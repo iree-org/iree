@@ -70,14 +70,14 @@ static iree_status_t iree_vm_function_call_count_fragment_values(
               break;
             default:
               return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "unsupported cconv span type %c",
+                                      "unsupported cconv span type '%c'",
                                       cconv_fragment.data[i]);
           }
         }
       } break;
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "unsupported cconv type %c",
+                                "unsupported cconv type '%c'",
                                 cconv_fragment.data[i]);
     }
   }
@@ -159,7 +159,7 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
               break;
             default:
               return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "unsupported cconv span type %c",
+                                      "unsupported cconv span type '%c'",
                                       cconv_fragment.data[i]);
           }
         }
@@ -167,7 +167,7 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
       } break;
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "unsupported cconv type %c",
+                                "unsupported cconv type '%c'",
                                 cconv_fragment.data[i]);
     }
   }
@@ -317,6 +317,7 @@ IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
 IREE_API_EXPORT iree_string_view_t
 iree_vm_function_name(const iree_vm_function_t* function) {
   IREE_ASSERT_ARGUMENT(function);
+  if (!function->module) return iree_string_view_empty();
   iree_string_view_t name;
   iree_status_t status = function->module->get_function(
       function->module->self, function->linkage, function->ordinal,

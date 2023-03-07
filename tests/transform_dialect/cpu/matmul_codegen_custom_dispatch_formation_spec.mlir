@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {  
 ^bb1(%variant_op: !pdl.operation):
   %0 = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
 
@@ -9,10 +9,16 @@ transform.structured.canonicalized_sequence failures(propagate) {
     // TODO: IREE needs own workgroup mapping attribute.
     ( mapping = [#gpu.block<x>] )
 
-  %1 = transform.iree.bufferize %variant_op
-  %memref_func = transform.structured.match ops{["func.func"]} in %1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.erase_hal_descriptor_type_from_memref %memref_func
+  // Canonicalization/CSE is needed before bufferization otherwise unnecessary
+  // allocs will be created.
+  %variant_op_2 = transform.iree.apply_patterns %variant_op 
+    { canonicalization, tiling_canonicalization, cse }
+  %variant_op_3 = transform.iree.bufferize %variant_op_2
+  %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
+    : (!pdl.operation) -> !pdl.operation
+  %memref_func_2 = transform.iree.erase_hal_descriptor_type_from_memref %memref_func
+  %memref_func_3 = transform.iree.forall_to_workgroup %memref_func_2
 
-  %func = transform.structured.match ops{["func.func"]} in %1 : (!pdl.operation) -> !pdl.operation
-  transform.iree.forall_to_workgroup %func
+  // CSE is needed on the workgroup_count region to pass this particular test.
+  transform.iree.apply_patterns %variant_op_3 { cse }
 }

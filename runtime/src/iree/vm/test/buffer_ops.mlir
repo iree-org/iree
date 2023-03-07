@@ -57,7 +57,8 @@ vm.module @buffer_ops {
   vm.export @test_alloc
   vm.func @test_alloc() {
     %c128 = vm.const.i64 128
-    %buf = vm.buffer.alloc %c128 : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %c128, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -71,7 +72,8 @@ vm.module @buffer_ops {
   vm.export @test_alloc_empty
   vm.func @test_alloc_empty() {
     %c0 = vm.const.i64 0
-    %buf = vm.buffer.alloc %c0 : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %c0, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -94,7 +96,8 @@ vm.module @buffer_ops {
     // Clone the last two 32-bit elements.
     %c4 = vm.const.i64 4
     %c8 = vm.const.i64 8
-    %buf = vm.buffer.clone %rodata, %c4, %c8 : !vm.buffer -> !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.clone %rodata, %c4, %c8, %alignment : !vm.buffer -> !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -111,14 +114,15 @@ vm.module @buffer_ops {
   vm.func @test_clone_empty() {
     // Allocate source zero-length buffer.
     %c0 = vm.const.i64 0
-    %buf0 = vm.buffer.alloc %c0 : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf0 = vm.buffer.alloc %c0, %alignment : !vm.buffer
     %buf0_dno = util.optimization_barrier %buf0 : !vm.buffer
     vm.check.nz %buf0_dno, "!null" : !vm.buffer
     %buf0_length = vm.buffer.length %buf0_dno : !vm.buffer -> i64
     vm.check.eq %c0, %buf0_length, "buffer length == 0" : i64
 
     // Clone it all (or, clone nothing?).
-    %buf1 = vm.buffer.clone %buf0_dno, %c0, %c0 : !vm.buffer -> !vm.buffer
+    %buf1 = vm.buffer.clone %buf0_dno, %c0, %c0, %alignment : !vm.buffer -> !vm.buffer
     %buf1_dno = util.optimization_barrier %buf1 : !vm.buffer
     vm.check.nz %buf1_dno, "!null" : !vm.buffer
     %buf1_length = vm.buffer.length %buf1_dno : !vm.buffer -> i64
@@ -137,7 +141,8 @@ vm.module @buffer_ops {
 
     // Try to clone off the end of the buffer.
     %c8 = vm.const.i64 8
-    %buf = vm.buffer.clone %rodata, %c8, %c8 : !vm.buffer -> !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.clone %rodata, %c8, %c8, %alignment : !vm.buffer -> !vm.buffer
 
     vm.return
   }
@@ -155,7 +160,8 @@ vm.module @buffer_ops {
     vm.check.nz %rodata, "!null" : !vm.buffer
 
     // Allocate target buffer.
-    %buf = vm.buffer.alloc %rodata_length : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %rodata_length, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -177,7 +183,8 @@ vm.module @buffer_ops {
   vm.func @test_copy_partial() {
     // Allocate target buffer.
     %c4 = vm.const.i64 4
-    %buf = vm.buffer.alloc %c4 : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %c4, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -199,7 +206,8 @@ vm.module @buffer_ops {
   vm.func @fail_copy_out_of_range_source_offset() {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c128 = vm.const.i64 128
-    %buf = vm.buffer.alloc %c128 : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %c128, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -215,7 +223,8 @@ vm.module @buffer_ops {
   vm.func @fail_copy_out_of_range_source_length() {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c128 = vm.const.i64 128
-    %buf = vm.buffer.alloc %c128 : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %c128, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -233,7 +242,8 @@ vm.module @buffer_ops {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %rodata_length = vm.buffer.length %rodata : !vm.buffer -> i64
     %c8 = vm.const.i64 8
-    %buf = vm.buffer.alloc %c8 : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %c8, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -249,7 +259,8 @@ vm.module @buffer_ops {
   vm.func @fail_copy_out_of_range_target_length() {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c8 = vm.const.i64 8
-    %buf = vm.buffer.alloc %c8 : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %c8, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
@@ -273,17 +284,16 @@ vm.module @buffer_ops {
     %element_size = vm.const.i64 4
     %num_elements = vm.const.i64 4
     %buffer_size = vm.mul.i64 %num_elements, %element_size : i64
-    %buf = vm.buffer.alloc %buffer_size : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %buffer_size, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.f32 42.0
-    vm.buffer.fill.f32 %buf_dno, %c2_byte, %c4_byte, %value : f32 -> !vm.buffer
+    vm.buffer.fill.f32 %buf_dno, %c2, %c4, %value : f32 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
@@ -295,7 +305,7 @@ vm.module @buffer_ops {
   }
 
   vm.rodata private @test_fill_i8_ref  dense<[0, 102, 102, 0]> : tensor<4xi8>
-  
+
   // Tests filling a buffer with 8-bit values.
   vm.export @test_fill_i8
   vm.func @test_fill_i8() {
@@ -303,17 +313,16 @@ vm.module @buffer_ops {
     %element_size = vm.const.i64 1
     %num_elements = vm.const.i64 4
     %buffer_size = vm.mul.i64 %num_elements, %element_size : i64
-    %buf = vm.buffer.alloc %buffer_size : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %buffer_size, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.i32 102
-    vm.buffer.fill.i8 %buf_dno, %c2_byte, %c4_byte, %value : i32 -> !vm.buffer
+    vm.buffer.fill.i8 %buf_dno, %c2, %c4, %value : i32 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
@@ -325,7 +334,7 @@ vm.module @buffer_ops {
   }
 
   vm.rodata private @test_fill_i16_ref dense<[0, 51966, 51966, 0]> : tensor<4xi16>
-  
+
   // Tests filling a buffer with 16-bit values.
   vm.export @test_fill_i16
   vm.func @test_fill_i16() {
@@ -333,17 +342,16 @@ vm.module @buffer_ops {
     %element_size = vm.const.i64 2
     %num_elements = vm.const.i64 4
     %buffer_size = vm.mul.i64 %num_elements, %element_size : i64
-    %buf = vm.buffer.alloc %buffer_size : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %buffer_size, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.i32 0xCAFE
-    vm.buffer.fill.i16 %buf_dno, %c2_byte, %c4_byte, %value : i32 -> !vm.buffer
+    vm.buffer.fill.i16 %buf_dno, %c2, %c4, %value : i32 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
@@ -355,7 +363,7 @@ vm.module @buffer_ops {
   }
 
   vm.rodata private @test_fill_i32_ref dense<[0, 0xFFFF0000, 0xFFFF0000, 0]> : tensor<4xi32>
-  
+
   // Tests filling a buffer with 32-bit values.
   vm.export @test_fill_i32
   vm.func @test_fill_i32() {
@@ -363,17 +371,16 @@ vm.module @buffer_ops {
     %element_size = vm.const.i64 4
     %num_elements = vm.const.i64 4
     %buffer_size = vm.mul.i64 %num_elements, %element_size : i64
-    %buf = vm.buffer.alloc %buffer_size : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %buffer_size, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.i32 0xFFFF0000
-    vm.buffer.fill.i32 %buf_dno, %c2_byte, %c4_byte, %value : i32 -> !vm.buffer
+    vm.buffer.fill.i32 %buf_dno, %c2, %c4, %value : i32 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
@@ -385,7 +392,7 @@ vm.module @buffer_ops {
   }
 
   vm.rodata private @test_fill_i64_ref dense<[0, 0x100000000, 0x100000000, 0]> : tensor<4xi64>
-  
+
   // Tests filling a buffer with 64-bit values.
   vm.export @test_fill_i64
   vm.func @test_fill_i64() {
@@ -393,71 +400,21 @@ vm.module @buffer_ops {
     %element_size = vm.const.i64 8
     %num_elements = vm.const.i64 4
     %buffer_size = vm.mul.i64 %num_elements, %element_size : i64
-    %buf = vm.buffer.alloc %buffer_size : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %buffer_size, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Fill the middle two elements.
     %c2 = vm.const.i64 1
     %c4 = vm.const.i64 2
-    %c2_byte = vm.mul.i64 %c2, %element_size : i64
-    %c4_byte = vm.mul.i64 %c4, %element_size : i64
     %value = vm.const.i64 0x100000000
-    vm.buffer.fill.i64 %buf_dno, %c2_byte, %c4_byte, %value : i64 -> !vm.buffer
+    vm.buffer.fill.i64 %buf_dno, %c2, %c4, %value : i64 -> !vm.buffer
 
     // Compare to reference.
     %c0 = vm.const.i64 0
     %rodata_ref = vm.const.ref.rodata @test_fill_i64_ref : !vm.buffer
     %cmp = vm.buffer.compare %rodata_ref, %c0, %buf_dno, %c0, %buffer_size : !vm.buffer, !vm.buffer
-    vm.check.nz %cmp, "buffer should match reference" : i32
-
-    vm.return
-  }
-
-  vm.rodata private @test_fill_i16_misaligned_offset_ref dense<[0xCAFE, 0xCAFE, 0, 0]> : tensor<4xi16>
-
-  // Tests that misaligned fill offsets will succeed but round down.
-  vm.export @test_fill_i16_misaligned_offset
-  vm.func @test_fill_i16_misaligned_offset() {
-    // Allocate zeroed buffer.
-    %c8 = vm.const.i64 8
-    %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.optimization_barrier %buf : !vm.buffer
-
-    // Try filling from offset 1, which is not i16-aligned.
-    %c1 = vm.const.i64 1
-    %c4 = vm.const.i64 4
-    %cafe = vm.const.i32 0xCAFE
-    vm.buffer.fill.i16 %buf_dno, %c1, %c4, %cafe : i32 -> !vm.buffer
-
-    // Compare to reference - should have written at offset 0.
-    %c0 = vm.const.i64 0
-    %rodata_ref = vm.const.ref.rodata @test_fill_i16_misaligned_offset_ref : !vm.buffer
-    %cmp = vm.buffer.compare %rodata_ref, %c0, %buf_dno, %c0, %c8 : !vm.buffer, !vm.buffer
-    vm.check.nz %cmp, "buffer should match reference" : i32
-
-    vm.return
-  }
-
-  vm.rodata private @test_fill_i16_misaligned_length_ref dense<[0, 0, 0, 0]> : tensor<4xi16>
-
-  // Tests that misaligned fill lengths will succeed but round down.
-  vm.export @test_fill_i16_misaligned_length
-  vm.func @test_fill_i16_misaligned_length() {
-    // Allocate zeroed buffer.
-    %c8 = vm.const.i64 8
-    %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.optimization_barrier %buf : !vm.buffer
-
-    // Try filling for length 1, which is not i16-aligned.
-    %c0 = vm.const.i64 0
-    %c1 = vm.const.i64 1
-    %cafe = vm.const.i32 0xCAFE
-    vm.buffer.fill.i16 %buf_dno, %c0, %c1, %cafe : i32 -> !vm.buffer
-
-    // Compare to reference - should have written 0 bytes.
-    %rodata_ref = vm.const.ref.rodata @test_fill_i16_misaligned_length_ref : !vm.buffer
-    %cmp = vm.buffer.compare %rodata_ref, %c0, %buf_dno, %c0, %c8 : !vm.buffer, !vm.buffer
     vm.check.nz %cmp, "buffer should match reference" : i32
 
     vm.return
@@ -629,7 +586,8 @@ vm.module @buffer_ops {
     %ref_dno = util.optimization_barrier %ref : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i64
 
-    %buf = vm.buffer.alloc %ref_length : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %ref_length, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
 
     %c0 = vm.const.i64 0
@@ -662,7 +620,8 @@ vm.module @buffer_ops {
     %ref_dno = util.optimization_barrier %ref : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i64
 
-    %buf = vm.buffer.alloc %ref_length : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %ref_length, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
 
     %c0 = vm.const.i64 0
@@ -695,7 +654,8 @@ vm.module @buffer_ops {
     %ref_dno = util.optimization_barrier %ref : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i64
 
-    %buf = vm.buffer.alloc %ref_length : !vm.buffer
+    %alignment = vm.const.i32 16
+    %buf = vm.buffer.alloc %ref_length, %alignment : !vm.buffer
     %buf_dno = util.optimization_barrier %buf : !vm.buffer
 
     %c0 = vm.const.i64 0

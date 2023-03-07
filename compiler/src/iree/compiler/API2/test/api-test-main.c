@@ -84,7 +84,7 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
   MlirPassManager pass = mlirPassManagerCreate(context);
   MlirOpPassManager op_pass = mlirPassManagerGetAsOpPassManager(pass);
   ireeCompilerBuildIREEVMPassPipeline(options, op_pass);
-  status = mlirPassManagerRun(pass, module);
+  status = mlirPassManagerRunOnOp(pass, mlirModuleGetOperation(module));
   if (mlirLogicalResultIsFailure(status)) {
     mlirPassManagerDestroy(pass);
     ireeCompilerOptionsDestroy(options);

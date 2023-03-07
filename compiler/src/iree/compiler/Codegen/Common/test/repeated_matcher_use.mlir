@@ -1,7 +1,7 @@
 // RUN: iree-opt %s --iree-transform-dialect-interpreter --verify-diagnostics --split-input-file
 
 module {
-  transform.structured.canonicalized_sequence failures(propagate) {
+  transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
     transform.iree.register_match_callbacks
 
@@ -54,7 +54,7 @@ module {
 
 // expected-error @below {{transform dialect interpreter failed}}
 module {
-  transform.structured.canonicalized_sequence failures(propagate) {
+  transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
     transform.iree.register_match_callbacks
 
@@ -109,7 +109,7 @@ module {
 
 // expected-error @below {{transform dialect interpreter failed}}
 module {
-  transform.structured.canonicalized_sequence failures(propagate) {
+  transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
     transform.iree.register_match_callbacks
 
@@ -161,7 +161,7 @@ module {
 // -----
 
 module {
-  transform.structured.canonicalized_sequence failures(propagate) {
+  transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
     transform.iree.register_match_callbacks
 

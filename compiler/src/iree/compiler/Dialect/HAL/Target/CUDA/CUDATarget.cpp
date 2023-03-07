@@ -56,11 +56,6 @@ static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
     llvm::cl::init("sm_35"));
 
-namespace llvm {
-class FunctionPass;
-FunctionPass *createNVVMIntrRangePass(unsigned int SmVersion);
-FunctionPass *createNVVMReflectPass(unsigned int SmVersion);
-}  // namespace llvm
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -149,13 +144,6 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
 /// Performs optimizations on |module| (including LTO-style whole-program ones).
 static void optimizeModule(llvm::Module &module,
                            llvm::TargetMachine &targetMachine) {
-  // Workaround run those passed ahead as they are temporarily disabled in NVPTX
-  // target.
-  llvm::legacy::PassManager legacyPM;
-  legacyPM.add(llvm::createNVVMIntrRangePass(35));
-  legacyPM.add(llvm::createNVVMReflectPass(35));
-  legacyPM.run(module);
-
   llvm::LoopAnalysisManager lam;
   llvm::FunctionAnalysisManager fam;
   llvm::CGSCCAnalysisManager cgam;
@@ -172,6 +160,15 @@ static void optimizeModule(llvm::Module &module,
   si.registerCallbacks(pic, &fam);
 
   llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
+  llvm::ModulePassManager mpm;
+  StringRef nnvmReflectPassName = "nvvm-reflect";
+  StringRef nnvmIntrRangePassName = "nvvm-intr-range";
+  if (pb.parsePassPipeline(mpm, nnvmReflectPassName)) {
+    llvm::errs() << "Could not parse -" << nnvmReflectPassName << "\n";
+  }
+  if (pb.parsePassPipeline(mpm, nnvmIntrRangePassName)) {
+    llvm::errs() << "Could not parse -" << nnvmIntrRangePassName << "\n";
+  }
   pb.registerModuleAnalyses(mam);
   pb.registerCGSCCAnalyses(cgam);
   pb.registerFunctionAnalyses(fam);
@@ -180,7 +177,6 @@ static void optimizeModule(llvm::Module &module,
 
   llvm::OptimizationLevel ol = llvm::OptimizationLevel::O2;
 
-  llvm::ModulePassManager mpm;
   mpm.addPass(llvm::VerifierPass());
   mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
   mpm.addPass(llvm::VerifierPass());

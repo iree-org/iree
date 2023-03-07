@@ -256,11 +256,13 @@ class CommandBufferPushDescriptorSetOpConversion
       }
       return null;
     };
+    auto i32Type = rewriter.getI32Type();
+    auto i64Type = rewriter.getI64Type();
 
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
         adaptor.getPipelineLayout(),
-        adaptor.getSet(),
+        castToImportType(adaptor.getSet(), i32Type, rewriter),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
@@ -270,7 +272,8 @@ class CommandBufferPushDescriptorSetOpConversion
         static_cast<int16_t>(adaptor.getBindingOrdinals().size()),
     };
     for (size_t i = 0; i < adaptor.getBindingOrdinals().size(); ++i) {
-      callOperands.push_back(adaptor.getBindingOrdinals()[i]);
+      callOperands.push_back(
+          castToImportType(adaptor.getBindingOrdinals()[i], i32Type, rewriter));
       auto bindingBuffer = adaptor.getBindingBuffers()[i];
       if (bindingBuffer.getType().isa<IREE::VM::RefType>()) {
         // Buffer binding; pass 0 for table slot.
@@ -281,10 +284,10 @@ class CommandBufferPushDescriptorSetOpConversion
         callOperands.push_back(bindingBuffer);
         callOperands.push_back(getNull());
       }
-      callOperands.push_back(castToImportType(adaptor.getBindingOffsets()[i],
-                                              rewriter.getI64Type(), rewriter));
-      callOperands.push_back(castToImportType(adaptor.getBindingLengths()[i],
-                                              rewriter.getI64Type(), rewriter));
+      callOperands.push_back(
+          castToImportType(adaptor.getBindingOffsets()[i], i64Type, rewriter));
+      callOperands.push_back(
+          castToImportType(adaptor.getBindingLengths()[i], i64Type, rewriter));
     }
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(

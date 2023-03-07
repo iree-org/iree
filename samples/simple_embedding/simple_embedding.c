@@ -127,7 +127,7 @@ iree_status_t Run() {
   // Get the result buffers from the invocation.
   iree_hal_buffer_view_t* ret_buffer_view =
       (iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
-          outputs, 0, iree_hal_buffer_view_get_descriptor());
+          outputs, 0, &iree_hal_buffer_view_descriptor);
   if (ret_buffer_view == NULL) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "can't find return buffer view");

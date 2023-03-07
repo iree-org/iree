@@ -33,6 +33,9 @@ namespace IREE {
 namespace HAL {
 namespace {
 
+// Map of original SymbolRefAttr to a list of SymbolRefAttrs in variants.
+using EntryPointExpansions = DenseMap<Attribute, SmallVector<Attribute>>;
+
 //===----------------------------------------------------------------------===//
 // Linkage utilities
 //===----------------------------------------------------------------------===//
@@ -51,9 +54,20 @@ static void setApplicableObjects(Operation *sourceOp,
 // hal.executable.source materialization
 //===----------------------------------------------------------------------===//
 
+SymbolRefAttr makeExportSymbolRefAttr(IREE::HAL::ExecutableOp executableOp,
+                                      IREE::HAL::ExecutableVariantOp variantOp,
+                                      IREE::HAL::ExecutableExportOp exportOp) {
+  return SymbolRefAttr::get(executableOp.getNameAttr(),
+                            {
+                                FlatSymbolRefAttr::get(variantOp.getNameAttr()),
+                                FlatSymbolRefAttr::get(exportOp.getNameAttr()),
+                            });
+}
+
 static LogicalResult materializeExecutableFromSourceOp(
     IREE::HAL::ExecutableSourceOp sourceOp,
-    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs) {
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs,
+    EntryPointExpansions &entryPointExpansions) {
   OpBuilder moduleBuilder(sourceOp);
 
   // Create the op that will contain the translated executable.
@@ -77,6 +91,14 @@ static LogicalResult materializeExecutableFromSourceOp(
     OpBuilder variantBuilder(&targetVariantOp.getBlock().back());
     for (auto sourceEntryPointOp : sourceEntryPointOps) {
       variantBuilder.clone(*sourceEntryPointOp);
+
+      // Map the original export names to the new variant exports.
+      entryPointExpansions[SymbolRefAttr::get(
+                               executableOp.getNameAttr(),
+                               {FlatSymbolRefAttr::get(
+                                   sourceEntryPointOp.getNameAttr())})]
+          .push_back(makeExportSymbolRefAttr(executableOp, targetVariantOp,
+                                             sourceEntryPointOp));
     }
 
     // Clone any target-specific object files specified.
@@ -99,7 +121,7 @@ static LogicalResult materializeExecutableFromSourceOp(
 }
 
 static LogicalResult materializeExecutablesFromSourceOps(
-    mlir::ModuleOp moduleOp) {
+    mlir::ModuleOp moduleOp, EntryPointExpansions &entryPointExpansions) {
   auto sourceOps =
       llvm::to_vector<32>(moduleOp.getOps<IREE::HAL::ExecutableSourceOp>());
   for (auto sourceOp : sourceOps) {
@@ -112,7 +134,8 @@ static LogicalResult materializeExecutablesFromSourceOps(
              << "no executable targets specified for translation";
     }
 
-    if (failed(materializeExecutableFromSourceOp(sourceOp, targetAttrs))) {
+    if (failed(materializeExecutableFromSourceOp(sourceOp, targetAttrs,
+                                                 entryPointExpansions))) {
       return failure();
     }
   }
@@ -234,6 +257,26 @@ static mlir::func::FuncOp cloneFuncWithInterface(
   return clonedFuncOp;
 }
 
+// Updates the target entry point symbols of |dispatchOp| to the expanded set of
+// variant exports in |entryPointExpansions|.
+static void updateDispatchTargets(
+    IREE::Stream::CmdDispatchOp dispatchOp,
+    const EntryPointExpansions &entryPointExpansions) {
+  SmallVector<Attribute> newAttrs;
+  for (auto oldAttr : dispatchOp.getEntryPointRefs()) {
+    auto it = entryPointExpansions.find(oldAttr);
+    if (it == entryPointExpansions.end()) {
+      newAttrs.push_back(oldAttr);  // preserve existing
+      continue;
+    }
+    for (auto newAttr : it->second) {
+      newAttrs.push_back(newAttr);
+    }
+  }
+  dispatchOp.setEntryPointsAttr(
+      ArrayAttr::get(dispatchOp.getContext(), newAttrs));
+}
+
 // Annotates |dispatchOp| with resource binding to interface binding mappings.
 // TODO(benvanik): have a HAL op with structured information instead.
 static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
@@ -253,7 +296,8 @@ static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
 static LogicalResult declareEntryPointOps(
     IREE::Stream::ExecutableOp sourceExecutableOp,
     IREE::HAL::ExecutableOp targetExecutableOp,
-    const BindingLayoutAnalysis &layoutAnalysis) {
+    const BindingLayoutAnalysis &layoutAnalysis,
+    EntryPointExpansions &entryPointExpansions) {
   auto sourceModuleOp = sourceExecutableOp.getInnerModule();
   auto variantOps =
       targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>();
@@ -293,6 +337,13 @@ static LogicalResult declareEntryPointOps(
           targetBuilder.getIndexAttr(ordinal), layoutAttr, ArrayAttr{},
           /*subgroup_size=*/IntegerAttr{},
           /*workgroup_local_memory=*/IntegerAttr{});
+
+      // Map the original export name to the new variant export.
+      entryPointExpansions[SymbolRefAttr::get(sourceExecutableOp.getNameAttr(),
+                                              {FlatSymbolRefAttr::get(
+                                                  exportOp.getNameAttr())})]
+          .push_back(makeExportSymbolRefAttr(targetExecutableOp, variantOp,
+                                             newExportOp));
 
       // Clone the workgroup count calculation function.
       if (!exportOp.getWorkgroupCount().empty()) {
@@ -431,9 +482,12 @@ class MaterializeInterfacesPass
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
 
+    EntryPointExpansions entryPointExpansions;
+
     // Handle any hand-authored executables; these only need variant expansion
     // and no layout analysis as the user specified the layout themselves.
-    if (failed(materializeExecutablesFromSourceOps(getOperation()))) {
+    if (failed(materializeExecutablesFromSourceOps(getOperation(),
+                                                   entryPointExpansions))) {
       return signalPassFailure();
     }
 
@@ -482,8 +536,8 @@ class MaterializeInterfacesPass
       }
 
       // Define interfaces for each exported function based on analysis.
-      if (failed(
-              declareEntryPointOps(sourceOp, executableOp, layoutAnalysis))) {
+      if (failed(declareEntryPointOps(sourceOp, executableOp, layoutAnalysis,
+                                      entryPointExpansions))) {
         return signalPassFailure();
       }
 
@@ -501,20 +555,27 @@ class MaterializeInterfacesPass
     // won't have materialized them from the stream ops above. We do expect to
     // be able to find the dispatch targets such that we can pull out the
     // pipeline layout, though, and any that fall through are errors.
-    auto annotateDispatchOp = [&](IREE::Stream::CmdDispatchOp dispatchOp) {
+    auto updateDispatchSites = [&](IREE::Stream::CmdDispatchOp dispatchOp) {
+      // Update the export targets to point at the new variants.
+      updateDispatchTargets(dispatchOp, entryPointExpansions);
+
+      // Annotate the dispatch site with binding information if required.
+      // TODO(benvanik): remove this path; shouldn't be needed in real usage.
+      // Because this is a hack we just look for the first target entry point.
       if (dispatchOp->hasAttr("hal.interface.bindings")) {
         // Already have bindings defined.
         return WalkResult::advance();
       }
       PipelineResourceMap resourceMap;
-      auto exportOp =
+      auto anyEntryPointAttr = *dispatchOp.getEntryPointRefs().begin();
+      auto anyExportOp =
           symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
-              dispatchOp, dispatchOp.getEntryPointAttr());
-      if (exportOp) {
+              dispatchOp, anyEntryPointAttr);
+      if (anyExportOp) {
         // Export found - we can use the pipeline layout defined there to infer
         // the bindings. This allows for bindings to be sparse or have
         // additional information declared.
-        for (auto setLayout : exportOp.getLayoutAttr().getSetLayouts()) {
+        for (auto setLayout : anyExportOp.getLayoutAttr().getSetLayouts()) {
           for (auto binding : setLayout.getBindings()) {
             resourceMap.emplace_back(setLayout.getOrdinal(),
                                      binding.getOrdinal());
@@ -535,7 +596,7 @@ class MaterializeInterfacesPass
       annotateDispatchSite(dispatchOp, resourceMap);
       return WalkResult::advance();
     };
-    if (getOperation()->walk(annotateDispatchOp).wasInterrupted()) {
+    if (getOperation()->walk(updateDispatchSites).wasInterrupted()) {
       return signalPassFailure();
     }
   }

@@ -102,7 +102,10 @@ class VMBytecodeDispatchTest
         bytecode_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_make_cstring_view(function_name), &function));
 
-    return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
+    iree_vm_invocation_flags_t flags = IREE_VM_INVOCATION_FLAG_NONE;
+    // NOTE: adding this bit makes it easy to debug issues on stdout:
+    // flags |= IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION;
+    return iree_vm_invoke(context_, function, flags,
                           /*policy=*/nullptr, /*inputs=*/nullptr,
                           /*outputs=*/nullptr, iree_allocator_system());
   }

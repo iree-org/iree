@@ -10,11 +10,9 @@
 #include <assert.h>
 #include <string.h>
 
-#include "iree/base/alignment.h"
-#include "iree/base/config.h"
-#include "iree/base/target_platform.h"
-#include "iree/vm/bytecode/generated/op_table.h"
+#include "iree/base/api.h"
 #include "iree/vm/bytecode/module_impl.h"
+#include "iree/vm/bytecode/utils/isa.h"
 
 //===----------------------------------------------------------------------===//
 // Shared data structures
@@ -63,14 +61,8 @@
 
 // Pointers to typed register storage.
 typedef struct iree_vm_registers_t {
-  // Ordinal mask defining which ordinal bits are valid. All i32 indexing must
-  // be ANDed with this mask.
-  uint16_t i32_mask;
   // 16-byte aligned i32 register array.
   int32_t* i32;
-  // Ordinal mask defining which ordinal bits are valid. All ref indexing must
-  // be ANDed with this mask.
-  uint16_t ref_mask;
   // Naturally aligned ref register array.
   iree_vm_ref_t* ref;
 } iree_vm_registers_t;
@@ -86,29 +78,13 @@ typedef struct iree_vm_bytecode_frame_storage_t {
   // will be stored by callees upon return.
   const iree_vm_register_list_t* return_registers;
 
-  // Counts of each register type rounded up to the next power of two.
-  iree_host_size_t i32_register_count;
-  iree_host_size_t ref_register_count;
-
-  // Relative byte offsets from the head of this struct.
-  iree_host_size_t i32_register_offset;
-  iree_host_size_t ref_register_offset;
+  // Counts of each register type and their relative byte offsets from the head
+  // of this struct.
+  uint32_t i32_register_count;
+  uint32_t i32_register_offset;
+  uint32_t ref_register_count;
+  uint32_t ref_register_offset;
 } iree_vm_bytecode_frame_storage_t;
-
-// Interleaved src-dst register sets for branch register remapping.
-// This structure is an overlay for the bytecode that is serialized in a
-// matching format.
-typedef struct iree_vm_register_remap_list_t {
-  uint16_t size;
-  struct pair {
-    uint16_t src_reg;
-    uint16_t dst_reg;
-  } pairs[];
-} iree_vm_register_remap_list_t;
-static_assert(iree_alignof(iree_vm_register_remap_list_t) == 2,
-              "Expecting byte alignment (to avoid padding)");
-static_assert(offsetof(iree_vm_register_remap_list_t, pairs) == 2,
-              "Expect no padding in the struct");
 
 // Maps a type ID to a type def with clamping for out of bounds values.
 static inline const iree_vm_type_def_t* iree_vm_map_type(
@@ -147,27 +123,6 @@ static inline const iree_vm_type_def_t* iree_vm_map_type(
 #define IREE_DISPATCH_MODE_SWITCH 1
 #endif  // IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
 
-#ifndef NDEBUG
-#define VMCHECK(expr) assert(expr)
-#else
-#define VMCHECK(expr)
-#endif  // NDEBUG
-
-//===----------------------------------------------------------------------===//
-// Bytecode data reading with little-/big-endian support
-//===----------------------------------------------------------------------===//
-
-static const int kRegSize = sizeof(uint16_t);
-
-// Bytecode data access macros for reading values of a given type from a byte
-// offset within the current function.
-#define OP_I8(i) iree_unaligned_load_le((uint8_t*)&bytecode_data[pc + (i)])
-#define OP_I16(i) iree_unaligned_load_le((uint16_t*)&bytecode_data[pc + (i)])
-#define OP_I32(i) iree_unaligned_load_le((uint32_t*)&bytecode_data[pc + (i)])
-#define OP_I64(i) iree_unaligned_load_le((uint64_t*)&bytecode_data[pc + (i)])
-#define OP_F32(i) iree_unaligned_load_le((float*)&bytecode_data[pc + (i)])
-#define OP_F64(i) iree_unaligned_load_le((double*)&bytecode_data[pc + (i)])
-
 //===----------------------------------------------------------------------===//
 // Utilities matching the tablegen op encoding scheme
 //===----------------------------------------------------------------------===//
@@ -176,9 +131,6 @@ static const int kRegSize = sizeof(uint16_t);
 //
 // Each macro will increment the pc by the number of bytes read and as such must
 // be called in the same order the values are encoded.
-
-#define VM_AlignPC(pc, alignment) \
-  (pc) = ((pc) + ((alignment)-1)) & ~((alignment)-1)
 
 #define VM_DecConstI8(name) \
   OP_I8(0);                 \
@@ -195,7 +147,6 @@ static const int kRegSize = sizeof(uint16_t);
 #define VM_DecConstF64(name) \
   OP_F64(0);                 \
   pc += 8;
-#define VM_DecOpcode(opcode) VM_DecConstI8(#opcode)
 #define VM_DecFuncAttr(name) VM_DecConstI32(name)
 #define VM_DecGlobalAttr(name) VM_DecConstI32(name)
 #define VM_DecRodataAttr(name) VM_DecConstI32(name)
@@ -216,57 +167,61 @@ static const int kRegSize = sizeof(uint16_t);
   VM_DecBranchOperandsImpl(bytecode_data, &pc)
 static inline const iree_vm_register_remap_list_t* VM_DecBranchOperandsImpl(
     const uint8_t* IREE_RESTRICT bytecode_data, iree_vm_source_offset_t* pc) {
-  VM_AlignPC(*pc, kRegSize);
+  VM_AlignPC(*pc, IREE_REGISTER_ORDINAL_SIZE);
   const iree_vm_register_remap_list_t* list =
       (const iree_vm_register_remap_list_t*)&bytecode_data[*pc];
-  *pc = *pc + kRegSize + list->size * 2 * kRegSize;
+  *pc = *pc + IREE_REGISTER_ORDINAL_SIZE +
+        list->size * 2 * IREE_REGISTER_ORDINAL_SIZE;
   return list;
 }
-#define VM_DecOperandRegI32(name)      \
-  regs.i32[OP_I16(0) & regs.i32_mask]; \
-  pc += kRegSize;
-#define VM_DecOperandRegI64(name)                           \
-  *((int64_t*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
-  pc += kRegSize;
+#define VM_DecOperandRegI32(name) \
+  regs_i32[OP_I16(0)];            \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_DecOperandRegI64(name)    \
+  *((int64_t*)&regs_i32[OP_I16(0)]); \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_DecOperandRegI64HostSize(name) \
   (iree_host_size_t) VM_DecOperandRegI64(name)
-#define VM_DecOperandRegF32(name)                  \
-  *((float*)&regs.i32[OP_I16(0) & regs.i32_mask]); \
-  pc += kRegSize;
-#define VM_DecOperandRegF64(name)                          \
-  *((double*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
-  pc += kRegSize;
+#define VM_DecOperandRegF32(name)  \
+  *((float*)&regs_i32[OP_I16(0)]); \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_DecOperandRegF64(name)   \
+  *((double*)&regs_i32[OP_I16(0)]); \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_DecOperandRegRef(name, out_is_move)                      \
-  &regs.ref[OP_I16(0) & regs.ref_mask];                             \
+  &regs_ref[OP_I16(0) & IREE_REF_REGISTER_MASK];                    \
   *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
-  pc += kRegSize;
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_DecVariadicOperands(name) \
   VM_DecVariadicOperandsImpl(bytecode_data, &pc)
 static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
     const uint8_t* IREE_RESTRICT bytecode_data, iree_vm_source_offset_t* pc) {
-  VM_AlignPC(*pc, kRegSize);
+  VM_AlignPC(*pc, IREE_REGISTER_ORDINAL_SIZE);
   const iree_vm_register_list_t* list =
       (const iree_vm_register_list_t*)&bytecode_data[*pc];
-  *pc = *pc + kRegSize + list->size * kRegSize;
+  *pc = *pc + IREE_REGISTER_ORDINAL_SIZE +
+        list->size * IREE_REGISTER_ORDINAL_SIZE;
   return list;
 }
-#define VM_DecResultRegI32(name)        \
-  &regs.i32[OP_I16(0) & regs.i32_mask]; \
-  pc += kRegSize;
-#define VM_DecResultRegI64(name)                           \
-  ((int64_t*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
-  pc += kRegSize;
-#define VM_DecResultRegF32(name)                  \
-  ((float*)&regs.i32[OP_I16(0) & regs.i32_mask]); \
-  pc += kRegSize;
-#define VM_DecResultRegF64(name)                          \
-  ((double*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
-  pc += kRegSize;
+#define VM_DecResultRegI32(name) \
+  &regs_i32[OP_I16(0)];          \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_DecResultRegI64(name)    \
+  ((int64_t*)&regs_i32[OP_I16(0)]); \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_DecResultRegF32(name)  \
+  ((float*)&regs_i32[OP_I16(0)]); \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_DecResultRegF64(name)   \
+  ((double*)&regs_i32[OP_I16(0)]); \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_DecResultRegRef(name, out_is_move)                       \
-  &regs.ref[OP_I16(0) & regs.ref_mask];                             \
+  &regs_ref[OP_I16(0) & IREE_REF_REGISTER_MASK];                    \
   *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
-  pc += kRegSize;
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_DecVariadicResults(name) VM_DecVariadicOperands(name)
+
+#define IREE_VM_BLOCK_MARKER_SIZE 1
 
 //===----------------------------------------------------------------------===//
 // Dispatch table structure
@@ -275,13 +230,6 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
 // goto is preferred when available as it has the most efficient codegen. MSVC
 // doesn't support it, though, and there may be other targets (like wasm) that
 // can only handle the switch-based approach.
-
-// Bytecode data -offset used when looking for the start of the currently
-// dispatched instruction: `instruction_start = pc - OFFSET`
-#define VM_PC_OFFSET_CORE 1
-#define VM_PC_OFFSET_EXT_I32 2
-#define VM_PC_OFFSET_EXT_F32 2
-#define VM_PC_OFFSET_EXT_F64 2
 
 #if defined(IREE_DISPATCH_MODE_COMPUTED_GOTO)
 
@@ -334,20 +282,20 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
 
 #define DISPATCH_UNHANDLED_CORE()                                           \
   _dispatch_unhandled : {                                                   \
-    VMCHECK(0);                                                             \
+    IREE_ASSERT(0);                                                         \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unhandled opcode"); \
   }
 #define UNHANDLED_DISPATCH_PREFIX(op_name, ext)                    \
   _dispatch_CORE_##op_name : {                                     \
-    VMCHECK(0);                                                    \
+    IREE_ASSERT(0);                                                \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,             \
                             "unhandled dispatch extension " #ext); \
   }
 
-#define DISPATCH_OP(ext, op_name, body)                          \
-  _dispatch_##ext##_##op_name:;                                  \
-  IREE_DISPATCH_TRACE_INSTRUCTION(VM_PC_OFFSET_##ext, #op_name); \
-  body;                                                          \
+#define DISPATCH_OP(ext, op_name, body)                               \
+  _dispatch_##ext##_##op_name:;                                       \
+  IREE_DISPATCH_TRACE_INSTRUCTION(IREE_VM_PC_OFFSET_##ext, #op_name); \
+  body;                                                               \
   goto* kDispatchTable_CORE[bytecode_data[pc++]];
 
 #define BEGIN_DISPATCH_PREFIX(op_name, ext)                                   \
@@ -367,23 +315,25 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
 
 #define DEFINE_DISPATCH_TABLES()
 
-#define DISPATCH_UNHANDLED_CORE()                      \
-  default: {                                           \
-    VMCHECK(0);                                        \
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, \
-                            "unhandled core opcode");  \
+#define DISPATCH_UNHANDLED_CORE()                         \
+  default: {                                              \
+    IREE_ASSERT(0);                                       \
+    IREE_BUILTIN_UNREACHABLE(); /* ok because verified */ \
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,    \
+                            "unhandled core opcode");     \
   }
 #define UNHANDLED_DISPATCH_PREFIX(op_name, ext)                    \
   case IREE_VM_OP_CORE_##op_name: {                                \
-    VMCHECK(0);                                                    \
+    IREE_ASSERT(0);                                                \
+    IREE_BUILTIN_UNREACHABLE(); /* ok because verified */          \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,             \
                             "unhandled dispatch extension " #ext); \
   }
 
-#define DISPATCH_OP(ext, op_name, body)                            \
-  case IREE_VM_OP_##ext##_##op_name: {                             \
-    IREE_DISPATCH_TRACE_INSTRUCTION(VM_PC_OFFSET_##ext, #op_name); \
-    body;                                                          \
+#define DISPATCH_OP(ext, op_name, body)                                 \
+  case IREE_VM_OP_##ext##_##op_name: {                                  \
+    IREE_DISPATCH_TRACE_INSTRUCTION(IREE_VM_PC_OFFSET_##ext, #op_name); \
+    body;                                                               \
   } break;
 
 #define BEGIN_DISPATCH_PREFIX(op_name, ext) \

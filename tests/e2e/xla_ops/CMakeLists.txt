@@ -468,7 +468,7 @@ iree_check_single_backend_test_suite(
     "exponential_fp16.mlir"
     "exponential_minus_one.mlir"
     # "fft.mlir"  # TODO(#9583): fix (fft codegen via spirv)
-    # "finite.mlir"  # TODO(#10906): fix (i8/i16?)
+    # "finite.mlir"  # TODO(#11321): error: value cannot be represented as 'f32': inf
     "floor.mlir"
     "gather.mlir"
     "iota.mlir"

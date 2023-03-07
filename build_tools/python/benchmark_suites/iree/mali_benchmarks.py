@@ -125,7 +125,7 @@ class Android_Mali_Benchmarks(object):
         for model in fp16_models
     ] + [
         iree_definitions.ModuleGenerationConfig.with_flag_generation(
-            compile_config=demote_compile_config,
+            compile_config=compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in quant_models
     ]

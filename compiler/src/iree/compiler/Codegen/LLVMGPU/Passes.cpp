@@ -215,6 +215,9 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
+  // Hoist loop invariant code to avoid pipelining it.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
 }
@@ -270,9 +273,15 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  // Pipeline memory operations.
+  // Hoist loop invariant code to avoid pipelining it.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
+      createLoopInvariantCodeMotionPass());
+  PipeliningSchedulingStrategy schedule =
+      llvmgpuUseMMASync ? PipeliningSchedulingStrategy::nvidiaTensorCore
+                        : PipeliningSchedulingStrategy::loadGlobalStage0;
+  // Pipeline memory operations.
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+      /*epiloguePeeling=*/false, pipelineDepth, schedule));
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
