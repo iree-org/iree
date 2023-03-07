@@ -15,8 +15,16 @@ set -euo pipefail
 
 BUILD_DIR="$1"
 
+get_default_parallel_level() {
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "$(sysctl -n hw.logicalcpu)"
+  else
+    echo "$(nproc)"
+  fi
+}
+
 # Respect the user setting, but default to as many jobs as we have cores.
-export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(get_default_parallel_level)}
 
 # Respect the user setting, but default to turning on Vulkan.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
@@ -89,6 +97,13 @@ if [[ "$OSTYPE" =~ ^msys ]]; then
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
     # TODO(#11080): Fix arrays not matching in test_variant_list_buffers
     "iree/runtime/bindings/python/vm_types_test"
+  )
+elif [[ "$OSTYPE" =~ ^darwin ]]; then
+  excluded_tests+=(
+    #TODO(#12496): Remove after fixing the test on macOS
+    "iree/compiler/bindings/c/loader_test"
+    #TODO(#12496): Remove after fixing the test on macOS
+    "iree/compiler/API/python/test/transforms/ireec/compile_sample_module"
   )
 fi
 

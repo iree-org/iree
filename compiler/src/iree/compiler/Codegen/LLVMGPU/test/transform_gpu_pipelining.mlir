@@ -52,7 +52,7 @@ func.func @matmul_pipelining() {
   return
 }
 }
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %for = transform.structured.match ops{["scf.for"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %1 = transform.cast %for : !pdl.operation to !transform.op<"scf.for">

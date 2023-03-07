@@ -133,11 +133,13 @@ def get_module_path(flag_file: TextIO) -> Optional[str]:
   return module_path
 
 
-def get_module_map_from_generation_config(
-    serialized_gen_config: TextIO, e2e_test_artifacts_dir: pathlib.PurePath
+def get_module_map_from_compilation_benchmark_config(
+    compilation_benchmark_config_data: TextIO,
+    e2e_test_artifacts_dir: pathlib.PurePath
 ) -> Dict[CompilationInfo, pathlib.Path]:
+  benchmark_config = json.load(compilation_benchmark_config_data)
   gen_configs = serialization.unpack_and_deserialize(
-      data=json.load(serialized_gen_config),
+      data=benchmark_config["generation_configs"],
       root_type=List[iree_definitions.ModuleGenerationConfig])
   module_map = {}
   for gen_config in gen_configs:
@@ -203,8 +205,9 @@ def _legacy_get_module_map_and_build_log(args: argparse.Namespace):
 
 
 def _alpha_get_module_map_and_build_log(args: argparse.Namespace):
-  module_map = get_module_map_from_generation_config(
-      serialized_gen_config=args.generation_config.open("r"),
+  config_data = args.compilation_benchmark_config.open("r")
+  module_map = get_module_map_from_compilation_benchmark_config(
+      compilation_benchmark_config_data=config_data,
       e2e_test_artifacts_dir=args.e2e_test_artifacts_dir)
   return module_map, args.build_log
 
@@ -257,10 +260,10 @@ def _parse_arguments():
   alpha_parser.set_defaults(
       get_module_map_and_build_log=_alpha_get_module_map_and_build_log)
   alpha_parser.add_argument(
-      "--generation_config",
+      "--compilation_benchmark_config",
       type=_check_file_path,
       required=True,
-      help="Exported module generation config of e2e test artifacts.")
+      help="Exported compilation benchmark config of e2e test artifacts.")
   alpha_parser.add_argument("--build_log",
                             type=_check_file_path,
                             required=True,

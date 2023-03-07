@@ -161,6 +161,7 @@ iree_cc_binary(
     iree::modules::hal
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
@@ -184,6 +185,17 @@ iree_cc_binary(
     iree::tooling::yaml_util
     iree::vm
     yaml
+)
+
+iree_cc_binary(
+  NAME
+    iree-cpuinfo
+  SRCS
+    "iree-cpuinfo.c"
+  DEPS
+    iree::base
+    iree::base::internal::cpu
+    iree::schemas::cpu_data
 )
 
 if(IREE_BUILD_COMPILER)

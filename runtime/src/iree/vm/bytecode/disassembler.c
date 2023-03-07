@@ -8,7 +8,6 @@
 
 #include <inttypes.h>
 
-#include "iree/base/config.h"
 #include "iree/vm/ops.h"
 
 #define BEGIN_DISASM_PREFIX(op_name, ext) \
@@ -64,39 +63,39 @@
 #define VM_ParseBranchOperands(operands_name) \
   VM_DecBranchOperandsImpl(bytecode_data, &pc)
 #define VM_ParseOperandRegI32(name) \
-  OP_I16(0) & regs->i32_mask;       \
-  pc += kRegSize;
-#define VM_ParseOperandRegI64(name)  \
-  OP_I16(0) & (regs->i32_mask & ~1); \
-  pc += kRegSize;
+  OP_I16(0);                        \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_ParseOperandRegI64(name) \
+  OP_I16(0);                        \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseOperandRegF32(name) \
-  OP_I16(0) & regs->i32_mask;       \
-  pc += kRegSize;
-#define VM_ParseOperandRegF64(name)  \
-  OP_I16(0) & (regs->i32_mask & ~1); \
-  pc += kRegSize;
+  OP_I16(0);                        \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_ParseOperandRegF64(name) \
+  OP_I16(0);                        \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseOperandRegRef(name, out_is_move)                    \
-  OP_I16(0) & regs->ref_mask;                                       \
+  OP_I16(0) & IREE_REF_REGISTER_MASK;                               \
   *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
-  pc += kRegSize;
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseVariadicOperands(name) \
   VM_DecVariadicOperandsImpl(bytecode_data, &pc)
 #define VM_ParseResultRegI32(name) \
-  OP_I16(0) & regs->i32_mask;      \
-  pc += kRegSize;
-#define VM_ParseResultRegI64(name)   \
-  OP_I16(0) & (regs->i32_mask & ~1); \
-  pc += kRegSize;
+  OP_I16(0);                       \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_ParseResultRegI64(name) \
+  OP_I16(0);                       \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseResultRegF32(name) \
-  OP_I16(0) & regs->i32_mask;      \
-  pc += kRegSize;
-#define VM_ParseResultRegF64(name)   \
-  OP_I16(0) & (regs->i32_mask & ~1); \
-  pc += kRegSize;
+  OP_I16(0);                       \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
+#define VM_ParseResultRegF64(name) \
+  OP_I16(0);                       \
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseResultRegRef(name, out_is_move)                     \
-  OP_I16(0) & regs->ref_mask;                                       \
+  OP_I16(0) & IREE_REF_REGISTER_MASK;                               \
   *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
-  pc += kRegSize;
+  pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseVariadicResults(name) VM_ParseVariadicOperands(name)
 
 #define EMIT_REG_NAME(reg)                \
@@ -651,6 +650,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, BufferAlloc) {
       uint16_t length_reg = VM_ParseOperandRegI64("length");
+      uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -658,6 +658,9 @@ iree_status_t iree_vm_bytecode_disassemble_op(
           iree_string_builder_append_cstring(b, " = vm.buffer.alloc "));
       EMIT_I64_REG_NAME(length_reg);
       EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I32_REG_NAME(alignment_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
       break;
     }
 
@@ -666,6 +669,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       uint16_t source_reg = VM_ParseOperandRegRef("source", &source_is_move);
       uint16_t offset_reg = VM_ParseOperandRegI64("offset");
       uint16_t length_reg = VM_ParseOperandRegI64("length");
+      uint16_t alignment_reg = VM_ParseOperandRegI32("alignment");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -679,6 +683,9 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       EMIT_I64_REG_NAME(length_reg);
       EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I32_REG_NAME(alignment_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[alignment_reg]);
       break;
     }
 
@@ -1320,6 +1327,11 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_CORE_BINARY_I32(RemI32S, "vm.rem.i32.s");
     DISASM_OP_CORE_BINARY_I32(RemI32U, "vm.rem.i32.u");
     DISASM_OP_CORE_TERNARY_I32(FMAI32, "vm.fma.i32");
+    DISASM_OP_CORE_UNARY_I32(AbsI32, "vm.abs.i32");
+    DISASM_OP_CORE_BINARY_I32(MinI32S, "vm.min.i32.s");
+    DISASM_OP_CORE_BINARY_I32(MinI32U, "vm.min.i32.u");
+    DISASM_OP_CORE_BINARY_I32(MaxI32S, "vm.max.i32.s");
+    DISASM_OP_CORE_BINARY_I32(MaxI32U, "vm.max.i32.u");
     DISASM_OP_CORE_UNARY_I32(NotI32, "vm.not.i32");
     DISASM_OP_CORE_BINARY_I32(AndI32, "vm.and.i32");
     DISASM_OP_CORE_BINARY_I32(OrI32, "vm.or.i32");
@@ -1334,6 +1346,11 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_CORE_BINARY_I64(RemI64S, "vm.rem.i64.s");
     DISASM_OP_CORE_BINARY_I64(RemI64U, "vm.rem.i64.u");
     DISASM_OP_CORE_TERNARY_I64(FMAI64, "vm.fma.i64");
+    DISASM_OP_CORE_UNARY_I64(AbsI64, "vm.abs.i64");
+    DISASM_OP_CORE_BINARY_I64(MinI64S, "vm.min.i64.s");
+    DISASM_OP_CORE_BINARY_I64(MinI64U, "vm.min.i64.u");
+    DISASM_OP_CORE_BINARY_I64(MaxI64S, "vm.max.i64.s");
+    DISASM_OP_CORE_BINARY_I64(MaxI64U, "vm.max.i64.u");
     DISASM_OP_CORE_UNARY_I64(NotI64, "vm.not.i64");
     DISASM_OP_CORE_BINARY_I64(AndI64, "vm.and.i64");
     DISASM_OP_CORE_BINARY_I64(OrI64, "vm.or.i64");
@@ -1514,6 +1531,12 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     //===------------------------------------------------------------------===//
     // Control flow
     //===------------------------------------------------------------------===//
+
+    DISASM_OP(CORE, Block) {
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_string(b, IREE_SV("<block>")));
+      break;
+    }
 
     DISASM_OP(CORE, Branch) {
       int32_t block_pc = VM_ParseBranchTarget("dest");
@@ -1932,6 +1955,9 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_EXT_F32_UNARY_F32(NegF32, "vm.neg.f32");
     DISASM_OP_EXT_F32_UNARY_F32(CeilF32, "vm.ceil.f32");
     DISASM_OP_EXT_F32_UNARY_F32(FloorF32, "vm.floor.f32");
+    DISASM_OP_EXT_F32_UNARY_F32(RoundF32, "vm.round.f32");
+    DISASM_OP_EXT_F32_BINARY_F32(MinF32, "vm.min.f32");
+    DISASM_OP_EXT_F32_BINARY_F32(MaxF32, "vm.max.f32");
 
     DISASM_OP_EXT_F32_UNARY_F32(AtanF32, "vm.atan.f32");
     DISASM_OP_EXT_F32_BINARY_F32(Atan2F32, "vm.atan2.f32");

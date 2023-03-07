@@ -137,11 +137,13 @@ MlirLogicalResult ireeCompilerTranslateModuletoVMBytecode(
   mlir::detail::CallbackOstream output(dataCallback, dataUserObject);
   if (auto op = llvm::dyn_cast<mlir::ModuleOp>(moduleOpCpp)) {
     result = iree_compiler::IREE::VM::translateModuleToBytecode(
-        op, optionsCpp->vmBytecodeTargetOptions, output);
+        op, optionsCpp->vmTargetOptions, optionsCpp->vmBytecodeTargetOptions,
+        output);
   } else if (auto op = llvm::dyn_cast<iree_compiler::IREE::VM::ModuleOp>(
                  moduleOpCpp)) {
     result = iree_compiler::IREE::VM::translateModuleToBytecode(
-        op, optionsCpp->vmBytecodeTargetOptions, output);
+        op, optionsCpp->vmTargetOptions, optionsCpp->vmBytecodeTargetOptions,
+        output);
   } else {
     emitError(moduleOpCpp->getLoc()) << "expected a supported module operation";
     result = failure();

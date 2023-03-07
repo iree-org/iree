@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %reduction = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!pdl.operation) -> !pdl.operation
@@ -40,7 +40,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
-  %func_4 = transform.iree.apply_patterns %func_3 { fold_reassociative_reshapes }
+  // Canonicalization/CSE is needed before bufferization otherwise unnecessary
+  // allocs will be created.
+  %func_4 = transform.iree.apply_patterns %func_3 
+    { fold_reassociative_reshapes, canonicalization, tiling_canonicalization, cse }
   %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
   %func_5 = transform.structured.match ops{["func.func"]} in %variant_op_2 : (!pdl.operation) -> !pdl.operation
   %func_6 = transform.iree.apply_patterns %func_5 { erase_unnecessary_tensor_operands }
@@ -58,7 +61,13 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
   %func_10 = transform.iree.apply_patterns %func_9 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
-  %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
+  %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 
+    : (!pdl.operation) -> !pdl.operation
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
-  transform.iree.vector.warp_distribute %func_10
+  %func_11 = transform.iree.vector.warp_distribute %func_10
+    : (!pdl.operation) -> !pdl.operation
+
+  // Late canonicalizations to cleanup and pass the checks
+  %func_12 = transform.iree.apply_patterns %func_11
+    { canonicalization, tiling_canonicalization, licm, cse }
 }

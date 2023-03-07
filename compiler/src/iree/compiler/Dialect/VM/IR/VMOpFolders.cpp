@@ -955,6 +955,70 @@ OpFoldResult AbsI64Op::fold(FoldAdaptor operands) {
                                        [](const APInt &a) { return a.abs(); });
 }
 
+OpFoldResult MinI32SOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::smin(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MinI64SOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::smin(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MinI32UOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::umin(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MinI64UOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::umin(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MaxI32SOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::smax(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MaxI64SOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::smax(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MaxI32UOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::umax(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MaxI64UOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::umax(lhs, rhs);
+                                        });
+}
+
 //===----------------------------------------------------------------------===//
 // Floating-point arithmetic
 //===----------------------------------------------------------------------===//
@@ -1163,6 +1227,32 @@ OpFoldResult FloorF64Op::fold(FoldAdaptor operands) {
     b.roundToIntegral(APFloat::rmTowardNegative);
     return b;
   });
+}
+
+OpFoldResult MinF32Op::fold(FoldAdaptor operands) {
+  return constFoldBinaryOp<FloatAttr>(
+      operands.getLhs(), operands.getRhs(),
+      [](const APFloat &a, const APFloat &b) { return llvm::minnum(a, b); });
+}
+
+OpFoldResult MinF64Op::fold(FoldAdaptor operands) {
+  return constFoldBinaryOp<FloatAttr>(
+      operands.getLhs(), operands.getRhs(),
+      [](const APFloat &a, const APFloat &b) { return llvm::minnum(a, b); });
+}
+
+OpFoldResult MaxF32Op::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<FloatAttr>(
+      operands.getLhs(), operands.getRhs(),
+      [](const APFloat &a, const APFloat &b) { return llvm::maxnum(a, b); });
+}
+
+OpFoldResult MaxF64Op::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<FloatAttr>(
+      operands.getLhs(), operands.getRhs(),
+      [](const APFloat &a, const APFloat &b) { return llvm::maxnum(a, b); });
 }
 
 //===----------------------------------------------------------------------===//

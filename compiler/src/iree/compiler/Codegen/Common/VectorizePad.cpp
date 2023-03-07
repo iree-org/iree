@@ -86,7 +86,9 @@ struct VectorizePadWithConditions final
     Value paddingValue = padOp.getConstantPaddingValue();
     if (!paddingValue) return failure();
     Attribute paddingAttr;
-    matchPattern(paddingValue, m_Constant(&paddingAttr));
+    if (!matchPattern(paddingValue, m_Constant(&paddingAttr))) {
+      return failure();
+    }
 
     SmallVector<OpFoldResult> lowPads = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> highPads = padOp.getMixedHighPad();

@@ -1,8 +1,5 @@
 // RUN: iree-dialects-opt %s  --transform-dialect-interpreter --split-input-file | FileCheck %s
 
-// CHECK-DAG: #[[$MUL_MAP:.*]] = affine_map<(d0)[s0] -> (d0 * s0)>
-// CHECK-DAG: #[[$SUB_MAP:.*]] = affine_map<(d0)[s0, s1] -> (-(d0 * s1) + s0, s1)>
-// CHECK-DAG: #[[$ID1_MAP:.*]] = affine_map<(d0) -> (d0)>
 #map0 = affine_map<(d0)[s0] -> (d0 ceildiv s0)>
 #map1 = affine_map<(d0)[s0] -> (d0 * s0)>
 #map2 = affine_map<(d0, d1) -> (d0 - d1)>
@@ -22,7 +19,7 @@ func.func @static_tile_buffers(%arg0: index, %arg1: memref<?xf32>, %arg2: memref
 
   // CHECK: %[[C1:.*]] = arith.constant 1 : index
   // CHECK: %[[M:.*]] = memref.dim %{{.*}}, %{{.*}} : memref<?xf32>
-  // CHECK: scf.for %[[IV:.*]] = {{.*}} step %[[C1]] {
+  // CHECK: scf.for %[[IV:.*]] = {{.*}}
   scf.forall (%arg3) in (%1) shared_outs() -> () {
       %3 = affine.apply #map1(%arg3)[%arg0]
       %4 = affine.apply #map2(%0, %3)
@@ -44,7 +41,7 @@ func.func @static_tile_buffers(%arg0: index, %arg1: memref<?xf32>, %arg2: memref
   return
 }
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
   %0 = transform.structured.match ops{["scf.forall"]} in %module_op : (!pdl.operation) -> !pdl.operation
   %1 = forall_to_scf_for %0

@@ -1,7 +1,7 @@
 // RUN: iree-opt %s
 
 // Codegen
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
 
   // Step 1. First level of tiling + fusion parallelizes to blocks.

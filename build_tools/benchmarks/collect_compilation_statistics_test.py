@@ -92,7 +92,7 @@ class CollectCompilationStatistics(unittest.TestCase):
 
     self.assertEqual(moduel_path, "/abcd-compile-stats.vmfb")
 
-  def test_get_module_map_from_generation_config(self):
+  def test_get_module_map_from_compilation_benchmark_config(self):
     model_a = common_definitions.Model(
         id="1234",
         name="tflite_m",
@@ -126,12 +126,14 @@ class CollectCompilationStatistics(unittest.TestCase):
         imported_model=imported_model_a, compile_config=compile_config_a)
     gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_a, compile_config=compile_config_b)
-    serialized_gen_config = json.dumps(
-        serialization.serialize_and_pack([gen_config_a, gen_config_b]))
+    benchmark_config = dict(generation_configs=serialization.serialize_and_pack(
+        [gen_config_a, gen_config_b]),
+                            module_dir_paths=["a", "b"])
     root_dir = pathlib.PurePath("artifacts_dir")
 
-    module_map = collect_compilation_statistics.get_module_map_from_generation_config(
-        serialized_gen_config=StringIO(serialized_gen_config),
+    module_map = collect_compilation_statistics.get_module_map_from_compilation_benchmark_config(
+        compilation_benchmark_config_data=StringIO(
+            json.dumps(benchmark_config)),
         e2e_test_artifacts_dir=root_dir)
 
     compile_info_a = common.benchmark_definition.CompilationInfo(

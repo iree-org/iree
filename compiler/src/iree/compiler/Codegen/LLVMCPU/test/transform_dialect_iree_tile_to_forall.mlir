@@ -47,7 +47,7 @@ hal.executable private @matmul_static_dispatch_0 {
   }
 }
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %original_matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
@@ -56,4 +56,9 @@ transform.structured.canonicalized_sequence failures(propagate) {
     transform.iree.tile_to_forall_and_workgroup_count_region %original_matmul
       num_threads [32]
       ( mapping = [#gpu.block<x>] )
+
+  // Late canonicalizations to cleanup and pass the checks.
+  // Needs to occur on the whole variant to perform cse on the workgroup_count region
+  transform.iree.apply_patterns %variant_op
+    { canonicalization, tiling_canonicalization, licm, cse }
 }

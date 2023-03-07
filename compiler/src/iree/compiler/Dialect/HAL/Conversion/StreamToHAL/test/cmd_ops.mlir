@@ -232,7 +232,7 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
     // CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]]
     // CHECK-SAME: target(@ex::@embedded_elf_x86_64::@dispatch)
     // CHECK-SAME: workgroups([%[[X]], %[[YZ]], %[[YZ]]])
-    stream.cmd.dispatch @ex::@dispatch[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
+    stream.cmd.dispatch @ex::@embedded_elf_x86_64::@dispatch[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
       ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
       wo %arg5[%c0 for %c128] : !stream.resource<external>{%arg3}
     } attributes {

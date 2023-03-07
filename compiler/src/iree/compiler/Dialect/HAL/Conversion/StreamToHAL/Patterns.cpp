@@ -806,6 +806,16 @@ struct CmdCollectiveOpPattern
   }
 };
 
+// Returns a hal.device.switch match expression that selects the given export.
+static Attribute getExportConditionAttr(
+    IREE::HAL::ExecutableExportOp exportOp) {
+  // TODO(benvanik): customizable selection logic. Today this just checks
+  // whether the variant target is supported but we can also allow
+  // specialization of entry points based on dispatch site parameters.
+  auto variantOp = exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  return variantOp.getTarget().getMatchExpression();
+}
+
 struct CmdDispatchOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -821,34 +831,21 @@ struct CmdDispatchOpPattern
     auto device = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
         loc, rewriter.getType<IREE::HAL::DeviceType>(), commandBuffer);
 
-    // Get the handle to the executable that is compatible with our device.
-    auto executableOp =
-        cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
-            dispatchOp, dispatchOp.getEntryPoint().getRootReference()));
-    assert(executableOp && "dispatch target executable op not found");
-
     // Ask each target backend to record their dispatch logic.
     IREE::HAL::DeviceSwitchRewriter switchRewriter(loc,
                                                    /*resultTypes=*/TypeRange{},
                                                    device, rewriter);
-    for (auto variantOp :
-         executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-      auto exportOps = variantOp.getOps<IREE::HAL::ExecutableExportOp>();
-      auto exportIt =
-          llvm::find_if(exportOps, [&](IREE::HAL::ExecutableExportOp op) {
-            return op.getNameAttr() ==
-                   dispatchOp.getEntryPoint().getLeafReference();
-          });
-      if (exportIt == exportOps.end()) {
-        return variantOp.emitError()
-               << "hal.executable.variant is missing the flow entry point for "
-               << dispatchOp.getEntryPoint();
-      }
-      auto exportOp = *exportIt;
+    dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+      // NOTE: slow lookup!
+      auto exportOp =
+          SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+              dispatchOp, entryPointAttr);
+      assert(exportOp && "dispatch target export not found");
 
-      auto *region = switchRewriter.addConditionRegion(
-          variantOp.getTarget().getMatchExpression());
-      auto &entryBlock = region->front();
+      // Setup the case condition for the entry point.
+      auto *caseRegion =
+          switchRewriter.addConditionRegion(getExportConditionAttr(exportOp));
+      auto &entryBlock = caseRegion->front();
       auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
 
       // Record push constants and buffer bindings.
@@ -856,18 +853,14 @@ struct CmdDispatchOpPattern
                        exportOp.getLayout(), caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
-      auto exportSymRef =
-          SymbolRefAttr::get(caseBuilder.getContext(), executableOp.getName(),
-                             {SymbolRefAttr::get(exportOp->getParentOp()),
-                              SymbolRefAttr::get(exportOp)});
       auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
           loc, device, adaptor.getWorkload(), caseBuilder);
       caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-          loc, commandBuffer, exportSymRef, caseWorkgroupCount[0],
+          loc, commandBuffer, entryPointAttr, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc);
-    }
+    });
     switchRewriter.build();
 
     rewriter.eraseOp(dispatchOp);

@@ -321,6 +321,7 @@ void iree_hal_get_devices_flag_list(iree_host_size_t* out_count,
 }
 
 iree_status_t iree_hal_create_device_from_flags(
+    iree_hal_driver_registry_t* driver_registry,
     iree_string_view_t default_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   iree_string_view_t device_uri = default_device;

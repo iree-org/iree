@@ -16,13 +16,3 @@ func.func @alloc_keep(%arg0: index, %arg1: index) -> memref<?x?xf32> {
 // CHECK-LABEL: func.func @alloc_keep
 //  CHECK-NEXT:   %[[ALLOC:.+]] = memref.alloc
 //  CHECK-NEXT:   return %[[ALLOC]]
-
-// -----
-
-func.func @cleanup_only_assume_alignment_uses() {
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<42xf32>
-  memref.assume_alignment %0, 64 : memref<42xf32>
-  return
-}
-// CHECK-LABEL: func.func @cleanup_only_assume_alignment_uses()
-//  CHECK-NEXT:   return

@@ -51,6 +51,7 @@ iree_cc_library(
     "stack.h"
     "type_def.h"
     "value.h"
+    "variant.h"
   SRCS
     "buffer.c"
     "context.c"

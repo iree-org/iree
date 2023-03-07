@@ -82,14 +82,14 @@ class VmTypesTest(unittest.TestCase):
       lst1.get_as_list(1)
 
   def test_vm_buffer(self):
-    b1 = rt.VmBuffer(10, mutable=True)
+    b1 = rt.VmBuffer(10, alignment=0, mutable=True)
     print(b1)
     contents = memoryview(b1)
     contents[0:] = b'0123456789'
     self.assertEqual(bytes(b1), b'0123456789')
 
   def test_vm_buffer_ro(self):
-    b1 = rt.VmBuffer(10, mutable=False)
+    b1 = rt.VmBuffer(10, alignment=16, mutable=False)
     contents = memoryview(b1)
     with self.assertRaises(TypeError):
       contents[0:] = b'0123456789'

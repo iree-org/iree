@@ -279,6 +279,9 @@ function(iree_py_test)
     "ARGS;LABELS;TIMEOUT"
     ${ARGN}
   )
+  if(NOT IREE_BUILD_PYTHON_BINDINGS)
+    return()
+  endif()
 
   iree_local_py_test(
     NAME

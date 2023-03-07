@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 
@@ -56,7 +57,7 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     auto attr = valueOrAttr.dyn_cast<Attribute>();
     return attr ? attr.cast<IntegerAttr>().getInt() : dynamicVal;
   };
-  /// To ensure contiguity, start from the least signficant dimension. As long
+  /// To ensure contiguity, start from the least significant dimension. As long
   /// as the inner slices are "full slices", the current slice can be any offset
   /// and size. If the inner slices are not "full slices", the current slice
   /// must be of size 1. All strides must be one.
@@ -122,7 +123,8 @@ LogicalResult convertInsertSliceOpToFlowUpdateOp(
         loc, sourceType, source, sourceDynamicDims, sourceDynamicDims);
   }
 
-  auto offsetVals = getAsValues(rewriter, loc, insertOp.getMixedOffsets());
+  auto offsetVals = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                    insertOp.getMixedOffsets());
   Value dest = insertOp.getDest();
   auto destDynamicDims = tensor::createDynamicDimValues(rewriter, loc, dest);
   rewriter.replaceOpWithNewOp<TensorUpdateOp>(
@@ -161,8 +163,8 @@ LogicalResult convertExtractSliceOpToFlowSliceOp(
         RankedTensorType::get(unreducedShape, sourceType.getElementType());
   }
 
-  auto offsetVals = getAsValues(rewriter, loc, offsets);
-  auto sizeVals = getAsValues(rewriter, loc, sizes);
+  auto offsetVals = getValueOrCreateConstantIndexOp(rewriter, loc, offsets);
+  auto sizeVals = getValueOrCreateConstantIndexOp(rewriter, loc, sizes);
   auto sourceDynamicDims =
       tensor::createDynamicDimValues(rewriter, loc, sliceOp.getSource());
   auto resultDynamicDims = getDynamicValues(sizes);

@@ -124,8 +124,8 @@ static Value shareForeachArgument(ImplicitLocOpBuilder &b, Value Forall,
 }
 
 static void buildStagedReductionStrategyThreadLevel(
-    ImplicitLocOpBuilder &b, Value gridReductionH, Value gridFillH,
-    Value maybeTiledLeadingH, Value maybeTiledTrailingH,
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value gridReductionH,
+    Value gridFillH, Value maybeTiledLeadingH, Value maybeTiledTrailingH,
     const StagedReductionStrategy &strategy) {
   // Map the potential maybeTiledLeadingH.
   // TODO: Consider fusing leading elementwise into threads.
@@ -136,6 +136,7 @@ static void buildStagedReductionStrategyThreadLevel(
     assert((vectorSize & (vectorSize - 1)) == 0 && "size must be power of 2");
     build1DSplittingStrategyWithOptionalThreadMapping(
         /*b=*/b,
+        /*isolatedParentOpH=*/isolatedParentOpH,
         /*opH=*/maybeTiledLeadingH,
         /*rank=*/strategy.captures.maybeLeadingRank,
         // TODO: capture and generalize mostMinorDim.
@@ -150,6 +151,7 @@ static void buildStagedReductionStrategyThreadLevel(
   auto [blockParallelForallOp, blockParallelFillH, blockCombinerOpH] =
       buildTileReductionUsingScfForeach(
           /*b=*/b,
+          /*isolatedParentOpH=*/isolatedParentOpH,
           /*reductionH=*/gridReductionH,
           /*reductionRank=*/strategy.captures.reductionRank,
           /*tileSize=*/strategy.getNumThreadsXInBlock(),
@@ -183,6 +185,7 @@ static void buildStagedReductionStrategyThreadLevel(
   }
   iree_compiler::buildTileFuseDistToForallWithTileSizes(
       /*b=*/b,
+      /*isolatedParentOpH=*/isolatedParentOpH,
       /*rootH=*/root,
       /*opsToFuse=*/opsToFuse,
       /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
@@ -196,6 +199,7 @@ static void buildStagedReductionStrategyThreadLevel(
         strategy.captures.maybeTrailingOutputElementalTypeBitWidth;
     build1DSplittingStrategyWithOptionalThreadMapping(
         /*b=*/b,
+        /*isolatedParentOpH=*/isolatedParentOpH,
         /*opH=*/maybeTiledTrailingH,
         /*rank=*/strategy.captures.maybeTrailingRank,
         // TODO: capture and generalize mostMinorDim.
@@ -221,9 +225,10 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
 
   // Step 2. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
-  buildStagedReductionStrategyThreadLevel(b, gridReductionH, gridFillH,
-                                          maybeLeadingHBlock,
-                                          maybeTiledTrailingHBlock, strategy);
+  buildStagedReductionStrategyThreadLevel(
+      b,
+      /*isolatedParentOpH=*/variantH, gridReductionH, gridFillH,
+      maybeLeadingHBlock, maybeTiledTrailingHBlock, strategy);
 
   // Step 3. Make sure we don't create allocation by sharing forall
   // output. This amounts to injecting user-defined static information that each

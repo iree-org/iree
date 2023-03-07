@@ -150,12 +150,7 @@ class ConversionPass
                                    patterns);
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
                              patterns);
-    arith::populateArithExpandOpsPatterns(patterns);
-    patterns.add<MaxMinIOpConverter<arith::MaxSIOp, arith::CmpIPredicate::sgt>,
-                 MaxMinIOpConverter<arith::MaxUIOp, arith::CmpIPredicate::ugt>,
-                 MaxMinIOpConverter<arith::MinSIOp, arith::CmpIPredicate::slt>,
-                 MaxMinIOpConverter<arith::MinUIOp, arith::CmpIPredicate::ult>>(
-        context);
+    arith::populateCeilFloorDivExpandOpsPatterns(patterns);
     populateStandardToVMPatterns(context, typeConverter, patterns);
     populateMathToVMPatterns(context, typeConverter, patterns);
     populateAffineToStdConversionPatterns(patterns);
