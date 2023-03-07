@@ -36,6 +36,10 @@ static llvm::cl::opt<unsigned> logSwizzleTile(
     "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
     llvm::cl::init(0));
 
+llvm::cl::opt<bool> llvmgpuUseGPUPipeliner(
+    "iree-codegen-llvmgpu-use-gpu-pipeliner",
+    llvm::cl::desc("use the gpu pipeliner"), llvm::cl::init(true));
+
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
@@ -261,17 +265,23 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorToGPU());
   nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
   nestedModulePM.addPass(createCSEPass());
 
   // Hoist loop invariant code to avoid pipelining it.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
-      /*epiloguePeeling=*/false, pipelineDepth,
-      PipeliningSchedulingStrategy::loadGlobalStage0));
+  if (llvmgpuUseGPUPipeliner) {
+    nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+        /*epiloguePeeling=*/false, pipelineDepth,
+        PipeliningSchedulingStrategy::loadGlobalStage0));
+  }
   // Optimize shared memory usage.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUPackSharedMemoryAlloc());
@@ -329,9 +339,11 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
-      /*epiloguePeeling=*/false, pipelineDepth,
-      PipeliningSchedulingStrategy::nvidiaTensorCore));
+  if (llvmgpuUseGPUPipeliner) {
+    nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+        /*epiloguePeeling=*/false, pipelineDepth,
+        PipeliningSchedulingStrategy::nvidiaTensorCore));
+  }
   // Optimize shared memory usage.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUPackSharedMemoryAlloc());
