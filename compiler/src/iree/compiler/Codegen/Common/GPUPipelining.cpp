@@ -428,30 +428,34 @@ struct MainLoopInfo {
   int getNumberOfKgroups() { return warpOperations.size(); }
 };
 
-/// Return a instruction schedule and stage assignment for the reduction
+/// This function returns an instruction schedule and stage assignment for the
 /// mainloop that gives good performance on Nvidia Ampere architecture using
-/// Ampere-stype multi-staged pipeline.
+/// Ampere-style multi-staged pipeline.
+///
+/// @param forOp the main loop operation to pipeline and schedule.
+/// @param ops a vector of pairs of operations and their assigned pipeline
+/// stage.
+/// @param numStages the total number of pipeline stages used for pipelining the
+/// mainloop.
 static void getMultiStagedPipelineSchedule(
     scf::ForOp forOp, std::vector<std::pair<Operation*, unsigned>>& ops,
     unsigned numStages) {
-  //////////////////////////////////////////////////////////////////////////////
   // Analyze the main loop and obtain information for coarse-grained pipelining
   // and fine-grained instruction scheduling.
   MainLoopInfo info(forOp);
   int numKgroups = info.getNumberOfKgroups();
-  //////////////////////////////////////////////////////////////////////////////
 
   // Assert the requirements for pipelining the mainloop targeting NVIDIA
   // Tensor Cores using multistaged pipeline.
   assert(numKgroups > 1 && "Number of kgroups should be 2 ore more");
   assert(numStages > 2 && "Number of stages should be 3 ore more");
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Start pipeling and scheduling the mainloop, all kgroups but the last one.
+  // Start pipelining and scheduling the main loop, all kgroups but the last
+  // one.
   for (int kgroup = 0; kgroup < numKgroups - 1; kgroup++) {
-    ////////////////////////////////////////////////////////////////////////////
-    // Fine-grained instruction scheduling, i.e., interleave Shared Memory loads
+    // Fine-grained instruction scheduling: interleave Shared Memory loads
     // into and mma.sync operations to hide load latencies.
+
     // Load the next kgroup into registers.
     for (Operation& op : forOp.getBody()->getOperations()) {
       if (info.ldmatrixOpDeps[kgroup + 1].count(&op))
@@ -464,11 +468,11 @@ static void getMultiStagedPipelineSchedule(
         ops.push_back(std::make_pair(&op, numStages - 1));
     }
   }
-  //////////////////////////////////////////////////////////////////////////////
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Coarse-grained instruction pipelining, i.e., pipeling Global Memory
+  // Coarse-grained instruction pipelining: pipeline Global Memory
   // transfer (GMEM -> SMEM) several stages in advance.
+
+  // Schedule all cp.async and one cp.async.commit_group.
   // TODO: Distribute cp.async throughout the main loop and do not concentrate
   // it at one place.
   // Schedule all cp.async and one cp.async.commit_group.
@@ -484,11 +488,11 @@ static void getMultiStagedPipelineSchedule(
   ops.push_back(std::make_pair(info.barrierOps[0], numStages - 2));
   //////////////////////////////////////////////////////////////////////////////
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Coarse-grained instruction pipelining, i.e., pipelining Shared Memory loads
+  // Coarse-grained instruction pipelining: pipeline Shared Memory loads
   // (SMEM -> Registers) for the first kgroup (kgroup = 0) one stage in advance.
-  // Schedule the Shared Memory loads for the first kgroup and pipeline into one
-  // stage ahead.
+
+  // Schedule the Shared Memory loads for the first kgroup and pipeline them
+  // into one stage ahead.
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (info.ldmatrixOpDeps[0].count(&op))
       ops.push_back(std::make_pair(&op, numStages - 2));
@@ -499,11 +503,10 @@ static void getMultiStagedPipelineSchedule(
     if (info.mmasyncOpDeps[numKgroups - 1].count(&op))
       ops.push_back(std::make_pair(&op, numStages - 1));
   }
-  //////////////////////////////////////////////////////////////////////////////
 }
 
-/// Apply pipeline rewrite pattern assuming the operations were already
-/// annotated with stage information.
+// Apply pipeline rewrite pattern assuming the operations were already
+// annotated with stage information.
 // TODO: move away from using attribute annotations.
 static FailureOr<scf::ForOp> applyPipelining(
     scf::ForOp forOp, int64_t depth, bool epiloguePeeling,
