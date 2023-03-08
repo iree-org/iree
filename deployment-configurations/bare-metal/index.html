@@ -1331,8 +1331,8 @@ to retrieve the IREE compiler.</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--iree-stream-partitioning-favor<span class="o">=</span>min-peak-memory<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--iree-llvm-target-triple<span class="o">=</span>x86_64-pc-linux-elf<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--iree-llvm-debug-symbols<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-llvmcpu-target-triple<span class="o">=</span>x86_64-pc-linux-elf<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--iree-llvmcpu-debug-symbols<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>samples/models/simple_abs.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-o<span class="w"> </span>/tmp/simple_abs_cpu.vmfb
 </code></pre></div>
@@ -1357,7 +1357,7 @@ demo sample for an example and instructions on running a model with IREE's
 <code>static_library_loader</code>.</p>
 <p>By default, the demo targets the host machine when compiling. To produce a
 bare-metal compatible model, run <code>iree-compile</code> as in the previous example
-and add the additional <code>-iree-llvm-static-library-output-path=</code> flag to specify
+and add the additional <code>-iree-llvmcpu-static-library-output-path=</code> flag to specify
 the static library destination. This will produce a <code>.h\.o</code> file to link
 directly into the target application.</p>
 <h2 id="build-bare-metal-runtime-from-the-source">Build bare-metal runtime from the source<a class="headerlink" href="#build-bare-metal-runtime-from-the-source" title="Permanent link">link</a></h2>
