@@ -227,6 +227,8 @@ objects into `keyed_obj_map` and uses their ids elsewhere to reference them.
 > Check [build_tools/python/e2e_test_framework/definitions/iree_definitions.py](/build_tools/python/e2e_test_framework/definitions/iree_definitions.py)
 > for all object definitions in Python.
 
+> TODO(#12215): Improve the readability of the serialized JSON config.
+
 ```json
 "iree_e2e_model_run_configs:<execution_benchmark_id>": {
   "module_generation_config": <id to its module generation config>
@@ -255,112 +257,95 @@ through these objects, starting with either
 commands to extract the information:
 
 ##### Get information of an execution benchmark
-```sh
-cat exec_config.json | \
-  jq --arg exec_id "${EXEC_BENCHMARK_ID}" \
-  'map_values(.[].keyed_obj_map? | ."iree_e2e_model_run_configs:\($exec_id)")'
-
-This shows an e2e model run object like:
-{
-  "c2-standard-16": {
-    "composite_id": "e496c2ea8de7fdffdb7597da63eed12cc5fb0595605d70e1f9d67a33857a299a",
-    "module_generation_config": "7a0add4835462bc66025022cdb6e87569da79cf103825a809863b8bd57a49055",
-    "module_execution_config": "13fc65a9-e5dc-4cbb-9c09-25b0b08f4c03",
-    "target_device_spec": "9a4804f1-b1b9-46cd-b251-7f16a655f782",
-    "input_data": "8d4a034e-944d-4725-8402-d6f6e61be93c",
-    "run_flags": [
-      "--function=forward",
-      "--input=1x224x224x3xf32=0",
-      "--device_allocator=caching",
-      "--device=local-sync"
-    ]
-  },
-  "a2-highgpu-1g": null,
-}
-
-Find the VMFB module at:
-echo ${IREE_BUILD_DIR}/e2e_test_artifacts/iree_*_<module_generation_config>/module.vmfb
-```
-
-##### Get compilation information of an execution / compilation benchmark
-First you need to get the compilation benchmark id, which can be either:
-
-- Field `module_generation_config` of an e2e model run object from an execution
-  benchmark (see [Get information of an execution benchmark](#get-information-of-an-execution-benchmark)).
-- Compilation benchmark id from https://perf.iree.dev or compilation benchmark
-  results.
-
-> Note that the configs for execution and compilation benchmarks might contain
-> different set of benchmark ids. Make sure you query the right config file.
-
-```sh
-# For execution benchmarks
-cat exec_config.json | \
-  jq --arg gen_id "${COMP_BENCHMARK_ID}" \
-  'map_values(.[].keyed_obj_map? | ."iree_module_generation_configs:\($gen_id)")'
-
-# For compilation benchmarks
-cat comp_config.json | \
-  jq --arg gen_id "${COMP_BENCHMARK_ID}" \
-  '.[].keyed_obj_map? | ."iree_module_generation_configs:\($gen_id)"'
-
-This shows a module generation obj like:
-{
-  "composite_id": "1d26fcfdb7387659356dd99ce7e10907c8560b0925ad839334b0a6155d25167a",
-  "imported_model": "394878992fb35f2ed531b7f0442c05bde693346932f049cbb3614e06b3c82337",
-  "compile_config": "32a56c8d-cc6c-41b8-8620-1f8eda0b8223-compile-stats",
-  "compile_flags": [
-    "--iree-hal-target-backends=vulkan-spirv",
-    "--iree-input-type=tosa",
-    "--iree-vulkan-target-triple=valhall-unknown-android31",
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-    "--iree-vm-emit-polyglot-zip=true",
-    "--iree-llvm-debug-symbols=false"
+Searching `iree_e2e_model_run_configs:${EXEC_BENCHMARK_ID}` in
+`exec_config.json`, you can find an `E2EModelRunConfig` object like:
+```json
+"iree_e2e_model_run_configs:e496c2ea8de7fdffdb7597da63eed12cc5fb0595605d70e1f9d67a33857a299a": {
+  "composite_id": "e496c2ea8de7fdffdb7597da63eed12cc5fb0595605d70e1f9d67a33857a299a",
+  // ModuleGenerationConfig id
+  "module_generation_config": "7a0add4835462bc66025022cdb6e87569da79cf103825a809863b8bd57a49055",
+  // ModuleExecutionConfig id
+  "module_execution_config": "13fc65a9-e5dc-4cbb-9c09-25b0b08f4c03",
+  // TargetDeviceSpec id
+  "target_device_spec": "9a4804f1-b1b9-46cd-b251-7f16a655f782",
+  // ModelInputData id
+  "input_data": "8d4a034e-944d-4725-8402-d6f6e61be93c",
+  // All run flags
+  "run_flags": [
+    "--function=forward",
+    "--input=1x224x224x3xf32=0",
+    "--device_allocator=caching",
+    "--device=local-sync"
   ]
 }
-
-Find the VMFB module at:
-echo ${IREE_BUILD_DIR}/e2e_test_artifacts/iree_*_${COMP_BENCHMARK_ID}/module.vmfb
-
-And the input imported MLIR at:
-echo ${IREE_BUILD_DIR}/e2e_test_artifacts/iree_*_<imported_model>.mlir
 ```
 
-##### Get information about how the model is imported
-```sh
-# For execution benchmarks
-cat exec_config.json | \
-  jq --arg IMPORTED_ID "${IMPORTED_MODEL_ID}" \
-  'map_values(.[].keyed_obj_map? | ."iree_imported_models:\($IMPORTED_ID)")'
+With the module generation config id, you can search
+`iree_module_generation_configs:<module generation config id>` and find a
+`ModuleGenerationConfig` object like:
+```json
+"iree_module_generation_configs:7a0add4835462bc66025022cdb6e87569da79cf103825a809863b8bd57a49055": {
+  "composite_id": "7a0add4835462bc66025022cdb6e87569da79cf103825a809863b8bd57a49055",
+  // ImportedModel id
+  "imported_model": "a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f",
+  // CompileConfig id
+  "compile_config": "e7e18b0f-c72d-4f1c-89b1-5afee70df6e9",
+  // All compile flags
+  "compile_flags": [
+    "--iree-hal-target-backends=llvm-cpu",
+    "--iree-input-type=mhlo",
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu",
+    "--iree-llvm-target-cpu=cascadelake"
+  ]
+}
+```
 
-# For compilation benchmarks
-cat comp_config.json | \
-  jq --arg IMPORTED_ID "${IMPORTED_MODEL_ID}" \
-  '.[].keyed_obj_map? | ."iree_imported_models:\($IMPORTED_ID)"'
-
-This shows an imported model object:
-{
-  "composite_id": "213fe9a8738a01f2b02b6f0614a40a31c83a2603ca3e3ae0aeab8090fedbe3a0",
-  "model": "ebe7897f-5613-435b-a330-3cb967704e5e",
+With the imported model id, you can search
+`iree_imported_models:<imported model id>` and find a `ImportedModel` object
+like:
+```json
+"iree_imported_models:a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f": {
+  "composite_id": "a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f",
+  // Model id
+  "model": "c393b4fa-beb4-45d5-982a-c6328aa05d08",
+  // ImportConfig id
   "import_config": "8b2df698-f3ba-4207-8696-6c909776eac4"
 }
-
-Find the input model at:
-echo ${IREE_BUILD_DIR}/e2e_test_artifacts/model_ebe7897f-5613-435b-a330-3cb967704e5e_*
 ```
 
-## Manipulating the Benchmarks
+You can find the related artifacts with these ids:
+```sh
+# VMFB module:
+${IREE_BUILD_DIR}/e2e_test_artifacts/iree_*_<ModuleGenerationConfig id>/module.vmfb
+
+# Imported MLIR (might not exist if the input model is already in MLIR):
+${IREE_BUILD_DIR}/e2e_test_artifacts/iree_*_<ImportedModel id>.mlir
+
+# Input model:
+${IREE_BUILD_DIR}/e2e_test_artifacts/model_<Model id>_*
+```
+
+##### Get information of an compilation benchmark
+Same as [Get information of an execution benchmark](#get-information-of-an-execution-benchmark),
+but you start by searching `iree_module_generation_configs:${COMP_BENCHMARK_ID}`
+to get the `ModuleGenerationConfig`.
+
+
+## Finding and Manipulating Benchmarks
 All benchmarks are defined by the scripts under
 [build_tools/python/benchmark_suites/iree](/build_tools/python/benchmark_suites/iree).
 
-> TODO(#12215): Add a doc to explain how to hack the benchmark suite.
+To find the code that generates a benchmark:
+1. Get the ids of `CompileConfig` and `ModuleExecutionConfig`.
+   - If you have a benchmark id, see [Get information of an execution benchmark](#get-information-of-an-execution-benchmark)
+   or [Get information of an compilation benchmark](#get-information-of-an-compilation-benchmark)
+   for how to find them in an exported benchmark config.
+2. Find the constants of these ids in [build_tools/python/e2e_test_framework/unique_ids.py](/build_tools/python/e2e_test_framework/unique_ids.py).
+3. Search in the code to see which generator uses those constants.
+   - `CompileConfig` id should help you locale which script generates it, as it
+   indicates the target architecture.
 
-To find the code that generates a benchmark config:
-1. Get the ids from `module_execution_config` and `compile_config` fields of the
-   benchmark.
-2. Find the defined constants of these ids (or their prefixes) in
-   [build_tools/python/e2e_test_framework/unique_ids.py](/build_tools/python/e2e_test_framework/unique_ids.py).
-3. Search in the code to see which generator uses these constants.
+> TODO(#12215): Add a doc to explain how to hack the benchmark suite.
 
 To manipulate the benchmarks:
 1. Modify the benchmark generation code under
