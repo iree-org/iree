@@ -337,6 +337,26 @@ void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
 //===--------------------------------------------------------------------====//
 
 namespace {
+
+// Erases the operation if its only users are memref.assume_alignment ops.
+static LogicalResult eraseAlignmentOnlyDeadOp(PatternRewriter &rewriter,
+                                              Operation *op) {
+  SmallVector<Operation *> deadUsers;
+  for (OpOperand &use : op->getUses()) {
+    if (auto user = dyn_cast<memref::AssumeAlignmentOp>(use.getOwner())) {
+      deadUsers.push_back(user);
+      continue;
+    }
+    // For any other use, return failure;
+    return failure();
+  }
+  for (auto user : deadUsers) {
+    rewriter.eraseOp(user);
+  }
+  rewriter.eraseOp(op);
+  return success();
+}
+
 // Removes operations with Allocate MemoryEffects but no uses.
 struct RemoveDeadMemAllocs : RewritePattern {
   RemoveDeadMemAllocs(MLIRContext *context, PatternBenefit benefit = 1)
@@ -348,26 +368,27 @@ struct RemoveDeadMemAllocs : RewritePattern {
     if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
       return failure();
     }
-    SmallVector<Operation *> deadUsers;
-    for (OpOperand &use : op->getUses()) {
-      if (auto user = dyn_cast<memref::AssumeAlignmentOp>(use.getOwner())) {
-        deadUsers.push_back(user);
-        continue;
-      }
-      // For any other use, return failure;
-      return failure();
-    }
-    for (auto user : deadUsers) {
-      rewriter.eraseOp(user);
-    }
-    rewriter.eraseOp(op);
-    return success();
+    return eraseAlignmentOnlyDeadOp(rewriter, op);
+  }
+};
+
+// Removes hal.interface.binding.subspan ops with only assume_alignment uses.
+struct RemoveDeadInterfaceBindings
+    : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  RemoveDeadInterfaceBindings(MLIRContext *context, PatternBenefit benefit = 1)
+      : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp>(context,
+                                                               benefit) {}
+
+  LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
+                                PatternRewriter &rewriter) const override {
+    return eraseAlignmentOnlyDeadOp(rewriter, op);
   }
 };
 }  // namespace
 
 void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
+  patterns.insert<RemoveDeadInterfaceBindings>(patterns.getContext());
 }
 
 }  // namespace iree_compiler
