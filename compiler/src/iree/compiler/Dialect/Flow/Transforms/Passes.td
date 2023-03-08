@@ -90,7 +90,6 @@ def CloneProducersIntoDispatchRegions :
   let constructor = "mlir::iree_compiler::IREE::Flow::createCloneProducersIntoDispatchRegionsPass()";
 }
 
-
 def CollapseDimensions :
     InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
   let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
