@@ -1,92 +1,7 @@
-# IREE Benchmark Suites Tool (Legacy)
-
-**For working with the new benchmark suite, see the [section below](#iree-new-benchmark-suite)**
-
-This directory contains the tools to run IREE benchmark suites and generate
-reports. More information about benchmark suites can be found [here](/benchmarks/README.md).
-
-## Benchmark Tools
-
-Currently we have `run_benchmarks_on_android.py` and
-`run_benchmarks_on_linux.py` scripts to run benchmark suites on Android devices
-(with `adb`) and Linux machines.
-
-The available arguments can be shown with `--help`. Some common usages are
-listed below. Here we assume:
-
-```sh
-IREE_BUILD_DIR="/path/to/IREE build root dir". It should contain the "benchmark_suites" directory built with the target "iree-benchmark-suites".
-
-IREE_NORMAL_TOOL_DIR="/path/to/IREE tool dir". It is usually "$IREE_BUILD_DIR/tools".
-
-IREE_TRACED_TOOL_DIR="/path/to/IREE tool dir built with IREE_ENABLE_RUNTIME_TRACING=ON".
-```
-
-See details about `IREE_ENABLE_RUNTIME_TRACING` [here](/docs/developers/developing_iree/profiling_with_tracy.md).
-
-**Run all benchmarks**
-```sh
-./run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir=$IREE_NORMAL_TOOL_DIR \
-  --output=results.json $IREE_BUILD_DIR
-```
-
-**Run all benchmarks and perform the Tracy captures**
-```sh
-./run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir=$IREE_NORMAL_TOOL_DIR \
-  --traced_benchmark_tool_dir=$IREE_TRACED_TOOL_DIR \
-  --trace_capture_tool=/path/to/iree-tracy-capture \
-  --capture_tarball=captured_tracy_files.tar.gz
-  --output=results.json $IREE_BUILD_DIR
-```
-
-**Run selected benchmarks with the filters**
-```sh
-./run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir=$IREE_NORMAL_TOOL_DIR \
-  --model_name_regex="MobileBertSquad" \
-  --driver_filter_regex="local-task" \
-  --mode_regex="4-threads" \
-  --output=results.json $IREE_BUILD_DIR
-```
-
-**Collect compilation statistics**
-
-See [here](/benchmarks/README.md#collect-compile-stats) for additional build
-steps to enable compilation statistics collection.
-```sh
-./collect_compilation_statistics.py \
-  legacy \
-  --output "compile-stats.json" \
-  "${IREE_BUILD_DIR}"
-```
-
-## Generating Benchmark Report
-
-The tools here are mainly designed for benchmark automation pipelines.
-The `post_benchmarks_as_pr_comment.py` and `upload_benchmarks_to_dashboard.py`
-scripts are used to upload and post reports to pull requests or the
-[dashboard](https://perf.iree.dev/).
-
-If you want to generate a comparison report locally, you can use
-`diff_local_benchmarks.py` script to compare two result json files and generate
-the report. For example:
-
-```sh
-./diff_local_benchmarks.py --base before.json --target after.json > report.md
-```
-
-An example that compares compilation statistics:
-
-```sh
-./diff_local_benchmarks.py \
-  --base-compile-stats "compile-stats-before.json" \
-  --target-compile-stats "compile-stats-after.json" \
-  > report.md
-```
-
 # IREE New Benchmark Suite
+
+**For working with the legacy benchmark suite, see [IREE Benchmark Suites Tool (Legacy)](#iree-benchmark-suites-tool-legacy)**
+
 We are in progress to replace the [legacy cmake benchmark suite](/benchmarks)
 with a new one written in python. Currently it only supports `x86_64`, `CUDA`,
 and `compilation statistics` benchmarks.
@@ -94,10 +9,10 @@ and `compilation statistics` benchmarks.
 **Our benchmark CI (https://perf.iree.dev) is using the new benchmark suite to
 benchmark those targets.**
 
-## Run benchmark suite locally 
+## Running Benchmark Suite Locally 
 
 ### Prerequisites
-- Install `iree-import-tf` and `iree-import-tflite` in the Python environment
+- Install `iree-import-tf` and `iree-import-tflite` in your Python environment
   (see [Tensorflow Integration](https://openxla.github.io/iree/getting-started/tensorflow/)
   and [TFLite Integration](https://openxla.github.io/iree/getting-started/tflite/)).
 - Install `jq` to manipulate JSON in command lines (recommended).
@@ -198,10 +113,10 @@ find their benchmark ids from:
 We refer the execution benchmark id as `${EXEC_BENCHMARK_ID}` and the
 compilation benchmark id as `${COMP_BENCHMARK_ID}` below.
 
-#### Just to get the compile and run flags
+#### Get the compile and run flags
 
-We provide a helper tool `benchmark_helper.py` to dump the compile and run flags
-of benchmarks. See the examples below:
+We provide a tool `benchmark_helper.py` to dump the compile and run flags of
+benchmarks. See the examples below:
 
 ##### Get run and compile flags of an execution benchmark
 ```sh
@@ -265,7 +180,7 @@ Example output:
 }
 ```
 
-### Exploring Exported Benchmark Config
+### Exploring Benchmark Config
 
 If you are interested in more detailed benchmark information, all metadata about
 a benchmark is stored in the exported benchmark config.
@@ -456,3 +371,114 @@ To manipulate the benchmarks:
 3. Rebuild the benchmark suite.
 4. Make sure to export the new benchmark configs again before running the
    benchmarks.
+
+## Fetching Benchmark Artifacts from CI
+
+##### 1. Find the corresponding CI workflow run
+On the commit of a benchmark run, you can find the list of the workflow jobs by
+clicking the green check mark. Click the `Details` of job
+`build_e2e_test_artifacts`:
+TODO
+
+##### 2. Find the GCS directory of benchmark artifacts
+On the job detail page, expand the step Uploading e2 test artifacts, you will
+see a bunch of lines like:
+```
+Copying file://build-e2e-test-artifacts/e2e_test_artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb to gs://iree-github-actions-postsubmit-artifacts/4360950546/1/e2e-test-artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb
+...
+```
+The URL `gs://iree-github-actions-...-artifacts/.../.../e2e-test-artifacts/` is
+the GCS directory of benchmark artifacts. You can use `gcloud` tool to list the
+contents:
+```sh
+gcloud storage ls gs://iree-github-actions-postsubmit-artifacts/4360950546/1/e2e-test-artifacts
+```
+It has the same directory structure as your local `"$IREE_BUILD_DIR/e2e_test_artifacts"`
+
+# IREE Benchmark Suites Tool (Legacy)
+
+**For working with the new benchmark suite, see [IREE New Benchmark Suite](#iree-new-benchmark-suite)**
+
+This directory contains the tools to run IREE benchmark suites and generate
+reports. More information about benchmark suites can be found [here](/benchmarks/README.md).
+
+## Benchmark Tools
+
+Currently we have `run_benchmarks_on_android.py` and
+`run_benchmarks_on_linux.py` scripts to run benchmark suites on Android devices
+(with `adb`) and Linux machines.
+
+The available arguments can be shown with `--help`. Some common usages are
+listed below. Here we assume:
+
+```sh
+IREE_BUILD_DIR="/path/to/IREE build root dir". It should contain the "benchmark_suites" directory built with the target "iree-benchmark-suites".
+
+IREE_NORMAL_TOOL_DIR="/path/to/IREE tool dir". It is usually "$IREE_BUILD_DIR/tools".
+
+IREE_TRACED_TOOL_DIR="/path/to/IREE tool dir built with IREE_ENABLE_RUNTIME_TRACING=ON".
+```
+
+See details about `IREE_ENABLE_RUNTIME_TRACING` [here](/docs/developers/developing_iree/profiling_with_tracy.md).
+
+**Run all benchmarks**
+```sh
+./run_benchmarks_on_linux.py \
+  --normal_benchmark_tool_dir=$IREE_NORMAL_TOOL_DIR \
+  --output=results.json $IREE_BUILD_DIR
+```
+
+**Run all benchmarks and perform the Tracy captures**
+```sh
+./run_benchmarks_on_linux.py \
+  --normal_benchmark_tool_dir=$IREE_NORMAL_TOOL_DIR \
+  --traced_benchmark_tool_dir=$IREE_TRACED_TOOL_DIR \
+  --trace_capture_tool=/path/to/iree-tracy-capture \
+  --capture_tarball=captured_tracy_files.tar.gz
+  --output=results.json $IREE_BUILD_DIR
+```
+
+**Run selected benchmarks with the filters**
+```sh
+./run_benchmarks_on_linux.py \
+  --normal_benchmark_tool_dir=$IREE_NORMAL_TOOL_DIR \
+  --model_name_regex="MobileBertSquad" \
+  --driver_filter_regex="local-task" \
+  --mode_regex="4-threads" \
+  --output=results.json $IREE_BUILD_DIR
+```
+
+**Collect compilation statistics**
+
+See [here](/benchmarks/README.md#collect-compile-stats) for additional build
+steps to enable compilation statistics collection.
+```sh
+./collect_compilation_statistics.py \
+  legacy \
+  --output "compile-stats.json" \
+  "${IREE_BUILD_DIR}"
+```
+
+## Generating Benchmark Report
+
+The tools here are mainly designed for benchmark automation pipelines.
+The `post_benchmarks_as_pr_comment.py` and `upload_benchmarks_to_dashboard.py`
+scripts are used to upload and post reports to pull requests or the
+[dashboard](https://perf.iree.dev/).
+
+If you want to generate a comparison report locally, you can use
+`diff_local_benchmarks.py` script to compare two result json files and generate
+the report. For example:
+
+```sh
+./diff_local_benchmarks.py --base before.json --target after.json > report.md
+```
+
+An example that compares compilation statistics:
+
+```sh
+./diff_local_benchmarks.py \
+  --base-compile-stats "compile-stats-before.json" \
+  --target-compile-stats "compile-stats-after.json" \
+  > report.md
+```
