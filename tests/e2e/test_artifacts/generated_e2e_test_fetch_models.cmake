@@ -157,3 +157,13 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/model_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF"
   UNPACK
 )
+
+iree_fetch_artifact(
+  NAME
+    "model-428ed41e-63df-4499-a63d-e1a7a1202d53"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/matmul_2560x2560xf16.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_428ed41e-63df-4499-a63d-e1a7a1202d53_UB_MATMUL_2560x2560xF16.mlir"
+  UNPACK
+)

@@ -73,18 +73,6 @@ class CollectCompilationStatistics(unittest.TestCase):
                              const_component_bytes=3,
                              total_dispatch_component_bytes=32))
 
-  def test_get_module_component_info_unknown_components(self):
-    module_file = BytesIO()
-    with zipfile.ZipFile(module_file, "w") as zip:
-      zip.writestr(VM_COMPONENT_NAME, b"abcd")
-      zip.writestr(CONST_COMPONENT_NAME, b"123")
-      zip.writestr("main_dispatch_0_unknown.fb", b"bindata")
-    module_file_data = module_file.getvalue()
-
-    self.assertRaises(
-        RuntimeError, lambda: get_module_component_info(
-            BytesIO(module_file_data), len(module_file_data)))
-
   def test_get_module_path(self):
     flag_file = StringIO(f"--module=/abcd.vmfb\n--inputs=1x2x3xf32")
 

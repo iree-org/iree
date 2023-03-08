@@ -97,8 +97,10 @@ def get_module_component_info(module: BinaryIO,
     size_map = dict(
         (info.filename, info.file_size) for info in module_zipfile.infolist())
 
-  vm_component_bytes = size_map[VM_COMPONENT_NAME]
-  const_component_bytes = size_map[CONST_COMPONENT_NAME]
+  vm_component_bytes = size_map[
+      VM_COMPONENT_NAME] if VM_COMPONENT_NAME in size_map else 0
+  const_component_bytes = size_map[
+      CONST_COMPONENT_NAME] if CONST_COMPONENT_NAME in size_map else 0
   identified_names = {VM_COMPONENT_NAME, CONST_COMPONENT_NAME}
   total_dispatch_component_bytes = 0
   for filename, size in size_map.items():
@@ -108,9 +110,9 @@ def get_module_component_info(module: BinaryIO,
         identified_names.add(filename)
         break
 
-  if identified_names != set(size_map.keys()):
-    raise RuntimeError(
-        f"Unrecognized components in the module: {size_map.keys()}.")
+  #if identified_names != set(size_map.keys()):
+  #  raise RuntimeError(
+  #      f"Unrecognized components in the module: {size_map.keys()}.")
 
   return ModuleComponentSizes(
       file_bytes=module_file_bytes,

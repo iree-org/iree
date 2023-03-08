@@ -751,6 +751,20 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-25e718ecf987cd7ef1cd15cd34cd33de225f4a9515ae0015a76679ea0d819aaa"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_428ed41e-63df-4499-a63d-e1a7a1202d53_UB_MATMUL_2560x2560xF16.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_UB_MATMUL_2560x2560xF16_module_25e718ecf987cd7ef1cd15cd34cd33de225f4a9515ae0015a76679ea0d819aaa/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-68f0eb37bb72d0d6605ecdf42691c64125960e122844b0beeae350871a445b1c"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_05c50f54ffea1fce722d07588e7de026ce10324eccc5d83d1eac2c5a9f5d639d.mlir"
@@ -2485,6 +2499,22 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-421c938143d6a4d4e0f9bd49ef2d1c6a5888fdf9f3482618836f297e7ca33358"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_428ed41e-63df-4499-a63d-e1a7a1202d53_UB_MATMUL_2560x2560xF16.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_UB_MATMUL_2560x2560xF16_module_421c938143d6a4d4e0f9bd49ef2d1c6a5888fdf9f3482618836f297e7ca33358/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-16b5b80aaf1271b5ad782570340cc0c7c1c97e10b7e6c6cc6e5f3ede8393cb6c"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_05c50f54ffea1fce722d07588e7de026ce10324eccc5d83d1eac2c5a9f5d639d.mlir"
@@ -3739,6 +3769,7 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-213fe9a8738a01f2b02b6f0614a40a31c83a2603ca3e3ae0aeab8090fedbe3a0
   ${PACKAGE_NAME}_iree-imported-model-d4a10c6d3e8a11d808baf398822ea8b61be07673517ff9be30fbe199b7fdd960
   ${PACKAGE_NAME}_iree-imported-model-a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f
+  ${PACKAGE_NAME}_model-428ed41e-63df-4499-a63d-e1a7a1202d53
 )
 
 add_dependencies(iree-benchmark-suites
@@ -3778,6 +3809,7 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-04ca0a5077b7dd5ace66d803c9b822dff3428b24e7620a61995aff0907af9533
   ${PACKAGE_NAME}_iree-module-deafafd0926321a4b8e4dc73ed4a30b2ed9317d26488246461415be2ee857eb1
   ${PACKAGE_NAME}_iree-module-fd81a89e9f8773bae142040775c7e3c4774f96b64f07f8d9f66b00191864ff40
+  ${PACKAGE_NAME}_iree-module-25e718ecf987cd7ef1cd15cd34cd33de225f4a9515ae0015a76679ea0d819aaa
   ${PACKAGE_NAME}_iree-module-68f0eb37bb72d0d6605ecdf42691c64125960e122844b0beeae350871a445b1c
   ${PACKAGE_NAME}_iree-module-a7a1553d0739151f06bbc00a3ef8b67b0606463eab4b6607069aa94ea0bfd92f
   ${PACKAGE_NAME}_iree-module-e80d71ed8e86c0756226b2323e27e2c7c0fff8eddde59ba69e9222d36ee3eef6
@@ -3888,6 +3920,7 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509
   ${PACKAGE_NAME}_iree-module-65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b
   ${PACKAGE_NAME}_iree-module-f770b1916e0b7a9a0b4aa9480791d21a46a352002ac1e38dfcea49ec0b63ed4e
+  ${PACKAGE_NAME}_iree-module-421c938143d6a4d4e0f9bd49ef2d1c6a5888fdf9f3482618836f297e7ca33358
   ${PACKAGE_NAME}_iree-module-16b5b80aaf1271b5ad782570340cc0c7c1c97e10b7e6c6cc6e5f3ede8393cb6c
   ${PACKAGE_NAME}_iree-module-65fa033050b916e8143d44b5081ee45db3b1946a5d77de223328a7fe92a1cc66
   ${PACKAGE_NAME}_iree-module-16ef56b6869d10b17e983fec62e9f48e6bb87e9a348ab52a0b2faabca2b03578

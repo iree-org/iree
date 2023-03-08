@@ -5,7 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines the groups of models."""
 
-from e2e_test_framework.models import tf_models, tflite_models
+from e2e_test_framework.models import tf_models, tflite_models, microbenchmarks
+
+# Microbenchmarks
+MICRO_BENCH = [
+    microbenchmarks.UB_MATMUL_2560x2560xF16,
+    #microbenchmarks.UB_MATMUL_3456x1024x2048xF16_CONFIG_128x128_32x5,
+    #microbenchmarks.UB_MATMUL_3456x1024x2048xF16_CONFIG_128x128_64x4,
+]
 
 # Small models that require less computational resources.
 SMALL = [
