@@ -14,22 +14,27 @@ if __name__ == "__main__":
   parser.add_argument("--build-dir", default=".", required=True, help="IREE "\
                       "top-level build directory is used to generate operations "\
                       "and npy files")
+  parser.add_argument("--operation_kind", default="all", help="Specifies the "\
+                      "operation kinds to generate (matmul, conv2d, all)")
+  parser.add_argument("--dispatches", default='', help="Comma delimited list to "\
+                      "filter dispatches by name. A dispatch is a combination of "\
+                      "operation and tuning configuration.")
+
   parser.add_argument("--mlir-dialect", default='linalg', help='MLIR dialect "\
                       entry point at which operation is emitter. For example, "\
                       "linalg*, mhlo, etc.')
-  parser.add_argument("--operations", default='', help='Comma delimited list "\
-                      "to filter operations by name.')
+
 
   args = parser.parse_args()
   
   # Manifests metadata for a group of accompanying opeartions and configurations. 
   manifest = Manifest(args)
 
-  # Collect all the avialable operations in a manifest.
+  # Collect all the pre-defined dispatches in a manifest.
   GpuMatmulTensorCoresF16(manifest)
   GpuMatmulTensorCoresF32(manifest)
 
-  # Emit the operations present in MLIR linalg dialect.
+  # Emit the dispatches present in MLIR linalg dialect.
   manifest.emit(MlirDialect.Linalg)
 
 

@@ -301,7 +301,7 @@ class MatmulOperationLauncher:
 
     if not os.path.exists(vmbf_file) or self.force_compile:
       cmd = SubstituteTemplate(cmd_template, values)
-      if self.verbose: print("Compilation command for " + CompilationModeNames[compilation_mode] + " : " + cmd)
+      print("Compilation command for " + CompilationModeNames[compilation_mode] + " : " + cmd)
       subprocess.getoutput(cmd)
 
     else:
@@ -388,8 +388,7 @@ class MatmulOperationLauncher:
     result = subprocess.getoutput(cmd)
     m = re.search(r"real_time_median\s+(?P<runtime>\d+.\d+)\s+ms", result)
     runtime_in_ms = float(m.group('runtime'))
-    gflops = float(self.operation.flops()) / runtime_in_ms / 1.0e6
-    return runtime_in_ms, gflops
+    return runtime_in_ms
 
 
 ###############################################################################
@@ -433,18 +432,17 @@ class EmitMatmulSourceMlir:
 ###############################################################################
 # Create a list of matmul operations along with tuning cofigurations.
 # The functions below seperated based on the target backend and the data type.
-###############################################################################
 
 # Matmul sizes and tuning configs for GPU TensorCore F16 data type.
 def GpuMatmulTensorCoresF16(mainfest):
 
   # Matmul tuning configurations for LLVM GPU TensorCore(F16)
   tile_descriptions = [
-    TileDescription([128, 128, 64], 2, [64, 2, 1]),
-    TileDescription([128, 128, 32], 4, [64, 2, 1]),
-    TileDescription([128, 64, 32], 4, [64, 2, 1]),
-   #TileDescription([64, 64, 64], 3, [64, 2, 1]),
-   #TileDescription([64, 64, 64], 4, [64, 2, 1]),
+    TileDescription([128, 128, 64], 3, [64, 2, 1]),
+    TileDescription([128, 128, 32], 5, [64, 2, 1]),
+    #TileDescription([128, 64, 32], 4, [64, 2, 1]),
+    #TileDescription([64, 64, 64], 3, [64, 2, 1]),
+    #TileDescription([64, 64, 64], 4, [64, 2, 1]),
   ]
 
   # compilation info configuration list.
@@ -457,8 +455,9 @@ def GpuMatmulTensorCoresF16(mainfest):
   # Matmul problems.
   problem_shapes = [
     [128, 128, 256], 
+    [2560, 2560, 2560],
     [1024, 512, 2048], 
-    #[3456, 1024, 2048]
+    [3456, 1024, 2048]
   ]
 
   # Create matmul 'operation collection list' : [{operation -> [configurations]}].

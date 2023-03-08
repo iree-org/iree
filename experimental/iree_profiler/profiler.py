@@ -3,6 +3,7 @@ import argparse
 from library import *
 from matmul import *
 from manifest import *
+from performance_report import *
 
 operation_launcher_map = {
   OperationKind.Matmul : MatmulOperationLauncher,
@@ -13,25 +14,30 @@ if __name__ == "__main__":
   # Parse command line arguments
   ###############################################################################
   parser = argparse.ArgumentParser(description="IREE Python profiler tool for "\
-                                   "verifcation and performance profiling tool for "\
-                                    "IREE-compiled MLIR operations.")
+                                   "verifcation and performance profiling tool "\
+                                    "for IREE-compiled MLIR operations.")
+  
   # General options 
-  parser.add_argument("--device", default="cuda", \
-                      help="Target backend device to benchmark the operation on. "\
-                        "For example, cuda, vulkan, etc.")
   parser.add_argument("--build-dir", default=".", required=True, \
                       help="IREE top-level build directory is used to generate "\
                         "operations and npy files.This should be same that used "\
                         "to call generated.py")
+  parser.add_argument("--verbose", default='False', \
+                      help='Prints verbose output and commands executed.')
+  
+  # Generator options
+  parser.add_argument("--operation_kind", default="all", help="Specifies the "\
+                      "operation kinds to generate (matmul, conv2d, all)")
+  parser.add_argument("--dispatches", default='', help="Comma delimited list to "\
+                      "filter dispatches by name. A dispatch is a combination of "\
+                      "operation and tuning configuration.")
   parser.add_argument("--mlir-dialect", default='linalg', help='MLIR dialect entry "\
                       "point at which operation is emitter. For example, "\
                       "linalg*, mhlo, etc.')
-  parser.add_argument("--verbose", default='False', help='Prints verbose output and "\
-                      "commands executed.')
-  parser.add_argument("--operations", default='', help='TODO: Comma delimited list "\
-                      "to filter regex operations by name.')
-  
   # Compilation options
+  parser.add_argument("--device", default="cuda", \
+                      help="Target backend device to benchmark the operation on. "\
+                        "For example, cuda, vulkan, etc.")
   parser.add_argument("--force-compile", default='False', \
                       type=str, help="Force re-compilation of the operation even "\
                       "if .vmfb file is present.")
@@ -54,6 +60,17 @@ if __name__ == "__main__":
   parser.add_argument("--verification-enabled", default='True', 
                       type=str, help="Verify the operation against reference numpy "\
                       "implementation.")
+  
+  # Performance reporting options
+  parser.add_argument("--output", default='', \
+                      help="Path to output file for csv readable results.")
+  parser.add_argument("--append", default='false', \
+                      help="If true, result is appended to possibly existing file. "\
+                        "Otherwise, any existing file is overwritten.")
+  
+  parser.add_argument("--tags", default='', \
+                      help="Inserts leading columns in output table and uniform "\
+                        "values for each column. Useful for generating pivot tables.") 
   args = parser.parse_args()
   ###############################################################################
 
@@ -76,27 +93,35 @@ if __name__ == "__main__":
   GpuMatmulTensorCoresF16(manifest)
   #GpuMatmulTensorCoresF32(manifest)
 
+  # Performance report
+  perf_report = PerformanceReport(args)
+
   # For all the operations in the manifest, compile and profile them.
   for operation_kind, operation_collection_list in manifest.operations.items():
     for operation_collection in operation_collection_list:
       
       # Select and create an instance of operation_launcher for the operation with operation_kind.
-      print(operation_collection.operation.name())
+      # print(operation_collection.operation.name())
       operation_launcher = operation_launcher_map[operation_kind](args, operation_collection.operation)
 
-      if verification_enabled:
-        for configuration in operation_collection.configuration_list:
+      for configuration in operation_collection.configuration_list:
+        if verification_enabled:
           operation_launcher.verify(configuration)
+        if profiling_enabled:
+          runtime = operation_launcher.profile(configuration)
+          
+          # Create and print a performance result.
+          result = PerformanceResult(operation_collection.operation, configuration, runtime)
+          result.print()
 
-      if profiling_enabled:
-        for configuration in operation_collection.configuration_list:
-          runtime, gflops = operation_launcher.profile(configuration)
-          # Report the runtime of the operation and configuration.
-          # TODO: Report the runtime in a structured format.
-          print(f"Operation: {operation_collection.operation.name()}, \
-                Configuration: {configuration.name()}, \
-                Runtime: {runtime} ms, GFLOPS: {round(gflops, 2)}")
+          # Append the performance result to the performance report.
+          perf_report.append_perf_result(result)
 
+      # Compile the operation for verification and profiling.
       if compile_only:
         operation_launcher.compile(CompilationMode.Verify)
         operation_launcher.compile(CompilationMode.Benchmark)
+
+  # Write the performance report to a csv file.
+  if args.output != '':
+    perf_report.write_csv()

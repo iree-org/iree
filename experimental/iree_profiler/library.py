@@ -38,12 +38,12 @@ GpuArchTypeNames = {
 #
 class OperationKind(enum.Enum):
   Matmul = enum_auto()
-  Conv = enum_auto()       
+  Conv2d = enum_auto()       
 
 #
 OperationKindNames = {
-  OperationKind.Matmul: 'matmul', 
-  OperationKind.Conv: 'conv'  
+  OperationKind.Matmul: 'matmul',
+  OperationKind.Conv2d: 'conv2d'
 }
 
 class MlirDialect(enum.Enum):
