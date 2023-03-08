@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "defaulting_select", "iree_compiler_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -72,7 +72,7 @@ config_setting(
 
 alias(
     name = "Impl",
-    actual = select({
+    actual = defaulting_select({
         ":link_shared_config": ":SharedImpl",
         "//conditions:default": ":StaticImpl",
     }),
