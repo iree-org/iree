@@ -37,7 +37,7 @@ build --enable_runfiles
 # Build settings flag aliases. See https://bazel.build/rules/config
 ###############################################################################
 build --flag_alias=iree_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
-build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API2:link_shared
+build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:link_shared
 # Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING.
 # Builds the runtime with tracing support enabled.
 build --flag_alias=iree_enable_runtime_tracing=@tracy_client//:runtime_enable

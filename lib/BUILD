@@ -13,17 +13,17 @@ package(
 cc_binary(
     name = "libIREECompiler.so",
     srcs = [
-        "//compiler/src/iree/compiler/API2:api_exports.c",
+        "//compiler/src/iree/compiler/API:api_exports.c",
     ],
     linkopts = [
-        "-Wl,--version-script=$(location //compiler/src/iree/compiler/API2:api_exports.ld)",
+        "-Wl,--version-script=$(location //compiler/src/iree/compiler/API:api_exports.ld)",
         "-Wl,--no-undefined",
     ],
     linkshared = 1,
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API2:MLIRInteropHeaders",
-        "//compiler/src/iree/compiler/API2:StaticImpl",
-        "//compiler/src/iree/compiler/API2:api_exports.ld",
+        "//compiler/src/iree/compiler/API:MLIRInteropHeaders",
+        "//compiler/src/iree/compiler/API:StaticImpl",
+        "//compiler/src/iree/compiler/API:api_exports.ld",
     ],
 )

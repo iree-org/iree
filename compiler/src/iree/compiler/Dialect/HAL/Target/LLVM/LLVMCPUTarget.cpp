@@ -465,32 +465,17 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       objectFiles.push_back(std::move(objectFile));
     }
 
-    // If we are keeping artifacts then let's also add the bitcode and
-    // assembly listing for easier debugging (vs just the binary object file).
-    if (options_.keepLinkerArtifacts) {
+    // Dump assembly listing after optimization, which is just a textual
+    // representation of the object file we generate below.
+    if (!options.dumpIntermediatesPath.empty()) {
       std::string asmData;
       if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
                                       llvm::CGFT_AssemblyFile, &asmData))) {
         return variantOp.emitError()
                << "failed to compile LLVM-IR module to an assembly file";
       }
-      {
-        auto asmFile = Artifact::createVariant(objectFiles.front().path, "s");
-        auto &os = asmFile.outputFile->os();
-        os << asmData;
-        os.flush();
-        os.close();
-        asmFile.outputFile->keep();
-      }
-      {
-        auto bitcodeFile =
-            Artifact::createVariant(objectFiles.front().path, "bc");
-        auto &os = bitcodeFile.outputFile->os();
-        llvm::WriteBitcodeToFile(*llvmModule, os);
-        os.flush();
-        os.close();
-        bitcodeFile.outputFile->keep();
-      }
+      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                     variantOp.getName(), ".s", asmData);
     }
 
     // If custom object files were specified then add those to our artifact set.

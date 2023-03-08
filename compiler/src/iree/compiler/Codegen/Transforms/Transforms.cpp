@@ -247,5 +247,231 @@ template void hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
 template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
     RewriterBase &rewriter, func::FuncOp funcOp);
 
+//===---------------------------------------------------------------------===//
+// Patterns to fold tensor.expand/collapse_shape into
+// `hal.interface.binding.subspan`
+//===---------------------------------------------------------------------===//
+
+namespace {
+
+// TODO(antigainst): enable dynamic shape support once they are needed.
+template <typename TensorReshapeOp>
+static Optional<Value> getStaticReshapeOpSrc(TensorReshapeOp reshapeOp) {
+  auto reshapeSrcType =
+      reshapeOp.getSrc().getType().template cast<ShapedType>();
+  auto reshapeDstType = reshapeOp.getType().template cast<ShapedType>();
+  if (!reshapeSrcType.hasStaticShape() || !reshapeDstType.hasStaticShape())
+    return std::nullopt;
+  return reshapeOp.getSrc();
+}
+
+/// Folds tensor.expand/collapse_shape into the source
+/// hal.interface.binding.subspan.
+///
+/// For example, this matches the following pattern:
+///
+///   %subspan = hal.interface.binding.subspan ... :
+///       !flow.dispatch.tensor<readonly:tensor<3x3x1x96xf32>>
+///   %tensor = flow.dispatch.tensor.load %subspan :
+///       !flow.dispatch.tensor<readonly:tensor<3x3x1x96xf32>> ->
+///       tensor<3x3x1x96xf32>
+///   %0 = linalg.tensor_reshape %tensor [
+///         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+///       ] : tensor<3x3x1x96xf32> into tensor<864xf32>
+///
+/// And turns it into:
+///
+///   %subspan = hal.interface.binding.subspan ... :
+///       !flow.dispatch.tensor<readonly:tensor<864xf32>>
+///   %0 = flow.dispatch.tensor.load %subspan :
+///       !flow.dispatch.tensor<readonly:tensor<864xf32>> -> tensor<864xf32>
+template <typename TensorReshapeOp>
+struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
+  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    Optional<Value> reshapeSrc =
+        getStaticReshapeOpSrc<TensorReshapeOp>(reshapeOp);
+    if (!reshapeSrc) return failure();
+
+    auto loadOp =
+        reshapeSrc->template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+    if (!loadOp) return failure();
+
+    // Make sure we are loading the full incoming subspan. Otherwise we cannot
+    // simply adjust the subspan's resultant type later.
+    if (!loadOp.offsets().empty() || !loadOp.sizes().empty() ||
+        !loadOp.strides().empty())
+      return failure();
+
+    auto subspanOp =
+        loadOp.getSource()
+            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!subspanOp) return failure();
+    assert(subspanOp.getDynamicDims().empty());
+
+    auto tensorAccess = subspanOp.getType()
+                            .template cast<IREE::Flow::DispatchTensorType>()
+                            .getAccess();
+    auto newSubspanType = IREE::Flow::DispatchTensorType::get(
+        tensorAccess, reshapeOp.getResultType());
+
+    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+        subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
+        subspanOp.getBinding(), subspanOp.getDescriptorType(),
+        subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
+        subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+
+    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
+        reshapeOp, reshapeOp.getResultType(), newSubspanOp,
+        loadOp.getSourceDims());
+
+    return success();
+  }
+};
+
+/// Folds tensor.expand/collapse_shape into the source
+/// hal.interface.binding.subspan.
+///
+/// For example, this matches the following pattern:
+///
+///   %subspan = hal.interface.binding.subspan ... :
+///       !flow.dispatch.tensor<writeonly:tensor<3x3x1x96xf32>>
+///   %0 = linalg.tensor_reshape %tensor [
+///         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+///       ] : tensor<864xf32> into tensor<3x3x1x96xf32>
+///   %tensor = flow.dispatch.tensor.store %0, %subspan :
+///       !flow.dispatch.tensor<writeonly:tensor<3x3x1x96xf32>> ->
+///       tensor<3x3x1x96xf32>
+///
+/// And turns it into:
+///
+///   %subspan = hal.interface.binding.subspan ... :
+///       !flow.dispatch.tensor<writeonly:tensor<864xf32>>
+///   %0 = flow.dispatch.tensor.store %tensor, %subspan :
+///       !flow.dispatch.tensor<writeonly:tensor<864xf32>> -> tensor<864xf32>
+struct FoldReshapeIntoInterfaceTensorStore
+    : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
+  using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    // Make sure we are storing the full incoming subspan. Otherwise we cannot
+    // simply adjust the subspan's resultant type later.
+    if (!storeOp.offsets().empty() || !storeOp.sizes().empty() ||
+        !storeOp.strides().empty())
+      return failure();
+
+    auto reshapeOp = storeOp.getValue().getDefiningOp();
+    if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(reshapeOp))
+      return failure();
+
+    // Dynamic shapes are currently unsupported.
+    Optional<Value> reshapeSrc =
+        isa<tensor::CollapseShapeOp>(reshapeOp)
+            ? getStaticReshapeOpSrc<tensor::CollapseShapeOp>(
+                  cast<tensor::CollapseShapeOp>(reshapeOp))
+            : getStaticReshapeOpSrc<tensor::ExpandShapeOp>(
+                  cast<tensor::ExpandShapeOp>(reshapeOp));
+    if (!reshapeSrc) return failure();
+
+    auto subspanOp =
+        storeOp.getTarget()
+            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!subspanOp) return failure();
+    assert(subspanOp.getDynamicDims().empty());
+
+    auto tensorAccess = subspanOp.getType()
+                            .template cast<IREE::Flow::DispatchTensorType>()
+                            .getAccess();
+    auto newSubspanType = IREE::Flow::DispatchTensorType::get(
+        tensorAccess, reshapeSrc->getType());
+
+    Value newSubspanOp;
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointAfter(subspanOp);
+      newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+          subspanOp.getLoc(), newSubspanType, subspanOp.getSet(),
+          subspanOp.getBinding(), subspanOp.getDescriptorType(),
+          subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
+          subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
+        storeOp, *reshapeSrc, newSubspanOp, storeOp.getTargetDims());
+
+    return success();
+  }
+};
+}  // namespace
+
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
+  patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
+                  FoldReshapeIntoInterfaceTensorLoad<tensor::ExpandShapeOp>>(
+      patterns.getContext());
+  patterns.insert<FoldReshapeIntoInterfaceTensorStore>(patterns.getContext());
+}
+
+//===--------------------------------------------------------------------====//
+// Pattern to remove dead allocations
+//===--------------------------------------------------------------------====//
+
+namespace {
+
+// Erases the operation if its only users are memref.assume_alignment ops.
+static LogicalResult eraseAlignmentOnlyDeadOp(PatternRewriter &rewriter,
+                                              Operation *op) {
+  SmallVector<Operation *> deadUsers;
+  for (OpOperand &use : op->getUses()) {
+    if (auto user = dyn_cast<memref::AssumeAlignmentOp>(use.getOwner())) {
+      deadUsers.push_back(user);
+      continue;
+    }
+    // For any other use, return failure;
+    return failure();
+  }
+  for (auto user : deadUsers) {
+    rewriter.eraseOp(user);
+  }
+  rewriter.eraseOp(op);
+  return success();
+}
+
+// Removes operations with Allocate MemoryEffects but no uses.
+struct RemoveDeadMemAllocs : RewritePattern {
+  RemoveDeadMemAllocs(MLIRContext *context, PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    auto memEffect = dyn_cast<MemoryEffectOpInterface>(op);
+    if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
+      return failure();
+    }
+    return eraseAlignmentOnlyDeadOp(rewriter, op);
+  }
+};
+
+// Removes hal.interface.binding.subspan ops with only assume_alignment uses.
+struct RemoveDeadInterfaceBindings
+    : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  RemoveDeadInterfaceBindings(MLIRContext *context, PatternBenefit benefit = 1)
+      : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp>(context,
+                                                               benefit) {}
+
+  LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
+                                PatternRewriter &rewriter) const override {
+    return eraseAlignmentOnlyDeadOp(rewriter, op);
+  }
+};
+}  // namespace
+
+void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
+  patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
+  patterns.insert<RemoveDeadInterfaceBindings>(patterns.getContext());
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -310,7 +310,12 @@ class BuildFileFunctions(object):
   def platform_trampoline_deps(self, basename, path="base"):
     return [f"//{path}/internal:{basename}_internal"]
 
-  def select(self, selector):
+  def select(self, d):
+    self._convert_unimplemented_function("select", str(d))
+    return d["//conditions:default"]
+
+  def defaulting_select(self, selector):
+    """Defined in build_defs.oss.bzl as a scoped alternative to select."""
     default_value = selector.get("//conditions:default")
     if default_value is None:
       raise ValueError("bazel_to_cmake can only convert selects with a default")

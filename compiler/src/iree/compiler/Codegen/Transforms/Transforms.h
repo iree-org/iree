@@ -88,6 +88,14 @@ using GetMinMaxExprFn =
 /// |getMinMaxFn| for some know values.
 void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
                                               GetMinMaxExprFn getMinMaxFn);
+
+/// Populate patterns that fold tensor.expand/collapse_shape into the source
+/// hal.interface.binding.subspan.
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
+
+/// Populate patterns that remove dead allocations
+void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

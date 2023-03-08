@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_API2_INTERNAL_DIAGNOSTICS_H
-#define IREE_COMPILER_API2_INTERNAL_DIAGNOSTICS_H
+#ifndef IREE_COMPILER_API_INTERNAL_DIAGNOSTICS_H
+#define IREE_COMPILER_API_INTERNAL_DIAGNOSTICS_H
 
 #include <functional>
 #include <string_view>
@@ -42,4 +42,4 @@ class FormattingDiagnosticHandler {
 
 }  // namespace mlir::iree_compiler::embed
 
-#endif  // IREE_COMPILER_API2_INTERNAL_DIAGNOSTICS_H
+#endif  // IREE_COMPILER_API_INTERNAL_DIAGNOSTICS_H

@@ -207,6 +207,10 @@ iree_thread_override_t* iree_thread_priority_class_override_begin(
 }
 
 void iree_thread_override_end(iree_thread_override_t* override) {
+  // pthread_override_qos_class_start_np() in the begin call can fail, in
+  // which case we must not attempt to end it.
+  if (!override) return;
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   pthread_override_qos_class_end_np((pthread_override_t)override);

@@ -37,12 +37,11 @@ constexpr unsigned AMDNumMNTilesPerSubgroup = 8;
 
 static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
                                         const spirv::TargetEnv &targetEnv) {
-  if (failed(setCooperativeMatrixConfig(
+  if (succeeded(setCooperativeMatrixConfig(
           targetEnv, op, AMDNumSubgroupsPerWorkgroup, AMDNumMNTilesPerSubgroup,
           AMDCoopMatrixSoftwarePipelineDepth,
           AMDCoopMatrixSoftwarePipelineStoreStage)))
-    return failure();
-  if (getLoweringConfig(op)) return success();
+    return success();
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   const int subgroupSize = limits.getSubgroupSize();
@@ -98,7 +97,7 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
         int bestTilingFactor = hasPaddedInput ? 16 : 32;
         return setConvOpConfig(op, subgroupSize, bestTilingFactor);
       })
-      .Default([](Operation *) { return success(); });
+      .Default([](Operation *) { return failure(); });
 }
 
 }  // namespace detail

@@ -17,8 +17,8 @@ iree_compiler_cc_test(
     srcs = ["api-test-main.c"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API2:Impl",
-        "//compiler/src/iree/compiler/API2:MLIRInteropHeaders",
+        "//compiler/src/iree/compiler/API:Impl",
+        "//compiler/src/iree/compiler/API:MLIRInteropHeaders",
         "//runtime/src/iree/base",
         "@llvm-project//mlir:CAPIIRHeaders",
     ],

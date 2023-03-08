@@ -46,12 +46,14 @@ cc_binary(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:benchmark",
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:trace_replay",
+        "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/tooling:yaml_util",
         "//runtime/src/iree/vm",
         "@com_github_yaml_libyaml//:yaml",
@@ -109,7 +111,7 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API2:Impl",
+        "//compiler/src/iree/compiler/API:Impl",
     ],
 )
 
@@ -118,7 +120,7 @@ cc_binary(
     srcs = ["iree-mlir-lsp-server.cc"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API2:Impl",
+        "//compiler/src/iree/compiler/API:Impl",
     ],
 )
 
@@ -245,6 +247,6 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API2:Impl",
+        "//compiler/src/iree/compiler/API:Impl",
     ],
 )

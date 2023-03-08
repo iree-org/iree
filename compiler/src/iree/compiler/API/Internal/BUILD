@@ -103,7 +103,7 @@ iree_compiler_cc_library(
         "MLIRInterop.cpp",
     ],
     deps = [
-        "//compiler/src/iree/compiler/API2:MLIRInteropHeaders",
+        "//compiler/src/iree/compiler/API:MLIRInteropHeaders",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",

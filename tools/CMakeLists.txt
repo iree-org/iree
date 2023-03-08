@@ -65,6 +65,7 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::atomic_slist
+    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
     iree::base::tracing
@@ -73,6 +74,7 @@ iree_cc_binary(
     iree::testing::benchmark
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
@@ -233,7 +235,7 @@ if(IREE_BUILD_COMPILER)
       "iree-compile-main.cc"
     DEPS
       iree::compiler::bindings::c::headers
-      iree::compiler::API2::Impl
+      iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -247,7 +249,7 @@ if(IREE_BUILD_COMPILER)
       "iree-opt-main.cc"
     DEPS
       iree::compiler::bindings::c::headers
-      iree::compiler::API2::Impl
+      iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -261,7 +263,7 @@ if(IREE_BUILD_COMPILER)
       "iree-mlir-lsp-server.cc"
     DEPS
       iree::compiler::bindings::c::headers
-      iree::compiler::API2::Impl
+      iree::compiler::API::Impl
     SETUP_INSTALL_RPATH
   )
 
