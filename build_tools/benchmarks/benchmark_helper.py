@@ -20,85 +20,106 @@ from e2e_test_framework import serialization
 from e2e_test_artifacts import model_artifacts, iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 
+IREE_COMPILER_NAME = "iree-compile"
 
-def dump_flags_of_generation_config(
-    module_generation_config: iree_definitions.ModuleGenerationConfig,
+
+def _dump_cmds_of_generation_config(
+    gen_config: iree_definitions.ModuleGenerationConfig,
     root_path: pathlib.PurePath = pathlib.PurePath()):
 
-  imported_model = module_generation_config.imported_model
+  imported_model = gen_config.imported_model
   imported_model_path = iree_artifacts.get_imported_model_path(
       imported_model=imported_model, root_path=root_path)
-  source_model_path = model_artifacts.get_model_path(model=imported_model.model,
-                                                     root_path=root_path)
-
-  compile_flags = module_generation_config.materialize_compile_flags() + [
-      str(imported_model_path)
+  module_path = iree_artifacts.get_module_dir_path(
+      module_generation_config=gen_config,
+      root_path=root_path) / iree_artifacts.MODULE_FILENAME
+  compile_cmds = [
+      IREE_COMPILER_NAME,
+      str(imported_model_path), "-o",
+      str(module_path)
   ]
-  import_flags = imported_model.import_config.materialize_import_flags(
-      model=imported_model.model) + [str(source_model_path)]
-  # TODO(#12215): Include benchmark name to make them searchable by keywords.
-  return {
-      "composite_id": module_generation_config.composite_id,
-      "compile_flags": compile_flags,
-      "import_tool": imported_model.import_config.tool.value,
-      "import_flags": import_flags
-  }
+  compile_cmds += gen_config.materialize_compile_flags()
+
+  if imported_model.import_config.tool == iree_definitions.ImportTool.NONE:
+    import_cmds = ["(Source model is already in MLIR)"]
+  else:
+    source_model_path = model_artifacts.get_model_path(
+        model=imported_model.model, root_path=root_path)
+    import_cmds = [
+        imported_model.import_config.tool.value,
+        str(source_model_path), "-o",
+        str(imported_model_path)
+    ]
+    import_cmds += imported_model.import_config.materialize_import_flags(
+        model=imported_model.model)
+
+  # TODO(#12215): Print benchmark name to make them searchable by keywords.
+  # Insert a blank line after each command to help read with line wrap.
+  return [
+      f'Compile Module: {" ".join(compile_cmds)}', "",
+      f'Import Model: {" ".join(import_cmds)}', ""
+  ]
 
 
-def dump_flags_from_run_config(
-    e2e_model_run_config: iree_definitions.E2EModelRunConfig,
+def _dump_cmds_from_run_config(
+    run_config: iree_definitions.E2EModelRunConfig,
     root_path: pathlib.PurePath = pathlib.PurePath()):
 
-  gen_config = e2e_model_run_config.module_generation_config
+  gen_config = run_config.module_generation_config
   module_path = iree_artifacts.get_module_dir_path(
       module_generation_config=gen_config,
       root_path=root_path) / iree_artifacts.MODULE_FILENAME
 
-  run_flags = e2e_model_run_config.materialize_run_flags() + [
-      f"--module={module_path}"
-  ]
+  run_cmds = [run_config.tool.value, f"--module={module_path}"]
+  run_cmds += run_config.materialize_run_flags()
   # TODO(#12215): Include benchmark name to make them searchable by keywords.
-  return {
-      "composite_id":
-          e2e_model_run_config.composite_id,
-      "run_flags":
-          run_flags,
-      "module_generation_config":
-          dump_flags_of_generation_config(module_generation_config=gen_config,
-                                          root_path=root_path)
-  }
+  # Insert a blank line after the command to help read with line wrap.
+  lines = [f'Run Module: {" ".join(run_cmds)}', ""]
+  lines += _dump_cmds_of_generation_config(gen_config=gen_config,
+                                           root_path=root_path)
+  return lines
 
 
-def _dump_flags_handler(args: argparse.Namespace):
-  dump_configs = {}
+def _dump_cmds_handler(args: argparse.Namespace):
   root_path = args.e2e_test_artifacts_dir
+  benchmark_id = args.benchmark_id
+  lines = []
+
   if args.execution_benchmark_config is not None:
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
     for target_device, benchmark_group in benchmark_groups.items():
       run_configs = serialization.unpack_and_deserialize(
           data=benchmark_group["run_configs"],
           root_type=List[iree_definitions.E2EModelRunConfig])
-      dump_configs[target_device] = dict(
-          (run_config.composite_id,
-           dump_flags_from_run_config(e2e_model_run_config=run_config,
-                                      root_path=root_path))
-          for run_config in run_configs)
+      for run_config in run_configs:
+        if benchmark_id is not None and benchmark_id != run_config.composite_id:
+          continue
 
-  elif args.compilation_benchmark_config is not None:
+        lines.append("################")
+        lines.append("")
+        lines.append(f"Execution Benchmark ID: {run_config.composite_id}")
+        lines.append(f"Target Device: {target_device}")
+        lines.append("")
+        lines += _dump_cmds_from_run_config(run_config=run_config,
+                                            root_path=root_path)
+
+  if args.compilation_benchmark_config is not None:
     benchmark_config = json.loads(args.compilation_benchmark_config.read_text())
     gen_configs = serialization.unpack_and_deserialize(
         data=benchmark_config["generation_configs"],
         root_type=List[iree_definitions.ModuleGenerationConfig])
-    dump_configs = dict(
-        (gen_config.composite_id,
-         dump_flags_of_generation_config(module_generation_config=gen_config,
-                                         root_path=root_path))
-        for gen_config in gen_configs)
+    for gen_config in gen_configs:
+      if benchmark_id is not None and benchmark_id != gen_config.composite_id:
+        continue
 
-  else:
-    raise AssertionError("No benchmark config is set.")
+      lines.append("################")
+      lines.append("")
+      lines.append(f"Compilation Benchmark ID: {gen_config.composite_id}")
+      lines.append("")
+      lines += _dump_cmds_of_generation_config(gen_config=gen_config,
+                                               root_path=root_path)
 
-  print(json.dumps(dump_configs, indent=2))
+  print(*lines, sep="\n")
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -107,27 +128,34 @@ def _parse_arguments() -> argparse.Namespace:
       "Miscellaneous tool to help work with benchmark suite and benchmark CI.")
 
   subparser = parser.add_subparsers(required=True, title="operation")
-  dump_flags_parser = subparser.add_parser(
-      "dump-flags",
-      help="Dump the flags to compile and run benchmarks manually.")
-  dump_flags_parser.add_argument(
+  dump_cmds_parser = subparser.add_parser(
+      "dump-cmds",
+      help="Dump the commands to compile and run benchmarks manually.")
+  dump_cmds_parser.add_argument(
       "--e2e_test_artifacts_dir",
       type=pathlib.PurePath,
       default=pathlib.Path(),
       help="E2E test artifacts root path used in the outputs of artifact paths")
-  dump_flags_input_parser = dump_flags_parser.add_mutually_exclusive_group(
-      required=True)
-  dump_flags_input_parser.add_argument(
+  dump_cmds_parser.add_argument("--benchmark_id",
+                                type=str,
+                                help="Only dump the benchmark with this id")
+  dump_cmds_parser.add_argument(
       "--execution_benchmark_config",
       type=pathlib.Path,
       help="Config file exported from export_benchmark_config.py execution")
-  dump_flags_input_parser.add_argument(
+  dump_cmds_parser.add_argument(
       "--compilation_benchmark_config",
       type=pathlib.Path,
       help="Config file exported from export_benchmark_config.py compilation")
-  dump_flags_parser.set_defaults(handler=_dump_flags_handler)
+  dump_cmds_parser.set_defaults(handler=_dump_cmds_handler)
 
-  return parser.parse_args()
+  args = parser.parse_args()
+  if (args.execution_benchmark_config is None and
+      args.compilation_benchmark_config is None):
+    parser.error("At least one of --execution_benchmark_config or "
+                 "--compilation_benchmark_config must be set.")
+
+  return args
 
 
 def main(args: argparse.Namespace):
