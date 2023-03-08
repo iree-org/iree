@@ -1514,7 +1514,7 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
     for (size_t i = 0; i < inv.res_exe->result_count; ++i) {
       iree::vm::ref<iree_hal_buffer_view_t> ret_buffer_view =
           retain_ref((iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
-              inv.outputs.get(), i, iree_hal_buffer_view_get_descriptor()));
+              inv.outputs.get(), i, &iree_hal_buffer_view_descriptor));
       // This should not be possible so just hard-assert.
       IREE_ASSERT_ARGUMENT(ret_buffer_view);
       auto result_buffer = std::make_unique<BufferInstance>(
