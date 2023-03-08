@@ -14,6 +14,8 @@ def defaulting_select(selector):
           include a "//conditions:default" branch, which is used by tooling
           outside of Bazel when converting to other build systems.
     """
+    if "//conditions:default" not in selector:
+        fail("defaulting_select requires a //conditions:default branch")
     return select(selector)
 
 def platform_trampoline_deps(basename, path = "runtime/src/iree/base"):
