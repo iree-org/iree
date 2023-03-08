@@ -463,7 +463,7 @@ struct LinalgPaddingPattern
     if (failed(filter.checkAndNotify(rewriter, op)))
       return failure();
     linalg::LinalgPaddingPattern p(op.getContext(), options);
-    auto maybeRes = p.returningMatchAndRewrite(op, rewriter);
+    auto maybeRes = linalg::padAndHoistLinalgOp(rewriter, op, options);
     if (failed(maybeRes))
       return failure();
     filter.replaceLinalgTransformationFilter(rewriter, *maybeRes);

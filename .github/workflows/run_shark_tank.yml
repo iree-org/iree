@@ -20,7 +20,6 @@ jobs:
       PR_BODY: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.configure.outputs.should-run }}
-      ci-stage: ${{ steps.configure.outputs.ci-stage }}
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
       write-caches: ${{ steps.configure.outputs.write-caches }}

@@ -65,7 +65,7 @@ jobs:
       BASE_REF: HEAD^
     outputs:
       should-run: ${{ steps.configure.outputs.should-run }}
-      ci-stage: ${{ steps.configure.outputs.ci-stage }}
+      is-pr: ${{ steps.configure.outputs.is-pr }}
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
       write-caches: ${{ steps.configure.outputs.write-caches }}
@@ -103,6 +103,8 @@ jobs:
         env:
           PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
           PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
+          ORIGINAL_PR_TITLE: ${{ github.event.pull_request.title }}
+          ORIGINAL_PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           # Just informative logging. There should only be two commits in the
           # history here, but limiting the depth helps when copying from a local
@@ -112,12 +114,19 @@ jobs:
 
           ./build_tools/github_actions/configure_ci.py
 
+      - name: "Show benchmark presets"
+        env:
+          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets }}
+        run: |
+          echo ":stopwatch: Enabled benchmarks: \`${BENCHMARK_PRESETS}\`" \
+            >> "${GITHUB_STEP_SUMMARY}"
+
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
   build_all:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -182,7 +191,7 @@ jobs:
 
   build_test_all_windows:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
+    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on: managed-windows-cpu
     defaults:
       run:
@@ -193,17 +202,9 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      # Attempt to restore from caches unconditionally.
-      # Note: these will first try to grab a cache entry for this exact commit
-      #       then they will fall back to the latest for any commit.
-      # We're pretty limited on repository cache space (10GB) relative to cache
-      # entry size (~2.5GB), so this usage is pretty optimistic.
-      - name: "Fetching cache (git submodules)"
-        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: .git/modules
-          key: gitmodules_all_windows_${{ github.sha }}
-          restore-keys: gitmodules_all_windows
+      # Attempt to restore from cache unconditionally.
+      # Note: this will first try to grab a cache entry for this exact commit
+      #       then it will fall back to the latest for any commit.
       - name: "Fetching cache (CMake/ccache)"
         uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
         with:
@@ -235,19 +236,19 @@ jobs:
           IREE_READ_LOCAL_CCACHE: 1
           IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
           CCACHE_DIR: ${{ github.workspace }}/.ccache
-          # A full build is around 2.5GB, but uploads/downloads are slow and
-          # we have a limit of 10GB per repository
-          CCACHE_MAXSIZE: 3G
+          # Cache size and compression level settings are a delicate balance.
+          # * A full build cache is around 2-5GB depending on compression level
+          # * Upload/download is slow (double compression may or may not help)
+          # * We have a limit of 10GB across all cached files per repository
+          # * Cache misses are quite costly:
+          #   * 99% cache hits -> ~5 minutes to build
+          #   * 20% cache hits -> ~15-20 minutes to build
+          CCACHE_MAXSIZE: 4G
+          CCACHE_COMPRESSLEVEL: 5
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      # Write caches (if configured to) after all other steps are finished.
-      - name: "Saving cache (git submodules)"
-        if: needs.setup.outputs.write-caches == '1'
-        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
-        with:
-          path: .git/modules
-          key: gitmodules_all_windows_${{ github.sha }}
+      # Write cache (if configured to) after all other steps are finished.
       - name: "Saving cache (CMake/ccache)"
         if: needs.setup.outputs.write-caches == '1'
         uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
@@ -255,9 +256,42 @@ jobs:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_windows_${{ github.sha }}
 
+  build_test_all_macos:
+    needs: setup
+    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
+    runs-on:
+      - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}  # must come first
+      - runner-group=postsubmit
+      - os-family=macOS
+    env:
+      BUILD_DIR: build-macos
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Updating git submodules"
+        run: git submodule update --init --jobs 8 --depth 1
+      - name: "Installing Python packages"
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Building IREE"
+        env:
+          IREE_READ_REMOTE_CCACHE: 0
+          IREE_WRITE_REMOTE_CCACHE: 0
+          IREE_READ_LOCAL_CCACHE: 1
+          IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
+          # We'll remove the GITHUB_WORKSPACE directory after the job.
+          # Persist the cache by storing in the parent directory.
+          CCACHE_DIR: ${{ github.workspace }}/../.ccache
+          CCACHE_MAXSIZE: 30G
+        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: "Testing IREE"
+        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+
   build_test_all_bazel:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -280,7 +314,7 @@ jobs:
 
   test_all:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -310,7 +344,7 @@ jobs:
 
   test_gpu:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -353,7 +387,7 @@ jobs:
   ##############################################################################
   build_test_runtime:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on: ubuntu-20.04-64core
     env:
       BUILD_DIR: build-runtime
@@ -381,7 +415,7 @@ jobs:
 
   build_test_runtime_windows:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on: managed-windows-cpu
     defaults:
       run:
@@ -410,7 +444,7 @@ jobs:
   ##############################################################################
   build_tf_integrations:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -457,7 +491,7 @@ jobs:
 
   test_tf_integrations:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -496,7 +530,7 @@ jobs:
 
   test_tf_integrations_gpu:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -544,7 +578,7 @@ jobs:
   # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
   test_build_benchmark_suites:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -587,7 +621,7 @@ jobs:
   ##############################################################################
   python_release_packages:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -628,7 +662,7 @@ jobs:
 
   asan:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -656,7 +690,7 @@ jobs:
 
   tsan:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -681,7 +715,7 @@ jobs:
 
   small_runtime:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on: ubuntu-20.04-64core
     env:
       BUILD_DIR: build-runtime
@@ -708,7 +742,7 @@ jobs:
 
   gcc:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -740,7 +774,7 @@ jobs:
 
   tracing:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -769,7 +803,7 @@ jobs:
 
   debug:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -802,7 +836,7 @@ jobs:
 
   build_benchmark_tools:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -885,7 +919,7 @@ jobs:
 
   build_e2e_test_artifacts:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -953,7 +987,7 @@ jobs:
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -1002,12 +1036,11 @@ jobs:
           GENERATION_CONFIG: generation-config.json
           COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
         run: |
-          jq '.generation_configs' "${COMPILATION_CONFIG}" > "${GENERATION_CONFIG}"
           mkdir -p benchmark-results
           ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
             --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
             --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
-            --generation_config="${GENERATION_CONFIG}" \
+            --compilation_benchmark_config="${COMPILATION_CONFIG}" \
             --output="${COMPILE_STATS_RESULTS}"
           echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading benchmark results"
@@ -1027,7 +1060,7 @@ jobs:
 
   execution_benchmarks:
     needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/benchmark_execution.yml
     with:
       # env.GCS_DIR is also duplicated in this workflow. See the note there on
@@ -1041,7 +1074,7 @@ jobs:
 
   process_benchmark_results:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.benchmark-presets != ''
+    if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -1078,7 +1111,7 @@ jobs:
             "${EXECUTION_BENCHMARK_RESULTS_DIR}"
           echo "execution-benchmark-results-pattern=${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-*.json" >> "${GITHUB_OUTPUT}"
       - name: Generating comment
-        if: needs.setup.outputs.ci-stage == 'presubmit'
+        if: fromJson(needs.setup.outputs.is-pr)
         id: generate-comment
         env:
           # Wildcard pattern to match all execution benchmark results. Empty if
@@ -1105,7 +1138,7 @@ jobs:
         # Due to security reasons, instead of posting the comment to PR, we only
         # upload the comment data in presubmit workflow and trigger the posting
         # workflow on the main branch. See post_benchmark_comment.yaml
-        if: needs.setup.outputs.ci-stage == 'presubmit'
+        if: fromJson(needs.setup.outputs.is-pr)
         env:
           BENCHMARK_COMMENT_ARTIFACT: ${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
           BENCHMARK_COMMENT_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.generate-comment.outputs.benchmark-comment-artifact }}
@@ -1114,7 +1147,7 @@ jobs:
             "${BENCHMARK_COMMENT_ARTIFACT}" \
             "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
       - name: Uploading results to dashboard
-        if: needs.setup.outputs.ci-stage == 'postsubmit'
+        if: github.ref_name == 'main'
         env:
           EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
           IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
@@ -1133,7 +1166,7 @@ jobs:
 
   cross_compile_and_test:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -1222,7 +1255,7 @@ jobs:
 
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
-    if: needs.setup.outputs.should-run == 'true'
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -1304,6 +1337,7 @@ jobs:
       # Basic
       - build_all
       - build_test_all_windows
+      - build_test_all_macos
       - build_test_all_bazel
       - test_all
       - test_gpu
@@ -1358,7 +1392,7 @@ jobs:
           fi
       - name: Posting to Discord
         uses: sarisia/actions-status-discord@c193626e5ce172002b8161e116aa897de7ab5383 # v1.10.2
-        if: failure() && needs.setup.outputs.ci-stage == 'postsubmit'
+        if: failure() && github.ref_name == 'main'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"

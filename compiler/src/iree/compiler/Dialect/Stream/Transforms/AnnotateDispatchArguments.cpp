@@ -340,9 +340,11 @@ class ArgumentAnalysis {
 
     // Find all dispatches and bucket by their target entry point.
     rootOp->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto exportOp = explorer.getSymbolTables().lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.getEntryPoint());
-      entryDispatchMap[exportOp].push_back(dispatchOp);
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp = explorer.getSymbolTables().lookupNearestSymbolFrom(
+            dispatchOp, entryPointAttr);
+        entryDispatchMap[exportOp].push_back(dispatchOp);
+      });
     });
   }
 

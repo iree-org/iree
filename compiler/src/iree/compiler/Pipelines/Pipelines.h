@@ -34,6 +34,8 @@ enum class IREEVMPipelinePhase {
   Preprocessing,
   Flow,
   Stream,
+  ExecutableSources,
+  ExecutableTargets,
   HAL,
   VM,
   End,
@@ -54,6 +56,11 @@ inline static void enumerateIREEVMPipelinePhases(
            "Compiles up to the `flow` dialect.");
   callback(IREEVMPipelinePhase::Stream, "stream",
            "Compiles up to the `stream` dialect.");
+  callback(IREEVMPipelinePhase::ExecutableSources, "executable-sources",
+           "Compiles up to just before `hal.executable`s are translated, "
+           "excluding codegen.");
+  callback(IREEVMPipelinePhase::ExecutableTargets, "executable-targets",
+           "Compiles up to translated `hal.executable`s, including codegen.");
   callback(IREEVMPipelinePhase::HAL, "hal",
            "Compiles up to the `hal` dialect, including codegen.");
   callback(IREEVMPipelinePhase::VM, "vm", "Compiles up to the `vm` dialect.");

@@ -37,7 +37,7 @@ static Status PrintVariantList(iree_vm_list_t* variant_list,
   iree_string_builder_t builder;
   iree_string_builder_initialize(iree_allocator_system(), &builder);
   IREE_RETURN_IF_ERROR(iree_tooling_append_variant_list_lines(
-      variant_list, /*max_element_count=*/1024, &builder));
+      IREE_SV("result"), variant_list, /*max_element_count=*/1024, &builder));
   out_string->assign(iree_string_builder_buffer(&builder),
                      iree_string_builder_size(&builder));
   iree_string_builder_deinitialize(&builder);

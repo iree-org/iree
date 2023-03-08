@@ -110,22 +110,24 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       }
 
       // Work around needing a mutable key for the set; C++ was a mistake.
-      auto &dispatchParamsSet = map[dispatchOp.getEntryPoint()];
-      DispatchParams *dispatchParams = nullptr;
-      for (auto &it : dispatchParamsSet) {
-        if (it.workload == workload) {
-          dispatchParams = &it;
-          break;
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto &dispatchParamsSet = map[entryPointAttr];
+        DispatchParams *dispatchParams = nullptr;
+        for (auto &it : dispatchParamsSet) {
+          if (it.workload == workload) {
+            dispatchParams = &it;
+            break;
+          }
         }
-      }
-      if (!dispatchParams) {
-        dispatchParamsSet.push_back({});
-        dispatchParams = &dispatchParamsSet.back();
-      }
-      dispatchParams->locs.push_back(dispatchOp.getLoc());
-      dispatchParams->workload = workload;
-      dispatchParams->bindings = std::move(bindings);
-      dispatchParams->uniformOperands = std::move(uniformOperands);
+        if (!dispatchParams) {
+          dispatchParamsSet.push_back({});
+          dispatchParams = &dispatchParamsSet.back();
+        }
+        dispatchParams->locs.push_back(dispatchOp.getLoc());
+        dispatchParams->workload = workload;
+        dispatchParams->bindings = std::move(bindings);
+        dispatchParams->uniformOperands = std::move(uniformOperands);
+      });
     });
   }
 
@@ -390,7 +392,10 @@ static mlir::OwningOpRef<mlir::ModuleOp> buildBenchmarkModule(
   for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
     auto symbolRefAttr =
         SymbolRefAttr::get(executableOp.getNameAttr(),
-                           {FlatSymbolRefAttr::get(exportOp.getNameAttr())});
+                           {
+                               FlatSymbolRefAttr::get(variantOp.getNameAttr()),
+                               FlatSymbolRefAttr::get(exportOp.getNameAttr()),
+                           });
     auto dispatchParamsSet = dispatchParamsMap.find(symbolRefAttr);
     if (dispatchParamsSet != dispatchParamsMap.end()) {
       for (auto &dispatchParams : dispatchParamsSet->second) {

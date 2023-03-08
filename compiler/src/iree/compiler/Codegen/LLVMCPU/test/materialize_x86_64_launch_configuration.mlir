@@ -32,12 +32,13 @@ hal.executable private @matvec_static  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0], [32, 0], [0, 16]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-//      CHECK: hal.executable.export public @matvec_static
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK: linalg.matvec
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0], [32, 0], [0, 16]]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
+//       CHECK: hal.executable.export public @matvec_static
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK: linalg.matvec
+//  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -183,15 +184,15 @@ hal.executable private @dot_dynamic  {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-hal.executable private @add {
+hal.executable private @dynamic_add {
   hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @add layout(#pipeline_layout)
+    hal.executable.export @dynamic_add layout(#pipeline_layout)
     builtin.module {
-      func.func @add() {
+      func.func @dynamic_add() {
         %c0 = arith.constant 0 : index
         %dim0 = hal.interface.constant.load[0] : index
         %dim1 = hal.interface.constant.load[1] : index
@@ -218,8 +219,8 @@ hal.executable private @add {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 4], [0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
-//      CHECK: hal.executable.export public @add
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.export public @dynamic_add
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -276,7 +277,7 @@ hal.executable private @add4D  {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @add4D
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
@@ -317,7 +318,7 @@ hal.executable private @add_static {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 8, 16, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @add_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
@@ -544,8 +545,8 @@ hal.executable private @outs_fusion {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 32, 0], [1, 4, 0], [0, 0, 1]{{\]}}>
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 32, 0], [1, 4, 0], [0, 0, 4]{{\]}}>
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @outs_fusion_fn
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK: func.func @outs_fusion_fn()
@@ -826,7 +827,7 @@ hal.executable private @generic_static {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 96], [16, 16], [0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @generic_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -1176,7 +1177,7 @@ hal.executable private @generic_unit_dims_dynamic {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0, 64, 64, 0, 64], [1, 1, 1, 1, 1, 1, 1, 4], [0, 0, 0, 0, 0, 0, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @generic_unit_dims_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
@@ -1264,7 +1265,7 @@ hal.executable private @reduce_to_scalar_dynamic {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [4]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @reduce_to_scalar_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic

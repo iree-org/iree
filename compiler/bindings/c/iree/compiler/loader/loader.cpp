@@ -94,13 +94,13 @@ bool ireeCompilerLoadLibrary(const char *libraryPath) {
     return false;
   }
 
-#define HANDLE_SYMBOL(fn_name)                                         \
-  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(            \
-      localLibraryHandle, IREE_CDECL_SYMBOL_PREFIX #fn_name);          \
-  if (!__##fn_name) {                                                  \
-    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol %s\n", \
-            #fn_name);                                                 \
-    return false;                                                      \
+#define HANDLE_SYMBOL(fn_name)                                           \
+  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(              \
+      localLibraryHandle, IREE_CDECL_SYMBOL_PREFIX #fn_name);            \
+  if (!__##fn_name) {                                                    \
+    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol '%s'\n", \
+            IREE_CDECL_SYMBOL_PREFIX #fn_name);                          \
+    return false;                                                        \
   }
 #include "./handle_symbols.inc"
 #undef HANDLE_SYMBOL

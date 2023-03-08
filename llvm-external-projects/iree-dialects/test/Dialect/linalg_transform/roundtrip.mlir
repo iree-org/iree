@@ -1,7 +1,7 @@
 // RUN: iree-dialects-opt %s | FileCheck %s
 
-// CHECK: transform.structured.canonicalized_sequence
-transform.structured.canonicalized_sequence failures(propagate) {
+// CHECK: transform.sequence
+transform.sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   // CHECK: %[[OPS:.*]] = pdl_match @match1 in %{{.*}}
   %0 = pdl_match @match1 in %arg0 : (!pdl.operation) -> !pdl.operation

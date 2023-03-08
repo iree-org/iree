@@ -14,6 +14,12 @@
 namespace mlir {
 namespace iree_compiler {
 
+namespace IREE {
+namespace transform_dialect {
+struct ApplyPatternsOpPatterns;
+}  // namespace transform_dialect
+}  // namespace IREE
+
 struct AbstractReductionStrategy;
 
 //===----------------------------------------------------------------------===//
@@ -56,6 +62,16 @@ void createTransformRegion(func::FuncOp entryPoint,
 /// `handles` is empty.
 void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
+/// Create an ApplyPatternsOp that performs a set of key canonicalizations and
+/// so-called enabling transformations to normalize the IR.
+/// Take an existing configuration by copy (cheap object) that will be augmented
+/// locally to additionally perform:
+///   canonicalization, tiling_canonicalization, licm and cse (in this order).
+Value buildCanonicalizationAndEnablingTransforms(
+    ImplicitLocOpBuilder &b,
+    IREE::transform_dialect::ApplyPatternsOpPatterns configuration,
+    Value variantH);
+
 /// Build transform IR to dynamically selects the first non-empty handle; i.e.
 /// if (h1, h2) is:
 ///   - (non-empty, non-empty), returns (h1, h2)
@@ -86,8 +102,8 @@ struct TileToScfForAndFuseResult {
 /// Build transform IR to perform multi-level tile and fuse into an scf.for op.
 /// Note: fusion is currently unsupported.
 TileToScfForAndFuseResult buildTileFuseToScfFor(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes);
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes);
 
 /// Result of the combined transform performing tiling, fusion and
 /// distribution to parallel constructs.
@@ -127,35 +143,42 @@ struct TileToForallAndFuseAndDistributeResult {
 ///
 // TODO: if someone knows how to properly export templates go for it .. sigh.
 TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithTileSizes(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
+    ArrayAttr threadDimMapping);
 
 /// Version of `buildTileFuseDistToForallWithTileSizes` that is aware of
 /// IREE's `workgroup_count` region and should be used for the block-level
 /// tiling in a dispatch region.
 TileToForallAndFuseAndDistributeResult
 buildTileFuseDistToForallAndWorkgroupCountWithTileSizes(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
+    ArrayAttr threadDimMapping);
 
 /// Similar to `buildTileFuseDistWithTileSizes` but using `numThreads` instead
 /// of `tileSizes`.
 TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithNumThreads(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
+    ArrayAttr threadDimMapping);
 
 /// Version of `buildTileFuseDistToForallWithNumThreads` that is aware of
 /// IREE's `workgroup_count` region and should be used for the block-level
 /// tiling in a dispatch region.
 TileToForallAndFuseAndDistributeResult
 buildTileFuseDistToForallAndWorgroupCountWithNumThreads(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
+    ArrayAttr threadDimMapping);
 
-/// Build transform IR  that applies rank-reduction patterns and vectorizes.
+/// Build transform IR that applies rank-reduction patterns and vectorizes.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
+
+/// Build transform IR to hoist redundant subset operations.
+Value buildHoisting(ImplicitLocOpBuilder &b, Value funcH);
 
 /// Build transform IR to bufferize and drop HAL descriptor from memref ops.
 /// Takes a handle variantOp and returns a handle to the same variant op.
@@ -169,8 +192,9 @@ Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
 /// resulting containing forall op.
 /// Return a triple of handles to (forall, fill, combiner)
 std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
-    ImplicitLocOpBuilder &b, Value reductionH, int64_t reductionRank,
-    int64_t tileSize, int64_t reductionVectorSize, Attribute mappingAttr);
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value reductionH,
+    int64_t reductionRank, int64_t tileSize, int64_t reductionVectorSize,
+    Attribute mappingAttr);
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor

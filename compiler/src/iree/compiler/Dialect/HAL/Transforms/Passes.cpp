@@ -207,7 +207,8 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    const TargetOptions &targetOptions,
-                                   const TransformOptions &transformOptions) {
+                                   const TransformOptions &transformOptions,
+                                   PipelinePhase compileTo) {
   //----------------------------------------------------------------------------
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
@@ -225,6 +226,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
         createPreprocessExecutablesPass(command));
   }
 
+  if (compileTo == PipelinePhase::ExecutableSources) return;
+
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead
   // insert placeholder ops that are expanded after translation.
@@ -237,6 +240,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // their interfaces.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       createTranslateExecutablesPass());
+
+  if (compileTo == PipelinePhase::ExecutableTargets) return;
 
   // Substitute hal.executables we've translated with those specified on the
   // command line. This developer feature allows for splicing in hand-authored
@@ -370,9 +375,11 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 }
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   const TargetOptions &targetOptions) {
+                                   const TargetOptions &targetOptions,
+                                   PipelinePhase compileTo) {
   TransformOptions transformOptions;
-  buildHALTransformPassPipeline(passManager, targetOptions, transformOptions);
+  buildHALTransformPassPipeline(passManager, targetOptions, transformOptions,
+                                compileTo);
 }
 
 void registerHALConfigurationPassPipeline() {
@@ -390,8 +397,9 @@ void registerHALTransformPassPipeline() {
       "iree-hal-transformation-pipeline",
       "Runs the full IREE HAL dialect transformation pipeline",
       [](OpPassManager &passManager, const TransformOptions &transformOptions) {
-        buildHALTransformPassPipeline(
-            passManager, TargetOptions::FromFlags::get(), transformOptions);
+        buildHALTransformPassPipeline(passManager,
+                                      TargetOptions::FromFlags::get(),
+                                      transformOptions, PipelinePhase::End);
       });
 }
 

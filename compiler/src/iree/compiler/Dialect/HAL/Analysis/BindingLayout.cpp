@@ -45,9 +45,11 @@ static BindingLayoutAnalysis::ExportDispatchMap findAllDispatchSites(
   SymbolTable symbolTable(rootOp);
   BindingLayoutAnalysis::ExportDispatchMap dispatchMap;
   rootOp->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-    auto exportOp = symbolTable.lookupNearestSymbolFrom(
-        dispatchOp, dispatchOp.getEntryPointAttr());
-    dispatchMap[exportOp].push_back(dispatchOp);
+    dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+      auto exportOp =
+          symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+      dispatchMap[exportOp].push_back(dispatchOp);
+    });
   });
   return dispatchMap;
 }

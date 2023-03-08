@@ -904,6 +904,16 @@ iree_status_t iree_hal_vulkan_device_create(
     features2.features.shaderInt64 = VK_TRUE;
   }
 
+  if (iree_all_bits_set(enabled_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS)) {
+    if (physical_device_features.robustBufferAccess != VK_TRUE) {
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "Robust buffer access not supported by physical device");
+    }
+    features2.features.robustBufferAccess = VK_TRUE;
+  }
+
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
   memset(&semaphore_features, 0, sizeof(semaphore_features));
   semaphore_features.sType =

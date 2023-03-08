@@ -404,6 +404,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
 void transform_dialect::VectorWarpDistributionOp::build(OpBuilder &builder,
                                                         OperationState &result,
                                                         Value target) {
+  result.addTypes(pdl::OperationType::get(builder.getContext()));
   result.addOperands(target);
 }
 
@@ -671,13 +672,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
         target, "warp execute on lane 0 to scf patterns failed to apply");
   }
 
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::VectorWarpDistributionOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
 }
 
 void transform_dialect::VectorToMMAConversionOp::build(OpBuilder &builder,

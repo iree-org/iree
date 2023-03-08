@@ -3781,9 +3781,11 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
                                        "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
             .getResult();
     Value length = adaptor.getOperands()[0];
+    Value alignment = adaptor.getOperands()[1];
 
     result.push_back(access);
     result.push_back(length);
+    result.push_back(alignment);
     result.push_back(allocator);
     result.push_back(containerPtr);
 
@@ -3832,11 +3834,13 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
 
     Value offset = adaptor.getOperands()[1];
     Value length = adaptor.getOperands()[2];
+    Value alignment = adaptor.getOperands()[3];
 
     result.push_back(access);
     result.push_back(source);
     result.push_back(offset);
     result.push_back(length);
+    result.push_back(alignment);
     result.push_back(allocator);
     result.push_back(containerPtr);
 
@@ -4312,6 +4316,14 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                         "vm_fma_i32");
   patterns.add<GenericOpConversion<IREE::VM::AbsI32Op>>(typeConverter, context,
                                                         "vm_abs_i32");
+  patterns.add<GenericOpConversion<IREE::VM::MinI32SOp>>(typeConverter, context,
+                                                         "vm_min_i32s");
+  patterns.add<GenericOpConversion<IREE::VM::MinI32UOp>>(typeConverter, context,
+                                                         "vm_min_i32u");
+  patterns.add<GenericOpConversion<IREE::VM::MaxI32SOp>>(typeConverter, context,
+                                                         "vm_max_i32s");
+  patterns.add<GenericOpConversion<IREE::VM::MaxI32UOp>>(typeConverter, context,
+                                                         "vm_max_i32u");
   patterns.add<GenericOpConversion<IREE::VM::NotI32Op>>(typeConverter, context,
                                                         "vm_not_i32");
   patterns.add<GenericOpConversion<IREE::VM::AndI32Op>>(typeConverter, context,
@@ -4413,6 +4425,10 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
       typeConverter, context, "vm_floor_f32");
   patterns.add<GenericOpConversion<IREE::VM::RoundF32Op>>(
       typeConverter, context, "vm_round_f32");
+  patterns.add<GenericOpConversion<IREE::VM::MinF32Op>>(typeConverter, context,
+                                                        "vm_min_f32");
+  patterns.add<GenericOpConversion<IREE::VM::MaxF32Op>>(typeConverter, context,
+                                                        "vm_max_f32");
 
   patterns.add<GenericOpConversion<IREE::VM::AtanF32Op>>(typeConverter, context,
                                                          "vm_atan_f32");
@@ -4534,6 +4550,14 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                         "vm_fma_i64");
   patterns.add<GenericOpConversion<IREE::VM::AbsI64Op>>(typeConverter, context,
                                                         "vm_abs_i64");
+  patterns.add<GenericOpConversion<IREE::VM::MinI64SOp>>(typeConverter, context,
+                                                         "vm_min_i64s");
+  patterns.add<GenericOpConversion<IREE::VM::MinI64UOp>>(typeConverter, context,
+                                                         "vm_min_i64u");
+  patterns.add<GenericOpConversion<IREE::VM::MaxI64SOp>>(typeConverter, context,
+                                                         "vm_max_i64s");
+  patterns.add<GenericOpConversion<IREE::VM::MaxI64UOp>>(typeConverter, context,
+                                                         "vm_max_i64u");
   patterns.add<GenericOpConversion<IREE::VM::NotI64Op>>(typeConverter, context,
                                                         "vm_not_i64");
   patterns.add<GenericOpConversion<IREE::VM::AndI64Op>>(typeConverter, context,

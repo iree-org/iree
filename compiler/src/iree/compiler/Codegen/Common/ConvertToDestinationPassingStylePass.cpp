@@ -523,6 +523,64 @@ struct RemoveCstOutsDependency
     return success();
   }
 };
+
+/// Add a pattern to switch
+/// ```mlir
+///  %0 = scf.if %cond {
+///    ...
+///    scf.yield %true
+///  } else {
+///    ...
+///    scf.yield %false
+///  }
+///  flow.dispatch.tensor.store %0, %target, ...
+/// ```
+///
+/// to
+///
+/// ```mlir
+///  scf.if %cond {
+///    ...
+///    flow.dispatch.tensor.store %true, %target
+///  } else {
+///    ...
+///    flow.dispatch.tensor.store %true, %target
+///  }
+/// ```
+/// This is a workaround for #11273 while a proper fix lands.
+struct SwitchStoreOfIfResultValue
+    : public OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    auto ifOp = storeOp.getValue().getDefiningOp<scf::IfOp>();
+    if (!ifOp) {
+      return rewriter.notifyMatchFailure(storeOp,
+                                         "store source is not an if statement");
+    }
+
+    auto resultNumber = storeOp.getValue().cast<OpResult>().getResultNumber();
+    auto moveStoreInsideBody = [&](Block *body) {
+      OpBuilder::InsertionGuard guard(rewriter);
+      auto yieldOp = cast<scf::YieldOp>(body->getTerminator());
+      rewriter.setInsertionPoint(yieldOp);
+      auto yieldedVal = yieldOp.getOperand(resultNumber);
+      SliceAndDynamicDims sliceAndDynamicDims =
+          cloneOffsetsSizesAndStrides(rewriter, storeOp);
+      rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
+          storeOp.getLoc(), yieldedVal, storeOp.getTarget(),
+          sliceAndDynamicDims.dynamicDims, sliceAndDynamicDims.offsets,
+          sliceAndDynamicDims.sizes, sliceAndDynamicDims.strides);
+    };
+
+    moveStoreInsideBody(&ifOp.getThenRegion().front());
+    moveStoreInsideBody(&ifOp.getElseRegion().front());
+    rewriter.eraseOp(storeOp);
+    return success();
+  }
+};
+
 }  // namespace
 
 void ConvertToDestinationPassingStylePass::runOnOperation() {
@@ -563,6 +621,14 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  {
+    RewritePatternSet patterns(context);
+    patterns.insert<SwitchStoreOfIfResultValue>(context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }

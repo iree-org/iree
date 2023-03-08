@@ -22,7 +22,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if(NOT IREE_BUILD_COMPILER)
+if(NOT IREE_BUILD_COMPILER OR NOT IREE_TARGET_BACKEND_LLVM_CPU)
   return()
 endif()
 
