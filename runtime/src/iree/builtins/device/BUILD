@@ -42,7 +42,7 @@ iree_runtime_cc_library(
 
 iree_cmake_extra_content(
     content = """
-if(NOT IREE_BUILD_COMPILER)
+if(NOT IREE_BUILD_COMPILER OR NOT IREE_TARGET_BACKEND_LLVM_CPU)
   return()
 endif()
 """,

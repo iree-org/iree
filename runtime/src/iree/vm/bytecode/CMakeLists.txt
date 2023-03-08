@@ -14,23 +14,24 @@ iree_cc_library(
   NAME
     module
   HDRS
+    "archive.h"
     "module.h"
   SRCS
+    "archive.c"
     "disassembler.c"
     "disassembler.h"
     "dispatch.c"
     "dispatch_util.h"
-    "generated/op_table.h"
     "module.c"
     "module_impl.h"
+    "verifier.c"
+    "verifier.h"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal
-    iree::base::internal::flatcc::parsing
     iree::base::tracing
-    iree::schemas::bytecode_module_def_c_fbs
     iree::vm
+    iree::vm::bytecode::utils
     iree::vm::ops
   PUBLIC
 )

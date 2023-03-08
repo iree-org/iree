@@ -17,10 +17,16 @@
 // Any call annotated with this will be relatively stable.
 // Calls without this are considered private to the IREE implementation and
 // should not be relied upon.
-#ifdef __cplusplus
+#if defined(__cplusplus)
 #define IREE_API_EXPORT extern "C"
 #else
 #define IREE_API_EXPORT
+#endif  // __cplusplus
+
+#if defined(__cplusplus)
+#define IREE_API_EXPORT_VARIABLE extern "C"
+#else
+#define IREE_API_EXPORT_VARIABLE extern
 #endif  // __cplusplus
 
 // Denotes a function pointer that is exposed as part of the IREE API.
@@ -33,11 +39,21 @@
 //===----------------------------------------------------------------------===//
 
 // Queries for [[attribute]] identifiers in modern compilers.
-#ifdef __has_attribute
+#if defined(__has_attribute)
 #define IREE_HAVE_ATTRIBUTE(x) __has_attribute(x)
 #else
 #define IREE_HAVE_ATTRIBUTE(x) 0
 #endif  // __has_attribute
+
+//===----------------------------------------------------------------------===//
+// IREE_HAVE_BUILTIN
+//===----------------------------------------------------------------------===//
+
+#if defined(__has_builtin)
+#define IREE_HAVE_BUILTIN(x) __has_builtin(x)
+#else
+#define IREE_HAVE_BUILTIN(x) 0
+#endif  // __has_builtin
 
 //===----------------------------------------------------------------------===//
 // IREE_PRINTF_ATTRIBUTE

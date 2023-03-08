@@ -2316,9 +2316,8 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   }];
 }
 
-def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
+def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     AttrSizedOperandSegments,
-    MemoryEffects<[MemAlloc]>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
@@ -2342,7 +2341,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     OptionalAttr<HAL_DescriptorFlagsAttr>:$descriptor_flags
   );
   let results = (outs
-    Res<AnyType, "", [MemAlloc]>:$result
+    AnyType:$result
   );
 
   let assemblyFormat = [{

@@ -9,8 +9,8 @@
 // Defines transformations that are common to backends
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
-#define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
+#ifndef IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
+#define IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -88,7 +88,15 @@ using GetMinMaxExprFn =
 /// |getMinMaxFn| for some know values.
 void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
                                               GetMinMaxExprFn getMinMaxFn);
+
+/// Populate patterns that fold tensor.expand/collapse_shape into the source
+/// hal.interface.binding.subspan.
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
+
+/// Populate patterns that remove dead allocations
+void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
+#endif  // IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_

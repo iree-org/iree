@@ -37,7 +37,7 @@ class Linux_RV64_Benchmarks(object):
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.MODELS
@@ -68,7 +68,7 @@ class Linux_RV32_Benchmarks(object):
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.with_flag_generation(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.MODELS

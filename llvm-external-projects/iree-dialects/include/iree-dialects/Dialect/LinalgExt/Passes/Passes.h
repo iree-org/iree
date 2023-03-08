@@ -160,8 +160,6 @@ void populateTopkSplitReductionPattern(
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtVectorizationPass();
-
 /// Tile and decompose the winograd transform ops into a sequence
 /// of linalg ops.
 std::unique_ptr<OperationPass<func::FuncOp>>

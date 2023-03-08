@@ -515,6 +515,7 @@ cc_library(
         ":IREELinalgTransformIncGen",
         ":IREELinalgTransformStructuredIncGen",
         "@llvm-project//llvm:Support",
+
         # Dialects
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
@@ -532,27 +533,34 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformDialect",
+
         # IR
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
+
         # Interfaces
         "@llvm-project//mlir:ControlFlowInterfaces",
 
         # Transforms
+        "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AsyncTransforms",
         "@llvm-project//mlir:LinalgTransforms",
-        "@llvm-project//mlir:AffineToStandard",
+        "@llvm-project//mlir:MemRefTransforms",
+        "@llvm-project//mlir:ReconcileUnrealizedCasts",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:ReconcileUnrealizedCasts",
+        "@llvm-project//mlir:VectorToSCF",
+
         # Utils
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:DialectUtils",
+
         # Conversions
         "@llvm-project//mlir:AsyncToLLVM",
         "@llvm-project//mlir:FuncToLLVM",
+        "@llvm-project//mlir:IndexToLLVM",
         "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgToStandard",
         "@llvm-project//mlir:MathToLLVM",
@@ -674,6 +682,7 @@ cc_binary(
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:AsyncDialect",
+        "@llvm-project//mlir:BufferizationTransformOps",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

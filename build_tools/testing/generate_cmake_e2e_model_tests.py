@@ -14,6 +14,7 @@ import argparse
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
 
+import benchmark_suites.iree.benchmark_collections
 import e2e_model_tests.cmake_generator
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
@@ -33,7 +34,10 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  cmake_rules = e2e_model_tests.cmake_generator.generate_rules()
+  (gen_configs,
+   _) = benchmark_suites.iree.benchmark_collections.generate_benchmarks()
+  cmake_rules = e2e_model_tests.cmake_generator.generate_rules(
+      module_generation_configs=gen_configs)
   output = GENERATED_E2E_MODEL_TESTS_CMAKE_TEMPLATE.substitute(
       __TEST_RULES="\n".join(cmake_rules))
   with open(args.output, "w") as output_file:

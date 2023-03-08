@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -47,10 +48,10 @@ getMaterializedType(RankedTensorType tensorType,
   if (failed(materializeEncodingInfo)) {
     return tensorType;
   }
-  return PackOp::getPackedType(tensorType,
-                               materializeEncodingInfo->innerTileSizes,
-                               materializeEncodingInfo->innerDimsPos,
-                               materializeEncodingInfo->outerDimsPerm)
+  return tensor::PackOp::inferPackedType(
+             tensorType, materializeEncodingInfo->innerTileSizes,
+             materializeEncodingInfo->innerDimsPos,
+             materializeEncodingInfo->outerDimsPerm)
       .cast<RankedTensorType>();
 }
 
@@ -116,7 +117,7 @@ static Optional<Value> getPaddingValue(Value &source) {
 /// Utility method to convert from `set_encoding` op to `pack` operation.
 /// For now this takes a `paddingValue` as input. The source is also taken
 /// as input so that these could be used with `OpConversionPatterns`.
-static FailureOr<PackOp> lowerSetEncodingOpToPackOp(
+static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, SetEncodingOp encodingOp, Value source,
     MaterializeEncodingFn materializeEncodingFn,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -139,14 +140,14 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(
   Optional<TensorEncoding> encoding = getEncoding(resultType);
   if (!encoding)
     return failure();
-  SmallVector<OpFoldResult> resultDims =
-      PackOp::getResultShape(rewriter, loc, sourceDims, *innerTileSizesOfr,
-                             materializeEncodingInfo->innerDimsPos,
-                             materializeEncodingInfo->outerDimsPerm);
+  SmallVector<OpFoldResult> resultDims = tensor::PackOp::getResultShape(
+      rewriter, loc, sourceDims, *innerTileSizesOfr,
+      materializeEncodingInfo->innerDimsPos,
+      materializeEncodingInfo->outerDimsPerm);
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   resultType.getElementType());
   Optional<Value> paddingValue = getPaddingValue(source);
-  auto packOp = rewriter.create<PackOp>(
+  auto packOp = rewriter.create<tensor::PackOp>(
       loc, source, emptyOp, materializeEncodingInfo->innerDimsPos,
       *innerTileSizesOfr, paddingValue, materializeEncodingInfo->outerDimsPerm);
   // As we rewrite the SetEncoding and its old result tensor, which used to hold
@@ -165,7 +166,7 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(
 /// Utility method to convert from `set_encoding` op to `pack` operation.
 /// The source is taken as input so that these could be used with
 /// `OpConversionPatterns`.
-static FailureOr<UnPackOp> lowerUnsetEncodingToUnpackOp(
+static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, UnsetEncodingOp encodingOp, Value packedValue,
     MaterializeEncodingFn materializeEncodingFn,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
@@ -188,7 +189,7 @@ static FailureOr<UnPackOp> lowerUnsetEncodingToUnpackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  return rewriter.create<UnPackOp>(
+  return rewriter.create<tensor::UnPackOp>(
       loc, packedValue, emptyOp, materializeEncodingInfo->innerDimsPos,
       *innerTileSizesOfr, materializeEncodingInfo->outerDimsPerm);
 }
@@ -303,7 +304,7 @@ struct SetEncodingOpToPackOpConversion
     if (failed(packOp))
       return rewriter.notifyMatchFailure(encodingOp,
                                          "failed to convert to pack op");
-    rewriter.replaceOp(encodingOp, packOp->getResults());
+    rewriter.replaceOp(encodingOp, packOp->getResult());
     return success();
   }
 };
@@ -327,7 +328,7 @@ struct UnsetEncodingOpToPackOpConversion
     if (failed(unpackOp))
       return rewriter.notifyMatchFailure(encodingOp,
                                          "failed to convert to unpack op");
-    rewriter.replaceOp(encodingOp, unpackOp->getResults());
+    rewriter.replaceOp(encodingOp, unpackOp->getResult());
     return success();
   }
 };
@@ -402,10 +403,11 @@ void MaterializeEncodingPass::runOnOperation() {
       return signalPassFailure();
   }
 
-  // Add patterns to fold pack/unpack ops with pad/extract_slice ops.
+  // Add patterns to fold tensor.pack/unpack ops with tensor.pad/extract_slice
+  // ops.
   {
     RewritePatternSet patterns(context);
-    populateFoldIntoPackAndUnpackOpsPatterns(patterns);
+    tensor::populateFoldIntoPackAndUnpackPatterns(patterns);
     if (failed(
             applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
       return signalPassFailure();

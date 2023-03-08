@@ -41,6 +41,7 @@ iree_lit_test_suite(
     "synchronize_symbol_visibility.mlir"
     "test_config_mmt4d.mlir"
     "transform_dialect_bufferize.mlir"
+    "transform_dialect_iree_tile_to_forall.mlir"
     "transpose_avx2_lowering.mlir"
     "triple_tiling_expert_pipeline.mlir"
     "unfused_fma.mlir"

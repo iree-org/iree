@@ -20,30 +20,32 @@
 set -euo pipefail
 
 DOCKER_WRAPPER="${IREE_DOCKER_WRAPPER:-./build_tools/docker/docker_run.sh}"
-DEVICE_NAME="${IREE_DEVICE_NAME}"
 NORMAL_BENCHMARK_TOOLS_DIR="${IREE_NORMAL_BENCHMARK_TOOLS_DIR}"
 E2E_TEST_ARTIFACTS_DIR="${1:-${IREE_E2E_TEST_ARTIFACTS_DIR}}"
-RUN_CONFIG="${2:-${IREE_RUN_CONFIG}}"
-BENCHMARK_RESULTS="${3:-${IREE_BENCHMARK_RESULTS}}"
+EXECUTION_BENCHMARK_CONFIG="${2:-${IREE_EXECUTION_BENCHMARK_CONFIG}}"
+TARGET_DEVICE_NAME="${3:-${IREE_TARGET_DEVICE_NAME}}"
+BENCHMARK_RESULTS="${4:-${IREE_BENCHMARK_RESULTS}}"
 
 if [[ "${DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
     --gpus all \
     --env NVIDIA_DRIVER_CAPABILITIES=all \
-    gcr.io/iree-oss/nvidia@sha256:1294591d06d2b5eb03a7214fac040a1ccab890ea62e466843553f7fb7aacdc1d \
+    gcr.io/iree-oss/nvidia@sha256:0088a9efa980de8c699dc75eb89a5d758e38c9f825181d8d5e679ac5a09a7da6 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
-        --run_config="${RUN_CONFIG}" \
+        --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
+        --target_device_name="${TARGET_DEVICE_NAME}" \
         --output="${BENCHMARK_RESULTS}" \
         --verbose
 elif [[ "${DEVICE_NAME}" == "c2-standard-16" ]]; then
   ${DOCKER_WRAPPER} \
-    gcr.io/iree-oss/base-bleeding-edge@sha256:479eefb76447c865cf58c5be7ca9fe33f48584b474a1da3dfaa125aad2510463 \
+    gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
-        --run_config="${RUN_CONFIG}" \
+        --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
+        --target_device_name="${TARGET_DEVICE_NAME}" \
         --output="${BENCHMARK_RESULTS}" \
         --device_model=GCP-c2-standard-16 \
         --cpu_uarch=CascadeLake \

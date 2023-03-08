@@ -119,6 +119,32 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
   return equivalentOp;
 }
 
+/// Check if two sets can be merged based on what operations exist in that set.
+static bool canSetsBeMerged(Value v1, Value v2, BufferizationPlan &plan) {
+  // Dont merge two sets if one of the sets is a constant.
+  if (getEquivalentOpOfType<arith::ConstantOp>(v1, plan) ||
+      getEquivalentOpOfType<arith::ConstantOp>(v2, plan)) {
+    return false;
+  }
+  auto v1InterfaceBinding =
+      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(v1, plan);
+  auto v2InterfaceBinding =
+      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(v2, plan);
+  // If any of these sets do not have a interface binding, they can be merged.
+  if (!v1InterfaceBinding || !v2InterfaceBinding) {
+    return true;
+  }
+  if (v1InterfaceBinding.getSet() != v2InterfaceBinding.getSet() ||
+      v1InterfaceBinding.getBinding() != v2InterfaceBinding.getBinding() ||
+      v1InterfaceBinding.getByteOffset() !=
+          v2InterfaceBinding.getByteOffset()) {
+    // If the set, binding or offsets are different, map these to different
+    // memrefs.
+    return false;
+  }
+  return true;
+}
+
 /// Returns true if the value and target of a `flow.dispatch.tensor.store`
 /// operation can be added to the same equivalence set. This can be done only if
 /// - The `value` is not from a equivalence set that contains a read-only
@@ -130,32 +156,24 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
 /// `hal.interface.binding.subspan` op.'
 static bool canSetStoreValueAndTargetAsEquivalent(
     IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
-  Value value = storeOp.getValue();
-  Value target = storeOp.getTarget();
-  auto targetInterfaceOp =
-      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target, plan);
-  assert(targetInterfaceOp);
-  if (auto valueConstantOp =
-          getEquivalentOpOfType<arith::ConstantOp>(value, plan)) {
+  if (!canSetsBeMerged(storeOp.getValue(), storeOp.getTarget(), plan)) {
     return false;
   }
-  if (auto valueInterfaceOp =
-          getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(value,
-                                                                      plan)) {
-    if (targetInterfaceOp.getBinding() != valueInterfaceOp.getBinding() ||
-        targetInterfaceOp.getByteOffset() != valueInterfaceOp.getByteOffset()) {
-      // If the binding and offsets are different, map these to different
-      // memrefs.
-      return false;
-    }
-    // If the binding and offsets are the same, make sure that the
-    // !flow.dispatch.tensor is read-write.
-    auto sourceType =
-        valueInterfaceOp.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
-    return sourceType &&
-           sourceType.getAccess() == IREE::Flow::TensorAccess::ReadWrite;
+  auto valueInterfaceBinding =
+      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
+          storeOp.getValue(), plan);
+  auto targetInterfaceBinding =
+      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
+          storeOp.getTarget(), plan);
+  if (!valueInterfaceBinding || !targetInterfaceBinding) {
+    return true;
   }
-  return true;
+  // If the binding and offsets are the same, make sure that the
+  // !flow.dispatch.tensor is read-write.
+  auto sourceType = valueInterfaceBinding.getType()
+                        .dyn_cast<IREE::Flow::DispatchTensorType>();
+  return sourceType &&
+         sourceType.getAccess() == IREE::Flow::TensorAccess::ReadWrite;
 }
 
 /// Tries to add the `value` and `target` to the same equivalence class.
@@ -462,6 +480,25 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
   }
 }
 
+void BufferizationPlan::unionSets(Value v1, Value v2) {
+  if (!canSetsBeMerged(v1, v2, *this)) {
+    return;
+  }
+  // If one the sets was part of the store set, the store set
+  // needs to be updated to drop the all leaders from the store set
+  // and add the new leader to it.
+  Value leader1 = getLeaderValue(v1);
+  Value leader2 = getLeaderValue(v2);
+  bool insertNewStoreLeader =
+      storeLeaders.count(leader1) || storeLeaders.count(leader2);
+  storeLeaders.erase(leader1);
+  storeLeaders.erase(leader2);
+  mappedTensors.unionSets(getPointer(v1), getPointer(v2));
+  if (insertNewStoreLeader) {
+    storeLeaders.insert(getLeaderValue(v1));
+  }
+}
+
 void BufferizationPlan::dump() {
   llvm::dbgs() << "BufferMappings : \n";
   unsigned numSets = 0;
@@ -560,7 +597,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Case<scf::YieldOp, tensor::EmptyOp, tensor::DimOp, tensor::ExtractOp,
-              tensor::PadOp, bufferization::ToMemrefOp,
+              tensor::GenerateOp, tensor::PadOp, bufferization::ToMemrefOp,
               bufferization::AllocTensorOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {

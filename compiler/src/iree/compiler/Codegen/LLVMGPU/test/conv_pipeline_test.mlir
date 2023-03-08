@@ -1,4 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target,canonicalize)))' \
+// RUN:   %s | FileCheck %s
 
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>]}>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
@@ -39,7 +41,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK-COUNT-2:        vector.transfer_read
 // CHECK-COUNT-4:        vector.contract
 //         CHECK:      scf.yield %{{.*}} : vector<1x4x4xf32>
-//         CHECK:    scf.yield %{{.*}} : vector<1x4x4xf32>
+//         CHECK:    scf.yield %{{.*}} : vector<4x4xf32>
 //         CHECK:    vector.transfer_write {{.*}} : vector<4x4xf32>, memref<1x112x112x64xf32>
 
 // -----

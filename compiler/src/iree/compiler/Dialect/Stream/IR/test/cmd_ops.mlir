@@ -106,11 +106,11 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
   %c5 = arith.constant 5 : index
   %c128 = arith.constant 128 : index
   %0 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<transient>{%arg1}, %arg2 as %arg5: !stream.resource<external>{%arg3}) {
-    //      CHECK: stream.cmd.dispatch @executable::@dispatch[%c1, %c2, %c3](%c4, %c5 : index, index) {
+    //      CHECK: stream.cmd.dispatch {@executable::@dispatch0, @executable::@dispatch1}[%c1, %c2, %c3](%c4, %c5 : index, index) {
     // CHECK-NEXT:   ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
     // CHECK-NEXT:   wo %arg5[%c0 for %c128] : !stream.resource<external>{%arg3}
     // CHECK-NEXT: }
-    stream.cmd.dispatch @executable::@dispatch[%c1, %c2, %c3](%c4, %c5 : index, index) {
+    stream.cmd.dispatch {@executable::@dispatch0, @executable::@dispatch1}[%c1, %c2, %c3](%c4, %c5 : index, index) {
       ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
       wo %arg5[%c0 for %c128] : !stream.resource<external>{%arg3}
     }

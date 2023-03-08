@@ -93,6 +93,7 @@ iree_cc_library(
     cpu_data
   HDRS
     "cpu_data.h"
+    "cpu_feature_bits.inl"
   DEPS
 
   PUBLIC

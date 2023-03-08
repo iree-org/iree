@@ -22,47 +22,29 @@ package(
 iree_runtime_cc_library(
     name = "module",
     srcs = [
+        "archive.c",
         "disassembler.c",
         "disassembler.h",
         "dispatch.c",
         "dispatch_util.h",
-        "generated/op_table.h",
         "module.c",
         "module_impl.h",
+        "verifier.c",
+        "verifier.h",
     ],
     hdrs = [
+        "archive.h",
         "module.h",
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal/flatcc:parsing",
-        "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:ops",
+        "//runtime/src/iree/vm/bytecode/utils",
     ],
 )
-
-# TODO(#357): Add a script to update op_table.h.
-# iree_gentbl_cc_library(
-#     name = "op_table_gen",
-#     tbl_outs = [
-#         (["--gen-iree-vm-op-table-defs"], "op_table.h"),
-#     ],
-#     tblgen = "//tools:iree-tblgen",
-#     td_file = "//compiler/src/iree/compiler/Dialect/VM/IR:VMOps.td",
-#     deps = [
-#         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
-#         "//compiler/src/iree/compiler/Dialect/VM/IR:td_files",
-#         "@llvm-project//mlir:CallInterfacesTdFiles",
-#         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
-#         "@llvm-project//mlir:FunctionInterfacesTdFiles",
-#         "@llvm-project//mlir:OpBaseTdFiles",
-#         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
-#     ],
-# )
 
 iree_cmake_extra_content(
     content = """

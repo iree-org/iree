@@ -162,7 +162,7 @@ struct AffineMinDistributedSCFCanonicalizationPattern
     if (!cst) return failure();
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(minOp,
                                                    rewriter.getIndexAttr(*cst));
-    return failure();
+    return success();
   }
 };
 

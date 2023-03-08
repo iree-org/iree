@@ -74,10 +74,20 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     unspecified order:
       - additional_iree_patterns: fancy patterns we shortcut into the system,
       will need to be sliced out better in the future.
-      - bubble_collapse_expand: bubble `expand_shape` up and `collapse_shape`
-      down across Linalg ops.
+      - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This 
+      must be applied separately from `bubble_expand` patterns because of some
+      upstream pattern interference issue atm.
+      - bubble_expand: bubble `expand_shape` down across Linalg ops. This 
+      must be applied separately from `bubble_collapse` patterns because of some
+      upstream pattern interference issue atm.
+      - bubble_pack_un_pack: bubble `pack` up and `unpack` down across Linalg
+      ops.
       - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
+      - cse: additionally apply common subexpression elimination. This must
+      apply on a funcOp. This is not a set of patterns per se but is still very
+      convenient to apply it close to canonicalization and other greedy pattern
+      applications.
       - erase_unnecessary_tensor_operands: add patterns that erase unnecessary
       tensor operands.
       - expand_memref_strided_metadata: adds patterns that expand memref
@@ -89,14 +99,20 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       extract_slice ops with reassociative reshape ops.
       - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
       case it is the only use of extract.
+      - licm: additionally apply loop-independent code motion and single 
+      iteration loop promotion. This is not a set of patterns per se but is still
+      very convenient to apply it close to canonicalization and other greedy 
+      pattern applications.
+      - linalg_elementwise_greedy_fusion: add linalg elementwise ops fusion 
+      patterns using a naive default heuristic.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
       - rank_reducing_linalg: adds patterns that results in rank-reducing
-      behavior on subset-based linalg operations.
+      behavior on subset-based linalg operations using insert/extract slices.
+      - rank_reducing_linalg_via_reshapes: adds patterns that results in rank-reducing
+      behavior on subset-based linalg operations using expand/collapse shape ops.
       - rank_reducing_vector: adds patterns that results in rank-reducing 
       behavior on subset-based vector operations.
-      - rewrite_pack_ops: rewrite tensor.pack/unpack to linalg_ext.pack/unpack.
-      This is a temporary pattern that is needed to connect to IREE until it 
       adopts the upstream version.
       - swapping_patterns: adds patterns that swap operations for a better outcome.
       This is a catch all that can be refined further if/when needed.
@@ -104,6 +120,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       tensor.extract_slice swapping pattern. This injects static information
       that guarantees padding is smaller than the window size which guarantees
       we never see a tile comprised of padding-only.
+      - tiling_canonicalization: adds specific tiling-related canonicalization
+      patterns.
       - unroll_vectors_gpu_mma_sync: adds patterns that unroll vectors to a native tile
       size for GPUs with mma operations. The size is currently hardcoded but 
       should be refactored upstream and made pluggable.
@@ -127,19 +145,25 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
   let arguments = (ins PDL_Operation:$target,
                        UnitAttr:$additional_iree_patterns,
-                       UnitAttr:$bubble_collapse_expand,
+                       UnitAttr:$bubble_collapse,
+                       UnitAttr:$bubble_expand,
+                       UnitAttr:$bubble_pack_un_pack,
                        UnitAttr:$canonicalization,
+                       UnitAttr:$cse,
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$expand_memref_strided_metadata,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$fold_tensor_empty_extract,
+                       UnitAttr:$licm,
+                       UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$rank_reducing_linalg,
+                       UnitAttr:$rank_reducing_linalg_via_reshapes,
                        UnitAttr:$rank_reducing_vector,
-                       UnitAttr:$rewrite_pack_ops,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns,
+                       UnitAttr:$tiling_canonicalization,
                        UnitAttr:$unroll_vectors_gpu_mma_sync,
                        UnitAttr:$unroll_vectors_gpu_wmma);
   let results = (outs PDL_Operation:$result);
@@ -173,8 +197,8 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
     It always return success.
   }];
 
-  let arguments = (ins Transform_ConcreteOpType<"func.func">:$target);
-  let results = (outs Transform_ConcreteOpType<"func.func">:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$result);
 
   let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -401,10 +425,10 @@ def ShareForallOperandsOp : Op<
   }];
 
   let arguments = (
-      ins Transform_ConcreteOpType<"scf.forall">:$forall_op,
+      ins TransformHandleTypeInterface:$forall_op,
           DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$share_operands
   );
-  let results = (outs Transform_ConcreteOpType<"scf.forall">:$result);
+  let results = (outs TransformHandleTypeInterface:$result);
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
@@ -485,33 +509,6 @@ def TileToForallAndWorkgroupCountRegionOp :
 
     ::llvm::SmallVector<::mlir::OpFoldResult> getMixedNumThreads();
     ::llvm::SmallVector<::mlir::OpFoldResult> getMixedTileSizes();
-  }];
-}
-
-def ConfigExtractPart :
-    Op<Transform_Dialect, "iree.config.extract_part",
-      [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-       TransformOpInterface]> {
-  let description = [{
-  }];
-  let arguments = (ins PDL_Operation:$target,
-                       StrAttr:$attr_name,
-                       OptionalAttr<I64Attr>:$level);
-  // TODO: allow return attributes ?
-  let results = (outs PDL_Operation:$resultConfigPart);
-  let assemblyFormat = "attr-dict $target";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  // TODO: impl me.
-  // let hasVerifier = 1;
-
-  let builders = [
-    OpBuilder<(ins "Value":$target, "StringRef":$attrName,
-               CArg<"Optional<int64_t>", "std::nullopt">:$level)>
-  ];
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
   }];
 }
 

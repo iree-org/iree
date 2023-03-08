@@ -1,7 +1,7 @@
 // RUN: iree-dialects-opt %s | FileCheck %s
 
-// CHECK: transform.structured.canonicalized_sequence
-transform.structured.canonicalized_sequence failures(propagate) {
+// CHECK: transform.sequence
+transform.sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   // CHECK: %[[OPS:.*]] = pdl_match @match1 in %{{.*}}
   %0 = pdl_match @match1 in %arg0 : (!pdl.operation) -> !pdl.operation
@@ -19,8 +19,6 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %5 = pdl_match @match2 in %arg0 : (!pdl.operation) -> !pdl.operation
   // CHECK: transform.structured.vectorize %[[OPS2]]
   transform.structured.vectorize %5
-  // CHECK: bufferize
-  bufferize
   // CHECK: %[[FUNC:.*]] = transform.structured.match ops{["func.func"]} in %arg0
   // CHECK: lower_vectors %[[FUNC]] {{.*}} multireduction_lowering = innerreduction
   %6 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation

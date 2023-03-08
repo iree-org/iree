@@ -49,69 +49,6 @@ def _ensure_string_attr(value: StringArg):
   return value
 
 
-class CanonicalizedSequenceOp:
-
-  @overload
-  def __init__(self, resultsOrRoot: Sequence[Type],
-               optionalRoot: Optional[Union[Operation, Value]]):
-    ...
-
-  @overload
-  def __init__(self, resultsOrRoot: Optional[Union[Operation, Value]],
-               optionalRoot: NoneType):
-    ...
-
-  def __init__(self, resultsOrRoot=None, optionalRoot=None):
-    results = resultsOrRoot if isinstance(resultsOrRoot, Sequence) else []
-    root = (resultsOrRoot
-            if not isinstance(resultsOrRoot, Sequence) else optionalRoot)
-    root = _get_op_result_or_value(root) if root else None
-    super().__init__(results_=results, root=root)
-    self.regions[0].blocks.append(pdl.OperationType.get())
-
-  @property
-  def body(self) -> Block:
-    return self.regions[0].blocks[0]
-
-  @property
-  def bodyTarget(self) -> Value:
-    return self.body.arguments[0]
-
-
-class LowerVectorsOp:
-  """Specialization for the LowerVectorsOp class."""
-
-  def __init__(self,
-               *,
-               stages: IntListArg = None,
-               contraction_lowering: StringArg = None,
-               multireduction_lowering: StringArg = None,
-               split_transfers: StringArg = None,
-               unroll_vector_transfers: BoolArg = None,
-               transpose_lowering: StringArg = None,
-               transpose_avx2_lowering: BoolArg = None,
-               loc=None,
-               ip=None):
-    stages = _ensure_int_array_attr(stages, [0, 1, 2, 3, 4, 5, 6])
-    contraction_lowering = _ensure_string_attr(contraction_lowering,
-                                               "outerproduct")
-    multireduction_lowering = _ensure_string_attr(multireduction_lowering,
-                                                  "innerparallel")
-    split_transfers = _ensure_string_attr(split_transfers, "linalg-copy")
-    unroll_vector_transfers = _ensure_bool_attr(unroll_vector_transfers, True)
-    transpose_lowering = _ensure_string_attr(transpose_lowering, "eltwise")
-    transpose_avx2_lowering = _ensure_bool_attr(transpose_avx2_lowering, False)
-    super().__init__(stages=stages,
-                     contraction_lowering=contraction_lowering,
-                     multireduction_lowering=multireduction_lowering,
-                     split_transfers=split_transfers,
-                     unroll_vector_transfers=unroll_vector_transfers,
-                     transpose_lowering=transpose_lowering,
-                     transpose_avx2_lowering=transpose_avx2_lowering,
-                     loc=loc,
-                     ip=ip)
-
-
 class LowerToLLVMOp:
   """Specialization for the LowerToLLVMOp class."""
 

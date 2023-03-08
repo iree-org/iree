@@ -88,12 +88,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         run_config.module_generation_config,
         root_path=self.config.root_benchmark_dir)
     cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
-    cmds += run_module_utils.build_run_flags_for_model(
-        model=run_config.module_generation_config.imported_model.model,
-        model_input_data=run_config.input_data)
-    cmds += run_module_utils.build_run_flags_for_execution_config(
-        module_execution_config=run_config.module_execution_config,
-        gpu_id=self.gpu_id)
+    cmds += run_config.materialize_run_flags(gpu_id=self.gpu_id)
 
     return cmds
 
@@ -152,14 +147,17 @@ def main(args):
   commit = get_git_commit_hash("HEAD")
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
-  if args.run_config is None:
+  if args.execution_benchmark_config is None:
     # TODO(#11076): Remove legacy path.
     benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
         benchmark_config.root_benchmark_dir)
   else:
-    run_config_data = json.loads(args.run_config.read_text())
+    benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
+    benchmark_group = benchmark_groups.get(args.target_device_name)
+    if benchmark_group is None:
+      raise ValueError("Target device not found in the benchmark config.")
     run_configs = serialization.unpack_and_deserialize(
-        data=run_config_data,
+        data=benchmark_group["run_configs"],
         root_type=typing.List[iree_definitions.E2EModelRunConfig])
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs)

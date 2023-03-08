@@ -175,9 +175,9 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
 //===----------------------------------------------------------------------===//
 void mlir::iree_compiler::gpu::
     build1DSplittingStrategyWithOptionalThreadMapping(
-        ImplicitLocOpBuilder &b, Value opH, int64_t rank, int64_t mostMinorDim,
-        SmallVector<int64_t> opSizes, int64_t numThreads, Attribute mappingAttr,
-        int64_t maxVectorSize) {
+        ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value opH,
+        int64_t rank, int64_t mostMinorDim, SmallVector<int64_t> opSizes,
+        int64_t numThreads, Attribute mappingAttr, int64_t maxVectorSize) {
   // Poor man's handling of optionality in C++. Will need to be converted to
   // proper transform dialect filters or handling of emptiness.
   if (rank == 0) return;
@@ -210,6 +210,7 @@ void mlir::iree_compiler::gpu::
     if (vectorSize > 1) {
       auto res = iree_compiler::buildTileFuseToScfFor(
           /*b=*/b,
+          /*isolatedParentOpH=*/isolatedParentOpH,
           /*rootH=*/opH,
           /*opsHToFuse=*/{},
           /*tileSizes=*/
@@ -223,6 +224,7 @@ void mlir::iree_compiler::gpu::
       assert(mappingAttr && "must specify a mapping attribute");
       iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*b=*/b,
+          /*isolatedParentOpH=*/isolatedParentOpH,
           /*rootH=*/opH,
           /*opsHToFuse=*/{},
           /*numThreads=*/getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
@@ -235,6 +237,7 @@ void mlir::iree_compiler::gpu::
   if (vectorSize > 1) {
     auto res = iree_compiler::buildTileFuseToScfFor(
         /*b=*/b,
+        /*isolatedParentOpH=*/isolatedParentOpH,
         /*rootH=*/opH,
         /*opsHToFuse=*/{},
         /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({scfForTileSizes})));
@@ -244,6 +247,7 @@ void mlir::iree_compiler::gpu::
     assert(mappingAttr && "must specify a mapping attribute");
     iree_compiler::buildTileFuseDistToForallWithNumThreads(
         /*b=*/b,
+        /*isolatedParentOpH=*/isolatedParentOpH,
         /*rootH=*/opH,
         /*opsHToFuse=*/{},
         /*numThreads=*/getAsOpFoldResult(b.getI64ArrayAttr(foreachTileSizes)),
@@ -258,22 +262,36 @@ void mlir::iree_compiler::gpu::
 std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const AbstractReductionStrategy &strategy) {
-  // Step N-1. Bufferize and drop HAL descriptor from memref ops.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
 
-  // Fold tensor.empty to avoid large allocations.
-  ApplyPatternsOpPatterns patterns;
-  patterns.foldTensorEmptyExtract = true;
-  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  // Step N-5. Fold tensor.empty to avoid large allocations.
+  ApplyPatternsOpPatterns configuration;
+  configuration.foldTensorEmptyExtract = true;
 
+  // Step N-4. Perform a pass of canonicalization + enabling after tiling.
+  funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, configuration, funcH);
   funcH = iree_compiler::buildVectorize(b, funcH);
+
+  // Step N-3. Perform a pass of canonicalization + enabling after vectorization
+  // as well as hoisting subset operations such as vector.transfer_read/write.
+  funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, configuration, funcH);
+  funcH = iree_compiler::buildHoisting(b, funcH);
+
+  // Step N-2. Bufferize and drop HAL descriptor from memref ops.
   variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
 
-  // Step N. Post-bufferization mapping to blocks and threads.
+  // Step N-1. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = buildMapToBlockAndThreads(b, funcH, strategy.getNumThreadsInBlock());
+
+  // Step N. Perform a final pass of canonicalization + enabling before
+  // returning.
+  variantH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, configuration, variantH);
   return std::make_pair(variantH, funcH);
 }
 

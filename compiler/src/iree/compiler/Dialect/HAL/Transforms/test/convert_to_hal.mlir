@@ -2,6 +2,7 @@
 
 // Tests an end-to-end simple single-dispatch `dispatch(arg0, arg1) -> result`.
 
+#executable_target_embedded_elf_aarch64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 #device_target_cpu = #hal.device.target<"llvm-cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
@@ -19,6 +20,19 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
   // CHECK: hal.executable private @ex
   hal.executable private @ex {
+    hal.executable.variant public @embedded_elf_aarch64, target = #executable_target_embedded_elf_aarch64_ {
+      hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+        translation_info = #iree_codegen.translation_info<CPUDefault>
+      } {
+      ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+        %c1 = arith.constant 1 : index
+        %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
+        hal.return %0, %c1, %c1 : index, index, index
+      }
+      builtin.module {
+        // Opaque at this point (in some target-specific dialects).
+      }
+    }
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
       hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault>
@@ -97,7 +111,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       // CHECK-SAME: workgroups([%c1, %c1, %c1])
       // CHECK:   hal.return
       // CHECK: }
-      stream.cmd.dispatch @ex::@dispatch[%c4, %c1, %c1] {
+      stream.cmd.dispatch {@ex::@embedded_elf_aarch64::@dispatch, @ex::@embedded_elf_x86_64::@dispatch}[%c4, %c1, %c1] {
         ro %arg0_capture[%c0 for %c16] : !stream.resource<external>{%c16},
         ro %arg1_capture[%c0 for %c16] : !stream.resource<external>{%c16},
         wo %result_capture[%c0 for %c16] : !stream.resource<external>{%c16}

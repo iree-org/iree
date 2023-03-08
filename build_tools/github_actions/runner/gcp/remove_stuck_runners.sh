@@ -25,7 +25,7 @@ REGION="$3"
 # the number of runners removed at a time.
 COUNT="${4:--0}"
 
-MIG="github-runner-${GROUP}-${TYPE}-${REGION}"
+MIG="gh-runner-${GROUP}-${TYPE}-${REGION}"
 
 
 # Give VMs 5 minutes to startup and register with GitHub. This is pretty generous

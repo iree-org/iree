@@ -106,11 +106,43 @@ vm.module @arithmetic_ops_f32 {
 
   vm.export @test_floor_f32
   vm.func @test_floor_f32() {
-    %c1 = vm.const.f32 1.5
-    %c1dno = util.optimization_barrier %c1 : f32
-    %v = vm.floor.f32 %c1dno : f32
-    %c2 = vm.const.f32 1.0
-    vm.check.eq %v, %c2, "floor(1.5)=1.0" : f32
+    %c15 = vm.const.f32 1.5
+    %c15dno = util.optimization_barrier %c15 : f32
+    %v = vm.floor.f32 %c15dno : f32
+    %c1 = vm.const.f32 1.0
+    vm.check.eq %v, %c1, "floor(1.5)=1.0" : f32
+    vm.return
+  }
+
+  vm.export @test_round_f32
+  vm.func @test_round_f32() {
+    %c15 = vm.const.f32 1.5
+    %c15dno = util.optimization_barrier %c15 : f32
+    %v = vm.round.f32 %c15dno : f32
+    %c2 = vm.const.f32 2.0
+    vm.check.eq %v, %c2, "round(1.5)=2.0" : f32
+    vm.return
+  }
+
+  vm.export @test_min_f32
+  vm.func @test_min_f32() {
+    %cn3 = vm.const.f32 -3.0
+    %cn3dno = util.optimization_barrier %cn3 : f32
+    %cn2 = vm.const.f32 -2.0
+    %cn2dno = util.optimization_barrier %cn2 : f32
+    %v = vm.min.f32 %cn3dno, %cn2dno : f32
+    vm.check.eq %v, %cn3, "min(-3.0,-2.0)=-3.0" : f32
+    vm.return
+  }
+
+  vm.export @test_max_f32
+  vm.func @test_max_f32() {
+    %cn3 = vm.const.f32 -3.0
+    %cn3dno = util.optimization_barrier %cn3 : f32
+    %cn2 = vm.const.f32 -2.0
+    %cn2dno = util.optimization_barrier %cn2 : f32
+    %v = vm.max.f32 %cn3dno, %cn2dno : f32
+    vm.check.eq %v, %cn2, "max(-3.0,-2.0)=-2.0" : f32
     vm.return
   }
 

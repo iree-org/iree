@@ -96,14 +96,16 @@ void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
 }
 
 static void buildSmallReductionStrategyThreadDistribution(
-    ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
-    Value maybeTrailingH, const AbstractReductionStrategy &strategy) {
+    ImplicitLocOpBuilder &b, Value variantH, Value maybeLeadingH, Value fillH,
+    Value reductionH, Value maybeTrailingH,
+    const AbstractReductionStrategy &strategy) {
   auto [fusionTargetH, fusionGroupH] =
       iree_compiler::buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
   ArrayRef<Attribute> allThreadsRef(strategy.allThreadAttrs);
   iree_compiler::TileToForallAndFuseAndDistributeResult tileResult =
       iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*builder=*/b,
+          /*isolatedParentOpH=*/variantH,
           /*rootH=*/fusionTargetH,
           /*opsToFuseH=*/fusionGroupH,
           /*numThreads=*/
@@ -130,6 +132,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   // part.
   build1DSplittingStrategyWithOptionalThreadMapping(
       /*b=*/b,
+      /*isolatedParentOpH=*/variantH,
       /*opH=*/blockReductionH,
       /*rank=*/strategy.captures.reductionRank,
       // TODO: capture and generalize mostMinorDim.
@@ -140,6 +143,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   // 3. apply the 1d splitting strategy to the trailing elementwise.
   build1DSplittingStrategyWithOptionalThreadMapping(
       /*b=*/b,
+      /*isolatedParentOpH=*/variantH,
       /*opH=*/maybeBlockTrailingH,
       /*rank=*/strategy.captures.maybeTrailingRank,
       // TODO: capture and generalize mostMinorDim.
@@ -159,7 +163,7 @@ void mlir::iree_compiler::gpu::buildSmallReductionStrategy(
 
   // Step 2. Apply thread-level part of the strategy, keeps everything fused.
   buildSmallReductionStrategyThreadDistribution(
-      b, maybeLeadingHBlock, gridFillH, gridReductionH,
+      b, variantH, maybeLeadingHBlock, gridFillH, gridReductionH,
       maybeTiledTrailingHBlock, strategy);
 
   // Step 3-4. Common trailing steps.

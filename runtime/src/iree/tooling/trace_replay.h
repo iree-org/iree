@@ -16,11 +16,36 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_trace_replay_t iree_trace_replay_t;
+
 enum iree_trace_replay_shutdown_flag_bits_e {
   IREE_TRACE_REPLAY_SHUTDOWN_QUIET = 0u,
   IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS = 1 << 0u,
 };
 typedef uint32_t iree_trace_replay_shutdown_flags_t;
+
+// Optional set of callbacks around a replay event function call.
+// Functions not required by the caller may be omitted.
+typedef struct iree_trace_replay_call_hooks_t {
+  // User context passed to each callback.
+  void* user_data;
+  // Issued before the call begins with the call inputs.
+  iree_status_t (*before)(void* user_data, iree_trace_replay_t* replay,
+                          yaml_document_t* document, yaml_node_t* event_node,
+                          iree_vm_function_t function,
+                          iree_vm_list_t* input_list);
+  // Issued after the call completes successfully with the call outputs.
+  iree_status_t (*after)(void* user_data, iree_trace_replay_t* replay,
+                         yaml_document_t* document, yaml_node_t* event_node,
+                         iree_vm_function_t function,
+                         iree_vm_list_t* output_list);
+  // Issued only when the call fails and not the replay operation itself.
+  // |status| is as returned from the call and ownership is transferred to the
+  // hook.
+  iree_status_t (*error)(void* user_data, iree_trace_replay_t* replay,
+                         yaml_document_t* document, yaml_node_t* event_node,
+                         iree_vm_function_t function, iree_status_t status);
+} iree_trace_replay_call_hooks_t;
 
 typedef struct iree_trace_replay_t {
   iree_allocator_t host_allocator;
@@ -33,8 +58,21 @@ typedef struct iree_trace_replay_t {
   iree_host_size_t device_uri_count;
   const iree_string_view_t* device_uris;
 
+  // Context used within the replay, modules registered on-demand.
   iree_vm_context_t* context;
+
+  // Active HAL device if any. Will be initialized on the first HAL module load.
   iree_hal_device_t* device;
+
+  // Optional inputs available via `!input.get`/`!input.take`.
+  iree_vm_list_t* inputs;
+  // Optional outputs populated via `!output.set`/`!output.push`.
+  iree_vm_list_t* outputs;
+  // Blackboard used to track state within the trace.
+  iree_vm_list_t* blackboard;
+
+  // Optional call hooks allowing reflection of calls and their I/O.
+  iree_trace_replay_call_hooks_t call_hooks;
 } iree_trace_replay_t;
 
 // Initializes a trace replay context.
@@ -82,139 +120,11 @@ iree_status_t iree_trace_replay_event_call_prepare(
     iree_vm_list_t** out_input_list);
 
 // Replays a `call` event against the replay context.
-// Optionally |out_output_list| can be populated with a caller-owned set of
-// outputs from the call.
-iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
-                                           yaml_document_t* document,
-                                           yaml_node_t* event_node,
-                                           iree_vm_list_t** out_output_list);
-
-// Defines the type of a primitive value.
-typedef enum iree_e2e_test_value_type_e {
-  // Not a value type.
-  IREE_E2E_TEST_VALUE_TYPE_NONE = 0,
-  // int8_t.
-  IREE_E2E_TEST_VALUE_TYPE_I8 = 1,
-  // int16_t.
-  IREE_E2E_TEST_VALUE_TYPE_I16 = 2,
-  // int32_t.
-  IREE_E2E_TEST_VALUE_TYPE_I32 = 3,
-  // int64_t.
-  IREE_E2E_TEST_VALUE_TYPE_I64 = 4,
-  // halft_t.
-  IREE_E2E_TEST_VALUE_TYPE_F16 = 5,
-  // float.
-  IREE_E2E_TEST_VALUE_TYPE_F32 = 6,
-  // double.
-  IREE_E2E_TEST_VALUE_TYPE_F64 = 7,
-} iree_e2e_test_value_type_t;
-
-// Maximum size, in bytes, of any value type we can represent.
-#define IREE_E2E_TEST_VALUE_STORAGE_SIZE 8
-
-// A variant value type.
-typedef struct iree_e2e_test_value_t {
-  iree_e2e_test_value_type_t type;
-  union {
-    int8_t i8;
-    int16_t i16;
-    int32_t i32;
-    int64_t i64;
-    float f32;
-    uint16_t f16_u16;
-    double f64;
-
-    uint8_t value_storage[IREE_E2E_TEST_VALUE_STORAGE_SIZE];  // max size of all
-                                                              // value types
-  };
-} iree_e2e_test_value_t;
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_none() {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_NONE;
-  return result;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_i8(int8_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_I8;
-  result.i8 = value;
-  return result;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_i16(
-    int16_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_I16;
-  result.i16 = value;
-  return result;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_i32(
-    int32_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_I32;
-  result.i32 = value;
-  return result;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline int32_t iree_e2e_test_value_get_i32(
-    iree_e2e_test_value_t* value) {
-  return value->i32;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_i64(
-    int64_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_I64;
-  result.i64 = value;
-  return result;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline int64_t iree_e2e_test_value_get_i64(
-    iree_e2e_test_value_t* value) {
-  return value->i64;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_f16(
-    uint16_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_F16;
-  result.f16_u16 = value;
-  return result;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_f32(float value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_F32;
-  result.f32 = value;
-  return result;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline float iree_e2e_test_value_get_f32(iree_e2e_test_value_t* value) {
-  return value->f32;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline uint16_t iree_e2e_test_value_get_f16(
-    iree_e2e_test_value_t* value) {
-  return value->f16_u16;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_f64(double value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_F64;
-  result.f64 = value;
-  return result;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline double iree_e2e_test_value_get_f64(iree_e2e_test_value_t* value) {
-  return value->f64;
-}
+// Optionally |hooks| may be specified to inspect the inputs and outputs of the
+// call operation.
+iree_status_t iree_trace_replay_event_call(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* event_node, const iree_trace_replay_call_hooks_t* hooks);
 
 #ifdef __cplusplus
 }  // extern "C"

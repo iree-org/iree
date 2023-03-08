@@ -228,7 +228,7 @@ cc_library(
     deps = [
         ":init_iree",
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API2/Internal:Embed",
+        "//compiler/src/iree/compiler/API/Internal:Embed",
         "//compiler/src/iree/compiler/Pipelines",
         "@llvm-project//llvm:Support",
     ],

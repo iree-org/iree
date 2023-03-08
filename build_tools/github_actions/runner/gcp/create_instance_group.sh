@@ -20,7 +20,8 @@ ZONES="${ZONES:-us-west1-a,us-west1-b,us-west1-c}"
 AUTOSCALING="${AUTOSCALING:-1}"
 GROUP="${GROUP:-presubmit}"
 TYPE="${TYPE:-cpu}"
-MIG_NAME_PREFIX="${MIG_NAME_PREFIX:-github-runner}"
+MIG_NAME_PREFIX="${MIG_NAME_PREFIX:-gh-runner}"
+TEMPLATE_NAME_PREFIX="${TEMPLATE_NAME_PREFIX:-gh-runner}"
 DRY_RUN="${DRY_RUN:-0}"
 
 # For GPU groups, these should both be set to the target group size, as
@@ -44,7 +45,7 @@ function create_mig() {
     mig_name+="-testing"
   fi
   mig_name+="-${runner_group}-${type}-${REGION}"
-  template="github-runner-${runner_group}-${type}-${VERSION}"
+  template="${TEMPLATE_NAME_PREFIX}-${runner_group}-${type}-${VERSION}"
 
   local -a create_cmd=(
     gcloud beta compute instance-groups managed create

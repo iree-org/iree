@@ -260,8 +260,19 @@ class MaterializeDispatchInstrumentationPass
 
         // Walk dispatches and pass them the ringbuffer and their unique ID.
         executeOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-          auto it = instrumentedExports.find(dispatchOp.getEntryPoint());
-          if (it == instrumentedExports.end()) return;  // not instrumented
+          // NOTE: we just choose the first instrumented export for attribution
+          // as that's good enough for all current use cases. If we start
+          // specializing really early we may want to fix that.
+          Optional<uint32_t> functionId;
+          for (auto entryPointAttr : dispatchOp.getEntryPointRefs()) {
+            auto it = instrumentedExports.find(entryPointAttr);
+            if (it != instrumentedExports.end()) {
+              // Found the first instrumented export.
+              functionId = it->second;
+              break;
+            }
+          }
+          if (!functionId) return;  // not instrumented
 
           // Append dispatch site ID to correlate this op with where it lives in
           // the program and what is being dispatched. Note that multiple
@@ -277,7 +288,7 @@ class MaterializeDispatchInstrumentationPass
           iree_instruments_DispatchSiteDef_start(metadataBuilder);
           // TODO(benvanik): source loc to identify the site.
           iree_instruments_DispatchSiteDef_function_add(metadataBuilder,
-                                                        it->second);
+                                                        *functionId);
           dispatchSiteRefs.push_back(
               iree_instruments_DispatchSiteDef_end(metadataBuilder));
 

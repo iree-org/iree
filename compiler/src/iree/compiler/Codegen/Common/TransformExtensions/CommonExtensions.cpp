@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
@@ -19,7 +20,9 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -30,6 +33,8 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
@@ -37,6 +42,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -133,8 +139,11 @@ void transform_dialect::ApplyPatternsOp::build(
   /// When touching something here, do not forget to update CommonExtensions.h.
   ///
   ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
-  ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
+  ADD_PATTERN(bubbleCollapse, getBubbleCollapseAttrName)
+  ADD_PATTERN(bubbleExpand, getBubbleExpandAttrName)
+  ADD_PATTERN(bubblePackUnPack, getBubblePackUnPackAttrName)
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
+  ADD_PATTERN(cse, getCseAttrName)
   ADD_PATTERN(eraseUnnecessaryTensorOperands,
               getEraseUnnecessaryTensorOperandsAttrName)
   ADD_PATTERN(expandMemrefStridedMetadata,
@@ -142,18 +151,48 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
+  ADD_PATTERN(licm, getLicmAttrName)
+  ADD_PATTERN(linalgElementwiseGreedyFusion,
+              getLinalgElementwiseGreedyFusionAttrName)
   ADD_PATTERN(lowerTransferOpPermutations,
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
+  ADD_PATTERN(rankReducingLinalgViaReshapes,
+              getRankReducingLinalgViaReshapesAttrName)
   ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
-  ADD_PATTERN(rewritePackOps, getRewritePackOpsAttrName)
   ADD_PATTERN(swapPaddingElideConditional,
               getSwapPaddingElideConditionalAttrName)
   ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
+  ADD_PATTERN(tilingCanonicalization, getTilingCanonicalizationAttrName)
   ADD_PATTERN(unrollVectorsGpuMmaSync, getUnrollVectorsGpuMmaSyncAttrName)
   ADD_PATTERN(unrollVectorsGpuWmma, getUnrollVectorsGpuWmmaAttrName)
 #undef ADD_PATTERN
   result.addTypes({pdl::OperationType::get(ctx)});
+}
+
+static void addOperands(Operation *op, SetVector<Value> &operandSet) {
+  if (!op) return;
+  TypeSwitch<Operation *, void>(op)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+        SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
+        operandSet.insert(inputOperands.begin(), inputOperands.end());
+      })
+      .Default([&](Operation *operation) {
+        operandSet.insert(operation->operand_begin(), operation->operand_end());
+      });
+}
+
+template <int limit = 3>
+static bool setFusedOpOperandLimit(OpOperand *fusedOperand) {
+  Operation *producer = fusedOperand->get().getDefiningOp();
+  if (!producer) return false;
+  Operation *consumer = fusedOperand->getOwner();
+  SetVector<Value> fusedOpOperands;
+  if (producer->getNumResults() != 1) return false;
+  addOperands(consumer, fusedOpOperands);
+  fusedOpOperands.remove(producer->getResult(0));
+  addOperands(producer, fusedOpOperands);
+  return fusedOpOperands.size() <= limit;
 }
 
 namespace {
@@ -195,32 +234,6 @@ struct FoldTensorEmptyExtract
     return success();
   }
 };
-
-/// Trivial 1-1 pattern to retire once IREE adopts tensor.pack.
-struct TensorPackToLinalgExt : public OpRewritePattern<tensor::PackOp> {
-  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::PackOp packOp,
-                                PatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<LinalgExt::PackOp>(
-        packOp, packOp.getSource(), packOp.getDest(), packOp.getInnerDimsPos(),
-        packOp.getMixedTiles(), packOp.getPaddingValue(),
-        packOp.getOuterDimsPerm());
-    return success();
-  }
-};
-
-/// Trivial 1-1 pattern to retire once IREE adopts tensor.unpack.
-struct TensorUnPackToLinalgExt : public OpRewritePattern<tensor::UnPackOp> {
-  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::UnPackOp unPackOp,
-                                PatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<LinalgExt::UnPackOp>(
-        unPackOp, unPackOp.getSource(), unPackOp.getDest(),
-        unPackOp.getInnerDimsPos(), unPackOp.getMixedTiles(),
-        unPackOp.getOuterDimsPerm());
-    return success();
-  }
-};
 }  // namespace
 
 static void addLowerTransferOpPermutationsPatterns(
@@ -250,13 +263,14 @@ static void addRankReducingLinalgPatterns(RewritePatternSet &patterns) {
   linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
 }
 
-static void addRankReducingVectorPatterns(RewritePatternSet &patterns) {
-  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+static void addRankReducingLinalgViaReshapesPatterns(
+    RewritePatternSet &patterns) {
+  populateReshapeToInterfaceTensorPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
 }
 
-static void addRewritePackOpsPatterns(RewritePatternSet &patterns) {
-  patterns.add<TensorPackToLinalgExt, TensorUnPackToLinalgExt>(
-      patterns.getContext());
+static void addRankReducingVectorPatterns(RewritePatternSet &patterns) {
+  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
 }
 
 static void addSwappingPatterns(RewritePatternSet &patterns,
@@ -266,6 +280,11 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
       [&](tensor::ExtractSliceOp) -> llvm::Optional<bool> {
         return !swapPaddingElideCornerCase;
       });
+}
+
+static void addTilingCanonicalizationPatterns(RewritePatternSet &patterns) {
+  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+  scf::populateSCFForLoopCanonicalizationPatterns(patterns);
 }
 
 static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeMmaSyncVectorSize(
@@ -326,9 +345,18 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   }
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
+  if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
+  if (getBubbleCollapse()) {
+    linalg::populateFoldReshapeOpsByCollapsingPatterns(
+        patterns, [](OpOperand *) { return true; });
+  }
+  if (getBubbleExpand()) {
+    linalg::populateFoldReshapeOpsByExpansionPatterns(
+        patterns, [](OpOperand *) { return true; });
+  }
+  if (getBubblePackUnPack())
+    linalg::populateDataLayoutPropagationPatterns(patterns);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
-  if (getLowerTransferOpPermutations())
-    addLowerTransferOpPermutationsPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getExpandMemrefStridedMetadata())
@@ -336,16 +364,18 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
+  if (getLinalgElementwiseGreedyFusion())
+    linalg::populateElementwiseOpsFusionPatterns(patterns,
+                                                 setFusedOpOperandLimit<3>);
+  if (getLowerTransferOpPermutations())
+    addLowerTransferOpPermutationsPatterns(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
+  if (getRankReducingLinalgViaReshapes())
+    addRankReducingLinalgViaReshapesPatterns(patterns);
   if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
-  if (getRewritePackOps()) addRewritePackOpsPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
-  if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
-  if (getBubbleCollapseExpand()) {
-    linalg::populateFoldReshapeOpsByExpansionPatterns(
-        patterns, [](OpOperand *) { return true; });
-  }
+  if (getTilingCanonicalization()) addTilingCanonicalizationPatterns(patterns);
   if (getUnrollVectorsGpuMmaSync())
     addUnrollVectorsGpuMmaSyncPatterns(patterns);
   if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
@@ -361,13 +391,57 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   });
   LogicalResult result =
       applyOpPatternsAndFold(ops, std::move(patterns), config);
-  LogicalResult listenerResult = listener.checkErrorState();
   if (failed(result)) {
-    return mlir::emitDefiniteFailure(target,
-                                     "greedy pattern application failed");
+    return mlir::emitDefiniteFailure(target, "greedy patterns failed");
   }
+  LogicalResult listenerResult = listener.checkErrorState();
   if (failed(listenerResult))
-    return mlir::emitDefiniteFailure(target, "listener tracking failed");
+    return mlir::emitDefiniteFailure(target, "pattern listener tracker fail");
+
+  if (getLicm()) {
+    target->walk([&](func::FuncOp funcOp) {
+      // This assumes LICM never removes operations so we don't need tracking.
+      // TODO: confirm / revisit this assumption and plumb a rewriter through
+      // upstream moveLoopInvariantCode if necessary.
+      funcOp->walk([](LoopLikeOpInterface loopLike) {
+        moveLoopInvariantCode(loopLike);
+      });
+      // For now, put single loop promotion as part of licm. Underlying
+      // implementations perform splice operations which shouldn't need
+      // tracking.
+      // TODO: confirm / revisit this assumption and plumb a rewriter through
+      // upstream moveLoopInvariantCode if necessary.
+      funcOp->walk([](Operation *op) {
+        (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
+            .Case<AffineForOp, scf::ForOp>(
+                [](auto loop) { return promoteIfSingleIteration(loop); })
+            .Default([](Operation *) { return success(); });
+      });
+    });
+  }
+
+  if (getCse()) {
+    func::FuncOp lastFuncVisited;
+    auto walkResult = target->walk([&](func::FuncOp funcOp) -> WalkResult {
+      lastFuncVisited = funcOp;
+      result =
+          eliminateCommonSubexpressions(funcOp, /*domInfo=*/nullptr, &listener);
+      if (failed(result)) return WalkResult::interrupt();
+      listenerResult = listener.checkErrorState();
+      if (failed(listenerResult)) return WalkResult::interrupt();
+      return WalkResult::advance();
+    });
+    if (walkResult.wasInterrupted()) {
+      if (failed(result)) {
+        return mlir::emitDefiniteFailure(lastFuncVisited,
+                                         "greedy patterns failed");
+      }
+      LogicalResult listenerResult = listener.checkErrorState();
+      if (failed(listenerResult))
+        return mlir::emitDefiniteFailure(lastFuncVisited,
+                                         "pattern listener tracker fail");
+    }
+  }
 
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
@@ -542,7 +616,8 @@ LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
     return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
   }
 
-  // Step 1. Complete the blockMapping to a full mapping (with 1s) if necessary.
+  // Step 1. Complete the blockMapping to a full mapping (with 1s) if
+  // necessary.
   SmallVector<Value> numBlocks =
       llvm::to_vector(forallOp.getUpperBound(rewriter));
   // Ensure we have 3 block sizes, one for each id.
@@ -774,8 +849,8 @@ void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
 /// pdl::OperationType handles on the fly.
 static LogicalResult lowerWorkgroupCountComputingRegion(
     transform::TransformState &state, RewriterBase &rewriter, Location loc,
-    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes,
-    Optional<ArrayAttr> mapping) {
+    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> numThreads,
+    ArrayRef<OpFoldResult> tileSizes, Optional<ArrayAttr> mapping) {
   Region &r = exportOp.getWorkgroupCount();
   if (!r.hasOneBlock()) {
     return rewriter.notifyMatchFailure(exportOp,
@@ -793,31 +868,37 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   auto workgroupCountOp = *workgroupCountOps.begin();
   auto workload = workgroupCountOp.getOperands();
 
-  SmallVector<OpFoldResult> unpackedTileSizes;
+  bool useNumThreads = !numThreads.empty();
+  ArrayRef<OpFoldResult> tileSizesOrNumThreads =
+      useNumThreads ? numThreads : tileSizes;
+  StringRef kindStr = useNumThreads ? "num thread" : "tile size";
+
+  SmallVector<OpFoldResult> unpackedTileSizesOrNumThreads;
   int64_t numTiledDims = 0;
-  for (auto ofr : tileSizes) {
+  for (auto ofr : tileSizesOrNumThreads) {
     if (ofr.is<Value>() &&
         ofr.get<Value>().getType().isa<pdl::OperationType>()) {
       for (Operation *sizeProducer : state.getPayloadOps(ofr.get<Value>())) {
         if (sizeProducer->getNumResults() != 1) {
-          auto diag =
-              mlir::emitDefiniteFailure(sizeProducer)
-              << "the operation producing tile size must have one result";
+          auto diag = mlir::emitDefiniteFailure(sizeProducer)
+                      << "the operation producing " << kindStr
+                      << " must have one result";
           diag.attachNote(loc) << "when applying this transform";
           return diag;
         }
-        unpackedTileSizes.push_back(sizeProducer->getResult(0));
+        unpackedTileSizesOrNumThreads.push_back(sizeProducer->getResult(0));
       }
     } else {
-      unpackedTileSizes.push_back(ofr);
+      unpackedTileSizesOrNumThreads.push_back(ofr);
     }
-    if (!isConstantIntValue(unpackedTileSizes.back(), 0)) ++numTiledDims;
+    if (!isConstantIntValue(unpackedTileSizesOrNumThreads.back(), 0))
+      ++numTiledDims;
   }
 
-  if (unpackedTileSizes.size() > workload.size()) {
+  if (unpackedTileSizesOrNumThreads.size() > workload.size()) {
     return rewriter.notifyMatchFailure(
         exportOp,
-        "number of tile sizes overflow the dimension from the workload");
+        "number of " + kindStr + "s overflow the dimension from the workload");
   }
 
   // Generate permutation of tiled dims based on the specified mapping.
@@ -826,7 +907,8 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
     if (numTiledDims != mapping->size()) {
       return rewriter.notifyMatchFailure(exportOp,
                                          "number of mapping elements must "
-                                         "match number of non-zero tile sizes");
+                                         "match number of non-zero " +
+                                             kindStr + "s");
     }
     for (DeviceMappingAttrInterface map : mapping.value())
       mappingPermutation.push_back(map.getMappingId());
@@ -843,15 +925,20 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   int64_t nextTiledDim = 0;
   for (int64_t workgroupsDim : mappingPermutation) {
     // Skip dims with tile size 0. These are not tiled.
-    while (isConstantIntValue(unpackedTileSizes[nextTiledDim], 0))
+    while (isConstantIntValue(unpackedTileSizesOrNumThreads[nextTiledDim], 0))
       ++nextTiledDim;
-    AffineExpr s0, s1;
-    bindSymbols(rewriter.getContext(), s0, s1);
-    auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
-    workgroupCount[workgroupsDim] = makeComposedFoldedAffineApply(
-        rewriter, loc, m,
-        ArrayRef<OpFoldResult>{workload[nextTiledDim],
-                               unpackedTileSizes[nextTiledDim]});
+    if (useNumThreads) {
+      workgroupCount[workgroupsDim] =
+          unpackedTileSizesOrNumThreads[nextTiledDim];
+    } else {
+      AffineExpr s0, s1;
+      bindSymbols(rewriter.getContext(), s0, s1);
+      auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
+      workgroupCount[workgroupsDim] = makeComposedFoldedAffineApply(
+          rewriter, loc, m,
+          ArrayRef<OpFoldResult>{workload[nextTiledDim],
+                                 unpackedTileSizesOrNumThreads[nextTiledDim]});
+    }
     ++nextTiledDim;
   }
 
@@ -915,8 +1002,8 @@ transform_dialect::TileToForallAndWorkgroupCountRegionOp::apply(
   /// regions are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
   if (failed(lowerWorkgroupCountComputingRegion(
-          state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes(),
-          getMapping()))) {
+          state, rewriter, getLoc(), exportOp.value(), getMixedNumThreads(),
+          getMixedTileSizes(), getMapping()))) {
     return mlir::emitDefiniteFailure(exportOp.value(),
                                      "failed to lower workgroup count region");
   }
@@ -1216,75 +1303,6 @@ void transform_dialect::IREEEliminateEmptyTensorsOp::build(
   result.addOperands(target);
   MLIRContext *ctx = builder.getContext();
   result.addTypes(pdl::OperationType::get(ctx));
-}
-
-//===---------------------------------------------------------------------===//
-// ConfigExtractPart
-//===---------------------------------------------------------------------===//
-void transform_dialect::ConfigExtractPart::build(OpBuilder &builder,
-                                                 OperationState &result,
-                                                 Value target,
-                                                 StringRef attrName,
-                                                 Optional<int64_t> maybeLevel) {
-  MLIRContext *ctx = builder.getContext();
-  result.addOperands(target);
-  result.addAttribute(ConfigExtractPart::getAttrNameAttrName(result.name),
-                      builder.getStringAttr(attrName));
-  if (maybeLevel) {
-    result.addAttribute(ConfigExtractPart::getLevelAttrName(result.name),
-                        builder.getI64IntegerAttr(*maybeLevel));
-  }
-  result.addTypes({pdl::OperationType::get(ctx)});
-}
-
-void transform_dialect::ConfigExtractPart::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResultConfigPart(), effects);
-  transform::modifiesPayload(effects);
-}
-
-DiagnosedSilenceableFailure transform_dialect::ConfigExtractPart::apply(
-    transform::TransformResults &transformResults,
-    transform::TransformState &state) {
-  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  if (targetOps.empty()) {
-    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
-    return DiagnosedSilenceableFailure::success();
-  }
-
-  assert(targetOps.size() == 1 && "expected single target op in payload");
-  Operation *target = targetOps.front();
-  auto config = iree_compiler::getLoweringConfig(target);
-  if (!config) {
-    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
-    return emitSilenceableFailure(target) << " has no IREE config";
-  }
-
-  // TODO: op verifier etc.
-  if (getAttrName() != "tile_sizes")
-    return emitDefiniteFailure("unsupported attr");
-
-  if (!getLevel()) {
-    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
-    return emitSilenceableFailure(target) << " level is required for tiling";
-  }
-  auto vals = config.getTileSizeVals(*getLevel());
-  if (vals.empty()) {
-    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
-    return emitSilenceableFailure(target) << " no tiling at level";
-  }
-  SmallVector<Value> values;
-  SmallVector<Operation *> results;
-  OpBuilder b(target);
-  for (int64_t ts : vals) {
-    results.push_back(b.create<arith::ConstantIndexOp>(target->getLoc(), ts));
-    values.push_back(results.back()->getResult(0));
-  }
-  b.create<LinalgExt::DoNotDCEOperandsOp>(target->getLoc(), values);
-
-  transformResults.set(getResultConfigPart().cast<OpResult>(), results);
-  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//

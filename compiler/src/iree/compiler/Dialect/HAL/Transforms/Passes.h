@@ -25,6 +25,15 @@ namespace HAL {
 // Helpers
 //===----------------------------------------------------------------------===//
 
+enum class PipelinePhase {
+  // Runs the transform pipeline up to executable sources (pre translation).
+  ExecutableSources,
+  // Runs the transform pipeline until just after executable translation.
+  ExecutableTargets,
+  // Runs the full pipeline.
+  End,
+};
+
 // Adds a set of passes to the given pass manager that run the required HAL
 // transforms in the canonical order.
 //
@@ -35,8 +44,9 @@ namespace HAL {
 //   <run conversion to flow/sequencer/etc>
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
-void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   const TargetOptions &targetOptions);
+void buildHALTransformPassPipeline(
+    OpPassManager &passManager, const TargetOptions &targetOptions,
+    PipelinePhase compileTo = PipelinePhase::End);
 
 // Adds a set of passes to the given pass manager that run the head of the HAL
 // pipeline to assign devices, materialize interfaces, and translate
