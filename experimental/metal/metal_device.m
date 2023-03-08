@@ -46,6 +46,8 @@ typedef struct iree_hal_metal_device_t {
   // semaphores and wake up threads.
   dispatch_queue_t semaphore_notification_queue;
   MTLSharedEventListener* event_listener;
+
+  MTLCaptureManager* capture_manager;
 } iree_hal_metal_device_t;
 
 static const iree_hal_device_vtable_t iree_hal_metal_device_vtable;
@@ -104,6 +106,7 @@ static iree_status_t iree_hal_metal_device_create_internal(
     device->semaphore_notification_queue = dispatch_queue_create("dev.iree.queue.metal", NULL);
     device->event_listener = [[MTLSharedEventListener alloc]
         initWithDispatchQueue:device->semaphore_notification_queue];  // +1
+    device->capture_manager = NULL;
 
     *out_device = (iree_hal_device_t*)device;
   }
@@ -342,13 +345,63 @@ static iree_status_t iree_hal_metal_device_wait_semaphores(
 }
 
 static iree_status_t iree_hal_metal_device_profiling_begin(
-    iree_hal_device_t* device, const iree_hal_device_profiling_options_t* options) {
-  // Unimplemented (and that's ok).
+    iree_hal_device_t* base_device, const iree_hal_device_profiling_options_t* options) {
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+
+  if (device->capture_manager) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "cannot nest profile capture");
+  }
+
+  if (iree_all_bits_set(options->mode, IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
+    device->capture_manager = [[MTLCaptureManager sharedCaptureManager] retain];  // +1
+
+    @autoreleasepool {
+      NSURL* capture_url = NULL;
+      if (strlen(options->file_path) != 0) {
+        if (!iree_string_view_ends_with(IREE_SV(options->file_path), IREE_SV(".gputrace"))) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "capture filename must end with .gputrace");
+        }
+        if (![device->capture_manager supportsDestination:MTLCaptureDestinationGPUTraceDocument]) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "unsupported capture to file (if invoking as command-line "
+                                  "binary, make sure there is companion Info.plist under the same "
+                                  "directory with 'MetalCaptureEnabled' key being true)");
+        }
+
+        NSString* ns_string = [NSString stringWithCString:options->file_path
+                                                 encoding:[NSString defaultCStringEncoding]];
+        NSString* capture_path = ns_string.stringByStandardizingPath;
+        capture_url = [NSURL fileURLWithPath:capture_path isDirectory:false];
+      }
+
+      MTLCaptureDescriptor* capture_descriptor = [[[MTLCaptureDescriptor alloc] init] autorelease];
+      capture_descriptor.captureObject = device->device;
+      if (capture_url) {
+        capture_descriptor.destination = MTLCaptureDestinationGPUTraceDocument;
+        capture_descriptor.outputURL = capture_url;
+      } else {
+        capture_descriptor.destination = MTLCaptureDestinationDeveloperTools;
+      }
+
+      NSError* error = NULL;
+      if (![device->capture_manager startCaptureWithDescriptor:capture_descriptor error:&error]) {
+#ifndef NDEBUG
+        NSLog(@"Failed to start capture: %@", error);
+#endif
+      }
+    }
+  }
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_metal_device_profiling_end(iree_hal_device_t* device) {
-  // Unimplemented (and that's ok).
+static iree_status_t iree_hal_metal_device_profiling_end(iree_hal_device_t* base_device) {
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  if (device->capture_manager) {
+    [device->capture_manager stopCapture];
+    [device->capture_manager release];  // -1
+    device->capture_manager = NULL;
+  }
   return iree_ok_status();
 }
 
