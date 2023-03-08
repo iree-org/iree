@@ -349,7 +349,7 @@ Find the input model at:
 echo ${IREE_BUILD_DIR}/e2e_test_artifacts/model_ebe7897f-5613-435b-a330-3cb967704e5e_*
 ```
 
-### Find and Manipulate the Benchmark Definitions
+## Manipulating the Benchmarks
 All benchmarks are defined by the scripts under
 [build_tools/python/benchmark_suites/iree](/build_tools/python/benchmark_suites/iree).
 
