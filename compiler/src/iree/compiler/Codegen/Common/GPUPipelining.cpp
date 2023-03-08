@@ -437,7 +437,7 @@ struct MainLoopInfo {
 /// stage.
 /// @param numStages the total number of pipeline stages used for pipelining the
 /// mainloop.
-static void getMultiStagedPipelineSchedule(
+static void getNvidiaAmpereTensorCorePipeline(
     scf::ForOp forOp, std::vector<std::pair<Operation*, unsigned>>& ops,
     unsigned numStages) {
   // Analyze the main loop and obtain information for coarse-grained pipelining
@@ -527,7 +527,7 @@ static FailureOr<scf::ForOp> applyPipelining(
                          scf::ForOp forOp,
                          std::vector<std::pair<Operation*, unsigned>>& ops) {
     if (schedule == PipeliningSchedulingStrategy::nvidiaTensorCore) {
-      return getMultiStagedPipelineSchedule(forOp, ops, maxDepth);
+      return getNvidiaAmpereTensorCorePipeline(forOp, ops, maxDepth);
     }
     return getPipelineStages(forOp, ops, maxDepth);
   };
