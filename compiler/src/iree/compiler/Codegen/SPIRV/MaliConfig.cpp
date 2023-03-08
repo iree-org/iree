@@ -68,7 +68,7 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
         int bestTilingFactor = hasPaddedInput ? 8 : 16;
         return setConvOpConfig(op, subgroupSize, bestTilingFactor);
       })
-      .Default([](Operation *) { return success(); });
+      .Default([](Operation *) { return failure(); });
 }
 
 }  // namespace detail
