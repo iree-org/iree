@@ -111,7 +111,7 @@ After this the newly updated/added bitcode files can be added to git.
 ### Compiler Bitcode Selection
 
 The logic in the compiler for selecting which bitcode file to use is found in
-[`iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Device.cpp`](/iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Device.cpp).
+[`iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.cpp`](/iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.cpp).
 The `lookupDeviceFile` function uses the `llvm::TargetMachine` to query the
 architecture, CPU features, and other properties to choose the corresponding
 bitcode file. If no matching bitcode file is found a fallback of the WebAssembly
@@ -133,7 +133,7 @@ The flags provided are passed directly to Clang and can be used to control the
 compilation environment with the requirement being that the corresponding
 selection logic is updated in `Device.cpp`.
 
-Finally update the [`iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Device.cpp`](/iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Device.cpp)
+Finally update the [`iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.cpp`](/iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.cpp)
 file in the compiler to select the new bitcode file based on the
 `llvm::TargetMachine` in the same way that it is produced with `make_arch_bc`.
 

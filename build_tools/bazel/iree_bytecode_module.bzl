@@ -50,9 +50,9 @@ def iree_bytecode_module(
         static_header_path = static_lib_path.replace(".o", ".h")
         out_files.extend([static_lib_path, static_header_path])
         flags += [
-            "--iree-llvm-link-embedded=false",
-            "--iree-llvm-link-static",
-            "--iree-llvm-static-library-output-path=$(location %s)" % (static_lib_path),
+            "--iree-llvmcpu-link-embedded=false",
+            "--iree-llvmcpu-link-static",
+            "--iree-llvmcpu-static-library-output-path=$(location %s)" % (static_lib_path),
         ]
 
     native.genrule(
@@ -63,9 +63,9 @@ def iree_bytecode_module(
             " ".join([
                 "$(location %s)" % (compile_tool),
                 " ".join(flags),
-                "--iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
-                "--iree-llvm-wasm-linker-path=$(location %s)" % (linker_tool),
-                # Note: --iree-llvm-system-linker-path is left unspecified.
+                "--iree-llvmcpu-embedded-linker-path=$(location %s)" % (linker_tool),
+                "--iree-llvmcpu-wasm-linker-path=$(location %s)" % (linker_tool),
+                # Note: --iree-llvmcpu-system-linker-path is left unspecified.
                 "-o $(location %s)" % (module_name),
                 "$(location %s)" % (src),
             ]),

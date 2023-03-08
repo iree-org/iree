@@ -118,7 +118,7 @@ def iree_check_single_backend_test_suite(
     # We haven't implemented this so far because we have been using target_cpu_features so far only
     # for aarch64 targets, for which we use the CMake build. To future people implementing this:
     # target_cpu_features should be a list, and here it should be joined into a comma-separated
-    # string to be passed to --iree-llvm-target-cpu-features
+    # string to be passed to --iree-llvmcpu-target-cpu-features
     if target_cpu_features:
         fail("target_cpu_features must currently be empty")
 

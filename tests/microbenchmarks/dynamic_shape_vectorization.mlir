@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir --iree-hal-target-backends=llvm-cpu --iree-llvm-link-embedded=true --iree-llvm-target-cpu-features='host' --iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
+// RUN: iree-run-mlir --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-link-embedded=true --iree-llvmcpu-target-cpu-features='host' --iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
 
 //===----------------------------------------------------------------------===//
 // Dynamic shape micro-benchmarks.

@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 #endif  // IREE_HAVE_CUDA_TARGET
 #ifdef IREE_HAVE_LLVM_CPU_TARGET
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMCPUTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.h"
 #endif  // IREE_HAVE_LLVM_CPU_TARGET
 #ifdef IREE_HAVE_METALSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"

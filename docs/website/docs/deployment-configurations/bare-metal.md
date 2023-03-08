@@ -30,8 +30,8 @@ The model can be compiled with the following command (assuming the path to
 iree-compile \
     --iree-stream-partitioning-favor=min-peak-memory \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=x86_64-pc-linux-elf \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-target-triple=x86_64-pc-linux-elf \
+    --iree-llvmcpu-debug-symbols=false \
     samples/models/simple_abs.mlir \
     -o /tmp/simple_abs_cpu.vmfb
 
@@ -62,7 +62,7 @@ demo sample for an example and instructions on running a model with IREE's
 
 By default, the demo targets the host machine when compiling. To produce a
 bare-metal compatible model, run `iree-compile` as in the previous example
-and add the additional `-iree-llvm-static-library-output-path=` flag to specify
+and add the additional `-iree-llvmcpu-static-library-output-path=` flag to specify
 the static library destination. This will produce a `.h\.o` file to link
 directly into the target application.
 
