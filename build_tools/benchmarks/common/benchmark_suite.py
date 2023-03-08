@@ -220,14 +220,13 @@ class BenchmarkSuite(object):
 
       model = module_gen_config.imported_model.model
 
-      benchmark_case = BenchmarkCase(
-          model_name=model.name,
-          model_tags=model.tags,
-          bench_mode=module_exec_config.tags,
-          target_arch=target_arch,
-          driver_info=driver_info,
-          benchmark_tool_name="iree-benchmark-module",
-          run_config=run_config)
+      benchmark_case = BenchmarkCase(model_name=model.name,
+                                     model_tags=model.tags,
+                                     bench_mode=module_exec_config.tags,
+                                     target_arch=target_arch,
+                                     driver_info=driver_info,
+                                     benchmark_tool_name=run_config.tool.value,
+                                     run_config=run_config)
       category = pathlib.Path(model.source_type.value)
       suite_map[category].append(benchmark_case)
 

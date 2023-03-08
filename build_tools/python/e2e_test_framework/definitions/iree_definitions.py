@@ -217,6 +217,11 @@ class ModuleGenerationConfig(object):
 E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER = r"${GPU_ID_PLACEHOLDER}"
 
 
+class E2EModelRunTool(Enum):
+  """Tool to run a module."""
+  IREE_BENCHMARK_MODULE = "iree-benchmark-module"
+
+
 @serialization.serializable(type_key="iree_e2e_model_run_configs",
                             id_field="composite_id")
 @dataclass(frozen=True)
@@ -232,6 +237,7 @@ class E2EModelRunConfig(object):
   # decouple from the generation code. Also serves as useful information in the
   # serialized JSON.
   run_flags: List[str]
+  tool: E2EModelRunTool
 
   def materialize_run_flags(self, gpu_id: str = "0"):
     """Materialize flags with dependent values."""
@@ -244,7 +250,8 @@ class E2EModelRunConfig(object):
   def with_flag_generation(module_generation_config: ModuleGenerationConfig,
                            module_execution_config: ModuleExecutionConfig,
                            target_device_spec: common_definitions.DeviceSpec,
-                           input_data: common_definitions.ModelInputData):
+                           input_data: common_definitions.ModelInputData,
+                           tool: E2EModelRunTool):
     composite_id = unique_ids.hash_composite_id([
         module_generation_config.composite_id, module_execution_config.id,
         target_device_spec.id, input_data.id
@@ -259,7 +266,8 @@ class E2EModelRunConfig(object):
                              module_execution_config=module_execution_config,
                              target_device_spec=target_device_spec,
                              input_data=input_data,
-                             run_flags=run_flags)
+                             run_flags=run_flags,
+                             tool=tool)
 
 
 def generate_run_flags(imported_model: ImportedModel,
