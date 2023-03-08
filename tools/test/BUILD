@@ -49,6 +49,7 @@ iree_lit_test_suite(
     ],
     tools = [
         "//tools:iree-benchmark-module",
+        "//tools:iree-benchmark-trace",
         "//tools:iree-compile",
         "//tools:iree-opt",
         "//tools:iree-run-mlir",

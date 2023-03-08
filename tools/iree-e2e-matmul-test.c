@@ -1282,7 +1282,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
                                     iree_vm_instance_t* instance) {
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
-      root_path, instance,
+      root_path, instance, IREE_TRACE_REPLAY_FLAG_NONE,
       FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                            : IREE_VM_CONTEXT_FLAG_NONE,
       iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
@@ -1298,7 +1298,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
-    iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+    iree_trace_replay_deinitialize(&replay);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "yaml_parser_initialize failed");
   }
@@ -1323,7 +1323,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
   }
 
   yaml_parser_delete(&parser);
-  iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+  iree_trace_replay_deinitialize(&replay);
   return status;
 }
 
