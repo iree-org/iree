@@ -376,24 +376,27 @@ To manipulate the benchmarks:
 
 ##### 1. Find the corresponding CI workflow run
 On the commit of a benchmark run, you can find the list of the workflow jobs by
-clicking the green check mark. Click the `Details` of job
+clicking the green check mark. Click the **Details** of job
 `build_e2e_test_artifacts`:
-TODO
 
-##### 2. Find the GCS directory of benchmark artifacts
+![image](https://user-images.githubusercontent.com/2104162/223781032-c22e2922-2bd7-422d-abc2-d6ef0d31b0f8.png)
+
+##### 2. Get GCS directory of benchmark artifacts
 On the job detail page, expand the step Uploading e2 test artifacts, you will
 see a bunch of lines like:
 ```
 Copying file://build-e2e-test-artifacts/e2e_test_artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb to gs://iree-github-actions-postsubmit-artifacts/4360950546/1/e2e-test-artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb
 ...
 ```
-The URL `gs://iree-github-actions-...-artifacts/.../.../e2e-test-artifacts/` is
-the GCS directory of benchmark artifacts. You can use `gcloud` tool to list the
-contents:
+`gs://iree-github-actions-...-artifacts/.../.../e2e-test-artifacts/` is the GCS
+directory of benchmark artifacts.
+
+You can use `gcloud` tool to list the contents (see its [doc](https://cloud.google.com/sdk/gcloud/reference/storage)
+for more usages):
 ```sh
 gcloud storage ls gs://iree-github-actions-postsubmit-artifacts/4360950546/1/e2e-test-artifacts
 ```
-It has the same directory structure as your local `"$IREE_BUILD_DIR/e2e_test_artifacts"`
+The GCS directory has the same structure as your local `"$IREE_BUILD_DIR/e2e_test_artifacts"`.
 
 # IREE Benchmark Suites Tool (Legacy)
 
