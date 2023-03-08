@@ -89,7 +89,7 @@ def write_env(iree_compiler_dylib: Path):
   with open(REPO_ROOT / "env.bazelrc", "wt") as env_bazelrc, open(
       REPO_ROOT / ".env", "wt") as dotenv, open(REPO_ROOT / ".env.sh",
                                                 "wt") as envsh:
-    envsh.write("# Source with: source .env.sh")
+    envsh.write("# Source with: source .env.sh\n")
 
     def add_env(key, value):
       env_bazelrc.write(f"build --action_env {key}={value}\n")
