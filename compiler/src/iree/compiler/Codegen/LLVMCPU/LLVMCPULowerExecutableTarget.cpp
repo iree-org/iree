@@ -225,7 +225,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                 executableLoweringPipeline,
                 static_cast<int>(TripleTilingLevel::NumTileLevels),
                 enableVectorMasking,
-                /*enablePeeling=*/false);
+                /*enablePeeling=*/false, /*lowerToAVX2i=*/false);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:

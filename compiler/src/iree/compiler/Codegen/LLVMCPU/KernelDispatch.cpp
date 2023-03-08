@@ -233,7 +233,8 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
-    if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
+    if ((linalg::isElementwise(linalgOp) || isFullyDynamicOp(linalgOp)) &&
+        enableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }

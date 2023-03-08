@@ -378,7 +378,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
                                       int64_t numLevels, bool enablePeeling,
                                       bool enableVectorMasking,
-                                      bool lowerToAVX2 = false);
+                                      bool lowerToAVX2);
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
                                           bool enableVectorMasking);
 
