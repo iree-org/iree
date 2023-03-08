@@ -5,6 +5,7 @@ import shutil
 from library import *
 from matmul import *
 
+
 # Mainfest class collects all the operations and configurations and emits \
 # them to the `generated` directory.
 class Manifest:
@@ -22,14 +23,13 @@ class Manifest:
     self.dispatch_names = []
     self.ignore_dispatch_names = []
 
-
     if args.operation_kind == 'all':
       self.operation_kind_enabled = []
     else:
       operations_kind_list = [
-        OperationKind.Matmul,
-        #OperationKind.Conv2d
-      ] 
+          OperationKind.Matmul,
+          #OperationKind.Conv2d
+      ]
       self.operation_kind_enabled = [x for x in operations_kind_list\
                                      if OperationKindNames[x] in\
                                      args.operation_kind.split(',')]
@@ -39,7 +39,8 @@ class Manifest:
     else:
       self.dispatch_names = [x for x in args.dispatches.split(',') if x != '']
 
- # Returns true if all substrings appear in the haystack in order
+# Returns true if all substrings appear in the haystack in order
+
   def _filter_string_matches(self, filter_string, haystack):
 
     substrings = filter_string.split('*')
@@ -53,7 +54,7 @@ class Manifest:
   # Filters the dispatches (operation, specific configuration) \
   # in the manifest based various criteria.
   def filter(self, operation, configuration):
-    
+
     # If no filter is enabled then return True.
     enabled = True
 
@@ -62,7 +63,7 @@ class Manifest:
     if len(self.operation_kind_enabled) and \
       operation.operation_kind not in self.operation_kind_enabled:
       enabled = False
-    
+
     # If dispatch name-based filter regex is enabled match the \
     # dispatch name (operation+configuration) against all regexs \
     # in self.dispatch_names.
@@ -78,7 +79,6 @@ class Manifest:
 
     # Return the result of the filter.
     return enabled
-          
 
   # Appends a single instance of OperationCollection to the manifest.
   def append_operation_collection(self, operation_collection):
@@ -87,7 +87,8 @@ class Manifest:
     if operation_kind not in self.operations.keys():
       self.operations[operation_kind] = []
 
-    filtered_operation_collection = OperationCollection(operation_collection.operation, [])
+    filtered_operation_collection = OperationCollection(
+        operation_collection.operation, [])
     for configuration in operation_collection.configuration_list:
       if self.filter(operation_collection.operation, configuration):
         filtered_operation_collection.configuration_list.append(configuration)
@@ -101,35 +102,37 @@ class Manifest:
     for operation_collection in operation_collection_list:
       self.append_operation_collection(operation_collection)
 
-
   # Emits the operations in the mainfest to the build directory as MLIR source files.
   # The operations are emitted in the dialect specified by the mlir_dialect flag.
-  def emit(self, mlir_dialect = MlirDialect.Linalg):
+  def emit(self, mlir_dialect=MlirDialect.Linalg):
     mlir_source_emitter = {
-      OperationKind.Matmul : EmitMatmulSourceMlir,
-      #OperationKind.Conv2d : EmitConv2dSourceMlir, TODO: Add conv2d
+        OperationKind.Matmul: EmitMatmulSourceMlir,
+        #OperationKind.Conv2d : EmitConv2dSourceMlir, TODO: Add conv2d
     }
 
-    generated_path = os.path.join(self.args.build_dir, 'generated', MlirDialectNames[mlir_dialect])
+    generated_path = os.path.join(self.args.build_dir, 'generated',
+                                  MlirDialectNames[mlir_dialect])
 
     if os.path.exists(generated_path):
       shutil.rmtree(generated_path)
 
     os.makedirs(generated_path)
 
-    # For each operation_kind create a directory and emit the operations with 
+    # For each operation_kind create a directory and emit the operations with
     # all the configurations in the configuration_list into their seperate directories.
     for operation_kind, operation_collection_list in self.operations.items():
 
-      operation_kind_path = os.path.join(generated_path, OperationKindNames[operation_kind])
-      
+      operation_kind_path = os.path.join(generated_path,
+                                         OperationKindNames[operation_kind])
+
       if os.path.exists(operation_kind_path):
         shutil.rmtree(operation_kind_path)
       os.makedirs(operation_kind_path)
 
       for operation_collection in operation_collection_list:
-        
-        operation_path = os.path.join(operation_kind_path, operation_collection.operation.name())
+
+        operation_path = os.path.join(operation_kind_path,
+                                      operation_collection.operation.name())
 
         if os.path.exists(operation_path):
           shutil.rmtree(operation_path)
@@ -139,7 +142,8 @@ class Manifest:
                             operation_collection.operation,\
                             operation_collection.configuration_list)\
                             as mlir_source:
-          
-          print(">> Generating MLIR operation: " + operation_collection.operation.name())
+
+          print(">> Generating MLIR operation: " +
+                operation_collection.operation.name())
           # Emit mlir source file for the operation_collection.operation with all the configurations
           mlir_source.emit()

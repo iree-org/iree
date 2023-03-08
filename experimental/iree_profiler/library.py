@@ -3,11 +3,13 @@ from enum import auto as enum_auto
 import re
 import numpy as np
 from collections import namedtuple
+
 ###################################################################################################
 # This file contains library of enumerations and classes used to build operation descritpions.
 # The operation descriptions are used to generate MLIR source files, performance tuning configuration,
 # reference implementations, and numpy input/output files.
 ###################################################################################################
+
 
 # Architecure types
 ###################################################################################################
@@ -15,11 +17,13 @@ class ArchType(enum.Enum):
   Cpu = enum_auto()
   Gpu = enum_auto()
 
+
 #
 ArchTypeNames = {
-  ArchType.Cpu: "cpu",
-  ArchType.Gpu: "gpu",
+    ArchType.Cpu: "cpu",
+    ArchType.Gpu: "gpu",
 }
+
 
 #
 class GpuArchType(enum.Enum):
@@ -27,44 +31,53 @@ class GpuArchType(enum.Enum):
   rocm = enum_auto()
   spirv = enum_auto()
 
+
 #
 GpuArchTypeNames = {
-  GpuArchType.nvptx: "nvptx",
-  GpuArchType.rocm: "rocm",
-  GpuArchType.spirv: "spirv",
+    GpuArchType.nvptx: "nvptx",
+    GpuArchType.rocm: "rocm",
+    GpuArchType.spirv: "spirv",
 }
+
 ###################################################################################################
+
 
 #
 class OperationKind(enum.Enum):
   Matmul = enum_auto()
-  Conv2d = enum_auto()       
+  Conv2d = enum_auto()
+
 
 #
 OperationKindNames = {
-  OperationKind.Matmul: 'matmul',
-  OperationKind.Conv2d: 'conv2d'
+    OperationKind.Matmul: 'matmul',
+    OperationKind.Conv2d: 'conv2d'
 }
+
 
 class MlirDialect(enum.Enum):
   Linalg = enum_auto()
   Mhlo = enum_auto()
 
+
 #
 MlirDialectNames = {
-  MlirDialect.Linalg: 'linalg',
-  MlirDialect.Mhlo: 'mhlo',
+    MlirDialect.Linalg: 'linalg',
+    MlirDialect.Mhlo: 'mhlo',
 }
 
-class CompilationMode (enum.Enum):
+
+class CompilationMode(enum.Enum):
   Verify = enum_auto()
   Benchmark = enum_auto()
 
+
 #
 CompilationModeNames = {
-  CompilationMode.Verify: 'verify',
-  CompilationMode.Benchmark: 'benchmark',
+    CompilationMode.Verify: 'verify',
+    CompilationMode.Benchmark: 'benchmark',
 }
+
 ###################################################################################################
 
 
@@ -94,50 +107,50 @@ class DataType(enum.Enum):
 
 #
 DataTypeName = {
-  DataType.b1: "b1",
-  DataType.u4: "u4",
-  DataType.u8: "u8",
-  DataType.u16: "u16",
-  DataType.u32: "u32",
-  DataType.u64: "u64",
-  DataType.s4: "s4",
-  DataType.s8: "s8",
-  DataType.s16: "s16",
-  DataType.s32: "s32",
-  DataType.s64: "s64",
-  DataType.e4m3: 'e4m3',
-  DataType.e5m2: 'e5m2',
-  DataType.f16: "f16",
-  DataType.bf16: "bf16",
-  DataType.f32: "f32",
-  DataType.tf32: "tf32",
-  DataType.f64: "f64",
+    DataType.b1: "b1",
+    DataType.u4: "u4",
+    DataType.u8: "u8",
+    DataType.u16: "u16",
+    DataType.u32: "u32",
+    DataType.u64: "u64",
+    DataType.s4: "s4",
+    DataType.s8: "s8",
+    DataType.s16: "s16",
+    DataType.s32: "s32",
+    DataType.s64: "s64",
+    DataType.e4m3: 'e4m3',
+    DataType.e5m2: 'e5m2',
+    DataType.f16: "f16",
+    DataType.bf16: "bf16",
+    DataType.f32: "f32",
+    DataType.tf32: "tf32",
+    DataType.f64: "f64",
 }
 
 DataTypeNumPyTag = {
-  DataType.f16: np.float16,
-  DataType.f32: np.float32,
+    DataType.f16: np.float16,
+    DataType.f32: np.float32,
 }
 
 DataTypeSizeInBits = {
-  DataType.b1: 1,
-  DataType.u4: 4,
-  DataType.u8: 8,
-  DataType.u16: 16,
-  DataType.u32: 32,
-  DataType.u64: 64,
-  DataType.s4: 4,
-  DataType.s8: 8,
-  DataType.s16: 16,
-  DataType.s32: 32,
-  DataType.s64: 64,
-  DataType.e4m3: 8,
-  DataType.e5m2: 8,
-  DataType.f16: 16,
-  DataType.bf16: 16,
-  DataType.f32: 32,
-  DataType.tf32: 32,
-  DataType.f64: 64,
+    DataType.b1: 1,
+    DataType.u4: 4,
+    DataType.u8: 8,
+    DataType.u16: 16,
+    DataType.u32: 32,
+    DataType.u64: 64,
+    DataType.s4: 4,
+    DataType.s8: 8,
+    DataType.s16: 16,
+    DataType.s32: 32,
+    DataType.s64: 64,
+    DataType.e4m3: 8,
+    DataType.e5m2: 8,
+    DataType.f16: 16,
+    DataType.bf16: 16,
+    DataType.f32: 32,
+    DataType.tf32: 32,
+    DataType.f64: 64,
 }
 
 
@@ -150,36 +163,39 @@ class LayoutType(enum.Enum):
 
 # cuBLAS layout type names convenctions ()
 ShortLayoutTypeName = {
-  LayoutType.ColumnMajor: 'n',
-  LayoutType.RowMajor: 't',
-  LayoutType.NHWC: 'nhwc',
-  LayoutType.NCWH: 'ncwh',
+    LayoutType.ColumnMajor: 'n',
+    LayoutType.RowMajor: 't',
+    LayoutType.NHWC: 'nhwc',
+    LayoutType.NCWH: 'ncwh',
 }
 
 
 ###################################################################################################
-# Data structures for describing a tensor, tiles and fundametal operation types 
+# Data structures for describing a tensor, tiles and fundametal operation types
 ###################################################################################################
 class TensorDescription:
+
   def __init__(self, datatype, layout):
     self.datatype = datatype
     self.layout = layout
 
   def name(self):
-    return "%s%s" % (DataTypeName[self.datatype], ShortLayoutTypeName[self.layout])
+    return "%s%s" % (DataTypeName[self.datatype],
+                     ShortLayoutTypeName[self.layout])
 
 
 ###################################################################################################
 class TileDescription:
 
   def __init__(self, threadblock_shape, stages, block_dim):
-    self.threadblock_shape = threadblock_shape # in number of elements in M, N, K
-    self.stages = stages                       # number of shared memory stages in tile K
-    self.block_dim = block_dim                 # block dimension in number of threads in x, y, z
-
+    self.threadblock_shape = threadblock_shape  # in number of elements in M, N, K
+    self.stages = stages  # number of shared memory stages in tile K
+    self.block_dim = block_dim  # block dimension in number of threads in x, y, z
 
   def name(self):
-    return "%dx%d_%dx%d" % (self.threadblock_shape[0], self.threadblock_shape[1], self.threadblock_shape[2], self.stages)
+    return "%dx%d_%dx%d" % (self.threadblock_shape[0],
+                            self.threadblock_shape[1],
+                            self.threadblock_shape[2], self.stages)
 
 
 ###################################################################################################
@@ -189,23 +205,25 @@ class TranslationInfo(enum.Enum):
   LLVMGPUMatmulTensorCore = enum_auto()
   LLVMGPUMatmulSIMT = enum_auto()
 
+
 #
 TranslationInfoTag = {
-  TranslationInfo.LLVMGPUMatmulTensorCore: "LLVMGPUMatmulTensorCore",
-  TranslationInfo.LLVMGPUMatmulSIMT: "LLVMGPUMatmulSIMT",
+    TranslationInfo.LLVMGPUMatmulTensorCore: "LLVMGPUMatmulTensorCore",
+    TranslationInfo.LLVMGPUMatmulSIMT: "LLVMGPUMatmulSIMT",
 }
 
 #
 TranslationInfoName = {
-  TranslationInfo.LLVMGPUMatmulTensorCore: "tensorcore",
-  TranslationInfo.LLVMGPUMatmulSIMT: "simt",
+    TranslationInfo.LLVMGPUMatmulTensorCore: "tensorcore",
+    TranslationInfo.LLVMGPUMatmulSIMT: "simt",
 }
 
 # A collection of indpendent dispatches. A dispatch is operation description + configuration.
 # A single mlir file is generated per operation enumerating multiple dispatches, one for each
 # configuration in the list. Total number of dispatches by one instaces of OperationCollection
 # is len(configuration_list).
-OperationCollection = namedtuple('OperationCollection', ['operation', 'configuration_list'])
+OperationCollection = namedtuple('OperationCollection',
+                                 ['operation', 'configuration_list'])
 
 
 ###################################################################################################
@@ -219,15 +237,17 @@ class Distribution(enum.Enum):
   Identity = enum_auto()
   Random = enum_auto()
 
+
 #
 DistributionName = {
-  Distribution.Empty: "empty",
-  Distribution.Zeros: "zeros",
-  Distribution.Ones: "ones",
-  Distribution.Sequential: "seq",
-  Distribution.Identity: "identity",
-  Distribution.Random: "random",
+    Distribution.Empty: "empty",
+    Distribution.Zeros: "zeros",
+    Distribution.Ones: "ones",
+    Distribution.Sequential: "seq",
+    Distribution.Identity: "identity",
+    Distribution.Random: "random",
 }
+
 
 # Helper function to generate a npy file name from a distribution and shape.
 def get_np_array(tensor_description, shape, dist):
@@ -252,7 +272,9 @@ def get_np_array(tensor_description, shape, dist):
     elif tensor_description.datatype == DataType.f32:
       return np.random.randint(-8, 8, shape)
 
+
 ###################################################################################################
+
 
 # Helper function to substitute values into a template string.
 def SubstituteTemplate(template, values):
@@ -267,5 +289,6 @@ def SubstituteTemplate(template, values):
         changed = True
       text = newtext
   return text
+
 
 ###################################################################################################

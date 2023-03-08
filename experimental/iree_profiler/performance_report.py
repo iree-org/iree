@@ -3,16 +3,18 @@ import os
 import numpy as np
 from collections import namedtuple
 
+
 # Performance results class is used to store the performance results of a single run.
 class PerformanceResult:
+
   def __init__(self, operation, configuration, runtime):
     self.operation = operation
     self.configuration = configuration
     self.bytes = operation.bytes()
     self.flops = operation.flops()
-    self.runtime = runtime # in milliseconds
+    self.runtime = runtime  # in milliseconds
     self.gflops = float(self.flops) / self.runtime / 1.0e6
-  
+
   # Prints the performance result to the console.
   def print(self):
     print('Operation     : %s' % self.operation.name())
@@ -26,15 +28,16 @@ class PerformanceResult:
   # Returns a dictionary with the performance result. Used for csv writing.
   def create_dict_entry(self):
     return {
-      'Operation': self.operation.name(),
-      'Configuration': self.configuration.name(),
-      'Runtime(ms)': self.runtime,
-      'Bytes': self.bytes,
-      'Flops': self.flops,
-      'GFLOP/s': self.gflops,
+        'Operation': self.operation.name(),
+        'Configuration': self.configuration.name(),
+        'Runtime(ms)': self.runtime,
+        'Bytes': self.bytes,
+        'Flops': self.flops,
+        'GFLOP/s': self.gflops,
     }
 
-# Performance report class is used to store the performance results of multiple runs as 
+
+# Performance report class is used to store the performance results of multiple runs as
 # a report. The report can be written to a csv file.
 class PerformanceReport:
   #
@@ -52,8 +55,7 @@ class PerformanceReport:
     # Useful for generating pivot tables.
     self.tags = []
     if args.tags != '':
-      self.tags =  args.tags.split(',')
-   
+      self.tags = args.tags.split(',')
 
   # Appends a performance result to the report.
   def append_perf_result(self, performance_result):
@@ -62,7 +64,7 @@ class PerformanceReport:
   # Writes the performance report to a csv file.
   def write_csv(self):
     open_mode = 'a' if self.append else 'w'
-  
+
     with open(self.output_file_path, open_mode) as csv_file:
       # Create the csv header.
       common_header = ['Operation', 'Configuration']
@@ -73,12 +75,12 @@ class PerformanceReport:
       if len(self.tags):
         tag_header = [tag.split(':')[0] for tag in self.tags]
         csv_header = tag_header + csv_header
-      
+
       # Create the csv dictionary writer.
       csv_writer = csv.DictWriter(csv_file, fieldnames=csv_header)
 
       # Write the header if the file is being created.
-      if open_mode == 'w': 
+      if open_mode == 'w':
         csv_writer.writeheader()
 
       # Write the performance results.
@@ -93,5 +95,5 @@ class PerformanceReport:
 
         # Write the row.
         csv_writer.writerow(csv_dict_row)
-      
+
       print('Writing performance report to %s' % self.output_file_path)

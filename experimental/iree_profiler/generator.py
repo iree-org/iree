@@ -4,7 +4,6 @@ from library import *
 from matmul import *
 from manifest import *
 
-
 ###############################################################################
 
 if __name__ == "__main__":
@@ -20,14 +19,15 @@ if __name__ == "__main__":
                       "filter dispatches by name. A dispatch is a combination of "\
                       "operation and tuning configuration.")
 
-  parser.add_argument("--mlir-dialect", default='linalg', help='MLIR dialect "\
+  parser.add_argument("--mlir-dialect",
+                      default='linalg',
+                      help='MLIR dialect "\
                       entry point at which operation is emitter. For example, "\
                       "linalg*, mhlo, etc.')
 
-
   args = parser.parse_args()
-  
-  # Manifests metadata for a group of accompanying opeartions and configurations. 
+
+  # Manifests metadata for a group of accompanying opeartions and configurations.
   manifest = Manifest(args)
 
   # Collect all the pre-defined dispatches in a manifest.
@@ -36,5 +36,3 @@ if __name__ == "__main__":
 
   # Emit the dispatches present in MLIR linalg dialect.
   manifest.emit(MlirDialect.Linalg)
-
-

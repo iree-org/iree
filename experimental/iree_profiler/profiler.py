@@ -6,7 +6,7 @@ from manifest import *
 from performance_report import *
 
 operation_launcher_map = {
-  OperationKind.Matmul : MatmulOperationLauncher,
+    OperationKind.Matmul: MatmulOperationLauncher,
 }
 
 if __name__ == "__main__":
@@ -16,22 +16,24 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="IREE Python profiler tool for "\
                                    "verifcation and performance profiling tool "\
                                     "for IREE-compiled MLIR operations.")
-  
-  # General options 
+
+  # General options
   parser.add_argument("--build-dir", default=".", required=True, \
                       help="IREE top-level build directory is used to generate "\
                         "operations and npy files.This should be same that used "\
                         "to call generated.py")
   parser.add_argument("--verbose", default='False', \
                       help='Prints verbose output and commands executed.')
-  
+
   # Generator options
   parser.add_argument("--operation_kind", default="all", help="Specifies the "\
                       "operation kinds to generate (matmul, conv2d, all)")
   parser.add_argument("--dispatches", default='', help="Comma delimited list to "\
                       "filter dispatches by name. A dispatch is a combination of "\
                       "operation and tuning configuration.")
-  parser.add_argument("--mlir-dialect", default='linalg', help='MLIR dialect entry "\
+  parser.add_argument("--mlir-dialect",
+                      default='linalg',
+                      help='MLIR dialect entry "\
                       "point at which operation is emitter. For example, "\
                       "linalg*, mhlo, etc.')
   # Compilation options
@@ -51,32 +53,36 @@ if __name__ == "__main__":
   parser.add_argument('--batch-size', '--benchmark-dispatch-repeat-count', \
                       default=100, help="Number of times dispatch is launched "\
                         "in a loop to amortize the launch overhead.")
-  parser.add_argument("--benchmark-repetitions", default=5, 
+  parser.add_argument("--benchmark-repetitions", default=5,
                       type=int, help="Number of times benchmark is repeated "\
                       "and min, max, median, and average runtimes/gflops are "\
                       "reported.")
 
-  # Verification options 
-  parser.add_argument("--verification-enabled", default='True', 
+  # Verification options
+  parser.add_argument("--verification-enabled", default='True',
                       type=str, help="Verify the operation against reference numpy "\
                       "implementation.")
-  
+
   # Performance reporting options
   parser.add_argument("--output", default='', \
                       help="Path to output file for csv readable results.")
   parser.add_argument("--append", default='false', \
                       help="If true, result is appended to possibly existing file. "\
                         "Otherwise, any existing file is overwritten.")
-  
+
   parser.add_argument("--tags", default='', \
                       help="Inserts leading columns in output table and uniform "\
-                        "values for each column. Useful for generating pivot tables.") 
+                        "values for each column. Useful for generating pivot tables.")
   args = parser.parse_args()
   ###############################################################################
 
   # Boolenize the string arguments from command line.
-  verification_enabled = False if args.verification_enabled in ['False', 'false', '0'] else True
-  profiling_enabled = False if args.profiling_enabled in ['False', 'false', '0'] else True
+  verification_enabled = False if args.verification_enabled in [
+      'False', 'false', '0'
+  ] else True
+  profiling_enabled = False if args.profiling_enabled in [
+      'False', 'false', '0'
+  ] else True
   compile_only = False if args.compile_only in ['False', 'false', '0'] else True
   # Overrite verification and profiling if compile_only is set.
   if compile_only:
@@ -86,7 +92,7 @@ if __name__ == "__main__":
   # Path to the directory where the generated operations are stored.
   generated_path = os.path.join(args.build_dir, 'generated', args.mlir_dialect)
 
-  # Manifests metadata for a group of accompanying opeartions and configurations. 
+  # Manifests metadata for a group of accompanying opeartions and configurations.
   manifest = Manifest(args)
 
   # Collect all the avialable operations in a manifest.
@@ -99,19 +105,21 @@ if __name__ == "__main__":
   # For all the operations in the manifest, compile and profile them.
   for operation_kind, operation_collection_list in manifest.operations.items():
     for operation_collection in operation_collection_list:
-      
+
       # Select and create an instance of operation_launcher for the operation with operation_kind.
       # print(operation_collection.operation.name())
-      operation_launcher = operation_launcher_map[operation_kind](args, operation_collection.operation)
+      operation_launcher = operation_launcher_map[operation_kind](
+          args, operation_collection.operation)
 
       for configuration in operation_collection.configuration_list:
         if verification_enabled:
           operation_launcher.verify(configuration)
         if profiling_enabled:
           runtime = operation_launcher.profile(configuration)
-          
+
           # Create and print a performance result.
-          result = PerformanceResult(operation_collection.operation, configuration, runtime)
+          result = PerformanceResult(operation_collection.operation,
+                                     configuration, runtime)
           result.print()
 
           # Append the performance result to the performance report.
