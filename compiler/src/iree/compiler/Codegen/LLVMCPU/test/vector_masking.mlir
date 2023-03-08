@@ -277,7 +277,7 @@ hal.executable private @preset_config_generic_add  {
   ]>
 ]>
 hal.executable private @preset_config_generic_add  {
-  hal.executable.variant @embedded_elf_rv32, target = <"llvm-cpu", "embedded-elf-arm_64", {
+  hal.executable.variant @embedded_elf_arm_64, target = <"llvm-cpu", "embedded-elf-arm_64", {
     cpu_features = "+sve",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
