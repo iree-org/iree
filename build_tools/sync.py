@@ -19,7 +19,7 @@ import re
 import subprocess
 import sys
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 EXTERNAL_PATH = REPO_ROOT / "external"
 CLONE_PATH = EXTERNAL_PATH / ".clones"
 
@@ -115,14 +115,17 @@ def checkout_repo(repo_name,
                   commit: Optional[str] = None) -> Path:
   link_path = EXTERNAL_PATH / repo_name
   clone_path = CLONE_PATH / repo_name
+  cloned = False
   if not link_path.exists():
     if not clone_path.exists():
       log(f"Repository not checked out at {link_path}... "
           f"cloning from {clone_url}")
       execute(["git", "clone", clone_url, str(clone_path)])
+      cloned = True
     log(f"Creating symlink from {clone_path} -> {link_path}")
     link_path.symlink_to(clone_path)
   if commit:
+    if not cloned: execute(["git", "fetch"])
     execute(["git", "checkout", commit], cwd=link_path)
   return link_path
 
