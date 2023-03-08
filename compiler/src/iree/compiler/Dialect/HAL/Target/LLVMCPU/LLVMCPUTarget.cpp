@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMCPUTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.h"
 
 #include <cstdlib>
 
@@ -12,12 +12,12 @@
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Device.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Musl.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Musl.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMIRPasses.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LibraryBuilder.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LinkerTool.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/ModuleUtils.h"

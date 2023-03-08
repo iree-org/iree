@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Musl.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Musl.h"
 
 #include "iree/builtins/musl/bin/libmusl.h"
 #include "llvm/Bitcode/BitcodeReader.h"

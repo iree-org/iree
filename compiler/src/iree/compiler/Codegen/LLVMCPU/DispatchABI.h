@@ -24,10 +24,10 @@ namespace mlir {
 namespace iree_compiler {
 
 // NOTE: HALDispatchABI and the associated conversion patterns should live under
-// iree/compiler/Dialect/HAL/Target/LLVM/ instead of here as they have nothing
-// to do with linalg. If we need to use the patterns in this conversion we can
-// expose a populate*Patterns() function to access them without needing them
-// defined here.
+// iree/compiler/Dialect/HAL/Target/LLVMCPU/ instead of here as they have
+// nothing to do with linalg. If we need to use the patterns in this conversion
+// we can expose a populate*Patterns() function to access them without needing
+// them defined here.
 
 //------------------------------------------------------------------------------
 // ExecutableLibraryDI

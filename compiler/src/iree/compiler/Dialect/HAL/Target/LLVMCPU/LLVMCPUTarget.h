@@ -5,10 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMCPUTARGET_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMCPUTARGET_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMCPUTARGET_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMCPUTARGET_H_
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMTargetOptions.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -24,4 +24,4 @@ void registerLLVMCPUTargetBackends(
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LLVMCPUTARGET_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMCPUTARGET_H_

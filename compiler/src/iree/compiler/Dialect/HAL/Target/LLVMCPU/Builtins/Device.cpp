@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/Builtins/Device.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.h"
 
 #include "iree/builtins/device/libdevice_bitcode.h"
 #include "llvm/Bitcode/BitcodeReader.h"

@@ -5,12 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LIBRARYBUILDER_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LIBRARYBUILDER_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LIBRARYBUILDER_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LIBRARYBUILDER_H_
 
 #include <string>
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMTargetOptions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Support/LogicalResult.h"
@@ -167,4 +167,4 @@ class LibraryBuilder {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LIBRARYBUILDER_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LIBRARYBUILDER_H_

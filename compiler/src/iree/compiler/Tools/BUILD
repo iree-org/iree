@@ -197,7 +197,7 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVM",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/ROCM",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VMVX",

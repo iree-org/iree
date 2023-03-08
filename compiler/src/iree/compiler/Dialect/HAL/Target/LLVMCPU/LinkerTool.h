@@ -5,12 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LINKERTOOL_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LINKERTOOL_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LINKERTOOL_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LINKERTOOL_H_
 
 #include <string>
 
-#include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMTargetOptions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -121,4 +121,4 @@ class LinkerTool {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_LINKERTOOL_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LINKERTOOL_H_

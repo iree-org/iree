@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_BUILTINS_MUSL_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_BUILTINS_MUSL_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_MUSL_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_MUSL_H_
 
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetMachine.h"
@@ -23,4 +23,4 @@ llvm::Expected<std::unique_ptr<llvm::Module>> loadMuslBitcode(
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_BUILTINS_MUSL_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_MUSL_H_

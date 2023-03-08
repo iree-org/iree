@@ -21,7 +21,7 @@ endif()
 )
 
 iree_compiler_cc_library(
-    name = "LLVM",
+    name = "LLVMCPU",
     srcs = [
         "LLVMCPUTarget.cpp",
         "LibraryBuilder.cpp",
@@ -42,7 +42,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/HAL/Target:LLVMLinkerUtils",
-        "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVM/Builtins",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins",
         "//compiler/src/iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
@@ -118,7 +118,7 @@ iree_compiler_cc_library(
     name = "LinkerTool",
     srcs = ["LinkerTool.cpp"],
     hdrs = ["LinkerTool.h"],
-    deps = platform_trampoline_deps("LinkerTools", "compiler/src/iree/compiler/Dialect/HAL/Target/LLVM") + [
+    deps = platform_trampoline_deps("LinkerTools", "compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU") + [
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
