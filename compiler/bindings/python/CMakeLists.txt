@@ -4,6 +4,18 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+################################################################################
+# CAPI library using the LLVM build system.
+#
+# WARNING WILL ROBINSON!
+# This does not look like the rest of IREE. It is directly using the upstream
+# LLVM build system in order to create bundled compiler API binaries that
+# are consistent with LLVM. Consult upstream CMake macros if you don't
+# understand what this does.
+################################################################################
+
+include(AddLLVM)
+include(AddMLIR)
 include(AddMLIRPython)
 
 # Specifies that all MLIR packages are co-located under npcomp.
