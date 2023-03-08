@@ -48,7 +48,7 @@ build_tools/benchmarks/run_benchmarks_on_linux.py \
   --target_device_name="<target_device_name, e.g. c2-standard-16>" \
   --output=benchmark_results.json \
   --verbose \
-  --cpu_uarch="<CPU uarch, e.g. CascadeLake>"
+  --cpu_uarch="<Host CPU uarch, e.g. CascadeLake>"
 # Traces can be collected by adding:
 # --traced_benchmark_tool_dir="$IREE_TRACED_BUILD_DIR/tools" \
 # --trace_capture_tool=/path/to/iree-tracy-capture \
