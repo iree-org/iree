@@ -304,11 +304,11 @@ git push UPSTREAM_AUTOMATION bump-llvm-...
 
 ### Update C-API exported
 
-If a new symbol needs to be export in the C-API run this [script](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/API2/generate_exports.py)
+If a new symbol needs to be export in the C-API run this [script](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/API/generate_exports.py)
 from IREE root directory:
 
 ```
-python compiler/src/iree/compiler/API2/generate_exports.py
+python compiler/src/iree/compiler/API/generate_exports.py
 ```
 
 Missing symbols would usually cause the following kind of errors in python builf kind of error:

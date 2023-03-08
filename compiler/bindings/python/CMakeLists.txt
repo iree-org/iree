@@ -126,7 +126,7 @@ add_mlir_python_modules(IREECompilerPythonModules
   INSTALL_PREFIX "${_PYTHON_INSTALL_PREFIX}/iree/compiler"
   DECLARED_SOURCES ${_SOURCE_COMPONENTS}
   COMMON_CAPI_LINK_LIBS
-    iree_compiler_API2_SharedImpl
+    iree_compiler_API_SharedImpl
   )
 
 
@@ -147,7 +147,7 @@ function(add_iree_compiler_busybox_tool target)
   )
   target_link_libraries(${target}
     iree_compiler_bindings_c_headers
-    iree_compiler_API2_Impl)
+    iree_compiler_API_Impl)
   set_target_properties(${target}
     PROPERTIES
       OUTPUT_NAME "${ARG_OUTPUT_NAME}"
@@ -189,7 +189,7 @@ cmake_language(EVAL CODE "
 cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}/compiler\"
   CALL install
   TARGETS
-    iree_compiler_API2_SharedImpl
+    iree_compiler_API_SharedImpl
   DESTINATION \"${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs\"
 )
 ")
@@ -205,9 +205,9 @@ if(WIN32)
   add_custom_command(
     OUTPUT "${_local_dll_copy}"
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-      "$<TARGET_FILE:iree_compiler_API2_SharedImpl>"
+      "$<TARGET_FILE:iree_compiler_API_SharedImpl>"
       "${_local_dll_copy}"
-    DEPENDS iree_compiler_API2_SharedImpl
+    DEPENDS iree_compiler_API_SharedImpl
   )
   add_custom_target(IREEPythonCopyDLL ALL
     DEPENDS "${_local_dll_copy}")

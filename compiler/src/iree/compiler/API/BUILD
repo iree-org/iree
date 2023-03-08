@@ -34,12 +34,12 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "StaticImpl",
     deps = [
-        "//compiler/src/iree/compiler/API2/Internal:Embed",
-        "//compiler/src/iree/compiler/API2/Internal:IREECompileToolEntryPoint",
-        "//compiler/src/iree/compiler/API2/Internal:IREEMLIRLSPServerToolEntryPoint",
-        "//compiler/src/iree/compiler/API2/Internal:IREEOptToolEntryPoint",
-        "//compiler/src/iree/compiler/API2/Internal:LLDToolEntryPoint",
-        "//compiler/src/iree/compiler/API2/Internal:MLIRInterop",
+        "//compiler/src/iree/compiler/API/Internal:Embed",
+        "//compiler/src/iree/compiler/API/Internal:IREECompileToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:IREEMLIRLSPServerToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:IREEOptToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:LLDToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:MLIRInterop",
         "//llvm-external-projects/iree-dialects:CAPI",
         "@llvm-project//mlir:CAPIDebug",
         "@llvm-project//mlir:CAPIIR",

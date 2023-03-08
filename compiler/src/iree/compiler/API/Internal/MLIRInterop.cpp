@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/API2/MLIRInterop.h"
+#include "iree/compiler/API/MLIRInterop.h"
 
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"

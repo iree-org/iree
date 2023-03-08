@@ -9,7 +9,7 @@
 
 #include <atomic>
 
-#include "iree/compiler/API2/Internal/Diagnostics.h"
+#include "iree/compiler/API/Internal/Diagnostics.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
