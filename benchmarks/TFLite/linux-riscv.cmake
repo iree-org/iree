@@ -18,20 +18,20 @@
 
 set(LINUX_RV64_GENERIC_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
-  "--iree-llvm-target-triple=riscv64"
-  "--iree-llvm-target-cpu=generic-rv64"
-  "--iree-llvm-target-abi=lp64d"
-  "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+  "--iree-llvmcpu-target-triple=riscv64"
+  "--iree-llvmcpu-target-cpu=generic-rv64"
+  "--iree-llvmcpu-target-abi=lp64d"
+  "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 
 # TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
 set(LINUX_RV32_GENERIC_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
-  "--iree-llvm-target-triple=riscv32-pc-linux-elf"
-  "--iree-llvm-target-cpu=generic-rv32"
-  "--iree-llvm-target-abi=ilp32"
-  "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
+  "--iree-llvmcpu-target-triple=riscv32-pc-linux-elf"
+  "--iree-llvmcpu-target-cpu=generic-rv32"
+  "--iree-llvmcpu-target-abi=ilp32"
+  "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 

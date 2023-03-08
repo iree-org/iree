@@ -131,7 +131,7 @@ function compile_program_wasm {
   "${IREE_COMPILE_PATH?}" "${INPUT_FILE}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=wasm32-unknown-emscripten \
+    --iree-llvmcpu-target-triple=wasm32-unknown-emscripten \
     --iree-hal-dump-executable-sources-to="${ARTIFACTS_DIR}" \
     --iree-hal-dump-executable-binaries-to="${ARTIFACTS_DIR}" \
     --iree-scheduling-dump-statistics-format=csv \

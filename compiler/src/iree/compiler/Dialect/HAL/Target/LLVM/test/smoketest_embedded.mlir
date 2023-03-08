@@ -1,5 +1,5 @@
 // Tests the embedded ELF linker that will work on all targets.
-// RUN: iree-opt --split-input-file --iree-stream-transformation-pipeline --iree-hal-transformation-pipeline --iree-llvm-link-embedded=true %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-transformation-pipeline --iree-hal-transformation-pipeline --iree-llvmcpu-link-embedded=true %s | FileCheck %s
 
 module attributes {
   hal.device.targets = [

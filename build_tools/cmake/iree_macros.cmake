@@ -424,7 +424,7 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
     # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
     # should pretty consistently be just a number we can use for target triple.
     set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
-    list(APPEND _FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
+    list(APPEND _FLAGS "--iree-llvmcpu-target-triple=${_TARGET_TRIPLE}")
   endif()
 
   if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
@@ -445,7 +445,7 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
 
   if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
     set(_EMSCRIPTEN_TEST_DEFAULT_FLAGS
-      "--iree-llvm-target-triple=wasm32-unknown-emscripten"
+      "--iree-llvmcpu-target-triple=wasm32-unknown-emscripten"
     )
     list(APPEND _FLAGS ${_EMSCRIPTEN_TEST_DEFAULT_FLAGS})
   endif()

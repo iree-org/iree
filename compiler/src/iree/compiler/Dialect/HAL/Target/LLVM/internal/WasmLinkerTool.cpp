@@ -32,15 +32,16 @@ namespace HAL {
 // * https://github.com/WebAssembly/wabt
 // * https://github.com/bytecodealliance/wasmtime
 //
-// Use with `-iree-llvm-target-triple=wasm32-unknown-unknown` (or equivalent).
-// For SIMD support, also set `-iree-llvm-target-cpu-features=+simd128`.
+// Use with `-iree-llvmcpu-target-triple=wasm32-unknown-unknown` (or
+// equivalent). For SIMD support, also set
+// `-iree-llvmcpu-target-cpu-features=+simd128`.
 class WasmLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
   std::string getWasmToolPath() const {
-    // Always use the --iree-llvm-wasm-linker-path flag when specified as it's
-    // explicitly telling us what to use.
+    // Always use the --iree-llvmcpu-wasm-linker-path flag when specified as
+    // it's explicitly telling us what to use.
     if (!targetOptions.wasmLinkerPath.empty()) {
       return targetOptions.wasmLinkerPath;
     }

@@ -80,30 +80,31 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   auto targetOptions = getDefaultLLVMTargetOptions();
 
   static llvm::cl::opt<std::string> clTargetTriple(
-      "iree-llvm-target-triple", llvm::cl::desc("LLVM target machine triple"),
+      "iree-llvmcpu-target-triple",
+      llvm::cl::desc("LLVM target machine triple"),
       llvm::cl::init(targetOptions.target.triple));
   static llvm::cl::opt<std::string> clTargetCPU(
-      "iree-llvm-target-cpu",
+      "iree-llvmcpu-target-cpu",
       llvm::cl::desc(
           "LLVM target machine CPU; use 'host' for your host native CPU"),
       llvm::cl::init("generic"));
   static llvm::cl::opt<std::string> clTargetCPUFeatures(
-      "iree-llvm-target-cpu-features",
+      "iree-llvmcpu-target-cpu-features",
       llvm::cl::desc("LLVM target machine CPU features; use 'host' for your "
                      "host native CPU"),
       llvm::cl::init(""));
 
   static llvm::cl::opt<bool> llvmLoopInterleaving(
-      "iree-llvm-loop-interleaving", llvm::cl::init(false),
+      "iree-llvmcpu-loop-interleaving", llvm::cl::init(false),
       llvm::cl::desc("Enable LLVM loop interleaving opt"));
   static llvm::cl::opt<bool> llvmLoopVectorization(
-      "iree-llvm-loop-vectorization", llvm::cl::init(false),
+      "iree-llvmcpu-loop-vectorization", llvm::cl::init(false),
       llvm::cl::desc("Enable LLVM loop vectorization opt"));
   static llvm::cl::opt<bool> llvmLoopUnrolling(
-      "iree-llvm-loop-unrolling", llvm::cl::init(true),
+      "iree-llvmcpu-loop-unrolling", llvm::cl::init(true),
       llvm::cl::desc("Enable LLVM loop unrolling opt"));
   static llvm::cl::opt<bool> llvmSLPVectorization(
-      "iree-llvm-slp-vectorization", llvm::cl::init(false),
+      "iree-llvmcpu-slp-vectorization", llvm::cl::init(false),
       llvm::cl::desc("Enable LLVM SLP Vectorization opt"));
 
   targetOptions.target.triple = clTargetTriple;
@@ -133,7 +134,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   targetOptions.pipelineTuningOptions.SLPVectorization = llvmSLPVectorization;
 
   static llvm::cl::opt<SanitizerKind> clSanitizerKind(
-      "iree-llvm-sanitize", llvm::cl::desc("Apply LLVM sanitize feature"),
+      "iree-llvmcpu-sanitize", llvm::cl::desc("Apply LLVM sanitize feature"),
       llvm::cl::init(SanitizerKind::kNone),
       llvm::cl::values(clEnumValN(SanitizerKind::kAddress, "address",
                                   "Address sanitizer support"),
@@ -142,13 +143,13 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   targetOptions.sanitizerKind = clSanitizerKind;
 
   static llvm::cl::opt<std::string> clTargetABI(
-      "iree-llvm-target-abi",
+      "iree-llvmcpu-target-abi",
       llvm::cl::desc("LLVM target machine ABI; specify for -mabi"),
       llvm::cl::init(""));
   targetOptions.options.MCOptions.ABIName = clTargetABI;
 
   static llvm::cl::opt<llvm::FloatABI::ABIType> clTargetFloatABI(
-      "iree-llvm-target-float-abi",
+      "iree-llvmcpu-target-float-abi",
       llvm::cl::desc("LLVM target codegen enables soft float abi e.g "
                      "-mfloat-abi=softfp"),
       llvm::cl::init(targetOptions.options.FloatABIType),
@@ -161,34 +162,34 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   targetOptions.options.FloatABIType = clTargetFloatABI;
 
   static llvm::cl::opt<bool> clDebugSymbols(
-      "iree-llvm-debug-symbols",
+      "iree-llvmcpu-debug-symbols",
       llvm::cl::desc("Generate and embed debug information (DWARF, PDB, etc)"),
       llvm::cl::init(targetOptions.debugSymbols));
   targetOptions.debugSymbols = clDebugSymbols;
 
   static llvm::cl::opt<std::string> clSystemLinkerPath(
-      "iree-llvm-system-linker-path",
+      "iree-llvmcpu-system-linker-path",
       llvm::cl::desc("Tool used to link system shared libraries produced by "
-                     "IREE (for --iree-llvm-link-embedded=false)."),
+                     "IREE (for --iree-llvmcpu-link-embedded=false)."),
       llvm::cl::init(""));
   targetOptions.systemLinkerPath = clSystemLinkerPath;
 
   static llvm::cl::opt<std::string> clEmbeddedLinkerPath(
-      "iree-llvm-embedded-linker-path",
+      "iree-llvmcpu-embedded-linker-path",
       llvm::cl::desc("Tool used to link embedded ELFs produced by IREE (for "
-                     "--iree-llvm-link-embedded=true)."),
+                     "--iree-llvmcpu-link-embedded=true)."),
       llvm::cl::init(""));
   targetOptions.embeddedLinkerPath = clEmbeddedLinkerPath;
 
   static llvm::cl::opt<std::string> clWasmLinkerPath(
-      "iree-llvm-wasm-linker-path",
+      "iree-llvmcpu-wasm-linker-path",
       llvm::cl::desc("Tool used to link WebAssembly modules produced by "
-                     "IREE (for --iree-llvm-target-triple=wasm32-*)."),
+                     "IREE (for --iree-llvmcpu-target-triple=wasm32-*)."),
       llvm::cl::init(""));
   targetOptions.wasmLinkerPath = clWasmLinkerPath;
 
   static llvm::cl::opt<bool> clLinkEmbedded(
-      "iree-llvm-link-embedded",
+      "iree-llvmcpu-link-embedded",
       llvm::cl::desc("Links binaries into a platform-agnostic ELF to be loaded "
                      "by the embedded IREE ELF loader"),
       llvm::cl::init(targetOptions.linkEmbedded));
@@ -207,7 +208,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   }
 
   static llvm::cl::opt<bool> clLinkStatic(
-      "iree-llvm-link-static",
+      "iree-llvmcpu-link-static",
       llvm::cl::desc(
           "Links system libraries into binaries statically to isolate them "
           "from platform dependencies needed at runtime"),
@@ -215,13 +216,13 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   targetOptions.linkStatic = clLinkStatic;
 
   static llvm::cl::opt<bool> clKeepLinkerArtifacts(
-      "iree-llvm-keep-linker-artifacts",
+      "iree-llvmcpu-keep-linker-artifacts",
       llvm::cl::desc("Keep LLVM linker target artifacts (.so/.dll/etc)"),
       llvm::cl::init(targetOptions.keepLinkerArtifacts));
   targetOptions.keepLinkerArtifacts = clKeepLinkerArtifacts;
 
   static llvm::cl::opt<std::string> clStaticLibraryOutputPath(
-      "iree-llvm-static-library-output-path",
+      "iree-llvmcpu-static-library-output-path",
       llvm::cl::desc(
           "Path to output static object (EX: '/path/to/static-library.o'). "
           "This will produce the static library at the specified path along "
@@ -230,7 +231,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   targetOptions.staticLibraryOutput = clStaticLibraryOutputPath;
 
   static llvm::cl::opt<bool> clListTargets(
-      "iree-llvm-list-targets",
+      "iree-llvmcpu-list-targets",
       llvm::cl::desc("Lists all registered targets that the LLVM backend can "
                      "generate code for."),
       llvm::cl::init(false), llvm::cl::ValueDisallowed,

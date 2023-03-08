@@ -1,7 +1,7 @@
 // Tests the system linker; this will fail on Windows and other platforms
 // that cannot generate ELFs using system tools.
 // TODO(benvanik): find a way to make this conditional or host-specific.
-// RUN: iree-opt --split-input-file --iree-stream-transformation-pipeline --iree-hal-transformation-pipeline --iree-llvm-link-embedded=false %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-transformation-pipeline --iree-hal-transformation-pipeline --iree-llvmcpu-link-embedded=false %s | FileCheck %s
 
 module attributes {
   hal.device.targets = [

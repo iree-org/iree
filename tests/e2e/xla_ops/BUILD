@@ -463,7 +463,7 @@ iree_check_single_backend_test_suite(
     ),
     compiler_flags = [
         "--iree-input-type=mhlo",
-        "--iree-llvm-target-cpu-features=host",
+        "--iree-llvmcpu-target-cpu-features=host",
     ],
     driver = "local-task",
     # Building and testing must be on the same architecture, which doesn't work
