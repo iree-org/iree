@@ -262,24 +262,19 @@ void iree_cpu_read_data(iree_host_size_t field_count, uint64_t* out_fields) {
 
 iree_status_t iree_cpu_lookup_data_by_key(iree_string_view_t key,
                                           int64_t* IREE_RESTRICT out_value) {
-#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name)  \
-  if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                               \
-    if (iree_string_view_equal(key, IREE_SV(llvm_name))) {                     \
-      *out_value = iree_all_bits_set(                                          \
-                       (iree_cpu_data_cache_[field_index]),                    \
-                       IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name)) \
-                       ? 1                                                     \
-                       : 0;                                                    \
-      return iree_ok_status();                                                 \
-    }                                                                          \
+#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
+  if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \
+    if (iree_string_view_equal(key, IREE_SV(llvm_name))) {                    \
+      *out_value = (iree_cpu_data_cache_[field_index] >> bit_pos) & 1;        \
+      return iree_ok_status();                                                \
+    }                                                                         \
   }
 #include "iree/schemas/cpu_feature_bits.inl"
 #undef IREE_CPU_FEATURE_BIT
 
-  return iree_make_status(
-      IREE_STATUS_NOT_FOUND,
-      "CPU feature '%.*s' unknown on this architecture (%s)", (int)key.size,
-      key.data, IREE_ARCH);
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "CPU feature '%.*s' unknown on %s", (int)key.size,
+                          key.data, IREE_ARCH);
 }
 
 //===----------------------------------------------------------------------===//

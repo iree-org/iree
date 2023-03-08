@@ -12,15 +12,63 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    ukernel_test_utils
+    util
   HDRS
-    "ukernel_test_utils.h"
+    "util.h"
   SRCS
-    "ukernel_test_utils.cc"
+    "util.c"
   DEPS
+    iree::base
+    iree::base::internal::cpu
+    iree::base::internal::synchronization
+    iree::builtins::ukernel::headers
+    iree::schemas::cpu_data
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    test
+  HDRS
+    "test.h"
+  SRCS
+    "test.c"
+  DEPS
+    ::util
     iree::base
     iree::builtins::ukernel::headers
     iree::schemas::cpu_data
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    benchmark
+  HDRS
+    "benchmark.h"
+  SRCS
+    "benchmark.c"
+  DEPS
+    ::util
+    iree::base
+    iree::builtins::ukernel::headers
+    iree::schemas::cpu_data
+    iree::testing::benchmark
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    memcpy_benchmark
+  HDRS
+    "memcpy_benchmark.h"
+  SRCS
+    "memcpy_benchmark.c"
+  DEPS
+    ::benchmark
+    iree::base
+    iree::builtins::ukernel::headers
+    iree::testing::benchmark
   PUBLIC
 )
 
@@ -30,9 +78,9 @@ iree_cc_binary_benchmark(
   SRCS
     "mmt4d_benchmark.c"
   DEPS
-    ::ukernel_test_utils
+    ::benchmark
+    ::util
     iree::base
-    iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
     iree::testing::benchmark
@@ -43,14 +91,13 @@ iree_cc_test(
   NAME
     mmt4d_test
   SRCS
-    "mmt4d_test.cc"
+    "mmt4d_test.c"
   DEPS
-    ::ukernel_test_utils
+    ::test
+    ::util
     iree::base
-    iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::testing::gtest
 )
 
 iree_cc_binary_benchmark(
@@ -59,9 +106,10 @@ iree_cc_binary_benchmark(
   SRCS
     "pack_benchmark.c"
   DEPS
-    ::ukernel_test_utils
+    ::benchmark
+    ::memcpy_benchmark
+    ::util
     iree::base
-    iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
     iree::testing::benchmark
@@ -72,14 +120,13 @@ iree_cc_test(
   NAME
     pack_test
   SRCS
-    "pack_test.cc"
+    "pack_test.c"
   DEPS
-    ::ukernel_test_utils
+    ::test
+    ::util
     iree::base
-    iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::testing::gtest
 )
 
 iree_cc_binary_benchmark(
@@ -88,9 +135,10 @@ iree_cc_binary_benchmark(
   SRCS
     "unpack_benchmark.c"
   DEPS
-    ::ukernel_test_utils
+    ::benchmark
+    ::memcpy_benchmark
+    ::util
     iree::base
-    iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
     iree::testing::benchmark
@@ -101,14 +149,14 @@ iree_cc_test(
   NAME
     unpack_test
   SRCS
-    "unpack_test.cc"
+    "unpack_test.c"
   DEPS
-    ::ukernel_test_utils
+    ::test
+    ::util
     iree::base
     iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::testing::gtest
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
