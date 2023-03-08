@@ -49,7 +49,7 @@ if(IREE_HAVE_DYNAMIC_LIBRARY_LOADING)
       SRCS
           "iree/compiler/loader/loader_test.c"
       ARGS
-          "$<TARGET_FILE:iree::compiler::API2::SharedImpl>"
+          "$<TARGET_FILE:iree::compiler::API::SharedImpl>"
       DEPS
           ::loader
       )
@@ -59,7 +59,7 @@ if(IREE_HAVE_DYNAMIC_LIBRARY_LOADING)
       # TODO: Find a better way to do this.
       add_dependencies(
           iree_compiler_bindings_c_loader_test
-          iree::compiler::API2::SharedImpl
+          iree::compiler::API::SharedImpl
       )
   endif()
 else()

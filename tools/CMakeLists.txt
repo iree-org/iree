@@ -233,7 +233,7 @@ if(IREE_BUILD_COMPILER)
       "iree-compile-main.cc"
     DEPS
       iree::compiler::bindings::c::headers
-      iree::compiler::API2::Impl
+      iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -247,7 +247,7 @@ if(IREE_BUILD_COMPILER)
       "iree-opt-main.cc"
     DEPS
       iree::compiler::bindings::c::headers
-      iree::compiler::API2::Impl
+      iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -261,7 +261,7 @@ if(IREE_BUILD_COMPILER)
       "iree-mlir-lsp-server.cc"
     DEPS
       iree::compiler::bindings::c::headers
-      iree::compiler::API2::Impl
+      iree::compiler::API::Impl
     SETUP_INSTALL_RPATH
   )
 
