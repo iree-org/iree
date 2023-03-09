@@ -1500,7 +1500,7 @@ hal.executable private @elem_pack {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @elem_pack
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   tensor.pack
+//      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----

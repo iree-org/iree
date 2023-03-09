@@ -1498,6 +1498,7 @@ static LogicalResult setPackOpRootConfig(
     const TargetMLTransformInfo &targetMLTransInfo,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
+  Operation *rootOp = op;
   TileSizesListType tileSizesList;
   if (auto srcGenericOp = op.getSource().getDefiningOp<linalg::GenericOp>()) {
     if (failed(setRootConfig(entryPointFn, srcGenericOp,
@@ -1508,6 +1509,7 @@ static LogicalResult setPackOpRootConfig(
     tileSizesList = getLoweringConfig(srcGenericOp).getTileSizeVals();
     pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
     removeLoweringConfig(srcGenericOp);
+    rootOp = srcGenericOp;
   } else {
     SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
         cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
@@ -1527,12 +1529,8 @@ static LogicalResult setPackOpRootConfig(
     }
   }
 
-  // The config must be set on tensor.pack ops. Otherwise the
-  // IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp will not get lowered in
-  // tile and distribute pass. See Common/TileAndDistributeToWorkgroupsPass.cpp
-  // for more details.
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizesList,
-                                               pipeline);
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
+                                               tileSizesList, pipeline);
 }
 
 namespace {
