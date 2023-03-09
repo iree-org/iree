@@ -247,17 +247,17 @@ struct MainLoopInfo {
   //
 
   // Mainloop operations GlobalMemory -> SharedMemory
-  SetVector<Operation*> copyGlobalToSharedOps;
-  SetVector<Operation*> asyncCreateGroupOp;
-  SetVector<Operation*> barrierOps;
-  SetVector<Operation*> asyncWaitOps;
+  llvm::SetVector<Operation*> copyGlobalToSharedOps;
+  llvm::SetVector<Operation*> asyncCreateGroupOp;
+  llvm::SetVector<Operation*> barrierOps;
+  llvm::SetVector<Operation*> asyncWaitOps;
 
   // Warp-level MMA operations SharedMemory -> Registers -> MMA.
   // Map: kgroupIdx -> WarpMmaOp
-  KgroupToWarpMmaMap warpOperations;
+  llvm::SmallVector<WarpMmaOp, 8> warpOperations;
 
-  std::vector<llvm::SetVector<Operation*>> ldmatrixOpDeps;
-  std::vector<llvm::SetVector<Operation*>> mmasyncOpDeps;
+  // std::vector<llvm::SetVector<Operation*>> ldmatrixOpDeps;
+  // std::vector<llvm::SetVector<Operation*>> mmasyncOpDeps;
   llvm::SetVector<Operation*> copyGlobalToSharedOpDeps;
 
   // Map: Operation -> kgroupIdx
@@ -314,12 +314,19 @@ struct MainLoopInfo {
 
   // Recursively traverse the chain of mma operations for all kgroups from 0
   // (start) to numKgroups (ends scf.yield).
+  // Assumption: The mma operations are in a chain in monotonic increasing
+  // kgroup order.
   void vistMmaSyncOp(Operation* op, int kgroupIdx) {
     // if the operation in an `scf.yield`, we reached the end of MmaSyncOp chain
     // return.
     if (seenMmaOps.count(op) || isa<scf::YieldOp>(op)) return;
 
     seenMmaOps.insert(op);
+
+    // If the kgroupIdx is not in the vector, create a new WarpMmaOp.
+    if (warpOperations.size() < kgroupIdx + 1)
+      warpOperations.push_back(WarpMmaOp());
+
     warpOperations[kgroupIdx].mmaOperations.insert(op);
 
     backtrackToFindSmemLoad(op->getOperand(0).getDefiningOp(),
@@ -370,8 +377,10 @@ struct MainLoopInfo {
     assert(asyncCreateGroupOp.size() == 1 &&
            "Expected only one async.create.group op");
     assert(asyncWaitOps.size() == 1 && "Expected only one async.wait op");
-    assert(barrierOps.size() == 1 && "Expected only one barrier op");
-
+    assert(
+        barrierOps.size() == 1 &&
+        "Expected only two barrier ops ,i.e., around each Shared Memory copy");
+#if 0
     // Obtain the reverse map: operation -> kgroup.
     for (auto& warpOp : warpOperations) {
       for (auto mmaOp : warpOp.second.mmaOperations) {
@@ -384,6 +393,7 @@ struct MainLoopInfo {
         opToKgroupMap[loadOp] = warpOp.first;
       }
     }
+#endif
 
     // Collect the dependent operations for cp.async for couarse-grained
     // instruction scheduling.
@@ -398,16 +408,20 @@ struct MainLoopInfo {
     // Collect the dependent operations for mma.sync and ldmatix operations
     // seperated by kgroups for fine-grained instruction scheduling.
     // Resize to accomodate the number of kgroups.
-    ldmatrixOpDeps.resize(warpOperations.size());
-    mmasyncOpDeps.resize(warpOperations.size());
+    // ldmatrixOpDeps.resize(warpOperations.size());
+    // mmasyncOpDeps.resize(warpOperations.size());
 
     for (int kgroup = 0; kgroup < getNumberOfKgroups(); ++kgroup) {
       // Dependent operations for ldmatrix for the kgroup in loop order.
       for (Operation& op : forOp.getBody()->getOperations()) {
         if (isa<nvgpu::LdMatrixOp>(&op)) {
-          if (opToKgroupMap[&op] == kgroup) {
-            backwardSliceOfDependentOps(ldmatrixOpDeps[kgroup], &op,
-                                        forOp.getBody());
+          if (warpOperations[kgroup].loadOperationsA.count(&op)) {
+            backwardSliceOfDependentOps(warpOperations[kgroup].loadOperationsA,
+                                        &op, forOp.getBody());
+          }
+          if (warpOperations[kgroup].loadOperationsB.count(&op)) {
+            backwardSliceOfDependentOps(warpOperations[kgroup].loadOperationsB,
+                                        &op, forOp.getBody());
           }
         }
       }
@@ -415,9 +429,9 @@ struct MainLoopInfo {
       // Dependent operations for mma.sync the kgroup in loop order.
       for (Operation& op : forOp.getBody()->getOperations()) {
         if (isa<nvgpu::MmaSyncOp>(&op)) {
-          if (opToKgroupMap[&op] == kgroup) {
-            backwardSliceOfDependentOps(mmasyncOpDeps[kgroup], &op,
-                                        forOp.getBody());
+          if (warpOperations[kgroup].mmaOperations.count(&op)) {
+            backwardSliceOfDependentOps(warpOperations[kgroup].mmaOperations,
+                                        &op, forOp.getBody());
           }
         }
       }
@@ -445,10 +459,12 @@ static void getNvidiaAmpereTensorCorePipeline(
   MainLoopInfo info(forOp);
   int numKgroups = info.getNumberOfKgroups();
 
-  // Assert the requirements for pipelining the mainloop targeting NVIDIA
-  // Tensor Cores using multistaged pipeline.
-  assert(numKgroups > 1 && "Number of kgroups should be 2 ore more");
-  assert(numStages > 2 && "Number of stages should be 3 ore more");
+  // NVIDIA Ampere Tensor Core multi-staged pipeline requires at least 2 kgroups
+  // and 3 software pipeline stages. If the conditions are not met, return an
+  // empty schedule.
+  if (numKgroups < 2 || numStages < 3) {
+    return;
+  }
 
   // Start pipelining and scheduling the main loop, all kgroups but the last
   // one.
@@ -458,13 +474,15 @@ static void getNvidiaAmpereTensorCorePipeline(
 
     // Load the next kgroup into registers.
     for (Operation& op : forOp.getBody()->getOperations()) {
-      if (info.ldmatrixOpDeps[kgroup + 1].count(&op))
+      if (info.warpOperations[kgroup + 1].loadOperationsA.count(&op) ||
+          info.warpOperations[kgroup + 1].loadOperationsB.count(&op)) {
         ops.push_back(std::make_pair(&op, numStages - 1));
+      }
     }
 
     // Issue mma.sync on previous loaded kgroup.
     for (Operation& op : forOp.getBody()->getOperations()) {
-      if (info.mmasyncOpDeps[kgroup].count(&op))
+      if (info.warpOperations[kgroup].mmaOperations.count(&op))
         ops.push_back(std::make_pair(&op, numStages - 1));
     }
   }
@@ -489,18 +507,20 @@ static void getNvidiaAmpereTensorCorePipeline(
   //////////////////////////////////////////////////////////////////////////////
 
   // Coarse-grained instruction pipelining: pipeline Shared Memory loads
-  // (SMEM -> Registers) for the first kgroup (kgroup = 0) one stage in advance.
+  // (SMEM -> Registers) for the first kgroup (kgroup = 0) one stage in
+  // advance.
 
   // Schedule the Shared Memory loads for the first kgroup and pipeline them
   // into one stage ahead.
   for (Operation& op : forOp.getBody()->getOperations()) {
-    if (info.ldmatrixOpDeps[0].count(&op))
+    if (info.warpOperations[0].loadOperationsA.count(&op) ||
+        info.warpOperations[0].loadOperationsB.count(&op))
       ops.push_back(std::make_pair(&op, numStages - 2));
   }
 
   // Issue mma.sync on for the last kgroup at the end of the mainloop.
   for (Operation& op : forOp.getBody()->getOperations()) {
-    if (info.mmasyncOpDeps[numKgroups - 1].count(&op))
+    if (info.warpOperations[numKgroups - 1].mmaOperations.count(&op))
       ops.push_back(std::make_pair(&op, numStages - 1));
   }
 }
