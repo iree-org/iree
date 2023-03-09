@@ -86,10 +86,10 @@ class UnixLinkerTool : public LinkerTool {
 
       // Produce a Mach-O dylib file.
       flags.push_back("-dylib");
+      // For flat namespace see https://stackoverflow.com/a/49392862/724872.
       flags.push_back("-flat_namespace");
-      flags.push_back(
-          "-L /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib "
-          "-lSystem");
+      // Link the System and C runtime library, and optionally SAN libraries.
+      flags.push_back(targetOptions.systemLinkerFlags);
     } else {
       // Avoids including any libc/startup files that initialize the CRT as
       // we don't use any of that. Our shared libraries must be freestanding.

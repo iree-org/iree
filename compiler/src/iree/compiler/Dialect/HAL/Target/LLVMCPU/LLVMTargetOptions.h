@@ -55,6 +55,9 @@ struct LLVMTargetOptions {
   // arguments.
   std::string systemLinkerPath;
 
+  // Additional flags passing to systemLinkerPath.
+  std::string systemLinkerFlags;
+
   // Tool to use for linking embedded ELFs. Must be lld.
   std::string embeddedLinkerPath;
 

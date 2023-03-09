@@ -174,6 +174,13 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::init(""));
   targetOptions.systemLinkerPath = clSystemLinkerPath;
 
+  static llvm::cl::opt<std::string> clSystemLinkerFlags(
+      "iree-llvmcpu-system-linker-flags",
+      llvm::cl::desc("Flags for the linker that links system shared libraries. "
+                     "Need --iree-llvmcpu-link-embedded=false."),
+      llvm::cl::init(""));
+  targetOptions.systemLinkerFlags = clSystemLinkerFlags;
+
   static llvm::cl::opt<std::string> clEmbeddedLinkerPath(
       "iree-llvmcpu-embedded-linker-path",
       llvm::cl::desc("Tool used to link embedded ELFs produced by IREE (for "
