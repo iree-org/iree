@@ -341,35 +341,28 @@ def FLOW_DispatchDynamicizeShapeOp : FLOW_PureOp<"dispatch.dynamicize_shape", [
 ]> {
   let summary = [{Dynamicize static shapes}];
   let description = [{
-    Turn static shapes into dynamic one, and capture the maximal power of two
-    divisors of the original static shape dimensions.
-
-    Dynamicizing the input shape ensures the CodeGen flow does not rely on the
-    exact static dimension values; instead, we use more coarse-grained signals
-    (like the maximal power of two divisors) for deducing kernel CodeGen
-    parameters. This helps to reduce the amount of kernel specialization towards
-    input shapes.
+    Turn static shapes into dynamic one. Dynamicizing input shapes enables better
+    executable deduplication at the flow level, so that kernel CodeGen flow is
+    not forced to specialize towards every input shapes. Instead, kernel CodeGen
+    backends will see dynamically shaped executables, with all concrete static 
+    dimension values as `stream.values` attributes, and make local decisions
+    w.r.t. whether/what to specialize or create multiple versions.
 
     This operation is meant to act as an intermediate inside dispatch region
-    formation. We dynamicize the shape and capture coarse-grained signals
-    after forming `flow.dispatch.region` but before finalizing
-    `flow.dispatch.workgroups`. Thus we can make SSA values injected for the new
-    dynamic dimensions to be captured consistently like others. After forming
-    `flow.dispatch.workgroups`, the information carried in this op would be
-    forwarded to `flow.dispatch.tie_shape`.
+    formation. We dynamicize the shape after forming `flow.dispatch.region` but
+    before finalizing `flow.dispatch.workgroups`. Thus we can make SSA values
+    injected for the new dynamic dimensions to be captured consistently like
+    others. This operation would be trivially erased when converting to stream.
   }];
 
   let arguments = (ins
     AnyRankedTensor:$source,
-    FLOW_ShapeDynamicDims:$dynamic_dims,
-    DenseI64ArrayAttr:$dim_divisors
+    FLOW_ShapeDynamicDims:$dynamic_dims
   );
   let results = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
-    $source attr-dict
-      `:` type($source) custom<StaticDimDivisorList>($dim_divisors)
-      `->` type($result) (`{` $dynamic_dims^ `}`)?
+    $source attr-dict `:` type($source) `->` type($result) (`{` $dynamic_dims^ `}`)?
   }];
 
   let extraClassDeclaration = [{
@@ -391,9 +384,9 @@ def FLOW_DispatchDynamicizeDimOp : FLOW_PureOp<"dispatch.dynamicize_dim"> {
   let summary = [{Dynamicize constant dimension sizes}];
   let description = [{
     This is effectively a constant index, but we have this separate operation
-    for it to help guaranteeing region boundaries for dispatch formation, as
-    normal constants are subject to transformations like folding and can be
-    moved across region boundary as canonicalization woule like.
+    for it to respect region boundaries for dispatch formation, as normal
+    constants are subject to transformations like folding and can be moved
+    across region boundary as canonicalization woule like.
   }];
 
   let arguments = (ins IndexAttr:$value);

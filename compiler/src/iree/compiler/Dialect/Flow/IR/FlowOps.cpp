@@ -489,49 +489,11 @@ void DispatchRegionOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // flow.dispatch.dynamicize_shape
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStaticDimDivisorList(OpAsmParser &parser,
-                                             DenseI64ArrayAttr &integers) {
-  SmallVector<int64_t, 4> integerVals;
-  auto parseInteger = [&]() {
-    int64_t integer;
-    if (succeeded(parser.parseOptionalQuestion())) {
-      integerVals.push_back(ShapedType::kDynamic);
-      return success();
-    }
-    if (failed(parser.parseInteger(integer))) return failure();
-    integerVals.push_back(integer);
-    return success();
-  };
-  if (parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Braces,
-                                     parseInteger,
-                                     " in dimension divisor list")) {
-    return parser.emitError(parser.getNameLoc()) << "expected integer";
-  }
-  integers = parser.getBuilder().getDenseI64ArrayAttr(integerVals);
-  return success();
-}
-
-static void printStaticDimDivisorList(OpAsmPrinter &printer, Operation *op,
-                                      ArrayRef<int64_t> integers) {
-  printer << '{';
-  llvm::interleaveComma(integers, printer, [&](int64_t integer) {
-    if (ShapedType::isDynamic(integer)) {
-      printer << "?";
-    } else {
-      printer << integer;
-    }
-  });
-  printer << '}';
-}
-
 LogicalResult DispatchDynamicizeShapeOp::verify() {
   auto srcShape = getSource().getType().cast<ShapedType>().getShape();
   auto dstShape = getType().cast<ShapedType>().getShape();
   if (srcShape.size() != dstShape.size()) {
     return emitOpError("output rank does not match input rank");
-  }
-  if (srcShape.size() != getDimDivisors().size()) {
-    return emitOpError("divisor count does not match input rank");
   }
   if (dstShape.size() != getDynamicDims().size()) {
     return emitOpError("dynamic shape value count does not match output rank");
@@ -542,22 +504,9 @@ LogicalResult DispatchDynamicizeShapeOp::verify() {
     return emitOpError("output shape should be fully dynamic");
   }
 
-  for (auto [srcDim, dstDim, divisor, dynDim] : llvm::zip_equal(
-           srcShape, dstShape, getDimDivisors(), getDynamicDims())) {
-    if (ShapedType::isDynamic(srcDim) != ShapedType::isDynamic(divisor)) {
-      return emitOpError(
-          "dynamic input dimension and dynamic divisor mismatch");
-    }
-
+  for (auto [srcDim, dstDim, dynDim] :
+       llvm::zip_equal(srcShape, dstShape, getDynamicDims())) {
     if (ShapedType::isDynamic(srcDim)) continue;
-
-    // Verify static dimensions have correct divisor integers.
-    uint64_t expected = llvm::bit_floor<uint64_t>(srcDim);
-    while (expected > 1 && srcDim % expected != 0) expected >>= 1;
-    if (expected != divisor)
-      return emitOpError("input dimension size ")
-             << srcDim << " expected to have a divisor of " << expected
-             << ", but given " << divisor;
 
     // Verify static dimensions have corresponding SSA value captured.
     APInt dimValue;
@@ -565,13 +514,13 @@ LogicalResult DispatchDynamicizeShapeOp::verify() {
     if (!dimOp) {
       return emitOpError(
           "output dimension SSA value should come from "
-          "dispatch.dynamicize_index");
+          "flow.dispatch.dynamicize_dim");
     }
     if (dimOp.getValue().getSExtValue() != srcDim) {
       return emitOpError("input dimension size ")
              << srcDim
-             << " expected the corresponding output dimension to capture a "
-                "constant SSA value";
+             << " expected the corresponding output dimension to capture the "
+                "same constant SSA value";
     }
   }
 
@@ -585,20 +534,14 @@ DispatchDynamicizeShapeOp DispatchDynamicizeShapeOp::build(OpBuilder &builder,
 
   SmallVector<Value, 4> dimValues;
   dimValues.reserve(sourceType.getRank());
-  SmallVector<int64_t, 4> divisors;
-  divisors.reserve(sourceType.getRank());
 
   for (auto [dimIndex, dimSize] : llvm::enumerate(sourceType.getShape())) {
     if (ShapedType::isDynamic(dimSize)) {
       dimValues.push_back(
           builder.create<tensor::DimOp>(loc, sourceValue, dimIndex));
-      divisors.push_back(ShapedType::kDynamic);
     } else {
       dimValues.push_back(
           builder.create<DispatchDynamicizeDimOp>(loc, dimSize));
-      uint64_t divisor = llvm::bit_floor<uint64_t>(dimSize);
-      while (divisor > 1 && dimSize % divisor != 0) divisor >>= 1;
-      divisors.push_back(divisor);
     }
   }
 
@@ -607,7 +550,7 @@ DispatchDynamicizeShapeOp DispatchDynamicizeShapeOp::build(OpBuilder &builder,
                                        sourceType.getEncoding());
 
   return builder.create<DispatchDynamicizeShapeOp>(loc, dstType, sourceValue,
-                                                   dimValues, divisors);
+                                                   dimValues);
 }
 
 //===----------------------------------------------------------------------===//

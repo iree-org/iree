@@ -183,8 +183,8 @@ func.func @dynamicizeShape4D(%source: tensor<6x?x7x16xf32>, %dim1 : index) -> te
   %c7 = flow.dispatch.dynamicize_dim 7 : index
   // CHECK: %[[C16:.+]] = flow.dispatch.dynamicize_dim 16 : index
   %c16 = flow.dispatch.dynamicize_dim 16 : index
-  // CHECK: flow.dispatch.dynamicize_shape %[[SRC]] : tensor<6x?x7x16xf32> {2, ?, 1, 16} -> tensor<?x?x?x?xf32>{%[[C6]], %[[DIM1]], %[[C7]], %[[C16]]}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32>{2, ?, 1, 16} -> tensor<?x?x?x?xf32>{%c6, %dim1, %c7, %c16}
+  // CHECK: flow.dispatch.dynamicize_shape %[[SRC]] : tensor<6x?x7x16xf32> -> tensor<?x?x?x?xf32>{%[[C6]], %[[DIM1]], %[[C7]], %[[C16]]}
+  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32> -> tensor<?x?x?x?xf32>{%c6, %dim1, %c7, %c16}
   return %0 : tensor<?x?x?x?xf32>
 }
 
@@ -192,8 +192,8 @@ func.func @dynamicizeShape4D(%source: tensor<6x?x7x16xf32>, %dim1 : index) -> te
 
 // CHECK-LABEL: @dynamicizeShape0D
 func.func @dynamicizeShape0D(%source: tensor<f32>) -> tensor<f32> {
-  // CHECK: flow.dispatch.dynamicize_shape %{{.+}} : tensor<f32> {} -> tensor<f32>
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<f32>{} -> tensor<f32>
+  // CHECK: flow.dispatch.dynamicize_shape %{{.+}} : tensor<f32> -> tensor<f32>
+  %0 = flow.dispatch.dynamicize_shape %source : tensor<f32> -> tensor<f32>
   return %0 : tensor<f32>
 }
 
@@ -204,7 +204,7 @@ func.func @dynamicizeShapeMismatchedSize(%source: tensor<6x?x7x16xf32>, %dim1 : 
   %c7 = flow.dispatch.dynamicize_dim 7 : index
   %c16 = flow.dispatch.dynamicize_dim 16 : index
   // expected-error @+1 {{output rank does not match input rank}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32>{2, ?, 1, 16} -> tensor<?x?x?xf32>{%c6, %dim1, %c7}
+  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32> -> tensor<?x?x?xf32>{%c6, %dim1, %c7}
   return %0 : tensor<?x?x?xf32>
 }
 
@@ -213,19 +213,8 @@ func.func @dynamicizeShapeMismatchedSize(%source: tensor<6x?x7x16xf32>, %dim1 : 
 func.func @dynamicizeShapeMismatchedSize(%source: tensor<6x?x7x16xf32>, %dim1 : index) -> tensor<?x?x?x?xf32> {
   %c6 = flow.dispatch.dynamicize_dim 6 : index
   %c7 = flow.dispatch.dynamicize_dim 7 : index
-  %c16 = flow.dispatch.dynamicize_dim 16 : index
-  // expected-error @+1 {{divisor count does not match input rank}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32>{2, 1, 16} -> tensor<?x?x?x?xf32>{%c6, %dim1, %c7, %c16}
-  return %0 : tensor<?x?x?x?xf32>
-}
-
-// -----
-
-func.func @dynamicizeShapeMismatchedSize(%source: tensor<6x?x7x16xf32>, %dim1 : index) -> tensor<?x?x?x?xf32> {
-  %c6 = flow.dispatch.dynamicize_dim 6 : index
-  %c7 = flow.dispatch.dynamicize_dim 7 : index
   // expected-error @+1 {{dynamic shape value count does not match output rank}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32>{2, ?, 1, 16} -> tensor<?x?x?x?xf32>{%c6, %dim1, %c7}
+  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32> -> tensor<?x?x?x?xf32>{%c6, %dim1, %c7}
   return %0 : tensor<?x?x?x?xf32>
 }
 
@@ -236,47 +225,16 @@ func.func @dynamicizeShapeOutput(%source: tensor<6x?x7x16xf32>, %dim1 : index) -
   %c7 = flow.dispatch.dynamicize_dim 7 : index
   %c16 = flow.dispatch.dynamicize_dim 16 : index
   // expected-error @+1 {{output shape should be fully dynamic}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32>{2, ?, 1, 16} -> tensor<?x?x?x16xf32>{%c6, %dim1, %c7, %c16}
+  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32> -> tensor<?x?x?x16xf32>{%c6, %dim1, %c7, %c16}
   return %0 : tensor<?x?x?x16xf32>
 }
 
 // -----
 
-func.func @dynamicizeShapeMismatchedDynamicDim(%source: tensor<6x?x7x16xf32>, %dim1 : index) -> tensor<?x?x?x?xf32> {
-  %c6 = flow.dispatch.dynamicize_dim 6 : index
-  %c7 = flow.dispatch.dynamicize_dim 7 : index
-  %c16 = flow.dispatch.dynamicize_dim 16 : index
-  // expected-error @+1 {{dynamic input dimension and dynamic divisor mismatch}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32>{2, 1, 1, 16} -> tensor<?x?x?x?xf32>{%c6, %dim1, %c7, %c16}
-  return %0 : tensor<?x?x?x?xf32>
-}
-
-// -----
-
-func.func @dynamicizeShapeMismatchedDynamicDim(%source: tensor<6x?x7x16xf32>, %dim1 : index) -> tensor<?x?x?x?xf32> {
-  %c6 = flow.dispatch.dynamicize_dim 6 : index
-  %c7 = flow.dispatch.dynamicize_dim 7 : index
-  %c16 = flow.dispatch.dynamicize_dim 16 : index
-  // expected-error @+1 {{dynamic input dimension and dynamic divisor mismatch}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6x?x7x16xf32>{2, ?, ?, 16} -> tensor<?x?x?x?xf32>{%c6, %dim1, %c7, %c16}
-  return %0 : tensor<?x?x?x?xf32>
-}
-
-// -----
-
-func.func @dynamicizeShapeWrongDivisor(%source: tensor<6xf32>) -> tensor<?xf32> {
-  %c6 = flow.dispatch.dynamicize_dim 6 : index
-  // expected-error @+1 {{dimension size 6 expected to have a divisor of 2, but given 3}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6xf32>{3} -> tensor<?xf32>{%c6}
-  return %0 : tensor<?xf32>
-}
-
-// -----
-
-func.func @dynamicizeShapeWrongOp(%source: tensor<6xf32>) -> tensor<?xf32> {
-  %c8 = arith.constant 8 : index
-  // expected-error @+1 {{output dimension SSA value should come from dispatch.dynamicize_index}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6xf32>{2} -> tensor<?xf32>{%c8}
+func.func @dynamicizeShapeWrongDimOp(%source: tensor<6xf32>) -> tensor<?xf32> {
+  %c6 = arith.constant 6 : index
+  // expected-error @+1 {{output dimension SSA value should come from flow.dispatch.dynamicize_dim}}
+  %0 = flow.dispatch.dynamicize_shape %source : tensor<6xf32> -> tensor<?xf32>{%c6}
   return %0 : tensor<?xf32>
 }
 
@@ -284,7 +242,7 @@ func.func @dynamicizeShapeWrongOp(%source: tensor<6xf32>) -> tensor<?xf32> {
 
 func.func @dynamicizeShapeMismatchedStaticDim(%source: tensor<6xf32>) -> tensor<?xf32> {
   %c8 = flow.dispatch.dynamicize_dim 8 : index
-  // expected-error @+1 {{input dimension size 6 expected the corresponding output dimension to capture a constant SSA value}}
-  %0 = flow.dispatch.dynamicize_shape %source : tensor<6xf32>{2} -> tensor<?xf32>{%c8}
+  // expected-error @+1 {{input dimension size 6 expected the corresponding output dimension to capture the same constant SSA value}}
+  %0 = flow.dispatch.dynamicize_shape %source : tensor<6xf32> -> tensor<?xf32>{%c8}
   return %0 : tensor<?xf32>
 }
