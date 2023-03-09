@@ -99,6 +99,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       pattern applications.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
+      - lower_vector_masks: Lower vector.mask ops away.
       - rank_reducing_linalg: adds patterns that results in rank-reducing
       behavior on subset-based linalg operations.
       - rank_reducing_vector: adds patterns that results in rank-reducing 
@@ -145,6 +146,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$fold_tensor_empty_extract,
                        UnitAttr:$licm,
                        UnitAttr:$lower_transfer_op_permutations,
+                       UnitAttr:$lower_vector_masks,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_vector,
                        UnitAttr:$swap_padding_elide_conditional,

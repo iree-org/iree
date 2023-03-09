@@ -46,6 +46,7 @@ struct ApplyPatternsOpPatterns {
   bool foldTensorEmptyExtract = false;
   bool licm = false;
   bool lowerTransferOpPermutations = false;
+  bool lowerVectorMasks = false;
   bool promoteForallCaptureToShared = false;
   bool rankReducingLinalg = false;
   bool rankReducingVector = false;
