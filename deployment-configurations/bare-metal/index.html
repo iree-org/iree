@@ -1338,14 +1338,14 @@ to retrieve the IREE compiler.</p>
 </code></pre></div>
 <p>In which</p>
 <ul>
-<li><code>-iree-stream-partitioning-favor=min-peak-memory</code>: Optimize for minimum peak
+<li><code>--iree-stream-partitioning-favor=min-peak-memory</code>: Optimize for minimum peak
     memory usage at the cost of concurrency - include when targeting
     single-threaded execution to reduce memory consumption.</li>
-<li><code>iree-hal-target-backends=llvm-cpu</code>: Compile using the LLVM CPU target</li>
-<li><code>iree-llvm-target-triple</code>: Use the <code>&lt;arch&gt;-pc-linux-elf</code> LLVM target triple
+<li><code>--iree-hal-target-backends=llvm-cpu</code>: Compile using the LLVM CPU target</li>
+<li><code>--iree-llvmcpu-target-triple</code>: Use the <code>&lt;arch&gt;-pc-linux-elf</code> LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
     <a href="https://github.com/openxla/iree/tree/main/iree/hal/local/elf">elf_module library</a></li>
-<li><code>iree-llvm-debug-symbols=false</code>: To reduce the artifact size</li>
+<li><code>--iree-llvmcpu-debug-symbols=false</code>: To reduce the artifact size</li>
 </ul>
 <p>See <a href="https://github.com/openxla/iree/blob/main/iree/hal/local/elf/testdata/generate.sh">generate.sh</a>
 for example command-line instructions of some common architectures</p>
