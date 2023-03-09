@@ -370,7 +370,7 @@ struct MainLoopInfo {
            "Expected only one async.create.group op");
     assert(asyncWaitOps.size() == 1 && "Expected only one async.wait op");
     assert(
-        barrierOps.size() == 1 &&
+        barrierOps.size() == 2 &&
         "Expected only two barrier ops ,i.e., around each Shared Memory copy");
 
     // Collect the dependent operations for cp.async for couarse-grained
@@ -477,7 +477,8 @@ static void getNvidiaAmpereTensorCorePipeline(
 
   // Schedule and pipeline all async.wait and barrier
   ops.push_back(std::make_pair(info.asyncWaitOps[0], numStages - 2));
-  ops.push_back(std::make_pair(info.barrierOps[0], numStages - 2));
+  info.barrierOps[0]->erase();
+  ops.push_back(std::make_pair(info.barrierOps[1], numStages - 2));
   //////////////////////////////////////////////////////////////////////////////
 
   // Coarse-grained instruction pipelining: pipeline Shared Memory loads
