@@ -106,7 +106,10 @@ static iree_status_t iree_hal_metal_device_create_internal(
     device->device = [metal_device retain];          // +1
     device->queue = [metal_device newCommandQueue];  // +1
     device->builtin_executable = builtin_executable;
-    device->semaphore_notification_queue = dispatch_queue_create("dev.iree.queue.metal", NULL);
+    dispatch_queue_attr_t queue_attr = dispatch_queue_attr_make_with_qos_class(
+        DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, /*relative_priority=*/0);
+    device->semaphore_notification_queue =
+        dispatch_queue_create("dev.iree.queue.metal", queue_attr);
     device->event_listener = [[MTLSharedEventListener alloc]
         initWithDispatchQueue:device->semaphore_notification_queue];  // +1
     device->capture_manager = NULL;
