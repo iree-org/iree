@@ -183,7 +183,7 @@ func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
 
 //      CHECK: flow.executable private @main_dispatch_0 {
 // CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_4x8
-//      CHECK: func.func @main_dispatch_0_fill_4x8(
+//      CHECK: func.func @main_dispatch_0_fill_4x8_f32xf32(
 func.func @main() -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
@@ -205,7 +205,7 @@ func.func @main() -> tensor<4x8xf32> {
 
 //      CHECK: flow.executable private @main_dispatch_0 {
 // CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_40
-//      CHECK: func.func @main_dispatch_0_fill_40(
+//      CHECK: func.func @main_dispatch_0_fill_40_f32xf32(
 func.func @main() -> tensor<10xf32> {
   %x = arith.constant 100 : index
   %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<10xf32>) = (
@@ -232,7 +232,7 @@ func.func @main() -> tensor<10xf32> {
 
 //      CHECK: flow.executable private @main_dispatch_0 {
 // CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_DxDxD
-//      CHECK: func.func @main_dispatch_0_fill_DxDxD(
+//      CHECK: func.func @main_dispatch_0_fill_DxDxD_f32xf32(
 func.func @main(%arg0 : index) -> tensor<10xf32> {
   %x = arith.constant 100 : index
   %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<10xf32>) = (

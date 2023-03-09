@@ -65,12 +65,42 @@ static std::string getLinalgOpLoopRanges(linalg::LinalgOp op) {
   return outputString;
 }
 
+static std::string operandTypeToString(OpOperand *opOperand) {
+  auto operandType = opOperand->get().getType();
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  if (auto shapedType = dyn_cast<ShapedType>(operandType)) {
+    shapedType.getElementType().print(sstream);
+  } else {
+    operandType.print(sstream);
+  }
+  return outputString;
+}
+
+// Returns a string like "f32xf32" representing a linalg op's types for each
+// operands.
+static std::string getLinalgDataTypes(linalg::LinalgOp op) {
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  llvm::interleave(
+      op.getDpsInputOperands(),
+      [&](OpOperand *opOperand) { sstream << operandTypeToString(opOperand); },
+      [&] { sstream << "x"; });
+  sstream << "x";
+  llvm::interleave(
+      op.getDpsInitOperands(),
+      [&](OpOperand *opOperand) { sstream << operandTypeToString(opOperand); },
+      [&] { sstream << "x"; });
+  return outputString;
+}
+
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   auto opName = op->getName().getStringRef();
   if (!opName.consume_front("linalg.")) return "";
-  std::string opSuffix = getLinalgOpLoopRanges(op);
-  // TODO(scotttodd): include element type(s) in this string
-  return opName.str() + (opSuffix.empty() ? "" : "_" + opSuffix);
+  std::string opLoopRanges = getLinalgOpLoopRanges(op);
+  std::string opTypes = opLoopRanges.empty() ? "" : getLinalgDataTypes(op);
+  return opName.str() + (opLoopRanges.empty() ? "" : "_" + opLoopRanges) +
+         (opTypes.empty() ? "" : "_" + opTypes);
 }
 
 // Summarizes the contents of a dispatch into a short string.
