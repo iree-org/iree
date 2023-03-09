@@ -48,6 +48,7 @@ iree_check_single_backend_test_suite(
     "layernorm.mlir"
     "linalg_ops.mlir"
     "lowering_config.mlir"
+    "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir"
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
     "strided_slice.mlir"

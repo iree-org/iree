@@ -13,7 +13,7 @@ set(IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES
 
 # Helper for iree_check_test and iree_trace_runner_test.
 # Just a thin wrapper around iree_bytecode_module, passing it some
-# common flags, including the appropriate --iree-llvm-target-triple in the
+# common flags, including the appropriate --iree-llvmcpu-target-triple in the
 # Android case.
 function(iree_bytecode_module_for_iree_check_test_and_friends)
   if(NOT IREE_BUILD_TESTS)
@@ -34,7 +34,7 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
 TARGET_BACKEND is not in the list (${IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES}). Actual values: \
 TARGET_CPU_FEATURES=${_RULE_TARGET_CPU_FEATURES}, TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
     endif()
-    list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
+    list(APPEND _RULE_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
 
   iree_bytecode_module(
@@ -74,7 +74,7 @@ endfunction()
 #   MODULE_FILE_NAME: Optional, specifies the absolute path to the filename
 #       to use for the generated IREE module (.vmfb).
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvm-target-cpu-features.
+#       --iree-llvmcpu-target-cpu-features.
 function(iree_check_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -183,7 +183,7 @@ endfunction()
 #   LABELS: Additional labels to apply to the generated tests. The package path
 #       is added automatically.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvm-target-cpu-features.
+#       --iree-llvmcpu-target-cpu-features.
 function(iree_check_single_backend_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -367,8 +367,8 @@ endfunction()
 #   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Only used
 #       for drivers that vary based on the target CPU features. For each list
 #       element, a separate test is created, with the list element passed as
-#       argument to --iree-llvm-target-cpu-features. The special value "default"
-#       is interpreted as no --iree-llvm-target-cpu-features flag to work around
+#       argument to --iree-llvmcpu-target-cpu-features. The special value "default"
+#       is interpreted as no --iree-llvmcpu-target-cpu-features flag to work around
 #       corner cases with empty entries in CMake lists.
 function(iree_check_test_suite)
   if(NOT IREE_BUILD_TESTS)

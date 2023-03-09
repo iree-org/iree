@@ -18,7 +18,7 @@
 
 set(ANDROID_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
-  "--iree-llvm-target-triple=aarch64-none-linux-android29")
+  "--iree-llvmcpu-target-triple=aarch64-none-linux-android29")
 
 # CPU, LLVM, local-sync, big/little-core, full-inference
 iree_benchmark_suite(
@@ -253,7 +253,7 @@ iree_benchmark_suite(
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-enable-data-tiling"
-    "--iree-llvm-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   BENCHMARK_TOOL
@@ -326,7 +326,7 @@ iree_benchmark_suite(
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-enable-data-tiling"
-    "--iree-llvm-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   BENCHMARK_TOOL
@@ -465,7 +465,7 @@ iree_benchmark_suite(
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-enable-data-tiling"
-    "--iree-llvm-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
 

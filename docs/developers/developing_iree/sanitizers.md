@@ -50,8 +50,8 @@ cmake \
 In practice, `IREE_ENABLE_TSAN` alone would be enough for many targets, but not
 all. The problem is that a IREE runtime built with `IREE_ENABLE_TSAN` cannot
 load a IREE compiled LLVM/CPU module unless the following flags were passed to
-the IREE compiler: `--iree-llvm-sanitize=thread` and
-`--iree-llvm-link-embedded=false`.
+the IREE compiler: `--iree-llvmcpu-sanitize=thread` and
+`--iree-llvmcpu-link-embedded=false`.
 
 The CMake options `IREE_BYTECODE_MODULE_ENABLE_TSAN` and
 `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` ensure that the above flags are

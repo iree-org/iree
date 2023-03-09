@@ -33,6 +33,8 @@ module:
   # The test pulls the .vmfb from stdin but you can also reference relative or
   # absolute file paths:
   #   path: ../iree-tmp/iree-run-trace.vmfb
+  # NOTE: if using iree-benchmark-trace then --capture_stdin must be passed to
+  # capture the full contents of stdin for reuse in benchmark iterations.
   path: <stdin>
 
 ---

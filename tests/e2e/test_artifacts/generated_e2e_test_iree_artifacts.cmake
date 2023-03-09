@@ -194,8 +194,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -209,8 +209,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -224,8 +224,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -239,8 +239,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -254,8 +254,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -269,8 +269,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -284,8 +284,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -299,8 +299,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -314,8 +314,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -329,8 +329,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -344,8 +344,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -359,8 +359,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -374,8 +374,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -389,8 +389,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -404,8 +404,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -419,8 +419,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -434,8 +434,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -451,8 +451,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -468,8 +468,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -485,8 +485,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -502,8 +502,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -519,8 +519,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -536,8 +536,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -553,8 +553,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -570,8 +570,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -587,8 +587,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -604,8 +604,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -621,8 +621,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -638,8 +638,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -655,8 +655,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -672,8 +672,8 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -759,10 +759,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -777,10 +777,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -795,10 +795,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -813,10 +813,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -831,10 +831,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -849,10 +849,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -867,10 +867,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv32"
-    "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
+    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv32"
+    "--iree-llvmcpu-target-abi=ilp32"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -885,10 +885,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv32"
-    "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
+    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv32"
+    "--iree-llvmcpu-target-abi=ilp32"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -903,10 +903,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv32"
-    "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
+    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv32"
+    "--iree-llvmcpu-target-abi=ilp32"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
@@ -921,7 +921,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
 
@@ -935,7 +935,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
 
@@ -949,7 +949,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
 
@@ -963,7 +963,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
 
@@ -977,7 +977,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
 
@@ -991,7 +991,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
 
@@ -1005,7 +1005,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
 
@@ -1019,7 +1019,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
@@ -1036,7 +1036,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
@@ -1053,7 +1053,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
@@ -1070,7 +1070,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
@@ -1087,7 +1087,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
@@ -1104,7 +1104,7 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
@@ -1121,9 +1121,9 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
-    "--iree-llvm-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
@@ -1856,10 +1856,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -1873,10 +1873,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -1890,10 +1890,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -1907,10 +1907,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -1924,10 +1924,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -1941,10 +1941,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -1958,10 +1958,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -1975,10 +1975,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -1992,10 +1992,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2009,10 +2009,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2026,10 +2026,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2043,10 +2043,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2060,10 +2060,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2077,10 +2077,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2094,10 +2094,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2111,10 +2111,10 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2128,12 +2128,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2147,12 +2147,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2166,12 +2166,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2185,12 +2185,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2204,12 +2204,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2223,12 +2223,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2242,12 +2242,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2261,12 +2261,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2280,12 +2280,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2299,12 +2299,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2318,12 +2318,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2337,12 +2337,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2356,12 +2356,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2375,12 +2375,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2394,12 +2394,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2415,7 +2415,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2431,7 +2431,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2447,7 +2447,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2463,7 +2463,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2479,7 +2479,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2493,13 +2493,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2513,13 +2513,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2533,13 +2533,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2553,13 +2553,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2573,13 +2573,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2593,13 +2593,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2613,13 +2613,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv32"
-    "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
+    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv32"
+    "--iree-llvmcpu-target-abi=ilp32"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2633,13 +2633,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv32"
-    "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
+    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv32"
+    "--iree-llvmcpu-target-abi=ilp32"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2653,13 +2653,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv32"
-    "--iree-llvm-target-abi=ilp32"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
+    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
+    "--iree-llvmcpu-target-cpu=generic-rv32"
+    "--iree-llvmcpu-target-abi=ilp32"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2673,9 +2673,9 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2689,9 +2689,9 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2705,9 +2705,9 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2721,9 +2721,9 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2737,9 +2737,9 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2753,9 +2753,9 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2769,9 +2769,9 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2785,12 +2785,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2804,12 +2804,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2823,12 +2823,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2842,12 +2842,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2861,12 +2861,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2880,12 +2880,12 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2899,13 +2899,13 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-flow-enable-data-tiling"
-    "--iree-llvm-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2921,7 +2921,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2937,7 +2937,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2953,7 +2953,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2969,7 +2969,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -2985,7 +2985,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3001,7 +3001,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3018,7 +3018,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3035,7 +3035,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3052,7 +3052,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3069,7 +3069,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3086,7 +3086,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3103,7 +3103,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3121,7 +3121,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3139,7 +3139,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3157,7 +3157,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3175,7 +3175,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3191,7 +3191,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3207,7 +3207,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3223,7 +3223,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3239,7 +3239,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3255,7 +3255,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3271,7 +3271,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3288,7 +3288,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3304,7 +3304,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3320,7 +3320,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3336,7 +3336,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3353,7 +3353,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3370,7 +3370,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3387,7 +3387,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3404,7 +3404,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3421,7 +3421,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3438,7 +3438,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3456,7 +3456,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3473,7 +3473,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3490,7 +3490,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3507,7 +3507,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3525,7 +3525,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3543,7 +3543,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3561,7 +3561,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3579,7 +3579,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3597,7 +3597,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3615,7 +3615,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3634,7 +3634,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3652,7 +3652,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3670,7 +3670,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3688,7 +3688,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3703,7 +3703,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vmvx"
     "--iree-input-type=tosa"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 
@@ -3718,7 +3718,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vmvx"
     "--iree-input-type=tosa"
     "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvm-debug-symbols=false"
+    "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
 

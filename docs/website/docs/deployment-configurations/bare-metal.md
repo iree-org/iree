@@ -30,8 +30,8 @@ The model can be compiled with the following command (assuming the path to
 iree-compile \
     --iree-stream-partitioning-favor=min-peak-memory \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=x86_64-pc-linux-elf \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-target-triple=x86_64-pc-linux-elf \
+    --iree-llvmcpu-debug-symbols=false \
     samples/models/simple_abs.mlir \
     -o /tmp/simple_abs_cpu.vmfb
 
@@ -39,14 +39,14 @@ iree-compile \
 
 In which
 
-* `-iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
+* `--iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
     memory usage at the cost of concurrency - include when targeting
     single-threaded execution to reduce memory consumption.
-* `iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
-* `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
+* `--iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
+* `--iree-llvmcpu-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
     [elf_module library](https://github.com/openxla/iree/tree/main/iree/hal/local/elf)
-* `iree-llvm-debug-symbols=false`: To reduce the artifact size
+* `--iree-llvmcpu-debug-symbols=false`: To reduce the artifact size
 
 See [generate.sh](https://github.com/openxla/iree/blob/main/iree/hal/local/elf/testdata/generate.sh)
 for example command-line instructions of some common architectures
@@ -62,7 +62,7 @@ demo sample for an example and instructions on running a model with IREE's
 
 By default, the demo targets the host machine when compiling. To produce a
 bare-metal compatible model, run `iree-compile` as in the previous example
-and add the additional `-iree-llvm-static-library-output-path=` flag to specify
+and add the additional `-iree-llvmcpu-static-library-output-path=` flag to specify
 the static library destination. This will produce a `.h\.o` file to link
 directly into the target application.
 

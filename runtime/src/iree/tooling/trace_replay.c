@@ -27,6 +27,7 @@
 
 iree_status_t iree_trace_replay_initialize(
     iree_string_view_t root_path, iree_vm_instance_t* instance,
+    iree_trace_replay_flags_t replay_flags,
     iree_vm_context_flags_t context_flags,
     iree_hal_driver_registry_t* driver_registry,
     iree_allocator_t host_allocator, iree_trace_replay_t* out_replay) {
@@ -36,6 +37,8 @@ iree_status_t iree_trace_replay_initialize(
 
   out_replay->host_allocator = host_allocator;
   out_replay->root_path = root_path;
+
+  out_replay->replay_flags = replay_flags;
 
   out_replay->instance = instance;
   iree_vm_instance_retain(out_replay->instance);
@@ -57,21 +60,25 @@ iree_status_t iree_trace_replay_initialize(
   }
 
   if (!iree_status_is_ok(status)) {
-    iree_trace_replay_deinitialize(out_replay,
-                                   IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+    iree_trace_replay_deinitialize(out_replay);
   }
   return status;
 }
 
-void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
-                                    iree_trace_replay_shutdown_flags_t flags) {
+void iree_trace_replay_deinitialize(iree_trace_replay_t* replay) {
   iree_vm_list_release(replay->inputs);
   iree_vm_list_release(replay->outputs);
   iree_vm_list_release(replay->blackboard);
+
   iree_vm_context_release(replay->context);
+  for (iree_host_size_t i = 0; i < replay->module_count; ++i) {
+    iree_vm_module_release(replay->modules[i]);
+  }
+  replay->module_count = 0;
   iree_vm_instance_release(replay->instance);
 
-  if (iree_all_bits_set(flags, IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS)) {
+  if (iree_all_bits_set(replay->replay_flags,
+                        IREE_TRACE_REPLAY_FLAG_PRINT_STATISTICS)) {
     IREE_IGNORE_ERROR(iree_hal_allocator_statistics_fprint(
         stderr, iree_hal_device_allocator(replay->device)));
   }
@@ -87,6 +94,12 @@ void iree_trace_replay_set_hal_devices_override(
   replay->device_uris = device_uris;
 }
 
+void iree_trace_replay_reset(iree_trace_replay_t* replay) {
+  iree_vm_list_clear(replay->inputs);
+  iree_vm_list_clear(replay->outputs);
+  iree_vm_list_clear(replay->blackboard);
+}
+
 //===----------------------------------------------------------------------===//
 // type: context_load
 //===----------------------------------------------------------------------===//
@@ -95,9 +108,19 @@ iree_status_t iree_trace_replay_event_context_load(iree_trace_replay_t* replay,
                                                    yaml_document_t* document,
                                                    yaml_node_t* event_node) {
   // Cleanup previous state.
-  iree_hal_device_release(replay->device);
-  replay->device = NULL;
+  if (!iree_all_bits_set(replay->replay_flags,
+                         IREE_TRACE_REPLAY_FLAG_REUSE_DEVICES)) {
+    iree_hal_device_release(replay->device);
+    replay->device = NULL;
+  }
   iree_vm_context_release(replay->context);
+  if (!iree_all_bits_set(replay->replay_flags,
+                         IREE_TRACE_REPLAY_FLAG_REUSE_MODULES)) {
+    for (iree_host_size_t i = 0; i < replay->module_count; ++i) {
+      iree_vm_module_release(replay->modules[i]);
+    }
+    replay->module_count = 0;
+  }
   replay->context = NULL;
 
   // Create new context.
@@ -114,6 +137,13 @@ iree_status_t iree_trace_replay_event_context_load(iree_trace_replay_t* replay,
 static iree_status_t iree_trace_replay_create_device(
     iree_trace_replay_t* replay, yaml_node_t* device_node,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+  // If there's already a device then reuse that if allowed.
+  if (*out_device && iree_all_bits_set(replay->replay_flags,
+                                       IREE_TRACE_REPLAY_FLAG_REUSE_DEVICES)) {
+    return iree_ok_status();
+  }
+  iree_hal_device_release(*out_device);
+
   // Use the provided driver name or override with the --device= flag.
   iree_string_view_t device_uri = iree_yaml_node_as_string(device_node);
   if (iree_string_view_is_empty(device_uri)) {
@@ -132,7 +162,8 @@ static iree_status_t iree_trace_replay_create_device(
 
 static iree_status_t iree_trace_replay_load_builtin_module(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* module_node) {
+    yaml_node_t* module_node, iree_vm_module_t** out_module) {
+  *out_module = NULL;
   iree_vm_module_t* module = NULL;
 
   yaml_node_t* name_node = NULL;
@@ -154,23 +185,35 @@ static iree_status_t iree_trace_replay_load_builtin_module(
         (int)name_node->data.scalar.length, name_node->data.scalar.value);
   }
 
-  iree_status_t status = iree_vm_context_register_modules(
-      replay->context, /*module_count=*/1, /*modules=*/&module);
-  iree_vm_module_release(module);
-  return status;
+  *out_module = module;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_trace_replay_load_bytecode_module(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* module_node) {
+    yaml_node_t* module_node, iree_vm_module_t** out_module) {
+  *out_module = NULL;
+
   yaml_node_t* path_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, module_node,
                                               IREE_SV("path"), &path_node));
 
+  // Special case sourcing from stdin, which is useful for fast iteration and
+  // tests where iree-compile output is piped directly into the replay tool.
+  bool from_stdin = iree_yaml_string_equal(path_node, IREE_SV("<stdin>"));
+  if (from_stdin && !iree_const_byte_span_is_empty(replay->stdin_contents)) {
+    // A copy of stdin was injected and we can use that instead of going to the
+    // system. The data is not owned but guaranteed to be live for as long as
+    // we'll need it.
+    return iree_vm_bytecode_module_create(
+        replay->instance, replay->stdin_contents, iree_allocator_null(),
+        replay->host_allocator, out_module);
+  }
+
   // Load bytecode file (or stdin) contents into memory.
   iree_file_contents_t* flatbuffer_contents = NULL;
   iree_status_t status = iree_ok_status();
-  if (iree_yaml_string_equal(path_node, IREE_SV("<stdin>"))) {
+  if (from_stdin) {
     fprintf(stdout, "Reading bytecode contents from stdin...\n");
     status =
         iree_stdin_read_contents(replay->host_allocator, &flatbuffer_contents);
@@ -197,13 +240,7 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
     }
   }
 
-  // Register the bytecode module with the context.
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_context_register_modules(
-        replay->context, /*module_count=*/1, /*modules=*/&module);
-  }
-
-  iree_vm_module_release(module);
+  *out_module = module;
   return status;
 }
 
@@ -219,16 +256,57 @@ iree_status_t iree_trace_replay_event_module_load(iree_trace_replay_t* replay,
                                               IREE_SV("type"), &type_node));
   iree_string_view_t type = iree_yaml_node_as_string(type_node);
 
-  if (iree_string_view_equal(type, IREE_SV("builtin"))) {
-    return iree_trace_replay_load_builtin_module(replay, document, module_node);
-  } else if (iree_string_view_equal(type, IREE_SV("bytecode"))) {
-    return iree_trace_replay_load_bytecode_module(replay, document,
-                                                  module_node);
+  // Check the cache to see if we've already loaded the module.
+  // We only do this with named modules.
+  yaml_node_t* name_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, module_node,
+                                                  IREE_SV("name"), &name_node));
+  if (name_node) {
+    iree_string_view_t name = iree_yaml_node_as_string(name_node);
+    for (iree_host_size_t i = 0; i < replay->module_count; ++i) {
+      if (iree_string_view_equal(iree_vm_module_name(replay->modules[i]),
+                                 name)) {
+        return iree_vm_context_register_modules(
+            replay->context, /*module_count=*/1,
+            /*modules=*/&replay->modules[i]);
+      }
+    }
   }
 
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "module type '%.*s' not recognized", (int)type.size,
-                          type.data);
+  // Ensure the cache has room for the module. We can make this a growable list
+  // if we end up with lots of modules, but most programs today have 2-3.
+  if (replay->module_count + 1 > IREE_ARRAYSIZE(replay->modules)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "maximum unique module count hit; ensure modules "
+                            "have consistent names");
+  }
+
+  // Load the module.
+  iree_vm_module_t* module = NULL;
+  if (iree_string_view_equal(type, IREE_SV("builtin"))) {
+    IREE_RETURN_IF_ERROR(iree_trace_replay_load_builtin_module(
+        replay, document, module_node, &module));
+  } else if (iree_string_view_equal(type, IREE_SV("bytecode"))) {
+    IREE_RETURN_IF_ERROR(iree_trace_replay_load_bytecode_module(
+        replay, document, module_node, &module));
+  } else {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "module type '%.*s' not recognized", (int)type.size,
+                            type.data);
+  }
+
+  // Insert the module into the cache.
+  // Note that we ensured there was room above.
+  // Note that the list retains the module.
+  replay->modules[replay->module_count++] = module;
+  iree_vm_module_retain(module);
+
+  // Register the loaded module with the context.
+  iree_status_t status = iree_vm_context_register_modules(
+      replay->context, /*module_count=*/1, /*modules=*/&module);
+
+  iree_vm_module_release(module);
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1220,16 +1298,14 @@ iree_status_t iree_trace_replay_event_call(
       z0, iree_trace_replay_event_call_prepare(replay, document, event_node,
                                                &function, &input_list));
 
-  iree_status_t status = iree_ok_status();
-  if (hooks && hooks->before) {
+  iree_vm_list_t* output_list = NULL;
+  iree_status_t status =
+      iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
+                          replay->host_allocator, &output_list);
+
+  if (iree_status_is_ok(status) && hooks && hooks->before) {
     status = hooks->before(hooks->user_data, replay, document, event_node,
                            function, input_list);
-  }
-
-  iree_vm_list_t* output_list = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
-                                 replay->host_allocator, &output_list);
   }
 
   // Invoke the function to produce outputs.
@@ -1239,7 +1315,6 @@ iree_status_t iree_trace_replay_event_call(
         replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
         /*policy=*/NULL, input_list, output_list, replay->host_allocator);
   }
-  iree_vm_list_release(input_list);
 
   if (!iree_status_is_ok(call_status)) {
     if (hooks && hooks->error) {
@@ -1252,6 +1327,12 @@ iree_status_t iree_trace_replay_event_call(
     status = hooks->after(hooks->user_data, replay, document, event_node,
                           function, output_list);
   }
+
+  // NOTE: we could release this prior to the hooks but if the hooks are timing
+  // or capturing performance data we want them to be able to scope themselves
+  // to just the call. The downside is that if the hook allocates memory it
+  // won't be able to reuse what we're holding on to here.
+  iree_vm_list_release(input_list);
 
   if (iree_status_is_ok(status)) {
     status = iree_trace_replay_event_call_finish(replay, document, event_node,

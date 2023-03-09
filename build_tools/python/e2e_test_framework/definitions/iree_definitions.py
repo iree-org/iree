@@ -322,27 +322,29 @@ def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
 
   if arch_info.architecture == "x86_64":
     flags = [
-        f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
-        f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
+        f"--iree-llvmcpu-target-triple=x86_64-unknown-{target.target_abi.value}",
+        f"--iree-llvmcpu-target-cpu={arch_info.microarchitecture.lower()}"
     ]
   elif arch_info.architecture == "riscv_64":
     flags = [
-        f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
-        "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
-        "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
+        f"--iree-llvmcpu-target-triple=riscv64-pc-{target.target_abi.value}",
+        "--iree-llvmcpu-target-cpu=generic-rv64",
+        "--iree-llvmcpu-target-abi=lp64d",
+        "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
         "--riscv-v-fixed-length-vector-lmul-max=8"
     ]
   elif arch_info.architecture == "riscv_32":
     # TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
     flags = [
-        f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
-        "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
-        "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
+        f"--iree-llvmcpu-target-triple=riscv32-pc-{target.target_abi.value}",
+        "--iree-llvmcpu-target-cpu=generic-rv32",
+        "--iree-llvmcpu-target-abi=ilp32",
+        "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
         "--riscv-v-fixed-length-vector-lmul-max=8"
     ]
   elif arch_info.architecture == "armv8.2-a":
     flags = [
-        f"--iree-llvm-target-triple=aarch64-none-{target.target_abi.value}",
+        f"--iree-llvmcpu-target-triple=aarch64-none-{target.target_abi.value}",
     ]
   elif arch_info.architecture == "cuda":
     if target.target_abi != TargetABI.LINUX_GNU:

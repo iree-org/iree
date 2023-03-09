@@ -34,6 +34,7 @@ iree_lit_test_suite(
     ${IREE_LLD_TARGET}
     FileCheck
     iree-benchmark-module
+    iree-benchmark-trace
     iree-compile
     iree-opt
     iree-run-mlir
