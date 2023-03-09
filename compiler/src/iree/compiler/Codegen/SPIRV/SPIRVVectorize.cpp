@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -63,6 +64,60 @@ int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
   return size % 2 == 0 ? 2 : 1;
 }
 
+SmallVector<int64_t> getNativeVectorShapeImpl(VectorTransferOpInterface op) {
+  auto vecType = op.getVectorType();
+  SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
+  for (const auto &[index, dim] :
+       llvm::enumerate(op.permutation_map().getResults())) {
+    if (auto dimExpr = dim.dyn_cast<AffineDimExpr>()) {
+      if (dimExpr.getPosition() == op.permutation_map().getNumDims() - 1) {
+        nativeSize[index] = getMemoryVectorSize(
+            op.source(), vecType.getElementType(), vecType.getShape()[index]);
+      }
+    }
+  }
+  return nativeSize;
+}
+
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::ContractionOp op) {
+  // Find the contract output's innermost dimension. It is guaranteed to be a
+  // parallel dimension due to contract definition. Unroll it with compute
+  // size.
+  AffineMap resultMap = op.getIndexingMapsArray().back();
+  unsigned lastParallelDim =
+      resultMap.getDimPosition(resultMap.getNumResults() - 1);
+  SmallVector<int64_t> nativeSize(op.getIteratorTypes().size(), 1);
+  SmallVector<int64_t, 4> bounds;
+  op.getIterationBounds(bounds);
+  nativeSize[lastParallelDim] = getComputeVectorSize(bounds[lastParallelDim]);
+  return nativeSize;
+}
+
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::MultiDimReductionOp op) {
+  // Unroll all reduction dimensions by size 1 for vector.multi_reduction.
+  VectorType srcVectorType = op.getSourceVectorType();
+  auto nativeSize = llvm::to_vector(srcVectorType.getShape());
+  auto dims = op.getReductionDims().getAsValueRange<IntegerAttr>();
+  for (const auto &dimAttr : dims) {
+    nativeSize[dimAttr.getZExtValue()] = 1;
+  }
+  return nativeSize;
+}
+
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::ReductionOp op) {
+  VectorType srcVectorType = op.getSourceVectorType();
+  assert(srcVectorType.getRank() == 1);  // Guaranteed by semantics
+  int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
+  return {vectorSize};
+}
+
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::TransposeOp op) {
+  VectorType vectorType = op.getResultVectorType();
+  SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
+  nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
+  return nativeSize;
+}
+
 Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
@@ -70,53 +125,14 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
       nativeSize.back() = getComputeVectorSize(vecType.getShape().back());
       return nativeSize;
     }
-  } else if (auto vtOp = dyn_cast<VectorTransferOpInterface>(op)) {
-    auto vecType = vtOp.getVectorType();
-    SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
-    for (const auto &[index, dim] :
-         llvm::enumerate(vtOp.permutation_map().getResults())) {
-      if (auto dimExpr = dim.dyn_cast<AffineDimExpr>()) {
-        if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1) {
-          nativeSize[index] =
-              getMemoryVectorSize(vtOp.source(), vecType.getElementType(),
-                                  vecType.getShape()[index]);
-        }
-      }
-    }
-    return nativeSize;
-  } else if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-    // Find the contract output's innermost dimension. It is guaranteed to be a
-    // parallel dimension due to contract definition. Unroll it with compute
-    // size.
-    AffineMap resultMap = contractOp.getIndexingMapsArray().back();
-    unsigned lastParallelDim =
-        resultMap.getDimPosition(resultMap.getNumResults() - 1);
-    SmallVector<int64_t> nativeSize(contractOp.getIteratorTypes().size(), 1);
-    SmallVector<int64_t, 4> bounds;
-    contractOp.getIterationBounds(bounds);
-    nativeSize[lastParallelDim] = getComputeVectorSize(bounds[lastParallelDim]);
-    return nativeSize;
-  } else if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
-    // Unroll all reduction dimensions by size 1 for vector.multi_reduction.
-    VectorType srcVectorType = reductionOp.getSourceVectorType();
-    auto nativeSize = llvm::to_vector(srcVectorType.getShape());
-    auto dims = reductionOp.getReductionDims().getAsValueRange<IntegerAttr>();
-    for (const auto &dimAttr : dims) {
-      nativeSize[dimAttr.getZExtValue()] = 1;
-    }
-    return nativeSize;
-  } else if (auto reductionOp = dyn_cast<vector::ReductionOp>(op)) {
-    VectorType srcVectorType = reductionOp.getSourceVectorType();
-    assert(srcVectorType.getRank() == 1);  // Guaranteed by semantics
-    int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
-    return SmallVector<int64_t>{vectorSize};
-  } else if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
-    VectorType vectorType = transposeOp.getResultVectorType();
-    SmallVector<int64_t> nativeSize(vectorType.getRank(), 1);
-    nativeSize.back() = getComputeVectorSize(vectorType.getShape().back());
-    return nativeSize;
   }
-  return std::nullopt;
+
+  return TypeSwitch<Operation *, Optional<SmallVector<int64_t>>>(op)
+      .Case<VectorTransferOpInterface, vector::ContractionOp,
+            vector::MultiDimReductionOp, vector::ReductionOp,
+            vector::TransposeOp>(
+          [](auto typedOp) { return getNativeVectorShapeImpl(typedOp); })
+      .Default([](Operation *) { return std::nullopt; });
 }
 
 /// Add patterns to vectorize any supported Linalg ops.
@@ -170,7 +186,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    // Speical peephole optimizations to clean up IR before further processing.
+    // Special peephole optimizations to clean up IR before further processing.
     {
       RewritePatternSet patterns(context);
       // Pull in patterns to shuffle broadcast/transpose ops around in order to
@@ -310,7 +326,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     // Next run canonicalization to cast away leading size-1 dimensions. They
     // can be generated from vector unrolling and generally cause issues to
     // cancel corresponding read/write or insert/extract op pairs. This also
-    // need to happen before hositing, where we would make certain vectors loop
+    // need to happen before hoisting, where we would make certain vectors loop
     // carried. Once that's done, it's hard to handle the leading size-1
     // dimensions across regions.
     {
