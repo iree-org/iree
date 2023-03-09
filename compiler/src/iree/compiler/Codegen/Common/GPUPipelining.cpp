@@ -18,6 +18,20 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+
+#include "mlir/Dialect/Affine/Transforms/Transforms.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/NVVMDialect.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/IR/TypeUtilities.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
 //====---------------------------------------------------------------------===//
@@ -260,6 +274,75 @@ static FailureOr<scf::ForOp> applyPipelining(scf::ForOp forOp, int64_t depth,
   return pattern.returningMatchAndRewrite(forOp, rewriter);
 }
 namespace {
+
+struct MmaLdMatrixOpToNVVM : public ConvertOpToLLVMPattern<nvgpu::LdMatrixOp> {
+  using ConvertOpToLLVMPattern<nvgpu::LdMatrixOp>::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(nvgpu::LdMatrixOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    MLIRContext *ctx = getContext();
+    Location loc = op->getLoc();
+
+    // The result type of ldmatrix will always be a struct of 32bit integer
+    // registers if more than one 32bit value is returned. Otherwise, the result
+    // is a single i32. The result type of the GPU operation is always a vector
+    // of shape (NumRegisters, VectorRegister) where VectorRegister is the
+    // vector type of the result and always 32 bits long. We bitcast the result
+    // of the NVVM::LdMatrix to this vector type.
+    auto vectorResultType = op->getResultTypes()[0].dyn_cast<VectorType>();
+    if (!vectorResultType) {
+      return failure();
+    }
+    Type innerVectorType = LLVM::getFixedVectorType(
+        vectorResultType.getElementType(), vectorResultType.getDimSize(1));
+
+    int64_t num32BitRegs = vectorResultType.getDimSize(0);
+
+    Type ldMatrixResultType;
+    if (num32BitRegs > 1) {
+      ldMatrixResultType = LLVM::LLVMStructType::getLiteral(
+          ctx, SmallVector<Type>(num32BitRegs, rewriter.getI32Type()));
+    } else {
+      ldMatrixResultType = rewriter.getI32Type();
+    }
+
+    auto srcMemrefType = op.getSrcMemref().getType().cast<MemRefType>();
+    Value srcPtr = getStridedElementPtrViaAffineApply(
+        loc, srcMemrefType, adaptor.getSrcMemref(),
+        // HACK: Here we don't use the adaptor indices because they would come
+        // with the LLVM types, whereas at this point we want to stick with the
+        // higher level types that we have (index vs. iXX). Indee, we are not
+        // lowering the address computation here, just making them more
+        // amendable to optimization.
+        op.getIndices(), rewriter);
+    Value ldMatrixResult = rewriter.create<NVVM::LdMatrixOp>(
+        loc, ldMatrixResultType, srcPtr,
+        /*num=*/op.getNumTiles(),
+        /*layout=*/op.getTranspose() ? NVVM::MMALayout::col
+                                     : NVVM::MMALayout::row);
+
+    // The ldmatrix operation returns either a single i32 value or a struct of
+    // i32 values. Here we unpack those values and cast them back to their
+    // actual vector type (still of width 32b) and repack them into a result
+    // struct.
+    Type finalResultType = typeConverter->convertType(vectorResultType);
+    Value result = rewriter.create<LLVM::UndefOp>(loc, finalResultType);
+    for (int64_t i = 0, e = vectorResultType.getDimSize(0); i < e; i++) {
+      Value i32Register =
+          num32BitRegs > 1
+              ? rewriter.create<LLVM::ExtractValueOp>(loc, ldMatrixResult, i)
+              : ldMatrixResult;
+      Value casted =
+          rewriter.create<LLVM::BitcastOp>(loc, innerVectorType, i32Register);
+      result = rewriter.create<LLVM::InsertValueOp>(loc, result, casted, i);
+    }
+
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
 struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
   GPUPipeliningPass(bool epiloguePeeling, unsigned depth, unsigned storeStage)
       : depth(depth), storeStage(storeStage) {
@@ -283,6 +366,53 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
     funcOp.walk([](gpu::BarrierOp barrierOp) {
       if (barrierOp->hasAttr(kPipeliningExtraBarrier)) barrierOp->erase();
     });
+    {
+      RewritePatternSet patterns(&getContext());
+      LLVMTypeConverter converter(&getContext(), /*DataLayoutAnalysis=*/nullptr,
+                                  /*converIndexTypeOpt=*/true);
+      //    converter.addConversion([&](nvgpu::DeviceAsyncTokenType type) ->
+      //    Type {
+      //      return converter.convertType(IntegerType::get(type.getContext(),
+      //      32));
+      //    });
+
+      populateGpuMemorySpaceAttributeConversions(
+          converter, [](gpu::AddressSpace space) -> unsigned {
+            switch (space) {
+              case gpu::AddressSpace::Global:
+                return static_cast<unsigned>(
+                    NVVM::NVVMMemorySpace::kGlobalMemorySpace);
+              case gpu::AddressSpace::Workgroup:
+                return static_cast<unsigned>(
+                    NVVM::NVVMMemorySpace::kSharedMemorySpace);
+              case gpu::AddressSpace::Private:
+                return 0;
+            }
+            llvm_unreachable("unknown address space enum value");
+            return 0;
+          });
+      patterns.add<MmaLdMatrixOpToNVVM>(converter);
+      LLVMConversionTarget target(getContext());
+      target.addLegalDialect<::mlir::LLVM::LLVMDialect>();
+      target.addLegalDialect<::mlir::NVVM::NVVMDialect>();
+      target.addLegalDialect<::mlir::AffineDialect>();
+      if (failed(applyPartialConversion(getOperation(), target,
+                                        std::move(patterns))))
+        signalPassFailure();
+
+    }
+    {
+      // At this point the ldmatrices address computations have been rewritten
+      // with affine.apply.
+      // Now, breakdown the affine.apply into loop variant and loop invariant
+      // components.
+      IRRewriter rewriter(&getContext());
+      this->getOperation().walk([&](AffineApplyOp op) {
+        rewriter.setInsertionPoint(op);
+        reorderOperandsByHoistability(rewriter, op);
+        (void)decompose(rewriter, op);
+      });
+    }
   }
 
  private:
