@@ -998,8 +998,8 @@ struct CmdExecuteOpPattern
     // Begin/end recording and inline the execution region between them.
     auto endOp =
         rewriter.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
-    rewriter.mergeBlockBefore(&executeOp.getBody().front(), endOp,
-                              adaptor.getResourceOperands());
+    rewriter.inlineBlockBefore(&executeOp.getBody().front(), endOp,
+                               adaptor.getResourceOperands());
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -1032,7 +1032,7 @@ struct CmdSerialOpPattern
                                 OpBuilder::atBlockBegin(&bodyBlock));
 
     // Inline the serial execution region.
-    rewriter.mergeBlockBefore(&serialOp.getBody().front(), serialOp);
+    rewriter.inlineBlockBefore(&serialOp.getBody().front(), serialOp);
     rewriter.eraseOp(serialOp);
     return success();
   }
@@ -1046,7 +1046,7 @@ struct CmdConcurrentOpPattern
       ConversionPatternRewriter &rewriter) const override {
     // Inline the concurrent execution region.
     // TODO(benvanik): split barriers (event set/wait) when nesting.
-    rewriter.mergeBlockBefore(&concurrentOp.getBody().front(), concurrentOp);
+    rewriter.inlineBlockBefore(&concurrentOp.getBody().front(), concurrentOp);
     rewriter.eraseOp(concurrentOp);
     return success();
   }
