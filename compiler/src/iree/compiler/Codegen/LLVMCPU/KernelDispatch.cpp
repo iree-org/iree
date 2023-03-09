@@ -1277,8 +1277,6 @@ static LogicalResult setDefaultGenericOpRootConfig(
   LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
                        << vecPreProcStrategy << "\n");
 
-
-
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
   SmallVector<int64_t> reductionTileSizes;
