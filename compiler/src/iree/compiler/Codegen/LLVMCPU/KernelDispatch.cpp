@@ -1508,7 +1508,6 @@ static LogicalResult setPackOpRootConfig(
     }
     tileSizesList = getLoweringConfig(srcGenericOp).getTileSizeVals();
     pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
-    removeLoweringConfig(srcGenericOp);
     rootOp = srcGenericOp;
   } else {
     SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(

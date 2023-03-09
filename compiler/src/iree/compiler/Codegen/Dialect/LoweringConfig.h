@@ -118,7 +118,6 @@ unsigned getNumTileLevels(Operation *op);
 
 /// Sets the lowering configuration, overwriting existing attribute values.
 void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
-void removeLoweringConfig(Operation *op);
 
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info on the entry point op for the common case of specifying
