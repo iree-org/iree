@@ -79,6 +79,9 @@ class UnixLinkerTool : public LinkerTool {
         "-o " + artifacts.libraryFile.path,
     };
 
+    // Link the System and C runtime library, and optionally SAN libraries.
+    flags.push_back(targetOptions.systemLinkerFlags);
+
     if (targetIsApple()) {
       // Statically link all dependencies so we don't have any runtime deps.
       // We cannot have any imports in the module we produce.
@@ -88,8 +91,6 @@ class UnixLinkerTool : public LinkerTool {
       flags.push_back("-dylib");
       // For flat namespace see https://stackoverflow.com/a/49392862/724872.
       flags.push_back("-flat_namespace");
-      // Link the System and C runtime library, and optionally SAN libraries.
-      flags.push_back(targetOptions.systemLinkerFlags);
     } else {
       // Avoids including any libc/startup files that initialize the CRT as
       // we don't use any of that. Our shared libraries must be freestanding.
