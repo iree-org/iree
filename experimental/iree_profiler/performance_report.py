@@ -7,9 +7,10 @@ from collections import namedtuple
 # Performance results class is used to store the performance results of a single run.
 class PerformanceResult:
 
-  def __init__(self, operation, configuration, runtime):
+  def __init__(self, operation, configuration, verification_result, runtime):
     self.operation = operation
     self.configuration = configuration
+    self.verification_result = verification_result
     self.bytes = operation.bytes()
     self.flops = operation.flops()
     self.runtime = runtime  # in milliseconds
@@ -17,23 +18,38 @@ class PerformanceResult:
 
   # Prints the performance result to the console.
   def print(self):
+
+    runtime = (str(self.runtime) if self.runtime != -1.0 else 'Not run')
+    gflops = (str(float(round(self.gflops, 2)))
+              if self.runtime != -1.0 else 'Not run')
+
+    print('---------------------------------------------------------------- ')
+    print('Dispatch      : %s' %
+          "_".join([self.operation.name(),
+                    self.configuration.name()]))
+    print('Provider      : %s' % "IREE Codegen")
     print('Operation     : %s' % self.operation.name())
     print('Configuration : %s' % self.configuration.name())
-    print('Runtime(ms)   : %f' % self.runtime)
+    print('Verification  : %s' % self.verification_result)
     print('Bytes         : %d' % self.bytes)
     print('Flops         : %d' % self.flops)
-    print('GFLOP/s       : %f' % round(self.gflops, 2))
-    print('-----------------------------------------------------------------')
+    print('Runtime(ms)   : %s' % runtime)
+    print('GFLOP/s       : %s' % gflops)
 
   # Returns a dictionary with the performance result. Used for csv writing.
   def create_dict_entry(self):
+    runtime = self.runtime if self.runtime != -1.0 else ''
+    gflops = (float(round(self.gflops, 2))
+              if self.runtime != -1.0 else 'Not run')
     return {
+        'Provider': 'IREE Codegen',
         'Operation': self.operation.name(),
         'Configuration': self.configuration.name(),
-        'Runtime(ms)': self.runtime,
+        'Verification': self.verification_result,
         'Bytes': self.bytes,
         'Flops': self.flops,
-        'GFLOP/s': self.gflops,
+        'Runtime(ms)': runtime,
+        'GFLOP/s': gflops,
     }
 
 
@@ -67,8 +83,10 @@ class PerformanceReport:
 
     with open(self.output_file_path, open_mode) as csv_file:
       # Create the csv header.
-      common_header = ['Operation', 'Configuration']
-      performance_header = ['Bytes', 'Flops', 'Runtime(ms)', 'GFLOP/s']
+      common_header = ['Provider', 'Operation', 'Configuration']
+      performance_header = [
+          'Verification', 'Bytes', 'Flops', 'Runtime(ms)', 'GFLOP/s'
+      ]
       csv_header = common_header + performance_header
 
       # If tags are present, add the tags.keys() to the csv header.
@@ -85,10 +103,10 @@ class PerformanceReport:
 
       # Write the performance results.
       for perf_result in self.perf_result_vector:
-        # Create a new row.
+        # Create the row entries for performance result.
         csv_dict_row = perf_result.create_dict_entry()
 
-        # Write the tags.
+        # Create the row entries for tags.
         for tag in self.tags:
           tag_key, tag_value = tag.split(':')
           csv_dict_row[tag_key] = tag_value

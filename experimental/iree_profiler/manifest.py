@@ -6,7 +6,7 @@ from library import *
 from matmul import *
 
 
-# Mainfest class collects all the operations and configurations and emits \
+# Manifest class collects all the operations and configurations and emits \
 # them to the `generated` directory.
 class Manifest:
   #
@@ -38,6 +38,7 @@ class Manifest:
       self.dispatch_names = []
     else:
       self.dispatch_names = [x for x in args.dispatches.split(',') if x != '']
+
 
 # Returns true if all substrings appear in the haystack in order
 
@@ -102,7 +103,7 @@ class Manifest:
     for operation_collection in operation_collection_list:
       self.append_operation_collection(operation_collection)
 
-  # Emits the operations in the mainfest to the build directory as MLIR source files.
+  # Emits the operations in the Manifest to the build directory as MLIR source files.
   # The operations are emitted in the dialect specified by the mlir_dialect flag.
   def emit(self, mlir_dialect=MlirDialect.Linalg):
     mlir_source_emitter = {

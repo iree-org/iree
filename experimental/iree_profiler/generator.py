@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
   args = parser.parse_args()
 
-  # Manifests metadata for a group of accompanying opeartions and configurations.
+  # Manifests metadata for a group of accompanying operations and configurations.
   manifest = Manifest(args)
 
   # Collect all the pre-defined dispatches in a manifest.

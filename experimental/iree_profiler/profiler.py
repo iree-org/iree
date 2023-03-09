@@ -16,18 +16,19 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="IREE Python profiler tool for "\
                                    "verifcation and performance profiling tool "\
                                     "for IREE-compiled MLIR operations.")
+  ###############################################################################
 
-  # General options
+  # General profiler options
   parser.add_argument("--build-dir", default=".", required=True, \
                       help="IREE top-level build directory is used to generate "\
                         "operations and npy files.This should be same that used "\
                         "to call generated.py")
+  parser.add_argument("--operation_kind", default="all", help="Specifies the "\
+                      "operation kinds to generate (matmul, conv2d, all)")
   parser.add_argument("--verbose", default='False', \
                       help='Prints verbose output and commands executed.')
 
-  # Generator options
-  parser.add_argument("--operation_kind", default="all", help="Specifies the "\
-                      "operation kinds to generate (matmul, conv2d, all)")
+  # Generator-specific options
   parser.add_argument("--dispatches", default='', help="Comma delimited list to "\
                       "filter dispatches by name. A dispatch is a combination of "\
                       "operation and tuning configuration.")
@@ -36,7 +37,7 @@ if __name__ == "__main__":
                       help='MLIR dialect entry "\
                       "point at which operation is emitter. For example, "\
                       "linalg*, mhlo, etc.')
-  # Compilation options
+  # Compilation-specific options
   parser.add_argument("--device", default="cuda", \
                       help="Target backend device to benchmark the operation on. "\
                         "For example, cuda, vulkan, etc.")
@@ -47,7 +48,7 @@ if __name__ == "__main__":
                       type=str, help="Compiles the operation "\
                         "without running verification and profiling.")
 
-  # Profiling options
+  # Profiling-specific options
   parser.add_argument("--profiling-enabled", "--benchmark", default='True', \
                       type=str, help="Benchmark the operation.")
   parser.add_argument('--batch-size', '--benchmark-dispatch-repeat-count', \
@@ -58,7 +59,7 @@ if __name__ == "__main__":
                       "and min, max, median, and average runtimes/gflops are "\
                       "reported.")
 
-  # Verification options
+  # Verification-specific options
   parser.add_argument("--verification-enabled", default='True',
                       type=str, help="Verify the operation against reference numpy "\
                       "implementation.")
@@ -73,6 +74,10 @@ if __name__ == "__main__":
   parser.add_argument("--tags", default='', \
                       help="Inserts leading columns in output table and uniform "\
                         "values for each column. Useful for generating pivot tables.")
+  
+
+
+  # Parse the command line arguments.
   args = parser.parse_args()
   ###############################################################################
 
@@ -89,20 +94,17 @@ if __name__ == "__main__":
     verification_enabled = False
     profiling_enabled = False
 
-  # Path to the directory where the generated operations are stored.
-  generated_path = os.path.join(args.build_dir, 'generated', args.mlir_dialect)
-
-  # Manifests metadata for a group of accompanying opeartions and configurations.
+  # Manifests metadata for a group of accompanying operations and configurations.
   manifest = Manifest(args)
 
   # Collect all the avialable operations in a manifest.
   GpuMatmulTensorCoresF16(manifest)
-  #GpuMatmulTensorCoresF32(manifest)
+  GpuMatmulTensorCoresF32(manifest)
 
   # Performance report
   perf_report = PerformanceReport(args)
 
-  # For all the operations in the manifest, compile and profile them.
+  # For all the operations in the manifest compile, verify, and profile.
   for operation_kind, operation_collection_list in manifest.operations.items():
     for operation_collection in operation_collection_list:
 
@@ -112,23 +114,32 @@ if __name__ == "__main__":
           args, operation_collection.operation)
 
       for configuration in operation_collection.configuration_list:
+
+        # Compile the operation dispatches for verification and profiling.
+        if compile_only:
+          operation_launcher.compile(CompilationMode.Verify)
+          operation_launcher.compile(CompilationMode.Benchmark)
+
+        # Initialize verification and profiling results.
+        verification_result = 'Not run' if not verification_enabled else 'Failed'
+        runtime = -1.0
+
+        # Launch the operation dispatches for verification and profiling.
         if verification_enabled:
-          operation_launcher.verify(configuration)
+          verification_result = operation_launcher.verify(configuration)
         if profiling_enabled:
           runtime = operation_launcher.profile(configuration)
 
+        # Save and print the performance result.
+        if verification_enabled or profiling_enabled:
           # Create and print a performance result.
           result = PerformanceResult(operation_collection.operation,
-                                     configuration, runtime)
+                                     configuration, verification_result,
+                                     runtime)
           result.print()
 
           # Append the performance result to the performance report.
           perf_report.append_perf_result(result)
-
-      # Compile the operation for verification and profiling.
-      if compile_only:
-        operation_launcher.compile(CompilationMode.Verify)
-        operation_launcher.compile(CompilationMode.Benchmark)
 
   # Write the performance report to a csv file.
   if args.output != '':

@@ -8,8 +8,14 @@ from collections import namedtuple
 # This file contains library of enumerations and classes used to build operation descritpions.
 # The operation descriptions are used to generate MLIR source files, performance tuning configuration,
 # reference implementations, and numpy input/output files.
-###################################################################################################
 
+# The file is organized as follows:
+# 1. Enumerations `Type` grouped together for a category, For e.g. [Arch]Type, [Data]Type etc.
+# 2. Dictonaries `Names` mapping the enumeration values to their string names. 
+#    For e.g. [Arch]TypeNames, [Data]TypeNames etc.
+# 3. `Tags` for each enumeration value to be used in the generated MLIR source files. 
+#    For e.g. [TranslationInfo]Tags
+###################################################################################################
 
 # Architecure types
 ###################################################################################################
@@ -39,10 +45,9 @@ GpuArchTypeNames = {
     GpuArchType.spirv: "spirv",
 }
 
+
+# Operation kinds
 ###################################################################################################
-
-
-#
 class OperationKind(enum.Enum):
   Matmul = enum_auto()
   Conv2d = enum_auto()
@@ -54,7 +59,7 @@ OperationKindNames = {
     OperationKind.Conv2d: 'conv2d'
 }
 
-
+# MLIR dialects
 class MlirDialect(enum.Enum):
   Linalg = enum_auto()
   Mhlo = enum_auto()
@@ -66,7 +71,8 @@ MlirDialectNames = {
     MlirDialect.Mhlo: 'mhlo',
 }
 
-
+# Compilation modes (verification or benchmarking/profiling)
+###################################################################################################
 class CompilationMode(enum.Enum):
   Verify = enum_auto()
   Benchmark = enum_auto()
@@ -78,7 +84,6 @@ CompilationModeNames = {
     CompilationMode.Benchmark: 'benchmark',
 }
 
-###################################################################################################
 
 
 # Enumerations for data types and layouts
@@ -170,65 +175,32 @@ ShortLayoutTypeName = {
 }
 
 
+# Compilation pipelines/translation info.
 ###################################################################################################
-# Data structures for describing a tensor, tiles and fundametal operation types
-###################################################################################################
-class TensorDescription:
-
-  def __init__(self, datatype, layout):
-    self.datatype = datatype
-    self.layout = layout
-
-  def name(self):
-    return "%s%s" % (DataTypeName[self.datatype],
-                     ShortLayoutTypeName[self.layout])
-
-
-###################################################################################################
-class TileDescription:
-
-  def __init__(self, threadblock_shape, stages, block_dim):
-    self.threadblock_shape = threadblock_shape  # in number of elements in M, N, K
-    self.stages = stages  # number of shared memory stages in tile K
-    self.block_dim = block_dim  # block dimension in number of threads in x, y, z
-
-  def name(self):
-    return "%dx%d_%dx%d" % (self.threadblock_shape[0],
-                            self.threadblock_shape[1],
-                            self.threadblock_shape[2], self.stages)
-
-
-###################################################################################################
-# Compilation pipelines/translation info
-###################################################################################################
+#
 class TranslationInfo(enum.Enum):
-  LLVMGPUMatmulTensorCore = enum_auto()
   LLVMGPUMatmulSIMT = enum_auto()
+  LLVMGPUMatmulTensorCore = enum_auto()
+  LLVMGPUMatmulTensorCoreMmaSync = enum_auto()
 
 
 #
 TranslationInfoTag = {
-    TranslationInfo.LLVMGPUMatmulTensorCore: "LLVMGPUMatmulTensorCore",
     TranslationInfo.LLVMGPUMatmulSIMT: "LLVMGPUMatmulSIMT",
+    TranslationInfo.LLVMGPUMatmulTensorCore: "LLVMGPUMatmulTensorCore",
+    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "LLVMGPUMatmulTensorCoreMmaSync",
 }
 
 #
 TranslationInfoName = {
-    TranslationInfo.LLVMGPUMatmulTensorCore: "tensorcore",
     TranslationInfo.LLVMGPUMatmulSIMT: "simt",
+    TranslationInfo.LLVMGPUMatmulTensorCore: "tensorcore_wmma",
+    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "tensorcore_mma_sync",
 }
 
-# A collection of indpendent dispatches. A dispatch is operation description + configuration.
-# A single mlir file is generated per operation enumerating multiple dispatches, one for each
-# configuration in the list. Total number of dispatches by one instaces of OperationCollection
-# is len(configuration_list).
-OperationCollection = namedtuple('OperationCollection',
-                                 ['operation', 'configuration_list'])
-
-
+# Distribution of values in a tensor.
 ###################################################################################################
-# Enumerations for npy files
-###################################################################################################
+#
 class Distribution(enum.Enum):
   Empty = enum_auto()
   Zeros = enum_auto()
@@ -248,6 +220,49 @@ DistributionName = {
     Distribution.Random: "random",
 }
 
+###################################################################################################
+# The next part of this file contains the data structures for describing a tensor, tiles etc that
+# are built using the above enumerations. These data structures are used to create compose bigger
+# data structures that describe an operation or a sequence of operations, along with compilation 
+# pipeling to form a collection of dispatches to profiled.
+###################################################################################################
+# A class for tensor description.
+class TensorDescription:
+
+  def __init__(self, datatype, layout):
+    self.datatype = datatype
+    self.layout = layout
+
+  def name(self):
+    return "%s%s" % (DataTypeName[self.datatype],
+                     ShortLayoutTypeName[self.layout])
+
+# A class tile description.
+class TileDescription:
+
+  def __init__(self, threadblock_shape, stages, block_dim):
+    self.threadblock_shape = threadblock_shape  # in number of elements in M, N, K
+    self.stages = stages  # number of shared memory stages in tile K
+    self.block_dim = block_dim  # block dimension in number of threads in x, y, z
+
+  def name(self):
+    return "%dx%d_%dx%d" % (self.threadblock_shape[0],
+                            self.threadblock_shape[1],
+                            self.threadblock_shape[2], self.stages)
+
+# A collection of indpendent dispatches. A dispatch is operation description + configuration.
+# A single mlir file is generated per operation enumerating multiple dispatches, one for each
+# configuration in the list. Total number of dispatches by one instaces of OperationCollection
+# is len(configuration_list).
+OperationCollection = namedtuple('OperationCollection',
+                                 ['operation', 'configuration_list'])
+
+
+###################################################################################################
+# The following part contains utility functions for which are used by the profiler tool.
+# These function may be moved as the need for create a proper structure for the
+# functionality they provide becomes apparent and necessary as we move forward.
+###################################################################################################
 
 # Helper function to generate a npy file name from a distribution and shape.
 def get_np_array(tensor_description, shape, dist):
@@ -274,8 +289,6 @@ def get_np_array(tensor_description, shape, dist):
 
 
 ###################################################################################################
-
-
 # Helper function to substitute values into a template string.
 def SubstituteTemplate(template, values):
   text = template
@@ -289,6 +302,3 @@ def SubstituteTemplate(template, values):
         changed = True
       text = newtext
   return text
-
-
-###################################################################################################
