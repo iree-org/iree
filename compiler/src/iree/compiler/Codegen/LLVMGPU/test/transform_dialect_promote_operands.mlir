@@ -6,7 +6,6 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<250x500xf32>>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<500x1020xf32>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<250x1020xf32>>
       %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<250x500xf32>> -> tensor<250x500xf32>
       %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [500, 1020], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<500x1020xf32>> -> tensor<500x1020xf32>
 
@@ -16,15 +15,14 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       // CHECK:      %[[CST:.+]] = arith.constant 0.000000e+00 : f32
       // CHECK:      %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
       // CHECK:      %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
-      // CHECK:      %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
-      // CHECK:      %[[D3:.+]] = flow.dispatch.tensor.load %[[D0]], offsets = [0, 0], sizes = [250, 500]
-      // CHECK:      %[[D4:.+]] = flow.dispatch.tensor.load %[[D1]], offsets = [0, 0], sizes = [500, 1020]
-      // CHECK:      %[[D5:.+]] = tensor.empty() : tensor<250x1020xf32>
-      // CHECK-NEXT: %[[D6:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D5]] : tensor<250x1020xf32>) -> tensor<250x1020xf32>
-      // CHECK-NEXT: %[[D7:.+]] = bufferization.alloc_tensor() copy(%[[D3]]) {bufferization.escape = [false]} : tensor<250x500xf32>
-      // CHECK-NEXT: %[[D8:.+]] = bufferization.alloc_tensor() copy(%[[D4]]) {bufferization.escape = [false]} : tensor<500x1020xf32>
-      // CHECK-NEXT: %[[D9:.+]] = linalg.matmul ins(%[[D7]], %[[D8]] : tensor<250x500xf32>, tensor<500x1020xf32>)
-      // CHECK-SAME:                 outs(%[[D6]] : tensor<250x1020xf32>) -> tensor<250x1020xf32>
+      // CHECK:      %[[D2:.+]] = flow.dispatch.tensor.load %[[D0]], offsets = [0, 0], sizes = [250, 500]
+      // CHECK:      %[[D3:.+]] = flow.dispatch.tensor.load %[[D1]], offsets = [0, 0], sizes = [500, 1020]
+      // CHECK:      %[[D4:.+]] = tensor.empty() : tensor<250x1020xf32>
+      // CHECK-NEXT: %[[D5:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D4]] : tensor<250x1020xf32>) -> tensor<250x1020xf32>
+      // CHECK-NEXT: %[[D6:.+]] = bufferization.alloc_tensor() copy(%[[D2]]) {bufferization.escape = [false]} : tensor<250x500xf32>
+      // CHECK-NEXT: %[[D7:.+]] = bufferization.alloc_tensor() copy(%[[D3]]) {bufferization.escape = [false]} : tensor<500x1020xf32>
+      // CHECK-NEXT: %[[D8:.+]] = linalg.matmul ins(%[[D6]], %[[D7]] : tensor<250x500xf32>, tensor<500x1020xf32>)
+      // CHECK-SAME:                 outs(%[[D5]] : tensor<250x1020xf32>) -> tensor<250x1020xf32>
       %6 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
       return %6: tensor<250x1020xf32>
     }

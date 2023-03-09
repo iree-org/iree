@@ -16,11 +16,36 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_trace_replay_t iree_trace_replay_t;
+
 enum iree_trace_replay_shutdown_flag_bits_e {
   IREE_TRACE_REPLAY_SHUTDOWN_QUIET = 0u,
   IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS = 1 << 0u,
 };
 typedef uint32_t iree_trace_replay_shutdown_flags_t;
+
+// Optional set of callbacks around a replay event function call.
+// Functions not required by the caller may be omitted.
+typedef struct iree_trace_replay_call_hooks_t {
+  // User context passed to each callback.
+  void* user_data;
+  // Issued before the call begins with the call inputs.
+  iree_status_t (*before)(void* user_data, iree_trace_replay_t* replay,
+                          yaml_document_t* document, yaml_node_t* event_node,
+                          iree_vm_function_t function,
+                          iree_vm_list_t* input_list);
+  // Issued after the call completes successfully with the call outputs.
+  iree_status_t (*after)(void* user_data, iree_trace_replay_t* replay,
+                         yaml_document_t* document, yaml_node_t* event_node,
+                         iree_vm_function_t function,
+                         iree_vm_list_t* output_list);
+  // Issued only when the call fails and not the replay operation itself.
+  // |status| is as returned from the call and ownership is transferred to the
+  // hook.
+  iree_status_t (*error)(void* user_data, iree_trace_replay_t* replay,
+                         yaml_document_t* document, yaml_node_t* event_node,
+                         iree_vm_function_t function, iree_status_t status);
+} iree_trace_replay_call_hooks_t;
 
 typedef struct iree_trace_replay_t {
   iree_allocator_t host_allocator;
@@ -33,8 +58,21 @@ typedef struct iree_trace_replay_t {
   iree_host_size_t device_uri_count;
   const iree_string_view_t* device_uris;
 
+  // Context used within the replay, modules registered on-demand.
   iree_vm_context_t* context;
+
+  // Active HAL device if any. Will be initialized on the first HAL module load.
   iree_hal_device_t* device;
+
+  // Optional inputs available via `!input.get`/`!input.take`.
+  iree_vm_list_t* inputs;
+  // Optional outputs populated via `!output.set`/`!output.push`.
+  iree_vm_list_t* outputs;
+  // Blackboard used to track state within the trace.
+  iree_vm_list_t* blackboard;
+
+  // Optional call hooks allowing reflection of calls and their I/O.
+  iree_trace_replay_call_hooks_t call_hooks;
 } iree_trace_replay_t;
 
 // Initializes a trace replay context.
@@ -82,12 +120,11 @@ iree_status_t iree_trace_replay_event_call_prepare(
     iree_vm_list_t** out_input_list);
 
 // Replays a `call` event against the replay context.
-// Optionally |out_output_list| can be populated with a caller-owned set of
-// outputs from the call.
-iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
-                                           yaml_document_t* document,
-                                           yaml_node_t* event_node,
-                                           iree_vm_list_t** out_output_list);
+// Optionally |hooks| may be specified to inspect the inputs and outputs of the
+// call operation.
+iree_status_t iree_trace_replay_event_call(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* event_node, const iree_trace_replay_call_hooks_t* hooks);
 
 #ifdef __cplusplus
 }  // extern "C"

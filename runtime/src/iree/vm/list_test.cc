@@ -101,7 +101,7 @@ static std::vector<iree_vm_value_t> GetValuesList(iree_vm_list_t* list) {
   result.resize(iree_vm_list_size(list));
   for (iree_host_size_t i = 0; i < result.size(); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    IREE_CHECK_OK(iree_vm_list_get_variant(list, i, &variant));
+    IREE_CHECK_OK(iree_vm_list_get_variant_assign(list, i, &variant));
     if (iree_vm_type_def_is_value(&variant.type)) {
       result[i].type = variant.type.value_type;
       memcpy(result[i].value_storage, variant.value_storage,
@@ -622,7 +622,7 @@ TEST_F(VMListTest, ResizeVariant) {
   IREE_ASSERT_OK(iree_vm_list_resize(list, 5));
   for (iree_host_size_t i = 0; i < 5; ++i) {
     iree_vm_variant_t value = iree_vm_variant_empty();
-    IREE_ASSERT_OK(iree_vm_list_get_variant(list, i, &value));
+    IREE_ASSERT_OK(iree_vm_list_get_variant_assign(list, i, &value));
     EXPECT_TRUE(iree_vm_variant_is_empty(value));
   }
 
@@ -655,7 +655,7 @@ TEST_F(VMListTest, ResizeVariant) {
   }
   for (iree_host_size_t i = 2; i < 5; ++i) {
     iree_vm_variant_t value = iree_vm_variant_empty();
-    IREE_ASSERT_OK(iree_vm_list_get_variant(list, i, &value));
+    IREE_ASSERT_OK(iree_vm_list_get_variant_assign(list, i, &value));
     EXPECT_TRUE(iree_vm_variant_is_empty(value));
   }
 

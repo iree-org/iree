@@ -158,8 +158,8 @@ iree_status_t Run(int* out_exit_code) {
     if (FLAG_output_list().count == 0) {
       IREE_RETURN_IF_ERROR(
           iree_tooling_variant_list_fprint(
-              outputs.get(), (iree_host_size_t)FLAG_output_max_element_count,
-              stdout),
+              IREE_SV("result"), outputs.get(),
+              (iree_host_size_t)FLAG_output_max_element_count, stdout),
           "printing results");
     } else {
       IREE_RETURN_IF_ERROR(

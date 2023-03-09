@@ -159,6 +159,31 @@ iree_status_t iree_tooling_parse_to_variant_list(
       z0,
       iree_vm_list_create(
           /*element_type=*/NULL, input_strings_count, host_allocator, &list));
+
+  iree_status_t status = iree_tooling_parse_into_variant_list(
+      device_allocator, input_strings, input_strings_count, host_allocator,
+      list);
+  if (iree_status_is_ok(status)) {
+    *out_list = list;
+  } else {
+    iree_vm_list_release(list);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_tooling_parse_into_variant_list(
+    iree_hal_allocator_t* device_allocator,
+    const iree_string_view_t* input_strings,
+    iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
+    iree_vm_list_t* list) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Reset the list and prepare for pushing items.
+  iree_vm_list_clear(list);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_list_reserve(list, input_strings_count));
+
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < input_strings_count; ++i) {
     if (!iree_status_is_ok(status)) break;
@@ -250,11 +275,7 @@ iree_status_t iree_tooling_parse_to_variant_list(
       if (!iree_status_is_ok(status)) break;
     }
   }
-  if (iree_status_is_ok(status)) {
-    *out_list = list;
-  } else {
-    iree_vm_list_release(list);
-  }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -334,7 +355,12 @@ static iree_status_t iree_variant_format(iree_vm_variant_t variant,
     IREE_RETURN_IF_ERROR(iree_string_builder_append_string(builder, type_name));
     IREE_RETURN_IF_ERROR(
         iree_string_builder_append_string(builder, IREE_SV("\n")));
-    if (iree_hal_buffer_view_isa(variant.ref)) {
+    if (iree_vm_list_isa(variant.ref)) {
+      iree_vm_list_t* child_list = iree_vm_list_deref(variant.ref);
+      IREE_RETURN_IF_ERROR(iree_tooling_append_variant_list_lines(
+          IREE_SV("child_list"), child_list, max_element_count, builder));
+      return iree_string_builder_append_string(builder, IREE_SV("\n"));
+    } else if (iree_hal_buffer_view_isa(variant.ref)) {
       iree_hal_buffer_view_t* buffer_view =
           iree_hal_buffer_view_deref(variant.ref);
       IREE_RETURN_IF_ERROR(iree_hal_buffer_view_append_to_builder(
@@ -370,15 +396,16 @@ static iree_status_t iree_variant_fprint(iree_vm_variant_t variant,
 }
 
 iree_status_t iree_tooling_append_variant_list_lines(
-    iree_vm_list_t* list, iree_host_size_t max_element_count,
-    iree_string_builder_t* builder) {
+    iree_string_view_t list_name, iree_vm_list_t* list,
+    iree_host_size_t max_element_count, iree_string_builder_t* builder) {
   IREE_TRACE_ZONE_BEGIN(z0);
   for (iree_host_size_t i = 0; i < iree_vm_list_size(list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_vm_list_get_variant(list, i, &variant),
+        z0, iree_vm_list_get_variant_assign(list, i, &variant),
         "variant %zu not present", i);
-    iree_string_builder_append_format(builder, "result[%zu]: ", i);
+    iree_string_builder_append_format(
+        builder, "%.*s[%" PRIhsz "]: ", (int)list_name.size, list_name.data, i);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_variant_format(variant, max_element_count, builder));
   }
@@ -387,11 +414,12 @@ iree_status_t iree_tooling_append_variant_list_lines(
 }
 
 iree_status_t iree_tooling_variant_list_fprint(
-    iree_vm_list_t* list, iree_host_size_t max_element_count, FILE* file) {
+    iree_string_view_t list_name, iree_vm_list_t* list,
+    iree_host_size_t max_element_count, FILE* file) {
   iree_string_builder_t builder;
   iree_string_builder_initialize(iree_allocator_system(), &builder);
-  iree_status_t status =
-      iree_tooling_append_variant_list_lines(list, max_element_count, &builder);
+  iree_status_t status = iree_tooling_append_variant_list_lines(
+      list_name, list, max_element_count, &builder);
   if (iree_status_is_ok(status)) {
     size_t written = fwrite(iree_string_builder_buffer(&builder), 1,
                             iree_string_builder_size(&builder), file);
@@ -482,7 +510,7 @@ iree_status_t iree_tooling_output_variant_list(
   for (iree_host_size_t i = 0; i < output_strings_count; ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_vm_list_get_variant(list, i, &variant));
+        z0, iree_vm_list_get_variant_assign(list, i, &variant));
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_tooling_output_variant(variant, output_strings[i],
                                         max_element_count, file));

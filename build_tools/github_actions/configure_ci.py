@@ -29,15 +29,12 @@ not.
 
 import difflib
 import fnmatch
+import json
 import os
 import subprocess
 import textwrap
 from typing import Iterable, Mapping, MutableMapping
 
-PULL_REQUEST_EVENT_NAME = "pull_request"
-PUSH_EVENT_NAME = "push"
-SCHEDULE_EVENT_NAME = "schedule"
-WORKFLOW_DISPATCH_EVENT_NAME = "workflow_dispatch"
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
 BENCHMARK_PRESET_KEY = "benchmarks"
@@ -86,7 +83,7 @@ def set_output(d: Mapping[str, str]):
   print(f"Setting outputs: {d}")
   step_output_file = os.environ["GITHUB_OUTPUT"]
   with open(step_output_file, "a") as f:
-    f.writelines(f"{k}={v}" "\n" for k, v in d.items())
+    f.writelines(f"{k}={v}" + "\n" for k, v in d.items())
 
 
 def write_job_summary(summary: str):
@@ -121,7 +118,9 @@ def check_description_and_show_diff(original_description: str,
   </details>""").format("".join(diffs)))
 
 
-def get_trailers() -> Mapping[str, str]:
+def get_trailers(is_pr: bool) -> Mapping[str, str]:
+  if not is_pr:
+    return {}
   title = os.environ["PR_TITLE"]
   body = os.environ.get("PR_BODY", "")
   original_title = os.environ.get("ORIGINAL_PR_TITLE")
@@ -167,10 +166,10 @@ def modifies_included_path(base_ref: str) -> bool:
   return any(not skip_path(p) for p in get_modified_paths(base_ref))
 
 
-def should_run_ci(event_name, trailers) -> bool:
-  if event_name != PULL_REQUEST_EVENT_NAME:
-    print(f"Running CI independent of diff because run was not triggered by a"
-          f" pull request event (event name is '{event_name}')")
+def should_run_ci(is_pr: bool, trailers: Mapping[str, str]) -> bool:
+  if not is_pr:
+    print("Running CI independent of diff because run was not triggered by a"
+          " pull request event.")
     return True
 
   if SKIP_CI_KEY in trailers:
@@ -204,19 +203,7 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
   return runner_env
 
 
-def get_ci_stage(event_name):
-  if event_name == PULL_REQUEST_EVENT_NAME:
-    return "presubmit"
-  elif event_name == PUSH_EVENT_NAME:
-    return "postsubmit"
-  elif event_name == SCHEDULE_EVENT_NAME:
-    return "postsubmit"
-  elif event_name == WORKFLOW_DISPATCH_EVENT_NAME:
-    return "unknown"
-  raise ValueError(f"Unrecognized event name '{event_name}'")
-
-
-def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
+def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str]) -> str:
   """Parses and validates the benchmark presets from trailers.
 
   Args:
@@ -226,7 +213,7 @@ def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
     A comma separated preset string, which later will be parsed by
     build_tools/benchmarks/export_benchmark_config.py.
   """
-  if ci_stage == "postsubmit":
+  if not is_pr:
     preset_options = ["all"]
   else:
     trailer = trailers.get(BENCHMARK_PRESET_KEY)
@@ -248,22 +235,16 @@ def get_benchmark_presets(ci_stage: str, trailers: Mapping[str, str]) -> str:
 
 
 def main():
-  output: MutableMapping[str, str] = {}
-  event_name = os.environ["GITHUB_EVENT_NAME"]
-  trailers = get_trailers() if event_name == PULL_REQUEST_EVENT_NAME else {}
-  if should_run_ci(event_name, trailers):
-    output["should-run"] = "true"
-  else:
-    output["should-run"] = "false"
-  output[RUNNER_ENV_KEY] = get_runner_env(trailers)
-  ci_stage = get_ci_stage(event_name)
-  output["ci-stage"] = ci_stage
-  output["runner-group"] = ci_stage
-  write_caches = "0"
-  if ci_stage == "postsubmit":
-    write_caches = "1"
-  output["write-caches"] = write_caches
-  output["benchmark-presets"] = get_benchmark_presets(ci_stage, trailers)
+  is_pr = os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+  trailers = get_trailers(is_pr)
+  output = {
+      "should-run": json.dumps(should_run_ci(is_pr, trailers)),
+      "is-pr": json.dumps(is_pr),
+      "runner-env": get_runner_env(trailers),
+      "runner-group": "presubmit" if is_pr else "postsubmit",
+      "write-caches": "0" if is_pr else "1",
+      "benchmark-presets": get_benchmark_presets(is_pr, trailers),
+  }
 
   set_output(output)
 

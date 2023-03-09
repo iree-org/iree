@@ -165,19 +165,15 @@ jobs:
       - name: "Running benchmarks"
         id: run
         env:
-          BENCHMARK_CONFIG: ${{ steps.download-assets.outputs.benchmark-config }}
+          IREE_EXECUTION_BENCHMARK_CONFIG: ${{ steps.download-assets.outputs.benchmark-config }}
           IREE_DOCKER_WRAPPER: ./build_tools/github_actions/docker_run.sh
           IREE_NORMAL_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.normal-benchmark-tools-dir }}
           IREE_TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
-          IREE_DEVICE_NAME: ${{ env.DEVICE_NAME }}
+          IREE_TARGET_DEVICE_NAME: ${{ env.DEVICE_NAME }}
           IREE_E2E_TEST_ARTIFACTS_DIR: ${{ env.E2E_TEST_ARTIFACTS_DIR }}
-          IREE_RUN_CONFIG: run-config.json
           IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}.json
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
-          jq --arg DEVICE_NAME "${IREE_DEVICE_NAME}" \
-            '.[$DEVICE_NAME] | .run_configs' \
-            "${BENCHMARK_CONFIG}" > "${IREE_RUN_CONFIG}"
           ./build_tools/benchmarks/run_benchmarks.sh
           echo "benchmark-results=${IREE_BENCHMARK_RESULTS}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading benchmark results"

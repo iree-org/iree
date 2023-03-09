@@ -341,7 +341,7 @@ struct ReductionSplitResult {
 /// produced as parent of reduction splitting if necessary for fusion of the
 /// leading elementwise operation.
 // TODO: consider passing a problem-specific struct to control information.
-static ReductionSplitResult createExpansionBubbleUp(
+static ReductionSplitResult createBubbleExpand(
     ImplicitLocOpBuilder &b, Value variantH,
     SplitReductionOp splitReductionTransformOp, bool hasLeadingEltwise,
     bool hasTrailingEltwise) {
@@ -355,7 +355,7 @@ static ReductionSplitResult createExpansionBubbleUp(
 
   auto funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   ApplyPatternsOpPatterns configuration;
-  configuration.bubbleCollapseExpand = true;
+  configuration.bubbleExpand = true;
   b.create<ApplyPatternsOp>(funcH, configuration);
   std::tie(result.originalFillH, result.splitFillH) =
       matchAndUnpack<2>(b, variantH, linalg::FillOp::getOperationName());

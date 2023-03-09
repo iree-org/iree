@@ -27,7 +27,7 @@ transform.sequence failures(propagate) {
   // able to preserve the handles.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %func { bubble_collapse_expand }
+  transform.iree.apply_patterns %func { bubble_expand }
   %fills = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %fill_2, %more_parallel_fill_2 = transform.split_handles %fills in [2]
     : (!pdl.operation) -> (!pdl.operation, !pdl.operation)

@@ -42,11 +42,18 @@ class CommonArgumentsTest(unittest.TestCase):
     with self.assertRaises(SystemExit):
       arg_parser.parse_args(["--trace_capture_tool=nonexistent", "."])
 
-  def test_parser_e2e_test_artifacts_dir_requires_run_config(self):
+  def test_parser_e2e_test_artifacts_dir_needs_execution_benchmark_config(self):
     arg_parser = common.common_arguments.Parser()
     with tempfile.TemporaryDirectory() as tempdir:
       with self.assertRaises(SystemExit):
         arg_parser.parse_args([f"--e2e_test_artifacts_dir={tempdir}"])
+
+  def test_parser_only_execution_benchmark_config_or_target_device_name(self):
+    arg_parser = common.common_arguments.Parser()
+    with self.assertRaises(SystemExit):
+      arg_parser.parse_args([f"--execution_benchmark_config"])
+    with self.assertRaises(SystemExit):
+      arg_parser.parse_args([f"--target_device_name"])
 
 
 if __name__ == "__main__":

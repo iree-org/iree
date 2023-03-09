@@ -255,7 +255,7 @@ py::object VmVariantList::GetAsList(int index) {
 
 py::object VmVariantList::GetVariant(int index) {
   iree_vm_variant_t v = iree_vm_variant_empty();
-  CheckApiStatus(iree_vm_list_get_variant(raw_ptr(), index, &v),
+  CheckApiStatus(iree_vm_list_get_variant_assign(raw_ptr(), index, &v),
                  "Could not access list element");
   if (iree_vm_type_def_is_value(&v.type)) {
     // Convert a value type.
@@ -288,7 +288,7 @@ py::object VmVariantList::GetVariant(int index) {
 
 py::object VmVariantList::GetAsSerializedTraceValue(int index) {
   iree_vm_variant_t v = iree_vm_variant_empty();
-  CheckApiStatus(iree_vm_list_get_variant(raw_ptr(), index, &v),
+  CheckApiStatus(iree_vm_list_get_variant_assign(raw_ptr(), index, &v),
                  "Could not access list element");
   if (iree_vm_type_def_is_value(&v.type)) {
     // Convert a value type.
@@ -367,8 +367,14 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
       // Element type.
       iree_hal_element_type_t element_type =
           iree_hal_buffer_view_element_type(buffer_view);
-      // TODO: Would be nice to output as hex.
-      record["element_type"] = element_type;
+      char element_type_str[64] = {0};
+      iree_host_size_t element_type_length = 0;
+      CheckApiStatus(
+          iree_hal_format_element_type(element_type, sizeof(element_type_str),
+                                       element_type_str, &element_type_length),
+          "Formatting element type");
+      record["element_type"] =
+          std::string(element_type_str, element_type_length);
 
       // Map memory.
       iree_device_size_t byte_length = iree_hal_buffer_byte_length(raw_buffer);
@@ -392,7 +398,7 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
 
 py::object VmVariantList::GetAsRef(int index) {
   iree_vm_variant_t v = iree_vm_variant_empty();
-  CheckApiStatus(iree_vm_list_get_variant(raw_ptr(), index, &v),
+  CheckApiStatus(iree_vm_list_get_variant_assign(raw_ptr(), index, &v),
                  "Could not access list element");
   if (!iree_vm_variant_is_ref(v)) {
     throw std::invalid_argument("list element is not a ref");
@@ -426,7 +432,7 @@ void AppendListContents(std::string& out, iree_vm_list_t* list,
                         std::unordered_set<iree_vm_list_t*>& visited) {
   for (iree_host_size_t i = 0, e = iree_vm_list_size(list); i < e; ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    iree_status_t status = iree_vm_list_get_variant(list, i, &variant);
+    iree_status_t status = iree_vm_list_get_variant_assign(list, i, &variant);
     if (!iree_status_is_ok(status)) {
       iree_status_ignore(status);
       out.append("Error");

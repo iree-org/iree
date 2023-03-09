@@ -74,8 +74,14 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     unspecified order:
       - additional_iree_patterns: fancy patterns we shortcut into the system,
       will need to be sliced out better in the future.
-      - bubble_collapse_expand: bubble `expand_shape` up and `collapse_shape`
-      down across Linalg ops.
+      - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This 
+      must be applied separately from `bubble_expand` patterns because of some
+      upstream pattern interference issue atm.
+      - bubble_expand: bubble `expand_shape` down across Linalg ops. This 
+      must be applied separately from `bubble_collapse` patterns because of some
+      upstream pattern interference issue atm.
+      - bubble_pack_un_pack: bubble `pack` up and `unpack` down across Linalg
+      ops.
       - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
       - cse: additionally apply common subexpression elimination. This must
@@ -97,10 +103,14 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       iteration loop promotion. This is not a set of patterns per se but is still
       very convenient to apply it close to canonicalization and other greedy 
       pattern applications.
+      - linalg_elementwise_greedy_fusion: add linalg elementwise ops fusion 
+      patterns using a naive default heuristic.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
       - rank_reducing_linalg: adds patterns that results in rank-reducing
-      behavior on subset-based linalg operations.
+      behavior on subset-based linalg operations using insert/extract slices.
+      - rank_reducing_linalg_via_reshapes: adds patterns that results in rank-reducing
+      behavior on subset-based linalg operations using expand/collapse shape ops.
       - rank_reducing_vector: adds patterns that results in rank-reducing 
       behavior on subset-based vector operations.
       adopts the upstream version.
@@ -135,7 +145,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
   let arguments = (ins PDL_Operation:$target,
                        UnitAttr:$additional_iree_patterns,
-                       UnitAttr:$bubble_collapse_expand,
+                       UnitAttr:$bubble_collapse,
+                       UnitAttr:$bubble_expand,
+                       UnitAttr:$bubble_pack_un_pack,
                        UnitAttr:$canonicalization,
                        UnitAttr:$cse,
                        UnitAttr:$erase_unnecessary_tensor_operands,
@@ -144,8 +156,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$fold_tensor_empty_extract,
                        UnitAttr:$licm,
+                       UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$rank_reducing_linalg,
+                       UnitAttr:$rank_reducing_linalg_via_reshapes,
                        UnitAttr:$rank_reducing_vector,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns,
@@ -183,8 +197,8 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
     It always return success.
   }];
 
-  let arguments = (ins Transform_ConcreteOpType<"func.func">:$target);
-  let results = (outs Transform_ConcreteOpType<"func.func">:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$result);
 
   let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -411,10 +425,10 @@ def ShareForallOperandsOp : Op<
   }];
 
   let arguments = (
-      ins Transform_ConcreteOpType<"scf.forall">:$forall_op,
+      ins TransformHandleTypeInterface:$forall_op,
           DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$share_operands
   );
-  let results = (outs Transform_ConcreteOpType<"scf.forall">:$result);
+  let results = (outs TransformHandleTypeInterface:$result);
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
