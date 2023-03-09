@@ -7,8 +7,15 @@ Sample parser for redistrib JSON manifests
 2. Validates SHA256 checksums
 3. Extracts archives
 4. Flattens into a collapsed directory structure
+
+Forked from https://github.com/NVIDIA/build-system-archive-import-examples/blob/355e25cca11725e88984443a6a343dffeb43308a/parse_redist.py
+and patched:
+  - avoid a dependency on the non-standard requests package (see
+the http_get helper) by using urllib directly
+  - explicit error handling on hash mismatch
+  - always download, even if files exist
+  - remove dependence on deprecated distutils copy_tree in favor of shutil
 """
-from distutils.dir_util import copy_tree
 import argparse
 import os.path
 import hashlib
@@ -18,7 +25,7 @@ import shutil
 import tarfile
 import zipfile
 import sys
-import requests
+import urllib.request
 
 __version__ = "0.1.0"
 
@@ -40,6 +47,21 @@ UNROLLED = True
 COLLAPSE = True
 
 
+def http_get(url):
+  """Fetch the contents of a URL."""
+  with urllib.request.urlopen(url) as f:
+    data = f.read()
+    if hasattr(f, "status"):
+      # For >= 3.9
+      status_code = f.status
+    else:
+      # Deprecated in 3.9
+      statuc_code = f.code
+    if status_code != 200:
+      raise IOError("  -> Failed to download: " + url)
+    return data
+
+
 def err(msg):
   """Print error message and exit"""
   print("ERROR: " + msg)
@@ -48,14 +70,11 @@ def err(msg):
 
 def fetch_file(full_path, filename):
   """Download file to disk"""
-  download = requests.get(full_path)
-  if download.status_code != 200:
-    print("  -> Failed: " + filename)
-  else:
-    print(":: Fetching: " + full_path)
-    with open(filename, "wb") as file:
-      file.write(download.content)
-      print("  -> Wrote: " + filename)
+  print(":: Fetching: " + full_path)
+  download_data = http_get(full_path)
+  with open(filename, "wb") as file:
+    file.write(download_data)
+    print("  -> Wrote: " + filename)
 
 
 def get_hash(filename):
@@ -77,18 +96,31 @@ def check_hash(filename, checksum):
   if checksum == sha256:
     print("     Verified sha256sum: " + sha256)
   else:
-    print("  => Mismatch sha256sum:")
-    print("    -> Calculation: " + sha256)
-    print("    -> Expectation: " + checksum)
+    raise IOError(f"Mismatch sha256sum: Calculation={sha256}, "
+                  f"Expectation={checksum} for {filename}")
 
 
 def flatten_tree(src, dest):
   """Merge hierarchy from multiple directories"""
+
+  # Should use shutil.copytree(dirs_exist_ok=True), but that isn't available
+  # until Python 3.8.
+  def copytree(src, dst):
+    if not os.path.exists(dst):
+      os.makedirs(dst)
+    for item in os.listdir(src):
+      s = os.path.join(src, item)
+      d = os.path.join(dst, item)
+      if os.path.isdir(s):
+        copytree(s, d)
+      else:
+        if not os.path.exists(d):
+          shutil.copy2(s, d)
+
   try:
-    copy_tree(src, dest, preserve_symlinks=1, update=1, verbose=1)
-  except FileExistsError:
-    pass
-  shutil.rmtree(src)
+    copytree(src, dest)
+  finally:
+    shutil.rmtree(src)
 
 
 def fetch_action(parent):
@@ -116,7 +148,7 @@ def fetch_action(parent):
         filename = os.path.basename(full_path)
         ARCHIVES[platform].append(filename)
 
-        if RETRIEVE and not os.path.exists(filename):
+        if RETRIEVE:
           # Download archive
           fetch_file(full_path, filename)
         elif os.path.exists(filename):
@@ -257,7 +289,7 @@ elif OS is not None and ARCH is None:
 
 # Parse JSON
 try:
-  MANIFEST = requests.get(URL).json()
+  MANIFEST = json.loads(http_get(URL))
 except json.decoder.JSONDecodeError:
   err("redistrib JSON manifest file not found")
 
