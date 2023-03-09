@@ -190,7 +190,7 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
              reshapeOp.getResultType().getShape(), outputShape[0])) {
       if (resultShape != ShapedType::kDynamic) continue;
       outputDynamicShapes.push_back(getValueOrCreateConstantIndexOp(
-        rewriter, reshapeOp.getLoc(), outputShp));
+          rewriter, reshapeOp.getLoc(), outputShp));
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         reshapeOp, reshapeOp.getResultType(), reshapeOp.getSrc(),

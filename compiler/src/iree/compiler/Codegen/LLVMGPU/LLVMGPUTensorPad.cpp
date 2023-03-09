@@ -98,8 +98,7 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
     int64_t rank = paddedResult.getType().cast<RankedTensorType>().getRank();
     SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> sizes;
-    for (OpFoldResult v : reifiedResultShapes[resultNumber])
-      sizes.push_back(v);
+    for (OpFoldResult v : reifiedResultShapes[resultNumber]) sizes.push_back(v);
     SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
     paddedSubviewResults.push_back(rewriter.create<tensor::ExtractSliceOp>(
         loc, paddedResult, offsets, sizes, strides));

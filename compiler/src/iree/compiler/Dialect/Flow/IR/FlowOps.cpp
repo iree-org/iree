@@ -644,9 +644,8 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
       if (droppedDims.test(mixedSize.index())) {
         continue;
       }
-      shape.push_back(
-          (Value)getValueOrCreateConstantIndexOp(b, getLoc(),
-                                                 mixedSize.value()));
+      shape.push_back((Value)getValueOrCreateConstantIndexOp(
+          b, getLoc(), mixedSize.value()));
     }
   } else {
     // Result size matches the source size (no slicing).

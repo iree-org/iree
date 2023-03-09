@@ -1938,15 +1938,15 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   for (auto dataTileDim :
        llvm::seq<unsigned>(getInputRank(), getOutputRank() - 1)) {
     Value ub = getValueOrCreateConstantIndexOp(builder, loc,
-                                               outputShape[0][dataTileDim]); 
+                                               outputShape[0][dataTileDim]);
     scf::ForOp loop = builder.create<scf::ForOp>(loc, zero, ub, one);
     builder.setInsertionPointToStart(loop.getBody());
     ivVec.push_back(loop.getInductionVar());
   }
   // The body of the innermost loops does the actual data movement.
   builder.create<scf::ForOp>(loc, zero,
-                             getValueOrCreateConstantIndexOp(builder, loc,
-                               outputShape[0].back()),
+                             getValueOrCreateConstantIndexOp(
+                                 builder, loc, outputShape[0].back()),
                              one, ValueRange{},
                              [&](OpBuilder &bodyBuilder, Location bodyLoc,
                                  Value iv, ValueRange regionIterArgs) {
