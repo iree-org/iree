@@ -39,14 +39,14 @@ iree-compile \
 
 In which
 
-* `-iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
+* `--iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
     memory usage at the cost of concurrency - include when targeting
     single-threaded execution to reduce memory consumption.
-* `iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
-* `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
+* `--iree-hal-target-backends=llvm-cpu`: Compile using the LLVM CPU target
+* `--iree-llvmcpu-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
     so the artifact has a fixed ABI to be rendered by the
     [elf_module library](https://github.com/openxla/iree/tree/main/iree/hal/local/elf)
-* `iree-llvm-debug-symbols=false`: To reduce the artifact size
+* `--iree-llvmcpu-debug-symbols=false`: To reduce the artifact size
 
 See [generate.sh](https://github.com/openxla/iree/blob/main/iree/hal/local/elf/testdata/generate.sh)
 for example command-line instructions of some common architectures

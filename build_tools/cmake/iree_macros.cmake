@@ -413,7 +413,7 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
     return()
   endif()
 
-  if(ANDROID AND NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+  if(ANDROID AND NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # Android's CMake toolchain defines some variables that we can use to infer
     # the appropriate target triple from the configured settings:
     # https://developer.android.com/ndk/guides/cmake#android_platform
@@ -429,21 +429,21 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
 
   if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
      CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
-     NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+     NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV64 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
     # llvm-target-triple is not specified.
     list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
   elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
-         NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+         NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV32 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
     # llvm-target-triple is not specified.
     list(APPEND _FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
   endif()
 
-  if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+  if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     set(_EMSCRIPTEN_TEST_DEFAULT_FLAGS
       "--iree-llvmcpu-target-triple=wasm32-unknown-emscripten"
     )

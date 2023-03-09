@@ -82,7 +82,7 @@ struct LLVMTargetOptions {
   std::string staticLibraryOutput;
 };
 
-// Returns LLVMTargetOptions struct intialized with the iree-llvm-* flags.
+// Returns LLVMTargetOptions struct intialized with the iree-llvmcpu-* flags.
 LLVMTargetOptions getLLVMTargetOptionsFromFlags();
 
 }  // namespace HAL
