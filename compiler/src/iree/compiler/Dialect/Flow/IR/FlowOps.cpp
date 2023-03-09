@@ -348,6 +348,9 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
                           {static_cast<int32_t>(allOperands.size()),
                            static_cast<int32_t>(workloadOperands.size())}));
 
+  if (parser.resolveOperands(allOperands, parser.getBuilder().getIndexType(),
+                             result.operands))
+    return failure();
   if (parser.resolveOperands(workloadOperands,
                              parser.getBuilder().getIndexType(),
                              workloadOperandsLoc, result.operands)) {
@@ -355,9 +358,6 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
   }
 
   result.addTypes(resultTypes);
-  if (parser.resolveOperands(allOperands, parser.getBuilder().getIndexType(),
-                             result.operands))
-    return failure();
   return success();
 }
 
