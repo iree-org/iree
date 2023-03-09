@@ -124,9 +124,6 @@ def iree_check_single_backend_test_suite(
 
     tests = []
     for src in srcs:
-        # CUDA backend/driver not supported by Bazel build.
-        if target_backend == "cuda" or driver == "cuda":
-            continue
         test_name = "_".join([name, src])
         iree_check_test(
             name = test_name,
