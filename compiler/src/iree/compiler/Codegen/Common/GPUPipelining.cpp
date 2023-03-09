@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <iostream>
+
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -18,7 +20,6 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
 //====---------------------------------------------------------------------===//
@@ -232,16 +233,11 @@ struct WarpMmaOp {
 };
 
 /// Structure to hold the matmul's mainloop information:
-/// Seperates the mmasync operations into kgroups and collects the Shared Memory
+/// Seperates the mma operations into kgroups and collects the Shared Memory
 /// loads for each kgroup. This information is used to pipeline the mainloop and
 /// to generate an optimal schedule interleaving Global Memory loads, Shared
 /// Memory loads, and math operations.
 struct MainLoopInfo {
-  //
-  // Type definitions
-  //
-  using KgroupToWarpMmaMap = std::unordered_map<int, WarpMmaOp>;
-
   //
   // Data members
   //
@@ -252,22 +248,18 @@ struct MainLoopInfo {
   llvm::SetVector<Operation*> barrierOps;
   llvm::SetVector<Operation*> asyncWaitOps;
 
-  // Warp-level MMA operations SharedMemory -> Registers -> MMA.
-  // Map: kgroupIdx -> WarpMmaOp
-  llvm::SmallVector<WarpMmaOp, 8> warpOperations;
+  // Warp-level operations covering:
+  // `ldmatrix, ld.shared` SharedMemory -> Registers
+  // `mma` Registers -> Tensor Cores.
+  llvm::SmallVector<WarpMmaOp, 4> warpOperations;
 
-  // std::vector<llvm::SetVector<Operation*>> ldmatrixOpDeps;
-  // std::vector<llvm::SetVector<Operation*>> mmasyncOpDeps;
   llvm::SetVector<Operation*> copyGlobalToSharedOpDeps;
-
-  // Map: Operation -> kgroupIdx
-  std::unordered_map<Operation*, int> opToKgroupMap;
 
   // Set to track the dependencies already seen to a backward slice.
   llvm::SetVector<Operation*> seenDepOps;
 
   // Set to track the mma operations in forward slice to count kgroups and
-  // populate the warp-level WarpMmaOp kgroupIdx -> WarpMmaOp map.
+  // populate the warp-level warpOperations
   llvm::SetVector<Operation*> seenMmaOps;
 
   //
@@ -316,28 +308,28 @@ struct MainLoopInfo {
   // (start) to numKgroups (ends scf.yield).
   // Assumption: The mma operations are in a chain in monotonic increasing
   // kgroup order.
-  void vistMmaSyncOp(Operation* op, int kgroupIdx) {
+  void vistMmaSyncOp(Operation* op, int kgroup) {
     // if the operation in an `scf.yield`, we reached the end of MmaSyncOp chain
     // return.
     if (seenMmaOps.count(op) || isa<scf::YieldOp>(op)) return;
 
     seenMmaOps.insert(op);
 
-    // If the kgroupIdx is not in the vector, create a new WarpMmaOp.
-    if (warpOperations.size() < kgroupIdx + 1)
+    // If the kgroup is not in the vector, create a new WarpMmaOp.
+    if (warpOperations.size() < kgroup + 1)
       warpOperations.push_back(WarpMmaOp());
 
-    warpOperations[kgroupIdx].mmaOperations.insert(op);
-
     backtrackToFindSmemLoad(op->getOperand(0).getDefiningOp(),
-                            warpOperations[kgroupIdx].loadOperationsA,
+                            warpOperations[kgroup].loadOperationsA,
                             op->getBlock());
 
     backtrackToFindSmemLoad(op->getOperand(1).getDefiningOp(),
-                            warpOperations[kgroupIdx].loadOperationsB,
+                            warpOperations[kgroup].loadOperationsB,
                             op->getBlock());
 
-    vistMmaSyncOp((op->getUses().begin())->getOwner(), ++kgroupIdx);
+    warpOperations[kgroup].mmaOperations.insert(op);
+
+    vistMmaSyncOp((op->getUses().begin())->getOwner(), ++kgroup);
   }
 
   // Ctor.
@@ -368,7 +360,7 @@ struct MainLoopInfo {
       // Collect the warp-level mma.sync and load operations (smem -> registers)
       // and separate them into kgroups for fine-grained instruction scheduling.
       if (isa<nvgpu::MmaSyncOp>(op)) {
-        vistMmaSyncOp(&op, 0 /*kgroup = 0*/);
+        vistMmaSyncOp(&op, 0 /*kgroup*/);
       }
     }
 
@@ -380,20 +372,6 @@ struct MainLoopInfo {
     assert(
         barrierOps.size() == 1 &&
         "Expected only two barrier ops ,i.e., around each Shared Memory copy");
-#if 0
-    // Obtain the reverse map: operation -> kgroup.
-    for (auto& warpOp : warpOperations) {
-      for (auto mmaOp : warpOp.second.mmaOperations) {
-        opToKgroupMap[mmaOp] = warpOp.first;
-      }
-      for (auto loadOp : warpOp.second.loadOperationsA) {
-        opToKgroupMap[loadOp] = warpOp.first;
-      }
-      for (auto loadOp : warpOp.second.loadOperationsB) {
-        opToKgroupMap[loadOp] = warpOp.first;
-      }
-    }
-#endif
 
     // Collect the dependent operations for cp.async for couarse-grained
     // instruction scheduling.
@@ -407,10 +385,6 @@ struct MainLoopInfo {
 
     // Collect the dependent operations for mma.sync and ldmatix operations
     // seperated by kgroups for fine-grained instruction scheduling.
-    // Resize to accomodate the number of kgroups.
-    // ldmatrixOpDeps.resize(warpOperations.size());
-    // mmasyncOpDeps.resize(warpOperations.size());
-
     for (int kgroup = 0; kgroup < getNumberOfKgroups(); ++kgroup) {
       // Dependent operations for ldmatrix for the kgroup in loop order.
       for (Operation& op : forOp.getBody()->getOperations()) {
@@ -522,6 +496,18 @@ static void getNvidiaAmpereTensorCorePipeline(
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (info.warpOperations[numKgroups - 1].mmaOperations.count(&op))
       ops.push_back(std::make_pair(&op, numStages - 1));
+  }
+
+  llvm::SmallDenseSet<Operation*> scheduledOperations;
+  std::cout << std::flush;
+  std::cout << ">>>> Final schedule for the mainloop: Instructions "
+            << ops.size() << std::endl;
+  for (auto& stage_op_pair : ops) {
+    std::cout << " Stage (" << stage_op_pair.second << ") , Operation: ";
+    std::cout << std::flush;
+    stage_op_pair.first->dump();
+    scheduledOperations.insert(stage_op_pair.first);
+    std::cout << std::flush;
   }
 }
 
