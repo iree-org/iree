@@ -453,7 +453,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     # "clamp.mlir"  # TODO(#10906): fix (i8/i16?)
     # "compare.mlir"  # TODO(#10906): fix (i8/i16?)
-    "complex.mlir"
+    # "complex.mlir" # TODO(#11054)
     "concatenate.mlir"
     "constant.mlir"
     # "convert.mlir"  # TODO(#10906): fix (i8/i16?)

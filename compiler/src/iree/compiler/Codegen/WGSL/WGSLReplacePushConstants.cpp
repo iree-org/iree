@@ -125,8 +125,6 @@ class WGSLReplacePushConstantsPass
         missingAlignmentValue = true;
       }
     }
-    auto maxConstantValue =
-        builder.create<arith::ConstantIndexOp>(loc, maxConstantIndex);
     mlir::IntegerAttr alignmentAttr = nullptr;
     // TODO(scotttodd): try llvm::all_equal with attrs directly
     if (!missingAlignmentValue && llvm::all_equal(alignmentValues)) {
@@ -153,12 +151,13 @@ class WGSLReplacePushConstantsPass
     // Note: we're ignoring all potential 'values' hints (if provided) on ops -
     // InterfaceBindingSubspanOp has no matching concept and we assume that any
     // analysis using the hint should have been performed by earlier passes.
+    auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
     auto subspanOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
         loc, dispatchTensorType,
         /*set=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX),
         /*binding=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX),
         IREE::HAL::DescriptorType::UniformBuffer,
-        /*byte_offset=*/maxConstantValue, dynamicDims, alignmentAttr, nullptr);
+        /*byte_offset=*/zero, dynamicDims, alignmentAttr, nullptr);
 
     // flow.dispatch.tensor.load -> tensor<Nxvector<4xi32>>
     auto tensorType =
