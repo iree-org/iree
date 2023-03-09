@@ -12,11 +12,16 @@ name: Benchmark Trigger
 # description and labels. See
 # https://github.com/openxla/iree/issues/10042#issuecomment-1449250094 for
 # more background.
+#
+# This workflow is running on the main branch.
 
 on:
+  # Run when a label is added to a PR that targets the main branch.
   pull_request_target:
     types:
       - labeled
+    branches:
+      - main
 
 env:
   PR_NUMBER: ${{ github.event.number }}
