@@ -164,7 +164,7 @@ Optional<SmallVector<int64_t>> getExtOpVectorShape(
       return std::nullopt;
   }
 
-  return llvm::to_vector<>(sliceType.getShape());
+  return llvm::to_vector(sliceType.getShape());
 }
 
 /// Returns vector shape matching native cooperative op sizes for unrolling
@@ -173,13 +173,13 @@ Optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
     Operation *op, ArrayRef<int64_t> nativeShape) {
   // Unroll vector.contract ops according to native cooperative matrix size.
   if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-    return llvm::to_vector<>(nativeShape);
+    return llvm::to_vector(nativeShape);
   }
 
   // Unroll elementwise ops according to native cooperative matrix size.
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>())
-      return llvm::to_vector<>(nativeShape.drop_back());  // Drop K dim size
+      return llvm::to_vector(nativeShape.drop_back());  // Drop K dim size
   }
 
   // Unrolling vector.contract generates vector.{insert|extract}_strided_slice
@@ -195,13 +195,13 @@ Optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
     auto insert =
         writeOp.getVector().getDefiningOp<vector::InsertStridedSliceOp>();
     if (insert) {
-      return llvm::to_vector<>(insert.getSourceVectorType().getShape());
+      return llvm::to_vector(insert.getSourceVectorType().getShape());
     }
 
     // There can exist vector.transfer_write for initializing output. Unroll
     // them to native shape. Native shape is for ([B, ]M, N, K), here we only
     // need ([B, ]M, N).
-    return llvm::to_vector<>(nativeShape.drop_back());
+    return llvm::to_vector(nativeShape.drop_back());
   }
 
   if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
@@ -220,7 +220,7 @@ Optional<SmallVector<int64_t>> getCooperativeOpVectorShape(
       if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }
-    return llvm::to_vector<>(sliceType.getShape());
+    return llvm::to_vector(sliceType.getShape());
   }
 
   if (auto extOp = dyn_cast<arith::ExtSIOp>(op))

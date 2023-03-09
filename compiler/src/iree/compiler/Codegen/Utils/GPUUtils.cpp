@@ -583,7 +583,7 @@ Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
       if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }
-    return llvm::to_vector<>(sliceType.getShape());
+    return llvm::to_vector(sliceType.getShape());
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
@@ -736,7 +736,7 @@ Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
           if (sliceType && sliceType != vecType) return std::nullopt;
           sliceType = vecType;
         }
-        return llvm::to_vector<>(sliceType.getShape());
+        return llvm::to_vector(sliceType.getShape());
       }
     }
   }
