@@ -94,7 +94,7 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
       int64_t offset;
       SmallVector<int64_t> strides;
       if (failed(getStridesAndOffset(type, strides, offset))) {
-        return std::nullopt;
+        return nullptr;
       }
       // Since the memref gets linearized, use a stride 1, offset 0.
       StridedLayoutAttr layoutAttr;
@@ -311,6 +311,13 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   SmallVector<int64_t> strides;
   int64_t offset;
   if (succeeded(getStridesAndOffset(sourceType, strides, offset))) {
+    // The memref itself might have an offset, but we should not account for it
+    // when computing the linearization. The original memref might be
+    // `memref<?x?xf32, strided<[?, ?], offset: ?>`
+    // where shape is `{%d0, %d1}`, strides are `{%s0, %s1}` and offset is
+    // `%offset`. The interpretation of that is the actual memref starts at
+    // `%offset` from the base pointer. After linearization, the offset remains,
+    // but the shape is 1D. So build a map with the same strides, but 0 offset.
     AffineMap linearLayoutMap =
         makeStridedLinearLayoutMap(strides, 0, builder.getContext());
     // Dynamic strides/offset will create symbols. There should be none for the

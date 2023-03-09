@@ -258,6 +258,32 @@ func.func @transfer_write_subspan_with_offset(
 
 // -----
 
+func.func @load_store_subspan_with_zero_offset(%arg0 : index, %arg1 : index, %arg2 : index, %arg3 : index) {
+  %subspan0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>{%arg0, %arg1}
+  %subspan1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>{%arg0, %arg1}
+  %val = memref.load %subspan0[%arg2, %arg3] : memref<?x?xf32>
+  memref.store %val, %subspan1[%arg2, %arg3] : memref<?x?xf32>
+  return
+}
+//   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>
+// CHECK-LABEL: func @load_store_subspan_with_zero_offset(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index
+//       CHECK:  %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:  %[[D0:.+]] = affine.apply #[[$MAP0]]()[%[[ARG0]], %[[ARG1]]]
+//       CHECK:  %[[BINDING0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[D0]]}
+//       CHECK:  %[[D1:.+]] = affine.apply #[[$MAP0]]()[%[[ARG0]], %[[ARG1]]]
+//       CHECK:  %[[BINDING1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[D1]]}
+//       CHECK:  %[[OFFSET0:.+]] = affine.apply #[[$MAP1]]()[%[[ARG2]], %[[ARG1]], %[[ARG3]]]
+//       CHECK:  %[[VAL:.+]] = memref.load %[[BINDING0]][%[[OFFSET0]]]
+//       CHECK:  %[[OFFSET1:.+]] = affine.apply #[[$MAP1]]()[%[[ARG2]], %[[ARG1]], %[[ARG3]]]
+//       CHECK:  memref.store %[[VAL]], %[[BINDING1]][%[[OFFSET1]]]
+
+// -----
+
 func.func @load_store_rank_zero_subspan_with_zero_offset() {
   %zero = arith.constant 0 : index
   %subspan0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%zero) : memref<f32>
