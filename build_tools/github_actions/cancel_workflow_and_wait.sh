@@ -5,11 +5,11 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Perform a best-effort attempt to cancel a running workflow (started before
+# this script is run) and wait for the cancellation to complete.
 #
-# Doing best-effort to cancel a running workflow (started before this script is
-# run) and wait for the cancellation to complete.
-#
-# Due to the limitations of Github API, there are race conditions cases that
+# Due to limitations in GitHub's APIs, there are race conditions cases that
 # this script can't be sure if the run is cancelled. It will detect and fail
 # fast in such cases.
 
