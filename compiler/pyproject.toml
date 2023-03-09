@@ -9,6 +9,5 @@ requires = [
     "packaging",
     "pybind11>=2.10.1",
     "PyYAML",
-    "requests",
 ]
 build-backend = "setuptools.build_meta"

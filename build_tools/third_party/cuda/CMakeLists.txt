@@ -5,79 +5,18 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 function(fetch_cuda_toolkit)
-  # Parameters to the download script.
-  # Look for an appropriate redistrib_*.json here to verify:
-  #   https://developer.download.nvidia.com/compute/cuda/redist/
-  set(_VERSION "11.6.2")
-  set(_PRODUCT "cuda")
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(_OS "linux")
-  elseif(WIN32)
-    set(_OS "windows")
-  else()
-    message(SEND_ERROR "Unsupported OS environment. Must be Windows or Linux.")
-    return()
+  set(_DOWNLOAD_SCRIPT_PATH "${IREE_SOURCE_DIR}/third_party/nvidia_sdk_download/fetch_cuda_toolkit.py")
+  message(STATUS "Checking and downloading CUDA SDK toolkit components")
+  execute_process(COMMAND ${Python3_EXECUTABLE}
+    "${_DOWNLOAD_SCRIPT_PATH}" "${CMAKE_CURRENT_BINARY_DIR}"
+    RESULT_VARIABLE _EXEC_RESULT
+    OUTPUT_VARIABLE _ACTUAL_DOWNLOAD_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  if(_EXEC_RESULT AND NOT _EXEC_RESULT EQUAL 0)
+    message(FATAL_ERROR "Error fetching CUDA toolkit")
   endif()
-  # CUDA is only supported on Linux/Windows where x64 is the only arch for now.
-  # Note: CMAKE_HOST_SYSTEM_PROCESSOR may be AMD64 on Windows, but we still
-  # want to use `x86_64` here.
-  set(_ARCH "x86_64")
-
-  set(_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/${_VERSION}")
-  set(_DOWNLOAD_SCRIPT_URL "https://raw.githubusercontent.com/NVIDIA/build-system-archive-import-examples/44dfb51fad75a8a2f1044a4fe221aba70571b86f/parse_redist.py")
-  set(_DOWNLOAD_SCRIPT_PATH "${_TARGET_DIR}/parse_redist.py")
-
-  # Only download if haven't already.
-  # This will produce a unified directory tree under:
-  #   flat/$OS-$ARCH
-  set(_ARCH_DIR "${_TARGET_DIR}/${_OS}-${_ARCH}")
-  set(_TOUCH_FILE "${_TARGET_DIR}/cuda_toolkit.downloaded")
-
-  if(NOT EXISTS "${_TOUCH_FILE}")
-    # The parse_redist.py script requires the Python requests module, which
-    # is not yet installed by default. Check for it.
-    execute_process(
-      COMMAND ${Python3_EXECUTABLE} -c "import requests"
-      RESULT_VARIABLE _PY_MODULES_EXIST_CODE
-      OUTPUT_QUIET
-    )
-    if(NOT ${_PY_MODULES_EXIST_CODE} EQUAL 0)
-      message(SEND_ERROR "CUDA auto-download requires Python packages that do not exist on your system. Recommend running: \n  ${Python3_EXECUTABLE} -m pip install requests")
-      return()
-    endif()
-
-    # Components that we need to fetch.
-    set(_COMPONENTS_TO_FETCH "")
-    list(APPEND _COMPONENTS_TO_FETCH "cuda_nvcc")
-    list(APPEND _COMPONENTS_TO_FETCH "cuda_cudart")
-
-    message(STATUS "Extracting CUDA Toolkit to ${_TARGET_DIR}")
-    file(MAKE_DIRECTORY ${_TARGET_DIR})
-
-    # First fetch the download script to its own directory.
-    file(DOWNLOAD ${_DOWNLOAD_SCRIPT_URL} ${_DOWNLOAD_SCRIPT_PATH})
-
-    # Then use the download script to fetch and flatten each component we want
-    # into the target dir.
-    foreach(COMPONENT ${_COMPONENTS_TO_FETCH})
-      message(STATUS "Downloading component ${COMPONENT}")
-      execute_process(COMMAND ${Python3_EXECUTABLE} "${_DOWNLOAD_SCRIPT_PATH}"
-        --label "${_VERSION}"
-        --product "${_PRODUCT}"
-        --os "${_OS}"
-        --arch "${_ARCH}"
-        --component "${COMPONENT}"
-        --output "${_TARGET_DIR}")
-    endforeach()
-  endif()
-
-  if(NOT EXISTS "${_ARCH_DIR}")
-    message(FATAL_ERROR "Download did not produce expected source dir: ${_ARCH_DIR}")
-    return()
-  endif()
-
-  file(TOUCH "${_TOUCH_FILE}")
-  set(CUDAToolkit_ROOT "${_ARCH_DIR}" PARENT_SCOPE)
+  set(CUDAToolkit_ROOT ${_ACTUAL_DOWNLOAD_PATH} PARENT_SCOPE)
 endfunction()
 
 if(DEFINED ENV{IREE_CUDA_DEPS_DIR})
