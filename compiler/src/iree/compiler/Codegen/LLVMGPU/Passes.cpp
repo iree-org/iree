@@ -36,12 +36,6 @@ static llvm::cl::opt<unsigned> logSwizzleTile(
     "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
     llvm::cl::init(0));
 
-/// Flag used for the transition from wmma to mma.sync. Once we have better
-/// performance with mma.sync we can drop wmma support and remove this flag.
-llvm::cl::opt<bool> llvmgpuUseMMASync(
-    "iree-codegen-llvmgpu-use-mma-sync",
-    llvm::cl::desc("use mma sync instead of wmma ops"), llvm::cl::init(false));
-
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
@@ -259,10 +253,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  if (!llvmgpuUseMMASync) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createGPUReduceSharedMemoryBankConflicts());
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUReduceSharedMemoryBankConflicts());
 
   // Vector -> MMA ops
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -276,12 +268,67 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   // Hoist loop invariant code to avoid pipelining it.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
-  PipeliningSchedulingStrategy schedule =
-      llvmgpuUseMMASync ? PipeliningSchedulingStrategy::nvidiaTensorCore
-                        : PipeliningSchedulingStrategy::loadGlobalStage0;
   // Pipeline memory operations.
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
-      /*epiloguePeeling=*/false, pipelineDepth, schedule));
+      /*epiloguePeeling=*/false, pipelineDepth,
+      PipeliningSchedulingStrategy::loadGlobalStage0));
+}
+
+void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
+                                               unsigned pipelineDepth) {
+  tileAndBufferize(pm);
+
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  // Distribute linalg onto warps within the workgroup.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  if (pipelineDepth > 1)
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUMultiBuffering(pipelineDepth));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkGroupSwizzle(logSwizzleTile));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Linalg -> vector
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType::MMA_SYNC));
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+
+  // Distribute shared memory copies.
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // Vector -> MMA ops
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUVectorToGPU(GPUTensorCoreType::MMA_SYNC));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Hoist loop invariant code to avoid pipelining it.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  // Pipeline memory operations.
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+      /*epiloguePeeling=*/false, pipelineDepth,
+      PipeliningSchedulingStrategy::nvidiaTensorCore));
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {

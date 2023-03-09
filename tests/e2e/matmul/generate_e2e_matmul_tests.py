@@ -44,6 +44,7 @@ class CompilationInfoId(enum.Enum):
   NONE = ""
   LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
   LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
+  LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
   SPIRVVectorizeMali = "SPIRVVectorizeMali"
   SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
 
