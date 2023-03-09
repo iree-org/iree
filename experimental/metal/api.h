@@ -27,6 +27,14 @@ typedef enum iree_hal_metal_command_dispatch_type_e {
   IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_SERIAL = 1,
 } iree_hal_metal_command_dispatch_type_t;
 
+typedef enum iree_hal_metal_resource_hazard_tracking_mode_e {
+  // Do not track resource hazards. Hosting applications are responsible for
+  // ensuring that resources are not modified while in use.
+  IREE_HAL_METAL_RESOURCE_HAZARD_TRACKING_MODE_UNTRACKED = 0,
+  // Track resource hazards within the system Metal runtime.
+  IREE_HAL_METAL_RESOURCE_HAZARD_TRACKING_MODE_TRACKED = 1,
+} iree_hal_metal_resource_hazard_tracking_mode_t;
+
 // Parameters configuring an iree_hal_metal_device_t.
 // Must be initialized with iree_hal_metal_device_params_initialize prior to
 // use.
@@ -42,6 +50,13 @@ typedef struct iree_hal_metal_device_params_t {
   // itself. Though being able to specify serial command dispatching helps
   // debugging in certain cases.
   iree_hal_metal_command_dispatch_type_t command_dispatch_type;
+
+  // Resource hazard tracking mode.
+  // IREE is following explicit GPU API model and tracks resource dependency by
+  // itself. So normally we don't need to let Metal runtime to track resource
+  // usages and prevent hazards, which incurs runtime overhead. But it can be
+  // helpful for debugging purposes.
+  iree_hal_metal_resource_hazard_tracking_mode_t resource_hazard_tracking_mode;
 } iree_hal_metal_device_params_t;
 
 // Initializes |out_params| to default values.

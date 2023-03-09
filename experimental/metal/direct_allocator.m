@@ -26,6 +26,8 @@ typedef struct iree_hal_metal_allocator_t {
   iree_hal_device_t* base_device;
   id<MTLDevice> device;
 
+  iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode;
+
   iree_allocator_t host_allocator;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
@@ -38,9 +40,10 @@ static iree_hal_metal_allocator_t* iree_hal_metal_allocator_cast(iree_hal_alloca
   return (iree_hal_metal_allocator_t*)base_value;
 }
 
-iree_status_t iree_hal_metal_allocator_create(iree_hal_device_t* base_device, id<MTLDevice> device,
-                                              iree_allocator_t host_allocator,
-                                              iree_hal_allocator_t** out_allocator) {
+iree_status_t iree_hal_metal_allocator_create(
+    iree_hal_device_t* base_device, id<MTLDevice> device,
+    iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -54,6 +57,7 @@ iree_status_t iree_hal_metal_allocator_create(iree_hal_device_t* base_device, id
     allocator->base_device = base_device;
     iree_hal_device_retain(base_device);
     allocator->device = [device retain];  // +1
+    allocator->resource_tracking_mode = resource_tracking_mode;
     allocator->host_allocator = host_allocator;
 
     *out_allocator = (iree_hal_allocator_t*)allocator;
@@ -130,8 +134,9 @@ static iree_hal_buffer_compatibility_t iree_hal_metal_allocator_query_buffer_com
 
 // Returns the corresponding Metal resource options controlling storage modes, CPU caching modes,
 // and hazard tracking modes for the given IREE HAL memory |type|.
-static MTLResourceOptions iree_hal_metal_select_resource_options(iree_hal_memory_type_t type,
-                                                                 bool is_unified_memory) {
+static MTLResourceOptions iree_hal_metal_select_resource_options(
+    iree_hal_memory_type_t type, bool is_unified_memory,
+    iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode) {
   MTLResourceOptions options;
 
   // Select a storage mode. There are four MTLStorageMode:
@@ -180,9 +185,9 @@ static MTLResourceOptions iree_hal_metal_select_resource_options(iree_hal_memory
     options |= MTLResourceCPUCacheModeWriteCombined;
   }
 
-  // Select hazard tracking mode. IREE is more explicit than Metal: it tracks various state by
-  // itself. There is no need to incur Metal runtime overhead for hazard tracking.
-  options |= MTLResourceHazardTrackingModeUntracked;
+  options |= resource_tracking_mode == IREE_HAL_METAL_RESOURCE_HAZARD_TRACKING_MODE_TRACKED
+                 ? MTLResourceHazardTrackingModeTracked
+                 : MTLResourceHazardTrackingModeUntracked;
   return options;
 }
 
@@ -206,8 +211,8 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
   iree_status_t status = iree_ok_status();
   bool is_unified_memory = [allocator->device hasUnifiedMemory];
 
-  MTLResourceOptions options =
-      iree_hal_metal_select_resource_options(compat_params.type, is_unified_memory);
+  MTLResourceOptions options = iree_hal_metal_select_resource_options(
+      compat_params.type, is_unified_memory, allocator->resource_tracking_mode);
   id<MTLBuffer> metal_buffer = nil;
   if (iree_const_byte_span_is_empty(initial_data)) {
     metal_buffer = [allocator->device newBufferWithLength:allocation_size options:options];  // +1

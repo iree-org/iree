@@ -67,6 +67,8 @@ void iree_hal_metal_device_params_initialize(iree_hal_metal_device_params_t* out
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
   out_params->command_dispatch_type = IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_CONCURRENT;
+  out_params->resource_hazard_tracking_mode =
+      IREE_HAL_METAL_RESOURCE_HAZARD_TRACKING_MODE_UNTRACKED;
 }
 
 const iree_hal_metal_device_params_t* iree_hal_metal_device_params(
@@ -84,6 +86,7 @@ static iree_status_t iree_hal_metal_device_create_internal(
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, total_size, (void**)&device));
 
   iree_status_t status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
+                                                         params->resource_hazard_tracking_mode,
                                                          host_allocator, &device->device_allocator);
   iree_hal_metal_builtin_executable_t* builtin_executable = NULL;
   if (iree_status_is_ok(status)) {
