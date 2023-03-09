@@ -6,55 +6,46 @@
 
 #include "iree/hal/local/executable_loader.h"
 
-#if defined(IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN)
+#include "iree/base/tracing.h"
 
-// Defined by the user and linked in to the binary:
-extern iree_hal_executable_import_provider_t
-IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN(void);
-
-iree_hal_executable_import_provider_t
-iree_hal_executable_import_provider_default(void) {
-  return IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN();
-}
-
-#else
-iree_hal_executable_import_provider_t
-iree_hal_executable_import_provider_default(void) {
-  return iree_hal_executable_import_provider_null();
-}
-#endif  // IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN
-
-iree_status_t iree_hal_executable_import_provider_resolve(
+iree_status_t iree_hal_executable_import_provider_try_resolve(
     const iree_hal_executable_import_provider_t import_provider,
-    iree_string_view_t symbol_name, void** out_fn_ptr, void** out_fn_context) {
-  IREE_ASSERT_ARGUMENT(out_fn_ptr);
-  IREE_ASSERT_ARGUMENT(out_fn_context);
-  *out_fn_ptr = NULL;
-  *out_fn_context = NULL;
+    iree_host_size_t count, const char* const* symbol_names, void** out_fn_ptrs,
+    void** out_fn_contexts,
+    iree_hal_executable_import_resolution_t* out_resolution) {
+  if (!count) return iree_ok_status();
+  IREE_ASSERT_ARGUMENT(symbol_names);
+  IREE_ASSERT_ARGUMENT(out_fn_ptrs);
+  IREE_ASSERT_ARGUMENT(out_fn_contexts);
+  if (out_resolution) *out_resolution = 0;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
 
-  // A `?` suffix indicates the symbol is weakly linked and can be NULL.
-  bool is_weak = false;
-  if (iree_string_view_ends_with(symbol_name, iree_make_cstring_view("?"))) {
-    is_weak = true;
-    symbol_name = iree_string_view_substr(symbol_name, 0, symbol_name.size - 1);
-  }
-
-  // Note that it's fine for there to be no registered provider if all symbols
-  // are weak.
+  // It's fine for there to be no registered provider if all symbols are
+  // optional. This is a special case for NULL import providers.
   if (import_provider.resolve == NULL) {
-    if (is_weak) return iree_ok_status();
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "no import provider registered for resolving "
-                            "executable imports (while try to resolve %.*s)",
-                            (int)symbol_name.size, symbol_name.data);
+    bool any_required = false;
+    for (iree_host_size_t i = 0; i < count; ++i) {
+      if (!iree_hal_executable_import_is_optional(symbol_names[i])) {
+        any_required = true;
+        break;
+      }
+    }
+    if (any_required) {
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "no import provider registered for resolving "
+                              "required executable imports");
+    } else {
+      // No required imports so a NULL provider is fine.
+      return iree_ok_status();
+    }
   }
 
-  iree_status_t status = import_provider.resolve(
-      import_provider.self, symbol_name, out_fn_ptr, out_fn_context);
-  if (!iree_status_is_ok(status) && is_weak) {
-    status = iree_status_ignore(status);  // ok to fail on weak symbols
-  }
+  iree_status_t status =
+      import_provider.resolve(import_provider.self, count, symbol_names,
+                              out_fn_ptrs, out_fn_contexts, out_resolution);
 
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 

@@ -13,7 +13,6 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/modules/vmvx/module.h"
 #include "iree/vm/bytecode/module.h"
