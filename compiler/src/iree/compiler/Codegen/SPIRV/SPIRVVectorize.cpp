@@ -99,7 +99,7 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
   } else if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
     // Unroll all reduction dimensions by size 1 for vector.multi_reduction.
     VectorType srcVectorType = reductionOp.getSourceVectorType();
-    auto nativeSize = llvm::to_vector<>(srcVectorType.getShape());
+    auto nativeSize = llvm::to_vector(srcVectorType.getShape());
     auto dims = reductionOp.getReductionDims().getAsValueRange<IntegerAttr>();
     for (const auto &dimAttr : dims) {
       nativeSize[dimAttr.getZExtValue()] = 1;
