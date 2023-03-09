@@ -61,9 +61,11 @@ class IreeRuleBuilder(object):
     # Import target name: iree-imported-model-<imported_model_id>
     target_name = f"iree-imported-model-{imported_model.composite_id}"
 
+    cmake_rules = [f"# Generate with ImportConfig id: {import_config.id}"]
+
     import_flags = import_config.materialize_import_flags(model)
     if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
-      cmake_rules = [
+      cmake_rules += [
           cmake_builder.rules.build_iree_import_tflite_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
@@ -71,7 +73,7 @@ class IreeRuleBuilder(object):
               output_mlir_file=str(output_file_path))
       ]
     elif import_config.tool == iree_definitions.ImportTool.TF_IMPORTER:
-      cmake_rules = [
+      cmake_rules += [
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
@@ -98,6 +100,7 @@ class IreeRuleBuilder(object):
     target_name = f"iree-module-{module_generation_config.composite_id}"
 
     cmake_rules = [
+        f"# Generate with CompileConfig id: {module_generation_config.compile_config.id}",
         cmake_builder.rules.build_iree_bytecode_module(
             target_name=target_name,
             src=str(model_import_rule.output_file_path),
