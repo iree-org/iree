@@ -6,11 +6,12 @@
 
 name: Benchmark Trigger
 
-# The privileged workflow listening the PR labeling events and checking if a
-# benchmark label is added. If so, it cancels the running CI workflow on the PR
-# and rerequests it, then the CI workflow will pick up the new benchmark labels.
-# See https://github.com/openxla/iree/issues/10042#issuecomment-1449250094 for
-# the reasons why it is designed in this way.
+# Trigger benchmark CI workflows when benchmark PR labels are added.
+# When a benchmark label is added, this cancels and then re-runs the CI
+# workflow. When the workflow is re-run, it will pick up the latest PR
+# description and labels. See
+# https://github.com/openxla/iree/issues/10042#issuecomment-1449250094 for
+# more background.
 
 on:
   pull_request_target:
