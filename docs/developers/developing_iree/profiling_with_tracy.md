@@ -38,11 +38,11 @@ Build Tracy capture (`iree-tracy-capture`) | Base instructions below for [depend
 Build Tracy profiler (`iree-tracy-profiler`) | Base instructions below for [dependencies](#install-dependencies) and [build](#build-the-tracy-tools) | Same plus [`capstone-next` instructions](#do-you-need-capstone-next) for CPU disassembly to work
 Build the IREE compiler (`iree-compile`) for profiling your own modules  | [Nothing particular](#build-the-iree-compiler-iree-compile) | Same
 Build the IREE compiler (`iree-compile`) for profiling the compiler itself | [Also need](#build-the-iree-compiler-iree-compile) CMake setting: `IREE_ENABLE_COMPILER_TRACING` | Same
-Compile your IREE module (run `iree-compile`) | [Nothing particular](#compile-your-iree-module-run-iree-compile) | [Also need](#additional-steps-for-sampling) to pass `--iree-llvm-link-embedded=false` (and also, for `llvm-cpu` backend, pass `--iree-llvm-debug-symbols=true`, but that is currently default).
+Compile your IREE module (run `iree-compile`) | [Nothing particular](#compile-your-iree-module-run-iree-compile) | [Also need](#additional-steps-for-sampling) to pass `--iree-llvmcpu-link-embedded=false` (and also, for `llvm-cpu` backend, pass `--iree-llvmcpu-debug-symbols=true`, but that is currently default).
 Build IREE device binaries (`iree-run-module` etc) | [Base instructions below](#build-iree-device-binaries-with-tracy-instrumentation-clients) (CMake: set `IREE_ENABLE_RUNTIME_TRACING`) | [Also need](#additional-steps-for-sampling-1) debug information (Set `CMAKE_BUILD_TYPE` to `RelWithDebInfo`).
 Run IREE device binaries loading your modules | [Nothing particular](#running-the-profiled-program) (May need to set the environment variable `TRACY_NO_EXIT=1` for short-running benchmarks) | [Also need](#additional-steps-for-sampling-2) to set the environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES` and adjust device security settings or run as root depending on OS.
 Run Tracy capture (`iree-tracy-capture`) to collect the trace | If device!=host (e.g. Android), [set up TCP port forwarding](#running-the-tracy-capture-cli-connecting-and-saving-profiles). | Same
-Build IREE's own tests and benchmark suites with Tracy instrumentation | [As above](#build-iree-device-binaries-with-tracy-instrumentation-clients), CMake: set `IREE_ENABLE_RUNTIME_TRACING`. | [Also need](#additional-steps-for-sampling) the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` so that `--iree-llvm-link-embedded=false` will be passed to `iree-compile`.
+Build IREE's own tests and benchmark suites with Tracy instrumentation | [As above](#build-iree-device-binaries-with-tracy-instrumentation-clients), CMake: set `IREE_ENABLE_RUNTIME_TRACING`. | [Also need](#additional-steps-for-sampling) the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` so that `--iree-llvmcpu-link-embedded=false` will be passed to `iree-compile`.
 
 ## Install dependencies
 
@@ -152,11 +152,11 @@ If you only want Instrumentation and not Sampling then you don't need anything p
 
 ### Additional steps for Sampling
 
-In order for Sampling to work with your compiled modules, add this flag to your `iree-compile` command line: `--iree-llvm-link-embedded=false`.
+In order for Sampling to work with your compiled modules, add this flag to your `iree-compile` command line: `--iree-llvmcpu-link-embedded=false`.
 
-For the `llvm-cpu` target backend, sampling features also rely on debug information in the compiled module, enabled by `--iree-llvm-debug-symbols=true`, but that is currently the default.
+For the `llvm-cpu` target backend, sampling features also rely on debug information in the compiled module, enabled by `--iree-llvmcpu-debug-symbols=true`, but that is currently the default.
 
-When building IREE's own test and benchmark suites, if Tracy Sampling support is wanted, set the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` to `ON`. It has the effect of passing that `--iree-llvm-link-embedded=false` when compiling test/benchmark modules.
+When building IREE's own test and benchmark suites, if Tracy Sampling support is wanted, set the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` to `ON`. It has the effect of passing that `--iree-llvmcpu-link-embedded=false` when compiling test/benchmark modules.
 
 ## Build IREE device binaries with Tracy instrumentation ("clients")
 

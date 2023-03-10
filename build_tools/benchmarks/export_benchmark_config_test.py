@@ -59,17 +59,20 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     unmatched_run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_b,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     matched_run_config_c = iree_definitions.E2EModelRunConfig.with_flag_generation(
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_c,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     matchers = [(lambda config: config.target_device_spec.architecture.
                  architecture == "cuda"),
                 (lambda config: config.target_device_spec.host_environment.
@@ -107,17 +110,20 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_b,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_config_c = iree_definitions.E2EModelRunConfig.with_flag_generation(
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_c,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
 
     run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[run_config_a, run_config_b, run_config_c])
@@ -144,12 +150,14 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
         module_generation_config=COMMON_GEN_CONFIG,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_b,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
 
     run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[run_config_a, run_config_b],
@@ -203,12 +211,14 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
         module_generation_config=small_gen_config,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
         module_generation_config=big_gen_config,
         module_execution_config=COMMON_EXEC_CONFIG,
         target_device_spec=device_spec_b,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
 
     run_config_map = export_benchmark_config.filter_and_group_run_configs(
         run_configs=[run_config_a, run_config_b],

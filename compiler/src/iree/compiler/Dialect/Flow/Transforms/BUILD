@@ -34,6 +34,7 @@ iree_compiler_cc_library(
         "CaptureDispatchDynamicDims.cpp",
         "CleanupNumericNarrowing.cpp",
         "CleanupTensorShapes.cpp",
+        "CloneProducersIntoDispatchRegions.cpp",
         "CollapseDimensions.cpp",
         "CollapseReductionDims.cpp",
         "Convert1X1FilterConv2DToMatmul.cpp",

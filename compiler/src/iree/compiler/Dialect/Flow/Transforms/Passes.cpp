@@ -242,13 +242,22 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
       // Only want use the transform dialect for some dispatch regions and let
-      // the FormDispatchRegions handle the rest.
+      // the FormDispatchRegions handle the rest. This only moves the root
+      // compute op into the dispatch region, so that we can run additional
+      // transformations afterwards with a simple region and without bothering
+      // producers.
       .addPass([&]() {
         return createFormDispatchRegionsPass(clEnableAggressiveFusion,
                                              clDispatchGenerateWorkloadRegion);
       })
       // Collapse dimensions of linalg Ops.
       .addPass(createCollapseDimensionsPass)
+      // Clone all producers into the dispatch region to perpare for being
+      // isolated from above. This enables running additional transformations
+      // afterwards that would need the full dispatch content but don't want to
+      // handle explicit captures as materialized as dispatch workgroup operands
+      // and block arguments.
+      .addPass(createCloneProducersIntoDispatchRegionsPass)
       // Form dispatch region into dispatch workgroups
       .addPass([&]() {
         return createFormDispatchWorkgroupsPass(

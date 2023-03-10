@@ -217,6 +217,11 @@ class ModuleGenerationConfig(object):
 E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER = r"${GPU_ID_PLACEHOLDER}"
 
 
+class E2EModelRunTool(Enum):
+  """Tool to run a module."""
+  IREE_BENCHMARK_MODULE = "iree-benchmark-module"
+
+
 @serialization.serializable(type_key="iree_e2e_model_run_configs",
                             id_field="composite_id")
 @dataclass(frozen=True)
@@ -232,6 +237,7 @@ class E2EModelRunConfig(object):
   # decouple from the generation code. Also serves as useful information in the
   # serialized JSON.
   run_flags: List[str]
+  tool: E2EModelRunTool
 
   def materialize_run_flags(self, gpu_id: str = "0"):
     """Materialize flags with dependent values."""
@@ -244,7 +250,8 @@ class E2EModelRunConfig(object):
   def with_flag_generation(module_generation_config: ModuleGenerationConfig,
                            module_execution_config: ModuleExecutionConfig,
                            target_device_spec: common_definitions.DeviceSpec,
-                           input_data: common_definitions.ModelInputData):
+                           input_data: common_definitions.ModelInputData,
+                           tool: E2EModelRunTool):
     composite_id = unique_ids.hash_composite_id([
         module_generation_config.composite_id, module_execution_config.id,
         target_device_spec.id, input_data.id
@@ -259,7 +266,8 @@ class E2EModelRunConfig(object):
                              module_execution_config=module_execution_config,
                              target_device_spec=target_device_spec,
                              input_data=input_data,
-                             run_flags=run_flags)
+                             run_flags=run_flags,
+                             tool=tool)
 
 
 def generate_run_flags(imported_model: ImportedModel,
@@ -322,27 +330,29 @@ def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
 
   if arch_info.architecture == "x86_64":
     flags = [
-        f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
-        f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
+        f"--iree-llvmcpu-target-triple=x86_64-unknown-{target.target_abi.value}",
+        f"--iree-llvmcpu-target-cpu={arch_info.microarchitecture.lower()}"
     ]
   elif arch_info.architecture == "riscv_64":
     flags = [
-        f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
-        "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
-        "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
+        f"--iree-llvmcpu-target-triple=riscv64-pc-{target.target_abi.value}",
+        "--iree-llvmcpu-target-cpu=generic-rv64",
+        "--iree-llvmcpu-target-abi=lp64d",
+        "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
         "--riscv-v-fixed-length-vector-lmul-max=8"
     ]
   elif arch_info.architecture == "riscv_32":
     # TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
     flags = [
-        f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
-        "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
-        "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
+        f"--iree-llvmcpu-target-triple=riscv32-pc-{target.target_abi.value}",
+        "--iree-llvmcpu-target-cpu=generic-rv32",
+        "--iree-llvmcpu-target-abi=ilp32",
+        "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
         "--riscv-v-fixed-length-vector-lmul-max=8"
     ]
   elif arch_info.architecture == "armv8.2-a":
     flags = [
-        f"--iree-llvm-target-triple=aarch64-none-{target.target_abi.value}",
+        f"--iree-llvmcpu-target-triple=aarch64-none-{target.target_abi.value}",
     ]
   elif arch_info.architecture == "cuda":
     if target.target_abi != TargetABI.LINUX_GNU:

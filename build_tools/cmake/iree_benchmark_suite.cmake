@@ -377,7 +377,7 @@ function(iree_benchmark_suite)
             # Enable zip polyglot to provide component sizes.
             "--iree-vm-emit-polyglot-zip=true"
             # Disable debug symbols to provide correct component sizes.
-            "--iree-llvm-debug-symbols=false"
+            "--iree-llvmcpu-debug-symbols=false"
             ${_COMPILATION_ARGS}
           DEPENDS
             "${_MODULE_SOURCE_TARGET}"

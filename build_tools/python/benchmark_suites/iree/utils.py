@@ -15,6 +15,8 @@ def generate_e2e_model_run_configs(
         iree_definitions.ModuleGenerationConfig],
     module_execution_configs: Sequence[iree_definitions.ModuleExecutionConfig],
     device_specs: Sequence[common_definitions.DeviceSpec],
+    tool: iree_definitions.E2EModelRunTool = iree_definitions.E2EModelRunTool.
+    IREE_BENCHMARK_MODULE
 ) -> List[iree_definitions.E2EModelRunConfig]:
   """Generates the run specs from the product of compile specs and run configs.
   """
@@ -23,8 +25,8 @@ def generate_e2e_model_run_configs(
           module_generation_config=module_generation_config,
           module_execution_config=module_execution_config,
           target_device_spec=device_spec,
-          input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
-      for module_generation_config,
+          input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+          tool=tool) for module_generation_config,
       module_execution_config, device_spec in itertools.product(
           module_generation_configs, module_execution_configs, device_specs)
   ]
