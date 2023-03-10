@@ -1819,7 +1819,7 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 
 /// Find the root operation for the dispatch region. The priority is:
 ///   1. A Linalg operation that has reduction loops.
-///   2. Any other Linalg op.
+///   2. Any other Lainlg op or LinalgExt op.
 ///   3. An operation that implements TilingInterface.
 /// If there are multiple operations meeting the same priority, the one closer
 /// to the end of the function is the root op.
@@ -1837,9 +1837,8 @@ static FailureOr<Operation *> getRootOperation(
     if (linalgOp.getNumReductionLoops()) return op;
   }
 
-  // If no root operation is found yet. Look for linalg generic ops.
   for (auto op : llvm::reverse(computeOps)) {
-    if (isa<linalg::LinalgOp>(op)) return op;
+    if (isa<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>(op)) return op;
   }
 
   for (auto op : llvm::reverse(computeOps)) {
