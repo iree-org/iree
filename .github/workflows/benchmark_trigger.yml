@@ -13,15 +13,12 @@ name: Benchmark Trigger
 # https://github.com/openxla/iree/issues/10042#issuecomment-1449250094 for
 # more background.
 #
-# This workflow is running on the main branch.
+# This workflow is running on the base branch the PR targets.
 
 on:
-  # Run when a label is added to a PR that targets the main branch.
   pull_request_target:
     types:
       - labeled
-    branches:
-      - main
 
 env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -54,6 +51,7 @@ jobs:
     needs: check
     if: needs.check.outputs.should-rerun == 'true'
     runs-on: ubuntu-20.04
+    # Required for cancel and rerun APIs.
     permissions:
       actions: write
     env:
@@ -64,7 +62,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: "Checking out repository"
-        # This checkouts from the main branch instead of the pull request. See
+        # This checkouts from the base branch instead of the pull request. See
         # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request_target
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Finding the previous workflow run"
