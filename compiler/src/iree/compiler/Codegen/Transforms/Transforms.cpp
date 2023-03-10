@@ -568,8 +568,7 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
   }
 
   Attribute memorySpace = aliasGroups[0][0]
-                              ->getOperand(0)
-                              .getType()
+                              ->getResultTypes()[0]
                               .cast<MemRefType>()
                               .getMemorySpace();
   MemRefType allocType = MemRefType::get({maxAlloc}, builder.getI8Type(),
