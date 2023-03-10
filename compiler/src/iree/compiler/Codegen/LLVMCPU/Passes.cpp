@@ -661,7 +661,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
-    options.vectorize = enableVectorMasking;
+    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
   }
