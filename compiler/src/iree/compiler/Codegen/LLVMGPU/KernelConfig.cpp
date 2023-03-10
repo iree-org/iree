@@ -53,6 +53,12 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
     llvm::cl::desc(
         "tag attribute value for the transform dialect transform op container"),
     llvm::cl::init(""));
+
+/// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
+llvm::cl::opt<bool> clGPUUseMMASync(
+    "iree-codegen-llvmgpu-use-mma-sync",
+    llvm::cl::desc("use mma sync instead of wmma ops"), llvm::cl::init(false));
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
@@ -290,12 +296,16 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
         if (sizeK % config.tileSize[2] == 0 &&
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
+          IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
+              clGPUUseMMASync ? IREE::Codegen::DispatchLoweringPassPipeline::
+                                    LLVMGPUMatmulTensorCoreMmaSync
+                              : IREE::Codegen::DispatchLoweringPassPipeline::
+                                    LLVMGPUMatmulTensorCore;
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,
               sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
-              IREE::Codegen::DispatchLoweringPassPipeline::
-                  LLVMGPUMatmulTensorCore);
+              codegenPipeline);
         }
       }
     }
