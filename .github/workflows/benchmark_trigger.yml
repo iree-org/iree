@@ -22,7 +22,7 @@ on:
       - labeled
 
 env:
-  PR_NUMBER: ${{ github.event.number }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
   HEAD_SHA: ${{ github.event.pull_request.head.sha }}
   # Target workflow that runs the benchmarks.
   WORKFLOW_NAME: CI
@@ -58,7 +58,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     concurrency:
       # This cancels queued and in-progress trigger runs for the same PR.
-      group: ${{ github.workflow }}-${{ github.event.number }}
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     steps:
       - name: "Checking out repository"
@@ -69,13 +69,7 @@ jobs:
         id: find-workflow
         env:
           RUN_JSON: workflow-run.json
-          A: ${{ github.event.pull_request.number }}
-          B: ${{ github.event.number }}
-          C: ${{ github.workflow }}
         run: |
-          echo "${A}"
-          echo "${B}"
-          echo "${C}"
           gh api "/repos/${GITHUB_REPOSITORY}/actions/runs" --method GET -F head_sha="${HEAD_SHA}" \
             | jq --arg name "${WORKFLOW_NAME}" '.workflow_runs | map(select(.name == $name))[0]' \
             > "${RUN_JSON}"
