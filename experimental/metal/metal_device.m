@@ -40,6 +40,9 @@ typedef struct iree_hal_metal_device_t {
   // We can relax this to support multiple queues when needed later.
   id<MTLCommandQueue> queue;
 
+  iree_hal_metal_command_buffer_resource_reference_mode_t command_buffer_resource_reference_mode;
+
+  // For polyfilling fill/copy/update buffers that are not directly supported by Metal APIs.
   iree_hal_metal_builtin_executable_t* builtin_executable;
 
   // A dispatch queue and associated event listener for running Objective-C blocks to signal
@@ -67,6 +70,8 @@ void iree_hal_metal_device_params_initialize(iree_hal_metal_device_params_t* out
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
   out_params->command_dispatch_type = IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_CONCURRENT;
+  out_params->command_buffer_resource_reference_mode =
+      IREE_HAL_METAL_COMMAND_BUFFER_RESOURCE_REFERENCE_MODE_UNRETAINED;
   out_params->resource_hazard_tracking_mode =
       IREE_HAL_METAL_RESOURCE_HAZARD_TRACKING_MODE_UNTRACKED;
 }
@@ -105,6 +110,7 @@ static iree_status_t iree_hal_metal_device_create_internal(
     device->host_allocator = host_allocator;
     device->device = [metal_device retain];          // +1
     device->queue = [metal_device newCommandQueue];  // +1
+    device->command_buffer_resource_reference_mode = params->command_buffer_resource_reference_mode;
     device->builtin_executable = builtin_executable;
     dispatch_queue_attr_t queue_attr = dispatch_queue_attr_make_with_qos_class(
         DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, /*relative_priority=*/0);
@@ -215,8 +221,9 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT))
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplmented multi-shot command buffer");
   return iree_hal_metal_direct_command_buffer_create(
-      base_device, mode, command_categories, binding_capacity, device->queue,
-      device->host_allocator, &device->block_pool, device->builtin_executable, out_command_buffer);
+      base_device, mode, command_categories, binding_capacity,
+      device->command_buffer_resource_reference_mode, device->queue, device->host_allocator,
+      &device->block_pool, device->builtin_executable, out_command_buffer);
 }
 
 static iree_status_t iree_hal_metal_device_create_descriptor_set_layout(
@@ -307,14 +314,20 @@ static iree_status_t iree_hal_metal_device_queue_execute(
   @autoreleasepool {
     // First create a new command buffer and encode wait commands for all wait semaphores.
     if (wait_semaphore_list.count > 0) {
+      MTLCommandBufferDescriptor* descriptor = [MTLCommandBufferDescriptor new];  // +1
+      descriptor.retainedReferences =
+          device->command_buffer_resource_reference_mode ==
+          IREE_HAL_METAL_COMMAND_BUFFER_RESOURCE_REFERENCE_MODE_RETAINED;
+      descriptor.errorOptions = MTLCommandBufferErrorOptionNone;
       id<MTLCommandBuffer> wait_command_buffer =
-          [device->queue commandBufferWithUnretainedReferences];  // autoreleased
+          [device->queue commandBufferWithDescriptor:descriptor];  // autoreleased
       for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
         [wait_command_buffer
             encodeWaitForEvent:iree_hal_metal_shared_event_handle(wait_semaphore_list.semaphores[i])
                          value:wait_semaphore_list.payload_values[i]];
       }
       [wait_command_buffer commit];
+      [descriptor release];  // -1
     }
 
     // Then commit all recorded compute command buffers.
@@ -324,14 +337,20 @@ static iree_status_t iree_hal_metal_device_queue_execute(
 
     // Finally create a new command buffer and encode signal commands for all signal semaphores.
     if (signal_semaphore_list.count > 0) {
+      MTLCommandBufferDescriptor* descriptor = [MTLCommandBufferDescriptor new];  // +1
+      descriptor.retainedReferences =
+          device->command_buffer_resource_reference_mode ==
+          IREE_HAL_METAL_COMMAND_BUFFER_RESOURCE_REFERENCE_MODE_RETAINED;
+      descriptor.errorOptions = MTLCommandBufferErrorOptionNone;
       id<MTLCommandBuffer> signal_command_buffer =
-          [device->queue commandBufferWithUnretainedReferences];  // autoreleased
+          [device->queue commandBufferWithDescriptor:descriptor];  // autoreleased
       for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
         [signal_command_buffer encodeSignalEvent:iree_hal_metal_shared_event_handle(
                                                      signal_semaphore_list.semaphores[i])
                                            value:signal_semaphore_list.payload_values[i]];
       }
       [signal_command_buffer commit];
+      [descriptor release];  // -1
     }
   }
 

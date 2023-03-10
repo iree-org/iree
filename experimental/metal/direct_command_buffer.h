@@ -9,6 +9,7 @@
 
 #import <Metal/Metal.h>
 
+#include "experimental/metal/api.h"
 #include "experimental/metal/builtin_executables.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
@@ -37,8 +38,11 @@ extern "C" {
 iree_status_t iree_hal_metal_direct_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_host_size_t binding_capacity, id<MTLCommandQueue> queue,
-    iree_allocator_t host_allocator, iree_arena_block_pool_t* block_pool,
+    iree_host_size_t binding_capacity,
+    iree_hal_metal_command_buffer_resource_reference_mode_t
+        resource_reference_mode,
+    id<MTLCommandQueue> queue, iree_allocator_t host_allocator,
+    iree_arena_block_pool_t* block_pool,
     iree_hal_metal_builtin_executable_t* builtin_executable,
     iree_hal_command_buffer_t** out_command_buffer);
 
