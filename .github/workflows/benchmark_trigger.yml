@@ -76,7 +76,7 @@ jobs:
         # If the workflow isn't completed, we need to cancel it first; otherwise
         # the API can't rerun it.
         if: |
-          steps.find-workflow.outputs.workflow-url != 'null' &&
+          fromJSON(steps.find-workflow.outputs.workflow-url) != null &&
           steps.find-workflow.outputs.run-status != 'completed'
         env:
           IREE_WORKFLOW_RUN_URL: ${{ steps.find-workflow.outputs.workflow-url }}
