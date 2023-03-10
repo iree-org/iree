@@ -107,6 +107,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       patterns using a naive default heuristic.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
+      - lower_vector_masks: Lower vector.mask ops away.
       - rank_reducing_linalg: adds patterns that results in rank-reducing
       behavior on subset-based linalg operations using insert/extract slices.
       - rank_reducing_linalg_via_reshapes: adds patterns that results in rank-reducing
@@ -158,6 +159,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$licm,
                        UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,
+                       UnitAttr:$lower_vector_masks,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_linalg_via_reshapes,
                        UnitAttr:$rank_reducing_vector,

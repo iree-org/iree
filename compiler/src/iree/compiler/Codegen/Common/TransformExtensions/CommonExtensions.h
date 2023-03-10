@@ -49,6 +49,7 @@ struct ApplyPatternsOpPatterns {
   bool licm = false;
   bool linalgElementwiseGreedyFusion = false;
   bool lowerTransferOpPermutations = false;
+  bool lowerVectorMasks = false;
   bool promoteForallCaptureToShared = false;
   bool rankReducingLinalg = false;
   bool rankReducingLinalgViaReshapes = false;

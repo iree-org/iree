@@ -38,6 +38,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -156,6 +157,7 @@ void transform_dialect::ApplyPatternsOp::build(
               getLinalgElementwiseGreedyFusionAttrName)
   ADD_PATTERN(lowerTransferOpPermutations,
               getLowerTransferOpPermutationsAttrName)
+  ADD_PATTERN(lowerVectorMasks, getLowerVectorMasksAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
   ADD_PATTERN(rankReducingLinalgViaReshapes,
               getRankReducingLinalgViaReshapesAttrName)
@@ -239,6 +241,10 @@ struct FoldTensorEmptyExtract
 static void addLowerTransferOpPermutationsPatterns(
     RewritePatternSet &patterns) {
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+}
+
+static void addLowerVectorMasksPatterns(RewritePatternSet &patterns) {
+  vector::populateVectorMaskLoweringPatternsForSideEffectingOps(patterns);
 }
 
 static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
@@ -369,6 +375,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
                                                  setFusedOpOperandLimit<3>);
   if (getLowerTransferOpPermutations())
     addLowerTransferOpPermutationsPatterns(patterns);
+  if (getLowerVectorMasks()) addLowerVectorMasksPatterns(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
   if (getRankReducingLinalgViaReshapes())
     addRankReducingLinalgViaReshapesPatterns(patterns);
