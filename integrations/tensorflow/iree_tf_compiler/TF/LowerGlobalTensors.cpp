@@ -155,7 +155,7 @@ void LowerGlobalTensors::runOnOperation() {
     }
     auto global = globalBuilder.create<mlir::ml_program::GlobalOp>(
         globalTensor.getLoc(), name, globalTensor.getValue()->getType(),
-        globalTensor.getIsMutable(), globalTensor.getValue(), nullptr);
+        globalTensor.getIsMutable(), *globalTensor.getValue(), nullptr);
     global.setPrivate();
     symbolRefMap[globalTensor] = global;
   }
