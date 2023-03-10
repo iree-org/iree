@@ -501,8 +501,14 @@ static void getNvidiaAmpereTensorCorePipeline(
 
   llvm::SmallDenseSet<Operation*> scheduledOperations;
   std::cout << std::flush;
-  std::cout << ">>>> Final schedule for the mainloop: Instructions "
-            << ops.size() << std::endl;
+  std::cout << ">> Debug prints from getNvidiaAmpereTensorCorePipeline() call "
+            << " in GPUPipelining.cpp " << std::endl;
+  std::cout << " Number of stages: " << numStages << std::endl;
+  std::cout << " Number of kgroups: " << numKgroups << std::endl;
+  std::cout << " Number of mainloop instructions " << ops.size() << std::endl;
+  std::cout << " Mainloop instructions schedule and stage assignment: "
+            << std::endl;
+
   for (auto& stage_op_pair : ops) {
     std::cout << " Stage (" << stage_op_pair.second << ") , Operation: ";
     std::cout << std::flush;
