@@ -77,21 +77,40 @@ static std::string operandTypeToString(OpOperand *opOperand) {
   return outputString;
 }
 
-// Returns a string like "f32xf32" representing a linalg op's types for each
-// operands.
+// Returns a string like "f32xi32xf16" representing a linalg op's types for each
+// operands. Will collapse to single type if all match.
 static std::string getLinalgDataTypes(linalg::LinalgOp op) {
-  std::string outputString;
-  llvm::raw_string_ostream sstream(outputString);
-  llvm::interleave(
-      op.getDpsInputOperands(),
-      [&](OpOperand *opOperand) { sstream << operandTypeToString(opOperand); },
-      [&] { sstream << "x"; });
-  sstream << "x";
-  llvm::interleave(
-      op.getDpsInitOperands(),
-      [&](OpOperand *opOperand) { sstream << operandTypeToString(opOperand); },
-      [&] { sstream << "x"; });
-  return outputString;
+  std::string firstToken = "";
+  bool allTokensSame = true;
+  SmallVector<std::string, 4> datatypeTokens;
+
+  for (OpOperand *opOperand : op.getDpsInputOperands()) {
+    datatypeTokens.push_back(operandTypeToString(opOperand));
+    if (firstToken.empty()) {
+      firstToken = operandTypeToString(opOperand);
+    } else if (allTokensSame) {
+      allTokensSame = firstToken == operandTypeToString(opOperand);
+    }
+  }
+  for (OpOperand *opOperand : op.getDpsInitOperands()) {
+    datatypeTokens.push_back(operandTypeToString(opOperand));
+    if (firstToken.empty()) {
+      firstToken = operandTypeToString(opOperand);
+    } else if (allTokensSame) {
+      allTokensSame = firstToken == operandTypeToString(opOperand);
+    }
+  }
+
+  if (allTokensSame) {
+    return firstToken;
+  } else {
+    std::string outputString;
+    llvm::raw_string_ostream sstream(outputString);
+    llvm::interleave(
+        datatypeTokens, [&](std::string token) { sstream << token; },
+        [&] { sstream << "x"; });
+    return outputString;
+  }
 }
 
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
