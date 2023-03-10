@@ -239,10 +239,6 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
     }
   }
 
-  if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
-    return VectorPreProcStrategy::Peeling;
-  }
-
   return VectorPreProcStrategy::None;
 }
 
@@ -1491,10 +1487,10 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   DispatchLoweringPassPipeline passPipeline;
   if (genericOp.hasBufferSemantics()) {
     passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
-  } else if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
-    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-  } else {
+  } else if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
     passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
+  } else {
+    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   }
 
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
