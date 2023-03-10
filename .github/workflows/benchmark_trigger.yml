@@ -20,8 +20,6 @@ on:
   pull_request_target:
     types:
       - labeled
-    branches:
-      - main
 
 env:
   PR_NUMBER: ${{ github.event.number }}
@@ -71,11 +69,17 @@ jobs:
         id: find-workflow
         env:
           RUN_JSON: workflow-run.json
+          A: ${{ github.event.pull_request.number }}
+          B: ${{ github.event.number }}
+          C: ${{ github.workflow }}
         run: |
+          echo "${A}"
+          echo "${B}"
+          echo "${C}"
           gh api "/repos/${GITHUB_REPOSITORY}/actions/runs" --method GET -F head_sha="${HEAD_SHA}" \
             | jq --arg name "${WORKFLOW_NAME}" '.workflow_runs | map(select(.name == $name))[0]' \
             > "${RUN_JSON}"
-          echo "workflow-url=$(jq --raw-output '.url' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "workflow-url=$(jq '.url' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
           echo "run-status=$(jq --raw-output '.status' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
       - name: "Cancelling the previous workflow run"
         # If the workflow isn't completed, we need to cancel it first; otherwise
@@ -84,7 +88,7 @@ jobs:
           fromJSON(steps.find-workflow.outputs.workflow-url) != null &&
           steps.find-workflow.outputs.run-status != 'completed'
         env:
-          IREE_WORKFLOW_RUN_URL: ${{ steps.find-workflow.outputs.workflow-url }}
+          IREE_WORKFLOW_RUN_URL: ${{ fromJSON(steps.find-workflow.outputs.workflow-url) }}
         run: build_tools/github_actions/cancel_workflow_and_wait.sh
       - name: "Getting the latest commit SHA"
         # A push might have happened to trigger a new workflow run. Check the
@@ -95,22 +99,22 @@ jobs:
         # commit. Even if that happens, users will see their CI run fails and
         # can rerun it manually from the UI.
         id: get-sha
-        if: steps.find-workflow.outputs.workflow-url != 'null'
+        if: fromJSON(steps.find-workflow.outputs.workflow-url) != null
         run: |
           echo "latest-sha=$(gh api /repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER} \
             | jq --raw-output '.head.sha')" \
             >> "${GITHUB_OUTPUT}"
       - name: "Rerequesting the workflow"
         if: |
-          steps.find-workflow.outputs.workflow-url != 'null' &&
+          fromJSON(steps.find-workflow.outputs.workflow-url) != null &&
           steps.get-sha.outputs.latest-sha == env.HEAD_SHA
         env:
-          WORKFLOW_RUN_URL: ${{ steps.find-workflow.outputs.workflow-url }}
+          WORKFLOW_RUN_URL: ${{ fromJSON(steps.find-workflow.outputs.workflow-url) }}
         run: |
           RERUN_RESPONSE="$(gh api ${WORKFLOW_RUN_URL}/rerun --method POST \
             | jq --raw-output '.message' \
           )" || true
-          if [[ "${RERUN_RESPONSE}" != null \
+          if [[ "${RERUN_RESPONSE}" != "null" \
                   && "${RERUN_RESPONSE}" != "This workflow is already running" \
           ]]; then
             echo "Failed to rerun the workflow: ${RERUN_RESPONSE}"
