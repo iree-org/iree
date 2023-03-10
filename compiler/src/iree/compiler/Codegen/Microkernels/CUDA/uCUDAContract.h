@@ -13,35 +13,31 @@
 #include <set>
 #include <string>
 
+#define INT int64_t
+
 inline std::string ugpu_kernel_prefix() { return "__iree_ucuda"; }
 
-inline int64_t get_cache_line() { return 128; }
+inline INT get_cache_line() { return 128; }
 
 struct uGPUKernel {
   std::string LHS, RHS, RESULT;
-  std::array<int64_t, 3> ThreadblockShape;
-  std::array<int64_t, 2> WarpShape;
-  std::array<int64_t, 3> InstShape;
+  std::array<INT, 3> ThreadblockShape;
+  std::array<INT, 2> WarpShape;
+  std::array<INT, 3> InstShape;
+  INT stages;
   bool has_linalg_fill;
 
-  uGPUKernel(std::string lhs, std::string result,
-             std::array<int64_t, 2> tileSize, bool hasFill) {
+  uGPUKernel(std::string lhs, std::string result, std::array<INT, 3> tileSize,
+             INT numstages, bool hasFill) {
     // todo(guray) needs to be verification here.
-
     LHS = RHS = lhs;
     RESULT = result;
     ThreadblockShape[0] = tileSize[0];
     ThreadblockShape[1] = tileSize[1];
-    // todo(guray) improve here
-    if (LHS == "float") {
-      // Tiling K loop for cache line is good rule of thumb.
-      int kTile = get_cache_line() / sizeof(float);
-      ThreadblockShape[2] = kTile;
-      // todo(guray) Need more shapes here
-      WarpShape = {64, 64};
-      // todo(guray) Need more shapes here
-      InstShape = {16, 8, 8};
-    }
+    ThreadblockShape[2] = tileSize[2];
+    WarpShape = {64, 64};
+    InstShape = {16, 8, 8};
+    stages = numstages;
     has_linalg_fill = hasFill;
   }
 
@@ -79,6 +75,8 @@ struct uGPUKernel {
       ukname.append(std::to_string(shape));
     }
     ukname.append("_");
+    ukname.append(std::to_string(stages));
+    ukname.append("_");
     ukname.append(has_linalg_fill ? "true" : "false");
     return ukname;
   }
@@ -93,25 +91,27 @@ struct uGPUContracts {
 
   uGPUContracts() {
     ukernels.clear();
-    ukernels.insert(uGPUKernel("float", "float", {128, 128}, true));
-    ukernels.insert(uGPUKernel("float", "float", {128, 128}, false));
-    // todo(guray) Generate more microkernels
-    // ukernels.insert(uGPUKernel("float", "float", {64, 64}, true));
-    // ukernels.insert(uGPUKernel("float", "float", {64, 64}, false));
-  }
-
-  bool is_exist(std::string lhs, std::string result,
-                std::array<int64_t, 2> tileSize, bool hasFill) {
-    uGPUKernel ukernel(lhs, result, tileSize, hasFill);
-    return ukernels.find(ukernel) != ukernels.end();
+    int stages = 3;
+    auto t = "float";
+    ukernels.insert(uGPUKernel(t, t, {128, 128, 32}, stages, true));
+    ukernels.insert(uGPUKernel(t, t, {128, 128, 32}, stages, false));
+    ukernels.insert(uGPUKernel(t, t, {128, 256, 32}, stages, true));
+    ukernels.insert(uGPUKernel(t, t, {128, 256, 32}, stages, false));
+    ukernels.insert(uGPUKernel(t, t, {256, 128, 32}, stages, true));
+    ukernels.insert(uGPUKernel(t, t, {256, 128, 32}, stages, false));
+    stages = 5;
+    ukernels.insert(uGPUKernel(t, t, {128, 128, 16}, stages, true));
+    ukernels.insert(uGPUKernel(t, t, {128, 128, 16}, stages, false));
+    ukernels.insert(uGPUKernel(t, t, {128, 128, 32}, stages, true));
+    ukernels.insert(uGPUKernel(t, t, {128, 128, 32}, stages, false));
   }
 };
 
 static uGPUContracts AllContracts;
 
 template <class AddTile>
-bool adduCUDAContracts(int64_t M, int64_t N, int64_t K, std::string lhs,
-                       std::string result, AddTile adder) {
+bool adduCUDAContracts(INT M, INT N, INT K, std::string lhs, std::string result,
+                       AddTile adder) {
   bool found = false;
   // todo(guray) improve here
   for (uGPUKernel kernel : AllContracts.ukernels) {
@@ -120,16 +120,11 @@ bool adduCUDAContracts(int64_t M, int64_t N, int64_t K, std::string lhs,
       int nWarp = (kernel.ThreadblockShape[0] * kernel.ThreadblockShape[1]) /
                   (kernel.WarpShape[0] * kernel.WarpShape[1]);
       adder(kernel.ThreadblockShape[0], kernel.ThreadblockShape[1],
-            kernel.ThreadblockShape[2], nWarp);
+            kernel.ThreadblockShape[2], kernel.stages, nWarp);
       found = true;
     }
   }
   return found;
-}
-
-static bool hasuCUDAContract(std::string lhs, std::string result,
-                             std::array<int64_t, 2> tileSize, bool hasFill) {
-  return AllContracts.is_exist(lhs, result, tileSize, hasFill);
 }
 
 #endif  // IREE_COMPILER_CODEGEN_UKERNELS_UGPUCONTRACT_H_

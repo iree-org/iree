@@ -110,7 +110,11 @@ static bool ukernelAddTileSizes(
   auto adder = [&](int64_t tileM, int64_t tileN, int64_t tileK, int64_t nWarps,
                    int64_t stages) {
     tileSizes.push_back(TileWorkgroupSizePair(
+<<<<<<< HEAD
         {{tileM, tileN, tileK}, {cudaWarpSize * nWarps, 1, 1}, stages}));
+=======
+        {{tileM, tileN, tileK}, {cudaWarpSize, nWarps, 1}, stages}));
+>>>>>>> 7f9ae84b5 (use C as accumulator)
   };
 
   return adduCUDAContracts(M, N, K, elementTypeA.value().str(),
@@ -136,9 +140,10 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
 }
 
-/// Return the best combination of tile size and wg size when using tensorcore
+/// Returns code generation pipeline that can be tensor core or microkernels.
+/// Fills the best combination of tile size and wg size when using tensorcore
 /// operations.
-static void getTensorCoreConfig(
+static IREE::Codegen::DispatchLoweringPassPipeline getTensorCoreConfig(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
     int64_t N, int64_t K) {
   // Based on early analysis we found that 128x256x32_3 gives acceptable
@@ -148,6 +153,8 @@ static void getTensorCoreConfig(
   // magnitude for large square like cases.
   int64_t parallelDim = M * N;
   static constexpr int64_t kLargDimThreashold = 1536;
+  // Tile sizes are skewed towards small matmul for now. Long term the plan is
+  // to not rely on hardcoded configurations.
   if (isFp16) {
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
       tileSizes.push_back(
@@ -164,6 +171,7 @@ static void getTensorCoreConfig(
     tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
   }
+  return IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
 }
 
 static StringRef getTargetArch(func::FuncOp entryPoint) {

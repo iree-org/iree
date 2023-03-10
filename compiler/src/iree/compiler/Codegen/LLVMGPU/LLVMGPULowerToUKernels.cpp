@@ -42,14 +42,13 @@ struct LLVMGPULowerToUKernelsPass
 };
 
 /// Generate microkernel names based on combinedOps
-static llvm::SmallString<512> generateMicrokernelName(
-    ArrayRef<Operation *> combinedOps, StringRef typeName, int TILE_M,
-    int TILE_N, bool has_fill) {
-  uGPUKernel ukernel(typeName.str(), typeName.str(), {TILE_M, TILE_N},
-                     has_fill);
-
-  std::string ukernelname = ukernel.generate_ukernel_name();
-  return llvm::SmallString<512>(ukernelname);
+static std::string generateMicrokernelName(ArrayRef<Operation *> combinedOps,
+                                           StringRef typeName, int TILE_M,
+                                           int TILE_N, int TILE_K,
+                                           int numstages, bool has_fill) {
+  uGPUKernel ukernel(typeName.str(), typeName.str(), {TILE_M, TILE_N, TILE_K},
+                     numstages, has_fill);
+  return ukernel.generate_ukernel_name();
 }
 
 static FailureOr<StringRef> returnCtype(Type type) {
@@ -62,6 +61,14 @@ static FailureOr<StringRef> returnCtype(Type type) {
 /// Lowers linalg's matmul op into micro kernel call op.
 struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
   using OpRewritePattern::OpRewritePattern;
+
+  Optional<unsigned> stages = std::nullopt;
+
+  MatmulConversion(MLIRContext *context, unsigned softwarePipeline)
+      : OpRewritePattern<linalg::MatmulOp>(context) {
+    stages = softwarePipeline;
+  }
+
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Operation *> combinedOps = {matmulOp};
@@ -98,39 +105,39 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
       fillValue = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getZeroAttr(elementType), elementType);
     }
+    if (!stages.has_value()) {
+      return matmulOp->emitError("Expects software pipeline depth\n");
+    }
+    auto fnName =
+        generateMicrokernelName(combinedOps, strType.value(), tiles[0],
+                                tiles[1], tiles[2], stages.value(), hasFill);
 
-    StringRef fnName = generateMicrokernelName(combinedOps, strType.value(),
-                                               tiles[0], tiles[1], hasFill);
-
-    SmallVector<Value> ins = {lhs, rhs};
+    SmallVector<Value> ins = {lhs, rhs, out};
     SmallVector<Value> others, outs;
 
-    // create shared memory allocation
-    const int kStages = 3;
-    int totalShmem = kStages * tiles[0] * tiles[1] * 2 / 4;
-    totalShmem = totalShmem - (tiles[0] * tiles[1]);
-    RankedTensorType totalShmemType =
-        RankedTensorType::get({totalShmem}, elementType);
-    Value shmemBuffer = rewriter.create<bufferization::AllocTensorOp>(
-        loc, totalShmemType, ValueRange{});
+    // todo(guray) Verify that we have sufficient shared memory here
+    int shmemOut = tiles[0] * tiles[1];
 
-    ins.push_back(out);
-    outs.push_back(out);
-    others.push_back(shmemBuffer);
+    int shmemIns =
+        ((tiles[0] * tiles[2]) + (tiles[1] * tiles[2])) * stages.value() -
+        shmemOut;
+    if (shmemIns > 0) {
+      Value insBuffer = rewriter.create<bufferization::AllocTensorOp>(
+          loc, RankedTensorType::get({shmemIns}, elementType), ValueRange{});
+
+      others.push_back(insBuffer);
+    } else {
+      others.push_back(out);
+    }
+    Value outBuffer = rewriter.create<bufferization::AllocTensorOp>(
+        loc, RankedTensorType::get({tiles[0], tiles[1]}, elementType),
+        ValueRange{});
+    outs.push_back(outBuffer);
     others.push_back(fillValue);
-    // } else {
-    //   ins.push_back(out);
-    //   RankedTensorType rType =
-    //       RankedTensorType::get({tiles[0], tiles[1]}, elementType);
-    //   Value dummy =
-    //       rewriter.create<tensor::EmptyOp>(loc, rType.getShape(),
-    //       elementType);
-    //   outs.push_back(dummy);
-    //   others.push_back(shmemBuffer);
-    //   others.push_back(fillValue);
-    // }
+
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
-        matmulOp, matmulOp.getResultTypes(), fnName, ins, outs, others);
+        matmulOp, matmulOp.getResultTypes(), StringRef(fnName), ins, outs,
+        others);
 
     return success();
   }
@@ -140,7 +147,15 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
 
 void LLVMGPULowerToUKernelsPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
-  patterns.insert<MatmulConversion>(&getContext());
+
+  IREE::Codegen::TranslationInfoAttr translation =
+      getTranslationInfo(getOperation());
+  if (!translation) {
+    getOperation()->emitError("Expects software pipeline depth\n");
+  }
+  unsigned stages = translation.getSoftwarePipelineDepth();
+
+  patterns.insert<MatmulConversion>(&getContext(), stages);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

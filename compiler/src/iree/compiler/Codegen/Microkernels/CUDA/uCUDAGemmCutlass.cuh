@@ -11,21 +11,18 @@
 #include "cutlass/gemm/threadblock/default_mma_core_sm80.h"
 #include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
 
-#ifdef DEBUG_CUTLASS
+#ifndef DEBUG_CUTLASS
 #include "cutlass/util/debug.h"
 #include "cutlass/util/device_dump.h"
 #endif
 
 template <class ElementA, class ElementB, class ElementC, int Tile_m,
           int Tile_n, int Tile_k, int Warp_m, int Warp_n, int Inst_m,
-          int Inst_n, int Inst_k, bool hasLinalgFill>
+          int Inst_n, int Inst_k, int Stages, bool hasLinalgFill>
 __forceinline__ __device__ void gemm_ukernel(
     ElementA* lhs, int64_t lhs_offset, int64_t lhs_dim2, ElementB* rhs,
     int64_t rhs_offset, int64_t rhs_dim2, ElementC* res, int64_t res_offset,
-    int64_t res_dim2, ElementC* shmem, ElementC initValue) {
-  ElementA* plhs = (ElementA*)__builtin_assume_aligned(lhs, 256);
-  ElementB* prhs = (ElementB*)__builtin_assume_aligned(rhs, 256);
-  ElementC* pres = (ElementC*)__builtin_assume_aligned(res, 256);
+    int64_t res_dim2, ElementC* shmem, ElementC fillValue) {
   using ElementAccumulator = ElementC;
   // todo(guray) Can be templatized
   using LayoutA = cutlass::layout::RowMajor;
@@ -36,8 +33,6 @@ __forceinline__ __device__ void gemm_ukernel(
   using WarpShape = cutlass::gemm::GemmShape<Warp_m, Warp_n, Tile_k>;
   using InstructionShape = cutlass::gemm::GemmShape<Inst_m, Inst_n, Inst_k>;
 
-  // todo(guray) maybe templatize kStages?
-  int const kStages = 3;
   int const kAlignmentA = 4;
   int const kAlignmentB = 4;
 
@@ -47,7 +42,7 @@ __forceinline__ __device__ void gemm_ukernel(
       ElementA, LayoutA, kAlignmentA, ElementB, LayoutB, kAlignmentB,
       ElementAccumulator, LayoutC, cutlass::arch::OpClassTensorOp,
       cutlass::arch::Sm80, ThreadblockShape, WarpShape, InstructionShape,
-      kStages, cutlass::arch::OpMultiplyAdd>;
+      Stages, cutlass::arch::OpMultiplyAdd>;
 
   // CUTLASS Threadblock-level multistage matrix multiply-accumulate
   // pipeline
@@ -93,25 +88,45 @@ __forceinline__ __device__ void gemm_ukernel(
 
   // Construct iterators to A and B operands
   typename ThreadblockMma::IteratorA iterator_A(
-      params_A, plhs, {problem_size.m(), problem_size.k()}, tb_thread_id,
+      params_A, lhs, {problem_size.m(), problem_size.k()}, tb_thread_id,
       tb_offset_A);
 
   typename ThreadblockMma::IteratorB iterator_B(
-      params_B, prhs, {problem_size.k(), problem_size.n()}, tb_thread_id,
+      params_B, rhs, {problem_size.k(), problem_size.n()}, tb_thread_id,
       tb_offset_B);
+
+  typename ThreadblockMma::Operator::IteratorC iterator_C(
+      {res, problem_size.n()}, threadIdx.x);
 
   // Construct thread-scoped matrix multiply
   ThreadblockMma mma(*shared_storage, tb_thread_id, warp_id, lane_id);
 
-  typename ThreadblockMma::FragmentC accum;
-
-  accum.clear();
+  typename ThreadblockMma::FragmentC accumSrc, accumDest;
+  accumDest.clear();
 
   int gemm_k_iterations = (problem_size.k() + ThreadblockMma::Shape::kK - 1) /
                           ThreadblockMma::Shape::kK;
 
-  // Compute threadblock-scoped matrix multiply-add
-  mma(gemm_k_iterations, accum, iterator_A, iterator_B, accum);
+  if (!hasLinalgFill) {
+    // Set the offset
+    iterator_C.add_tile_offset(
+        {(tb_tile_offset.m() * ThreadblockMma::WarpCount::kM) +
+             (warp_id % ThreadblockMma::WarpCount::kM),
+         (tb_tile_offset.n() * ThreadblockMma::WarpCount::kN) +
+             (warp_id / ThreadblockMma::WarpCount::kM)});
+
+    // Clear the fragment
+    accumSrc.clear();
+
+    // Load C as source accumulator
+    iterator_C.load(accumSrc);
+
+    // Compute threadblock-scoped matrix multiply-add
+    mma(gemm_k_iterations, accumDest, iterator_A, iterator_B, accumSrc);
+  } else {
+    // Compute threadblock-scoped matrix multiply-add
+    mma(gemm_k_iterations, accumDest, iterator_A, iterator_B, accumDest);
+  }
 
 #ifdef DEBUG_CUTLASS
   if (threadIdx.x == 0 && blockIdx.x == 0)
@@ -119,56 +134,14 @@ __forceinline__ __device__ void gemm_ukernel(
   cutlass::debug::dump_fragment(accum);
 #endif
 
-  /* Use C as accumulator */
-  typename ThreadblockMma::FragmentC accumC;
-  if (!hasLinalgFill) {
-    int offset_X = (tb_tile_offset.m() * ThreadblockMma::WarpCount::kM) +
-                   (warp_id % ThreadblockMma::WarpCount::kM);
-    int offset_Y = (tb_tile_offset.n() * ThreadblockMma::WarpCount::kN) +
-                   (warp_id / ThreadblockMma::WarpCount::kM);
-    typename ThreadblockMma::Operator::IteratorC iterator_C(
-        {pres, problem_size.n()}, threadIdx.x);
-    iterator_C.add_tile_offset({offset_X, offset_Y});
-    accumC.clear();
-    iterator_C.load(accumC);
-  }
-
   /* Store result to shared memory */
-  int total_elements = accum.size();
+  int total_elements = accumDest.size();
   ElementC* offset_shmem =
       &GemmSharedStorageBase[tb_thread_id * total_elements];
-  for (int i = 0; i < total_elements; ++i) {
-    ElementC res =
-        initValue +
-        ElementC(typename ThreadblockMma::FragmentC::value_type(accum[i]));
-    if (!hasLinalgFill) {
-      res += accumC[i];
-    }
-    offset_shmem[i] = res;
+  for (int i = 0; i < accumDest.size(); ++i) {
+    offset_shmem[i] = accumDest[i];
+    if (hasLinalgFill) offset_shmem[i] += fillValue;
   }
-
-#if 0 
-  /* Store accumulator to global memory */
-  int total_elements = accum.size();
-  if (hasLinalgFill && initValue != 0) {
-    for (int i = 0; i < total_elements; ++i) accum[i] += initValue;
-  }
-
-  auto offset_X = (tb_tile_offset.m() * ThreadblockMma::WarpCount::kM) +
-                  (warp_id % ThreadblockMma::WarpCount::kM);
-  auto offset_Y = (tb_tile_offset.n() * ThreadblockMma::WarpCount::kN) +
-                  (warp_id / ThreadblockMma::WarpCount::kM);
-  typename ThreadblockMma::Operator::IteratorC iterator_C(
-      {pres, problem_size.n()}, threadIdx.x);
-  iterator_C.add_tile_offset({offset_X, offset_Y});
-  if (!hasLinalgFill) {
-    typename ThreadblockMma::FragmentC loadme;
-    loadme.clear();
-    iterator_C.load(loadme);
-    for (int i = 0; i < accum.size(); ++i) accum[i] += loadme[i];
-  }
-  iterator_C.store(accum);
-#endif
 }
 
 #endif  // UCUDA_GEMM_CUTLASS

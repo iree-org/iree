@@ -25,6 +25,7 @@ void generateUndefs(std::ofstream& ofs) {
   ofs << "#undef INST_M\n";
   ofs << "#undef INST_N\n";
   ofs << "#undef INST_K\n";
+  ofs << "#undef STAGES\n";
   ofs << "#undef HAS_LINALG_FILL\n";
 }
 
@@ -44,6 +45,7 @@ void generateKernel(std::ofstream& ofs, uGPUKernel ukernel) {
   ofs << "#define INST_M  " << ukernel.InstShape[0] << "\n";
   ofs << "#define INST_N  " << ukernel.InstShape[1] << "\n";
   ofs << "#define INST_K  " << ukernel.InstShape[2] << "\n";
+  ofs << "#define STAGES  " << ukernel.stages << "\n";
   ofs << "#define HAS_LINALG_FILL  "
       << (ukernel.has_linalg_fill ? "true" : "false") << "\n";
 
