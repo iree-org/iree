@@ -47,10 +47,6 @@ FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options);
 
-/// Populate patterns that fold tensor.expand/collapse_shape into the source
-/// hal.interface.binding.subspan.
-void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

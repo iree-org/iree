@@ -99,8 +99,8 @@ iree_bytecode_module(
     c_identifier = "iree_samples_simple_embedding_test_module_cpu_x86_64",
     flags = [
         "--iree-hal-target-backends=llvm-cpu",
-        "--iree-llvm-target-triple=x86_64-pc-linux-elf",
-        "--iree-llvm-debug-symbols=false",
+        "--iree-llvmcpu-target-triple=x86_64-pc-linux-elf",
+        "--iree-llvmcpu-debug-symbols=false",
         "--iree-vm-bytecode-module-strip-source-map=true",
         "--iree-vm-emit-polyglot-zip=false",
     ],
@@ -112,11 +112,11 @@ iree_bytecode_module(
     c_identifier = "iree_samples_simple_embedding_test_module_cpu_riscv_32",
     flags = [
         "--iree-hal-target-backends=llvm-cpu",
-        "--iree-llvm-target-triple=riscv32-pc-linux-elf",
-        "--iree-llvm-target-cpu=generic-rv32",
-        "--iree-llvm-target-cpu-features=+m,+f",
-        "--iree-llvm-target-abi=ilp32",
-        "--iree-llvm-debug-symbols=false",
+        "--iree-llvmcpu-target-triple=riscv32-pc-linux-elf",
+        "--iree-llvmcpu-target-cpu=generic-rv32",
+        "--iree-llvmcpu-target-cpu-features=+m,+f",
+        "--iree-llvmcpu-target-abi=ilp32",
+        "--iree-llvmcpu-debug-symbols=false",
         "--iree-vm-bytecode-module-strip-source-map=true",
         "--iree-vm-emit-polyglot-zip=false",
     ],
@@ -128,11 +128,11 @@ iree_bytecode_module(
     c_identifier = "iree_samples_simple_embedding_test_module_cpu_riscv_64",
     flags = [
         "--iree-hal-target-backends=llvm-cpu",
-        "--iree-llvm-target-triple=riscv64-pc-linux-elf",
-        "--iree-llvm-target-cpu=generic-rv64",
-        "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c",
-        "--iree-llvm-target-abi=lp64d",
-        "--iree-llvm-debug-symbols=false",
+        "--iree-llvmcpu-target-triple=riscv64-pc-linux-elf",
+        "--iree-llvmcpu-target-cpu=generic-rv64",
+        "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+c",
+        "--iree-llvmcpu-target-abi=lp64d",
+        "--iree-llvmcpu-debug-symbols=false",
         "--iree-vm-bytecode-module-strip-source-map=true",
         "--iree-vm-emit-polyglot-zip=false",
     ],
@@ -144,9 +144,9 @@ iree_bytecode_module(
     c_identifier = "iree_samples_simple_embedding_test_module_cpu_arm_32",
     flags = [
         "--iree-hal-target-backends=llvm-cpu",
-        "--iree-llvm-target-triple=armv7a-pc-linux-elf",
-        "--iree-llvm-target-float-abi=hard",
-        "--iree-llvm-debug-symbols=false",
+        "--iree-llvmcpu-target-triple=armv7a-pc-linux-elf",
+        "--iree-llvmcpu-target-float-abi=hard",
+        "--iree-llvmcpu-debug-symbols=false",
         "--iree-vm-bytecode-module-strip-source-map=true",
         "--iree-vm-emit-polyglot-zip=false",
     ],
@@ -158,8 +158,8 @@ iree_bytecode_module(
     c_identifier = "iree_samples_simple_embedding_test_module_cpu_arm_64",
     flags = [
         "--iree-hal-target-backends=llvm-cpu",
-        "--iree-llvm-target-triple=aarch64-pc-linux-elf",
-        "--iree-llvm-debug-symbols=false",
+        "--iree-llvmcpu-target-triple=aarch64-pc-linux-elf",
+        "--iree-llvmcpu-debug-symbols=false",
         "--iree-vm-bytecode-module-strip-source-map=true",
         "--iree-vm-emit-polyglot-zip=false",
     ],
@@ -245,7 +245,7 @@ iree_bytecode_module(
     c_identifier = "iree_samples_simple_embedding_test_module_vulkan",
     flags = [
         "--iree-hal-target-backends=vulkan-spirv",
-        "--iree-llvm-debug-symbols=false",
+        "--iree-llvmcpu-debug-symbols=false",
     ],
 )
 
@@ -297,7 +297,7 @@ endif()
 #     c_identifier = "iree_samples_simple_embedding_test_module_cuda",
 #     flags = [
 #         "--iree-hal-target-backends=cuda",
-#         "--iree-llvm-debug-symbols=false",
+#         "--iree-llvmcpu-debug-symbols=false",
 #     ],
 # )
 

@@ -78,12 +78,14 @@ struct UsageInfo {
     }
     for (auto executeOp : executeOps) {
       executeOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-        auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
-            symbolTable.lookupSymbolIn(moduleOp, dispatchOp.getEntryPoint()));
-        assert(exportOp && "missing executable/export");
-        auto funcOp = exportOp.lookupFunctionRef();
-        assert(funcOp && "missing exported function");
-        exportDispatchOps[funcOp].push_back(dispatchOp);
+        dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+          auto exportOp = cast<IREE::Stream::ExecutableExportOp>(
+              symbolTable.lookupSymbolIn(moduleOp, entryPointAttr));
+          assert(exportOp && "missing executable/export");
+          auto funcOp = exportOp.lookupFunctionRef();
+          assert(funcOp && "missing exported function");
+          exportDispatchOps[funcOp].push_back(dispatchOp);
+        });
       });
     }
   }
@@ -460,10 +462,10 @@ static void dumpExecutionCSVTable(const UsageInfo &usageInfo,
               workloadSum *= dimValue;
             }
           }
-          os << llvm::formatv(R"({0},"dispatch","{1}",,{2},"{3}",{4},{5})",
-                              depth, op.getEntryPoint(), workloadSum,
-                              workloadStr, op.getUniformOperands().size(),
-                              op.getResources().size());
+          os << llvm::formatv(
+              R"({0},"dispatch","{1}",,{2},"{3}",{4},{5})", depth,
+              *op.getEntryPointRefs().begin(), workloadSum, workloadStr,
+              op.getUniformOperands().size(), op.getResources().size());
           os << "\n";
         });
   };

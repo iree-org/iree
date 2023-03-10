@@ -84,7 +84,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-input-type=tosa \
     --iree-hal-target-backends=cuda \
     --iree-hal-cuda-llvm-target-arch=sm_80 \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
@@ -96,7 +96,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-hal-target-backends=cuda \
     --iree-hal-cuda-llvm-target-arch=sm_80 \
     --iree-flow-demote-f32-to-f16 \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
@@ -107,9 +107,9 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-cpu=cascadelake \
-    --iree-llvm-target-triple=x86_64-unknown-linux-gnu \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-target-cpu=cascadelake \
+    --iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu \
+    --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
@@ -119,10 +119,10 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-cpu=cascadelake \
-    --iree-llvm-target-triple=x86_64-unknown-linux-gnu \
+    --iree-llvmcpu-target-cpu=cascadelake \
+    --iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu \
     --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \

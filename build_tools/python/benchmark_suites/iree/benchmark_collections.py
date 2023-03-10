@@ -51,7 +51,7 @@ def generate_benchmarks(
             # Enable zip polyglot to provide component sizes.
             "--iree-vm-emit-polyglot-zip=true",
             # Disable debug symbols to provide correct component sizes.
-            "--iree-llvm-debug-symbols=false"
+            "--iree-llvmcpu-debug-symbols=false"
         ])
     compile_stats_gen_configs.append(
         iree_definitions.ModuleGenerationConfig.with_flag_generation(

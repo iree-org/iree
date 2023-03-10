@@ -350,7 +350,11 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
   let hasCanonicalizer = 1;
 }
 
-def Util_UnreachableOp : Util_Op<"unreachable", [NoMemoryEffect, Terminator]> {
+def Util_UnreachableOp : Util_Op<"unreachable", [
+    NoMemoryEffect,
+    ReturnLike,
+    Terminator
+  ]> {
   let summary = [{unreachable assertion op}];
   let description = [{
     Signals to the compiler that the parent block should not be reachable.

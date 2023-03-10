@@ -299,7 +299,7 @@ static void updateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
   OpBuilder builder(dispatchOp);
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
       dispatchOp.getLoc(), dispatchOp.getWorkload(),
-      dispatchOp.getEntryPointAttr(), newOperands, newResources,
+      dispatchOp.getEntryPointsAttr(), newOperands, newResources,
       newResourceSizes, newOffsets, newLengths,
       builder.getArrayAttr(newAccesses));
   (void)newOp;
@@ -433,9 +433,11 @@ class FuseDispatchBindingsPass
     DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.getEntryPoint());
-      entryDispatchMap[exportOp].push_back(dispatchOp);
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp =
+            symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+        entryDispatchMap[exportOp].push_back(dispatchOp);
+      });
     });
 
     // Perform fusion for each executable entry point using all known dispatches

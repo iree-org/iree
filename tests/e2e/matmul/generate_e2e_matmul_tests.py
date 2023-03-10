@@ -555,7 +555,7 @@ def parse_arguments():
       "--requirements",
       type=str,
       help=
-      "Target requirements for this module. Comma-separated. As in -iree-llvm-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
+      "Target requirements for this module. Comma-separated. As in -iree-llvmcpu-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
       required=False)
   return parser.parse_args()
 

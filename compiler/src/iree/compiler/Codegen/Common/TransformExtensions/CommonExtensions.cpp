@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
@@ -19,7 +20,9 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -30,6 +33,8 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
@@ -37,6 +42,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -133,8 +139,11 @@ void transform_dialect::ApplyPatternsOp::build(
   /// When touching something here, do not forget to update CommonExtensions.h.
   ///
   ADD_PATTERN(additionalIreePatterns, getAdditionalIreePatternsAttrName)
-  ADD_PATTERN(bubbleCollapseExpand, getBubbleCollapseExpandAttrName)
+  ADD_PATTERN(bubbleCollapse, getBubbleCollapseAttrName)
+  ADD_PATTERN(bubbleExpand, getBubbleExpandAttrName)
+  ADD_PATTERN(bubblePackUnPack, getBubblePackUnPackAttrName)
   ADD_PATTERN(canonicalization, getCanonicalizationAttrName)
+  ADD_PATTERN(cse, getCseAttrName)
   ADD_PATTERN(eraseUnnecessaryTensorOperands,
               getEraseUnnecessaryTensorOperandsAttrName)
   ADD_PATTERN(expandMemrefStridedMetadata,
@@ -142,17 +151,48 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
+  ADD_PATTERN(licm, getLicmAttrName)
+  ADD_PATTERN(linalgElementwiseGreedyFusion,
+              getLinalgElementwiseGreedyFusionAttrName)
   ADD_PATTERN(lowerTransferOpPermutations,
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
+  ADD_PATTERN(rankReducingLinalgViaReshapes,
+              getRankReducingLinalgViaReshapesAttrName)
   ADD_PATTERN(rankReducingVector, getRankReducingVectorAttrName)
   ADD_PATTERN(swapPaddingElideConditional,
               getSwapPaddingElideConditionalAttrName)
   ADD_PATTERN(swappingPatterns, getSwappingPatternsAttrName)
+  ADD_PATTERN(tilingCanonicalization, getTilingCanonicalizationAttrName)
   ADD_PATTERN(unrollVectorsGpuMmaSync, getUnrollVectorsGpuMmaSyncAttrName)
   ADD_PATTERN(unrollVectorsGpuWmma, getUnrollVectorsGpuWmmaAttrName)
 #undef ADD_PATTERN
   result.addTypes({pdl::OperationType::get(ctx)});
+}
+
+static void addOperands(Operation *op, SetVector<Value> &operandSet) {
+  if (!op) return;
+  TypeSwitch<Operation *, void>(op)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+        SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
+        operandSet.insert(inputOperands.begin(), inputOperands.end());
+      })
+      .Default([&](Operation *operation) {
+        operandSet.insert(operation->operand_begin(), operation->operand_end());
+      });
+}
+
+template <int limit = 3>
+static bool setFusedOpOperandLimit(OpOperand *fusedOperand) {
+  Operation *producer = fusedOperand->get().getDefiningOp();
+  if (!producer) return false;
+  Operation *consumer = fusedOperand->getOwner();
+  SetVector<Value> fusedOpOperands;
+  if (producer->getNumResults() != 1) return false;
+  addOperands(consumer, fusedOpOperands);
+  fusedOpOperands.remove(producer->getResult(0));
+  addOperands(producer, fusedOpOperands);
+  return fusedOpOperands.size() <= limit;
 }
 
 namespace {
@@ -223,6 +263,12 @@ static void addRankReducingLinalgPatterns(RewritePatternSet &patterns) {
   linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
 }
 
+static void addRankReducingLinalgViaReshapesPatterns(
+    RewritePatternSet &patterns) {
+  populateReshapeToInterfaceTensorPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
+}
+
 static void addRankReducingVectorPatterns(RewritePatternSet &patterns) {
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
 }
@@ -234,6 +280,11 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
       [&](tensor::ExtractSliceOp) -> llvm::Optional<bool> {
         return !swapPaddingElideCornerCase;
       });
+}
+
+static void addTilingCanonicalizationPatterns(RewritePatternSet &patterns) {
+  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+  scf::populateSCFForLoopCanonicalizationPatterns(patterns);
 }
 
 static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeMmaSyncVectorSize(
@@ -294,9 +345,18 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   }
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
+  if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
+  if (getBubbleCollapse()) {
+    linalg::populateFoldReshapeOpsByCollapsingPatterns(
+        patterns, [](OpOperand *) { return true; });
+  }
+  if (getBubbleExpand()) {
+    linalg::populateFoldReshapeOpsByExpansionPatterns(
+        patterns, [](OpOperand *) { return true; });
+  }
+  if (getBubblePackUnPack())
+    linalg::populateDataLayoutPropagationPatterns(patterns);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
-  if (getLowerTransferOpPermutations())
-    addLowerTransferOpPermutationsPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getExpandMemrefStridedMetadata())
@@ -304,15 +364,18 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
+  if (getLinalgElementwiseGreedyFusion())
+    linalg::populateElementwiseOpsFusionPatterns(patterns,
+                                                 setFusedOpOperandLimit<3>);
+  if (getLowerTransferOpPermutations())
+    addLowerTransferOpPermutationsPatterns(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
+  if (getRankReducingLinalgViaReshapes())
+    addRankReducingLinalgViaReshapesPatterns(patterns);
   if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
-  if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
-  if (getBubbleCollapseExpand()) {
-    linalg::populateFoldReshapeOpsByExpansionPatterns(
-        patterns, [](OpOperand *) { return true; });
-  }
+  if (getTilingCanonicalization()) addTilingCanonicalizationPatterns(patterns);
   if (getUnrollVectorsGpuMmaSync())
     addUnrollVectorsGpuMmaSyncPatterns(patterns);
   if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
@@ -328,13 +391,57 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   });
   LogicalResult result =
       applyOpPatternsAndFold(ops, std::move(patterns), config);
-  LogicalResult listenerResult = listener.checkErrorState();
   if (failed(result)) {
-    return mlir::emitDefiniteFailure(target,
-                                     "greedy pattern application failed");
+    return mlir::emitDefiniteFailure(target, "greedy patterns failed");
   }
+  LogicalResult listenerResult = listener.checkErrorState();
   if (failed(listenerResult))
-    return mlir::emitDefiniteFailure(target, "listener tracking failed");
+    return mlir::emitDefiniteFailure(target, "pattern listener tracker fail");
+
+  if (getLicm()) {
+    target->walk([&](func::FuncOp funcOp) {
+      // This assumes LICM never removes operations so we don't need tracking.
+      // TODO: confirm / revisit this assumption and plumb a rewriter through
+      // upstream moveLoopInvariantCode if necessary.
+      funcOp->walk([](LoopLikeOpInterface loopLike) {
+        moveLoopInvariantCode(loopLike);
+      });
+      // For now, put single loop promotion as part of licm. Underlying
+      // implementations perform splice operations which shouldn't need
+      // tracking.
+      // TODO: confirm / revisit this assumption and plumb a rewriter through
+      // upstream moveLoopInvariantCode if necessary.
+      funcOp->walk([](Operation *op) {
+        (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
+            .Case<AffineForOp, scf::ForOp>(
+                [](auto loop) { return promoteIfSingleIteration(loop); })
+            .Default([](Operation *) { return success(); });
+      });
+    });
+  }
+
+  if (getCse()) {
+    func::FuncOp lastFuncVisited;
+    auto walkResult = target->walk([&](func::FuncOp funcOp) -> WalkResult {
+      lastFuncVisited = funcOp;
+      result =
+          eliminateCommonSubexpressions(funcOp, /*domInfo=*/nullptr, &listener);
+      if (failed(result)) return WalkResult::interrupt();
+      listenerResult = listener.checkErrorState();
+      if (failed(listenerResult)) return WalkResult::interrupt();
+      return WalkResult::advance();
+    });
+    if (walkResult.wasInterrupted()) {
+      if (failed(result)) {
+        return mlir::emitDefiniteFailure(lastFuncVisited,
+                                         "greedy patterns failed");
+      }
+      LogicalResult listenerResult = listener.checkErrorState();
+      if (failed(listenerResult))
+        return mlir::emitDefiniteFailure(lastFuncVisited,
+                                         "pattern listener tracker fail");
+    }
+  }
 
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
@@ -509,7 +616,8 @@ LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
     return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
   }
 
-  // Step 1. Complete the blockMapping to a full mapping (with 1s) if necessary.
+  // Step 1. Complete the blockMapping to a full mapping (with 1s) if
+  // necessary.
   SmallVector<Value> numBlocks =
       llvm::to_vector(forallOp.getUpperBound(rewriter));
   // Ensure we have 3 block sizes, one for each id.

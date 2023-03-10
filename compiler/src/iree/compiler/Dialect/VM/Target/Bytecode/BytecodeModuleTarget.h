@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEMODULETARGET_H_
 #define IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEMODULETARGET_H_
 
+#include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/Support/raw_ostream.h"
@@ -65,12 +66,12 @@ struct BytecodeTargetOptions {
 // serialized module format.
 //
 // Exposed via the --iree-vm-ir-to-bytecode-module translation.
-LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
-                                        BytecodeTargetOptions targetOptions,
-                                        llvm::raw_ostream &output);
-LogicalResult translateModuleToBytecode(mlir::ModuleOp outerModuleOp,
-                                        BytecodeTargetOptions targetOptions,
-                                        llvm::raw_ostream &output);
+LogicalResult translateModuleToBytecode(
+    IREE::VM::ModuleOp moduleOp, IREE::VM::TargetOptions vmOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
+LogicalResult translateModuleToBytecode(
+    mlir::ModuleOp outerModuleOp, IREE::VM::TargetOptions vmOptions,
+    IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
 
 }  // namespace VM
 }  // namespace IREE

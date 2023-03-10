@@ -36,11 +36,10 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
                                            const spirv::TargetEnv &targetEnv) {
   // First try to see if we can use tensor cores.
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  if (failed(setCooperativeMatrixConfig(targetEnv, op,
-                                        NVIDIANumSubgroupsPerWorkgroup,
-                                        NVIDIANumMNTilesPerSubgroup)))
-    return failure();
-  if (getLoweringConfig(op)) return success();
+  if (succeeded(setCooperativeMatrixConfig(targetEnv, op,
+                                           NVIDIANumSubgroupsPerWorkgroup,
+                                           NVIDIANumMNTilesPerSubgroup)))
+    return success();
 
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
@@ -95,7 +94,7 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
           [&](auto op) { return setNVIDIAMatmulConfig(op, targetEnv); })
-      .Default([](Operation *) { return success(); });
+      .Default([](Operation *) { return failure(); });
 }
 
 }  // namespace detail

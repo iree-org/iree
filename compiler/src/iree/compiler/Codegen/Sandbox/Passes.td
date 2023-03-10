@@ -50,6 +50,8 @@ def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,
+    Option<"enableVectorMasking", "enableVectorMasking", "bool", /*default=*/"false",
+      "Enable vector masking during vectorization.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
       "Rewrite all tensor.pad ops in the function to vector form.">,
 
@@ -136,6 +138,8 @@ def LinalgSingleTilingExpert
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,
+    Option<"enableVectorMasking", "enableVectorMasking", "bool", /*default=*/"false",
+      "Enable vector masking during vectorization.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
       "Rewrite all tensor.pad ops in the function to vector form.">,
 

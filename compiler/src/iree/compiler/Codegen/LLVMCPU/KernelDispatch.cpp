@@ -233,7 +233,8 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
-    if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
+    if ((linalg::isElementwise(linalgOp) || isFullyDynamicOp(linalgOp)) &&
+        enableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -618,15 +619,15 @@ static void setVectorSizesForDynamicShapes(
     linalg::LinalgOp op, VectorPreProcStrategy vecPreProcStrategy,
     SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes) {
-  SmallVector<int64_t> origParallelSizes(parallelSizes.begin(),
-                                         parallelSizes.end());
-  SmallVector<int64_t> origReductionSizes(reductionSizes.begin(),
-                                          reductionSizes.end());
   // Masking doesn't need any dim set to 1.
   if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
     return;
   }
 
+  SmallVector<int64_t> origParallelSizes(parallelSizes.begin(),
+                                         parallelSizes.end());
+  SmallVector<int64_t> origReductionSizes(reductionSizes.begin(),
+                                          reductionSizes.end());
   setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
 
   // If peeling is enabled and the 'op' is fully dynamic, we only vectorize the
@@ -1283,6 +1284,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
                            maxTileSizes, vecPreProcStrategy, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
+  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
+                                 parallelTileSizes, reductionTileSizes);
 
   LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (parallel): "
                        << parallelTileSizes << "\n");

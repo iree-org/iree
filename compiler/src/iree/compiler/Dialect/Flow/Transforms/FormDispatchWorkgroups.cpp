@@ -54,7 +54,6 @@ createDispatchWorkgroups(mlir::TensorDimTrackingRewriter &rewriter,
   // Clone additional producers and rewrite to DispatchWorkgroupsOp.
   SmallVector<Flow::DispatchWorkgroupsOp> result;
   for (auto regionOp : regionOps) {
-    if (failed(cloneProducersToRegion(rewriter, regionOp))) return failure();
     auto maybeWorkgroupOp =
         rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp, rewriter);
     if (failed(maybeWorkgroupOp)) return failure();

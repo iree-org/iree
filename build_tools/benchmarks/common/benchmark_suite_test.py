@@ -182,7 +182,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
                 id="1", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_a,
         target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
         module_generation_config=iree_definitions.ModuleGenerationConfig.
         with_flag_generation(
@@ -192,7 +193,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
                 id="2", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_b,
         target_device_spec=device_spec_b,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_config_c = iree_definitions.E2EModelRunConfig.with_flag_generation(
         module_generation_config=iree_definitions.ModuleGenerationConfig.
         with_flag_generation(
@@ -201,7 +203,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
                 id="3", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_a,
         target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_configs = [run_config_a, run_config_b, run_config_c]
 
     suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs)

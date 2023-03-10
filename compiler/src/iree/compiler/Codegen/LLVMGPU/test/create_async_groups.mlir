@@ -22,7 +22,7 @@ builtin.module {
     return
   }
 
-  transform.structured.canonicalized_sequence failures(propagate) {
+  transform.sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
     %transformed_func = transform.iree.create_async_groups %top_level_func {use_mma_sync = true} : (!pdl.operation) -> (!pdl.operation)
@@ -54,7 +54,7 @@ builtin.module {
     return
   }
 
-  transform.structured.canonicalized_sequence failures(propagate) {
+  transform.sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
     %transformed_func = transform.iree.create_async_groups %top_level_func {use_mma_sync = false} : (!pdl.operation) -> (!pdl.operation)
@@ -82,7 +82,7 @@ builtin.module {
     return
   }
 
-  transform.structured.canonicalized_sequence failures(propagate) {
+  transform.sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
     %vector_transfer = transform.structured.match ops{["memref.alloc"]} in %top_level_func : (!pdl.operation) -> !pdl.operation

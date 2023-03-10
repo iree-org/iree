@@ -167,7 +167,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(*linalgOp);
   const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp) ||
                       isa<linalg::DepthwiseConv2DNhwcHwcOp>(*linalgOp);
-  if (!isNCHW & !isNHWC) return success();
+  if (!isNCHW & !isNHWC) return failure();
 
   const int icIndex = isNHWC ? 3 : 1;
   const int ohIndex = isNHWC ? 1 : 2;
@@ -176,7 +176,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
   if (ShapedType::isDynamic(inputShape[icIndex]) ||
       llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
-    return success();
+    return failure();
   }
 
   const int64_t ic = inputShape[icIndex], oc = outputShape[ocIndex];
@@ -184,7 +184,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
   // The conversion pipeline requires the input channel dimension to be some
   // multipler of four, or less than four.
-  if (!(ic % 4 == 0 || ic < 4)) return success();
+  if (!(ic % 4 == 0 || ic < 4)) return failure();
 
   // The core idea is to distribute the convolution dimensions to the workgroup
   // Z/Y/X dimensions, with each thread in a workgroup handling multiple vector
@@ -208,14 +208,14 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
         !tileConvOneDim(oc, /*isInnerMostDim=*/false, residualThreads,
                         residualTilingFactor, workgroupSize[2],
                         workgroupTileSizes[1])) {
-      return success();
+      return failure();
     }
   } else {
     // OC -> x
     if (!tileConvOneDim(oc, /*isInnerMostDim=*/true, residualThreads,
                         residualTilingFactor, workgroupSize[0],
                         workgroupTileSizes[3]))
-      return success();
+      return failure();
 
     // Deduce the configruation for the OW and OH dimension. Try to make them
     // even if possible given we typically have images with the same height
@@ -234,7 +234,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
           !tileConvOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
                           residualTilingFactor, workgroupSize[2],
                           workgroupTileSizes[1])) {
-        return success();
+        return failure();
       }
     }
   }
@@ -256,7 +256,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   } else if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1});  // (N, OH, OW, C, FH, FW)
   } else {
-    return success();
+    return failure();
   }
   // Tile along OH by size 1 to enable downsizing 2-D convolution to 1-D.
   SmallVector<int64_t> windowTileSizes(4, 0);
@@ -543,19 +543,19 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   auto rhsType = rhs->get().getType().cast<ShapedType>();
   auto elementBits =
       static_cast<int>(lhsType.getElementType().getIntOrFloatBitWidth());
-  if (!llvm::is_contained({8, 16, 32}, elementBits)) return success();
+  if (!llvm::is_contained({8, 16, 32}, elementBits)) return failure();
 
   ArrayRef<int64_t> lhsShape = lhsType.getShape();
   ArrayRef<int64_t> rhsShape = rhsType.getShape();
-  if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
-  if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
+  if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return failure();
+  if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return failure();
 
   assert(llvm::is_contained({2u, 3u}, op.getNumParallelLoops()));
 
   int lastParallelDim = -1;
   const auto [bIndex, mIndex, nIndex, kIndex] =
       getMatmulBMNKIndex(op, &lastParallelDim);
-  if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
+  if (mIndex < 0 || nIndex < 0 || kIndex < 0) return failure();
   const bool isBM = bIndex >= 0;
 
   SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
@@ -608,7 +608,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
                                residualTilingFactor, workgroupSize[1],
                                workgroupTileSizes[mIndex]) ||
       !tileMatmulK(dimK, residualTilingFactor, reductionTileSizes[kIndex])) {
-    return success();
+    return failure();
   }
   LLVM_DEBUG({
     llvm::dbgs() << "workgroup tile size before promotion = (";
@@ -801,10 +801,10 @@ LogicalResult setCooperativeMatrixConfig(
   // This configuration is only for cooperative matrix.
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
-    return success();
+    return failure();
   }
 
-  if (op.hasDynamicShape()) return success();
+  if (op.hasDynamicShape()) return failure();
 
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
@@ -813,7 +813,7 @@ LogicalResult setCooperativeMatrixConfig(
   int lastParallelDim = -1;
   const auto [bIndex, mIndex, nIndex, kIndex] =
       getMatmulBMNKIndex(op, &lastParallelDim);
-  if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
+  if (mIndex < 0 || nIndex < 0 || kIndex < 0) return failure();
   const bool isBM = bIndex >= 0;
 
   SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
@@ -841,7 +841,7 @@ LogicalResult setCooperativeMatrixConfig(
       limits, numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
       getElementType(lhs), getElementType(rhs), getElementType(init), dimM,
       dimN, dimK);
-  if (!coopMatSize) return success();
+  if (!coopMatSize) return failure();
 
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
       SPIRVCooperativeMatrixVectorize;
@@ -1331,32 +1331,32 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
     return setUserConfig(entryPointFn, rootOp, compilationInfo);
   }
 
-  LogicalResult result = success();
   // First try to find a proper CodeGen configuration to tile and vectorize for
   // the current target architecture.
   switch (targetEnv.getVendorID()) {
     case spirv::Vendor::AMD:
-      result = detail::setAMDCodeGenConfig(targetEnv, rootOp);
+      if (succeeded(detail::setAMDCodeGenConfig(targetEnv, rootOp)))
+        return success();
       break;
     case spirv::Vendor::Apple:
-      result = detail::setAppleCodeGenConfig(targetEnv, rootOp);
+      if (succeeded(detail::setAppleCodeGenConfig(targetEnv, rootOp)))
+        return success();
       break;
     case spirv::Vendor::ARM:
-      result = detail::setMaliCodeGenConfig(targetEnv, rootOp);
+      if (succeeded(detail::setMaliCodeGenConfig(targetEnv, rootOp)))
+        return success();
       break;
     case spirv::Vendor::NVIDIA:
-      result = detail::setNVIDIACodeGenConfig(targetEnv, rootOp);
+      if (succeeded(detail::setNVIDIACodeGenConfig(targetEnv, rootOp)))
+        return success();
       break;
     case spirv::Vendor::Qualcomm:
-      result = detail::setAdrenoCodeGenConfig(targetEnv, rootOp);
+      if (succeeded(detail::setAdrenoCodeGenConfig(targetEnv, rootOp)))
+        return success();
       break;
     default:
       break;
   }
-
-  if (failed(result)) return result;
-  // Check whether there is actually a configuration found. If so, it's done.
-  if (getLoweringConfig(rootOp)) return result;
 
   // Otherwise fallback to use a default configuration that tiles and
   // distributes/vectorizes.
@@ -1376,8 +1376,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         }
         auto result =
             detail::setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
-        if (failed(result)) return result;
-        if (getLoweringConfig(op)) return result;
+        if (succeeded(result)) return success();
 
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
@@ -1388,8 +1387,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // per subgroup for GPUs.
         auto result = detail::setConvOpConfig(op, /*subgroupSize=*/32,
                                               /*bestTilingFactor=*/32);
-        if (failed(result)) return result;
-        if (getLoweringConfig(op)) return result;
+        if (succeeded(result)) return success();
 
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
@@ -1408,7 +1406,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         if (op.getNumLoops() != op.getNumParallelLoops()) {
           return setDefaultOpConfig(limits, op);
         }
-        return success();
+        return failure();
       })
       .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
         return setFftOpConfig(limits, op);
@@ -1416,12 +1414,43 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
       .Case<IREE::LinalgExt::WinogradInputTransformOp,
             IREE::LinalgExt::WinogradOutputTransformOp>(
           [&](auto op) { return setWinogradOpConfig(limits, op); })
-      .Default([](Operation *) { return success(); });
+      .Default([](Operation *) { return failure(); });
 };
 
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
+
+static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
+                                        IREE::HAL::ExecutableExportOp exportOp,
+                                        func::FuncOp funcOp) {
+  SmallVector<Operation *> computeOps;
+  if (failed(getComputeOps(funcOp, computeOps))) {
+    return funcOp.emitOpError("failed to get compute ops");
+  }
+
+  if (computeOps.empty()) {
+    // No compute operations found. Allow to pass through without a config.
+    return success();
+  }
+
+  // Try to find a configuration according to a matmul/convolution op and use
+  // it as the root op.
+  for (Operation *computeOp : computeOps) {
+    if (succeeded(setSPIRVOpConfig(targetEnv, funcOp, computeOp)))
+      return success();
+  }
+
+  Operation *computeOp = computeOps.back();
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
+  // If there are still no root op, check for any linalg.generic op.
+  if (succeeded(setDefaultOpConfig(limits, computeOp))) return success();
+
+  // Check if the op configuration was set.
+  return computeOp->emitOpError(
+      "without known roots, the last compute operation in the tiled "
+      "loop body is expected to be set as root");
+}
 
 LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
@@ -1433,52 +1462,16 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
         "attribute");
   }
   spirv::TargetEnv targetEnv(targetEnvAttr);
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
   for (auto funcOp : module.getOps<func::FuncOp>()) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp) continue;
 
-    SmallVector<Operation *> computeOps;
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return funcOp.emitOpError("failed to get compute ops");
-    }
-
-    if (computeOps.empty()) {
-      // No compute operations found. Allow to pass through without a config.
-      continue;
-    }
-
-    Operation *rootOperation = nullptr;
-    // Try to find a configuration according to a matmul/convolution op and use
-    // it as the root op.
-    for (Operation *computeOp : computeOps) {
-      if (failed(setSPIRVOpConfig(targetEnv, funcOp, computeOp)))
-        return failure();
-
-      // Check if the op configuration was set.
-      if (!getLoweringConfig(computeOp)) continue;
-
-      rootOperation = computeOp;
-      // Break after finding the first one--following ops may still use the same
-      // attribute for other purposes.
-      break;
-    }
-
-    if (!rootOperation) {
-      // If there are still no root op, check for any linalg.generic op.
-      Operation *computeOp = computeOps.back();
-      if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
-
-      // Check if the op configuration was set.
-      if (!getLoweringConfig(computeOp)) {
-        return computeOp->emitOpError(
-            "without known roots, the last compute operation in the tiled "
-            "loop body is expected to be set as root");
-      }
-      rootOperation = computeOp;
+    if (failed(setConfigForKernel(targetEnv, exportOp, funcOp))) {
+      return failure();
     }
   }
+
   return success();
 }
 

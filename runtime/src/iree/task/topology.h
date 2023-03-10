@@ -58,7 +58,7 @@ typedef struct iree_task_topology_group_t {
   uint8_t group_index;
 
   // A name assigned to executor workers used for logging/tracing.
-  char name[15];
+  char name[32 - /*group_index*/ 1];
 
   // Processor index in the cpuinfo set.
   uint32_t processor_index;
