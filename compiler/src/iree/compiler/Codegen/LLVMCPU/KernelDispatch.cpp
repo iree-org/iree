@@ -1851,13 +1851,18 @@ static FailureOr<Operation *> getRootOperation(
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult setTranslationInfoAndRootConfig(
     func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
-  // First check if the operations have a preset pipeline.
+  // First check if the operations have a preset pipeline. If the config is
+  // preset, do not overwrite it.
   for (auto computeOp : computeOps) {
-    // If the config is preset, do not overwrite it.
     if (IREE::Codegen::CompilationInfoAttr compilationInfo =
             getCompilationInfo(computeOp)) {
       return setUserConfig(entryPointFn, computeOp, compilationInfo);
     }
+  }
+
+  // Make sure that lowering_config is not preset on any compute ops.
+  for (auto computeOp : computeOps) {
+    if (getLoweringConfig(computeOp)) return failure();
   }
 
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
