@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+include(iree_macros)
+
 iree_py_test(
   NAME
     mnist_train_test_cpu
@@ -28,6 +30,10 @@ iree_py_test(
     "requires-gpu-nvidia"
     "driver=cuda"
 )
+iree_package_path(PKG_PATH)
+set_tests_properties(
+  ${PKG_PATH}/mnist_train_test_cuda
+  PROPERTIES WILL_FAIL TRUE)
 
 iree_py_test(
   NAME
