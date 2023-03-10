@@ -475,8 +475,8 @@ void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveDeadInterfaceBindings>(patterns.getContext());
 }
 
-void analyzeSharedMemoryAlloc(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
-                              SmallVector<AliasGroup> &aliasGroups) {
+void analyseAllocsForPacking(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
+                             SmallVector<AliasGroup> &aliasGroups) {
   // Represent of a group of allocations with overlapping liverange and the
   // liveness of the overall group.
   struct AllocGroup {

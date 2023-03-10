@@ -80,7 +80,7 @@ struct LLVMGPUPackSharedMemoryAllocPass
     // First sink the alloc as low as possible in the CFG.
     sinkOpsInCFG(allocs, dominators);
     SmallVector<AliasGroup> aliasGroups;
-    analyzeSharedMemoryAlloc(funcOp, allocs, aliasGroups);
+    analyseAllocsForPacking(funcOp, allocs, aliasGroups);
     // If there is 1 or less alias group there is nothing to do.
     if (aliasGroups.size() <= 1) return;
 
