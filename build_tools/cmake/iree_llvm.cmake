@@ -132,6 +132,11 @@ macro(iree_llvm_set_bundled_cmake_options)
   # Unconditionally enable mlir.
   list(APPEND LLVM_ENABLE_PROJECTS mlir)
 
+  # Currently always required.
+  # TODO(laurenzo): optional LLD in compiler API (only used by llvm-cpu)
+  #                 maybe some IREE_LLD_FLAVORS= option too?
+  set(IREE_LLD_TARGET lld)
+
   # Configure LLVM based on enabled IREE target backends.
   message(STATUS "IREE compiler target backends:")
   if(IREE_TARGET_BACKEND_CUDA)
@@ -143,13 +148,11 @@ macro(iree_llvm_set_bundled_cmake_options)
     message(STATUS "  - llvm-cpu")
     list(APPEND LLVM_TARGETS_TO_BUILD "${IREE_DEFAULT_CPU_LLVM_TARGETS}")
     set(IREE_CLANG_TARGET clang)
-    set(IREE_LLD_TARGET lld)
   endif()
   if(IREE_TARGET_BACKEND_LLVM_CPU_WASM)
     message(STATUS "  - llvm-cpu (wasm)")
     list(APPEND LLVM_TARGETS_TO_BUILD WebAssembly)
     set(IREE_CLANG_TARGET clang)
-    set(IREE_LLD_TARGET lld)
   endif()
   if(IREE_TARGET_BACKEND_METAL_SPIRV)
     message(STATUS "  - metal-spirv")
