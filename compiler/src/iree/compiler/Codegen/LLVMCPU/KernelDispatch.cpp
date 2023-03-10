@@ -1875,6 +1875,8 @@ static FailureOr<Operation *> getRootOperation(
 
 static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
                                               Operation *rootOp) {
+  if (!rootOp) return success();
+
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp) return success();
 
