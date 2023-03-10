@@ -21,7 +21,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
-#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -186,6 +185,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
       auto target = variantOp.getTarget();
       bool lowerToAVX2 = hasAVX2Feature(target);
+      bool enableVectorMasking =
+          isX86(target) || isRISCV(target) ||
+          (isAArch64(target) && hasAnySVEFeature(target));
       bool enableMicrokernels = hasMicrokernels(target);
       if (!testLoweringConfiguration) {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
@@ -195,40 +197,44 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUBufferOpsTileAndVectorize:
-            addCPUBufferOpsTileAndVectorizePipeline(executableLoweringPipeline);
+            addCPUBufferOpsTileAndVectorizePipeline(executableLoweringPipeline,
+                                                    enableVectorMasking);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline,
                 static_cast<int>(StrategyTilingLevel::NumStrategyTileLevels),
-                /*enablePeeling=*/false, lowerToAVX2);
+                /*enablePeeling=*/false, enableVectorMasking, lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingPadExpert:
-            addDoubleTilingPadExpertPassPipeline(executableLoweringPipeline);
+            addDoubleTilingPadExpertPassPipeline(executableLoweringPipeline,
+                                                 enableVectorMasking);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingPeelingExpert:
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline,
                 static_cast<int>(StrategyTilingLevel::NumStrategyTileLevels),
-                /*enablePeeling=*/true, lowerToAVX2);
+                /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTripleTilingExpert:
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline,
                 static_cast<int>(TripleTilingLevel::NumTileLevels),
-                /*enablePeeling=*/false);
+                enableVectorMasking,
+                /*enablePeeling=*/false, /*lowerToAVX2i=*/false);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
             addConvTileAndDecomposeExpertPassPipeline(
-                executableLoweringPipeline);
+                executableLoweringPipeline, enableVectorMasking);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
-            addMmt4dTilingExpertPassPipeline(executableLoweringPipeline);
+            addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
+                                             enableVectorMasking);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling:
             addCPUDataTilingPipeline(executableLoweringPipeline);

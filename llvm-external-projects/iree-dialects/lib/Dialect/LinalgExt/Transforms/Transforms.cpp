@@ -336,7 +336,7 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
   if (failed(filter.checkAndNotify(rewriter, linalgOp)))
     return failure();
   SmallVector<int64_t> vectorSizes;
-  if (options.vectorSizeComputationFunction)
+  if (options.enableVectorMasking)
     vectorSizes.append(options.vectorSizeComputationFunction(
         linalgOp, options.canonicalVectorSizes));
   return vectorize(rewriter, linalgOp, vectorSizes);

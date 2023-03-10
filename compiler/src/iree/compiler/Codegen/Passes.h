@@ -357,7 +357,8 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
 /// Populates the passes to lower linalg ops on buffers. Currenly this
 /// pipeline is only used for dispatches that just copy data from input
 /// interfaces to output interface.
-void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager);
+void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
+                                             bool enableVectorMasking);
 
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
@@ -376,8 +377,10 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     ArrayRef<int64_t> workgroupSize = {});
 void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
                                       int64_t numLevels, bool enablePeeling,
-                                      bool lowerToAVX2 = false);
-void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager);
+                                      bool enableVectorMasking,
+                                      bool lowerToAVX2);
+void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
+                                          bool enableVectorMasking);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops using the Codegen drivers from sandbox.
@@ -385,14 +388,16 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
-void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
+void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
+                                               bool enableVectorMasking);
 
 /// Transform dialect-based common.
 void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager);
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
+                                      bool enableVectorMasking);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.

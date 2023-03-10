@@ -338,7 +338,10 @@ hal.executable private @add_static {
   ]>
 ]>
 hal.executable private @preset_config_matmul_tensors  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
     hal.executable.export @preset_config layout(#pipeline_layout)
     builtin.module {
       func.func @preset_config() {
@@ -383,7 +386,10 @@ hal.executable private @preset_config_matmul_tensors  {
   ]>
 ]>
 hal.executable @copy_op_dynamic {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
     hal.executable.export @copy_op_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_op_dynamic() {
@@ -425,7 +431,10 @@ hal.executable @copy_op_dynamic {
   ]>
 ]>
 hal.executable private @static_1d_fft_stage2  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
     hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
@@ -463,7 +472,10 @@ hal.executable private @static_1d_fft_stage2  {
   ]>
 ]>
 hal.executable private @static_3d_fft_stage3  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
     hal.executable.export @static_3d_fft_stage3 layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
@@ -501,7 +513,10 @@ hal.executable private @static_3d_fft_stage3  {
   ]>
 ]>
 hal.executable private @outs_fusion {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
     hal.executable.export @outs_fusion_fn layout(#pipeline_layout)
     builtin.module {
       func.func @outs_fusion_fn() {
@@ -545,6 +560,7 @@ hal.executable private @outs_fusion {
     }
   }
 }
+
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 32, 0], [1, 4, 0], [0, 0, 4]{{\]}}>
 //      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @outs_fusion_fn
