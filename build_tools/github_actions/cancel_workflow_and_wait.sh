@@ -25,11 +25,11 @@ RUN_ATTEMPT_BEFORE="$(gh api ${WORKFLOW_RUN_URL} \
 # cancel. So there is a chance that we cancel a newer run attempt.
 CANCEL_RESPONSE="$(gh api ${WORKFLOW_RUN_URL}/cancel --method POST \
   | jq --raw-output '.message' \
-)" || true
+)" || CANCEL_FAILED=1
 
 if [[ "${CANCEL_RESPONSE}" == "Cannot cancel a workflow run that is completed." ]]; then
   exit 0
-elif [[ "${CANCEL_RESPONSE}" != "null" ]]; then
+elif [[ -n "${CANCEL_FAILED}" ]]; then
   echo "Failed to cancel the workflow: ${CANCEL_RESPONSE}"
   exit 1
 fi

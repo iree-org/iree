@@ -113,8 +113,8 @@ jobs:
         run: |
           RERUN_RESPONSE="$(gh api ${WORKFLOW_RUN_URL}/rerun --method POST \
             | jq --raw-output '.message' \
-          )" || true
-          if [[ "${RERUN_RESPONSE}" != "null" \
+          )" || RERUN_FAILED=1
+          if [[ "${RERUN_FAILED}" == "1" \
                   && "${RERUN_RESPONSE}" != "This workflow is already running" \
           ]]; then
             echo "Failed to rerun the workflow: ${RERUN_RESPONSE}"
