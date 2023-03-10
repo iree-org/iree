@@ -111,12 +111,4 @@ jobs:
         env:
           WORKFLOW_RUN_URL: ${{ fromJSON(steps.find-workflow.outputs.workflow-url) }}
         run: |
-          RERUN_RESPONSE="$(gh api ${WORKFLOW_RUN_URL}/rerun --method POST \
-            | jq --raw-output '.message' \
-          )" || RERUN_FAILED=1
-          if [[ "${RERUN_FAILED}" == "1" \
-                  && "${RERUN_RESPONSE}" != "This workflow is already running" \
-          ]]; then
-            echo "Failed to rerun the workflow: ${RERUN_RESPONSE}"
-            exit 1
-          fi
+          gh api "${WORKFLOW_RUN_URL}/rerun" --method POST
