@@ -1842,7 +1842,7 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 }
 
 /// Find the root operation for the dispatch region. The priority is:
-///   1. A tensor.pack op or a tensor.unpack op/
+///   1. A tensor.unpack op.
 ///   2. A Linalg operation that has reduction loops.
 ///   3. Any other Lainlg op or LinalgExt op.
 ///   4. An operation that implements TilingInterface.
@@ -1850,10 +1850,10 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 /// to the end of the function is the root op.
 static FailureOr<Operation *> getRootOperation(
     ArrayRef<Operation *> computeOps) {
-  // TODO(hanchung): The pack ops and unpack ops are unconditionally treated as
-  // root ops. This should be fixed if there are fusion cases.
+  // TODO(hanchung): The unpack ops are unconditionally treated as root ops.
+  // This should be fixed if there are fusion cases.
   for (auto op : computeOps) {
-    if (isa<tensor::PackOp, tensor::UnPackOp>(op)) return op;
+    if (isa<tensor::UnPackOp>(op)) return op;
   }
 
   for (auto op : llvm::reverse(computeOps)) {
@@ -1871,6 +1871,57 @@ static FailureOr<Operation *> getRootOperation(
   }
 
   return nullptr;
+}
+
+static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
+                                              Operation *rootOp) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
+  if (!linalgOp) return success();
+
+  TileSizesListType tileSizesList =
+      getLoweringConfig(linalgOp).getTileSizeVals();
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+
+  bool hasChanged = false;
+  auto res = entryPointFn.walk([&](tensor::PackOp packOp) -> WalkResult {
+    // Multiple pack ops case is not supported.
+    if (hasChanged) return WalkResult::interrupt();
+
+    // TODO(hanchung): Support chain cases. It needs following use-def chain
+    // until rootOp.
+    if (packOp.getSource().getDefiningOp() != rootOp) {
+      return WalkResult::advance();
+    }
+    hasChanged = true;
+    OpResult result = packOp.getSource().cast<OpResult>();
+    auto idxMap = linalgOp.getMatchingIndexingMap(
+        linalgOp.getDpsInitOperand(result.getResultNumber()));
+    LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n"
+                         << "The corresponding indexing map is: " << idxMap
+                         << "\n");
+
+    for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
+      SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
+      ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+      for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+        if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+
+        auto dimExpr = idxMap.getResult(pos).dyn_cast<AffineDimExpr>();
+        if (!dimExpr) return WalkResult::interrupt();
+        int mappedPos = dimExpr.getPosition();
+        tileSizes[mappedPos] = tileSizes[mappedPos] / size;
+        tileSizes[mappedPos] = std::max<int64_t>(tileSizes[mappedPos], 1);
+        LLVM_DEBUG(KD_DBGS() << "Scale # " << mappedPos << " tile size to "
+                             << tileSizes[mappedPos] << "\n");
+      }
+    }
+
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted()) return failure();
+
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
+                                               tileSizesList, pipeline);
 }
 
 /// Sets the translation information to use for a dispatch region.
@@ -1917,6 +1968,10 @@ static LogicalResult setTranslationInfoAndRootConfig(
     if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
       return failure();
     }
+  }
+
+  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
+    return failure();
   }
 
   return success();
