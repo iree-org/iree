@@ -14,13 +14,28 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import argparse
 import json
-from typing import List
+import os
+import shlex
+import subprocess
+from typing import List, Optional, Sequence
 
-from e2e_test_framework import serialization
 from e2e_test_artifacts import model_artifacts, iree_artifacts
+from e2e_test_framework import serialization
 from e2e_test_framework.definitions import iree_definitions
 
 IREE_COMPILER_NAME = "iree-compile"
+
+
+def _convert_to_cmd_string(cmds: Sequence[str]) -> str:
+  if os.name == "nt":
+    # list2cmdline is an undocumented method for Windows command lines. Python
+    # doesn't provide an official method for quoting Windows command lines and
+    # the correct implementation is slightly non-trivial. Use the undocumented
+    # method for now and can be rewritten with our own implementation later.
+    # See https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
+    return subprocess.list2cmdline(cmds)
+
+  return " ".join(shlex.quote(cmd) for cmd in cmds)
 
 
 def _dump_cmds_of_generation_config(
@@ -39,9 +54,10 @@ def _dump_cmds_of_generation_config(
       str(module_path)
   ]
   compile_cmds += gen_config.materialize_compile_flags()
+  compile_cmd_str = _convert_to_cmd_string(compile_cmds)
 
   if imported_model.import_config.tool == iree_definitions.ImportTool.NONE:
-    import_cmds = ["(Source model is already in MLIR)"]
+    import_cmd_str = "# (Source model is already in MLIR)"
   else:
     source_model_path = model_artifacts.get_model_path(
         model=imported_model.model, root_path=root_path)
@@ -52,12 +68,13 @@ def _dump_cmds_of_generation_config(
     ]
     import_cmds += imported_model.import_config.materialize_import_flags(
         model=imported_model.model)
+    import_cmd_str = _convert_to_cmd_string(import_cmds)
 
   # TODO(#12215): Print benchmark name to make them searchable by keywords.
   # Insert a blank line after each command to help read with line wrap.
   return [
-      f'Compile Module: {" ".join(compile_cmds)}', "",
-      f'Import Model: {" ".join(import_cmds)}', ""
+      "Compile Module:", compile_cmd_str, "", "Import Model:", import_cmd_str,
+      ""
   ]
 
 
@@ -74,19 +91,20 @@ def _dump_cmds_from_run_config(
   run_cmds += run_config.materialize_run_flags()
   # TODO(#12215): Include benchmark name to make them searchable by keywords.
   # Insert a blank line after the command to help read with line wrap.
-  lines = [f'Run Module: {" ".join(run_cmds)}', ""]
+  lines = ["Run Module:", _convert_to_cmd_string(run_cmds), ""]
   lines += _dump_cmds_of_generation_config(gen_config=gen_config,
                                            root_path=root_path)
   return lines
 
 
-def _dump_cmds_handler(args: argparse.Namespace):
-  root_path = args.e2e_test_artifacts_dir
-  benchmark_id = args.benchmark_id
+def _dump_cmds_handler(e2e_test_artifacts_dir: pathlib.Path,
+                       execution_benchmark_config: Optional[pathlib.Path],
+                       compilation_benchmark_config: Optional[pathlib.Path],
+                       benchmark_id: Optional[str], **_unused_args):
   lines = []
 
-  if args.execution_benchmark_config is not None:
-    benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
+  if execution_benchmark_config is not None:
+    benchmark_groups = json.loads(execution_benchmark_config.read_text())
     for target_device, benchmark_group in benchmark_groups.items():
       run_configs = serialization.unpack_and_deserialize(
           data=benchmark_group["run_configs"],
@@ -101,10 +119,10 @@ def _dump_cmds_handler(args: argparse.Namespace):
         lines.append(f"Target Device: {target_device}")
         lines.append("")
         lines += _dump_cmds_from_run_config(run_config=run_config,
-                                            root_path=root_path)
+                                            root_path=e2e_test_artifacts_dir)
 
-  if args.compilation_benchmark_config is not None:
-    benchmark_config = json.loads(args.compilation_benchmark_config.read_text())
+  if compilation_benchmark_config is not None:
+    benchmark_config = json.loads(compilation_benchmark_config.read_text())
     gen_configs = serialization.unpack_and_deserialize(
         data=benchmark_config["generation_configs"],
         root_type=List[iree_definitions.ModuleGenerationConfig])
@@ -117,7 +135,7 @@ def _dump_cmds_handler(args: argparse.Namespace):
       lines.append(f"Compilation Benchmark ID: {gen_config.composite_id}")
       lines.append("")
       lines += _dump_cmds_of_generation_config(gen_config=gen_config,
-                                               root_path=root_path)
+                                               root_path=e2e_test_artifacts_dir)
 
   print(*lines, sep="\n")
 
@@ -159,7 +177,7 @@ def _parse_arguments() -> argparse.Namespace:
 
 
 def main(args: argparse.Namespace):
-  args.handler(args)
+  args.handler(**vars(args))
 
 
 if __name__ == "__main__":
