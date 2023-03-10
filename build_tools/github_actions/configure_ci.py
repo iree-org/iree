@@ -16,7 +16,7 @@ When GITHUB_EVENT_NAME is "pull_request", there are additional environment
 variables to be set:
 - PR_TITLE (required): PR title.
 - PR_BODY (optional): PR description.
-- PR_LABELS (optional): PR label names, splitted by comma.
+- PR_LABELS (optional): JSON list of PR label names.
 - BASE_REF (required): base commit SHA of the PR.
 - ORIGINAL_PR_TITLE (optional): PR title from the original PR event, showing a
     notice if PR_TITLE is different.
@@ -130,13 +130,12 @@ def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
 
   title = os.environ["PR_TITLE"]
   body = os.environ.get("PR_BODY", "")
-  labels = os.environ.get("PR_LABELS", "")
+  labels = json.loads(os.environ.get("PR_LABELS", "[]"))
   original_title = os.environ.get("ORIGINAL_PR_TITLE")
   original_body = os.environ.get("ORIGINAL_PR_BODY", "")
-  original_labels = os.environ.get("ORIGINAL_PR_LABELS", "")
+  original_labels = json.loads(os.environ.get("ORIGINAL_PR_LABELS", "[]"))
 
   description = PR_DESCRIPTION_TEMPLATE.format(title=title, body=body)
-  labels = [label.strip() for label in labels.split(",")]
 
   # PR information can be fetched from API for the latest updates. If
   # ORIGINAL_PR_TITLE is set, compare the current and original description and
@@ -145,7 +144,6 @@ def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
   if original_title is not None:
     original_description = PR_DESCRIPTION_TEMPLATE.format(title=original_title,
                                                           body=original_body)
-    original_labels = [label.strip() for label in original_labels.split(",")]
     print("Original PR description and labels:",
           original_description,
           original_labels,
