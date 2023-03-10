@@ -30,10 +30,16 @@ iree_py_test(
     "requires-gpu-nvidia"
     "driver=cuda"
 )
+
+# Mark the CUDA test as WILL_FAIL if it was defined.
 iree_package_path(PKG_PATH)
-set_tests_properties(
-  ${PKG_PATH}/mnist_train_test_cuda
-  PROPERTIES WILL_FAIL TRUE)
+set(CUDA_TEST_NAME ${PKG_PATH}/mnist_train_test_cuda)
+get_directory_property(TESTS_LIST TESTS)
+if(${CUDA_TEST_NAME} IN_LIST TESTS_LIST)
+  set_tests_properties(
+    ${CUDA_TEST_NAME}
+    PROPERTIES WILL_FAIL TRUE)
+endif()
 
 iree_py_test(
   NAME
