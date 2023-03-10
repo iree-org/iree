@@ -473,9 +473,9 @@ struct RemoveDeadInterfaceBindings
 void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
   patterns.insert<RemoveDeadInterfaceBindings>(patterns.getContext());
+}
 
-void analyzeSharedMemoryAlloc(func::FuncOp funcOp,
-                              const SmallVector<Operation *> &allocs,
+void analyzeSharedMemoryAlloc(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
                               SmallVector<AliasGroup> &aliasGroups) {
   // Represent of a group of allocations with overlapping liverange and the
   // liveness of the overall group.
@@ -483,9 +483,9 @@ void analyzeSharedMemoryAlloc(func::FuncOp funcOp,
     SmallVector<Operation *> allocs;
     // Keep track of every operation where any of the alloc in the group is
     // live.
-    // Liveness is represent as a set of Operations where the alloc is alive. To
-    // make it merge liveranges and check if a given Operation interfers with
-    // the liverange we store it as a DesneSet.
+    // Liveness is represent as a set of Operations where the alloc is alive.
+    // To make it merge liveranges and check if a given Operation interfers
+    // with the liverange we store it as a DesneSet.
     llvm::DenseSet<Operation *> liveness;
   };
   Liveness liveness(funcOp);
@@ -555,7 +555,7 @@ static int64_t getAllocSize(Operation *op, DataLayout &dataLayout) {
 }
 
 void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
-                SmallVector<AliasGroup> &aliasGroups) {
+                ArrayRef<AliasGroup> aliasGroups) {
   DataLayout dataLayout = DataLayout::closest(funcOp);
   builder.setInsertionPointToStart(&(*funcOp.getBody().begin()));
   int64_t maxAlloc = 0;

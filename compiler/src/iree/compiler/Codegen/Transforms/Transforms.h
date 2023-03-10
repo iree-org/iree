@@ -106,15 +106,14 @@ using AliasGroup = SmallVector<Operation *>;
 /// they are merge into the same group. If a new alloc is part of multiple alias
 /// groups all those are merged into one. At the end we are left with groups of
 /// allocations that are disjoint and can use the same memory.
-void analyzeSharedMemoryAlloc(func::FuncOp funcOp,
-                              const SmallVector<Operation *> &allocs,
+void analyzeSharedMemoryAlloc(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
                               SmallVector<AliasGroup> &aliasGroups);
 
 /// Pack groups of allocations into a unique large i8 allocation and use
 /// memref.view to separate the indivudual allocations. This allows re-using
 /// memory across alias groups.
 void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
-                SmallVector<AliasGroup> &aliasGroups);
+                ArrayRef<AliasGroup> aliasGroups);
 
 }  // namespace iree_compiler
 }  // namespace mlir
