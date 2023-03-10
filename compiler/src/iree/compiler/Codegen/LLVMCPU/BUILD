@@ -31,6 +31,7 @@ iree_compiler_cc_library(
         "LLVMCPUUnfuseFMAOps.cpp",
         "Passes.cpp",
         "TargetMLTransformInfo.cpp",
+        "Utils.cpp",
         "VectorContractCustomKernels.cpp",
         "VerifyLinalgTransformLegality.cpp",
     ],
@@ -38,6 +39,7 @@ iree_compiler_cc_library(
         "DispatchABI.h",
         "KernelDispatch.h",
         "TargetMLTransformInfo.h",
+        "Utils.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
