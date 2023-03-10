@@ -67,8 +67,7 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFuseMultiUse(
-    "iree-flow-fuse-multi-use",
-    llvm::cl::desc("Fuse multi-use ops"),
+    "iree-flow-fuse-multi-use", llvm::cl::desc("Fuse multi-use ops"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
@@ -213,9 +212,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Elementwise fusion.
-      .addPass([]() {
-        return createFusionOfTensorOpsPass(clEnableFuseMultiUse);
-      })
+      .addPass(
+          []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse); })
       .addPass(mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
