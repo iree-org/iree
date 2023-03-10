@@ -53,7 +53,7 @@ iree_lit_test_suite(
         #
         # FIXME: This must be used with the custom dispatch region formation
         # because IREE's does not fuse the 6 ops softmax version even with
-        # --iree-flow-enable-aggressive-fusion.
+        # --iree-flow-fuse-multi-use.
         #
         "softmax_dispatch_spec.mlir",
         # First few ops of softmax only, acts as a proxy example.

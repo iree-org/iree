@@ -66,11 +66,9 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableAggressiveFusion(
-    "iree-flow-enable-aggressive-fusion",
-    llvm::cl::desc(
-        "Enable the aggressive fusion heuristic to fuse multiuse ops and ops "
-        "with reduction loops"),
+static llvm::cl::opt<bool> clEnableFuseMultiUse(
+    "iree-flow-fuse-multi-use",
+    llvm::cl::desc("Fuse multi-use ops"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
@@ -216,7 +214,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCSEPass)
       // Elementwise fusion.
       .addPass([]() {
-        return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
+        return createFusionOfTensorOpsPass(clEnableFuseMultiUse);
       })
       .addPass(mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
@@ -247,7 +245,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transformations afterwards with a simple region and without bothering
       // producers.
       .addPass([&]() {
-        return createFormDispatchRegionsPass(clEnableAggressiveFusion,
+        return createFormDispatchRegionsPass(clEnableFuseMultiUse,
                                              clDispatchGenerateWorkloadRegion);
       })
       // Collapse dimensions of linalg Ops.

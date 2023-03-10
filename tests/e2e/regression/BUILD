@@ -128,7 +128,7 @@ iree_check_single_backend_test_suite(
         "softmax_large.mlir",
     ],
     compiler_flags = [
-        "--iree-flow-enable-aggressive-fusion",
+        "--iree-flow-fuse-multi-use",
     ],
     driver = "cuda",
     tags = [
@@ -158,7 +158,7 @@ iree_check_single_backend_test_suite(
         "softmax.mlir",
     ],
     compiler_flags = [
-        "--iree-flow-enable-aggressive-fusion",
+        "--iree-flow-fuse-multi-use",
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",

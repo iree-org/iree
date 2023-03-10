@@ -172,7 +172,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-flow-enable-aggressive-fusion"
+    "--iree-flow-fuse-multi-use"
   LABELS
     "noasan"
     "nomsan"
@@ -204,7 +204,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-flow-enable-aggressive-fusion"
+    "--iree-flow-fuse-multi-use"
 )
 
 iree_check_single_backend_test_suite(

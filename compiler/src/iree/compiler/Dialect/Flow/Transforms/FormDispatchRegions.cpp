@@ -476,7 +476,7 @@ static bool isFusableWithConsumer(
 static void fuseRootsWithConsumers(MLIRContext *context,
                                    ArrayRef<Operation *> roots,
                                    DominanceInfo const &dominanceInfo,
-                                   bool aggressiveFusion) {
+                                   bool fuseMultiUse) {
   // Fuse with consumers where possible.
   for (Operation *root : roots) {
     SmallVector<Operation *> workList;
@@ -496,8 +496,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
         appendToFusionGroup(currRoot, rootNumber);
       };
 
-      Optional<OpOperand *> fusableUse = getFusableUse(
-          currRoot, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
+      Optional<OpOperand *> fusableUse =
+          getFusableUse(currRoot, dominanceInfo, /*fuseMultiUse=*/fuseMultiUse);
       if (!fusableUse) continue;
 
       // Analyse the use to see if it is fusable.
@@ -553,7 +553,7 @@ static bool isFusableWithProducer(
 static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
                                    unsigned groupNum,
                                    DominanceInfo const &dominanceInfo,
-                                   bool aggressiveFusion) {
+                                   bool fuseMultiUse) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
   llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
@@ -567,8 +567,8 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      Optional<OpOperand *> fusableUse = getFusableUse(
-          producer, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
+      Optional<OpOperand *> fusableUse =
+          getFusableUse(producer, dominanceInfo, /*fuseMultiUse=*/fuseMultiUse);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
       if (!isFusableWithProducer(operand, rootOuterParallelLoops)) {
@@ -591,7 +591,7 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
 /// enough to capture any heuristic.
 static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
                                        DominanceInfo const &dominanceInfo,
-                                       bool aggressiveFusion) {
+                                       bool fuseMultiUse) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
@@ -609,11 +609,11 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       setRootAttribute(context, &op, newGroup);
 
       fuseRootsWithProducers(context, &op, newGroup, dominanceInfo,
-                             aggressiveFusion);
+                             fuseMultiUse);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo, aggressiveFusion);
+    fuseRootsWithConsumers(context, roots, dominanceInfo, fuseMultiUse);
   }
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
@@ -636,7 +636,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo, aggressiveFusion);
+    fuseRootsWithConsumers(context, roots, dominanceInfo, fuseMultiUse);
   }
 
   return numRootOps;
@@ -689,11 +689,11 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
                                         FunctionOpInterface funcOp,
                                         DominanceInfo const &dominanceInfo,
                                         bool generateWorkloadRegion,
-                                        bool aggressiveFusion) {
+                                        bool fuseMultiUse) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
   unsigned numRoots =
-      decideFusableLinalgOps(funcOp, dominanceInfo, aggressiveFusion);
+      decideFusableLinalgOps(funcOp, dominanceInfo, fuseMultiUse);
   SmallVector<Operation *> roots(numRoots, nullptr);
   DenseMap<unsigned, SmallVector<Operation *>> producers;
 
@@ -779,12 +779,12 @@ struct FormDispatchRegionsPass
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
                 scf::SCFDialect, tensor::TensorDialect>();
   }
-  FormDispatchRegionsPass(bool aggressiveFusion, bool generateWorkloadRegion) {
-    this->aggressiveFusion = aggressiveFusion;
+  FormDispatchRegionsPass(bool fuseMultiUse, bool generateWorkloadRegion) {
+    this->fuseMultiUse = fuseMultiUse;
     this->generateWorkloadRegion = generateWorkloadRegion;
   }
   FormDispatchRegionsPass(const FormDispatchRegionsPass &pass)
-      : FormDispatchRegionsPass(pass.aggressiveFusion,
+      : FormDispatchRegionsPass(pass.fuseMultiUse,
                                 pass.generateWorkloadRegion) {}
   void runOnOperation() override;
 };
@@ -796,16 +796,15 @@ void FormDispatchRegionsPass::runOnOperation() {
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo,
-                                generateWorkloadRegion, aggressiveFusion))) {
+                                generateWorkloadRegion, fuseMultiUse))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();
   }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchRegionsPass(bool aggressiveFusion,
-                              bool generateWorkloadRegion) {
-  return std::make_unique<FormDispatchRegionsPass>(aggressiveFusion,
+createFormDispatchRegionsPass(bool fuseMultiUse, bool generateWorkloadRegion) {
+  return std::make_unique<FormDispatchRegionsPass>(fuseMultiUse,
                                                    generateWorkloadRegion);
 }
 }  // namespace Flow
