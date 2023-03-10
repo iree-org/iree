@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 
-#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;

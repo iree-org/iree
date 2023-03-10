@@ -17,6 +17,7 @@ iree_cc_library(
     "DispatchABI.h"
     "KernelDispatch.h"
     "TargetMLTransformInfo.h"
+    "Utils.h"
   SRCS
     "ConvertToLLVM.cpp"
     "DispatchABI.cpp"
@@ -34,6 +35,7 @@ iree_cc_library(
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
+    "Utils.cpp"
     "VectorContractCustomKernels.cpp"
     "VerifyLinalgTransformLegality.cpp"
   DEPS
