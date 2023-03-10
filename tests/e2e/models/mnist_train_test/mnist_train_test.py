@@ -25,8 +25,7 @@ Tensor = TypeVar('Tensor')
 
 def build_module(artifacts_dir: str):
   vmfb_file = os.path.join(artifacts_dir, "mnist_train.vmfb")
-  compile_file(input_file=os.path.join(
-      artifacts_dir, "tests/e2e/models/mnist_train_test/mnist_train.mlirbc"),
+  compile_file(input_file=os.path.join(artifacts_dir, "mnist_train.mlirbc"),
                output_file=vmfb_file,
                target_backends=[args.target_backend],
                input_type=InputType.MHLO)
@@ -107,7 +106,7 @@ class MnistTrainTest(unittest.TestCase):
           expected_optimizer_state_after_init,
           expected_optimizer_state_after_train_step,
           expected_prediction_after_train_step,
-      ) = load_data(os.path.join(tmp_dir, "tests/e2e/models/mnist_train_test"))
+      ) = load_data(tmp_dir)
 
     module.update(*batch)
     assert_array_list_allclose(module.get_opt_state(),
