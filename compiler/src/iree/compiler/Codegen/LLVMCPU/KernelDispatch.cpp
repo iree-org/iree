@@ -1875,14 +1875,21 @@ static FailureOr<Operation *> getRootOperation(
 
 static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
                                               Operation *rootOp) {
+  // The check is not needed if we land
+  // https://github.com/openxla/iree/pull/12594
   if (!rootOp) return success();
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp) return success();
 
+  // The transform dialect codegen has differnet logics and codegen flow. Ignore
+  // the adjustment for it.
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+  if (pipeline == DispatchLoweringPassPipeline::TransformDialectCodegen) {
+    return success();
+  }
   TileSizesListType tileSizesList =
       getLoweringConfig(linalgOp).getTileSizeVals();
-  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
 
   bool hasChanged = false;
   auto res = entryPointFn.walk([&](tensor::PackOp packOp) -> WalkResult {
