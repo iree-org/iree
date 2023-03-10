@@ -677,8 +677,6 @@ static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
     PartitionableLoopsInterface partitionableLoopsInterfaceOp,
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
-  if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
-
   SmallVector<unsigned> partitionableLoops =
       partitionableLoopsInterfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
@@ -1240,10 +1238,6 @@ static LogicalResult setDefaultGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (getLoweringConfig(genericOp)) {
-    return success();
-  }
-
   LLVM_DEBUG(KD_DBGS() << "Setting default generic op root configuration\n");
 
   // If there are no loops, there is nothing to do.
@@ -1315,7 +1309,6 @@ static LogicalResult setTransformStrategyRootConfig(
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
   if (!clCPUEnableTransformDialectJit) return failure();
-  if (getLoweringConfig(genericOp)) return failure();
   cpu::CPUModel cpuModel;
   if (failed(
           cpu::matchAndSetReductionStrategy(entryPointFn, genericOp, cpuModel)))
@@ -1334,13 +1327,9 @@ static LogicalResult setTransposeLikeOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (getLoweringConfig(genericOp)) {
-    return success();
-  }
-
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (!hasAVX2Feature(targetAttr) || !isSupportedTransposeOp(genericOp)) {
-    return success();
+    return failure();
   }
 
   unsigned numLoops = genericOp.getNumLoops();
@@ -1349,14 +1338,14 @@ static LogicalResult setTransposeLikeOpRootConfig(
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
     // Nothing to vectorize just lower to loops.
-    return success();
+    return failure();
   }
 
   if (llvm::count_if(minTileSizes,
                      [](int64_t tileSize) { return tileSize > 1; }) != 2) {
     // Transpose patterns are not applicable if vectorizing more or less than
     // two dims.
-    return success();
+    return failure();
   }
 
   // Make sure that the original tile sizes are multiple of the tile sizes
@@ -1365,7 +1354,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
   if (llvm::any_of(minTileSizes, [](int64_t tileSize) {
         return tileSize > 1 && (tileSize % 8) != 0;
       })) {
-    return success();
+    return failure();
   }
 
   // Replace dims to be vectorized with the new 8x8 tile sizes.
@@ -1407,13 +1396,9 @@ static LogicalResult setElementwiseGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (getLoweringConfig(genericOp)) {
-    return success();
-  }
-
   unsigned numLoops = genericOp.getNumLoops();
-  if (numLoops == 0) return success();
-  if (!linalg::isElementwise(genericOp)) return success();
+  if (numLoops == 0) return failure();
+  if (!linalg::isElementwise(genericOp)) return failure();
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
@@ -1502,17 +1487,23 @@ static LogicalResult setRootConfig(
     const TargetMLTransformInfo &targetMLTransInfo) {
   // First, try to apply the transform dialect strategy, if defined.
   if (succeeded(setTransformStrategyRootConfig(
-          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)))
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
     return success();
-  if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
-                                          targetMLTransInfo)) ||
-      failed(setElementwiseGenericOpRootConfig(
-          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)) ||
-      failed(setDefaultGenericOpRootConfig(entryPointFn, genericOp,
-                                           linalgOpInfo, targetMLTransInfo))) {
-    return failure();
   }
-  return success();
+
+  if (succeeded(setTransposeLikeOpRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
+    return success();
+  }
+  if (succeeded(setElementwiseGenericOpRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
+    return success();
+  }
+  if (succeeded(setDefaultGenericOpRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
+    return success();
+  }
+  return failure();
 }
 
 namespace {
@@ -1725,8 +1716,6 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::LinalgOp linalgOp,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
-  if (getLoweringConfig(linalgOp)) return success();
-
   auto partitionableLoopOp =
       cast<PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
@@ -1746,8 +1735,6 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, TilingInterface tilingInterfaceOp,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
-  if (getLoweringConfig(tilingInterfaceOp)) return success();
-
   auto partitionableLoopOp =
       cast<PartitionableLoopsInterface>(tilingInterfaceOp.getOperation());
 
@@ -1777,10 +1764,6 @@ static LogicalResult setRootConfig(
 static LogicalResult setRootConfigImpl(
     func::FuncOp entryPointFn, Operation *op,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  // Do not overwrite default configuration.
-  if (getLoweringConfig(op)) return success();
-
-  // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<linalg::GenericOp>([&](auto op) {
@@ -1811,9 +1794,6 @@ static LogicalResult setRootConfigImpl(
 /// VMVX backend.
 static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
                                            Operation *op) {
-  if (getLoweringConfig(op)) return success();
-
-  // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<IREE::LinalgExt::FftOp>([&](auto op) {
@@ -1837,47 +1817,52 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
   return setRootConfigFn(op);
 }
 
-/// Find the root operation for the dispatch region.
+/// Find the root operation for the dispatch region. The priority is:
+///   1. A Linalg operation that has reduction loops.
+///   2. Any other Linalg op.
+///   3. An operation that implements TilingInterface.
+/// If there are multiple operations meeting the same priority, the one closer
+/// to the end of the function is the root op.
 static FailureOr<Operation *> getRootOperation(
     ArrayRef<Operation *> computeOps) {
-  Operation *rootOperation = nullptr;
-  for (auto op : llvm::reverse(computeOps)) {
-    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-      // Do not not treat linalg ops that are all parallel as root operations in
-      // this sweep.
-      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops()) continue;
-
-      // All other linalg ops are root ops.
-      rootOperation = op;
-      break;
-    }
-
-    if (isa<TilingInterface>(op)) {
-      // All other operations that implement this interface are root ops.
-      rootOperation = op;
-      break;
-    }
+  // TODO(hanchung): The pack ops and unpack ops are unconditionally treated as
+  // root ops. This should be fixed if there are fusion cases.
+  for (auto op : computeOps) {
+    if (isa<tensor::PackOp, tensor::UnPackOp>(op)) return op;
   }
-  if (rootOperation) return rootOperation;
+
+  for (auto op : llvm::reverse(computeOps)) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp) continue;
+    if (linalgOp.getNumReductionLoops()) return op;
+  }
 
   // If no root operation is found yet. Look for linalg generic ops.
   for (auto op : llvm::reverse(computeOps)) {
-    if (isa<linalg::LinalgOp>(op)) {
-      rootOperation = op;
-      break;
-    }
+    if (isa<linalg::LinalgOp>(op)) return op;
   }
-  return rootOperation;
+
+  for (auto op : llvm::reverse(computeOps)) {
+    if (isa<TilingInterface>(op)) return op;
+  }
+
+  return nullptr;
 }
 
-/// Finds the root operation in the given list of Linalg operations and sets
-/// its configuration. Returns error for multiple root operations.
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   ArrayRef<Operation *> computeOps) {
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp)) {
-    return failure();
+/// Sets the translation information to use for a dispatch region.
+static LogicalResult setTranslationInfoAndRootConfig(
+    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
+  // First check if the operations have a preset pipeline.
+  for (auto computeOp : computeOps) {
+    // If the config is preset, do not overwrite it.
+    if (IREE::Codegen::CompilationInfoAttr compilationInfo =
+            getCompilationInfo(computeOp)) {
+      return setUserConfig(entryPointFn, computeOp, compilationInfo);
+    }
   }
+
+  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+  if (failed(rootOp)) return failure();
   Operation *rootOperation = rootOp.value();
 
   if (rootOperation) {
@@ -1906,22 +1891,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   }
 
   return success();
-}
-
-/// Sets the translation information to use for a dispatch region.
-static LogicalResult setTranslationInfoAndRootConfig(
-    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
-  // First check if the operations have a preset pipeline.
-  for (auto computeOp : computeOps) {
-    if (IREE::Codegen::CompilationInfoAttr compilationInfo =
-            getCompilationInfo(computeOp)) {
-      if (failed(setUserConfig(entryPointFn, computeOp, compilationInfo)))
-        return failure();
-    }
-  }
-
-  // Next set the configuration of the operations.
-  return setRootConfig(entryPointFn, computeOps);
 }
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
