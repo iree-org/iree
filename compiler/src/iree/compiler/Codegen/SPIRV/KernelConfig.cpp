@@ -1424,11 +1424,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
 static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
                                         IREE::HAL::ExecutableExportOp exportOp,
                                         func::FuncOp funcOp) {
-  SmallVector<Operation *> computeOps;
-  if (failed(getComputeOps(funcOp, computeOps))) {
-    return funcOp.emitOpError("failed to get compute ops");
-  }
-
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   if (computeOps.empty()) {
     // No compute operations found. Allow to pass through without a config.
     return success();
