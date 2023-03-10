@@ -556,6 +556,7 @@ static int64_t getAllocSize(Operation *op, DataLayout &dataLayout) {
 
 void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
                 ArrayRef<AliasGroup> aliasGroups) {
+  if (aliasGroups.empty()) return;
   DataLayout dataLayout = DataLayout::closest(funcOp);
   builder.setInsertionPointToStart(&(*funcOp.getBody().begin()));
   int64_t maxAlloc = 0;
@@ -566,7 +567,6 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
     }
     maxAlloc = std::max(maxAlloc, allocSize);
   }
-
   Attribute memorySpace = aliasGroups[0][0]
                               ->getResultTypes()[0]
                               .cast<MemRefType>()
