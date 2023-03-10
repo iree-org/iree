@@ -677,6 +677,8 @@ static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
     PartitionableLoopsInterface partitionableLoopsInterfaceOp,
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
+  assert(!getLoweringConfig(partitionableLoopsInterfaceOp) &&
+         "expected lowering_config is not set");
   SmallVector<unsigned> partitionableLoops =
       partitionableLoopsInterfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
@@ -943,6 +945,8 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
 /// implements the contraction operation interface.
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp) {
+  assert(!getLoweringConfig(contractionOp) &&
+         "expected lowering_config is not set");
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
   unsigned numLoops = linalgOp.getNumLoops();
   {
@@ -1049,6 +1053,7 @@ static LogicalResult setRootConfig(
 /// op
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::Mmt4DOp mmt4dOp) {
+  assert(!getLoweringConfig(mmt4dOp) && "expected lowering_config is not set");
   auto getWorkgroupTileSizes = [&]() -> SmallVector<int64_t> {
     if (!mmt4dWorkgroupTileSizes.empty()) {
       return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
@@ -1113,6 +1118,7 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PackOp op) {
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
 
@@ -1137,6 +1143,7 @@ static LogicalResult setUnPackOpRootConfig(
     func::FuncOp entryPointFn, tensor::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   // TODO(#11505): Consider multi-level tiling for handling unpack + generic
   // cases.
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
@@ -1162,6 +1169,7 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
+  assert(!getLoweringConfig(fftOp) && "expected lowering_config is not set");
   SmallVector<int64_t> workgroupTileSizes =
       getLinalgExtDefaultWorkgroupTileSizes(fftOp, defaultWorkgroupTileSize);
   auto rank = fftOp.getOperandRank();
@@ -1238,6 +1246,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   LLVM_DEBUG(KD_DBGS() << "Setting default generic op root configuration\n");
 
   // If there are no loops, there is nothing to do.
@@ -1308,6 +1318,8 @@ static LogicalResult setTransformStrategyRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   if (!clCPUEnableTransformDialectJit) return failure();
   cpu::CPUModel cpuModel;
   if (failed(
@@ -1327,6 +1339,8 @@ static LogicalResult setTransposeLikeOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (!hasAVX2Feature(targetAttr) || !isSupportedTransposeOp(genericOp)) {
     return failure();
@@ -1396,6 +1410,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0) return failure();
   if (!linalg::isElementwise(genericOp)) return failure();
@@ -1485,6 +1501,8 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   // First, try to apply the transform dialect strategy, if defined.
   if (succeeded(setTransformStrategyRootConfig(
           entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
@@ -1525,6 +1543,7 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
       !is2DPoolingOp(convOp)) {
     return failure();
   }
+  assert(!getLoweringConfig(convOp) && "expected lowering_config is not set");
 
   // Use the default distribution for the conv loops.
   unsigned numLoops = convOp.getNumLoops();
@@ -1735,6 +1754,8 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, TilingInterface tilingInterfaceOp,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
+  assert(!getLoweringConfig(tilingInterfaceOp) &&
+         "expected lowering_config is not set");
   auto partitionableLoopOp =
       cast<PartitionableLoopsInterface>(tilingInterfaceOp.getOperation());
 
