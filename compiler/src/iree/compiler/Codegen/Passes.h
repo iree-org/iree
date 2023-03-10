@@ -437,11 +437,11 @@ LogicalResult verifyGPUMatmulSimtPassPipeline(
     ArrayRef<int64_t> workgroupSize);
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
-/// Lowering using tensorcore operations.
 LogicalResult verifyGPUMatmulTensorCorePipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
+/// Lowering using wmma tensorcore operations.
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
 
