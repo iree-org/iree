@@ -78,21 +78,9 @@ SmallVector<Value, 4> getDimValues(OpBuilder &builder, Location loc,
   return dimValues;
 }
 
-SmallVector<Value, 4> getTensorEmptyDimValues(OpBuilder &builder,
-                                              tensor::EmptyOp emptyOp) {
-  SmallVector<Value, 4> dynamicDims;
-  int dimIndex = 0;
-  for (int64_t dimSize : emptyOp.getType().getShape()) {
-    if (ShapedType::isDynamic(dimSize)) {
-      dynamicDims.push_back(emptyOp->getOperand(dimIndex));
-    } else {
-      dynamicDims.push_back(
-          builder.create<DispatchDynamicizeDimOp>(emptyOp.getLoc(), dimSize));
-    }
-  }
-  return dynamicDims;
-}
-
+/// For the given `op` implementing `OffsetSizeAndStrideOpInterface` to derive a
+/// `partialType` from a `fullType`, updates `offsetValues` and `sizeValues`
+/// with SSA values for the offsets and sizes.
 void getTensorSliceOffsetsSizesAndDimValues(
     OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface op,
     RankedTensorType fullType, RankedTensorType partialType,
@@ -106,6 +94,7 @@ void getTensorSliceOffsetsSizesAndDimValues(
       continue;
     }
 
+    // Create flow.dispatch.dynamicize_dim op for this dimension.
     auto attr = offsets[i].get<Attribute>().cast<IntegerAttr>();
     auto dimOp = builder.create<DispatchDynamicizeDimOp>(
         loc, attr.getValue().getSExtValue());
@@ -123,9 +112,12 @@ void getTensorSliceOffsetsSizesAndDimValues(
       continue;
     }
 
+    // Create flow.dispatch.dynamicize_dim op for this dimension.
     auto attr = sizes[i].get<Attribute>().cast<IntegerAttr>();
     auto value = attr.getValue().getSExtValue();
     if (value == 1 && reducedRank > 0) {
+      // For rank reduced dimensions, we need to keep the unit dim as constant
+      // value to make the op semantics sound.
       sizeValues[i] = attr;
       --reducedRank;
     } else {
@@ -135,6 +127,8 @@ void getTensorSliceOffsetsSizesAndDimValues(
   }
 }
 
+/// Goes through all tensor-shaped ops inside the given `regionOp` and turn
+/// static shapes into dynamic ones.
 LogicalResult dynamicizeStaticShapes(IRRewriter &rewriter,
                                      DispatchRegionOp &regionOp) {
   IRRewriter::InsertionGuard guard(rewriter);
@@ -167,6 +161,7 @@ LogicalResult dynamicizeStaticShapes(IRRewriter &rewriter,
       tensorOps.push_back(&op);
     }
   }
+
   SmallVector<Type, 4> resultTypes;
   for (Operation *op : tensorOps) {
     // For inlined constants, don't do anything.
@@ -177,13 +172,16 @@ LogicalResult dynamicizeStaticShapes(IRRewriter &rewriter,
     if (auto emptyOp = dyn_cast<tensor::EmptyOp>(op)) {
       SmallVector<Value, 4> dynamicDims;
       rewriter.setInsertionPoint(regionOp);
-      dynamicDims = getTensorEmptyDimValues(rewriter, emptyOp);
+      dynamicDims = getDimValues(rewriter, emptyOp.getLoc(),
+                                 emptyOp.getResult(), emptyOp.getOperands());
       rewriter.setInsertionPoint(op);
       rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
           emptyOp, getDynamicTensorType(emptyOp.getType()), dynamicDims);
       continue;
     }
 
+    // For tensor extract/insert slice ops, we want to turn their offsets/sizes
+    // into dynamic values.
     if (auto extractOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
       SmallVector<OpFoldResult, 4> offsets;
       SmallVector<OpFoldResult, 4> sizes;
@@ -195,6 +193,19 @@ LogicalResult dynamicizeStaticShapes(IRRewriter &rewriter,
       rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
           extractOp, getDynamicTensorType(extractOp.getType()),
           extractOp.getSource(), offsets, sizes, extractOp.getMixedStrides());
+      continue;
+    }
+    if (auto insertOp = dyn_cast<tensor::InsertSliceOp>(op)) {
+      SmallVector<OpFoldResult, 4> offsets;
+      SmallVector<OpFoldResult, 4> sizes;
+      rewriter.setInsertionPoint(regionOp);
+      getTensorSliceOffsetsSizesAndDimValues(
+          rewriter, insertOp.getLoc(), insertOp, insertOp.getDestType(),
+          insertOp.getSourceType(), offsets, sizes);
+      rewriter.setInsertionPoint(op);
+      rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
+          insertOp, insertOp.getSource(), insertOp.getDest(), offsets, sizes,
+          insertOp.getMixedStrides());
       continue;
     }
 
@@ -230,6 +241,9 @@ LogicalResult dynamicizeStaticShapes(IRRewriter &rewriter,
       regionOp.getLoc(), resultTypes, dimValues, regionOp.getWorkload());
   rewriter.inlineRegionBefore(regionOp.getBody(), newOp.getBody(),
                               newOp.getBody().begin());
+  rewriter.inlineRegionBefore(regionOp.getWorkgroupCount(),
+                              newOp.getWorkgroupCount(),
+                              newOp.getWorkgroupCount().begin());
   SmallVector<Value> results;
   for (auto [oldResult, newResult] :
        llvm::zip(regionOp.getResult(), newOp.getResult())) {

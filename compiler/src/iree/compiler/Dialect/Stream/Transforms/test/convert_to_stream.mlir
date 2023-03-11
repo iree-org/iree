@@ -179,3 +179,17 @@ func.func @unrealizedCastCleanup(%cond: i1, %lhs: tensor<1024xf32>, %rhs: tensor
   // CHECK: return %[[RET]], %[[RET_SIZE]]
   return %0 : tensor<1024xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @dynamicizeOps
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[ARG1:.+]]: index) -> (!stream.resource<*>, index)
+func.func @dynamicizeOps(%arg0: tensor<3x4xf32>) -> tensor<?x?xf32> {
+  // CHECK-DAG: arith.constant 3 : index
+  // CHECK-DAG: arith.constant 4 : index
+  %dim3 = flow.dispatch.dynamicize_dim 3 : index
+  %dim4 = flow.dispatch.dynamicize_dim 4 : index
+  %shape = flow.dispatch.dynamicize_shape %arg0 : tensor<3x4xf32> -> tensor<?x?xf32>{%dim3, %dim4}
+  // CHECK: return %[[ARG0]], %[[ARG1]] : !stream.resource<*>, index
+  return %shape : tensor<?x?xf32>
+}

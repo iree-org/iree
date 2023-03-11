@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "dispatch_linalg_on_tensors_default.mlir"
     "dispatch_linalg_on_tensors_fusion_with_transpose.mlir"
     "dispatch_linalg_transform_dialect.mlir"
+    "dynamicize_static_shape.mlir"
     "expand_tensor_shapes.mlir"
     "export_benchmark_funcs.mlir"
     "fusion_of_tensor_ops.mlir"
