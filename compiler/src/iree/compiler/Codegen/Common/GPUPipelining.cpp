@@ -266,6 +266,11 @@ struct MainLoopInfo {
   // populate the warp-level warpOperations
   llvm::SetVector<Operation*> seenMmaOps;
 
+  // Boolen to store if the mainloop can be pipelined (coarse-grained
+  // scheduling) and the instructions can be interleaved (fine-grained
+  // scheduling).
+  bool isSchedulable = false;
+
   //
   // Methods
   //
@@ -337,7 +342,7 @@ struct MainLoopInfo {
   }
 
   // Ctor.
-  MainLoopInfo(scf::ForOp forOp) { analyze(forOp); }
+  MainLoopInfo(scf::ForOp forOp) : isSchedulable(true) { analyze(forOp); }
 
   // Iterate through the mainloop and collect `cp.async`, `cp.commit_group`,
   // `cp.wait_group`, and `barrier` operations. These operations are used to
@@ -348,6 +353,12 @@ struct MainLoopInfo {
   // memory loads, shared memory loads, and math operations.
   void analyze(scf::ForOp forOp) {
     for (Operation& op : forOp.getBody()->getOperations()) {
+      if (op.getNumRegions() > 0) {
+        // Pipeline and schedule the most inner for op ,i.e., the mainloop that
+        // should be a flat region.
+        isSchedulable = false;
+        return;
+      }
       if (isa<nvgpu::DeviceAsyncCopyOp>(op)) {
         copyGlobalToSharedOps.insert(&op);
       }
@@ -367,14 +378,14 @@ struct MainLoopInfo {
       }
     }
 
-    // Assert that cp.async, commit_group and cp.async.wait_group only 1
-    // occurance in un-pipelined mainloop.
-    assert(asyncCreateGroupOp.size() == 1 &&
-           "Expected only one async.create.group op");
-    assert(asyncWaitOps.size() == 1 && "Expected only one async.wait op");
-    assert(
-        barrierOps.size() == 2 &&
-        "Expected only two barrier ops, i.e., around each Shared Memory copy");
+    // If one of the ingredients (`cp.async`, `cp.commit_group`,
+    // `cp.wait_group`, `bar.sync`, `mma.sync`, `ldmatrix` or `ld.shared`) for
+    // scheduling is missing, the mainloop cannot be scheduled.
+    if (copyGlobalToSharedOps.empty() || asyncCreateGroupOp.empty() ||
+        asyncWaitOps.empty() || barrierOps.empty() || warpOperations.empty()) {
+      isSchedulable = false;
+      return;
+    }
 
     // Collect the dependent operations for cp.async in the mainloop order for
     // coarse-grained software pipeling.
@@ -429,12 +440,26 @@ static void getNvidiaAmpereTensorCorePipeline(
   // Analyze the main loop and obtain information for coarse-grained pipelining
   // and fine-grained instruction scheduling.
   MainLoopInfo mainloop(forOp);
-  int numKgroups = mainloop.getNumberOfKgroups();
+
+  // If the mainloop is not schedulable, return an empty schedule.
+  if (!mainloop.isSchedulable) return;
 
   // NVIDIA Ampere Tensor Core multi-staged pipeline requires at least 2 kgroups
   // and 3 software pipeline stages. If the conditions are not met, return an
   // empty schedule.
+  int numKgroups = mainloop.getNumberOfKgroups();
   if (numKgroups < 2 || numStages < 3) {
+    return;
+  }
+
+  // Un-pipelined mainloop should have only one occurance of
+  // cp.async.commit_group and cp.async.wait_group. Additionally, two barrier
+  // ops are inserted around each staged copy. The barrier op before the copy is
+  // un-necessary and will be removed. If the conditions are not met, return an
+  // empty schedule.
+  if (!(mainloop.asyncCreateGroupOp.size() == 1) ||
+      !(mainloop.asyncWaitOps.size() == 1) ||
+      !(mainloop.barrierOps.size() == 2)) {
     return;
   }
 
@@ -497,6 +522,7 @@ static void getNvidiaAmpereTensorCorePipeline(
       ops.push_back(std::make_pair(&op, numStages - 1));
   }
 
+#if 0
   llvm::SmallDenseSet<Operation*> scheduledOperations;
   std::cout << std::flush;
   std::cout << ">> Debug prints from getNvidiaAmpereTensorCorePipeline() call "
@@ -514,6 +540,7 @@ static void getNvidiaAmpereTensorCorePipeline(
     scheduledOperations.insert(stage_op_pair.first);
     std::cout << std::flush;
   }
+#endif
 }
 
 // Apply pipeline rewrite pattern assuming the operations were already
