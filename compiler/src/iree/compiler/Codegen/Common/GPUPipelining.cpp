@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iostream>
-
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
@@ -20,6 +19,9 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-gpu-nvidia-ampere-mainloop-schedule"
+
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
 //====---------------------------------------------------------------------===//
@@ -426,6 +428,25 @@ struct MainLoopInfo {
   int getNumberOfKgroups() { return warpOperations.size(); }
 };
 
+/// Prints the given `funcOp` after a leading `step` comment header.
+void debugMainloopSchedule(MainLoopInfo& mainloop, int numStages,
+                           std::vector<std::pair<Operation*, unsigned>>& ops) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- Mainloop schedule generated for Nvidia Ampere "
+                    "mma.sync TensorCore Pipeline. ---//\n";
+    llvm::dbgs() << " Number of stages: " << numStages << "\n";
+    llvm::dbgs() << " Number of kgroups: " << mainloop.getNumberOfKgroups()
+                 << "\n";
+    llvm::dbgs() << " Number of mainloop instructions " << ops.size() << "\n";
+    llvm::dbgs() << " Mainloop instructions schedule and stage assignment: ";
+    for (auto& stage_op_pair : ops) {
+      llvm::dbgs() << " Stage (" << stage_op_pair.second << ") , Operation: ";
+      stage_op_pair.first->dump();
+    }
+    llvm::dbgs() << "\n\n";
+  });
+}
+
 /// This function returns an *coarse-grained* stage assignment for software
 /// pipelining of the mainloop and a *fine-grained* instruction interleaving.
 /// The schedule provides good performance on Nvidia Ampere architecture using
@@ -522,25 +543,9 @@ static void getNvidiaAmpereTensorCorePipeline(
       ops.push_back(std::make_pair(&op, numStages - 1));
   }
 
-#if 0
-  llvm::SmallDenseSet<Operation*> scheduledOperations;
-  std::cout << std::flush;
-  std::cout << ">> Debug prints from getNvidiaAmpereTensorCorePipeline() call "
-            << " in GPUPipelining.cpp " << std::endl;
-  std::cout << " Number of stages: " << numStages << std::endl;
-  std::cout << " Number of kgroups: " << numKgroups << std::endl;
-  std::cout << " Number of mainloop instructions " << ops.size() << std::endl;
-  std::cout << " Mainloop instructions schedule and stage assignment: "
-            << std::endl;
-
-  for (auto& stage_op_pair : ops) {
-    std::cout << " Stage (" << stage_op_pair.second << ") , Operation: ";
-    std::cout << std::flush;
-    stage_op_pair.first->dump();
-    scheduledOperations.insert(stage_op_pair.first);
-    std::cout << std::flush;
-  }
-#endif
+  // Prints the mainloop schedule generated for NVIDIA Ampere through native
+  // Tensor Core operations (asyncronous copy, load matrix, and mma.sync).
+  debugMainloopSchedule(mainloop, numStages, ops);
 }
 
 // Apply pipeline rewrite pattern assuming the operations were already
