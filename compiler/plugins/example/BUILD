@@ -19,6 +19,7 @@ cc_library(
     deps = [
         ":defs",
         "//compiler/src/iree/compiler/PluginAPI",
+        "@llvm-project//mlir:IR",
     ],
 )
 

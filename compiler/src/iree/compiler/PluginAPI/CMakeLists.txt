@@ -14,9 +14,10 @@ iree_cc_library(
   NAME
     PluginAPI
   HDRS
-    "Registration.h"
+    "PluginManager.h"
   DEPS
-
+    LLVMSupport
+    iree::compiler::Utils
   PUBLIC
 )
 
@@ -27,8 +28,8 @@ iree_cc_library(
     "PluginManager.cpp"
   DEPS
     ::PluginAPI
+    MLIRIR
     iree::compiler::PluginAPI::Config::StaticLinkedPlugins
-    iree::compiler::Utils
   PUBLIC
 )
 

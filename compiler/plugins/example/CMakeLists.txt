@@ -23,6 +23,7 @@ iree_cc_library(
     "src/PluginRegistration.cpp"
   DEPS
     ::defs
+    MLIRIR
     iree::compiler::PluginAPI
   PUBLIC
 )

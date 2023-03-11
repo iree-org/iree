@@ -4,9 +4,177 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/PluginAPI/Registration.h"
+#include <optional>
+#include <string_view>
+#include <vector>
+
+#include "iree/compiler/Utils/OptionUtils.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringMap.h"
+
+namespace mlir {
+class DialectRegistry;
+class MLIRContext;
+}  // namespace mlir
 
 namespace mlir::iree_compiler {
+
+class AbstractPluginSession;
+class PluginManager;
+struct PluginManagerSession;
+class PluginRegistrar;
+
+// Registration functions are exported with this signature.
+using PluginRegistrationFunction = bool (*)(PluginRegistrar *);
+
+// Empty options class that satisfies the contract for an OptionsBinder.
+// Used by default if a plugin does not support options.
+struct EmptyPluginOptions {
+  static void bindOptions(OptionsBinder &binder) {}
+};
+
+// Abstract class representing a plugin registration. It is responsible for
+// various global initialization and creation of plugin sessions that mirror
+// the lifetime of and |iree_compiler_session_t| for when the plugin is
+// activated.
+//
+// This is typically not instantiated directly but via the PluginSession
+// CRTP helper which manages most details.
+class AbstractPluginRegistration {
+ public:
+  AbstractPluginRegistration(std::string pluginId)
+      : pluginId(std::move(pluginId)) {}
+  virtual ~AbstractPluginRegistration();
+
+  // Gets the plugin id. Valid for the life of the registration.
+  std::string_view getPluginId() { return pluginId; }
+
+  // Performs once-only global initialization. This is called prior to any
+  // sessions being created and affects everything in the process. It is
+  // best used for passes and other such things.
+  // The default implementation does nothing.
+  virtual void globalInitialize() {}
+
+  // Initializes the process-global command line interface. This will be called
+  // if the CLI is enabled, and if so, it indicates that creates sessions
+  // must configure any options from the CLI environment.
+  virtual void initializeCLI() {}
+
+  // If a plugin is activated, performs all needed registrations into the
+  // compiler session's DialectRegistry. By default, does nothing.
+  // Note that this does global registration, regardless of whether the
+  // plugin is loaded. It should be used sparingly for things that cannot
+  // change behavior. It is safer to customize the context on a per-session
+  // basis in a plugin session's activate() method (i.e. if registering
+  // interfaces or behavior changes extensions).
+  virtual void registerDialects(DialectRegistry &registry) {}
+
+  // Creates a concrete session. If the CLI was initialized, then this should
+  // also ensure that any command line options were managed properly into
+  // the session instance.
+  virtual std::unique_ptr<AbstractPluginSession> createSession(
+      MLIRContext *context) = 0;
+
+ private:
+  std::string pluginId;
+};
+
+// Primary base class that plugins extend to provide functionality and
+// extensions to the compiler.
+//
+// A plugin session's life-cycle is bound to an |iree_compiler_session_t| for
+// which it is activated (typically, a CLI will only have a single session, but
+// APIs can create as many as they want within the same process).
+//
+// Most users will inherit from this class via the PluginSession CRTP helper,
+// which adds some niceties and static support for command line option
+// registration.
+class AbstractPluginSession {
+ public:
+  virtual ~AbstractPluginSession();
+
+  // Called after the session has been fully constructed. If it fails, then
+  // it should emit an appropriate diagnostic.
+  virtual LogicalResult activate() {}
+};
+
+template <typename DerivedTy, typename OptionsTy = EmptyPluginOptions>
+class PluginSession : public AbstractPluginSession {
+ public:
+  using Options = OptionsTy;
+  const Options &getOptions() { return options; }
+
+  // DerivedTy default implementations (no-op). Forwarded from the
+  // AbstractPluginRegistration.
+  static void globalInitialize() {}
+  static void registerDialects(DialectRegistry &registry) {}
+
+  struct Registration : public AbstractPluginRegistration {
+    using AbstractPluginRegistration::AbstractPluginRegistration;
+    void globalInitialize() override {
+      // Forward to the CRTP derived type.
+      DerivedTy::globalInitialize();
+    }
+    void initializeCLI() override {
+      // Actually need to capture the reference, not a copy. So get a pointer.
+      globalCLIOptions = &OptionsFromFlags<OptionsTy>::get();
+    }
+    void registerDialects(DialectRegistry &registry) override {
+      // Forward to the CRTP derived type.
+      DerivedTy::registerDialects(registry);
+    }
+    std::unique_ptr<AbstractPluginSession> createSession(
+        MLIRContext *context) override {
+      auto instance = std::make_unique<DerivedTy>();
+      if (globalCLIOptions) {
+        instance->options = *(*globalCLIOptions);
+      }
+      instance->context = context;
+      return instance;
+    }
+    std::optional<OptionsTy *> globalCLIOptions;
+  };
+
+ protected:
+  OptionsTy options;
+  MLIRContext *context = nullptr;
+  friend class Registration;
+};
+
+// Interface to the registration system.
+// Implemented by PluginManager.
+class PluginRegistrar {
+ public:
+  // Register a plugin based on a registration class.
+  void registerPlugin(std::unique_ptr<AbstractPluginRegistration> registration);
+
+  // Registration helper which synthesizes a plugin registration based on
+  // template parameters. It is expected that SessionTy extends the CRTP
+  // base class PluginSession. The OptionsTy, if specified, must satisfy
+  // the contract of an OptionsBinder.
+  template <typename SessionTy>
+  void registerPlugin(std::string pluginId) {
+    auto registration =
+        std::make_unique<typename SessionTy::Registration>(std::move(pluginId));
+    registerPlugin(std::move(registration));
+  }
+
+ protected:
+  llvm::StringMap<std::unique_ptr<AbstractPluginRegistration>> registrations;
+};
+
+// Command line options for the plugin manager.
+class PluginManagerOptions {
+ public:
+  // Plugins to be activated in a session.
+  llvm::SmallVector<std::string> plugins;
+
+  // Print plugin information to stderr.
+  bool printPluginInfo = false;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<PluginManagerOptions>;
+};
 
 // Manages global registrations for available plugins.
 // Typically, there will be one PluginManager globally for the compiler, and
@@ -20,20 +188,46 @@ namespace mlir::iree_compiler {
 //
 // Most of the work of a plugin is done at session initialization time when
 // an MLIRContext is available.
-class PluginManager {
+class PluginManager : public PluginRegistrar {
  public:
-  PluginManager(DialectRegistry &dialectRegistry)
-      : dialectRegistry(dialectRegistry) {}
+  PluginManager();
 
   // Initializes the plugin manager. Since this may do shared library opening
   // and use failable initializers, it can fail. There probably isn't much to
   // do in that case but crash, but the choice is left to the caller.
-  bool initialize();
+  bool loadAvailablePlugins();
+
+  // Calls through to AbstractPluginRegistration::globalInitialize for all
+  // available plugins.
+  void globalInitialize();
+
+  // Calls through to AbstractPluginRegistration::initializeCLI for all
+  // available plugins.
+  void initializeCLI();
+
+  // Calls through to AbstractPluginRegistration::registerDialects for all
+  // available plugins.
+  void registerDialects(DialectRegistry &registry);
 
  private:
-  bool registerPlugin(const char *pluginId, PluginRegistrationFunction f);
+  friend class PluginManagerSession;
+};
 
-  DialectRegistry &dialectRegistry;
+// Holds activated plugins for an |iree_compiler_session_t|.
+class PluginManagerSession {
+ public:
+  PluginManagerSession(PluginManager &pluginManager, MLIRContext *context,
+                       PluginManagerOptions &options)
+      : pluginManager(pluginManager), context(context), options(options) {}
+
+  // Activates plugins as configured.
+  LogicalResult activatePlugins();
+
+ private:
+  PluginManager &pluginManager;
+  MLIRContext *context;
+  PluginManagerOptions &options;
+  llvm::SmallVector<std::unique_ptr<AbstractPluginSession>> activatedSessions;
 };
 
 }  // namespace mlir::iree_compiler

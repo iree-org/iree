@@ -8,7 +8,11 @@ load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
 
 iree_compiler_cc_library(
     name = "PluginAPI",
-    hdrs = ["Registration.h"],
+    hdrs = ["PluginManager.h"],
+    deps = [
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+    ],
 )
 
 iree_compiler_cc_library(
@@ -19,6 +23,6 @@ iree_compiler_cc_library(
     deps = [
         ":PluginAPI",
         "//compiler/src/iree/compiler/PluginAPI/Config:StaticLinkedPlugins",
-        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//mlir:IR",
     ],
 )
