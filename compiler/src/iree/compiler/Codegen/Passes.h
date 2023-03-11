@@ -533,6 +533,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUPackSharedMemoryAlloc();
 
+/// Create pass to do layout analysis and distribution.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPULayoutAnalysisAndDistributionPass();
+
 //------------------------------------------------------------------------------
 // SPIR-V Passes
 //------------------------------------------------------------------------------

@@ -234,7 +234,7 @@ def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
            "Try to use un-peeling epilogue when false, peeled epilouge o.w.">,
     Option<"depth", "pipeline-depth", "int64_t",
             /*default=*/"2",
-           "Number of stages ">,           
+           "Number of stages ">,
     Option<"scheduleIndex", "schedule-index", "int64_t",
             /*default=*/"0",
            "Allows picking different schedule for the pipelining transformation.">,
@@ -242,7 +242,7 @@ def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
             /*default=*/"\"\"",
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
-            "transform dialect operation somewhere in the module.">,           
+            "transform dialect operation somewhere in the module.">,
   ];
 }
 
@@ -472,6 +472,12 @@ def ConvertToNVVM :
   let summary = "Perform final conversion from builtin/GPU/HAL/standard dialect to LLVM "
     "and NVVM dialects";
   let constructor = "mlir::iree_compiler::createConvertToNVVMPass()";
+}
+
+def LLVMGPULayoutAnalysisAndDistribution :
+    Pass<"iree-llvmgpu-layout-analysis-and-distribution", "func::FuncOp"> {
+  let summary = "Pass to do layout analysis followed by distribution";
+  let constructor = "mlir::iree_compiler::createLLVMGPULayoutAnalysisAndDistributionPass()";
 }
 
 // TODO: Bring the argument in line with the names used elsewhere.
