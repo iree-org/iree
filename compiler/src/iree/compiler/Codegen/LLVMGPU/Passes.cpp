@@ -272,6 +272,9 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
       /*epiloguePeeling=*/false, pipelineDepth,
       PipeliningSchedulingStrategy::loadGlobalStage0));
+  // Optimize shared memory usage.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUPackSharedMemoryAlloc());
 }
 
 void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
@@ -329,6 +332,9 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
       /*epiloguePeeling=*/false, pipelineDepth,
       PipeliningSchedulingStrategy::nvidiaTensorCore));
+  // Optimize shared memory usage.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUPackSharedMemoryAlloc());
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {

@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
@@ -175,6 +176,10 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
 /// propagate the type change and erase old subview ops.
 void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
                                        OpBuilder &builder);
+
+/// Sink given operations as close as possible to their uses.
+void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
+                  DominanceInfo &dominators);
 
 }  // namespace iree_compiler
 }  // namespace mlir

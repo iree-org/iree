@@ -670,5 +670,38 @@ void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
   for (Operation *op : opToDelete) op->erase();
 }
 
+void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
+                  DominanceInfo &dominators) {
+  for (Operation *sinkOp : allocs) {
+    Block *dom = nullptr;
+    for (Operation *user : sinkOp->getUsers()) {
+      if (!dom) {
+        dom = user->getBlock();
+        // Find the block in the same region.
+        while (dom->getParent() != sinkOp->getParentRegion()) {
+          dom = dom->getParentOp()->getBlock();
+        }
+        continue;
+      }
+      dom = dominators.findNearestCommonDominator(dom, user->getBlock());
+    }
+    llvm::SmallDenseSet<Operation *> users;
+    for (Operation *user : sinkOp->getUsers()) {
+      while (user->getParentRegion() != sinkOp->getParentRegion()) {
+        user = user->getParentOp();
+      }
+      users.insert(user);
+    }
+    Operation *firstUse = dom->getTerminator();
+    for (Operation &op : dom->getOperations()) {
+      if (users.count(&op)) {
+        firstUse = &op;
+        break;
+      }
+    }
+    sinkOp->moveBefore(firstUse);
+  }
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

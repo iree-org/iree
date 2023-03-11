@@ -505,6 +505,12 @@ def LLVMGPUTensorAlloc :
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorAlloc()";
 }
 
+def LLVMGPUPackSharedMemoryAlloc :
+    Pass<"iree-llvmgpu-pack-shared-memory-alloc", "func::FuncOp"> {
+  let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
+}
+
 def LLVMGPUTensorCoreVectorization :
     Pass<"iree-llvmgpu-tensorcore-vectorization", "func::FuncOp"> {
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";

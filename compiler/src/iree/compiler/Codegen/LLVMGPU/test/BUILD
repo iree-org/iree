@@ -37,6 +37,7 @@ iree_lit_test_suite(
             "linalg_transform.mlir",
             "legalize.mlir",
             "pack_pipeline_test.mlir",
+            "pack_shared_memory_alloc.mlir",
             "tensor_alloc.mlir",
             "tensor_pad.mlir",
             "tensorcore_vectorization.mlir",

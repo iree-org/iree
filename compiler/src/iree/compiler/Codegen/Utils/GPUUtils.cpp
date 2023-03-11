@@ -743,5 +743,12 @@ Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   return std::nullopt;
 }
 
+bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
+  auto addrSpace =
+      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+  return addrSpace &&
+         addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
