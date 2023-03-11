@@ -13,6 +13,7 @@
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
+#include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
@@ -52,6 +53,7 @@ struct GlobalInit {
 
   mlir::DialectRegistry registry;
   bool usesCommandLine;
+  PluginManager pluginManager;
 
   // Our session options can optionally be bound to the global command-line
   // environment. If that is not the case, then these will be nullptr, and
@@ -67,7 +69,7 @@ struct GlobalInit {
 };
 
 GlobalInit::GlobalInit(bool initializeCommandLine)
-    : usesCommandLine(initializeCommandLine) {
+    : usesCommandLine(initializeCommandLine), pluginManager(registry) {
   // Global/static registrations.
   // Allegedly need to register passes to get good reproducers
   // TODO: Verify this (I think that this was fixed some time ago).
@@ -78,6 +80,11 @@ GlobalInit::GlobalInit(bool initializeCommandLine)
   // MLIRContext registration and hooks.
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerLLVMIRTranslations(registry);
+
+  if (!pluginManager.initialize()) {
+    fprintf(stderr, "Failed to initialize IREE compiler plugins.\n");
+    abort();
+  }
 
   if (initializeCommandLine) {
     // Register MLIRContext command-line options like
