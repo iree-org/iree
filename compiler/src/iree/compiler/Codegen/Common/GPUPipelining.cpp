@@ -19,7 +19,6 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 #define DEBUG_TYPE "iree-gpu-nvidia-ampere-mainloop-schedule"
 
 //====---------------------------------------------------------------------===//
@@ -62,7 +61,7 @@ static Operation* replaceOpWithPredicatedOp(Operation* op, Value pred,
     if (mlir::isMemoryEffectFree(op)) return op;
     // Return/execute the op if it is barrier, commit group, or ldmatrix op.
     if (isa<gpu::BarrierOp, nvgpu::DeviceAsyncCreateGroupOp, nvgpu::LdMatrixOp,
-            nvgpu::DeviceAsyncWaitOp>(op))
+            memref::LoadOp, nvgpu::DeviceAsyncWaitOp>(op))
       return op;
     // Return/execute the op if it is a shared memory load.
     if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
@@ -300,7 +299,7 @@ struct MainLoopInfo {
                                Block* block) {
     if (!op) return;
 
-    if (isa<nvgpu::LdMatrixOp>(op)) {
+    if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(op)) {
       if (op->getBlock() == block) {
         loadOperations.insert(op);
       }
@@ -402,7 +401,7 @@ struct MainLoopInfo {
     // seperated by kgroups for fine-grained instruction scheduling.
     for (int kgroup = 0; kgroup < getNumberOfKgroups(); ++kgroup) {
       for (Operation& op : forOp.getBody()->getOperations()) {
-        if (isa<nvgpu::LdMatrixOp>(&op)) {
+        if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(&op)) {
           if (warpOperations[kgroup].loadOperationsA.count(&op)) {
             backwardSliceOfDependentOps(warpOperations[kgroup].loadOperationsA,
                                         &op, forOp.getBody());
