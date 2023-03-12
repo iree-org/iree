@@ -106,7 +106,18 @@ static void iree_hal_metal_end_blit_encoder(iree_hal_metal_command_buffer_t* com
 
 static id<MTLComputeCommandEncoder> iree_hal_metal_get_or_begin_compute_encoder(
     iree_hal_metal_command_buffer_t* command_buffer) {
-  if (command_buffer->blit_encoder) iree_hal_metal_end_blit_encoder(command_buffer);
+  id<MTLFence> encoder_fence = nil;
+  if (command_buffer->blit_encoder) {
+    // We would need to use a fence to synchronize "one or more resources across different passes
+    // within a command buffer."
+    // https://developer.apple.com/documentation/metal/resource_synchronization
+    encoder_fence = [command_buffer->command_buffer.device newFence];  // +1
+    [command_buffer->command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+      [encoder_fence release];  // -1
+    }];
+    [command_buffer->blit_encoder updateFence:encoder_fence];
+    iree_hal_metal_end_blit_encoder(command_buffer);
+  }
 
   @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
     if (!command_buffer->compute_encoder) {
@@ -116,18 +127,37 @@ static id<MTLComputeCommandEncoder> iree_hal_metal_get_or_begin_compute_encoder(
           computeCommandEncoderWithDispatchType:command_buffer->dispatch_type] retain];  // +1
     }
   }
+
+  if (encoder_fence != nil) {
+    [command_buffer->compute_encoder waitForFence:encoder_fence];
+  }
   return command_buffer->compute_encoder;
 }
 
 static id<MTLBlitCommandEncoder> iree_hal_metal_get_or_begin_blit_encoder(
     iree_hal_metal_command_buffer_t* command_buffer) {
-  if (command_buffer->compute_encoder) iree_hal_metal_end_compute_encoder(command_buffer);
+  id<MTLFence> encoder_fence = nil;
+  if (command_buffer->compute_encoder) {
+    // We would need to use a fence to synchronize "one or more resources across different passes
+    // within a command buffer."
+    // https://developer.apple.com/documentation/metal/resource_synchronization
+    encoder_fence = [command_buffer->command_buffer.device newFence];  // +1
+    [command_buffer->command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+      [encoder_fence release];  // -1
+    }];
+    [command_buffer->compute_encoder updateFence:encoder_fence];
+    iree_hal_metal_end_compute_encoder(command_buffer);
+  }
 
   @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
     if (!command_buffer->blit_encoder) {
       command_buffer->blit_encoder =
           [[command_buffer->command_buffer blitCommandEncoder] retain];  // +1
     }
+  }
+
+  if (encoder_fence != nil) {
+    [command_buffer->blit_encoder waitForFence:encoder_fence];
   }
   return command_buffer->blit_encoder;
 }
