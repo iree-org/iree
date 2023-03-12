@@ -104,6 +104,17 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-cpuinfo
+  SRCS
+    "iree-cpuinfo.c"
+  DEPS
+    iree::base
+    iree::base::internal::cpu
+    iree::schemas::cpu_data
+)
+
+iree_cc_binary(
+  NAME
     iree-dump-instruments
   SRCS
     "iree-dump-instruments-main.c"
@@ -129,6 +140,23 @@ iree_cc_binary(
     iree::schemas::bytecode_module_def_c_fbs
     iree::vm::bytecode::module
 )
+
+# Only enable fatelf tool when we're compiling it in.
+# Currently it requires that the host and target both support embedded ELFs as
+# the ELF implementation is only compiled when the target supports it.
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
+iree_cc_binary(
+  NAME
+    iree-fatelf
+  SRCS
+    "iree-fatelf.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::path
+    iree::hal::local::elf::elf_module
+)
+endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
 
 iree_cc_binary(
   NAME
@@ -187,17 +215,6 @@ iree_cc_binary(
     iree::tooling::yaml_util
     iree::vm
     yaml
-)
-
-iree_cc_binary(
-  NAME
-    iree-cpuinfo
-  SRCS
-    "iree-cpuinfo.c"
-  DEPS
-    iree::base
-    iree::base::internal::cpu
-    iree::schemas::cpu_data
 )
 
 if(IREE_BUILD_COMPILER)

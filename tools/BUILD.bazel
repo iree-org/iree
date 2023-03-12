@@ -84,6 +84,16 @@ iree_runtime_cc_binary(
 )
 
 iree_runtime_cc_binary(
+    name = "iree-cpuinfo",
+    srcs = ["iree-cpuinfo.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/schemas:cpu_data",
+    ],
+)
+
+iree_runtime_cc_binary(
     name = "iree-dump-instruments",
     srcs = ["iree-dump-instruments-main.c"],
     deps = [
@@ -104,6 +114,17 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/base/internal/flatcc:debugging",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
         "//runtime/src/iree/vm/bytecode:module",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "iree-fatelf",
+    srcs = ["iree-fatelf.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal:path",
+        "//runtime/src/iree/hal/local/elf:elf_module",
     ],
 )
 
@@ -217,16 +238,6 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/tooling:yaml_util",
         "//runtime/src/iree/vm",
         "@com_github_yaml_libyaml//:yaml",
-    ],
-)
-
-iree_runtime_cc_binary(
-    name = "iree-cpuinfo",
-    srcs = ["iree-cpuinfo.c"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:cpu",
-        "//runtime/src/iree/schemas:cpu_data",
     ],
 )
 
