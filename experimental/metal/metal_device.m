@@ -314,6 +314,20 @@ static iree_status_t iree_hal_metal_device_queue_execute(
   @autoreleasepool {
     // First create a new command buffer and encode wait commands for all wait semaphores.
     if (wait_semaphore_list.count > 0) {
+      // Extract all MTLSharedEvents behind into a heap-allocated array--we will need to access them
+      // in command buffer completion callback.
+      id<MTLSharedEvent>* shared_events;
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_allocator_malloc(device->host_allocator,
+                                    sizeof(id<MTLSharedEvent>) * wait_semaphore_list.count,
+                                    (void**)&shared_events));
+      for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
+        shared_events[i] = iree_hal_metal_shared_event_handle(wait_semaphore_list.semaphores[i]);
+        // Make sure we retain the shared event until command buffer completion. IREE might free the
+        // wrapping semaphore after refcount become zero.
+        [shared_events[i] retain];  // +1
+      }
+
       MTLCommandBufferDescriptor* descriptor = [MTLCommandBufferDescriptor new];  // +1
       descriptor.retainedReferences =
           device->command_buffer_resource_reference_mode ==
@@ -322,10 +336,15 @@ static iree_status_t iree_hal_metal_device_queue_execute(
       id<MTLCommandBuffer> wait_command_buffer =
           [device->queue commandBufferWithDescriptor:descriptor];  // autoreleased
       for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
-        [wait_command_buffer
-            encodeWaitForEvent:iree_hal_metal_shared_event_handle(wait_semaphore_list.semaphores[i])
-                         value:wait_semaphore_list.payload_values[i]];
+        [wait_command_buffer encodeWaitForEvent:shared_events[i]
+                                          value:wait_semaphore_list.payload_values[i]];
       }
+      [wait_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+        for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
+          [shared_events[i] release];  // -1
+        }
+        iree_allocator_free(device->host_allocator, shared_events);
+      }];
       [wait_command_buffer commit];
       [descriptor release];  // -1
     }
@@ -337,6 +356,20 @@ static iree_status_t iree_hal_metal_device_queue_execute(
 
     // Finally create a new command buffer and encode signal commands for all signal semaphores.
     if (signal_semaphore_list.count > 0) {
+      // Extract all MTLSharedEvents behind into a heap-allocated array--we will need to access them
+      // in command buffer completion callback.
+      id<MTLSharedEvent>* shared_events;
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_allocator_malloc(device->host_allocator,
+                                    sizeof(id<MTLSharedEvent>) * signal_semaphore_list.count,
+                                    (void**)&shared_events));
+      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+        shared_events[i] = iree_hal_metal_shared_event_handle(signal_semaphore_list.semaphores[i]);
+        // Make sure we retain the shared event until command buffer completion. IREE might free the
+        // wrapping semaphore after refcount become zero.
+        [shared_events[i] retain];  // +1
+      }
+
       MTLCommandBufferDescriptor* descriptor = [MTLCommandBufferDescriptor new];  // +1
       descriptor.retainedReferences =
           device->command_buffer_resource_reference_mode ==
@@ -349,6 +382,12 @@ static iree_status_t iree_hal_metal_device_queue_execute(
                                                      signal_semaphore_list.semaphores[i])
                                            value:signal_semaphore_list.payload_values[i]];
       }
+      [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+        for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
+          [shared_events[i] release];  // -1
+        }
+        iree_allocator_free(device->host_allocator, shared_events);
+      }];
       [signal_command_buffer commit];
       [descriptor release];  // -1
     }
