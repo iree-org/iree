@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Transforms/ValueBoundsOpInterface.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/X86Vector/Transforms.h"
 #include "mlir/Pass/PassManager.h"
@@ -190,7 +191,7 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
       return failure();
     }
 
-    // Static case: `dim` size is available in the operand type.
+    // Trivial case: `dim` size is available in the operand type.
     int64_t dimSize =
         operand.getType().cast<ShapedType>().getShape()[operandDim];
     if (!ShapedType::isDynamic(dimSize)) {
@@ -198,79 +199,38 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
       continue;
     }
 
-    // Dynamic case: Traverse the U-D chain of the operand and try to find an
-    // operation (e.g., `tensor.extract_slice`, `affine.min`) that contains
-    // static information about the `dim` size.
-    Operation *currentOp = operand.getDefiningOp();
-    while (currentOp) {
-      LDBG("Inspecting for vector sizes: " << *currentOp << "\n");
-
-      if (isa<AffineMinOp>(currentOp)) {
-        break;
-      }
-      if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(currentOp)) {
-        if (!extractSliceOp.isDynamicSize(operandDim)) {
-          // Extract slice has static information about the `dim` size.
-          break;
-        }
-        currentOp = extractSliceOp.getDynamicSize(operandDim).getDefiningOp();
-        continue;
-      }
-      if (auto subviewOp = dyn_cast<memref::SubViewOp>(currentOp)) {
-        if (!subviewOp.isDynamicSize(operandDim)) {
-          // Subview has static information about the `dim` size.
-          break;
-        }
-        currentOp = subviewOp.getDynamicSize(operandDim).getDefiningOp();
-        continue;
-      }
-      if (auto affineApplyOp = dyn_cast<AffineApplyOp>(currentOp)) {
-        AffineValueMap valueMap = affineApplyOp.getAffineValueMap();
-        if (valueMap.getNumDims() != 1 || valueMap.getNumSymbols() != 1)
-          return failure();
-        currentOp = valueMap.getOperand(1).getDefiningOp();
-        continue;
-      }
-
-      // Unexpected op in U-D chain;
-      return failure();
+    // TODO
+    OpBuilder fakeBuilder(linalgOp.getContext());
+    FailureOr<OpFoldResult> dimBound =
+        linalg::ValueBoundsConstraintSet::reifyBound(
+            fakeBuilder, linalgOp.getLoc(),
+            presburger::IntegerPolyhedron::BoundType::UB, operand, operandDim,
+            [](Value value) -> bool {
+              Operation *defOp = isa<BlockArgument>(value)
+                                     ? value.getParentRegion()->getParentOp()
+                                     : value.getDefiningOp();
+              if (!defOp) {
+                return true;
+              }
+              if (isa<tensor::ExtractSliceOp, memref::SubViewOp, AffineMinOp,
+                      AffineApplyOp, scf::ForOp>(defOp)) {
+                return false;
+              }
+              return true;
+            });
+    if (failed(dimBound)) {
+      llvm_unreachable("reifyBounds failed");
     }
 
-    // Extract the static information found for `dim`.
-    if (auto extractSliceOp =
-            dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp)) {
-      vectorSizes.push_back(extractSliceOp.getStaticSize(operandDim));
-      continue;
+    if (auto val = dimBound->dyn_cast<Value>()) {
+      val.dump();
+      llvm_unreachable("bound is a Value");
     }
 
-    if (auto subViewOp = dyn_cast_or_null<memref::SubViewOp>(currentOp)) {
-      vectorSizes.push_back(subViewOp.getStaticSize(operandDim));
-      continue;
-    }
-
-    auto affineMin = dyn_cast_or_null<AffineMinOp>(currentOp);
-    if (!affineMin) {
-      return failure();
-    }
-
-    auto minResults = affineMin.getAffineMap().getResults();
-    if (minResults.size() != 2) {
-      return failure();
-    }
-
-    auto const0Result = minResults[0].dyn_cast<AffineConstantExpr>();
-    auto const1Result = minResults[1].dyn_cast<AffineConstantExpr>();
-    if ((!const0Result && !const1Result) || (const0Result && const1Result)) {
-      return failure();
-    }
-
-    if (const0Result) {
-      vectorSizes.push_back(const0Result.getValue());
-    }
-
-    if (const1Result) {
-      vectorSizes.push_back(const1Result.getValue());
-    }
+    LDBG("Getting vector sizes for:\n" << linalgOp << "\n");
+    dimSize = dimBound->get<Attribute>().cast<IntegerAttr>().getInt();
+    vectorSizes.push_back(dimSize);
+    LDBG("Inferred vector size: " << dimSize << "\n");
   }
 
   return vectorSizes;
