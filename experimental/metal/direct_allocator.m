@@ -135,7 +135,7 @@ static iree_hal_buffer_compatibility_t iree_hal_metal_allocator_query_buffer_com
 // Returns the corresponding Metal resource options controlling storage modes, CPU caching modes,
 // and hazard tracking modes for the given IREE HAL memory |type|.
 static MTLResourceOptions iree_hal_metal_select_resource_options(
-    iree_hal_memory_type_t type, bool is_unified_memory,
+    iree_hal_memory_type_t type, bool is_unified_memory, bool has_init_data,
     iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode) {
   MTLResourceOptions options;
 
@@ -162,7 +162,8 @@ static MTLResourceOptions iree_hal_metal_select_resource_options(
 #endif  // IREE_PLATFORM_MACOS
     } else {
       // Device local + host invisible.
-      options = MTLResourceStorageModePrivate;
+      options = (is_unified_memory && has_init_data) ? MTLResourceStorageModeShared
+                                                     : MTLResourceStorageModePrivate;
     }
   } else {
     if (iree_all_bits_set(type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
@@ -210,17 +211,20 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
 
   iree_status_t status = iree_ok_status();
   bool is_unified_memory = [allocator->device hasUnifiedMemory];
+  bool has_init_data = !iree_const_byte_span_is_empty(initial_data);
 
   MTLResourceOptions options = iree_hal_metal_select_resource_options(
-      compat_params.type, is_unified_memory, allocator->resource_tracking_mode);
+      compat_params.type, is_unified_memory, has_init_data, allocator->resource_tracking_mode);
   id<MTLBuffer> metal_buffer = nil;
-  if (iree_const_byte_span_is_empty(initial_data)) {
-    metal_buffer = [allocator->device newBufferWithLength:allocation_size options:options];  // +1
-  } else {
+  // If we chose shared storage mode, we can handle initial data with newByfferWithBytes directly.
+  // Otherwise we just create the buffer here, and explicitly transfer range later.
+  if (has_init_data && iree_all_bits_set(options, MTLResourceStorageModeShared)) {
     IREE_ASSERT_EQ(allocation_size, initial_data.data_length);
     metal_buffer = [allocator->device newBufferWithBytes:(void*)initial_data.data
                                                   length:initial_data.data_length
                                                  options:options];  // +1
+  } else {
+    metal_buffer = [allocator->device newBufferWithLength:allocation_size options:options];  // +1
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -234,6 +238,15 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
         metal_buffer, base_allocator, compat_params.type, compat_params.access, compat_params.usage,
         allocation_size, /*byte_offset=*/0,
         /*byte_length=*/allocation_size, iree_hal_buffer_release_callback_null(), &buffer);  // +1
+  }
+
+  if (iree_status_is_ok(status) && has_init_data &&
+      !iree_all_bits_set(options, MTLResourceStorageModeShared)) {
+    status = iree_hal_device_transfer_range(
+        allocator->base_device,
+        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data, initial_data.data_length),
+        0, iree_hal_make_device_transfer_buffer(buffer), 0, initial_data.data_length,
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
   }
 
   if (iree_status_is_ok(status)) {
