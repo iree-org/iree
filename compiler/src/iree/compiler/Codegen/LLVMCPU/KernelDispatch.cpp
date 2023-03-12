@@ -203,10 +203,12 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
   bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
+  bool isContraction =
+      isa<linalg::ContractionOpInterface>(linalgOp.getOperation());
 
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
-    if (isLinalgGeneric) {
+    if (isLinalgGeneric || isContraction) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -793,6 +795,8 @@ static LogicalResult setMatmulNoPadRootConfig(
 
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+  // TODO(dcaballe): This is no longer true but we can't remove the loop because
+  // `shape` is redefined in the loop.
   // Iterate over the inner tile size tuples to check that their sizes divides
   // the sizes of the iteration space.
   for (auto tileSizeTuple :
@@ -801,25 +805,29 @@ static LogicalResult setMatmulNoPadRootConfig(
       // Quantized cases are not fully evaluated yet, so it might go with NoPad
       // approach.
       if (tileSize == 0 || shape[idx] == ShapedType::kDynamic) continue;
-      assert(shape[idx] % tileSize == 0);
+      // assert(shape[idx] % tileSize == 0);
       shape[idx] = tileSize;
     }
   }
 
-  // TODO(hanchung): Create an addtional pass to handle such cases.
+  // TODO(hanchung): Create an additional pass to handle such cases.
   // The tiling for parallel dims and reduction dims should be separated.
   const SmallVectorImpl<int64_t> &workgroupTileSizes = inputTileSizes.back();
   SmallVector<int64_t> parallelTileSizes;
   for (auto [index, tileSize] : llvm::enumerate(workgroupTileSizes)) {
     int64_t sz = tileSize;
     bool allowIncompleteTile =
-        vecPreProcStrategy == VectorPreProcStrategy::Peeling ||
+        vecPreProcStrategy == VectorPreProcStrategy::Peeling;
+    bool enforcePowerOfTwo =
         vecPreProcStrategy == VectorPreProcStrategy::Masking;
+
+    // TODO(dcaballe): Align padding tile size computation with masking.
 
     if (sz != 0) {
       sz = getMaxTileSize(
           /*lb=*/0, /*ub=*/shape[index],
-          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile);
+          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile,
+          enforcePowerOfTwo);
     }
     parallelTileSizes.push_back(sz);
   }
@@ -995,13 +1003,16 @@ static LogicalResult setRootConfig(
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
   auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
-  bool usePaddingPipeline =
-      vecPreProcStrategy == VectorPreProcStrategy::Padding;
+  bool usePadding = vecPreProcStrategy == VectorPreProcStrategy::Padding;
+  bool useMasking = vecPreProcStrategy == VectorPreProcStrategy::Masking;
 
   LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
                        << vecPreProcStrategy << "\n");
 
-  if (usePaddingPipeline) {
+  // TODO(dcaballe): Try to use the same tile size configuration for padding and
+  // masking. Note that there is a tile size tweak in `setMatmulPadRootConfig`
+  // that is not done for masking (yet).
+  if (usePadding || useMasking) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
     // 288/12*8=192
@@ -1031,7 +1042,7 @@ static LogicalResult setRootConfig(
   }
 
   TileSizesListType tileSizes = {flowTileSizes, workgroupTileSizes};
-  if (usePaddingPipeline) {
+  if (usePadding) {
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   workgroupTileSizes, vectorSize);
   }
