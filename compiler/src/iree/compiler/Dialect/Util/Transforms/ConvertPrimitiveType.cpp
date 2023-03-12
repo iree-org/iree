@@ -43,6 +43,9 @@ struct PrimitiveTypeConverter : public TypeConverter {
       if (!isSourceType(type)) return type;
       return getTargetType(type);
     });
+    addConversion([&](ComplexType type) {
+      return ComplexType::get(convertType(type.getElementType()));
+    });
     addConversion([&](RankedTensorType type) {
       return RankedTensorType::get(type.getShape(),
                                    convertType(type.getElementType()),
