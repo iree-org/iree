@@ -39,10 +39,14 @@ static std::tuple<std::string, int> getOrdinalFromDebugTarget(
   if (marker.empty() || marker[0] != '@') return std::make_tuple("", -1);
 
   SmallVector<StringRef, 2> parts;
-  llvm::SplitString(marker.substr(1), parts, ":");
+  auto cropped = marker.substr(1);
+  llvm::SplitString(llvm::StringRef(cropped), parts, ":");
   if (parts.size() != 2) return std::make_tuple("", -1);
 
-  return std::make_tuple(parts[0].str(), std::stoi(parts[1].str()));
+  int ordinal;
+  if (parts[1].getAsInteger(10, ordinal)) return std::make_tuple("", -1);
+
+  return std::make_tuple(parts[0].str(), ordinal);
 }
 
 // Inserts flow.tensor.trace ops around the specified dispatch op.
