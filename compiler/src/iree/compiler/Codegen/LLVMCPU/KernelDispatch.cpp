@@ -793,50 +793,64 @@ static LogicalResult setMatmulNoPadRootConfig(
   size_t numTuples = inputTileSizes.size();
   assert(numTuples >= 2 && "Expected two or more tile size tuples");
 
-  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  // TODO(dcaballe): This is no longer true but we can't remove the loop because
-  // `shape` is redefined in the loop.
-  // Iterate over the inner tile size tuples to check that their sizes divides
-  // the sizes of the iteration space.
-  for (auto tileSizeTuple :
-       llvm::make_range(inputTileSizes.begin(), inputTileSizes.end() - 1)) {
-    for (const auto &[idx, tileSize] : llvm::enumerate(tileSizeTuple)) {
-      // Quantized cases are not fully evaluated yet, so it might go with NoPad
-      // approach.
-      if (tileSize == 0 || shape[idx] == ShapedType::kDynamic) continue;
-      // assert(shape[idx] % tileSize == 0);
-      shape[idx] = tileSize;
-    }
-  }
+  // auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+  // SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+  //// TODO(dcaballe): This is no longer true but we can't remove the loop
+  /// because / `shape` is redefined in the loop. / Iterate over the inner tile
+  /// size tuples to check that their sizes divides / the sizes of the iteration
+  /// space.
+  // for (auto tileSizeTuple :
+  //      llvm::make_range(inputTileSizes.begin(), inputTileSizes.end() - 1)) {
+  //   for (const auto &[idx, tileSize] : llvm::enumerate(tileSizeTuple)) {
+  //     // Quantized cases are not fully evaluated yet, so it might go with
+  //     NoPad
+  //     // approach.
+  //     if (tileSize == 0 || shape[idx] == ShapedType::kDynamic) continue;
+  //     // assert(shape[idx] % tileSize == 0);
+  //     shape[idx] = tileSize;
+  //   }
+  // }
 
-  // TODO(hanchung): Create an additional pass to handle such cases.
-  // The tiling for parallel dims and reduction dims should be separated.
+  //// TODO(hanchung): Create an additional pass to handle such cases.
+  //// The tiling for parallel dims and reduction dims should be separated.
   const SmallVectorImpl<int64_t> &workgroupTileSizes = inputTileSizes.back();
-  SmallVector<int64_t> parallelTileSizes;
-  for (auto [index, tileSize] : llvm::enumerate(workgroupTileSizes)) {
-    int64_t sz = tileSize;
-    bool allowIncompleteTile =
-        vecPreProcStrategy == VectorPreProcStrategy::Peeling;
-    bool enforcePowerOfTwo =
-        vecPreProcStrategy == VectorPreProcStrategy::Masking;
+  // SmallVector<int64_t> parallelTileSizes;
+  // for (auto [index, tileSize] : llvm::enumerate(workgroupTileSizes)) {
+  //   int64_t sz = tileSize;
+  //   bool allowIncompleteTile =
+  //       vecPreProcStrategy == VectorPreProcStrategy::Peeling;
+  //   bool enforcePowerOfTwo =
+  //       vecPreProcStrategy == VectorPreProcStrategy::Masking;
 
-    // TODO(dcaballe): Align padding tile size computation with masking.
+  //  // TODO(dcaballe): Align padding tile size computation with masking.
 
-    if (sz != 0) {
-      sz = getMaxTileSize(
-          /*lb=*/0, /*ub=*/shape[index],
-          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile,
-          enforcePowerOfTwo);
-    }
-    parallelTileSizes.push_back(sz);
-  }
-  SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
-                                 reductionTileSizes);
+  //  if (sz != 0) {
+  //    sz = getMaxTileSize(
+  //        /*lb=*/0, /*ub=*/shape[index],
+  //        /*maxTileSize=*/sz, vectorSize, allowIncompleteTile,
+  //        enforcePowerOfTwo);
+  //  }
+  //  parallelTileSizes.push_back(sz);
+  //}
+  // SmallVector<int64_t> reductionTileSizes;
+  // splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
+  //                               reductionTileSizes);
 
-  setVectorSizesForDynamicShapes(op.getOperation(), vecPreProcStrategy,
-                                 parallelTileSizes, reductionTileSizes);
+  // setVectorSizesForDynamicShapes(op.getOperation(), vecPreProcStrategy,
+  //                                parallelTileSizes, reductionTileSizes);
+
+  // TODO(dcaballe): Tile size configuration copied from MatmulPadRootConfig.
+  SmallVector<int64_t> parallelTileSizes(workgroupTileSizes.begin(),
+                                         workgroupTileSizes.end());
+  parallelTileSizes.back() = 0;
+
+  // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
+  // if the dim size is small (e.g., K=24).
+  SmallVector<int64_t> reductionTileSizes(workgroupTileSizes.size() - 1, 0);
+  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  int64_t K = lhsShapedType.getShape().back();
+  reductionTileSizes.push_back(
+      getMaxTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
   TileSizesListType newTileSizes;
   // Copy all the tile size levels except the workgroup one which will be split
