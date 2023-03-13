@@ -154,6 +154,17 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     const SmallVector<int64_t> &tileSizes);
 
+//===---------------------------------------------------------------------===//
+// Misc. utility functions.
+//===---------------------------------------------------------------------===//
+
+/// Convert byte offset into offsets in terms of number of elements based
+/// on `elementType`
+OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
+                                              Location loc,
+                                              OpFoldResult byteOffset,
+                                              Type elementType);
+
 /// Replace the uses of memref `oldOp` with the given `val` and for subview uses
 /// propagate the type change. Changing the memref type may require propagating
 /// it through subview ops so we cannot just do a replaceAllUse but need to

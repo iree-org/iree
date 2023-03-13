@@ -91,26 +91,20 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
 
     // Convert n-D MemRef to 1-D MemRef.
     addConversion([](MemRefType type) -> Optional<Type> {
-      if (Attribute storage = type.getMemorySpace()) {
-        if (auto dtAttr = storage.dyn_cast<IREE::HAL::DescriptorTypeAttr>()) {
-          // Uniform buffers are faster but generally have a much smaller
-          // capacity limits. GPUs would expect such buffers to have a bound
-          // size when declaring resource ops in the kernel, so converting them
-          // to a static shaped 1-D memref.
-          if (dtAttr.getValue() == IREE::HAL::DescriptorType::UniformBuffer &&
-              type.hasStaticShape()) {
-            return MemRefType::get(type.getNumElements(), type.getElementType(),
-                                   AffineMap(), type.getMemorySpace());
-          }
-        }
+      int64_t offset;
+      SmallVector<int64_t> strides;
+      if (failed(getStridesAndOffset(type, strides, offset))) {
+        return nullptr;
       }
-      // By default convert others to a MemRef with unknown dimension. This is
-      // actually more akin to how IREE uses memref types for storage buffers:
-      // they are representing a view from a byte buffer with potentially
-      // unknown total size, as transformation passes can concatenate buffers,
-      // etc.
-      return MemRefType::get(ShapedType::kDynamic, type.getElementType(),
-                             AffineMap(), type.getMemorySpace());
+      // Since the memref gets linearized, use a stride 1, offset 0.
+      StridedLayoutAttr layoutAttr;
+      if (offset != 0) {
+        layoutAttr = StridedLayoutAttr::get(type.getContext(), offset, {1});
+      }
+      int64_t staticShape =
+          type.hasStaticShape() ? type.getNumElements() : ShapedType::kDynamic;
+      return MemRefType::get(staticShape, type.getElementType(), layoutAttr,
+                             type.getMemorySpace());
     });
   }
 };
@@ -238,24 +232,61 @@ struct FlattenBindingSubspan final
     auto oldType = subspanOp.getType().dyn_cast<MemRefType>();
     // IREE subspan ops only use memref types with the default identity
     // layout maps.
-    if (!oldType || !oldType.getLayout().isIdentity()) return failure();
+    if (!oldType) return failure();
 
-    auto newType = getTypeConverter()->convertType(oldType).cast<MemRefType>();
-    SmallVector<Value, 1> dynamicDims;
-    if (!newType.hasStaticShape()) {
-      dynamicDims.push_back(createTotalElementCountValue(
-          oldType, subspanOp.getDynamicDims(), subspanOp.getLoc(), rewriter));
+    OpFoldResult linearShape;
+    if (oldType.hasStaticShape()) {
+      linearShape = rewriter.getIndexAttr(oldType.getNumElements());
+    } else {
+      linearShape = createTotalElementCountValue(
+          oldType, subspanOp.getDynamicDims(), subspanOp.getLoc(), rewriter);
+    }
+    OpFoldResult linearShapeWithoutOffset = linearShape;
+
+    // Check if the subspan has offset. Convert the subspan into a new subpan
+    // of zero offset with size = linearize(original shape) + byteOffset /
+    // element-width.
+    auto byteOffset = subspanOp.getByteOffset();
+    Location loc = subspanOp.getLoc();
+    OpFoldResult elementOffset = rewriter.getIndexAttr(0);
+    if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
+      elementOffset = convertByteOffsetToElementOffset(
+          rewriter, loc, byteOffset, oldType.getElementType());
+      AffineExpr s0, s1;
+      bindSymbols(rewriter.getContext(), s0, s1);
+      linearShape = makeComposedFoldedAffineApply(rewriter, loc, s0 + s1,
+                                                  {linearShape, elementOffset});
     }
 
+    SmallVector<int64_t, 1> staticShape;
+    SmallVector<Value, 1> dynamicShape;
+    dispatchIndexOpFoldResult(linearShape, dynamicShape, staticShape);
+    auto newType =
+        MemRefType::get(staticShape, oldType.getElementType(),
+                        MemRefLayoutAttrInterface(), oldType.getMemorySpace());
+
+    auto newOffset = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp.getLoc(), newType, subspanOp.getSet(), subspanOp.getBinding(),
-        subspanOp.getDescriptorType(), subspanOp.getByteOffset(), dynamicDims,
+        subspanOp.getDescriptorType(), newOffset, dynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-    if (isRankZeroOrOneMemRef(oldType)) {
-      rewriter.replaceOpWithNewOp<memref::CastOp>(subspanOp, oldType, newOp);
-    } else {
-      rewriter.replaceOp(subspanOp, newOp.getResult());
+
+    Value replacement = newOp;
+    if (!isConstantIntValue(elementOffset, 0)) {
+      OpFoldResult stride = rewriter.getIndexAttr(1);
+      MemRefType returnType =
+          oldType.getRank() == 0
+              ? memref::SubViewOp::inferRankReducedResultType(
+                    {}, newType, elementOffset, linearShapeWithoutOffset,
+                    stride)
+                    .cast<MemRefType>()
+              : nullptr;
+      replacement = rewriter.create<memref::SubViewOp>(
+          loc, returnType, newOp, elementOffset, linearShapeWithoutOffset,
+          OpFoldResult(rewriter.getIndexAttr(1)));
     }
+
+    rewriter.replaceOp(subspanOp, replacement);
     return success();
   }
 };
@@ -280,8 +311,15 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   SmallVector<int64_t> strides;
   int64_t offset;
   if (succeeded(getStridesAndOffset(sourceType, strides, offset))) {
+    // The memref itself might have an offset, but we should not account for it
+    // when computing the linearization. The original memref might be
+    // `memref<?x?xf32, strided<[?, ?], offset: ?>`
+    // where shape is `{%d0, %d1}`, strides are `{%s0, %s1}` and offset is
+    // `%offset`. The interpretation of that is the actual memref starts at
+    // `%offset` from the base pointer. After linearization, the offset remains,
+    // but the shape is 1D. So build a map with the same strides, but 0 offset.
     AffineMap linearLayoutMap =
-        makeStridedLinearLayoutMap(strides, offset, builder.getContext());
+        makeStridedLinearLayoutMap(strides, 0, builder.getContext());
     // Dynamic strides/offset will create symbols. There should be none for the
     // static case.
     if (linearLayoutMap.getNumSymbols() == 0) {
@@ -481,7 +519,9 @@ struct LinearizeTransferReadIndices final
       ConversionPatternRewriter &rewriter) const override {
     if (!transferReadOp.getPermutationMap().isMinorIdentity()) {
       return rewriter.notifyMatchFailure(
-          transferReadOp, "cannot convert op with non-minor identity map");
+          transferReadOp,
+          "cannot convert op with non-minor identity "
+          "map");
     }
     if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
@@ -513,7 +553,9 @@ struct LinearizeTransferWriteIndices final
       ConversionPatternRewriter &rewriter) const override {
     if (!transferWriteOp.getPermutationMap().isMinorIdentity()) {
       return rewriter.notifyMatchFailure(
-          transferWriteOp, "cannot convert op with non-minor identity map");
+          transferWriteOp,
+          "cannot convert op with non-minor identity "
+          "map");
     }
     if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
@@ -666,10 +708,12 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
                                    subspanOp.getDynamicDims().end());
     Type resultType = memrefType;
     if (memrefType.getRank() == 0) {
-      // The current MemRef has rank zero but a non-zero offset. This only works
-      // in IREE's subspan ops--a subview of the underlying whole buffer. For
-      // such cases we'd need to make the type and offset consistent to utilize
-      // MLIR IR constructs. Turn the 0-D MemRef into a 1-D dynamic one.
+      // The current MemRef has rank zero but a non-zero
+      // offset. This only works in IREE's subspan ops--a
+      // subview of the underlying whole buffer. For such
+      // cases we'd need to make the type and offset
+      // consistent to utilize MLIR IR constructs. Turn
+      // the 0-D MemRef into a 1-D dynamic one.
       resultType =
           MemRefType::get(ShapedType::kDynamic, memrefType.getElementType(),
                           AffineMap(), memrefType.getMemorySpace());
@@ -830,7 +874,11 @@ struct FlattenMemRefSubspanPass
             });
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
         [&](IREE::HAL::InterfaceBindingSubspanOp op) {
-          return interfaceTypeConverter.isLegal(op.getType());
+          if (!isRankZeroOrOneMemRef(op.getType())) {
+            return false;
+          }
+          auto byteOffset = op.getByteOffset();
+          return !byteOffset || matchPattern(byteOffset, m_Zero());
         });
     target.addDynamicallyLegalOp<memref::GlobalOp>([](memref::GlobalOp op) {
       return isRankZeroOrOneMemRef(op.getType());

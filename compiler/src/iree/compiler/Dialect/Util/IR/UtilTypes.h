@@ -205,6 +205,10 @@ static inline int32_t getRoundedElementByteWidth(Type type) {
   if (auto complexType = type.dyn_cast<ComplexType>()) {
     return 2 * getRoundedElementByteWidth(complexType.getElementType());
   }
+  if (auto vectorType = type.dyn_cast<VectorType>()) {
+    return vectorType.getNumElements() *
+           getRoundedElementByteWidth(vectorType.getElementType());
+  }
   unsigned bitsUnaligned = type.getIntOrFloatBitWidth();
   assert(bitsUnaligned > 0 && "0-width types unsupported");
   // Round up to 8-bit aligned bytes.
