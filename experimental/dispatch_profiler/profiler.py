@@ -5,9 +5,22 @@ from matmul import *
 from manifest import *
 from performance_report import *
 
+###############################################################################
+# Map of operation kinds to their dispatch launchers.
 operation_launcher_map = {
     OperationKind.Matmul: MatmulOperationLauncher,
 }
+###############################################################################
+
+
+###############################################################################
+# Profiler main
+###############################################################################
+# The main entry point for the profiler tool. This tool compiles, verifies, and
+# profiles IREE-compiled MLIR operations for a given backend device and tuning 
+# configuration. A few definitions to help read the data structures, comments,
+# and the profiler tool. 
+#
 
 if __name__ == "__main__":
   ###############################################################################
@@ -19,7 +32,7 @@ if __name__ == "__main__":
   ###############################################################################
 
   # General profiler options
-  parser.add_argument("--build-dir", default=".", required=True, \
+  parser.add_argument("--build-dir", default=".", \
                       help="IREE top-level build directory is used to generate "\
                         "operations and npy files.This should be same that used "\
                         "to call generated.py")

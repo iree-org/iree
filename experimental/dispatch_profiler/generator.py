@@ -10,9 +10,9 @@ if __name__ == "__main__":
 
   parser = argparse.ArgumentParser(description="Generates MLIR operations for "\
                      "functional and performance testing of IREE compilers")
-  parser.add_argument("--build-dir", default=".", required=True, help="IREE "\
-                      "top-level build directory is used to generate operations "\
-                      "and npy files")
+  parser.add_argument("--build-dir", default=".", \
+                      help="IREE top-level build directory is used to generate "\
+                        "operations and npy files")
   parser.add_argument("--operation_kind", default="all", help="Specifies the "\
                       "operation kinds to generate (matmul, conv2d, all)")
   parser.add_argument("--dispatches", default='', help="Comma delimited list to "\
