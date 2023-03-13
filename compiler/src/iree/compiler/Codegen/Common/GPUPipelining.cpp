@@ -61,11 +61,15 @@ static Operation* replaceOpWithPredicatedOp(Operation* op, Value pred,
     if (mlir::isMemoryEffectFree(op)) return op;
     // Return/execute the op if it is barrier, commit group, or ldmatrix op.
     if (isa<gpu::BarrierOp, nvgpu::DeviceAsyncCreateGroupOp, nvgpu::LdMatrixOp,
-            memref::LoadOp, nvgpu::DeviceAsyncWaitOp>(op))
+            nvgpu::DeviceAsyncWaitOp>(op))
       return op;
     // Return/execute the op if it is a shared memory load.
     if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
       auto loadBaseType = loadOp.getBase().getType().cast<MemRefType>();
+      if (hasSharedMemoryAddressSpace(loadBaseType)) return op;
+    }
+    if (auto loadOp = dyn_cast<memref::LoadOp>(op)) {
+      auto loadBaseType = loadOp.getMemRefType();
       if (hasSharedMemoryAddressSpace(loadBaseType)) return op;
     }
     // If we are here that means the operation does not have predication support
@@ -292,7 +296,7 @@ struct MainLoopInfo {
   }
 
   // Backtrack from the MmaSyncOp operand (mlir::OpOperand) to its defining
-  // `mlir::Operation` to find the ldmatrix or ld.shared operations that load
+  // mlir::Operation to find the ldmatrix or ld.shared operations that load
   // MmaSyncOp operands.
   void backtrackToFindSmemLoad(Operation* op,
                                llvm::SetVector<Operation*>& loadOperations,
@@ -308,7 +312,7 @@ struct MainLoopInfo {
 
     // Recurse upwards towards the definition until a Shared Memory load is
     // found. Assumption here is that only single operand operations are
-    // leading up to LdMatrix.
+    // leading up to a Shared Memory load.
     Operation* defOp = op->getOperand(0).getDefiningOp();
 
     backtrackToFindSmemLoad(defOp, loadOperations, block);
@@ -397,8 +401,8 @@ struct MainLoopInfo {
       }
     }
 
-    // Collect the dependent operations for mma.sync and ldmatix operations
-    // seperated by kgroups for fine-grained instruction scheduling.
+    // Collect the dependent operations for `mma.sync` and `ldmatrix/ld.shared`
+    // operations seperated by kgroups for fine-grained instruction scheduling.
     for (int kgroup = 0; kgroup < getNumberOfKgroups(); ++kgroup) {
       for (Operation& op : forOp.getBody()->getOperations()) {
         if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(&op)) {
