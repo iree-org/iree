@@ -2,8 +2,8 @@
 
 **We are migrating to the new benchmark suites. Currently IREE benchmark CI
 (https://perf.iree.dev) is using the new one for x86_64, CUDA, and all
-compilation statistics targets. If you need to reproduce those results, please
-see the [docs for IREE new benchmark suites](/build_tools/benchmarks/README.md#iree-benchmark-suites)**.
+compilation statistics targets. To reproduce those results, please see the
+[docs for IREE new benchmark suites](/docs/developers/developing_iree/benchmark_suites.md)**.
 
 This directory contains configuration definition for IREE's legacy benchmarks
 suite.

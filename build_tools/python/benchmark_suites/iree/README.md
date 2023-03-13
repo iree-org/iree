@@ -1,9 +1,7 @@
 # IREE Benchmark Suites Configurations
 
-**For working with the legacy benchmark suites, see [IREE Benchmarks (Legacy)](/benchmarks)**
-
 This directory contains the Python scripts that define the benchmark
-configrations. To run the benchmark suites, see [IREE Benchmark Suites](/build_tools/benchmarks/README.md).
+configrations. To run the benchmark suites, see [IREE Benchmark Suites](/docs/developers/developing_iree/benchmark_suites.md).
 
 ## Updating Benchmarks
 1. Modify the Python scripts of benchmark generators under
