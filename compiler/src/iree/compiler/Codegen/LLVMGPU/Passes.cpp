@@ -15,6 +15,7 @@
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -276,15 +277,10 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLoopInvariantCodeMotionPass());
   if (llvmgpuUseGPUPipeliner) {
     // Pipeline memory operations.
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLoopInvariantCodeMotionPass());
-    nestedModulePM.addPass(createLowerAffinePass());
   }
 }
 
@@ -402,6 +398,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // but after linalg lowering.
   pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
 
+  // FIXME:  Do we need to keep that one?
+  // We do the lower-affine later already in the pipeline.
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -411,6 +409,21 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createFoldTensorExtractOpPass());
 
   pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorLoweringPass());
+
+
+  // <This needs to run before scf ->cf>
+  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
+  pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  pm.addPass(memref::createRewriteAddressComputationPass());
+  pm.addPass(memref::createExpandStridedMetadataPass());
+  // decompose affine:
+  // Hoist loop invariant variables.
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  // Decompose the `affine.apply`s.
+  pm.addPass(createDecomposeAffinePass());
+  // Hoist the resulting decompositions.
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  // </This needs to run before scf ->cf>
 
   // SCF -> STD
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
@@ -423,9 +436,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
-  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
-  pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
-  pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createLowerAffinePass());
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.

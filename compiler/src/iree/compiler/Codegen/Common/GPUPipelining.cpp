@@ -366,6 +366,7 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
     funcOp.walk([](gpu::BarrierOp barrierOp) {
       if (barrierOp->hasAttr(kPipeliningExtraBarrier)) barrierOp->erase();
     });
+#if 0
     {
       RewritePatternSet patterns(&getContext());
       LLVMTypeConverter converter(&getContext(), /*DataLayoutAnalysis=*/nullptr,
@@ -413,6 +414,7 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
         (void)decompose(rewriter, op);
       });
     }
+#endif
   }
 
  private:
