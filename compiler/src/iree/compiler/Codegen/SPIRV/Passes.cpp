@@ -201,6 +201,8 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // because we don't use upstream memref descriptors.
   pm.addNestedPass<func::FuncOp>(createFixupSubspanWithOffsetsPass());
   pm.addPass(createFlattenMemRefSubspanPass());
+  pm.addNestedPass<func::FuncOp>(
+      createSPIRVEraseStorageBufferStaticShapePass());
 }
 
 /// Adds passes to perform the final SPIR-V conversion.

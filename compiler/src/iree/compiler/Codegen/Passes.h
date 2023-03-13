@@ -650,6 +650,10 @@ createSPIRVCreateFastSlowPathPass();
 /// Emulates 64-bit integer ops with 32-bit integer ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
 
+/// Turns static shaped storage buffer subspan ops into dynamic shaped ones.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVEraseStorageBufferStaticShapePass();
+
 /// Pass to map MemRef memory spaces to SPIR-V storage classes.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVMapMemRefStorageClassPass();
