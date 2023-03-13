@@ -16,6 +16,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -178,13 +179,10 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
     if (reshapeOp->template getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
-    SmallVector<SmallVector<OpFoldResult>> outputShape;
-    ReifyRankedShapedTypeOpInterface reifyShapedTypeInterface =
-        cast<ReifyRankedShapedTypeOpInterface>(reshapeOp.getOperation());
-    if (failed(reifyShapedTypeInterface.reifyResultShapes(rewriter,
-                                                          outputShape))) {
+    ReifiedRankedShapedTypeDims outputShape;
+    if (failed(
+            reifyResultShapes(rewriter, reshapeOp.getOperation(), outputShape)))
       return failure();
-    }
     SmallVector<Value> outputDynamicShapes;
     for (auto [resultShape, outputShp] : llvm::zip_equal(
              reshapeOp.getResultType().getShape(), outputShape[0])) {

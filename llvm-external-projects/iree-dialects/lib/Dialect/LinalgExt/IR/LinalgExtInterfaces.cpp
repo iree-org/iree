@@ -51,6 +51,9 @@ LogicalResult LinalgExtOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   Operation *op = getOperation();
   for (auto output : getOutputs()) {
+    // Only tensor outputs have a tied result.
+    if (!output.getType().isa<TensorType>())
+      continue;
     SmallVector<OpFoldResult> dims;
     Type outputType = output.getType();
     if (auto rankedTensorType = outputType.dyn_cast<RankedTensorType>()) {

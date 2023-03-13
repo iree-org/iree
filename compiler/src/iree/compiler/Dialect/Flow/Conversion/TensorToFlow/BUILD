@@ -29,6 +29,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:TensorDialect",

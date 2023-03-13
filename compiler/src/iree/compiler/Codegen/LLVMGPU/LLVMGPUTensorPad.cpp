@@ -85,11 +85,10 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   // Slice out the original shape from the padded result to pass on to
   // consumers. The original linalg op is used to provide the dims for the reify
   // result shapes.
-  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
-  if (failed(cast<ReifyRankedShapedTypeOpInterface>(linalgOp.getOperation())
-                 .reifyResultShapes(rewriter, reifiedResultShapes))) {
+  ReifiedRankedShapedTypeDims reifiedResultShapes;
+  if (failed(reifyResultShapes(rewriter, linalgOp.getOperation(),
+                               reifiedResultShapes)))
     return failure();
-  }
 
   SmallVector<Value> paddedSubviewResults;
   paddedSubviewResults.reserve(paddedOp->getNumResults());
@@ -147,10 +146,9 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
 
   // Slice out the original shape from the padded result to pass on to
   // consumers.
-  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
-  if (failed(op.reifyResultShapes(rewriter, reifiedResultShapes))) {
+  ReifiedRankedShapedTypeDims reifiedResultShapes;
+  if (failed(reifyResultShapes(rewriter, op, reifiedResultShapes)))
     return failure();
-  }
 
   Value paddedSubviewResults;
   int64_t rank = paddedOp.getDestRank();

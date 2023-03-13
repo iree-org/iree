@@ -1567,6 +1567,32 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   return dimAndTileMapping;
 }
 
+template <typename OpTy>
+static OpFoldResult reifyPackUnPackOutputDimSize(OpBuilder &builder, OpTy op,
+                                                 int64_t dim) {
+  static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
+                "applies to only pack or unpack operations");
+  Location loc = op.getLoc();
+  Value output = op.getOutput();
+  auto outputType = output.getType().cast<ShapedType>();
+  if (!outputType.isDynamicDim(dim)) {
+    return builder.getIndexAttr(outputType.getDimSize(dim));
+  }
+  if (outputType.isa<TensorType>()) {
+    return builder
+        .create<tensor::DimOp>(loc, output,
+                               builder.create<arith::ConstantIndexOp>(loc, dim))
+        .getResult();
+  }
+  if (outputType.isa<MemRefType>()) {
+    return builder
+        .create<memref::DimOp>(loc, output,
+                               builder.create<arith::ConstantIndexOp>(loc, dim))
+        .getResult();
+  }
+  llvm_unreachable("unsupported shaped type");
+}
+
 /// Utility function to build the iteration domain for `packOp` or `unPackOp`.
 template <typename OpTy>
 static SmallVector<Range> getIterationDomain(OpTy op, OpBuilder &builder) {
@@ -1579,12 +1605,10 @@ static SmallVector<Range> getIterationDomain(OpTy op, OpBuilder &builder) {
   SmallVector<Range> loopBounds(rank);
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  ReifiedRankedShapedTypeDims resultShape;
-  (void)op.reifyResultShapes(builder, resultShape);
   for (auto dim : llvm::seq<int64_t>(0, rank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].stride = one;
-    loopBounds[dim].size = resultShape[0][dim];
+    loopBounds[dim].size = reifyPackUnPackOutputDimSize(builder, op, dim);
   }
   return loopBounds;
 }
@@ -1920,14 +1944,6 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   // The `ivs` already represent the position into the output tensor for the
   // non data-tile dimensions.
   SmallVector<Value> ivVec = llvm::to_vector(ivs);
-  ReifiedRankedShapedTypeDims outputShape;
-  if (failed(reifyResultShapes(builder, outputShape)))
-    return getOperation()->emitOpError("failed to reify result shape");
-  if (outputShape.size() != 1 || outputShape[0].size() != getOutputRank()) {
-    return getOperation()->emitOpError(
-               "expected shape of one result value of rank")
-           << getOutputRank();
-  }
 
   // Generate the loops that iterate over the data tile.
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
@@ -1937,24 +1953,27 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   // over the tile dimensions.
   for (auto dataTileDim :
        llvm::seq<unsigned>(getInputRank(), getOutputRank() - 1)) {
-    Value ub = getValueOrCreateConstantIndexOp(builder, loc,
-                                               outputShape[0][dataTileDim]);
+    Value ub = getValueOrCreateConstantIndexOp(
+        builder, loc,
+        reifyPackUnPackOutputDimSize(builder, *this, dataTileDim));
     scf::ForOp loop = builder.create<scf::ForOp>(loc, zero, ub, one);
     builder.setInsertionPointToStart(loop.getBody());
     ivVec.push_back(loop.getInductionVar());
   }
   // The body of the innermost loops does the actual data movement.
-  builder.create<scf::ForOp>(loc, zero,
-                             getValueOrCreateConstantIndexOp(
-                                 builder, loc, outputShape[0].back()),
-                             one, ValueRange{},
-                             [&](OpBuilder &bodyBuilder, Location bodyLoc,
-                                 Value iv, ValueRange regionIterArgs) {
-                               ivVec.push_back(iv);
-                               generatePackOpScalarImplementationBody(
-                                   *this, bodyBuilder, bodyLoc, ivVec);
-                               bodyBuilder.create<scf::YieldOp>(bodyLoc);
-                             });
+  builder.create<scf::ForOp>(
+      loc, zero,
+      getValueOrCreateConstantIndexOp(
+          builder, loc,
+          reifyPackUnPackOutputDimSize(builder, *this, getOutputRank() - 1)),
+      one, ValueRange{},
+      [&](OpBuilder &bodyBuilder, Location bodyLoc, Value iv,
+          ValueRange regionIterArgs) {
+        ivVec.push_back(iv);
+        generatePackOpScalarImplementationBody(*this, bodyBuilder, bodyLoc,
+                                               ivVec);
+        bodyBuilder.create<scf::YieldOp>(bodyLoc);
+      });
   return success();
 }
 
@@ -2006,15 +2025,6 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   assert(ivs.size() == getOutputRank() &&
          "number of ivs must match the rank of the output tensor");
   OpBuilder::InsertionGuard g(builder);
-  ReifiedRankedShapedTypeDims outputShape;
-  if (failed(reifyResultShapes(builder, outputShape)))
-    return getOperation()->emitOpError("failed to reify result shape");
-  if (outputShape.size() != 1 || outputShape[0].size() != getOutputRank()) {
-    return getOperation()->emitOpError(
-               "expected shape of one result value of rank")
-           << getOutputRank();
-  }
-
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
   // untiled loops and tile loops induction variables.
   SmallVector<Value> inputIvs;

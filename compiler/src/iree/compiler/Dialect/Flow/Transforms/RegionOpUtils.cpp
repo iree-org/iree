@@ -66,7 +66,7 @@ static SmallVector<Range> getLoopRangesImpl(tensor::ExtractSliceOp sliceOp,
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   ReifiedRankedShapedTypeDims resultDims;
-  LogicalResult status = sliceOp.reifyResultShapes(builder, resultDims);
+  LogicalResult status = reifyResultShapes(builder, sliceOp, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
   return llvm::to_vector(llvm::map_range(resultDims[0], [&](OpFoldResult v) {
