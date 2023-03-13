@@ -123,16 +123,17 @@ iree_status_t iree_hal_cuda_native_executable_create(
       int32_t max_shared_mem = 0;
       status = CU_RESULT_TO_STATUS(
           context->syms,
-          cuDeviceGetAttribute(&max_shared_mem,
-                               CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK,
-                               context->cu_device),
+          cuDeviceGetAttribute(
+              &max_shared_mem,
+              CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN,
+              context->cu_device),
           "cuDeviceGetAttribute");
       if (!iree_status_is_ok(status)) break;
       if (shared_memory_sizes[i] > max_shared_mem) {
-        status = iree_make_status(
-            IREE_STATUS_INTERNAL,
-            "Requested shared memory size of %d larger than allowed size of %d",
-            shared_memory_sizes[i], max_shared_mem);
+        status = iree_make_status(IREE_STATUS_INTERNAL,
+                                  "CUDA driver error: Requested shared memory "
+                                  "size of %d larger than allowed size of %d",
+                                  shared_memory_sizes[i], max_shared_mem);
       } else {
         status = CU_RESULT_TO_STATUS(
             context->syms,
