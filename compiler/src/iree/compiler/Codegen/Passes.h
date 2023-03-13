@@ -9,7 +9,6 @@
 
 #include <memory>
 
-#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
@@ -532,10 +531,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
 // usage.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUPackSharedMemoryAlloc();
-
-/// Create pass to do layout analysis and distribution.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPULayoutAnalysisAndDistributionPass();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes

@@ -1,10 +1,9 @@
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
-#include "mlir/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 namespace mlir::iree_compiler {
 
@@ -458,60 +457,43 @@ static void eraseOps(func::FuncOp funcOp, IRRewriter &rewriter) {
   });
 }
 
-struct LLVMGPULayoutAnalysisAndDistributionPass
-    : public LLVMGPULayoutAnalysisAndDistributionBase<
-          LLVMGPULayoutAnalysisAndDistributionPass> {
- public:
-  LLVMGPULayoutAnalysisAndDistributionPass() {}
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, nvgpu::NVGPUDialect,
-                    memref::MemRefDialect>();
-  }
-  void runOnOperation() override {
-    func::FuncOp funcOp = getOperation();
-    // First compute the layouts (set MMA layouts and propagate to rest)
-    DenseMap<Value, Layout> layoutMap;
-    funcOp.walk([&](Operation *op) {
-      if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-        Value lhs = contractOp.getLhs();
-        Value rhs = contractOp.getRhs();
-        Value result = contractOp.getResult();
-        setMMALayout(lhs, rhs, result, layoutMap);
-      } else {
-        propagateLayout(op, layoutMap);
-      }
-      return WalkResult::advance();
-    });
-
-    // Apply SIMD to SIMT conversion
-    MLIRContext *context = &getContext();
-    IRRewriter rewriter(context);
-    DenseMap<Value, Value> simdToSimtMap;
-    funcOp.walk([&](Operation *op) {
-      if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
-        distributeTransferReads(readOp, layoutMap, simdToSimtMap, rewriter);
-      }
-      if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-        distributeContracts(contractOp, layoutMap, simdToSimtMap, rewriter);
-      }
-      if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
-        distributeTransferWrites(writeOp, layoutMap, simdToSimtMap, rewriter);
-      }
-      return WalkResult::advance();
-    });
-
-    // Erase old ops
-    eraseOps<vector::TransferWriteOp>(funcOp, rewriter);
-    eraseOps<vector::ContractionOp>(funcOp, rewriter);
-    eraseOps<vector::TransferReadOp>(funcOp, rewriter);
-  }
-};
-
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPULayoutAnalysisAndDistributionPass() {
-  return std::make_unique<LLVMGPULayoutAnalysisAndDistributionPass>();
+void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
+                                     func::FuncOp funcOp) {
+  // First compute the layouts (set MMA layouts and propagate to rest)
+  DenseMap<Value, Layout> layoutMap;
+  funcOp.walk([&](Operation *op) {
+    if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
+      Value lhs = contractOp.getLhs();
+      Value rhs = contractOp.getRhs();
+      Value result = contractOp.getResult();
+      setMMALayout(lhs, rhs, result, layoutMap);
+    } else {
+      propagateLayout(op, layoutMap);
+    }
+    return WalkResult::advance();
+  });
+
+  // Apply SIMD to SIMT conversion
+  DenseMap<Value, Value> simdToSimtMap;
+  funcOp.walk([&](Operation *op) {
+    if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
+      distributeTransferReads(readOp, layoutMap, simdToSimtMap, rewriter);
+    }
+    if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
+      distributeContracts(contractOp, layoutMap, simdToSimtMap, rewriter);
+    }
+    if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+      distributeTransferWrites(writeOp, layoutMap, simdToSimtMap, rewriter);
+    }
+    return WalkResult::advance();
+  });
+
+  // Erase old ops
+  eraseOps<vector::TransferWriteOp>(funcOp, rewriter);
+  eraseOps<vector::ContractionOp>(funcOp, rewriter);
+  eraseOps<vector::TransferReadOp>(funcOp, rewriter);
 }
 
 }  // namespace mlir::iree_compiler

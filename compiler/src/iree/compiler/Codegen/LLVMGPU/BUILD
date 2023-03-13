@@ -20,7 +20,6 @@ iree_compiler_cc_library(
         "ConvertToROCDL.cpp",
         "KernelConfig.cpp",
         "LLVMGPUDistribute.cpp",
-        "LLVMGPULayoutAnalysisAndDistribution.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUPackSharedMemoryAlloc.cpp",
         "LLVMGPUTensorAlloc.cpp",

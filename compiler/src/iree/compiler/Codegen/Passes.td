@@ -474,12 +474,6 @@ def ConvertToNVVM :
   let constructor = "mlir::iree_compiler::createConvertToNVVMPass()";
 }
 
-def LLVMGPULayoutAnalysisAndDistribution :
-    Pass<"iree-llvmgpu-layout-analysis-and-distribution", "func::FuncOp"> {
-  let summary = "Pass to do layout analysis followed by distribution";
-  let constructor = "mlir::iree_compiler::createLLVMGPULayoutAnalysisAndDistributionPass()";
-}
-
 // TODO: Bring the argument in line with the names used elsewhere.
 def LLVMGPULowerExecutableTarget :
     Pass<"iree-llvmgpu-lower-executable-target", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
