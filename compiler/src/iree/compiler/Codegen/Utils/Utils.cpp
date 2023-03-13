@@ -495,45 +495,21 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   return loopInfo;
 }
 
-LogicalResult getFilteredOps(
-    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
-    SmallVectorImpl<Operation *> &filteredOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  Region &region = funcOp.getFunctionBody();
-  if (!llvm::hasSingleElement(region)) {
-    return funcOp.emitError("unable dispatch function with multiple blocks");
-  }
-  Block *body = &region.front();
+SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
+  Block *body = &funcOp.getFunctionBody().front();
   auto forOps = body->getOps<scf::ForOp>();
   while (!forOps.empty()) {
-    if (!llvm::hasSingleElement(forOps)) return failure();
+    assert(llvm::hasSingleElement(forOps) &&
+           "expected dispatch function with single block");
     scf::ForOp forOp = *(forOps.begin());
-    if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
-      tiledLoops.emplace_back(std::move(tiledLoopInfo.value()));
-    }
     body = forOp.getBody();
     forOps = body->getOps<scf::ForOp>();
   }
-  for (Operation &op : body->getOperations()) {
-    if (filteringFn(&op)) {
-      filteredOps.push_back(&op);
-    }
+  SmallVector<Operation *> computeOps;
+  for (auto op : body->getOps<TilingInterface>()) {
+    computeOps.push_back(op);
   }
-  return success();
-}
-
-LogicalResult getComputeOps(
-    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  if (failed(getFilteredOps(
-          funcOp,
-          [](Operation *op) {
-            return isa<linalg::LinalgOp, TilingInterface>(op);
-          },
-          computeOps, tiledLoops))) {
-    return failure();
-  }
-  return success();
+  return computeOps;
 }
 
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(

@@ -1012,11 +1012,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
-    SmallVector<Operation *> computeOps;
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return funcOp.emitOpError("failed to get compute ops");
-    }
-
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     Operation *rootOperation = nullptr;
     // Find the root operation. linalg.generic and linalg.fill are not root
     // operations if there are other compute operations present.

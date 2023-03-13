@@ -132,26 +132,10 @@ struct LoopTilingAndDistributionInfo {
 ///   }
 /// }
 ///
-/// Returns the list of filtered operations in the functions. If there are no
-/// `scf.for` operations in the function return the linalg operations in the
-/// body of the function if it has a single basic block. Return failure in all
-/// other cases.
-using RootOpFilteringFn = std::function<bool(Operation *)>;
-LogicalResult getFilteredOps(
-    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
-    SmallVectorImpl<Operation *> &filteredOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
-
-/// Specialization of `getFilteredOps` for filtering `LinalgOp`s and
-/// `LinagExtOp`s.
-LogicalResult getComputeOps(
-    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
-inline LogicalResult getComputeOps(func::FuncOp funcOp,
-                                   SmallVectorImpl<Operation *> &computeOps) {
-  SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-  return getComputeOps(funcOp, computeOps, tiledLoops);
-}
+/// Returns the list of TilingInterface ops in the functions. If there are no
+/// `scf.for` operations in the function return the TilingInterface operations
+/// in the body of the function if it has a single basic block.
+SmallVector<Operation *> getComputeOps(func::FuncOp funcOp);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.

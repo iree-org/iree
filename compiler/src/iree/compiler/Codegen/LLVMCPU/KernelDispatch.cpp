@@ -1877,6 +1877,11 @@ static FailureOr<Operation *> getRootOperation(
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult setTranslationInfoAndRootConfig(
     func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
+  if (computeOps.empty()) {
+    // No compute operations found. Allow to pass through without a config.
+    return success();
+  }
+
   // First check if the operations have a preset pipeline. If the config is
   // preset, do not overwrite it.
   for (auto computeOp : computeOps) {
@@ -1942,13 +1947,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       continue;
     }
 
-    SmallVector<Operation *> computeOps;
-
-    // If there are no linalg ops, not using Linalg based lowering.
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return failure();
-    }
-
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
       return failure();
     }
