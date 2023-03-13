@@ -12,6 +12,9 @@ configrations. To run the benchmark suites, see
     [tests/e2e/test_artifacts](https://github.com/openxla/iree/tree/main/tests/e2e/test_artifacts)
     to regenerate the cmake files that will build the benchmarks.
 
+To add a new source model, see
+[Adding a new model](/build_tools/python/e2e_test_framework/models/README.md#adding-a-new-model)
+
 ## Benchmark Suites Design
 
 > TODO(#12215): Explain the design and the end-to-end flow.
