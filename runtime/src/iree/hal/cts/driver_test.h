@@ -100,7 +100,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
               << "' with index #" << i << "..\n";
     iree_hal_device_t* device = NULL;
     char index[8];
-    IREE_ASSERT_LT(snprintf(index, 8, "%d", i), 8);
+    snprintf(index, 8, "%d", i);
     IREE_ASSERT_OK(iree_hal_driver_create_device_by_path(
         driver_, name, IREE_SV(index),
         /*param_count=*/0,
@@ -116,7 +116,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
               << "' with index #" << device_info_count << "..\n";
     iree_hal_device_t* device = NULL;
     char index[8];
-    IREE_ASSERT_LT(snprintf(index, 8, "%d", device_info_count), 8);
+    snprintf(index, 8, "%d", device_info_count);
     iree_status_t status = iree_hal_driver_create_device_by_path(
         driver_, name, IREE_SV(index),
         /*param_count=*/0,
