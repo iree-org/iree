@@ -1,3 +1,4 @@
+#!/bin/python3
 # Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
