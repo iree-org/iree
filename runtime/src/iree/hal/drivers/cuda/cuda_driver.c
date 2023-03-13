@@ -391,7 +391,7 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
                        "cuDeviceGetCount");
   if (device_index >= device_count) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "default device %d not found (of %d enumerated)",
+                            "device %d not found (of %d enumerated)",
                             device_index, device_count);
   }
 

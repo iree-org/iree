@@ -138,28 +138,13 @@ static iree_status_t iree_hal_sync_driver_create_device_by_path(
     iree_string_view_t device_path, iree_host_size_t param_count,
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
-  if (iree_string_view_is_empty(device_path)) {
-    return iree_hal_sync_driver_create_device_by_id(
-        base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
-        host_allocator, out_device);
+  if (!iree_string_view_is_empty(device_path)) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "device paths not yet implemented");
   }
-
-  // Try to parse as a device index.
-  uint32_t device_index = 0;
-  if (iree_string_view_atoi_uint32(device_path, &device_index)) {
-    // Right now we only ever expose 1 device. So error out for all other cases.
-    if (device_index != 0) {
-      return iree_make_status(
-          IREE_STATUS_NOT_FOUND,
-          "device index %u invalid; only %u device(s) available", device_index,
-          1);
-    }
-    return iree_hal_sync_driver_create_device_by_id(
-        base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
-        host_allocator, out_device);
-  }
-
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");
+  return iree_hal_sync_driver_create_device_by_id(
+      base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
+      host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_sync_driver_vtable = {
