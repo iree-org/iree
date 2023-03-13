@@ -27,7 +27,7 @@ jobs:
       runner-group: ${{ steps.configure.outputs.runner-group }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
@@ -50,7 +50,7 @@ jobs:
       pull-requests: write
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Checking benchmark processing job"
         id: check
         env:
@@ -76,12 +76,11 @@ jobs:
             "${PR_CI_GCS_URL}/${BENCHMARK_COMMENT_ARTIFACT}"
           echo "benchmark-comment-artifact=${BENCHMARK_COMMENT_ARTIFACT}" >> "${GITHUB_OUTPUT}"
       - name: Posting comments
-        # TODO(#11076): Temporarily disabled until we migrate the database.
-        if: false && steps.check.outputs.job-conclusion == 'success'
+        if: steps.check.outputs.job-conclusion == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIST_BOT_TOKEN: ${{ secrets.GIST_BOT_TOKEN }}
-          COMMENT_BOT_USER: iree-github-actions-bot
+          COMMENT_BOT_USER: github-actions[bot]
           # Get PR number from the event instead of the untrusted comment
           # artifact, to make sure we won't incorrectly update other PRs.
           BENCHMARK_COMMENT_ARTIFACT: ${{ steps.download.outputs.benchmark-comment-artifact }}

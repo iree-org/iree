@@ -18,7 +18,7 @@ then shares some metrics and next steps.
 
 ### HAL support
 
-IREE has a [HAL API](https://github.com/iree-org/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables)
+IREE has a [HAL API](https://github.com/openxla/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables)
 that abstract all the targets behind a common interface. The first step to
 supporting a CUDA target was to map the HAL API onto CUDA. We use the CUDA
 driver API to reduce dependencies and be closer to the hardware. The HAL API is
@@ -31,7 +31,7 @@ using CUDA streams for comparison.
 
 HAL exposes an API that can be tested independently, even if we are not able to
 create CUDA kernels yet we can test a large portion of the CUDA driver using
-[CTS tests](https://github.com/iree-org/iree/blob/main/iree/hal/cts/README.md).
+[CTS tests](https://github.com/openxla/iree/blob/main/iree/hal/cts/README.md).
 Those can be run to make sure a system has the required CUDA support.
 
  ![Compilation flow](./2021-10-15-cuda-compiler-flow.png){ align=left }
@@ -86,7 +86,7 @@ can now successfully compile full models.
 ![Compilation diagram](./2021-10-15-cuda-bring_up.png)
 
 The steps to reproduce running a simple op end to end through CUDA backend are
-described [here](https://github.com/iree-org/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
+described [here](https://github.com/openxla/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
 
 ## Performance
 

@@ -21,6 +21,7 @@ class OwningOpRef;
 class Region;
 
 namespace transform {
+namespace iree_dialects {
 namespace detail {
 /// Template-free implementation of TransformInterpreterPassBase::initialize.
 LogicalResult
@@ -145,6 +146,7 @@ private:
   std::shared_ptr<OwningOpRef<ModuleOp>> sharedTransformModule = nullptr;
 };
 
+} // namespace iree_dialects
 } // namespace transform
 } // namespace mlir
 #endif // IREE_DIALECTS_LINALG_TRANSFORM_TRANSFORM_INTERPRETER_UTILS_H

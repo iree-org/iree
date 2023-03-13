@@ -14,7 +14,7 @@
 //   'memref.alloca' op all stack allocations need to be hoisted to the entry block of the function
 //
 // R-UN: iree-opt %s --iree-transform-dialect-interpreter --transform-dialect-drop-schedule | \
-// R-UN: iree-compile --iree-hal-target-backends=llvm-cpu 
+// R-UN: iree-compile --iree-hal-target-backends=llvm-cpu
 
 !a_tensor_t = tensor<1234x567xf32>
 !b_tensor_t = tensor<567x890xf32>
@@ -27,25 +27,25 @@
 // CHECK-DAG: #[[$map_rhs:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d1, d3, d5)>
 // CHECK-DAG: #[[$map_res:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 
-// CHECK-LABEL: func.func @_matmul_dispatch_0
+// CHECK-LABEL: func.func @matmul_dispatch_0
 //       CHECK:   tensor.empty() : tensor<155x18x8x32xf32>
-//       CHECK:   iree_linalg_ext.pack
+//       CHECK:   tensor.pack
 
-// CHECK-LABEL: func.func @_matmul_dispatch_1
+// CHECK-LABEL: func.func @matmul_dispatch_1
 //       CHECK:   arith.constant dense<1.000000e-01> : tensor<567x890xf32>
 //       CHECK:   tensor.empty() : tensor<18x56x16x32xf32>
-//       CHECK:   iree_linalg_ext.pack
+//       CHECK:   tensor.pack
 
-// CHECK-LABEL: func.func @_matmul_dispatch_2
+// CHECK-LABEL: func.func @matmul_dispatch_2
 //       CHECK:   tensor.empty() : tensor<155x56x8x16xf32>
-//       CHECK:   iree_linalg_ext.pack
+//       CHECK:   tensor.pack
 
-// CHECK-LABEL: func.func @_matmul_dispatch_3
+// CHECK-LABEL: func.func @matmul_dispatch_3
 func.func @matmul(%arg0: !a_tensor_t, %arg2: !c_tensor_t) -> !c_tensor_t {
   %c0 = arith.constant dense<0.1> : !b_tensor_t
   //  CHECK-NOT: pack
-  //      CHECK: linalg.generic {indexing_maps = [#[[$map_lhs]], #[[$map_rhs]], #[[$map_res]]], 
-  // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} 
+  //      CHECK: linalg.generic {indexing_maps = [#[[$map_lhs]], #[[$map_rhs]], #[[$map_res]]],
+  // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
   // CHECK-SAME:   ins(%{{.*}} : tensor<155x18x8x32xf32>, tensor<18x56x16x32xf32>)
   // CHECK-SAME:  outs(%{{.*}} : tensor<155x56x8x16xf32>)
 
@@ -55,8 +55,8 @@ func.func @matmul(%arg0: !a_tensor_t, %arg2: !c_tensor_t) -> !c_tensor_t {
   return %0 : !c_tensor_t
 }
 
-// CHECK-LABEL: func.func @_matmul_dispatch_4
-//       CHECK:   iree_linalg_ext.unpack 
+// CHECK-LABEL: func.func @matmul_dispatch_4
+//       CHECK:   tensor.unpack
 
 transform.sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
@@ -66,9 +66,4 @@ transform.sequence failures(propagate) {
   transform.structured.pack_greedily %matmul
       gemm_packed_sizes = [8, 16, 32] gemm_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
-
-  // TODO: Remove once IREE adopts tensor.pack/unpack.
-  %func = transform.structured.match ops{["func.func"]} in %module_op
-    : (!pdl.operation) -> (!pdl.operation)
-  transform.iree.apply_patterns %func { rewrite_pack_ops }
 }

@@ -48,7 +48,7 @@ In order to perform capture and analysis with AGI, you will need a full Android
 app. In IREE we have a simple Android native app wrapper to help package
 IREE core libraries together with a specific VM bytecode invocation into an
 Android app. The wrapper and its documentation are placed at
-[`tools/android/run_module_app/`](https://github.com/iree-org/iree/tree/main/tools/android/run_module_app).
+[`tools/android/run_module_app/`](https://github.com/openxla/iree/tree/main/tools/android/run_module_app).
 
 For example, to package a module compiled from the following `mhlo-dot.mlir` as
 an Android app:

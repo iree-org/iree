@@ -17,6 +17,7 @@ package(
 
 exports_files([
     "ProcessorOpInterfaces.td",
+    "UKernelOpInterface.td",
 ])
 
 td_library(
@@ -25,6 +26,7 @@ td_library(
         [
             "PartitionableLoopsInterface.td",
             "ProcessorOpInterfaces.td",
+            "UKernelOpInterface.td",
         ],
         include = ["*.td"],
     ),
@@ -45,6 +47,7 @@ iree_compiler_cc_library(
         ":BufferizationInterfaces",
         ":PartitionableLoopsInterface",
         ":ProcessorOpInterfaces",
+        ":UKernelOpInterface",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:IR",
@@ -86,9 +89,46 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:VectorTransforms",
     ],
+)
+
+iree_compiler_cc_library(
+    name = "UKernelOpInterface",
+    srcs = [
+        "UKernelOpInterface.cpp",
+    ],
+    hdrs = [
+        "UKernelOpInterface.h",
+    ],
+    textual_hdrs = [
+        "UKernelOpInterface.cpp.inc",
+        "UKernelOpInterface.h.inc",
+    ],
+    deps = [
+        ":UKernelOpInterfaceGen",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "UKernelOpInterfaceGen",
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "UKernelOpInterface.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "UKernelOpInterface.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "UKernelOpInterface.td",
+    deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 iree_compiler_cc_library(

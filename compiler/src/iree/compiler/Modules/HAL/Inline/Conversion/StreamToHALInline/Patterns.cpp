@@ -456,8 +456,8 @@ struct CmdExecuteOpPattern
       IREE::Stream::CmdExecuteOp executeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Inline the serial execution region.
-    rewriter.mergeBlockBefore(&executeOp.getBody().front(), executeOp,
-                              adaptor.getResourceOperands());
+    rewriter.inlineBlockBefore(&executeOp.getBody().front(), executeOp,
+                               adaptor.getResourceOperands());
     // Immediately resolve the timepoint.
     auto resolvedTimepoint =
         rewriter.create<arith::ConstantIntOp>(executeOp.getLoc(), 0, 64)
@@ -474,7 +474,7 @@ struct CmdSerialOpPattern
       IREE::Stream::CmdSerialOp serialOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Inline the serial execution region.
-    rewriter.mergeBlockBefore(&serialOp.getBody().front(), serialOp);
+    rewriter.inlineBlockBefore(&serialOp.getBody().front(), serialOp);
     rewriter.eraseOp(serialOp);
     return success();
   }
@@ -487,7 +487,7 @@ struct CmdConcurrentOpPattern
       IREE::Stream::CmdConcurrentOp concurrentOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Inline the concurrent execution region.
-    rewriter.mergeBlockBefore(&concurrentOp.getBody().front(), concurrentOp);
+    rewriter.inlineBlockBefore(&concurrentOp.getBody().front(), concurrentOp);
     rewriter.eraseOp(concurrentOp);
     return success();
   }

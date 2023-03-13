@@ -16,7 +16,7 @@ steps:
         --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
         --workdir="$$IREE_DOCKER_WORKDIR" \
         --rm \
-        gcr.io/iree-oss/frontends@sha256:41e82bb62a3850c01d0252aa67aebd7816e47da0132af677cd70fc76731c4b5d \
+        gcr.io/iree-oss/frontends@sha256:8f9c268fd4b57a1818695cba9e794dc5dff32b432c36af8345dc1c8f12f0a1e9 \
         build_tools/cmake/build_android_benchmark.sh
       tar --exclude='*.tar.gz' \
         --exclude='*.tgz' \
@@ -105,27 +105,6 @@ steps:
       - "trace-captures-moto-edge-x30-${BUILDKITE_BUILD_NUMBER}.tgz"
     timeout_in_minutes: "60"
 
-  - label: ":recycle: Collect compilation statistics"
-    key: "collect-compilation-statistics"
-    commands: |
-      git clean -fdx
-      buildkite-agent artifact download --step Build \
-        "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz" ./
-      tar -xzvf "benchmark-suites-$${BUILDKITE_BUILD_NUMBER}.tgz"
-      python3 build_tools/benchmarks/collect_compilation_statistics.py \
-        legacy \
-        --verbose \
-        --output "compile-stats-results-$${BUILDKITE_BUILD_NUMBER}.json" \
-        "build-host"
-    if: >
-      build.pull_request.id == null ||
-      build.pull_request.labels includes 'buildkite:benchmark-android'
-    agents:
-      - "queue=build"
-    artifact_paths:
-      - "compile-stats-results-${BUILDKITE_BUILD_NUMBER}.json"
-    timeout_in_minutes: "10"
-
   - wait
 
   - label: "Comment benchmark results on pull request"
@@ -135,7 +114,6 @@ steps:
       git fetch -v --prune --no-recurse-submodules -- origin \
         "$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
       buildkite-agent artifact download "benchmark-results-*.json" ./
-      buildkite-agent artifact download "compile-stats-results-*.json" ./
       # The script will handle the wildcard patterns.
       # --comment_type_id is a random-generated id and shouldn't be changed (
       # even we change the title); otherwise the script will post a new comment
@@ -143,7 +121,6 @@ steps:
       python3 build_tools/benchmarks/generate_benchmark_comment.py \
         --verbose \
         --benchmark_files="benchmark-results-*.json" \
-        --compile_stats_files="compile-stats-results-*.json" \
         --pr_number="$${BUILDKITE_PULL_REQUEST}" \
         --pr_committish="$${BUILDKITE_COMMIT}" \
         --pr_base_branch="origin/$${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" \
@@ -165,11 +142,9 @@ steps:
     commands: |
       git clean -fdx
       buildkite-agent artifact download benchmark-results-*.json ./
-      buildkite-agent artifact download "compile-stats-results-*.json" ./
       python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
         --verbose \
-        --benchmark_files benchmark-results-*.json \
-        --compile_stats_files compile-stats-results-*.json
+        --benchmark_files benchmark-results-*.json
     key: "upload-to-dashboard"
     branches: "main"
     agents:

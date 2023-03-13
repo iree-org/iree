@@ -155,13 +155,13 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
 
     if (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()) {
       lhsEncoding = TensorEncoding::MATMUL_F32F32F32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE;
+      rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS;
       outEncoding = TensorEncoding::MATMUL_F32F32F32_RESULT;
     } else if (lhsElemType.isSignlessInteger(8) &&
                rhsElemType.isSignlessInteger(8) &&
                outElemType.isSignlessInteger(32)) {
       lhsEncoding = TensorEncoding::MATMUL_I8I8I32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE;
+      rhsEncoding = TensorEncoding::MATMUL_I8I8I32_RHS;
       outEncoding = TensorEncoding::MATMUL_I8I8I32_RESULT;
     } else {
       return rewriter.notifyMatchFailure(

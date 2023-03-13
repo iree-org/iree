@@ -22,14 +22,13 @@ set -eu -o errtrace
 
 this_dir="$(cd $(dirname $0) && pwd)"
 repo_root="$(cd $this_dir/../../ && pwd)"
-python_versions="${override_python_versions:-3.10 3.11}"
+python_versions="${override_python_versions:-3.11}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
 
 # Note that this typically is selected to match the version that the official
 # Python distributed is built at.
 export MACOSX_DEPLOYMENT_TARGET=11.0
-export CMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 
 # cpuinfo is incompatible with universal builds.
 export IREE_ENABLE_CPUINFO=OFF
@@ -101,7 +100,9 @@ function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
   echo ":::: Clean wheels $wheel_basename $python_version"
-  rm -f -v /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
+  # python_version is something like "3.11", but we'd want something like "cp311".
+  local cpython_version_string="cp${python_version%.*}${python_version#*.}"
+  rm -f -v ${output_dir}/${wheel_basename}-*-${cpython_version_string}-*.whl
 }
 
 run

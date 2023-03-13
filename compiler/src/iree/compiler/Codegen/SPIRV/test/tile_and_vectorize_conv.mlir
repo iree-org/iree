@@ -1,4 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-create-fast-slow-path,iree-spirv-tile,canonicalize,cse,iree-spirv-vectorize)))))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-create-fast-slow-path,iree-spirv-tile,canonicalize,cse,iree-spirv-vectorize,canonicalize,cse)))))' \
+// RUN:   %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
@@ -468,11 +470,11 @@ hal.executable private @nchw_conv_static_shape_f32 {
 //      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
 // CHECK-SAME:       -> (tensor<2x8x1x4xf32>)
 //      CHECK:     scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:         -> (tensor<2x8x1x4xf32>)
+// CHECK-SAME:         -> (vector<4xf32>{{(, vector<4xf32>)+}})
 
 // CHECK-COUNT-64: vector.fma
 
 // For linalg.conv_2d_nchw_fchw
 // CHECK-COUNT-16: vector.transfer_write
 
-//  CHECK-COUNT-3: scf.yield %{{.+}} : tensor<2x8x1x4xf32>
+//  CHECK-COUNT-3: scf.yield %{{.+}} : tensor<2x16x8x8xf32>

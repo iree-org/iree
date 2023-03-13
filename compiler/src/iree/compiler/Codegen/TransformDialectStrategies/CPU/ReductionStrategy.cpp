@@ -62,7 +62,7 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
     const ReductionStrategy &strategy) {
   // Step 1. Tiling to the block/workgroup level. Keep everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
-        foreachThread] =
+        forall] =
       buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
   // Step 2. Naive first strategy to tile the most minor dimension by
@@ -74,7 +74,7 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
     if (rank == 0) continue;
     SmallVector<int64_t> tileSizes(rank - 1, 0);
     tileSizes.push_back(strategy.getVectorSize());
-    buildTileFuseToScfFor(b, val, {},
+    buildTileFuseToScfFor(b, variantH, val, {},
                           getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
   }
 

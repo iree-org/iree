@@ -36,6 +36,7 @@ iree_cc_library(
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
@@ -51,13 +52,18 @@ iree_cc_library(
     MLIRPDLDialect
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFTransforms
+    MLIRSCFUtils
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTransformDialect
     MLIRTransforms
+    MLIRVectorDialect
+    MLIRVectorTransforms
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

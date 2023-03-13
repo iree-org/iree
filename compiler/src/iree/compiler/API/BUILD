@@ -4,48 +4,76 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("//build_tools/bazel:build_defs.oss.bzl", "defaulting_select", "iree_compiler_cc_library")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
-    licenses = ["notice"],
+    licenses = ["notice"],  # Apache 2.0
 )
 
-# Allow all python sources to be built externally.
-exports_files(glob([
-    "python/*.cpp",
-    "python/*.c",
-    "python/**/*.py",
-    "unittests/**/*.py",
-]))
+exports_files([
+    "api_exports.c",
+    "api_exports.def",
+    "api_exports.ld",
+    "api_exports.lst",
+])
 
-################################################################################
-# Package-by-package filegroup exports.
-# Some tools can make use of such non-nested groups.
-################################################################################
-
-filegroup(
-    name = "python_compiler_tools",
-    srcs = glob(["python/iree/compiler/tools/*.py"]),
-)
-
-filegroup(
-    name = "python_compiler_tools_deprecated_redirects",
-    srcs = [
-        "python/iree/compiler/__init__.py",
-        "python/iree/compiler/tf.py",
-        "python/iree/compiler/tflite.py",
-        "python/iree/compiler/xla.py",
+# All headers for APIs exported by the library.
+iree_compiler_cc_library(
+    name = "MLIRInteropHeaders",
+    hdrs = [
+        "MLIRInterop.h",
+    ],
+    deps = [
+        "@llvm-project//mlir:CAPIIRHeaders",
     ],
 )
 
-filegroup(
-    name = "python_compiler_api",
-    srcs = glob(["python/iree/compiler/transforms/*.py"]),
+iree_compiler_cc_library(
+    name = "StaticImpl",
+    deps = [
+        "//compiler/src/iree/compiler/API/Internal:Embed",
+        "//compiler/src/iree/compiler/API/Internal:IREECompileToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:IREEMLIRLSPServerToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:IREEOptToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:LLDToolEntryPoint",
+        "//compiler/src/iree/compiler/API/Internal:MLIRInterop",
+        "//llvm-external-projects/iree-dialects:CAPI",
+        "@llvm-project//mlir:CAPIDebug",
+        "@llvm-project//mlir:CAPIIR",
+        "@llvm-project//mlir:CAPIInterfaces",
+        "@llvm-project//mlir:CAPILinalg",
+        "@llvm-project//mlir:CAPIPDL",
+        "@llvm-project//mlir:CAPITransformDialect",
+    ],
 )
 
-filegroup(
-    name = "unittests_tools_testdata",
-    srcs = glob([
-        "python/test/tools/testdata/*",
-    ]),
+iree_compiler_cc_library(
+    name = "SharedImpl",
+    srcs = [
+        "//lib:libIREECompiler.so",
+    ],
+    tags = ["skip-bazel_to_cmake"],
+)
+
+bool_flag(
+    name = "link_shared",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "link_shared_config",
+    flag_values = {
+        ":link_shared": "True",
+    },
+)
+
+alias(
+    name = "Impl",
+    actual = defaulting_select({
+        ":link_shared_config": ":SharedImpl",
+        "//conditions:default": ":StaticImpl",
+    }),
 )

@@ -30,11 +30,11 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 }
 
 // CHECK-LABEL: @reduce
-// CHECK: scf.foreach_thread
-// CHECK:   scf.foreach_thread
+// CHECK: scf.forall
+// CHECK:   scf.forall
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
-// CHECK:   scf.foreach_thread
+// CHECK:   scf.forall
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
 
@@ -77,12 +77,12 @@ func.func @eltwise_reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 }
 
 // CHECK-LABEL: @eltwise_reduce
-// CHECK: scf.foreach_thread
-// CHECK:   scf.foreach_thread
+// CHECK: scf.forall
+// CHECK:   scf.forall
 // CHECK:     linalg.generic
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
-// CHECK:   scf.foreach_thread
+// CHECK:   scf.forall
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
 
@@ -124,11 +124,11 @@ func.func @reduce_eltwise(%arg : !in_tensor_t) -> (!out_tensor_t) {
 
 
 // CHECK-LABEL: @reduce_eltwise
-// CHECK: scf.foreach_thread
-// CHECK:   scf.foreach_thread
+// CHECK: scf.forall
+// CHECK:   scf.forall
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
-// CHECK:   scf.foreach_thread
+// CHECK:   scf.forall
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
 // CHECK:     linalg.generic
@@ -185,12 +185,12 @@ func.func @eltwise_reduce_eltwise(%arg : !in_tensor_t) -> (!out_tensor_t) {
 }
 
 // CHECK-LABEL: @eltwise_reduce_eltwise
-// CHECK: scf.foreach_thread
-// CHECK:   scf.foreach_thread
+// CHECK: scf.forall
+// CHECK:   scf.forall
 // CHECK:     linalg.generic
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
-// CHECK:   scf.foreach_thread
+// CHECK:   scf.forall
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
 // CHECK:     linalg.generic
@@ -247,12 +247,12 @@ func.func @eltwise_reduce_eltwise_swapped(%arg : !in_tensor_t) -> (!out_tensor_t
 }
 
 // CHECK-LABEL: @eltwise_reduce_eltwise_swapped
-// CHECK: scf.foreach_thread
-// CHECK:   scf.foreach_thread
+// CHECK: scf.forall
+// CHECK:   scf.forall
 // CHECK:     linalg.generic
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
-// CHECK:   scf.foreach_thread
+// CHECK:   scf.forall
 // CHECK:     linalg.fill
 // CHECK:     linalg.generic
 // CHECK:     linalg.generic

@@ -14,6 +14,12 @@
 namespace mlir {
 namespace iree_compiler {
 
+namespace IREE {
+namespace transform_dialect {
+struct ApplyPatternsOpPatterns;
+}  // namespace transform_dialect
+}  // namespace IREE
+
 struct AbstractReductionStrategy;
 
 //===----------------------------------------------------------------------===//
@@ -56,6 +62,16 @@ void createTransformRegion(func::FuncOp entryPoint,
 /// `handles` is empty.
 void buildPrint(ImplicitLocOpBuilder &b, ValueRange handles = {});
 
+/// Create an ApplyPatternsOp that performs a set of key canonicalizations and
+/// so-called enabling transformations to normalize the IR.
+/// Take an existing configuration by copy (cheap object) that will be augmented
+/// locally to additionally perform:
+///   canonicalization, tiling_canonicalization, licm and cse (in this order).
+Value buildCanonicalizationAndEnablingTransforms(
+    ImplicitLocOpBuilder &b,
+    IREE::transform_dialect::ApplyPatternsOpPatterns configuration,
+    Value variantH);
+
 /// Build transform IR to dynamically selects the first non-empty handle; i.e.
 /// if (h1, h2) is:
 ///   - (non-empty, non-empty), returns (h1, h2)
@@ -86,15 +102,15 @@ struct TileToScfForAndFuseResult {
 /// Build transform IR to perform multi-level tile and fuse into an scf.for op.
 /// Note: fusion is currently unsupported.
 TileToScfForAndFuseResult buildTileFuseToScfFor(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes);
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes);
 
 /// Result of the combined transform performing tiling, fusion and
 /// distribution to parallel constructs.
-struct TileToForeachThreadAndFuseAndDistributeResult {
-  /// Outer `scf.foreach_thread` loop containing the tiled and fused
+struct TileToForallAndFuseAndDistributeResult {
+  /// Outer `scf.forall` loop containing the tiled and fused
   /// operations.
-  Value foreachThreadH;
+  Value forallH;
   /// Handles to fused operations other than the final consumer operation. May
   /// be empty if fusion was not performed iteratively.
   // TODO: support returning handles from `fuse_into_containing_op` and remove
@@ -105,9 +121,9 @@ struct TileToForeachThreadAndFuseAndDistributeResult {
 };
 
 /// Build transform IR to perform the following transformations:
-///   1. Tiles `rootH` to scf.foreach_thread to with `tileSizesOrNumThreads`
+///   1. Tiles `rootH` to scf.forall to with `tileSizesOrNumThreads`
 ///      according to whether spec is a TileSizesSpec or a NumThreadsSpec.
-///   2. Maps the resulting scf.foreach_thread to threads according to
+///   2. Maps the resulting scf.forall to threads according to
 ///      `threadDimMapping`.
 ///   3. Iterates over `opsHToFuse` in order and fuses into the containing op.
 ///
@@ -122,44 +138,47 @@ struct TileToForeachThreadAndFuseAndDistributeResult {
 /// enabling transform will be introduced and may result in better fusions.
 ///
 /// Note: this version cannot be used for the block-level tiling in a dispatch
-/// region. `buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes` is
+/// region. `buildTileFuseDistToForallAndWorkgroupCountWithTileSizes` is
 /// the modified version that is aware of the `workgroup_count` region.
 ///
 // TODO: if someone knows how to properly export templates go for it .. sigh.
-TileToForeachThreadAndFuseAndDistributeResult
-buildTileFuseDistToForeachThreadWithTileSizes(ImplicitLocOpBuilder &b,
-                                              Value rootH,
-                                              ValueRange opsHToFuse,
-                                              ArrayRef<OpFoldResult> tileSizes,
-                                              ArrayAttr threadDimMapping);
+TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithTileSizes(
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
+    ArrayAttr threadDimMapping);
 
-/// Version of `buildTileFuseDistToForeachThreadWithTileSizes` that is aware of
+/// Version of `buildTileFuseDistToForallWithTileSizes` that is aware of
 /// IREE's `workgroup_count` region and should be used for the block-level
 /// tiling in a dispatch region.
-TileToForeachThreadAndFuseAndDistributeResult
-buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> tileSizes, ArrayAttr threadDimMapping);
+TileToForallAndFuseAndDistributeResult
+buildTileFuseDistToForallAndWorkgroupCountWithTileSizes(
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
+    ArrayAttr threadDimMapping);
 
 /// Similar to `buildTileFuseDistWithTileSizes` but using `numThreads` instead
 /// of `tileSizes`.
-TileToForeachThreadAndFuseAndDistributeResult
-buildTileFuseDistToForeachThreadWithNumThreads(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
+TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithNumThreads(
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
+    ArrayAttr threadDimMapping);
 
-/// Version of `buildTileFuseDistToForeachThreadWithNumThreads` that is aware of
+/// Version of `buildTileFuseDistToForallWithNumThreads` that is aware of
 /// IREE's `workgroup_count` region and should be used for the block-level
 /// tiling in a dispatch region.
-TileToForeachThreadAndFuseAndDistributeResult
-buildTileFuseDistToForeachThreadAndWorgroupCountWithNumThreads(
-    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<OpFoldResult> numThreads, ArrayAttr threadDimMapping);
+TileToForallAndFuseAndDistributeResult
+buildTileFuseDistToForallAndWorgroupCountWithNumThreads(
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
+    ArrayAttr threadDimMapping);
 
-/// Build transform IR  that applies rank-reduction patterns and vectorizes.
+/// Build transform IR that applies rank-reduction patterns and vectorizes.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
+
+/// Build transform IR to hoist redundant subset operations.
+Value buildHoisting(ImplicitLocOpBuilder &b, Value funcH);
 
 /// Build transform IR to bufferize and drop HAL descriptor from memref ops.
 /// Takes a handle variantOp and returns a handle to the same variant op.
@@ -170,11 +189,12 @@ Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH,
 /// Then tile the parallel part and map it to `tileSize` threads, each reducing
 /// on `vectorSize` elements.
 /// Lastly, fuse the newly created fill and elementwise operations into the
-/// resulting containing foreach_thread op.
-/// Return a triple of handles to (foreach_thread, fill, combiner)
+/// resulting containing forall op.
+/// Return a triple of handles to (forall, fill, combiner)
 std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
-    ImplicitLocOpBuilder &b, Value reductionH, int64_t reductionRank,
-    int64_t tileSize, int64_t reductionVectorSize, Attribute mappingAttr);
+    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value reductionH,
+    int64_t reductionRank, int64_t tileSize, int64_t reductionVectorSize,
+    Attribute mappingAttr);
 
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
@@ -183,16 +203,16 @@ std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
 
 /// Build transform IR to match exactly an N-D reduction operation (with
 /// optional leading and trailing elementwise) and create a top-level
-/// `scf.foreach_thread` tiled by `strategy.workgroupTileSizes`.
+/// `scf.forall` tiled by `strategy.workgroupTileSizes`.
 /// The matched `maybeLeadingH`, `fillH`, `reductionH` and `maybeTrailingH` are
-/// fused into the top-level `scf.foreach_thread` and handles are returned to
+/// fused into the top-level `scf.forall` and handles are returned to
 /// the fused versions of these ops, in order, that are all tiled and
-/// distributed accordingly. The scf.foreach_thread is returned as the last
+/// distributed accordingly. The scf.forall is returned as the last
 /// value.
-/// The mapping of the `scf.foreach_thread` dimensions is tied the first
+/// The mapping of the `scf.forall` dimensions is tied the first
 /// dimensions of `strategy.allBlockAttrs`.
 ///
-/// Note: `buildTileFuseDistToForeachThreadAndWorkgroupCountWithTileSizes` is
+/// Note: `buildTileFuseDistToForallAndWorkgroupCountWithTileSizes` is
 /// called internally, this version is only for the block-level tiling inside a
 /// dispatch region with an attached workgroup_count region.
 ///

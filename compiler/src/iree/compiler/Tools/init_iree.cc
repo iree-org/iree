@@ -9,7 +9,7 @@
 #include "llvm/Support/CommandLine.h"
 
 static void versionPrinter(llvm::raw_ostream &os) {
-  os << "IREE (https://iree-org.github.io/):\n  ";
+  os << "IREE (https://openxla.github.io/):\n  ";
   std::string version = mlir::iree_compiler::getIreeRevision();
   if (version.empty()) {
     version = "(unknown)";
@@ -37,7 +37,7 @@ static void versionPrinter(llvm::raw_ostream &os) {
 mlir::iree_compiler::InitIree::InitIree(int &argc, char **&argv)
     : init_llvm_(argc, argv) {
   llvm::setBugReportMsg(
-      "Please report issues to https://github.com/iree-org/iree/issues and "
+      "Please report issues to https://github.com/openxla/iree/issues and "
       "include the crash backtrace.\n");
   llvm::cl::SetVersionPrinter(versionPrinter);
 }

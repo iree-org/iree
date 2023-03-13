@@ -63,7 +63,7 @@ These steps help reproduce the failures in TFLite models.
 
 1. Install `iree-import-tflite`.
    ```
-   $ python -m pip install iree-tools-tflite -f https://iree-org.github.io/iree/pip-release-links.html
+   $ python -m pip install iree-tools-tflite -f https://openxla.github.io/iree/pip-release-links.html
    ```
 
 2. Expose and confirm the binary `iree-import-tflite` is in your path by running
@@ -85,8 +85,8 @@ These steps help reproduce the failures in TFLite models.
 
 ### <a name="run-benchmark-locally"></a> Running benchmark suites locally
 
-First you need to have [`iree-import-tflite`](https://iree-org.github.io/iree/getting-started/tflite/),
-[`iree-import-tf`](https://iree-org.github.io/iree/getting-started/tensorflow/),
+First you need to have [`iree-import-tflite`](https://openxla.github.io/iree/getting-started/tflite/),
+[`iree-import-tf`](https://openxla.github.io/iree/getting-started/tensorflow/),
 and `requests` in your python environment. Then you can build the target
 `iree-benchmark-suites` to generate the required files. Note that this target
 requires the `IREE_BUILD_BENCHMARKS` CMake option.

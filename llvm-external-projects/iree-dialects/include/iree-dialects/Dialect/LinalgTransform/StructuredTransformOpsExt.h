@@ -7,7 +7,6 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALG_TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H
 #define IREE_DIALECTS_DIALECT_LINALG_TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H
 
-#include "iree-dialects/Transforms/Listener.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
@@ -46,7 +45,7 @@ auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
   return std::tuple_cat(a);
 }
 
-class TrackingListener : public RewriteListener,
+class TrackingListener : public RewriterBase::Listener,
                          public transform::TransformState::Extension {
 public:
   explicit TrackingListener(transform::TransformState &state)
@@ -58,7 +57,7 @@ public:
 #endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
   }
 
-  void notifyRootReplaced(Operation *op, ValueRange newValues) override;
+  void notifyOperationReplaced(Operation *op, ValueRange newValues) override;
 
   void notifyOperationRemoved(Operation *op) override;
 

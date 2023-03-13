@@ -100,11 +100,55 @@ vm.module @arithmetic_ops_i64 {
 
   vm.export @test_abs_i64
   vm.func @test_abs_i64() {
-    %c1 = vm.const.i64 -1
-    %c1dno = util.optimization_barrier %c1 : i64
-    %v = vm.abs.i64 %c1dno : i64
-    %c2 = vm.const.i64 1
-    vm.check.eq %v, %c2, "abs(-1)=1" : i64
+    %cn1 = vm.const.i64 -1
+    %cn1dno = util.optimization_barrier %cn1 : i64
+    %v = vm.abs.i64 %cn1dno : i64
+    %c1 = vm.const.i64 1
+    vm.check.eq %v, %c1, "abs(-1)=1" : i64
+    vm.return
+  }
+
+  vm.export @test_min_i64s
+  vm.func @test_min_i64s() {
+    %cn3 = vm.const.i64 -3
+    %cn3dno = util.optimization_barrier %cn3 : i64
+    %c2 = vm.const.i64 2
+    %c2dno = util.optimization_barrier %c2 : i64
+    %v = vm.min.i64.s %cn3dno, %c2dno : i64
+    vm.check.eq %v, %cn3, "smin(-3,2)=-3" : i64
+    vm.return
+  }
+
+  vm.export @test_min_i64u
+  vm.func @test_min_i64u() {
+    %cn3 = vm.const.i64 -3
+    %cn3dno = util.optimization_barrier %cn3 : i64
+    %c2 = vm.const.i64 2
+    %c2dno = util.optimization_barrier %c2 : i64
+    %v = vm.min.i64.u %cn3dno, %c2dno : i64
+    vm.check.eq %v, %c2, "umin(-3,2)=2" : i64
+    vm.return
+  }
+
+  vm.export @test_max_i64s
+  vm.func @test_max_i64s() {
+    %cn3 = vm.const.i64 -3
+    %cn3dno = util.optimization_barrier %cn3 : i64
+    %c2 = vm.const.i64 2
+    %c2dno = util.optimization_barrier %c2 : i64
+    %v = vm.max.i64.s %cn3dno, %c2dno : i64
+    vm.check.eq %v, %c2, "smax(-3,2)=2" : i64
+    vm.return
+  }
+
+  vm.export @test_max_i64u
+  vm.func @test_max_i64u() {
+    %cn3 = vm.const.i64 -3
+    %cn3dno = util.optimization_barrier %cn3 : i64
+    %c2 = vm.const.i64 2
+    %c2dno = util.optimization_barrier %c2 : i64
+    %v = vm.max.i64.u %cn3dno, %c2dno : i64
+    vm.check.eq %v, %cn3, "umax(-3,2)=-3" : i64
     vm.return
   }
 

@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
@@ -34,12 +35,6 @@ namespace iree_compiler {
 static llvm::cl::opt<unsigned> logSwizzleTile(
     "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
     llvm::cl::init(0));
-
-/// Flag used for the transition from wmma to mma.sync. Once we have better
-/// performance with mma.sync we can drop wmma support and remove this flag.
-llvm::cl::opt<bool> llvmgpuUseMMASync(
-    "iree-codegen-llvmgpu-use-mma-sync",
-    llvm::cl::desc("use mma sync instead of wmma ops"), llvm::cl::init(false));
 
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
@@ -214,6 +209,9 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
+  // Hoist loop invariant code to avoid pipelining it.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
 }
@@ -255,10 +253,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  if (!llvmgpuUseMMASync) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createGPUReduceSharedMemoryBankConflicts());
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUReduceSharedMemoryBankConflicts());
 
   // Vector -> MMA ops
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -269,9 +265,76 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  // Pipeline memory operations.
+  // Hoist loop invariant code to avoid pipelining it.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
+      createLoopInvariantCodeMotionPass());
+  // Pipeline memory operations.
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+      /*epiloguePeeling=*/false, pipelineDepth,
+      PipeliningSchedulingStrategy::loadGlobalStage0));
+  // Optimize shared memory usage.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUPackSharedMemoryAlloc());
+}
+
+void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
+                                               unsigned pipelineDepth) {
+  tileAndBufferize(pm);
+
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  // Distribute linalg onto warps within the workgroup.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  if (pipelineDepth > 1)
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUMultiBuffering(pipelineDepth));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkGroupSwizzle(logSwizzleTile));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Linalg -> vector
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType::MMA_SYNC));
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+
+  // Distribute shared memory copies.
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // Vector -> MMA ops
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUVectorToGPU(GPUTensorCoreType::MMA_SYNC));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Hoist loop invariant code to avoid pipelining it.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  // Pipeline memory operations.
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+      /*epiloguePeeling=*/false, pipelineDepth,
+      PipeliningSchedulingStrategy::nvidiaTensorCore));
+  // Optimize shared memory usage.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUPackSharedMemoryAlloc());
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
@@ -358,6 +421,31 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 }
 
+void addGPUPackUnPackPasses(OpPassManager &pm) {
+  tileAndDistributeToWorkgroup(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createVectorizePackUnPackOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+
+  addBufferizePasses(nestedModulePM);
+
+  // distribute foreach threads
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createSplitFullPartialTransferPass("linalg-copy"));
+}
+
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   tileAndBufferize(pm);
 
@@ -403,6 +491,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
 
+  // Handle complex operation conversion.
+  pm.addPass(createConvertComplexToStandardPass());
+
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
@@ -410,7 +501,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createLowerAffinePass());
-  pm.addPass(createGPULowerMemorySpaceAttributesPass());
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addPass(createStripDebugInfoPass());

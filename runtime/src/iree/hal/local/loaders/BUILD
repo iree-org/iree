@@ -115,7 +115,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local:executable_loader",
         "//runtime/src/iree/modules/vmvx",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 

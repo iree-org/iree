@@ -4,7 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
+#define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
+
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 
@@ -34,14 +38,16 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     TilingInterface op, linalg::LinalgTilingOptions tilingOptions,
     PatternRewriter &rewriter);
 
+FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
+    scf::ForOp forOp, PipeliningSchedulingStrategy startegy, bool peelEpilogue,
+    int64_t depth, PatternRewriter &rewriter);
+
 /// Populate patterns related to clean up the IR after tile and distribute to
 /// workgroups.
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options);
 
-/// Populate patterns that fold tensor.expand/collapse_shape into the source
-/// hal.interface.binding.subspan.
-void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
-
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#endif  // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_

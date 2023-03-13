@@ -1,8 +1,6 @@
 
 add_mlir_library(IREEDialectsTransforms
-  Listener.cpp
   ListenerCSE.cpp
-  ListenerGreedyPatternRewriteDriver.cpp
   TransformMatchers.cpp
 
   LINK_LIBS PRIVATE

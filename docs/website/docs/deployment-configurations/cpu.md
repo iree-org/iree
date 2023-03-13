@@ -98,9 +98,9 @@ where `iree_input.mlir` is the imported program.
 
 !!! tip
 
-    The `--iree-llvm-target-triple=` flag tells the compiler to generate code
+    The `--iree-llvmcpu-target-triple=` flag tells the compiler to generate code
     for a specific type of CPU. You can see the list of supported targets with
-    `iree-compile --iree-llvm-list-targets`, or omit the flag to let LLVM infer
+    `iree-compile --iree-llvmcpu-list-targets`, or omit the flag to let LLVM infer
     the triple from your host machine (e.g. `x86_64-linux-gnu`).
 
 ### Get IREE runtime with local CPU HAL driver

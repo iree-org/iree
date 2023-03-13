@@ -65,10 +65,10 @@ echo "=== Compiling MLIR to static library output (.vmfb, .h, .o) ==="
 "${COMPILE_TOOL}" "${INPUT_PATH}" \
   --iree-input-type=mhlo \
   --iree-hal-target-backends=llvm-cpu \
-  --iree-llvm-target-triple=wasm32-unknown-unknown \
-  --iree-llvm-target-cpu-features=+simd128 \
-  --iree-llvm-link-static \
-  --iree-llvm-static-library-output-path="${BINARY_DIR}/${INPUT_NAME}_static.o" \
+  --iree-llvmcpu-target-triple=wasm32-unknown-unknown \
+  --iree-llvmcpu-target-cpu-features=+simd128 \
+  --iree-llvmcpu-link-static \
+  --iree-llvmcpu-static-library-output-path="${BINARY_DIR}/${INPUT_NAME}_static.o" \
   --o "${BINARY_DIR}/${INPUT_NAME}.vmfb"
 
 echo "=== Embedding bytecode module (.vmfb) into C source files (.h, .c) ==="
@@ -108,7 +108,7 @@ emcmake "${CMAKE_BIN}" \
 echo "=== Copying static files to the build directory ==="
 
 cp "${SOURCE_DIR}/index.html" "${BINARY_DIR}"
-cp "${ROOT_DIR}/docs/website/overrides/ghost.svg" "${BINARY_DIR}"
+cp "${ROOT_DIR}/docs/website/overrides/.icons/iree/ghost.svg" "${BINARY_DIR}"
 cp "${SOURCE_DIR}/iree_api.js" "${BINARY_DIR}"
 cp "${SOURCE_DIR}/iree_worker.js" "${BINARY_DIR}"
 

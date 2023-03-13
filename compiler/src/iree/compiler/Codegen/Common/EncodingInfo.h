@@ -8,20 +8,15 @@
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree/compiler/Codegen/Utils/EncodingInfo.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-enum class MatmulType {
-  F32F32F32,
-  I8I8I32,
-};
-
 enum class MatmulOperandRole {
   LHS,
   RHS,
-  RHS_TRANSPOSE,
   RESULT,
 };
 

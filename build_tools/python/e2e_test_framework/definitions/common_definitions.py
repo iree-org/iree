@@ -88,7 +88,8 @@ class ModelSourceType(Enum):
   # Exported TFLite model file.
   EXPORTED_TFLITE = "exported_tflite"
   # Exported SavedModel from Tensorflow.
-  EXPORTED_TF = "exported_tf"
+  EXPORTED_TF_V1 = "exported_tf_v1"
+  EXPORTED_TF_V2 = "exported_tf_v2"
 
 
 class InputDataFormat(Enum):
@@ -127,7 +128,7 @@ class DeviceSpec(object):
 class Model(object):
   """Model to be benchmarked."""
   id: str
-  # Friendly name.
+  # Friendly unique name.
   name: str
   # Tags that describe the model characteristics.
   tags: List[str]

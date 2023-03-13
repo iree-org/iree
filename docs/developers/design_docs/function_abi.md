@@ -50,26 +50,26 @@ The above are all representable with native constructs in the VM:
 -   ValueType:
 
     -   Runtime:
-        [`iree_vm_value`](https://github.com/iree-org/iree/blob/main/iree/vm/value.h)
+        [`iree_vm_value`](https://github.com/openxla/iree/blob/main/iree/vm/value.h)
     -   Compile Time: primitive MLIR integer/floating point types
 
 -   Simple ND-Array Buffer:
 
     -   Runtime:
-        [`iree_hal_buffer_view`](https://github.com/iree-org/iree/blob/main/iree/hal/buffer_view.h)
+        [`iree_hal_buffer_view`](https://github.com/openxla/iree/blob/main/iree/hal/buffer_view.h)
     -   Compile Time: `tensor<>`
 
 -   String:
 
     -   Runtime:
-        [`iree_vm_list`](https://github.com/iree-org/iree/blob/main/iree/vm/list.h)
+        [`iree_vm_list`](https://github.com/openxla/iree/blob/main/iree/vm/list.h)
         containing `i8`
     -   Compile Time: `!util.list<i8>`
 
 -   Tuple:
 
     -   Runtime:
-        [`iree_vm_list`](https://github.com/iree-org/iree/blob/main/iree/vm/list.h)
+        [`iree_vm_list`](https://github.com/openxla/iree/blob/main/iree/vm/list.h)
         of variant
     -   Compile Time: `!util.list<?>`
     -   Note that these are statically type erased at the boundary.
@@ -77,7 +77,7 @@ The above are all representable with native constructs in the VM:
 -   TypedList (homogenous):
 
     -   Runtime:
-        [`iree_vm_list`](https://github.com/iree-org/iree/blob/main/iree/vm/list.h)
+        [`iree_vm_list`](https://github.com/openxla/iree/blob/main/iree/vm/list.h)
         of `T`
     -   Compile Time: `!util.list<T>`
 

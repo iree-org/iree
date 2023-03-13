@@ -44,6 +44,23 @@ func.func @FoldSubviewIntoLoadOp(%arg0: !stream.resource<staging>, %arg1: index)
 
 // -----
 
+// CHECK-LABEL: @DontFoldSubviewIntoLoadAcrossAwaitOp
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<staging>, %[[SIZE:.+]]: index, %[[FENCE:.+]]: !stream.timepoint)
+func.func @DontFoldSubviewIntoLoadAcrossAwaitOp(%source: !stream.resource<staging>, %size: index, %fence: !stream.timepoint) -> i32 {
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  %c256 = arith.constant 256 : index
+  // CHECK-NOT: stream.resource.subview
+  %0 = stream.resource.subview %source[%c128] : !stream.resource<staging>{%size} -> !stream.resource<staging>{%c256}
+  // CHECK: %[[READY:.+]] = stream.timepoint.await %[[FENCE]] => %[[SOURCE]]
+  %1 = stream.timepoint.await %fence => %0 : !stream.resource<staging>{%c256}
+  // CHECK: = stream.resource.load %[[READY]][%c192] : !stream.resource<staging>{%[[SIZE]]} -> i32
+  %2 = stream.resource.load %1[%c64] : !stream.resource<staging>{%c256} -> i32
+  return %2 : i32
+}
+
+// -----
+
 // CHECK-LABEL: @FoldSubviewIntoStoreOp
 func.func @FoldSubviewIntoStoreOp(%arg0: !stream.resource<staging>, %arg1: index) {
   %c64 = arith.constant 64 : index

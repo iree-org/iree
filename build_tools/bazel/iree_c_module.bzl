@@ -47,9 +47,9 @@ def iree_c_module(
         static_header_path = static_lib_path.replace(".o", ".h")
         out_files.extend([static_lib_path, static_header_path])
         flags += [
-            "--iree-llvm-link-embedded=false",
-            "--iree-llvm-link-static",
-            "--iree-llvm-static-library-output-path=$(location %s)" % (static_lib_path),
+            "--iree-llvmcpu-link-embedded=false",
+            "--iree-llvmcpu-link-static",
+            "--iree-llvmcpu-static-library-output-path=$(location %s)" % (static_lib_path),
         ]
 
     native.genrule(

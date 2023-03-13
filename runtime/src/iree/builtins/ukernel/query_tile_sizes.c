@@ -24,8 +24,6 @@ static void iree_uk_query_tile_sizes_2d_validate(
   iree_uk_uint32_t role = iree_uk_query_tile_sizes_operand_role(params->flags);
   IREE_UK_ASSERT(role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS ||
                  role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS ||
-                 role ==
-                     IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE ||
                  role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT);
   const iree_uk_int64_t kDynamic = IREE_UK_INT64_MIN;
   IREE_UK_ASSERT((params->size0 >= 0 || params->size0 == kDynamic) ||
@@ -63,9 +61,6 @@ static void iree_uk_query_tile_sizes_2d_matmul(
     out_params->tile_size0 = matmul_tile_sizes.M;
     out_params->tile_size1 = matmul_tile_sizes.K;
   } else if (role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS) {
-    out_params->tile_size0 = matmul_tile_sizes.K;
-    out_params->tile_size1 = matmul_tile_sizes.N;
-  } else if (role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE) {
     out_params->tile_size0 = matmul_tile_sizes.N;
     out_params->tile_size1 = matmul_tile_sizes.K;
   } else if (role == IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT) {

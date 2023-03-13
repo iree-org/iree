@@ -7,6 +7,8 @@
 #include "LLVMGPUExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
@@ -16,18 +18,26 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/Region.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE;
 
 iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
+  // CreateAsyncGroupsOp depends on the following two dialects.
+  declareGeneratedDialect<gpu::GPUDialect>();
+  declareGeneratedDialect<nvgpu::NVGPUDialect>();
+
   registerTransformOps<
 #define GET_OP_LIST
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.cpp.inc"
@@ -43,13 +53,12 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // IREE-specific LLVMGPU transformations.
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
+void transform_dialect::MapNestedForallToGpuThreadsOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<int64_t> workgroupSize) {
   result.addOperands(target);
   result.addAttribute(
-      MapNestedForeachThreadToGpuThreadsOp::getWorkgroupSizeAttrName(
-          result.name),
+      MapNestedForallToGpuThreadsOp::getWorkgroupSizeAttrName(result.name),
       builder.getI64ArrayAttr(workgroupSize));
   MLIRContext *ctx = builder.getContext();
   result.addTypes({pdl::OperationType::get(ctx)});
@@ -59,7 +68,7 @@ void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
-transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
+transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -92,9 +101,19 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
       gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimY),
       gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimZ)};
 
+  auto threadIdGenerator = [](RewriterBase &rewriter, scf::ForallOp forallOp,
+                              SmallVectorImpl<Value> &threadIds) {
+    Location loc = forallOp.getLoc();
+    IndexType indexType = rewriter.getIndexType();
+    threadIds.assign(
+        {rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x),
+         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y),
+         rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::z)});
+  };
+
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-          rewriter, target, workgroupSize, true, transformOp,
+          rewriter, target, workgroupSize, threadIdGenerator, true, transformOp,
           threadMappingAttributes);
 
   if (diag.succeeded()) {
@@ -102,6 +121,57 @@ transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
     // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
     exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   }
+
+  // Map warpIds, only if threadIdx.x is a multiple of the warp size.
+  // TODO: more advanced mechanism to linearize/delinearize the threadIds to
+  // warps.
+  SmallVector<DeviceMappingAttrInterface> warpMappingAttributes = {
+      gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimX),
+      gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimY),
+      gpu::GPUWarpMappingAttr::get(ctx, gpu::Warps::DimZ)};
+  if (diag.succeeded() && (workgroupSize[0] % kWarpSize == 0)) {
+    auto warpIdGenerator = [](RewriterBase &rewriter, scf::ForallOp forallOp,
+                              SmallVectorImpl<Value> &warpIds) {
+      Location loc = forallOp.getLoc();
+      IndexType indexType = rewriter.getIndexType();
+      Value threadIdX =
+          rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x);
+      Value cstWarpSize =
+          rewriter.create<arith::ConstantIndexOp>(loc, kWarpSize);
+      Value warpIdX =
+          rewriter.create<arith::DivUIOp>(loc, threadIdX, cstWarpSize);
+      warpIds.assign(
+          {warpIdX,
+           rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y),
+           rewriter.create<gpu::ThreadIdOp>(loc, indexType,
+                                            gpu::Dimension::z)});
+    };
+    SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
+                                     workgroupSize[1], workgroupSize[2]};
+    diag = mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+        rewriter, target, numWarps, warpIdGenerator, true, transformOp,
+        warpMappingAttributes);
+  }
+
+  auto walkResult = target->walk([&warpMappingAttributes](
+                                     scf::ForallOp forallOp) -> WalkResult {
+    auto maybeMapping = forallOp.getMapping();
+    if (!maybeMapping) return WalkResult::advance();
+    for (Attribute attr : *maybeMapping) {
+      for (const auto &warpAttr : warpMappingAttributes) {
+        if (attr == warpAttr) {
+          forallOp->emitOpError(
+              "Mapping failed: is threadIdx.x a multiple of the warp size?");
+          return WalkResult::interrupt();
+        }
+      }
+    }
+    return WalkResult::advance();
+  });
+  if (walkResult.wasInterrupted()) {
+    return emitDefaultDefiniteFailure(target);
+  }
+
   results.push_back(target);
   return diag;
 }
@@ -334,6 +404,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
 void transform_dialect::VectorWarpDistributionOp::build(OpBuilder &builder,
                                                         OperationState &result,
                                                         Value target) {
+  result.addTypes(pdl::OperationType::get(builder.getContext()));
   result.addOperands(target);
 }
 
@@ -601,13 +672,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
         target, "warp execute on lane 0 to scf patterns failed to apply");
   }
 
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::VectorWarpDistributionOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
 }
 
 void transform_dialect::VectorToMMAConversionOp::build(OpBuilder &builder,
@@ -627,34 +693,62 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
         "patterns greedily");
     return emitDefaultDefiniteFailure(target);
   }
-  MLIRContext *ctx = target->getContext();
 
-  // Step 1. Unroll vectors to native size.
-  RewritePatternSet unrollPatterns(ctx);
-  vector::populateVectorUnrollPatterns(
-      unrollPatterns,
-      vector::UnrollVectorOptions().setNativeShapeFn(getWmmaNativeVectorSize));
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(unrollPatterns)))) {
-    target->emitOpError(
-        "failed to break up vector operations into mma native size");
+  auto funcOp = dyn_cast<func::FuncOp>(target);
+  if (!funcOp) {
+    target->emitOpError("Must apply to a func op");
     return emitDefaultDefiniteFailure(target);
   }
 
-  // TODO: Step 2. add pattern to propagate the extract through the scf.for ops.
+  if (!(getUseMmaSync() ^ getUseWmma())) {
+    target->emitOpError(
+        "Exactly one of use_mma_sync or use_wmma must be specified");
+    return emitDefaultDefiniteFailure(target);
+  }
 
-  // Step 3. Convert slice of contract operations to wmma ops.
+  MLIRContext *ctx = target->getContext();
+
+  // Unrolling to native vector size must have previously occurred.
+  // TODO: Add pattern to propagate the extract through the scf.for ops.
+  // Convert slice of contract operations to mma_sync/wmma ops.
   RewritePatternSet patterns(ctx);
   mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  populatePrepareVectorToMMAPatterns(patterns, /*llvmgpuUseMMASync=*/false);
+  populatePrepareVectorToMMAPatterns(patterns, getUseMmaSync());
   if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
+    target->emitOpError("vector to mma preparation patterns failed to apply");
+    return emitDefaultDefiniteFailure(target);
+  }
+
+  IRRewriter rewriter(getContext());
+  if (getUseWmma()) {
+    if (failed(convertVectorToMMAOps(rewriter, target))) {
+      target->emitOpError("vector to wmma patterns failed to apply");
+      return emitDefaultDefiniteFailure(target);
+    }
+    results.push_back(target);
+    return DiagnosedSilenceableFailure::success();
+  }
+
+  if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp))) {
     target->emitOpError("vector to mma patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
-  convertVectorToMMAOps(target);
-
+  // Using TF32 for Float.
+  RewritePatternSet f32ToTF32patterns(funcOp.getContext());
+  nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
+                                          nvgpu::MmaSyncF32Lowering::TF32);
+  if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                          std::move(f32ToTF32patterns)))) {
+    target->emitOpError("vector to mma F32ToTF32 patterns failed to apply");
+    return emitDefaultDefiniteFailure(target);
+  }
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
+
+//===----------------------------------------------------------------------===//
+// PromoteOperandsOp
+//===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
@@ -664,6 +758,8 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
   rewriter.setInsertionPoint(target);
   SmallVector<int64_t> indices = llvm::to_vector(getIndices());
   int64_t numOperands = target->getNumOperands();
+
+  results.push_back(target);
   bufferization::BufferizationOptions options;
   for (int64_t index : indices) {
     if ((index >= 0) && (index < numOperands)) {
@@ -680,6 +776,35 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
       return emitDefaultDefiniteFailure(target) << "invalid index specified";
     }
   }
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// PipelineSharedMemoryCopiesOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
+    scf::ForOp forOp, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  transform::TrivialPatternRewriter rewriter(getContext());
+  int64_t depth(getDepth());
+  FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
+      forOp, PipeliningSchedulingStrategy::loadGlobalStage0, false, depth,
+      rewriter);
+  if (failed(pipelinedFor)) return emitDefaultSilenceableFailure(forOp);
+  results.push_back(pipelinedFor.value());
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// CreateAsyncGroupsOp.
+//===---------------------------------------------------------------------===//
+DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
+    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  iree_compiler::createAsyncGroups(cast<func::FuncOp>(target), getUseMmaSync());
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 

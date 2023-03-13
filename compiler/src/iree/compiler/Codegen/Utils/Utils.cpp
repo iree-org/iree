@@ -6,15 +6,11 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -109,34 +105,6 @@ Optional<llvm::Triple> getTargetTriple(
   return llvm::Triple(triple.value().str());
 }
 
-/// Returns the CPU target features associated with the `hal.executable.variant`
-/// operation, if set.
-Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
-  if (!cpuFeatures) return std::nullopt;
-  return cpuFeatures->getValue();
-}
-
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isX86();
-}
-
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().getArch() == llvm::Triple::x86_64;
-}
-
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isAArch64();
-}
-
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isRISCV();
-}
-
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
 }
@@ -144,51 +112,6 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto enableMicrokernels = getConfigBoolAttr(targetAttr, "ukernels");
   return enableMicrokernels && enableMicrokernels->getValue();
-}
-
-bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto intrinsicsAttr =
-      getConfigBoolAttr(targetAttr, "prefer_intrinsics_over_asm");
-  return intrinsicsAttr && intrinsicsAttr->getValue();
-}
-
-// TODO(dcaballe): If we have to check for a significantly large number of
-// features in the future, we may want to consider a persistent state to carry
-// over processed HAL information or keeping the TTI instance alive and query
-// subtarget features data structure.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
-  Optional<StringRef> features = getCpuFeatures(targetAttr);
-  if (!features) {
-    return false;
-  }
-
-  // Find feature string in list of features, making sure that we don't match a
-  // sub-string.
-  std::stringstream sstream(features->str());
-  std::string str;
-  while (std::getline(sstream, str, ',')) {
-    if (str == feature) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+avx2");
-}
-
-bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+v");
-}
-
-bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+zve32x");
-}
-
-bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+zve64x");
 }
 
 bool isReadOnly(Value v) {
@@ -745,6 +668,39 @@ void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
   for (OpOperand *operand : operandsToReplace) operand->set(val);
   // Clean up old subview ops.
   for (Operation *op : opToDelete) op->erase();
+}
+
+void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
+                  DominanceInfo &dominators) {
+  for (Operation *sinkOp : allocs) {
+    Block *dom = nullptr;
+    for (Operation *user : sinkOp->getUsers()) {
+      if (!dom) {
+        dom = user->getBlock();
+        // Find the block in the same region.
+        while (dom->getParent() != sinkOp->getParentRegion()) {
+          dom = dom->getParentOp()->getBlock();
+        }
+        continue;
+      }
+      dom = dominators.findNearestCommonDominator(dom, user->getBlock());
+    }
+    llvm::SmallDenseSet<Operation *> users;
+    for (Operation *user : sinkOp->getUsers()) {
+      while (user->getParentRegion() != sinkOp->getParentRegion()) {
+        user = user->getParentOp();
+      }
+      users.insert(user);
+    }
+    Operation *firstUse = dom->getTerminator();
+    for (Operation &op : dom->getOperations()) {
+      if (users.count(&op)) {
+        firstUse = &op;
+        break;
+      }
+    }
+    sinkOp->moveBefore(firstUse);
+  }
 }
 
 }  // namespace iree_compiler

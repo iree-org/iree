@@ -7,19 +7,19 @@
 Constructs a TF module for performing image edge detection and runs it using
 IREE
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/edge_detection.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/edge_detection.ipynb)
 
 ### [low_level_invoke_function\.ipynb](low_level_invoke_function.ipynb)
 
 Shows off some concepts of the low level IREE python bindings
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
 
 ### [mnist_training\.ipynb](mnist_training.ipynb)
 
 Compile, train and execute a TensorFlow Keras neural network with IREE
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/mnist_training.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/mnist_training.ipynb)
 
 ### [resnet\.ipynb](resnet.ipynb)
 
@@ -27,7 +27,7 @@ Loads a pretrained
 [ResNet50](https://www.tensorflow.org/api_docs/python/tf/keras/applications/ResNet50)
 model and runs it using IREE
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/resnet.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/resnet.ipynb)
 
 ### [tensorflow_hub_import\.ipynb](tensorflow_hub_import.ipynb)
 
@@ -35,7 +35,7 @@ Downloads a pretrained
 [MobileNet V2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 model, pre-processes it for import, then compiles it using IREE
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
 
 ### [tflite_text_classification\.ipynb](tflite_text_classification.ipynb)
 
@@ -43,7 +43,7 @@ Downloads a pretrained
 [TFLite text classification](https://www.tensorflow.org/lite/examples/text_classification/overview)
 model, and runs it using TFLite and IREE
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
 
 ## Working with GitHub
 

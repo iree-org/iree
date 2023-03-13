@@ -37,14 +37,13 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 //         CHECK: #[[$MAP:.*]] = affine_map<(d0) -> (d0 * 4)>
 //   CHECK-LABEL: func.func @add_tensor
-//     CHECK-DAG:   %[[C64:.*]] = arith.constant 64 : index
 //     CHECK-DAG:   %[[A:.*]] = hal.interface.binding.subspan set(0) binding(0)
 //     CHECK-DAG:   %[[B:.*]] = hal.interface.binding.subspan set(0) binding(1)
 //     CHECK-DAG:   %[[C:.*]] = hal.interface.binding.subspan set(0) binding(2)
 //     CHECK-DAG:   %[[LA:.*]] = flow.dispatch.tensor.load %[[A]]
 //     CHECK-DAG:   %[[LB:.*]] = flow.dispatch.tensor.load %[[B]]
 //     CHECK-DAG:   %[[LC:.*]] = flow.dispatch.tensor.load %[[C]]
-//         CHECK:   %[[T:.*]] = scf.foreach_thread (%[[ARG:.*]]) in (%[[C64]]) shared_outs(%[[O:.*]] = %[[LC]]) -> (tensor<1x256xf32>) {
+//         CHECK:   %[[T:.*]] = scf.forall (%[[ARG:.*]]) in (64) shared_outs(%[[O:.*]] = %[[LC]]) -> (tensor<1x256xf32>) {
 //         CHECK:     %[[OFF:.*]] = affine.apply #[[$MAP]](%[[ARG]])
 //     CHECK-DAG:     %[[TA:.*]] = tensor.extract_slice %[[LA]][0, %[[OFF]]] [1, 4] [1, 1] : tensor<1x256xf32> to tensor<1x4xf32>
 //     CHECK-DAG:     %[[TB:.*]] = tensor.extract_slice %[[LB]][0, %[[OFF]]] [1, 4] [1, 1] : tensor<1x256xf32> to tensor<1x4xf32>
@@ -53,7 +52,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:       %{{.*}} = arith.addf %{{.*}}, %{{.*}} : f32
 //         CHECK:       linalg.yield %{{.*}} : f32
 //         CHECK:     } -> tensor<1x4xf32>
-//         CHECK:     scf.foreach_thread.perform_concurrently {
+//         CHECK:     scf.forall.in_parallel {
 //         CHECK:       tensor.parallel_insert_slice %[[L]] into %[[O]][0, %[[OFF]]] [1, 4] [1, 1] : tensor<1x4xf32> into tensor<1x256xf32>
 //         CHECK:     }
 //         CHECK:   } {mapping = [#gpu.thread<x>]}
@@ -98,12 +97,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //   CHECK-LABEL: func.func @reduction
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C4:.*]] = arith.constant 4 : index
-//     CHECK-DAG:   %[[C64:.*]] = arith.constant 64 : index
 //     CHECK-DAG:   %[[C384:.*]] = arith.constant 384 : index
 //         First the scf.foreach for the linalg.fill.
-//         CHECK:   scf.foreach_thread
+//         CHECK:   scf.forall
 //         then the reduction case.
-//         CHECK:   %[[T:.*]] = scf.foreach_thread (%[[ARG:.*]]) in (%[[C64]]) shared_outs(%[[O:.+]] = %{{.+}}) -> (tensor<64xf32>) {
+//         CHECK:   %[[T:.*]] = scf.forall (%[[ARG:.*]]) in (64) shared_outs(%[[O:.+]] = %{{.+}}) -> (tensor<64xf32>) {
 //         CHECK:     %[[OUTSLICE:.*]] = tensor.extract_slice %{{.*}}[%[[ARG]], 0] [1, 384] [1, 1] : tensor<64x384xf32> to tensor<1x384xf32>
 //         CHECK:     %[[A:.*]] = tensor.extract_slice %[[O]][%[[ARG]]] [1] [1] : tensor<64xf32> to tensor<1xf32>
 //         CHECK:     %[[R:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C384]] step %[[C4]] iter_args(%[[ACC:.*]] = %[[A]]) -> (tensor<1xf32>) {
@@ -114,7 +112,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:       } -> tensor<1xf32>
 //         CHECK:       scf.yield %[[L]] : tensor<1xf32>
 //         CHECK:     }
-//         CHECK:     scf.foreach_thread.perform_concurrently {
+//         CHECK:     scf.forall.in_parallel {
 //         CHECK:       tensor.parallel_insert_slice %[[R]] into %[[O]][%[[ARG]]] [1] [1] : tensor<1xf32> into tensor<64xf32>
 //         CHECK:     }
 //         CHECK:   } {mapping = [#gpu.thread<x>]}
@@ -179,11 +177,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C4:.*]] = arith.constant 4 : index
 //     CHECK-DAG:   %[[C10:.*]] = arith.constant 10 : index
 //     CHECK-DAG:   %[[C4096:.*]] = arith.constant 4096 : index
-//         CHECK:   scf.foreach_thread
+//         CHECK:   scf.forall
 //         CHECK:     linalg.fill
-//         CHECK:   scf.foreach_thread
+//         CHECK:   scf.forall
 //         CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C10]] step %[[C4]]
 //         CHECK:       scf.for %{{.*}} = %[[C0]] to %[[C4096]] step %[[C4]]
 //         CHECK:         linalg.generic
-//         CHECK:   scf.foreach_thread
+//         CHECK:   scf.forall
 //         CHECK:     linalg.generic

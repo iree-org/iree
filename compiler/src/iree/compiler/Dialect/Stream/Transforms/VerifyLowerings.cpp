@@ -303,11 +303,11 @@ class VerifyLoweringToTensorsPass
 
   void runOnOperation() override {
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
-    // as they use different memory models.
+    // as they use different memory models. We need to allow them through,
+    // though, to allow for compiler re-entrancy.
     Verifier verifier;
     setupDefaultOpLegality(verifier);
     markTensorInputsIllegal(verifier);
-    markStreamCmdOpsIllegal(verifier);
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
@@ -339,12 +339,12 @@ class VerifyLoweringToAsyncPass
 
   void runOnOperation() override {
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
-    // as they use different memory models.
+    // as they use different memory models. We need to allow them through,
+    // though, to allow for compiler re-entrancy.
     Verifier verifier;
     setupDefaultOpLegality(verifier);
     markTensorInputsIllegal(verifier);
     markStreamTensorOpsIllegal(verifier);
-    markStreamCmdOpsIllegal(verifier);
 
     // All resources should have had their usage assigned.
     verifier.addTypeVerifier<IREE::Stream::ResourceType>([](auto type) {
@@ -357,6 +357,11 @@ class VerifyLoweringToAsyncPass
     // All streamable ops should be inside of execution regions.
     verifier.addOpVerifier<IREE::Stream::StreamableOpInterface>(
         [](auto op) -> Optional<Verifier::Legality> {
+          // Skip cmd ops that may exist.
+          if (op->template hasTrait<OpTrait::IREE::Stream::CmdPhaseOp>()) {
+            return Verifier::Legality::LEGAL;
+          }
+
           // Allow metadata ops outside of execution regions.
           if (op.isMetadata()) return Verifier::Legality::LEGAL;
 

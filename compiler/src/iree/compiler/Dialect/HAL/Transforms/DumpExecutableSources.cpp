@@ -59,6 +59,10 @@ class DumpExecutableSourcesPass
     }
 
     for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+      // Reset to public visibility so symbol DCE won't drop it on load.
+      auto originalVisibility = executableOp.getVisibility();
+      executableOp.setVisibility(SymbolTable::Visibility::Public);
+
       auto fileName =
           (moduleName + "_" + executableOp.getName() + ".mlir").str();
       if (path.empty() || path == "-") {
@@ -76,6 +80,9 @@ class DumpExecutableSourcesPass
         dumpExecutableToStream(executableOp, filePath, file->os());
         file->keep();
       }
+
+      // Restore original visibility.
+      executableOp.setVisibility(originalVisibility);
     }
   }
 

@@ -583,7 +583,7 @@ Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
       if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }
-    return llvm::to_vector<>(sliceType.getShape());
+    return llvm::to_vector(sliceType.getShape());
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
@@ -594,6 +594,160 @@ Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     }
   }
   return std::nullopt;
+}
+
+//===----------------------------------------------------------------------===//
+// getMmaNativeVectorSize
+//===----------------------------------------------------------------------===//
+/// Returns vector::ContractionOp operand's index where the result is used.
+static Optional<int> getVectorContractOpOperandId(
+    vector::ContractionOp contractOp, OpResult result) {
+  if (contractOp.getLhs() == result) return 0;
+  if (contractOp.getRhs() == result) return 1;
+  if (contractOp.getAcc() == result) return 2;
+  return std::nullopt;
+}
+
+/// Returns vector::ContractionOp operand's index  where the
+/// vector::TransferReadOp is consumed either consumed directly or via
+/// vector::ExtractStridedSliceOp.
+static Optional<int> getVectorContractOpOperandIdForVectorReadOp(
+    Operation *op) {
+  vector::ContractionOp contractOp;
+
+  Operation *firstLevelUser = *((op->getUsers()).begin());
+  if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser))
+    return getVectorContractOpOperandId(contractOp, op->getResult(0));
+  Operation *secondLevelUser = *((firstLevelUser->getUsers()).begin());
+  if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser))
+    return getVectorContractOpOperandId(contractOp,
+                                        firstLevelUser->getResult(0));
+  return std::nullopt;
+}
+
+/// Helper function to return native size for MMA.SYNC-based operations.
+Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
+  // Shape of native Tensor Core GPU mma.sync operations.
+  int64_t mmaShapeM = 16;
+  int64_t mmaShapeN = 8;
+  int64_t mmaShapeK;
+
+  // Shape the mma.sync warp-level operation.
+  if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
+    Type sourceType = contract.getLhsType().getElementType();
+
+    // Set mmaShapeK based on sourceType.
+    if (sourceType.isInteger(4))
+      mmaShapeK = 64;
+    else if (sourceType.isInteger(8))
+      mmaShapeK = 32;
+    else if (sourceType.isF16() || sourceType.isBF16())
+      mmaShapeK = 16;
+    else if (sourceType.isF32())
+      mmaShapeK = 8;
+    else
+      return std::nullopt;
+
+    // Initialize/set the starting dims of the ranked shape, such as batch,
+    // to 1.
+    SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3, 1);
+    mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
+    return mmaShape;
+  }
+
+  // Shape of warp-level vector write operation.
+  if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+    SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
+    outputShape.append({mmaShapeM, mmaShapeN});
+    return outputShape;
+  }
+
+  // Shape of warp-level vector read (load) operation.
+  if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
+    auto resultVectorType = readOp.getVector().getType().cast<VectorType>();
+    Type resultElementType = resultVectorType.getElementType();
+
+    Optional<int> operandId = getVectorContractOpOperandIdForVectorReadOp(op);
+    if (!operandId) {
+      op->emitError() << "Cannot determine operandId this "
+                         "vector::TransferReadOp is used as in the "
+                         "vector::TransferContractOp";
+      return std::nullopt;
+    }
+
+    // Loading F16 values from Shared Memory to Registers.
+    if (resultElementType.isF16() || resultElementType.isBF16()) {
+      // For matrixC.
+      if (*operandId == 2) {
+        SmallVector<int64_t> readShape;
+        readShape.append({mmaShapeM, mmaShapeN});
+        return readShape;
+      }
+
+      // For matrixA and matrixB.
+      if (*operandId == 0 || *operandId == 1) {
+        // MmaSyncOp input operands: matrixA and matrixB.
+        // LDSMx1, x2, x4:
+        // - LDSMx1 loads a 1 tile  of 8x8.
+        // - LDSMx2 loads a 2 tiles of 8x8.
+        // - LDSMx4 loads a 4 tiles of 8x8. (in use)
+        // IREE uses the largest tiled load, i.e., LDSMx4.
+
+        // MmaSyncOp source operand: matrixC.
+        // matrixC is also read/written in tiled block of 16x16. In the pass
+        // OptimizeVectorTransfer, matrixC reads are moved above the mainloop
+        // and writes are moved below the mainloop. Thus, mma.sync read/write
+        // accumulator inplace.
+
+        SmallVector<int64_t> readShape;
+        readShape.append({16, 16});
+        return readShape;
+      }
+    }
+
+    // Loading F32 values from Shared Memory to Registers.
+    if (resultElementType.isF32()) {
+      // Set mmaShapeK for F32 datatype mma.sync.f32.tf32.m16n8k8.
+      mmaShapeK = 8;
+
+      // For matrixC.
+      if (*operandId == 2) {
+        SmallVector<int64_t> readShape;
+        readShape.append({mmaShapeM, mmaShapeN});
+        return readShape;
+      }
+      // For matrixA.
+      if (*operandId == 0) {
+        SmallVector<int64_t> readShape;
+        readShape.append({mmaShapeM, mmaShapeK});
+        return readShape;
+      }
+      // For matrixB.
+      if (*operandId == 1) {
+        // Do not use ldmatrix for matrixB.
+        // Transfer read ops may need different shapes based on how they are
+        // being used. For simplicity just match the shape used by the extract
+        // strided op.
+        VectorType sliceType;
+        for (Operation *users : op->getUsers()) {
+          auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
+          if (!extract) return std::nullopt;
+          auto vecType = extract.getResult().getType().cast<VectorType>();
+          if (sliceType && sliceType != vecType) return std::nullopt;
+          sliceType = vecType;
+        }
+        return llvm::to_vector(sliceType.getShape());
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
+  auto addrSpace =
+      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+  return addrSpace &&
+         addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
 }
 
 }  // namespace iree_compiler

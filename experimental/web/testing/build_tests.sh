@@ -96,4 +96,4 @@ echo "=== Copying static files to the build directory ==="
 
 cp ${SOURCE_DIR?}/test-runner.html ${BINARY_DIR}
 cp ${SOURCE_DIR?}/*.js ${BINARY_DIR}
-cp ${ROOT_DIR?}/docs/website/overrides/ghost.svg ${BINARY_DIR}
+cp ${ROOT_DIR?}/docs/website/overrides/.icons/iree/ghost.svg ${BINARY_DIR}

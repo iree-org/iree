@@ -10,16 +10,15 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
-#include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
-#include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -68,6 +67,12 @@ static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     llvm::cl::desc("Enables reassociation for FP reductions"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
+    "iree-llvmcpu-instrument-memory-accesses",
+    llvm::cl::desc("Instruments memory accesses in dispatches when dispatch "
+                   "instrumentation is enabled."),
+    llvm::cl::init(false)};
+
 // MLIR file containing a top-level module that specifies the transformations to
 // apply to form dispatch regions.
 // Defined externally in KernelDispatch.cpp to control the codegen pass
@@ -98,8 +103,9 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
                                         unsigned alignment) {
   auto funcOp = builder.getInsertionPoint()->getParentOfType<func::FuncOp>();
   if (funcOp) {
-    std::optional<Value> hoistedAllocation = hoistStaticallyBoundAllocations(
-        funcOp, builder, loc, memRefType, dynamicSizes, alignment);
+    std::optional<Value> hoistedAllocation =
+        hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
+            funcOp, builder, loc, memRefType, dynamicSizes, alignment);
     if (hoistedAllocation) {
       return hoistedAllocation.value();
     }
@@ -326,7 +332,8 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
 // Codegen pipelines.
 //===---------------------------------------------------------------------===//
 
-void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
+void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
+                                             bool enableVectorMasking) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -338,6 +345,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
     options.peel = true;
     options.vectorize = true;
+    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -357,7 +365,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   }
 }
 
-void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
+void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
+                                          bool enableVectorMasking) {
   addTileAndDistributePasses(passManager,
                              /*useFuseTensorPadWithConsumerPass=*/false);
 
@@ -428,6 +437,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
+    options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
@@ -480,6 +490,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
 
 void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
                                       int64_t numLevels, bool enablePeeling,
+                                      bool enableVectorMasking,
                                       bool lowerToAVX2) {
   addTileAndDistributePasses(passManager);
 
@@ -520,6 +531,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     LinalgSingleTilingExpertPassOptions options;
     options.peel = enablePeeling;
     options.vectorize = true;
+    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -542,7 +554,8 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   }
 }
 
-void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
+void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
+                                               bool enableVectorMasking) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -586,6 +599,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
+    options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
@@ -612,7 +626,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
+                                      bool enableVectorMasking) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -646,6 +661,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
+    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
   }
@@ -661,8 +677,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
 void addCPUDataTilingPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createLinalgExtVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createVectorizePackUnPackOpsPass());
   addBufferizePasses(nestedModulePM);
@@ -716,6 +730,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(arith::createConstantBufferizePass());
   passManager.addPass(createFoldTensorExtractOpPass());
 
+  // Handle complex operation conversion.
+  passManager.addPass(createConvertComplexToStandardPass());
+
   // math dialect elementry functions -> polynomial form.
   passManager.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
@@ -737,6 +754,10 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // (HAL, IREE, Linalg, CF) -> LLVM
   passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  if (clInstrumentMemoryAccesses) {
+    passManager.addNestedPass<func::FuncOp>(
+        createInstrumentMemoryAccessesPass());
+  }
   passManager.addPass(createConvertToLLVMPass(clEnableReassociateFpReductions));
   passManager.addPass(createReconcileUnrealizedCastsPass());
 

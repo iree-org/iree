@@ -12,11 +12,41 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    allocators
+  HDRS
+    "allocators.h"
+  SRCS
+    "allocators.c"
+  DEPS
+    ::caching_allocator
+    ::debug_allocator
+    iree::base
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     buffer_transfer
   HDRS
     "buffer_transfer.h"
   SRCS
     "buffer_transfer.c"
+  DEPS
+    iree::base
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    debug_allocator
+  HDRS
+    "debug_allocator.h"
+  SRCS
+    "debug_allocator.c"
   DEPS
     iree::base
     iree::base::tracing

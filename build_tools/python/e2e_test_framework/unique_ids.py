@@ -3,10 +3,62 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""List of unique random IDs in the benchmark suites.
+"""List of unique random IDs in the framework and id utilities.
 
 Each ID should be generated from uuid.uuid4().
 """
+
+import hashlib
+from typing import Sequence
+
+# Special id which will be ignored when calculating the composite id.
+#
+# It should only be used when adding a new field to a composite object while
+# we want to maintain the same id on the existing composite objects.
+#
+# In such case, you need to create a "default config" for the new field with
+# this id and populate that config to the fields of the existing objects. The
+# composite id computing function will ignore this id and keep the output
+# unchanged.
+TRANSPARENT_ID = "00000000-0000-0000-0000-000000000000"
+
+
+def hash_composite_id(keys: Sequence[str]) -> str:
+  """Computes the composite hash id from string keys.
+
+  String keys are the component ids that compose this composite object. We hash
+  the composite id since the id isn't designed to be inspected and insufficient
+  to reconstruct the original composite object.
+
+  Note that the output is sensitive to the order of the keys, and any key ==
+  TRANSPARENT_ID will be skipped. When adding a new key to the keys, the new key
+  should be always appended to the end. In this way, the composite id can be
+  unchanged for the existing composite object if they use TRANSPARENT_ID on the
+  new keyed field.
+
+  The composite id is computed in the following steps:
+  1. Index each key with its position in the list from 0.
+  2. Remove any key == TRANSPARENT_ID
+  3. Get the SHA256 hex digest of "0-key_0:1-key_1:..."
+
+  Step 1 is needed to avoid the ambiguity between:
+  ["key_abc", TRANSPARENT_ID] and [TRANSPARENT_ID, "key_abc"]
+  since after removing TRANSPARENT_ID, they both become ["key_abc"] without the
+  position index.
+
+  Args:
+    keys: list of string keys.
+
+  Returns:
+    Unique composite id.
+  """
+  trimmed_indexed_key = [
+      f"{index}-{key}" for index, key in enumerate(keys)
+      if key != TRANSPARENT_ID
+  ]
+  return hashlib.sha256(
+      ":".join(trimmed_indexed_key).encode("utf-8")).hexdigest()
+
 
 # Models
 MODEL_DEEPLABV3_FP32 = "c36c63b0-220a-4d78-8ade-c45ce47d89d3"
@@ -24,6 +76,7 @@ MODEL_MINILM_L12_H384_UNCASED_INT32_SEQLEN128 = "ecf5c970-ee97-49f0-a4ed-df1f34e
 MODEL_BERT_FOR_MASKED_LM_FP32_SEQLEN512_TF = "39d157ad-f0ec-4a76-963b-d783beaed60f"
 MODEL_EFFICIENTNET_V2_S_FP32_TF = "ebe7897f-5613-435b-a330-3cb967704e5e"
 MODEL_RESNET50_TF_FP32 = "c393b4fa-beb4-45d5-982a-c6328aa05d08"
+MODEL_BERT_LARGE_TF_FP32_SEQLEN384 = "8871f602-571c-4eb8-b94d-554cc8ceec5a"
 
 # Model input data
 MODEL_INPUT_DATA_ZEROS = "8d4a034e-944d-4725-8402-d6f6e61be93c"
@@ -59,3 +112,7 @@ IREE_MODULE_EXECUTION_CONFIG_VULKAN = "34ae13f0-d6d9-43f7-befb-15d024e88e89"
 IREE_MODULE_EXECUTION_CONFIG_VULKAN_BATCH_SIZE_16 = "b10737a8-5da4-4052-9b7a-5b07f21e02d0"
 IREE_MODULE_EXECUTION_CONFIG_VULKAN_BATCH_SIZE_32 = "c59f6ed8-ef78-4ddd-93ea-f173c5e4d6b8"
 IREE_MODULE_EXECUTION_CONFIG_VMVX_LOCAL_TASK_BASE = "953183e2-1e84-4a51-a43c-9b869bdc2218"
+IREE_MODEL_IMPORT_TF_V1_DEFAULT = "8b2df698-f3ba-4207-8696-6c909776eac4"
+IREE_MODEL_IMPORT_TF_V2_DEFAULT = "2464f30a-d04c-4f46-a332-b8c7853d61fc"
+IREE_MODEL_IMPORT_TFLITE_DEFAULT = "16280d67-7ce0-4807-ab4b-0cb3c771d206"
+IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT = "8afc4561-e84d-4a91-af55-2b1917465fcc"

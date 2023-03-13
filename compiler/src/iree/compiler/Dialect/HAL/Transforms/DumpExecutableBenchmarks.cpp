@@ -48,6 +48,8 @@ struct DispatchParams {
   SmallVector<unsigned> workload;
   // Analyzed minimum binding sizes.
   SmallVector<Binding> bindings;
+  // Push constant operands that are known constant. May be null if dynamic.
+  SmallVector<Attribute> uniformOperands;
 };
 
 using DispatchParamsMap =
@@ -63,8 +65,6 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
 
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      // NOTE: we could record operands here if we wanted real push constants.
-
       // TODO(benvanik): typed accessors for bindings.
       auto bindingAttrs = dispatchOp->getAttr("hal.interface.bindings")
                               .dyn_cast_or_null<ArrayAttr>();
@@ -97,22 +97,37 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
                             resourceLengthInt.getSExtValue()});
       }
 
-      // Work around needing a mutable key for the set; C++ was a mistake.
-      auto &dispatchParamsSet = map[dispatchOp.getEntryPoint()];
-      DispatchParams *dispatchParams = nullptr;
-      for (auto &it : dispatchParamsSet) {
-        if (it.workload == workload) {
-          dispatchParams = &it;
-          break;
+      SmallVector<Attribute> uniformOperands;
+      for (auto operand : dispatchOp.getUniformOperands()) {
+        Attribute uniformOperand;
+        if (!matchPattern(operand, m_Constant(&uniformOperand))) {
+          // Non-constant uniform operand; skip the dispatch.
+          // TODO(benvanik): extract information from the executable annotations
+          // or allow the dynamic value to be passed in as an additional arg.
+          return;
         }
+        uniformOperands.push_back(uniformOperand);
       }
-      if (!dispatchParams) {
-        dispatchParamsSet.push_back({});
-        dispatchParams = &dispatchParamsSet.back();
-      }
-      dispatchParams->locs.push_back(dispatchOp.getLoc());
-      dispatchParams->workload = workload;
-      dispatchParams->bindings = bindings;
+
+      // Work around needing a mutable key for the set; C++ was a mistake.
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto &dispatchParamsSet = map[entryPointAttr];
+        DispatchParams *dispatchParams = nullptr;
+        for (auto &it : dispatchParamsSet) {
+          if (it.workload == workload) {
+            dispatchParams = &it;
+            break;
+          }
+        }
+        if (!dispatchParams) {
+          dispatchParamsSet.push_back({});
+          dispatchParams = &dispatchParamsSet.back();
+        }
+        dispatchParams->locs.push_back(dispatchOp.getLoc());
+        dispatchParams->workload = workload;
+        dispatchParams->bindings = std::move(bindings);
+        dispatchParams->uniformOperands = std::move(uniformOperands);
+      });
     });
   }
 
@@ -238,13 +253,14 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
           .getResult();
 
   // Push constant values.
-  // TODO(benvanik): use push constants the program used? can help with
-  // specialization that may have been applied in the streams dialect.
   if (int64_t pushConstantCount = layoutAttr.getPushConstants()) {
     int pushConstantBase = 0;  // always 0 today
-    SmallVector<Value> pushConstants(pushConstantCount,
-                                     funcBuilder.create<arith::ConstantIntOp>(
-                                         loc, 0, funcBuilder.getI32Type()));
+    SmallVector<Value> pushConstants;
+    pushConstants.reserve(pushConstantCount);
+    for (int64_t i = 0; i < pushConstantCount; ++i) {
+      pushConstants.push_back(funcBuilder.create<arith::ConstantOp>(
+          loc, dispatchParams.uniformOperands[i]));
+    }
     funcBuilder.create<IREE::HAL::CommandBufferPushConstantsOp>(
         loc, commandBuffer, pipelineLayout,
         funcBuilder.getIndexAttr(pushConstantBase), pushConstants);
@@ -376,7 +392,10 @@ static mlir::OwningOpRef<mlir::ModuleOp> buildBenchmarkModule(
   for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
     auto symbolRefAttr =
         SymbolRefAttr::get(executableOp.getNameAttr(),
-                           {FlatSymbolRefAttr::get(exportOp.getNameAttr())});
+                           {
+                               FlatSymbolRefAttr::get(variantOp.getNameAttr()),
+                               FlatSymbolRefAttr::get(exportOp.getNameAttr()),
+                           });
     auto dispatchParamsSet = dispatchParamsMap.find(symbolRefAttr);
     if (dispatchParamsSet != dispatchParamsMap.end()) {
       for (auto &dispatchParams : dispatchParamsSet->second) {

@@ -65,8 +65,8 @@ std::pair<Value, Value> buildCommonTrailingStrategy(
 /// Take a handle `opH` to a Linalg op of rank `rank`, sizes `opSizes` and for
 /// which we know the most minor dimension `mostMinorDim` (assuming all accesses
 /// are contiguous along that dimension for now).
-/// Build a schedule that maps `mostMinorDim` to a `scf.foreach_thread` op.
-/// When `numThreads` > 1, the `scf.foreach_thread` is also mapped to
+/// Build a schedule that maps `mostMinorDim` to a `scf.forall` op.
+/// When `numThreads` > 1, the `scf.forall` is also mapped to
 /// `mappingAttr` (which must then be non-null).
 /// The constructed schedule first performs a split of the largest possible
 /// multiple of `numThreads * maxVectorSize` to form a maximally divisible
@@ -78,8 +78,8 @@ std::pair<Value, Value> buildCommonTrailingStrategy(
 // in schedule complexity and can be handled with simple padding of the
 // underlying allocation.
 void build1DSplittingStrategyWithOptionalThreadMapping(
-    ImplicitLocOpBuilder& b, Value opH, int64_t rank, int64_t mostMinorDim,
-    SmallVector<int64_t> opSizes, int64_t numThreads,
+    ImplicitLocOpBuilder& b, Value isolatedParentOpH, Value opH, int64_t rank,
+    int64_t mostMinorDim, SmallVector<int64_t> opSizes, int64_t numThreads,
     Attribute mappingAttr = Attribute(), int64_t maxVectorSize = 4);
 
 //===----------------------------------------------------------------------===//

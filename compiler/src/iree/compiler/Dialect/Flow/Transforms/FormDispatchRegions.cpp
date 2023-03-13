@@ -16,13 +16,11 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -43,15 +41,6 @@
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-regions"
 
-// NOTE: These flags are added for experimental purposes only
-// for developer control. These should be treated as internal
-// compiler implementation details.
-static llvm::cl::opt<int> clInlineConstantByteLength(
-    "iree-flow-inline-constants-max-byte-length",
-    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
-                   "dispatch region"),
-    llvm::cl::init(256));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -63,6 +52,7 @@ namespace mlir {
 
 TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
     : IRRewriter(op->getContext()) {
+  setListener(this);
   op->walk([&](tensor::DimOp dimOp) { dimOps.insert(dimOp.getOperation()); });
 }
 SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
@@ -71,12 +61,12 @@ SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
   return result;
 }
 void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
-  IRRewriter::notifyOperationRemoved(op);
+  IRRewriter::Listener::notifyOperationRemoved(op);
   if (isa<tensor::DimOp>(op)) dimOps.erase(op);
 }
 
 void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
-  IRRewriter::notifyOperationInserted(op);
+  IRRewriter::Listener::notifyOperationInserted(op);
   if (isa<tensor::DimOp>(op)) dimOps.insert(op);
 }
 
@@ -202,43 +192,6 @@ static bool isRootOp(Operation *op) {
          isa<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp>(op);
 }
 
-/// Operations that are cloned into dispatch regions formed with other
-/// operations as roots.
-bool isClonableIntoDispatchOp(Operation *op) {
-  // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
-  // trivially clonable too, but they cause problems
-  // with bufferization. Make them clonable when fixed.
-  if (isa<AffineApplyOp, arith::IndexCastOp, linalg::FillOp, tensor::EmptyOp,
-          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp,
-          tensor::PadOp>(op)) {
-    return true;
-  }
-  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.getValue();
-    auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      auto shapedType = constantOp.getType().cast<ShapedType>();
-      uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
-          8;
-      return denseAttr.isSplat() ||
-             estimatedByteLength <= clInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
-  }
-  if (llvm::all_of(op->getOperands(),
-                   [&](Value v) { return v.getType().isIntOrFloat(); }) &&
-      llvm::all_of(op->getResults(),
-                   [&](Value v) { return v.getType().isIntOrFloat(); })) {
-    return true;
-  }
-  return false;
-}
-
 //===----------------------------------------------------------------------===//
 // Methods for getting the workload information for dispatch region creation.
 //===----------------------------------------------------------------------===//
@@ -309,52 +262,6 @@ static bool isIdentityMapWithZeros(AffineMap map) {
     if (!isValidExpr) return false;
   }
   return dimsSeen == map.getNumDims();
-}
-
-/// For the fusion of root op -> elementwise operation to be bufferized
-/// in-place without use of extra memory, the result of the root operation
-/// must be able to reuse the buffer for the result of the elementwise
-/// operation. This is possible if input and output are accessed using the same
-/// indexing map.
-// TODO: This restriction can go away if we can vectorize always, but that has
-// a long tail of tasks.
-static bool isInsOperandBufferizable(OpOperand *insOperand,
-                                     bool aggressiveFusion) {
-  // Ignore the check if in-place bufferization is not required.
-  if (aggressiveFusion) return true;
-
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
-  if (!linalgOp) return false;
-
-  AffineMap insOperandIndexingMap = linalgOp.getMatchingIndexingMap(insOperand);
-
-  auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    AffineMap outsOperandIndexingMap =
-        linalgOp.getMatchingIndexingMap(outsOperand);
-
-    if (outsOperandIndexingMap != insOperandIndexingMap) {
-      // if (!aggressiveFusion) return false;
-      // If the operand is a projected permutation a small stack might be
-      // fine.
-      if (!(insOperandIndexingMap.isProjectedPermutation() &&
-            !insOperandIndexingMap.isPermutation())) {
-        return false;
-      }
-    }
-
-    // TODO(#8411): Until ops are vectorized (always), we need
-    // to check that the elementtype matches for the operands to be tied.
-    // For now just doing this check for convolution ops since we expect
-    // contraction ops to be vectorized.
-    auto producer = insOperand->get().getDefiningOp();
-    if (isa<linalg::GenericOp, linalg::ConvolutionOpInterface>(producer) &&
-        insOperand->get().getType().cast<ShapedType>().getElementType() !=
-            outsOperand->get().getType().cast<ShapedType>().getElementType()) {
-      return false;
-    }
-    return true;
-  };
-  return llvm::any_of(linalgOp.getDpsInitOperands(), canTieWithOutsOperand);
 }
 
 static bool matchIteratorTypes(
@@ -458,12 +365,45 @@ static bool areOpsAggresiveFusable(
       })) {
     return false;
   }
+  return true;
+}
 
-  // Finally only fuse if the `ins` operand can be properly bufferized.
-  // TODO(#10498): Handle the multi-result case.
-  return llvm::all_of(allUses, [&](OpOperand *operand) {
-    return isInsOperandBufferizable(operand, aggressiveFusion);
-  });
+/// For the fusion of root op -> elementwise operation to be bufferized
+/// in-place without use of extra memory, the result of the root operation
+/// must be able to reuse the buffer for the result of the elementwise
+/// operation. Check if that is possible for the input/init operand pair.
+static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
+                                         OpOperand *initOperand) {
+  assert(inOperand->getOwner() == initOperand->getOwner() &&
+         "expected in-operand and init-operand to be owned by same operation");
+
+  // Check that the owner is a `generic` op.
+  auto genericOp = dyn_cast<linalg::GenericOp>(inOperand->getOwner());
+  if (!genericOp) return false;
+
+  // All loops to be parallel.
+  if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+    return false;
+  }
+
+  /// The input operand cannot be an init operand already.
+  if (genericOp.isDpsInit(inOperand)) return false;
+
+  // If the init operand value is used it cannot be reused for the input
+  // operand.
+  if (genericOp.payloadUsesValueFromOperand(initOperand)) return false;
+
+  // Indexing map used to access the input and init have to match.
+  if (genericOp.getMatchingIndexingMap(inOperand) !=
+      genericOp.getMatchingIndexingMap(initOperand)) {
+    return false;
+  }
+
+  // Types have to match for the input operand to reuse the buffer from the init
+  // operand
+  if (inOperand->get().getType() != initOperand->get().getType()) return false;
+
+  return true;
 }
 
 /// Returns true if this is a fusable use, while fusing a root with its
@@ -506,6 +446,20 @@ static bool isFusableWithConsumer(
   if (!areOpsAggresiveFusable(producer, consumer, rootOuterParallelLoops,
                               aggressiveFusion)) {
     return false;
+  }
+
+  // While fusing with consumer, the result of the root might not be the final
+  // result of the dispatch. To avoid a stack allocation we have to ensure that
+  // all operations can bufferize without needing additional memory.
+  for (OpOperand *inputOperand : consumerLinalgOp.getDpsInputOperands()) {
+    if (inputOperand->get().getDefiningOp() != producer) continue;
+    if (isa<linalg::ConvolutionOpInterface>(producer) &&
+        !llvm::any_of(
+            consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
+              return canUseInOperandAsInitOperand(inputOperand, initOperand);
+            })) {
+      return false;
+    }
   }
 
   // Check if the iteration spaces of the producer and consumer are same.

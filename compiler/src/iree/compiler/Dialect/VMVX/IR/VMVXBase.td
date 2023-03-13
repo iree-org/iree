@@ -28,8 +28,6 @@ def VMVX_Dialect : Dialect {
 
     See `vmvx.imports.mlir` for the full list of exported functions.
   }];
-
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 //===----------------------------------------------------------------------===//

@@ -66,8 +66,7 @@ IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_PACK_TRANSPOSE_OUTER);
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_MASK_INTERNAL 0xf0000u
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS 0x00000u
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS 0x10000u
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE 0x20000u
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT 0x30000u
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT 0x20000u
 // OPERATION (bits 20..31, though may be shrunk as needed as this is currently
 // only using bit 20 and will only grow as needed) describes the operation
 // owning the tensor (that we are doing a query_tile_sizes for) as an operand.

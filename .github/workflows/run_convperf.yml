@@ -38,7 +38,7 @@ jobs:
       runner-group: ${{ steps.configure.outputs.runner-group }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
@@ -74,7 +74,7 @@ jobs:
       GCS_UPLOAD_DIR_NAME: ${{ needs.setup.outputs.artifact-upload-dir }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Running convperf for CPU"
         run: |
           mkdir ${RESULTS_DIR}

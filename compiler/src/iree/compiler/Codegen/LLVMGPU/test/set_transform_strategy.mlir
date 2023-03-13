@@ -29,25 +29,28 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 
 //   CHECK-LABEL: func.func @group_reduction
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
+//         CHECK:   transform.sequence failures(propagate)
 //         CHECK:   transform.iree.match_callback failures(propagate) "reduction"(%{{.+}})
 //         CHECK:   transform.iree.take_first
-//         CHECK:   transform.iree.tile_to_foreach_thread_and_workgroup_count_region {{.*}} tile_sizes [1](mapping = [#gpu.block<x>])
+//         CHECK:   transform.iree.tile_to_forall_and_workgroup_count_region {{.*}} tile_sizes [1](mapping = [#gpu.block<x>])
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
 // CHECK-COUNT-2:   transform.structured.fuse_into_containing_op
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
 //         CHECK:   transform.iree.take_first
-//         CHECK:   tile_reduction_using_foreach_thread {{.*}} by num_threads = [0, 64], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
+//         CHECK:   tile_reduction_using_forall {{.*}} by num_threads = [0, 64], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
 //         CHECK:   transform.structured.fuse_into_containing_op
-//         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}} tile_sizes [1](mapping = [#gpu.thread<y>])
-//         CHECK:   cast %{{.*}} : !pdl.operation to !transform.op<"scf.foreach_thread">
-//         CHECK:   transform.iree.share_foreach_thread_operands %{{.*}} share_operands = [0] : (!transform.op<"scf.foreach_thread">) -> !transform.op<"scf.foreach_thread">
+//         CHECK:   transform.structured.tile_to_forall_op %{{.*}} tile_sizes [1](mapping = [#gpu.thread<y>])
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+//         CHECK:   cast %{{.*}} : !pdl.operation to !transform.op<"scf.forall">
+//         CHECK:   transform.iree.share_forall_operands %{{.*}} share_operands = [0] : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
 //         CHECK:   transform.structured.match ops{["func.func"]} in %arg0
 //         CHECK:   transform.structured.vectorize
 //         CHECK:   transform.iree.bufferize {target_gpu}
 //         CHECK:   transform.structured.match ops{["func.func"]} in %{{.*}}
 //         CHECK:   transform.iree.erase_hal_descriptor_type_from_memref
 //         CHECK:   transform.structured.match ops{["func.func"]} in %{{.*}}
-//         CHECK:   transform.iree.foreach_thread_to_workgroup
-//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
+//         CHECK:   transform.iree.forall_to_workgroup
+//         CHECK:   transform.iree.map_nested_forall_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
 //         CHECK:   transform.iree.apply_patterns %{{.*}} {fold_memref_aliases, rank_reducing_vector}
 //         CHECK:   transform.structured.match ops{["scf.if"]} in %{{.*}}
 //         CHECK:   sequence {{.*}} failures(suppress) {
@@ -91,9 +94,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Checking only the tile sizes.
 
 //   CHECK-LABEL: func.func @group_reduction_128
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.structured.tile_reduction_using_foreach_thread %{{.*}} by num_threads = [0, 32], tile_sizes = [0, 4], mapping = [#gpu.thread<x>]
-//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [32, 1, 1]}
+//         CHECK:   transform.sequence failures(propagate)
+//         CHECK:   transform.structured.tile_reduction_using_forall %{{.*}} by num_threads = [0, 32], tile_sizes = [0, 4], mapping = [#gpu.thread<x>]
+//         CHECK:   transform.iree.map_nested_forall_to_gpu_threads %{{.*}} {workgroup_size = [32, 1, 1]}
 //         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 32 : i64}
 
 // -----
@@ -133,9 +136,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Checking only the tile sizes.
 
 //   CHECK-LABEL: func.func @group_reduction_D
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.structured.tile_reduction_using_foreach_thread %{{.*}} by num_threads = [0, 256], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
-//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [256, 1, 1]}
+//         CHECK:   transform.sequence failures(propagate)
+//         CHECK:   transform.structured.tile_reduction_using_forall %{{.*}} by num_threads = [0, 256], tile_sizes = [0, 1], mapping = [#gpu.thread<x>]
+//         CHECK:   transform.iree.map_nested_forall_to_gpu_threads %{{.*}} {workgroup_size = [256, 1, 1]}
 //         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0 %{{.*}} {warp_size = 256 : i64}
 
 // -----
@@ -173,13 +176,16 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // Checking only the tile sizes.
 
 //   CHECK-LABEL: func.func @group_reduction_34
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.iree.tile_to_foreach_thread_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [64](mapping = [#gpu.block<x>])
-//         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}}   num_threads [64] tile_sizes [](mapping = [#gpu.thread<x>])
+//         CHECK:   transform.sequence failures(propagate)
+//         CHECK:   transform.iree.tile_to_forall_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [64](mapping = [#gpu.block<x>])
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+//         CHECK:   transform.structured.tile_to_forall_op %{{.*}}   num_threads [64] tile_sizes [](mapping = [#gpu.thread<x>])
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
 // CHECK-COUNT-4:   transform.structured.scalarize %{{.*}}
 //         CHECK:   transform.structured.split %{{.*}} after 32  {dimension = 1 : i64}
 //         CHECK:   transform.structured.tile %{{.*}}[0, 4]
-//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+//         CHECK:   transform.iree.map_nested_forall_to_gpu_threads %{{.*}} {workgroup_size = [64, 1, 1]}
 //     CHECK-NOT:   transform.iree.vector.to_warp_execute_on_lane_0
 
 
@@ -226,12 +232,17 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 
 //   CHECK-LABEL: func.func @group_reduction_12345
-//         CHECK:   transform.structured.canonicalized_sequence failures(propagate)
-//         CHECK:   transform.iree.tile_to_foreach_thread_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [1](mapping = [#gpu.block<x>])
-//         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}}   num_threads [] tile_sizes [1](mapping = [#gpu.thread<y>])
+//         CHECK:   transform.sequence failures(propagate)
+//         CHECK:   transform.iree.tile_to_forall_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [1](mapping = [#gpu.block<x>])
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+//         CHECK:   transform.structured.tile_to_forall_op %{{.*}}   num_threads [] tile_sizes [1](mapping = [#gpu.thread<y>])
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
 //         CHECK:   transform.structured.split %{{.*}} after 8192  {dimension = 1 : i64}
 //         CHECK:   transform.structured.tile %{{.*}}[0, 8192]
-//         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}}   num_threads [0, 1024] tile_sizes [](mapping = [#gpu.thread<x>])
-//         CHECK:   transform.structured.tile_to_foreach_thread_op %{{.*}}   num_threads [0, 1024] tile_sizes [](mapping = [#gpu.thread<x>])
-//         CHECK:   transform.iree.map_nested_foreach_thread_to_gpu_threads %{{.*}} {workgroup_size = [1024, 1, 1]}
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+//         CHECK:   transform.structured.tile_to_forall_op %{{.*}}   num_threads [0, 1024] tile_sizes [](mapping = [#gpu.thread<x>])
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+//         CHECK:   transform.structured.tile_to_forall_op %{{.*}}   num_threads [0, 1024] tile_sizes [](mapping = [#gpu.thread<x>])
+//         CHECK:   transform.iree.apply_patterns %{{.*}} {canonicalization, cse, licm, tiling_canonicalization}
+//         CHECK:   transform.iree.map_nested_forall_to_gpu_threads %{{.*}} {workgroup_size = [1024, 1, 1]}
 //         CHECK:   transform.iree.vector.to_warp_execute_on_lane_0{{.*}}{warp_size = 1024 : i64}

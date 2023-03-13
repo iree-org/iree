@@ -17,6 +17,7 @@ iree_cc_library(
     "DispatchABI.h"
     "KernelDispatch.h"
     "TargetMLTransformInfo.h"
+    "Utils.h"
   SRCS
     "ConvertToLLVM.cpp"
     "DispatchABI.cpp"
@@ -27,12 +28,14 @@ iree_cc_library(
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
+    "LLVMCPULowerToUKernels.cpp"
     "LLVMCPUMaterializeEncodingPass.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
+    "Utils.cpp"
     "VectorContractCustomKernels.cpp"
     "VerifyLinalgTransformLegality.cpp"
   DEPS
@@ -42,6 +45,7 @@ iree_cc_library(
     IREELinalgTransformDialectPasses
     LLVMBinaryFormat
     LLVMSupport
+    LLVMTargetParser
     MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAnalysis
@@ -52,6 +56,7 @@ iree_cc_library(
     MLIRArmNeonDialect
     MLIRBufferizationDialect
     MLIRComplexToLLVM
+    MLIRComplexToStandard
     MLIRControlFlowToLLVM
     MLIRFuncDialect
     MLIRFuncToLLVM
@@ -77,6 +82,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransformDialect
@@ -85,6 +91,7 @@ iree_cc_library(
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms
+    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
@@ -101,6 +108,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
+    iree::schemas::instruments
   PUBLIC
 )
 

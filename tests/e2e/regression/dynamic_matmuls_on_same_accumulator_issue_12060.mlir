@@ -1,4 +1,4 @@
-// Regression testcase from https://github.com/iree-org/iree/issues/12060
+// Regression testcase from https://github.com/openxla/iree/issues/12060
 
 func.func @matmul_i8(%lhs: tensor<?x?xi8>, %rhs: tensor<?x?xi8>, %acc: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %result1 = linalg.matmul ins(%lhs, %rhs: tensor<?x?xi8>, tensor<?x?xi8>) outs(%acc: tensor<?x?xi32>) -> tensor<?x?xi32>

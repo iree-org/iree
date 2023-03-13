@@ -20,6 +20,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_status_handle_t* iree_status_t;
+
 #define IREE_STRING_VIEW_NPOS SIZE_MAX
 
 // A string view (ala std::string_view) into a non-NUL-terminated string.
@@ -221,6 +223,15 @@ IREE_API_EXPORT bool iree_string_view_atod(iree_string_view_t value,
 IREE_API_EXPORT bool iree_string_view_parse_hex_bytes(
     iree_string_view_t value, iree_host_size_t buffer_length,
     uint8_t* out_buffer);
+
+// Parses a byte size in |value| and returns the value in |out_size|.
+//
+// Examples:
+//   1073741824 => 1073741824
+//          1gb => 1000000000
+//         1gib => 1073741824
+IREE_API_EXPORT iree_status_t iree_string_view_parse_device_size(
+    iree_string_view_t value, iree_device_size_t* out_size);
 
 #ifdef __cplusplus
 }  // extern "C"

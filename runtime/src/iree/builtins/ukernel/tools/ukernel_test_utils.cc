@@ -184,10 +184,10 @@ int iree_uk_test_cpu_features_str(char* buf, int buf_length,
     return snprintf(buf, buf_length, "(none)");
   }
 #if defined(IREE_UK_ARCH_ARM_64)
-  if (cpu_data[0] & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM) {
+  if (cpu_data[0] & IREE_CPU_DATA0_ARM_64_I8MM) {
     return snprintf(buf, buf_length, "i8mm");
   }
-  if (cpu_data[0] & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD) {
+  if (cpu_data[0] & IREE_CPU_DATA0_ARM_64_DOTPROD) {
     return snprintf(buf, buf_length, "dotprod");
   }
 #endif  // defined(IREE_UK_ARCH_ARM_64)

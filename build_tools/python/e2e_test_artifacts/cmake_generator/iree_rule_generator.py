@@ -48,36 +48,39 @@ class IreeRuleBuilder(object):
       output_file_path: pathlib.PurePath) -> IreeModelImportRule:
 
     model = imported_model.model
-    if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+    import_config = imported_model.import_config
+    if import_config.tool == iree_definitions.ImportTool.NONE:
       if source_model_rule.file_path != output_file_path:
         raise ValueError(
-            f"Separate path for Linalg model isn't supported "
+            f"Separate path for MLIR model isn't supported yet: "
             f"('{source_model_rule.file_path }' != '{output_file_path}')")
       return IreeModelImportRule(target_name=source_model_rule.target_name,
                                  output_file_path=output_file_path,
                                  cmake_rules=[])
 
-    # Import target name: iree-imported-model-<model_id>
-    target_name = f"iree-imported-model-{model.id}"
+    # Import target name: iree-imported-model-<imported_model_id>
+    target_name = f"iree-imported-model-{imported_model.composite_id}"
 
-    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
+    import_flags = import_config.materialize_import_flags(model)
+    if import_config.tool == iree_definitions.ImportTool.TFLITE_IMPORTER:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tflite_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
+              import_flags=import_flags,
               output_mlir_file=str(output_file_path))
       ]
-    elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
+    elif import_config.tool == iree_definitions.ImportTool.TF_IMPORTER:
       cmake_rules = [
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=self.build_target_path(target_name),
               source=str(source_model_rule.file_path),
-              import_flags=imported_model.import_flags,
+              import_flags=import_flags,
               output_mlir_file=str(output_file_path))
       ]
     else:
       raise ValueError(
-          f"Unsupported source type '{model.source_type}' of the model '{model.id}'."
+          f"Unsupported import tool '{import_config.tool}' of the model '{model.id}'."
       )
 
     return IreeModelImportRule(target_name=target_name,
@@ -86,17 +89,13 @@ class IreeRuleBuilder(object):
 
   def build_module_compile_rule(
       self, model_import_rule: IreeModelImportRule,
-      imported_model: iree_definitions.ImportedModel,
-      compile_config: iree_definitions.CompileConfig,
+      module_generation_config: iree_definitions.ModuleGenerationConfig,
       output_file_path: pathlib.PurePath) -> IreeModuleCompileRule:
 
-    compile_flags = self._generate_compile_flags(
-        compile_config=compile_config,
-        mlir_dialect_type=imported_model.dialect_type.dialect_name
-    ) + compile_config.extra_flags
+    compile_flags = module_generation_config.materialize_compile_flags()
 
-    # Module target name: iree-module-<model_id>-<compile_config_id>
-    target_name = f"iree-module-{imported_model.model.id}-{compile_config.id}"
+    # Module target name: iree-module-<gen_config_id>
+    target_name = f"iree-module-{module_generation_config.composite_id}"
 
     cmake_rules = [
         cmake_builder.rules.build_iree_bytecode_module(
@@ -117,65 +116,6 @@ class IreeRuleBuilder(object):
     name.
     """
     return f"{self._package_name}_{target_name}"
-
-  def _generate_compile_flags(self,
-                              compile_config: iree_definitions.CompileConfig,
-                              mlir_dialect_type: str) -> List[str]:
-    if len(compile_config.compile_targets) != 1:
-      raise ValueError(f"Only one compile target is supported. Got:"
-                       f" {compile_config.compile_targets}")
-
-    compile_target = compile_config.compile_targets[0]
-    flags = [
-        f"--iree-hal-target-backends={compile_target.target_backend.value}",
-        f"--iree-input-type={mlir_dialect_type}"
-    ]
-    flags.extend(self._generate_compile_target_flags(compile_target))
-    return flags
-
-  def _generate_compile_target_flags(
-      self, target: iree_definitions.CompileTarget) -> List[str]:
-    arch_info = target.target_architecture
-    if target.target_backend == iree_definitions.TargetBackend.VULKAN_SPIRV:
-      return [
-          f"--iree-vulkan-target-triple={arch_info.architecture}-unknown-{target.target_abi.value}",
-      ]
-
-    if arch_info.architecture == "x86_64":
-      flags = [
-          f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
-          f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
-      ]
-    elif arch_info.architecture == "riscv_64":
-      flags = [
-          f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
-          "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
-          "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
-          "--riscv-v-fixed-length-vector-lmul-max=8"
-      ]
-    elif arch_info.architecture == "riscv_32":
-      flags = [
-          f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
-          "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
-          "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x",
-          "--riscv-v-fixed-length-vector-lmul-max=8"
-      ]
-    elif arch_info.architecture == "armv8.2-a":
-      flags = [
-          f"--iree-llvm-target-triple=aarch64-none-{target.target_abi.value}",
-      ]
-    elif arch_info.architecture == "cuda":
-      if target.target_abi != iree_definitions.TargetABI.LINUX_GNU:
-        raise ValueError(
-            f"Unsupported target ABI for CUDA backend: `{target.target_abi}`")
-      flags = [
-          f"--iree-hal-cuda-llvm-target-arch=sm_80",
-      ]
-    elif arch_info.architecture == "vmvx":
-      flags = []
-    else:
-      raise ValueError(f"Unsupported architecture: '{arch_info.architecture}'")
-    return flags
 
 
 def generate_rules(
@@ -198,12 +138,12 @@ def generate_rules(
   rule_builder = IreeRuleBuilder(package_name=package_name)
 
   all_imported_models = dict(
-      (config.imported_model.model.id, config.imported_model)
+      (config.imported_model.composite_id, config.imported_model)
       for config in module_generation_configs)
 
   cmake_rules = []
   model_import_rule_map = {}
-  for model_id, imported_model in all_imported_models.items():
+  for imported_model_id, imported_model in all_imported_models.items():
     model_rule = model_rule_map.get(imported_model.model.id)
     if model_rule is None:
       raise ValueError(f"Model rule not found for {imported_model.model.id}.")
@@ -214,20 +154,19 @@ def generate_rules(
         source_model_rule=model_rule,
         imported_model=imported_model,
         output_file_path=imported_model_path)
-    model_import_rule_map[model_id] = model_import_rule
+    model_import_rule_map[imported_model_id] = model_import_rule
     cmake_rules.extend(model_import_rule.cmake_rules)
 
   module_target_names = []
   compile_stats_module_target_names = []
   for gen_config in module_generation_configs:
     model_import_rule = model_import_rule_map[
-        gen_config.imported_model.model.id]
+        gen_config.imported_model.composite_id]
     module_dir_path = iree_artifacts.get_module_dir_path(
         module_generation_config=gen_config, root_path=root_path)
     module_compile_rule = rule_builder.build_module_compile_rule(
         model_import_rule=model_import_rule,
-        imported_model=gen_config.imported_model,
-        compile_config=gen_config.compile_config,
+        module_generation_config=gen_config,
         output_file_path=module_dir_path / iree_artifacts.MODULE_FILENAME)
     if benchmark_collections.COMPILE_STATS_TAG in gen_config.compile_config.tags:
       compile_stats_module_target_names.append(module_compile_rule.target_name)

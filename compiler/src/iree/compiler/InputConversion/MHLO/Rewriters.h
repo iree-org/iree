@@ -27,6 +27,11 @@ void populateMHLOBroadcastingToLinalgPatterns(MLIRContext *context,
                                               TypeConverter &typeConverter,
                                               RewritePatternSet &patterns);
 
+/// Populates patterns to convert MHLO collective ops to Stream ops.
+void populateMHLOCollectiveOpsConversionPatterns(MLIRContext *context,
+                                                 TypeConverter &typeConverter,
+                                                 RewritePatternSet &patterns);
+
 /// Populates patterns to convert MHLO/CHLO arithmetic on complex tensors to
 /// equivalent HLO level real arithmetic.
 void populateMHLOComplexToRealPatterns(MLIRContext *context,

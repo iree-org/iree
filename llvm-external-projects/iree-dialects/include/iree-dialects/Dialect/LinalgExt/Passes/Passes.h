@@ -160,8 +160,6 @@ void populateTopkSplitReductionPattern(
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtVectorizationPass();
-
 /// Tile and decompose the winograd transform ops into a sequence
 /// of linalg ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -258,6 +256,14 @@ using VectorSizeComputationFunction =
     std::function<SmallVector<int64_t>(linalg::LinalgOp, ArrayRef<int64_t>)>;
 
 struct LinalgVectorizationOptions {
+  /// Enable vector masking during vectorization.
+  bool enableVectorMasking = false;
+
+  LinalgVectorizationOptions &setEnableVectorMasking(bool val) {
+    enableVectorMasking = val;
+    return *this;
+  }
+
   /// Canonical vector sizes for the vector iteration space (i.e., vectorization
   /// factors). They are optional for input code with full static shapes.
   SmallVector<int64_t> canonicalVectorSizes;

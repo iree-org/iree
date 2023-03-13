@@ -49,6 +49,12 @@ timeout_map = {
 }
 
 
+def _should_skip_target(tags=None, **kwargs):
+  if tags and "skip-bazel_to_cmake" in tags:
+    return True
+  return False
+
+
 def _convert_timeout_arg_block(name, value):
   if value is None:
     return ""
@@ -179,6 +185,18 @@ def _convert_target_list_block(list_name, targets):
   return _convert_string_list_block(list_name, targets, sort=True, quote=False)
 
 
+def _convert_includes_block(includes):
+  if not includes:
+    return ""
+  dirs = []
+  for include in includes:
+    dirs.append("$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/%s>" %
+                (include,))
+    dirs.append("$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/%s>" %
+                (include,))
+  return _convert_string_list_block("INCLUDES", dirs, sort=False, quote=True)
+
+
 class BuildFileFunctions(object):
   """Object passed to `exec` that has handlers for BUILD file functions."""
 
@@ -207,6 +225,9 @@ class BuildFileFunctions(object):
 
   # Functions with no mapping to CMake. Just ignore these.
   def alias(self, *args, **kwargs):
+    pass
+
+  def bool_flag(self, *args, **kwargs):
     pass
 
   def load(self, *args, **kwargs):
@@ -243,6 +264,8 @@ class BuildFileFunctions(object):
     self._convert_unimplemented_function("filegroup", name)
 
   def sh_binary(self, name, **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     self._convert_unimplemented_function("sh_binary", name)
 
   def enforce_glob(self, files, **kwargs):
@@ -291,6 +314,13 @@ class BuildFileFunctions(object):
     self._convert_unimplemented_function("select", str(d))
     return d["//conditions:default"]
 
+  def defaulting_select(self, selector):
+    """Defined in build_defs.oss.bzl as a scoped alternative to select."""
+    default_value = selector.get("//conditions:default")
+    if default_value is None:
+      raise ValueError("bazel_to_cmake can only convert selects with a default")
+    return default_value
+
   def cc_library(self,
                  name,
                  hdrs=None,
@@ -302,7 +332,10 @@ class BuildFileFunctions(object):
                  deps=None,
                  testonly=None,
                  linkopts=None,
+                 includes=None,
                  **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -316,6 +349,7 @@ class BuildFileFunctions(object):
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
     testonly_block = _convert_option_block("TESTONLY", testonly)
+    includes_block = _convert_includes_block(includes)
 
     self.converter.body += (f"iree_cc_library(\n"
                             f"{name_block}"
@@ -327,6 +361,7 @@ class BuildFileFunctions(object):
                             f"{deps_block}"
                             f"{defines_block}"
                             f"{testonly_block}"
+                            f"{includes_block}"
                             f"  PUBLIC\n)\n\n")
 
   def iree_compiler_cc_library(self, deps=[], **kwargs):
@@ -346,7 +381,10 @@ class BuildFileFunctions(object):
               timeout=None,
               args=None,
               tags=None,
+              includes=None,
               **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
     srcs_block = _convert_srcs_block(srcs)
@@ -357,6 +395,7 @@ class BuildFileFunctions(object):
     args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
     timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
+    includes_block = _convert_includes_block(includes)
 
     self.converter.body += (f"iree_cc_test(\n"
                             f"{name_block}"
@@ -369,6 +408,7 @@ class BuildFileFunctions(object):
                             f"{args_block}"
                             f"{labels_block}"
                             f"{timeout_block}"
+                            f"{includes_block}"
                             f")\n\n")
 
   def iree_runtime_cc_test(self, deps=[], **kwargs):
@@ -386,7 +426,10 @@ class BuildFileFunctions(object):
                 defines=None,
                 linkopts=None,
                 testonly=None,
+                includes=None,
                 **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -396,6 +439,7 @@ class BuildFileFunctions(object):
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
     testonly_block = _convert_option_block("TESTONLY", testonly)
+    includes_block = _convert_includes_block(includes)
 
     self.converter.body += (f"iree_cc_binary(\n"
                             f"{name_block}"
@@ -405,6 +449,7 @@ class BuildFileFunctions(object):
                             f"{data_block}"
                             f"{deps_block}"
                             f"{testonly_block}"
+                            f"{includes_block}"
                             f")\n\n")
 
   # Effectively an alias in IREE code.
@@ -421,6 +466,8 @@ class BuildFileFunctions(object):
                    identifier=None,
                    deps=None,
                    **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     c_file_output_block = _convert_string_arg_block("C_FILE_OUTPUT",
@@ -441,6 +488,39 @@ class BuildFileFunctions(object):
                             f"{identifier_block}"
                             f"{testonly_block}"
                             f"{flatten_block}"
+                            f"  PUBLIC\n)\n\n")
+
+  def iree_bitcode_library(self,
+                           name,
+                           srcs,
+                           hdrs=None,
+                           copts=None,
+                           defines=None,
+                           data=None,
+                           clang_tool=None,
+                           builtin_headers=None,
+                           testonly=None):
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = _convert_srcs_block(srcs)
+    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
+    data_block = _convert_target_list_block("DATA", data)
+    clang_tool_block = _convert_target_block("CLANG_TOOL", clang_tool)
+    builtin_headers_block = _convert_target_list_block("BUILTIN_HEADERS",
+                                                       builtin_headers)
+    testonly_block = _convert_option_block("TESTONLY", testonly)
+
+    self.converter.body += (f"iree_bitcode_library(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{hdrs_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
+                            f"{data_block}"
+                            f"{clang_tool_block}"
+                            f"{builtin_headers_block}"
+                            f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
   def iree_bytecode_module(self,
@@ -511,6 +591,8 @@ class BuildFileFunctions(object):
                             f")\n\n")
 
   def iree_gentbl_cc_library(self, **kwargs):
+    if _should_skip_target(**kwargs):
+      return
     # The bazel version of this rule adds some include directories and defs
     # that are implicitly handled by the cmake version.
     self.gentbl_cc_library(**kwargs)
@@ -544,6 +626,8 @@ class BuildFileFunctions(object):
                           tags=None,
                           timeout=None,
                           **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     tools_block = _convert_target_list_block("TOOLS", tools)
@@ -572,6 +656,8 @@ class BuildFileFunctions(object):
                                            target_cpu_features=None,
                                            timeout=None,
                                            **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     target_backend_block = _convert_string_arg_block("TARGET_BACKEND",
@@ -607,6 +693,8 @@ class BuildFileFunctions(object):
                             target_cpu_features_variants=None,
                             timeout=None,
                             **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     target_backends = None
     drivers = None
     if target_backends_and_drivers is not None:
@@ -649,6 +737,8 @@ class BuildFileFunctions(object):
                                        tags=None,
                                        target_cpu_features_variants=None,
                                        **kwargs):
+    if _should_skip_target(tags=tags, **kwargs):
+      return
     target_backends = None
     drivers = None
     if target_backends_and_drivers is not None:
@@ -695,6 +785,8 @@ class BuildFileFunctions(object):
                   data=None,
                   tags=None,
                   timeout=None):
+    if _should_skip_target(tags=tags):
+      return
     if data is not None:
       self._convert_unimplemented_function("native_test", name + " has data")
 
@@ -725,7 +817,8 @@ class BuildFileFunctions(object):
       # unused
       size="small",
       timeout=None):
-
+    if _should_skip_target(tags=tags):
+      return
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
     data_block = _convert_target_list_block("DATA", data)

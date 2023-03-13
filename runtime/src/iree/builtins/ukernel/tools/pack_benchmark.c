@@ -214,7 +214,7 @@ static void iree_pack_benchmark_register(
 #define PACK_BENCHMARK_REGISTER_ARM_64_WITH_CPU_FEATURE(_type, _size2, _size3, \
                                                         _cpu_feature)          \
   PACK_BENCHMARK_REGISTER(_type, _size2, _size3,                               \
-                          IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_##_cpu_feature,   \
+                          IREE_CPU_DATA0_ARM_64_##_cpu_feature,                \
                           arm_64_##_cpu_feature)
 
 int main(int argc, char** argv) {

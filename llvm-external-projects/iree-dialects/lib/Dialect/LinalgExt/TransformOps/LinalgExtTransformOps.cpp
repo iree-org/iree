@@ -122,11 +122,10 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
 }
 
-DiagnosedSilenceableFailure
-LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
-    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
+DiagnosedSilenceableFailure LinalgExt::RewriteForallToAsyncOp::applyToOne(
+    scf::ForallOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  LinalgExt::ForeachThreadOpToAsyncRewriter pattern(this->getContext());
+  LinalgExt::ForallOpToAsyncRewriter pattern(this->getContext());
   SimplePatternRewriter rewriter(target);
   FailureOr<Operation *> result =
       pattern.returningMatchAndRewrite(target, rewriter);
@@ -136,11 +135,10 @@ LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
-DiagnosedSilenceableFailure
-LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
-    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
+DiagnosedSilenceableFailure LinalgExt::RewriteForallToScfForOp::applyToOne(
+    scf::ForallOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  LinalgExt::ForeachThreadOpToScfForRewriter pattern(this->getContext());
+  LinalgExt::ForallOpToScfForRewriter pattern(this->getContext());
   SimplePatternRewriter rewriter(target);
   FailureOr<Operation *> result =
       pattern.returningMatchAndRewrite(target, rewriter);

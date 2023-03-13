@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -144,7 +145,7 @@ struct ConvertTensorFromElementsPattern
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: This pattern was mainly added to iron out some kinks specific to
-    // detensoring (see: https://github.com/iree-org/iree/issues/1159). Do we
+    // detensoring (see: https://github.com/openxla/iree/issues/1159). Do we
     // need to expand this check for other uses?
     if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
@@ -177,7 +178,7 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
     if (reshapeOp->template getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
-    SmallVector<SmallVector<Value>> outputShape;
+    SmallVector<SmallVector<OpFoldResult>> outputShape;
     ReifyRankedShapedTypeOpInterface reifyShapedTypeInterface =
         cast<ReifyRankedShapedTypeOpInterface>(reshapeOp.getOperation());
     if (failed(reifyShapedTypeInterface.reifyResultShapes(rewriter,
@@ -185,10 +186,11 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;
-    for (auto [resultShape, outputShape] : llvm::zip_equal(
+    for (auto [resultShape, outputShp] : llvm::zip_equal(
              reshapeOp.getResultType().getShape(), outputShape[0])) {
       if (resultShape != ShapedType::kDynamic) continue;
-      outputDynamicShapes.push_back(outputShape);
+      outputDynamicShapes.push_back(getValueOrCreateConstantIndexOp(
+          rewriter, reshapeOp.getLoc(), outputShp));
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         reshapeOp, reshapeOp.getResultType(), reshapeOp.getSrc(),

@@ -464,11 +464,27 @@ void ExecutableObjectAttr::print(AsmPrinter &p) const {
   if (auto pathAttr = getPath()) {
     os << "path = ";
     p.printAttribute(getPath());
-  } else if (auto dataAttr = getData()) {
-    os << "data = ";
+  }
+  if (auto dataAttr = getData()) {
+    os << ", data = ";
     p.printAttribute(getData());
   }
   os << "}>";
+}
+
+// static
+void ExecutableObjectAttr::filterObjects(
+    ArrayAttr objectAttrs, ArrayRef<StringRef> extensions,
+    SmallVectorImpl<ExecutableObjectAttr> &filteredAttrs) {
+  if (!objectAttrs) return;
+  for (auto objectAttr :
+       objectAttrs.getAsRange<IREE::HAL::ExecutableObjectAttr>()) {
+    auto path = objectAttr.getPath();
+    auto ext = llvm::sys::path::extension(path);
+    if (llvm::is_contained(extensions, ext)) {
+      filteredAttrs.push_back(objectAttr);
+    }
+  }
 }
 
 // Tries to find |filePath| on disk either at its absolute path or joined with

@@ -197,7 +197,7 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVM",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/ROCM",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/VMVX",
@@ -227,8 +227,8 @@ cc_library(
     hdrs = ["iree_compile_lib.h"],
     deps = [
         ":init_iree",
-        "//compiler/src/iree/compiler/API2:Headers",
-        "//compiler/src/iree/compiler/API2/Internal:Embed",
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API/Internal:Embed",
         "//compiler/src/iree/compiler/Pipelines",
         "@llvm-project//llvm:Support",
     ],

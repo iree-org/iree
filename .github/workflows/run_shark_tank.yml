@@ -20,7 +20,6 @@ jobs:
       PR_BODY: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.configure.outputs.should-run }}
-      ci-stage: ${{ steps.configure.outputs.ci-stage }}
       runner-env: ${{ steps.configure.outputs.runner-env }}
       runner-group: ${{ steps.configure.outputs.runner-group }}
       write-caches: ${{ steps.configure.outputs.write-caches }}
@@ -28,7 +27,7 @@ jobs:
       artifact-upload-dir: ${{ steps.shark.outputs.artifact-upload-dir }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
@@ -42,7 +41,7 @@ jobs:
           git log --oneline --graph --max-count=3
           ./build_tools/github_actions/configure_ci.py
       - name: "Checking out SHARK tank"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           repository: nod-ai/SHARK
           path: ${{ github.workspace }}/SHARK
@@ -75,13 +74,13 @@ jobs:
       SHARK_OUTPUT_DIR: shark-output-dir
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
       - name: "Benchmarking SHARK tank on CPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:5716f77da8022ec7fa18ebfadd9510f673d39b97a6fca145c81e90146de400c7 \
+            gcr.io/iree-oss/shark@sha256:ce3bd3abe454d2e481512823e9d2d080322fb2fc1470a12c7306c48140eebdb2 \
           ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cpu" --driver "cpu" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "true" --iree-source-dir "${IREE_SOURCE_DIR}"
       - name: "Uploading artifacts"
         run: |
@@ -103,14 +102,14 @@ jobs:
       SHARK_OUTPUT_DIR: shark-output-dir
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
       - name: "Benchmarking SHARK tank on CUDA"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
-            gcr.io/iree-oss/shark@sha256:5716f77da8022ec7fa18ebfadd9510f673d39b97a6fca145c81e90146de400c7 \
+            gcr.io/iree-oss/shark@sha256:ce3bd3abe454d2e481512823e9d2d080322fb2fc1470a12c7306c48140eebdb2 \
           ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cuda" --driver "cuda" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "false" --iree-source-dir "${IREE_SOURCE_DIR}"
       - name: "Uploading artifacts"
         run: |
@@ -132,7 +131,7 @@ jobs:
       BENCHMARK_RESULTS_DIR: benchmark-results
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
       - name: "Download benchmark results"
@@ -145,7 +144,7 @@ jobs:
       - name: "Generating report"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:5716f77da8022ec7fa18ebfadd9510f673d39b97a6fca145c81e90146de400c7 \
+            gcr.io/iree-oss/shark@sha256:ce3bd3abe454d2e481512823e9d2d080322fb2fc1470a12c7306c48140eebdb2 \
           ./build_tools/benchmarks/shark/run_report.sh "${BENCHMARK_RESULTS_DIR}" \
             "${BENCHMARK_RESULTS_DIR}/cpu_baseline.csv" \
             "${BENCHMARK_RESULTS_DIR}/cuda_baseline.csv" \

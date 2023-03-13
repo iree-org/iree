@@ -21,6 +21,7 @@ iree_cc_library(
     ::BufferizationInterfaces
     ::PartitionableLoopsInterface
     ::ProcessorOpInterfaces
+    ::UKernelOpInterface
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
     MLIRAffineTransformOps
@@ -57,11 +58,39 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRSCFTransforms
     MLIRSupport
+    MLIRTensorDialect
     MLIRTensorTransforms
     MLIRVectorTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    UKernelOpInterface
+  HDRS
+    "UKernelOpInterface.h"
+  TEXTUAL_HDRS
+    "UKernelOpInterface.cpp.inc"
+    "UKernelOpInterface.h.inc"
+  SRCS
+    "UKernelOpInterface.cpp"
+  DEPS
+    ::UKernelOpInterfaceGen
+    MLIRFuncDialect
+    MLIRIR
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    UKernelOpInterfaceGen
+  TD_FILE
+    "UKernelOpInterface.td"
+  OUTS
+    --gen-op-interface-decls UKernelOpInterface.h.inc
+    --gen-op-interface-defs UKernelOpInterface.cpp.inc
 )
 
 iree_cc_library(

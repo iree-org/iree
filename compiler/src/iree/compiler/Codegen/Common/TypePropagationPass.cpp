@@ -142,6 +142,29 @@ struct ConstantOpTypeConversion
   }
 };
 
+/// Type conversion for Linalg named op. Interface patterns are not used
+/// here cause the region of the operation cannot be cloned. Instead create
+/// a new operation with the operands of the correct type.
+template <typename OpTy>
+struct NamedOpTypePropagation : public TypePropagationPattern<OpTy> {
+  using TypePropagationPattern<OpTy>::TypePropagationPattern;
+
+  LogicalResult matchAndRewrite(
+      OpTy namedOp, typename OpTy::Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
+    SmallVector<Type> resultTypes;
+    resultTypes.reserve(namedOp->getNumResults());
+    for (auto resultType : namedOp->getResultTypes()) {
+      Type legalizedType = this->getTypeConverter()->convertType(resultType);
+      resultTypes.push_back(legalizedType);
+    }
+    rewriter.replaceOpWithNewOp<OpTy>(namedOp, resultTypes, adaptor.getInputs(),
+                                      adaptor.getOutputs(),
+                                      linalg::getPrunedAttributeList(namedOp));
+    return success();
+  }
+};
+
 /// Propagates the type for `linalg.generic` operation.
 /// - Convert operands whose type has changed.
 /// - Convert corresponding basic block argument type and introduce element
@@ -386,10 +409,11 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
     RewritePatternSet patterns(context);
 
     TypePropagationTypeConverter typeConverter;
-    patterns.insert<ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
-                    ForwardSourceType<arith::TruncIOp>,
-                    GenericOpTypePropagation, LinalgFillTypePropagation,
-                    LegalizeResultElementType, TensorExtractTypePropagation>(
+    patterns.insert<
+        ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
+        ForwardSourceType<arith::TruncIOp>, GenericOpTypePropagation,
+        LinalgFillTypePropagation, LegalizeResultElementType,
+        NamedOpTypePropagation<linalg::MatmulOp>, TensorExtractTypePropagation>(
         typeConverter, context);
 
     ConversionTarget target(*context);

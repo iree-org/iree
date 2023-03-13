@@ -10,39 +10,43 @@
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
+include "mlir/Dialect/Transform/IR/TransformTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def MapNestedForeachThreadToGpuThreadsOp :
-  Op<Transform_Dialect, "iree.map_nested_foreach_thread_to_gpu_threads",
+def MapNestedForallToGpuThreadsOp :
+  Op<Transform_Dialect, "iree.map_nested_forall_to_gpu_threads",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Target the whole hal.executable_variant op and rewrite all scf.foreach_thread
+    Target the whole hal.executable_variant op and rewrite all scf.forall
     to distributed gpu.thread_id and translation_info attribute.
+    
+    This op will handle all the scf.forall using gpu.thread or gpu.warp
+    mapping.
 
     The mapping of threads to gpu.thread_id is currently one-to-one and in order.
-    Only **bufferized** scf.foreach_thread are currently supported.
-    Only scf.foreach_thread distributed to **at most 3 dimensions** are currently
+    Only **bufferized** scf.forall are currently supported.
+    Only scf.forall distributed to **at most 3 dimensions** are currently
     supported.
 
-    Multiple scf.foreach_thread are supported per function in which case, the
+    Multiple scf.forall are supported per function in which case, the
     max of all the threads is computed and taken for the global gpu.thread_id.
-    If necessary, scf.foreach_thread that do not use the whole thread range
+    If necessary, scf.forall that do not use the whole thread range
     result in predicated computations.
 
-    Barriers are inserted after each scf.foreach_thread op for now.
+    Barriers are inserted after each scf.forall op for now.
 
     Return modes:
     =============
     This operation ignores non-Func ops and drops them in the return.
 
-    If any scf.foreach_thread with tensors is found, the transform definitely
+    If any scf.forall with tensors is found, the transform definitely
     fails.
 
-    If all the scf.foreach_thread operations contained within the FuncOp
+    If all the scf.forall operations contained within the FuncOp
     referred to by the `target` PDLOperation lower to GPU properly, the
     transform succeeds. Otherwise the transform definitely fails.
 
@@ -58,10 +62,10 @@ def MapNestedForeachThreadToGpuThreadsOp :
       hal.executable.variant {
         hal.executable.export {
           func @foo() {
-            scf.foreach_thread (%i, %j) in (7, 9) {
+            scf.forall (%i, %j) in (7, 9) {
               ... // body 1
             }
-            scf.foreach_thread (%i) in (12) {
+            scf.forall (%i) in (12) {
               ... // body 2
             }
           }
@@ -209,9 +213,10 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
 }
 
 def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribute",
-    [TransformEachOpTrait,
-     TransformOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     Given a vector.warp_execute_on_lane_0, apply the patterns to rewrite into
     distributed form with warp synchronization. This produces IR that runs
@@ -298,10 +303,10 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
     ```
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let skipDefaultBuilders = 1;
@@ -327,12 +332,16 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
     operations are bigger than the native mma size it will first split up those
     vector operations.
 
+    Exactly one of use_wmma or use_mma_sync must be specified.
+
     #### Return modes
 
     This transform consumes the target handle and produces a result handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins PDL_Operation:$target,
+                       UnitAttr:$use_mma_sync,
+                       UnitAttr:$use_wmma);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";
@@ -360,8 +369,11 @@ def PromoteOperandsOp :
     This op promotes the specified operands of the provided target handle.
 
     #### Return modes
-    This op returns a handle to an allocTensorOp for each of the provided
-    valid indices.
+    This op consume its target handle and returns a new handle to its target handle
+    as well as an allocTensorOp for each of the provided valid indices.
+
+    If the promotion of any specified operand fails to occur, the op definitely
+    fails.
   }];
 
   let arguments = (ins PDL_Operation:$target,
@@ -378,6 +390,85 @@ def PromoteOperandsOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def PipelineSharedMemoryCopiesOp : Op<
+    Transform_Dialect, "iree.pipeline_shared_memory_copies", [
+      FunctionalStyleTransformOpTrait,
+      MemoryEffectsOpInterface,
+      TransformEachOpTrait,
+      TransformOpInterface]> {
+  let description = [{
+    This applies software pipelining to a given scf.for loop. The pipelining
+    strategy will look for a copy to shared memory and pipeline it to overlap
+    it with the rest of the loop. 
+    It is user responsability to ensure that there are no dependency between
+    `depth` iterations of the loop by using multi-buffering.
+
+    `depth` will indicate how many stages the software pipeline should have.
+    `peel_epilogue` allows to force the epilogue to be peeled out instead of
+    potentially using predicated operations for the epilogue phase.
+
+    #### Return modes
+    This transform consumes the scf.for handle and produces a result handle
+    which points to the new scf.for loop generated. It will fail if the loop
+    cannot be pipelined or if there are no shared memory copies.
+  }];
+
+  let arguments = (
+      ins Transform_ConcreteOpType<"scf.for">:$for_op,
+          I64Attr:$depth,
+          UnitAttr:$peel_epilogue);
+  let results = (outs Transform_ConcreteOpType<"scf.for">:$result);
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let assemblyFormat = [{ $for_op attr-dict `:` functional-type(operands, results)}];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::scf::ForOp forOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def CreateAsyncGroupsOp :
+  Op<Transform_Dialect, "iree.create_async_groups",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    Convert copies to shared memory to async copies. This creates groups
+    of consecutive copies and emit wait operation right after.
+    The input operation is a `func.func`.
+
+    `use_mma_sync` specifies whether or not `bypassL1` attributes should be
+    added to the async copies.
+
+    #### Return modes
+    This op returns a handle to the transformed function, even if nothing
+    changed.
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   BoolAttr:$use_mma_sync);
+  let results = (outs Variadic<PDL_Operation>:$result);
+
+  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, "bool":$use_mma_sync)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];

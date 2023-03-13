@@ -10,12 +10,13 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
@@ -62,32 +63,9 @@ Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
 Optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr);
 
-/// Returns the CPU target features associated with the `targetAttr`, if set.
-Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
-
 /// Methods to get target information.
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if `targetAttr` has `feature` in its CPU features.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
-
-/// Returns true if the 'targetAttr' contains '+avx2' in its cpu features.
-bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if the 'targetAttr' contains '+v' in its cpu features.
-bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if the 'targetAttr' contains '+zve32x' in its cpu features.
-bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if the 'targetAttr' contains '+zve64x' in its cpu features.
-bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`
@@ -198,6 +176,10 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
 /// propagate the type change and erase old subview ops.
 void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
                                        OpBuilder &builder);
+
+/// Sink given operations as close as possible to their uses.
+void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
+                  DominanceInfo &dominators);
 
 }  // namespace iree_compiler
 }  // namespace mlir

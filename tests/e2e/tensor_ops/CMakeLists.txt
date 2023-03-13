@@ -32,6 +32,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "extract_slice.mlir"
     "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -45,7 +46,10 @@ iree_check_single_backend_test_suite(
     check_vmvx_local-task
   SRCS
     "extract_slice.mlir"
+    "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
     "tensor_insert_slice.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
@@ -54,9 +58,26 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_vmvx_ukernel_local-task
+  SRCS
+    "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
+    "unpack.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+    "--iree-vmvx-enable-microkernels-decompose-linalg-generic=false"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_cuda
   SRCS
     "extract_slice.mlir"
+    "pack.mlir"
     "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "cuda"

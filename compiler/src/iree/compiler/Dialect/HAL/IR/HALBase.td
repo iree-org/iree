@@ -752,9 +752,12 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
   let mnemonic = "executable.object";
   let summary = [{object file reference}];
   let description = [{
-    WIP; defines an object file that can be linked into executables.
+    Defines an object file that can be linked into executables.
     Today this is only supported for external file references with paths the
     compiler can successfully resolve from its current working directory.
+    Inlined data can optionally be provided to avoid the need for file system
+    access and ensure the data source is attached to the IR as it makes its way
+    through multiple compiler stages or reproducers.
 
     Future revisions may change this to an interface that allows both internal
     and external resources to define the object contents. Linking needs to be
@@ -770,18 +773,27 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
     Example:
     ```mlir
     #hal.executable.object<{path = "some/file.obj"}>
-    #hal.executable.object<{data = dense<[...]> : vector<2048xi8>}>
+    #hal.executable.object<{
+      path = "some/embedded/file.obj",
+      data = dense<[...]> : vector<2048xi8>
+    }>
     ```
   }];
 
   let parameters = (ins
-    OptionalParameter<"StringAttr", "">:$path,
+    AttrParameter<"StringAttr", "">:$path,
     OptionalParameter<"DenseIntElementsAttr", "">:$data
   );
 
   let hasCustomAssemblyFormat = 1;
 
   let extraClassDeclaration = [{
+    // Returns a list of all objects with a path matching one of the provided
+    // file extensions.
+    static void filterObjects(
+        ArrayAttr objectAttrs, ArrayRef<StringRef> extensions,
+        SmallVectorImpl<ExecutableObjectAttr> &filteredAttrs);
+
     // Returns the absolute path of the referenced object file if it exists.
     FailureOr<std::string> getAbsolutePath();
 
@@ -852,7 +864,7 @@ def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
   let mnemonic = "affinity.queue";
   let summary = [{specifies a set of allowed queues for an operation}];
   let description = [{
-    WIP; see https://github.com/iree-org/iree/issues/10765.
+    WIP; see https://github.com/openxla/iree/issues/10765.
     This may change in the future to either be a nested attribute on a larger
     affinity struct or be defined by an implementation of the affinity attr
     interface. For now this allows higher levels of the stack to specify

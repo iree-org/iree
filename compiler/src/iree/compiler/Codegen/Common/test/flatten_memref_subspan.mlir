@@ -267,6 +267,22 @@ func.func @transfer_write_subspan_with_offset(
 
 // -----
 
+func.func @load_store_rank_zero_subspan_with_zero_offset() {
+  %zero = arith.constant 0 : index
+  %subspan0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%zero) : memref<f32>
+  %subspan1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%zero) : memref<f32>
+  %val = memref.load %subspan0[] : memref<f32>
+  memref.store %val, %subspan1[] : memref<f32>
+  return
+}
+
+//CHECK-LABEL: func.func @load_store_rank_zero_subspan_with_zero_offset
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//      CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<f32>
+//      CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%[[C0]]) : memref<f32>
+
+// -----
+
 func.func @load_store_rank_zero_subspan_with_offset(%offset : index) {
   %subspan0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<f32>
   %subspan1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<f32>

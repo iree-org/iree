@@ -214,7 +214,6 @@ py_binary(
     name = "e2e_matmul_direct_f32_gpu_large_mma_sync_%s" % compilation_info,
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
-        "--iree-codegen-llvmgpu-use-mma-sync=true",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -235,7 +234,7 @@ py_binary(
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for compilation_info in [
-    "LLVMGPUMatmulTensorCore",
+    "LLVMGPUMatmulTensorCoreMmaSync",
 ]]
 
 # WMMA TensorCore(F16): wmma.161616.f16.f16
@@ -271,7 +270,6 @@ py_binary(
     name = "e2e_matmul_direct_f16_gpu_large_mma_sync_%s" % compilation_info,
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
-        "--iree-codegen-llvmgpu-use-mma-sync=true",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -292,7 +290,7 @@ py_binary(
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for compilation_info in [
-    "LLVMGPUMatmulTensorCore",
+    "LLVMGPUMatmulTensorCoreMmaSync",
 ]]
 
 [iree_generated_trace_runner_test(

@@ -24,9 +24,8 @@ using namespace mlir;
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
-using iree_compiler::IREE::transform_dialect::ForeachThreadToWorkgroupOp;
-using iree_compiler::IREE::transform_dialect::
-    MapNestedForeachThreadToGpuThreadsOp;
+using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
+using iree_compiler::IREE::transform_dialect::MapNestedForallToGpuThreadsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;
@@ -97,14 +96,16 @@ void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
 }
 
 static void buildSmallReductionStrategyThreadDistribution(
-    ImplicitLocOpBuilder &b, Value maybeLeadingH, Value fillH, Value reductionH,
-    Value maybeTrailingH, const AbstractReductionStrategy &strategy) {
+    ImplicitLocOpBuilder &b, Value variantH, Value maybeLeadingH, Value fillH,
+    Value reductionH, Value maybeTrailingH,
+    const AbstractReductionStrategy &strategy) {
   auto [fusionTargetH, fusionGroupH] =
       iree_compiler::buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
   ArrayRef<Attribute> allThreadsRef(strategy.allThreadAttrs);
-  iree_compiler::TileToForeachThreadAndFuseAndDistributeResult tileResult =
-      iree_compiler::buildTileFuseDistToForeachThreadWithNumThreads(
+  iree_compiler::TileToForallAndFuseAndDistributeResult tileResult =
+      iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*builder=*/b,
+          /*isolatedParentOpH=*/variantH,
           /*rootH=*/fusionTargetH,
           /*opsToFuseH=*/fusionGroupH,
           /*numThreads=*/
@@ -112,9 +113,9 @@ static void buildSmallReductionStrategyThreadDistribution(
           /*threadDimMapping=*/
           b.getArrayAttr(
               allThreadsRef.take_front(strategy.captures.reductionRank - 1)));
-  fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.foreachThreadH);
+  fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.forallH);
   maybeLeadingH =
-      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.foreachThreadH);
+      b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH);
 
   // 1. Scalarize all ops to ensure vectorization.
   auto pdlOperation = pdl::OperationType::get(b.getContext());
@@ -131,6 +132,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   // part.
   build1DSplittingStrategyWithOptionalThreadMapping(
       /*b=*/b,
+      /*isolatedParentOpH=*/variantH,
       /*opH=*/blockReductionH,
       /*rank=*/strategy.captures.reductionRank,
       // TODO: capture and generalize mostMinorDim.
@@ -141,6 +143,7 @@ static void buildSmallReductionStrategyThreadDistribution(
   // 3. apply the 1d splitting strategy to the trailing elementwise.
   build1DSplittingStrategyWithOptionalThreadMapping(
       /*b=*/b,
+      /*isolatedParentOpH=*/variantH,
       /*opH=*/maybeBlockTrailingH,
       /*rank=*/strategy.captures.maybeTrailingRank,
       // TODO: capture and generalize mostMinorDim.
@@ -155,12 +158,12 @@ void mlir::iree_compiler::gpu::buildSmallReductionStrategy(
     const SmallReductionStrategy &strategy) {
   // Step 1. Apply block-level part of the strategy, keeps everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
-        foreachThread] =
+        forall] =
       buildReductionStrategyBlockDistribution(b, variantH, strategy);
 
   // Step 2. Apply thread-level part of the strategy, keeps everything fused.
   buildSmallReductionStrategyThreadDistribution(
-      b, maybeLeadingHBlock, gridFillH, gridReductionH,
+      b, variantH, maybeLeadingHBlock, gridFillH, gridReductionH,
       maybeTiledTrailingHBlock, strategy);
 
   // Step 3-4. Common trailing steps.

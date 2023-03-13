@@ -72,7 +72,7 @@ iree_vmfb = iree_torch.compile_to_vmfb(mlir, iree_backend)
 ```
 
 Here we have a choice of backend we want to target. See the
-[Deployment Configurations](https://iree-org.github.io/iree/deployment-configurations/)
+[Deployment Configurations](https://openxla.github.io/iree/deployment-configurations/)
 section of this site for a full list of targets and configurations.
 
 The generated flatbuffer can now be serialized and stored for another time or

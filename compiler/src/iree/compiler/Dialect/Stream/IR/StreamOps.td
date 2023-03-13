@@ -588,6 +588,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     Value getSubrangeResult() { return getResult(); }
 
     // Walks up the use-def chain to find a subview op that feeds into |value|.
+    // Stops at any timeline op that may indicate a change in resource contents.
     static IREE::Stream::ResourceSubviewOp findSubviewOp(Value value);
   }];
 
@@ -2480,7 +2481,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
 
   let arguments = (ins
     Variadic<Index>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<Stream_PrimitiveType>:$uniform_operands,
     Variadic<Stream_AnyStreamResource>:$resources,
     Variadic<Stream_Size>:$resource_sizes,
@@ -2491,7 +2492,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   let results = (outs);
 
   let assemblyFormat = [{
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     (`(` $uniform_operands^ `:` type($uniform_operands) `)`)? `{`
     custom<DispatchResources>($resources, type($resources), $resource_sizes,
@@ -2502,6 +2503,13 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   }];
 
   let extraClassDeclaration = [{
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(
           idx - getODSOperandIndexAndLength(2).first,

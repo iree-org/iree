@@ -14,7 +14,7 @@
 namespace mlir {
 class Operation;
 /// A rewriter that keeps track of all tensor::DimOps.
-class TensorDimTrackingRewriter : public IRRewriter {
+class TensorDimTrackingRewriter : public IRRewriter, IRRewriter::Listener {
  public:
   /// Create a new rewriter: Scan the given op for tensor::DimOps.
   TensorDimTrackingRewriter(Operation *op);
@@ -32,13 +32,6 @@ class TensorDimTrackingRewriter : public IRRewriter {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-
-/// A heuristic that decides which ops should be cloned and fused into a
-/// dispatch region.
-///
-/// Note: This function returns `false` for ops that should be tiled and fused
-/// into a dispatch region.
-bool isClonableIntoDispatchOp(Operation *op);
 
 /// Computes the workload and provides a workload region builder for the given
 /// root op.

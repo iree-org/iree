@@ -6,6 +6,7 @@
 
 include(CheckCXXCompilerFlag)
 include(CheckLinkerFlag)
+include(CheckSymbolExists)
 
 # Appends ${VALUE} to each argument.
 function(iree_append_to_lists VALUE)
@@ -13,6 +14,25 @@ function(iree_append_to_lists VALUE)
     set(${_VARIABLE} "${${_VARIABLE}} ${VALUE}" PARENT_SCOPE)
   endforeach(_VARIABLE)
 endfunction()
+
+#-------------------------------------------------------------------------------
+# Supports dynamic library loading.
+#-------------------------------------------------------------------------------
+
+set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
+check_symbol_exists(dlopen dlfcn.h IREE_HAVE_DLOPEN)
+unset(CMAKE_REQUIRED_LIBRARIES)
+if(WIN32 OR IREE_HAVE_DLOPEN)
+  set(IREE_HAVE_DYNAMIC_LIBRARY_LOADING ON)
+else()
+  set(IREE_HAVE_DYNAMIC_LIBRARY_LOADING OFF)
+endif()
+
+#-------------------------------------------------------------------------------
+# Compiler flag support
+#-------------------------------------------------------------------------------
+
+check_cxx_compiler_flag(-fvisibility=default IREE_SUPPORTS_VISIBILITY_DEFAULT)
 
 #-------------------------------------------------------------------------------
 # Linker setup
@@ -77,6 +97,21 @@ endif()
 if(IREE_ENABLE_ASAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=address")
   string(APPEND CMAKE_C_FLAGS " -fsanitize=address")
+
+  # Not technically ASAN, but it guards against similar bugs in accessing
+  # uninitialized memory. See the extensive description in that patch that
+  # originally introduced it:
+  # https://reviews.llvm.org/rG14daa20be1ad89639ec209d969232d19cf698845
+  string(APPEND CMAKE_CXX_FLAGS " -ftrivial-auto-var-init=pattern")
+  string(APPEND CMAKE_C_FLAGS " -ftrivial-auto-var-init=pattern")
+
+  # If doing any kind of shared library builds, then we have to link against
+  # the shared libasan, and the user will be responsible for adding the
+  # appropriate path to LD_LIBRARY_PATH (or else binaries will fail to launch).
+  if(BUILD_SHARED_LIBS OR IREE_COMPILER_BUILD_SHARED_LIBS)
+    string(APPEND CMAKE_EXE_LINKER_FLAGS " -shared-libasan")
+    string(APPEND CMAKE_SHARED_LINKER_FLAGS " -shared-libasan")
+  endif()
 endif()
 if(IREE_ENABLE_MSAN)
   string(APPEND CMAKE_CXX_FLAGS " -fsanitize=memory")

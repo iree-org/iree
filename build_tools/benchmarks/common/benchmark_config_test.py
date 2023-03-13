@@ -93,13 +93,15 @@ class BenchmarkConfigTest(unittest.TestCase):
 
   def test_build_from_args_with_e2e_test_artifacts_dir(self):
     with tempfile.TemporaryDirectory() as e2e_test_artifacts_dir:
-      run_config = pathlib.Path(e2e_test_artifacts_dir) / "run_config.json"
-      run_config.touch()
+      exec_bench_config = pathlib.Path(
+          e2e_test_artifacts_dir) / "exec_bench_config.json"
+      exec_bench_config.touch()
       args = common_arguments.Parser().parse_args([
           f"--tmp_dir={self.tmp_dir}",
           f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
           f"--e2e_test_artifacts_dir={e2e_test_artifacts_dir}",
-          f"--run_config={run_config}"
+          f"--execution_benchmark_config={exec_bench_config}",
+          f"--target_device_name=device_a",
       ])
 
       config = benchmark_config.BenchmarkConfig.build_from_args(
@@ -108,14 +110,16 @@ class BenchmarkConfigTest(unittest.TestCase):
       self.assertEqual(config.root_benchmark_dir,
                        pathlib.Path(e2e_test_artifacts_dir))
 
-  def test_build_from_args_with_run_config_and_build_dir(self):
+  def test_build_from_args_with_execution_benchmark_config_and_build_dir(self):
     with tempfile.TemporaryDirectory() as e2e_test_artifacts_dir:
-      run_config = pathlib.Path(e2e_test_artifacts_dir) / "run_config.json"
-      run_config.touch()
+      exec_bench_config = pathlib.Path(
+          e2e_test_artifacts_dir) / "exec_bench_config.json"
+      exec_bench_config.touch()
       args = common_arguments.Parser().parse_args([
           f"--tmp_dir={self.tmp_dir}",
           f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
-          f"--run_config={run_config}",
+          f"--execution_benchmark_config={exec_bench_config}",
+          f"--target_device_name=device_a",
           str(self.build_dir)
       ])
 

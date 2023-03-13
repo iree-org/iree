@@ -8,7 +8,7 @@
 # Each test file should have a name matching the corresponding XLA HLO op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
 # written using the IREE Check framework and should always pass on the reference VMVX backend.
-# See https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
+# See https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
@@ -32,6 +32,7 @@ iree_check_single_backend_test_suite(
             "broadcast_in_dim.mlir",
             "clamp.mlir",
             "compare.mlir",
+            "complex.mlir",
             "concatenate.mlir",
             "constant.mlir",
             "convert.mlir",
@@ -113,6 +114,7 @@ iree_check_single_backend_test_suite(
             "broadcast_in_dim.mlir",
             "clamp.mlir",
             "compare.mlir",
+            "complex.mlir",
             "concatenate.mlir",
             "constant.mlir",
             "convert.mlir",
@@ -193,6 +195,7 @@ iree_check_single_backend_test_suite(
             "broadcast_in_dim.mlir",
             "clamp.mlir",
             "compare.mlir",
+            "complex.mlir",
             "concatenate.mlir",
             "constant.mlir",
             "convert.mlir",
@@ -262,6 +265,7 @@ iree_check_single_backend_test_suite(
             "broadcast_in_dim.mlir",
             "clamp.mlir",
             "compare.mlir",
+            "complex.mlir",
             "concatenate.mlir",
             "constant.mlir",
             "convert.mlir",
@@ -333,6 +337,7 @@ iree_check_single_backend_test_suite(
             "broadcast_in_dim.mlir",
             "clamp.mlir",
             "compare.mlir",
+            "complex.mlir",
             "concatenate.mlir",
             "constant.mlir",
             "convert.mlir",
@@ -361,7 +366,6 @@ iree_check_single_backend_test_suite(
             "reduce_window.mlir",
             "remainder.mlir",
             "reshape.mlir",
-            "reverse.mlir",
             "rng_normal.mlir",
             "rng_uniform.mlir",
             "round.mlir",
@@ -383,6 +387,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "exponential_fp16.mlir",
             "fft.mlir",  # TODO(#9583)
+            "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
         ],
     ),
     compiler_flags = ["--iree-input-type=mhlo"],
@@ -405,6 +410,7 @@ iree_check_single_backend_test_suite(
             "broadcast_in_dim.mlir",
             "clamp.mlir",
             "compare.mlir",
+            "complex.mlir",
             "concatenate.mlir",
             "constant.mlir",
             "convert.mlir",
@@ -457,7 +463,7 @@ iree_check_single_backend_test_suite(
     ),
     compiler_flags = [
         "--iree-input-type=mhlo",
-        "--iree-llvm-target-cpu-features=host",
+        "--iree-llvmcpu-target-cpu-features=host",
     ],
     driver = "local-task",
     # Building and testing must be on the same architecture, which doesn't work

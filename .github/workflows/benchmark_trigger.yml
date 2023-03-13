@@ -1,0 +1,108 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Benchmark Trigger
+
+# Trigger benchmark CI workflows when benchmark PR labels are added.
+# When a benchmark label is added, this cancels and then re-runs the CI
+# workflow. When the workflow is re-run, it will pick up the latest PR
+# description and labels. See
+# https://github.com/openxla/iree/issues/10042#issuecomment-1449250094 for
+# more background.
+#
+# This workflow is running on the base branch the PR targets.
+
+on:
+  pull_request_target:
+    types:
+      - labeled
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  # Target workflow that runs the benchmarks.
+  WORKFLOW_NAME: CI
+  BENCHMARK_LABEL_PREFIX: 'benchmarks:'
+
+jobs:
+  # Precondition check is a separate step because we can't put the concurrency
+  # constraint on it; otherwise the irrelevant labeling events will cancel the
+  # events that meet the preconditions. Even with cancel-in-progress = false,
+  # the queued events will still be cancelled.
+  check:
+    runs-on: ubuntu-20.04
+    outputs:
+      should-rerun: ${{ steps.precondition.outputs.should-rerun }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: "Checking labels"
+        id: precondition
+        run: |
+          echo "should-rerun=$(jq --raw-output \
+            --arg label_prefix ${BENCHMARK_LABEL_PREFIX} \
+            '.label.name | startswith($label_prefix)' \
+            ${GITHUB_EVENT_PATH})" >> "${GITHUB_OUTPUT}"
+
+  trigger:
+    needs: check
+    if: needs.check.outputs.should-rerun == 'true'
+    runs-on: ubuntu-20.04
+    # Required for cancel and rerun APIs.
+    permissions:
+      actions: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    concurrency:
+      # This cancels queued and in-progress trigger runs for the same PR.
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: "Checking out repository"
+        # This checkouts from the base branch instead of the pull request. See
+        # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request_target
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Finding the previous workflow run"
+        id: find-workflow
+        env:
+          RUN_JSON: workflow-run.json
+        run: |
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/runs" --method GET -F head_sha="${HEAD_SHA}" \
+            | jq --arg name "${WORKFLOW_NAME}" '.workflow_runs | map(select(.name == $name))[0]' \
+            > "${RUN_JSON}"
+          echo "workflow-url=$(jq '.url' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "run-status=$(jq --raw-output '.status' ${RUN_JSON})" >> "${GITHUB_OUTPUT}"
+      - name: "Cancelling the previous workflow run"
+        # If the workflow isn't completed, we need to cancel it first; otherwise
+        # the API can't rerun it.
+        if: |
+          fromJSON(steps.find-workflow.outputs.workflow-url) != null &&
+          steps.find-workflow.outputs.run-status != 'completed'
+        env:
+          IREE_WORKFLOW_RUN_URL: ${{ fromJSON(steps.find-workflow.outputs.workflow-url) }}
+        run: build_tools/github_actions/cancel_workflow_and_wait.sh
+      - name: "Getting the latest commit SHA"
+        # A push might have happened to trigger a new workflow run. Check the
+        # PR's latest commit SHA and only rerun if there is no new push.
+        #
+        # It reduces the chance that we rerun a workflow on the previous commit
+        # and cancel (due to the concurrency constraint) the run on the newer
+        # commit. Even if that happens, users will see their CI run fails and
+        # can rerun it manually from the UI.
+        id: get-sha
+        if: fromJSON(steps.find-workflow.outputs.workflow-url) != null
+        run: |
+          echo "latest-sha=$(gh api /repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER} \
+            | jq --raw-output '.head.sha')" \
+            >> "${GITHUB_OUTPUT}"
+      - name: "Rerequesting the workflow"
+        if: |
+          fromJSON(steps.find-workflow.outputs.workflow-url) != null &&
+          steps.get-sha.outputs.latest-sha == env.HEAD_SHA
+        env:
+          WORKFLOW_RUN_URL: ${{ fromJSON(steps.find-workflow.outputs.workflow-url) }}
+        run: |
+          gh api "${WORKFLOW_RUN_URL}/rerun" --method POST

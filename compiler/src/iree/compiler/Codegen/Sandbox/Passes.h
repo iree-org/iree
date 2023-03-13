@@ -28,6 +28,7 @@ struct LinalgFusePassOptions {
   SmallVector<int64_t> hoistPaddings = {};
   SmallVector<std::string> transposePaddings = {};
   bool vectorize = false;
+  bool enableVectorMasking = false;
   bool vectorizePadding = false;
   int64_t tilingLevel = -1;
 };
@@ -57,6 +58,7 @@ struct LinalgSingleTilingExpertPassOptions {
   bool decomposeToLowerDimOp = false;
   bool peel = false;
   bool vectorize = false;
+  bool enableVectorMasking = false;
   bool vectorizePadding = false;
   int64_t tilingLevel = -1;
 };

@@ -501,12 +501,7 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
       return rewriter.notifyMatchFailure(sliceOp,
                                          "fusion along slice op failed");
     }
-    auto tiledProducer = tiledProducerVal->getDefiningOp<TilingInterface>();
-    if (!tiledProducer) {
-      return rewriter.notifyMatchFailure(
-          tiledProducer,
-          "expected tiled implementation to implement TilingInterface as well");
-    }
+    auto tiledProducer = tiledProducerVal->getDefiningOp();
     if (tiledProducer->getNumResults() != fusableProducer->getNumResults()) {
       return rewriter.notifyMatchFailure(fusableProducer,
                                          "fused operation expected to produce "
@@ -524,8 +519,12 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     for (auto [index, range] : llvm::enumerate(producerIterationDomain)) {
       if (index < tilingResult->tiledLoops.size() &&
           tilingResult->tiledLoops.test(index)) {
-        producerOffset.push_back(tilingResult->tileOffsets[index]);
-        producerSizes.push_back(tilingResult->tileSizes[index]);
+        // It is not true that the tiling sizes for produces are always as same
+        // as the tiling sizes for consumers. The tensor.extract_slice op
+        // carries the information, so we can get the tiling sizes and offsets
+        // from it.
+        producerOffset.push_back(sliceOp.getMixedOffsets()[index]);
+        producerSizes.push_back(sliceOp.getMixedSizes()[index]);
       } else {
         producerOffset.push_back(range.offset);
         producerSizes.push_back(range.size);
@@ -555,35 +554,6 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
 }
 
 namespace {
-
-//===----------------------------------------------------------------------===//
-// SwapExtractSliceWithTiledProducer
-//===----------------------------------------------------------------------===//
-
-/// Pattern to swap a `tilinginterface op` -> `tensor.extract_slice` with
-/// `tensor.extract_slice` of operands of the op -> tiled `tilinginterface
-/// op`.
-struct SwapExtractSliceWithTiledProducer
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    OpResult producer = sliceOp.getSource().dyn_cast<OpResult>();
-    if (!producer) {
-      return rewriter.notifyMatchFailure(sliceOp, "source uses bb arg");
-    }
-    FailureOr<Value> tiledProducer =
-        tensor::replaceExtractSliceWithTiledProducer(rewriter, sliceOp,
-                                                     producer);
-    if (failed(tiledProducer)) {
-      return failure();
-    }
-    // Replace all uses of the producer within the
-    rewriter.replaceOp(sliceOp, tiledProducer.value());
-    return success();
-  }
-};
 
 //===----------------------------------------------------------------------===//
 // SwapExtractSliceWithDispatchTensorLoad
@@ -616,12 +586,12 @@ struct SwapExtractSliceWithDispatchTensorLoad
 };
 
 //===----------------------------------------------------------------------===//
-// SwapExtractSliceWithInitTensor
+// SwapExtractSliceWithTensorEmpty
 //===----------------------------------------------------------------------===//
 
-/// Pattern to swap `init_tensor` -> `tensor.extract_slice` with
-/// `init_tensor` of the slice.
-struct SwapExtractSliceWithInitTensor
+/// Pattern to swap `empty` -> `tensor.extract_slice` with
+/// `empty` of the slice.
+struct SwapExtractSliceWithTensorEmpty
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
@@ -653,8 +623,7 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options) {
   MLIRContext *context = patterns.getContext();
   patterns.insert<SwapExtractSliceWithDispatchTensorLoad,
-                  SwapExtractSliceWithInitTensor,
-                  SwapExtractSliceWithTiledProducer>(context);
+                  SwapExtractSliceWithTensorEmpty>(context);
 }
 
 }  // namespace iree_compiler

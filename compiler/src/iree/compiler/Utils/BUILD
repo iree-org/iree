@@ -23,6 +23,7 @@ iree_compiler_cc_library(
         "OptionUtils.cpp",
         "PassUtils.cpp",
         "StringUtils.cpp",
+        "ToolUtils.cpp",
         "TracingUtils.cpp",
     ],
     hdrs = [
@@ -35,6 +36,7 @@ iree_compiler_cc_library(
         "PassUtils.h",
         "PatternUtils.h",
         "StringUtils.h",
+        "ToolUtils.h",
         "TracingUtils.h",
     ],
     deps = [

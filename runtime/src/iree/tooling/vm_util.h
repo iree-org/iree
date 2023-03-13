@@ -32,6 +32,19 @@ iree_status_t iree_tooling_parse_to_variant_list(
     iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
     iree_vm_list_t** out_list);
 
+// Parses |input_strings| into a variant list of VM scalars and buffers.
+// Scalars should be in the format:
+//   type=value
+// Buffers should be in the IREE standard shaped buffer format:
+//   [shape]xtype=[value]
+// described in iree/hal/api.h
+// Uses |device_allocator| to allocate the buffers.
+iree_status_t iree_tooling_parse_into_variant_list(
+    iree_hal_allocator_t* device_allocator,
+    const iree_string_view_t* input_strings,
+    iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
+    iree_vm_list_t* list);
+
 // Appends fences to |list| if the invocation model of |function| requires them.
 // If no |wait_fence| is provided then the invocation will begin immediately.
 // The caller must wait on the returned |out_signal_fence| before accessing the
@@ -42,19 +55,23 @@ iree_status_t iree_tooling_append_async_fence_inputs(
     iree_hal_fence_t** out_signal_fence);
 
 // Appends a variant list of VM scalars and buffers to |builder|.
+// |list_name| will be printed alongside each element ordinal.
+//
 // Prints scalars in the format:
 //   value
 // Prints buffers in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/iree-org/iree/tree/main/iree/hal/api.h
+// https://github.com/openxla/iree/tree/main/iree/hal/api.h
 iree_status_t iree_tooling_append_variant_list_lines(
-    iree_vm_list_t* list, iree_host_size_t max_element_count,
-    iree_string_builder_t* builder);
+    iree_string_view_t list_name, iree_vm_list_t* list,
+    iree_host_size_t max_element_count, iree_string_builder_t* builder);
 
-// Prints a variant list to a file.
+// Prints a variant list to a |file|.
+// |list_name| will be printed alongside each element ordinal.
 iree_status_t iree_tooling_variant_list_fprint(
-    iree_vm_list_t* list, iree_host_size_t max_element_count, FILE* file);
+    iree_string_view_t list_name, iree_vm_list_t* list,
+    iree_host_size_t max_element_count, FILE* file);
 
 // Prints a variant |list| to targets based on the provided |output_strings|.
 //

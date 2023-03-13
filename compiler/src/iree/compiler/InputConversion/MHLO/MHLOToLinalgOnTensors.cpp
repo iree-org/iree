@@ -356,6 +356,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     // TODO: Collapse/rework all of these patterns once the consolidation
     // lands. There is little reason to have these so spread out.
     populateMHLOToFlowPatterns(context, patterns);
+
     chlo::populateDecomposeChloPatterns(context, &patterns);
     populateMHLOBroadcastingToLinalgPatterns(context, *typeConverter, patterns);
     mhlo::populateScalarHloToArithmeticConversionPatterns(
@@ -365,6 +366,8 @@ struct ConvertMHLOToLinalgOnTensorsPass
                                                     patterns);
     populateMHLOComplexToRealPatterns(context, *typeConverter, patterns);
 
+    populateMHLOCollectiveOpsConversionPatterns(context, *typeConverter,
+                                                patterns);
     // TODO(*): expose patterns that do this much better from
     // iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
 
@@ -386,8 +389,13 @@ struct ConvertMHLOToLinalgOnTensorsPass
         context);
     patterns.insert<GenericTypeConvert>(
         ml_program::GlobalStoreOp::getOperationName(), *typeConverter, context);
-
+    // This is needed when converting mhlo::ReplicaIDOp.
+    patterns.insert<GenericTypeConvert>(
+        tensor::FromElementsOp::getOperationName(), *typeConverter, context);
+    patterns.insert<GenericTypeConvert>(
+        arith::IndexCastUIOp::getOperationName(), *typeConverter, context);
     ConversionTarget target(getContext());
+
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
     auto isLegallyTypedOp = [&](Operation *op) -> bool {
       for (Type type : op->getResultTypes()) {

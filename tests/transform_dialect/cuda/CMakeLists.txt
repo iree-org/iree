@@ -18,6 +18,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "mma.mlir"
     "reduction.mlir"
     "reduction_eltwise.mlir"
     "reduction_v2.mlir"

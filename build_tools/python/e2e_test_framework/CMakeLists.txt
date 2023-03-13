@@ -11,4 +11,11 @@ iree_build_tools_py_test(
     "serialization_test.py"
 )
 
-add_subdirectory(device_specs)
+iree_build_tools_py_test(
+  NAME
+    unique_ids_test
+  SRC
+    "unique_ids_test.py"
+)
+
+iree_add_all_subdirs()

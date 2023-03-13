@@ -81,15 +81,15 @@ some examples:
 
 This field specifies the IREE HAL driver:
 
-* [`local-task`](https://iree-org.github.io/iree/deployment-configurations/cpu/):
+* [`local-task`](https://openxla.github.io/iree/deployment-configurations/cpu/):
   For CPU via the local task system. Kernels contain CPU native instructions AOT
   compiled using LLVM. This driver issues workloads to the CPU asynchronously
   and supports multithreading.
-* [`local-sync`](https://iree-org.github.io/iree/deployment-configurations/cpu/):
+* [`local-sync`](https://openxla.github.io/iree/deployment-configurations/cpu/):
   For CPU via the local 'sync' device. Kernels contain contain CPU native
   instructions AOT compiled using LLVM. This driver issues workloads to the CPU
   synchronously.
-* [`Vulkan`](https://iree-org.github.io/iree/deployment-configurations/gpu-vulkan/):
+* [`Vulkan`](https://openxla.github.io/iree/deployment-configurations/gpu-vulkan/):
   For GPU via Vulkan. Kernels contain SPIR-V. This driver issues workload to
   the GPU via the Vulkan API.
 

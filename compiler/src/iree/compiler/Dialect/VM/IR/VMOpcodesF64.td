@@ -42,6 +42,8 @@ def VM_OPC_FloorF64              : VM_OPC<0x13, "FloorF64">;
 def VM_OPC_RoundF64              : VM_OPC<0x3C, "RoundF64">;
 def VM_OPC_TruncF64F32           : VM_OPC<0x14, "TruncF64F32">;
 def VM_OPC_ExtF32F64             : VM_OPC<0x15, "ExtF32F64">;
+def VM_OPC_MinF64                : VM_OPC<0x3D, "MinF64">;
+def VM_OPC_MaxF64                : VM_OPC<0x3E, "MaxF64">;
 
 def VM_OPC_CastSI32F64           : VM_OPC<0x16, "CastSI32F64">;
 def VM_OPC_CastUI32F64           : VM_OPC<0x17, "CastUI32F64">;
@@ -118,6 +120,8 @@ def VM_ExtF64OpcodeAttr :
     VM_OPC_CeilF64,
     VM_OPC_FloorF64,
     VM_OPC_RoundF64,
+    VM_OPC_MinF64,
+    VM_OPC_MaxF64,
 
     VM_OPC_TruncF64F32,
     VM_OPC_ExtF32F64,

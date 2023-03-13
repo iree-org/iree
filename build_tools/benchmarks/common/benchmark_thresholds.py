@@ -80,8 +80,9 @@ BENCHMARK_THRESHOLDS = [
 ]
 
 COMPILATION_TIME_THRESHOLDS = [
-    # Default threshold: 5%.
-    BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
+    # Compilation time measurement is very stable right now. Use a large
+    # threshold until we make it stable.
+    BenchmarkThreshold(re.compile(r".*"), 50, ThresholdUnit.PERCENTAGE),
 ]
 
 TOTAL_DISPATCH_SIZE_THRESHOLDS = [

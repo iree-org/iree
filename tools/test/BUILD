@@ -18,13 +18,17 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "compile_pipelines.mlir",
+            "compile_to_continuation.mlir",
             "compile_to_phase.mlir",
             "executable_benchmarks.mlir",
+            "executable_sources.mlir",
             "iree-benchmark-module.mlir",
             "iree-run-mlir.mlir",
             "iree-run-module.mlir",
             "iree-run-module-expected.mlir",
             "iree-run-module-outputs.mlir",
+            "iree-run-trace.mlir",
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "null_values.mlir",
@@ -36,6 +40,7 @@ iree_lit_test_suite(
     cfg = "//tools:lit.cfg.py",
     data = [
         "echo_npy.py",
+        "iree-run-trace.yml",
     ],
     tags = [
         "driver=local-task",
@@ -44,9 +49,12 @@ iree_lit_test_suite(
     ],
     tools = [
         "//tools:iree-benchmark-module",
+        "//tools:iree-benchmark-trace",
         "//tools:iree-compile",
+        "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "//tools:iree-run-module",
+        "//tools:iree-run-trace",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
         "@llvm-project//llvm:not",

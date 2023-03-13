@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -52,7 +53,8 @@ class VMVXTargetBackend final : public TargetBackend {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::VM::VMDialect,
-                    IREE::VMVX::VMVXDialect>();
+                    IREE::VMVX::VMVXDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
@@ -68,16 +70,22 @@ class VMVXTargetBackend final : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
+  IREE::VM::TargetOptions getTargetOptions(
+      IREE::HAL::ExecutableTargetAttr targetAttr) {
+    // TODO(benvanik): derive these from a vm target triple.
+    auto vmOptions = IREE::VM::TargetOptions::FromFlags::get();
+    vmOptions.f32Extension = true;
+    vmOptions.optimizeForStackSize = false;
+    return vmOptions;
+  }
+
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
 
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
-    // TODO(benvanik): derive these from a vm target triple.
-    auto vmOptions = IREE::VM::TargetOptions::FromFlags::get();
-    vmOptions.f32Extension = true;
-    vmOptions.optimizeForStackSize = false;
+    auto vmOptions = getTargetOptions(variantOp.getTargetAttr());
     IREE::VM::buildVMTransformPassPipeline(nestedModulePM, vmOptions);
   }
 
@@ -105,10 +113,15 @@ class VMVXTargetBackend final : public TargetBackend {
     // Serialize the VM module to bytes and embed it directly.
     SmallVector<char> moduleData;
     {
-      IREE::VM::BytecodeTargetOptions bytecodeOptions;
+      auto vmOptions = getTargetOptions(variantOp.getTargetAttr());
+      // TODO(benvanik): plumb this through somewhere? these options are mostly
+      // about output format stuff such as debug information so it's probably
+      // fine to share.
+      auto bytecodeOptions = IREE::VM::BytecodeTargetOptions::FromFlags::get();
       llvm::raw_svector_ostream stream(moduleData);
       if (failed(translateModuleToBytecode(variantOp.getInnerModule(),
-                                           bytecodeOptions, stream))) {
+                                           vmOptions, bytecodeOptions,
+                                           stream))) {
         return variantOp.emitOpError()
                << "failed to serialize VM bytecode module";
       }

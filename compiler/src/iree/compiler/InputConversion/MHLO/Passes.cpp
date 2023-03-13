@@ -35,6 +35,11 @@ static llvm::cl::opt<bool> clDemoteF64ToF32(
     llvm::cl::desc(
         "Converts all MHLO f64 ops and values into f32 counterparts."),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clPromoteBF16ToF32(
+    "iree-mhlo-promote-bf16-to-f32",
+    llvm::cl::desc(
+        "Converts all MHLO bf16 ops and values into f32 counterparts."),
+    llvm::cl::init(true));
 
 void registerMHLOConversionPassPipeline() {
   PassPipelineRegistration<> mhlo(
@@ -86,6 +91,9 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   }
   if (clDemoteF64ToF32) {
     passManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
+  }
+  if (clPromoteBF16ToF32) {
+    passManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
   }
 
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In

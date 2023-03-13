@@ -53,6 +53,12 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
     llvm::cl::desc(
         "tag attribute value for the transform dialect transform op container"),
     llvm::cl::init(""));
+
+/// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
+llvm::cl::opt<bool> clGPUUseMMASync(
+    "iree-codegen-llvmgpu-use-mma-sync",
+    llvm::cl::desc("use mma sync instead of wmma ops"), llvm::cl::init(false));
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
@@ -69,6 +75,7 @@ struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
   std::array<int64_t, 3> workgroupSize;
+  int64_t pipelineDepth;
 };
 
 // Software pipeline depths
@@ -83,30 +90,42 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   // Pick tile size so that M*K and K*N dividible by wgSize * \*vecSize=*\4.
   // This way workgroup memory copy don't need to be masked. Once we support
   // masked load we can get performance out of more configuration.
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}, 1}));
 
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
 }
 
 /// Return the best combination of tile size and wg size when using tensorcore
 /// operations.
 static void getTensorCoreConfig(
-    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16) {
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
+    int64_t N, int64_t K) {
   // Tile sizes are skewed towards small matmul for now. Long term the plan is
   // to not rely on hardcoded configurations.
   if (isFp16) {
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}}));
+    int64_t parallelDim = M * N;
+    static constexpr int64_t kLargDimThreashold = 1536;
+    // Based on early analysis we found that 128x256x32_3 gives acceptable
+    // performance across many of the large matrix sizes for f16. This needs to
+    // be refined into a better startegy based on empircal data but this gives
+    // us a quick solution to achieve performance in the right order of
+    // magnitude for large square like cases.
+    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
+    }
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}}));
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
   }
 }
 
@@ -264,25 +283,29 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-
-      getTensorCoreConfig(TCtileSizeConfig, op.getDpsInputOperand(0)
-                                                ->get()
-                                                .getType()
-                                                .cast<RankedTensorType>()
-                                                .getElementType()
-                                                .isF16());
+      bool isFp16 = op.getDpsInputOperand(0)
+                        ->get()
+                        .getType()
+                        .cast<RankedTensorType>()
+                        .getElementType()
+                        .isF16();
+      getTensorCoreConfig(TCtileSizeConfig, isFp16, sizeM, sizeN, sizeK);
       // Pick the best configuration where the original shape is aligned on the
       // tile size.
       for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
         if (sizeK % config.tileSize[2] == 0 &&
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
+          IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
+              clGPUUseMMASync ? IREE::Codegen::DispatchLoweringPassPipeline::
+                                    LLVMGPUMatmulTensorCoreMmaSync
+                              : IREE::Codegen::DispatchLoweringPassPipeline::
+                                    LLVMGPUMatmulTensorCore;
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,
-              sizeK == config.tileSize[2] ? 1 : softwarePipelineDepthTensorCore,
-              IREE::Codegen::DispatchLoweringPassPipeline::
-                  LLVMGPUMatmulTensorCore);
+              sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
+              codegenPipeline);
         }
       }
     }
@@ -401,6 +424,47 @@ static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
       workgroupSize);
 }
 
+static SmallVector<int64_t> getDefaultWorkgroupTileSizesForPackUnPack(
+    TilingInterface op, int64_t defaultSize) {
+  unsigned numLoops = op.getLoopIteratorTypes().size();
+  auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
+                              .getPartitionableLoops(kNumMaxParallelDims);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultSize);
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
+    if (!partitionedLoopsSet.count(dim)) {
+      workgroupTileSizes[dim] = 0;
+    }
+  }
+
+  return workgroupTileSizes;
+}
+
+static LogicalResult setPackConfig(func::FuncOp entryPoint,
+                                   tensor::PackOp packOp) {
+  SmallVector<int64_t> tileSizes = getDefaultWorkgroupTileSizesForPackUnPack(
+      cast<TilingInterface>(packOp.getOperation()), cudaWarpSize);
+
+  // The default function aims to returns the number of workload per workgroup,
+  // but it does not know that it is working on packed domain. We need to take
+  // inner tile sizes into account and adjust the distribution tile sizes.
+  SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
+  ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    tileSizes[pos] = tileSizes[pos] / size;
+    tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+  }
+
+  TileSizesListType tileSizesList = {tileSizes};
+  std::array<int64_t, 3> workgroupSizes = {cudaWarpSize, 1, 1};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, packOp, tileSizesList,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack,
+      workgroupSizes);
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
 static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
                                           Operation *op) {
@@ -428,7 +492,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       workgroupTileSizes[depth] = 0;
     }
   }
-
+  int64_t skipInnerTiling = 0;
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     for (auto [index, outputOperand] :
          llvm::enumerate(genericOp.getDpsInitOperands())) {
@@ -462,6 +526,26 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         vectorSize = 1;
         break;
       }
+      // If the inner dimension is too small to have one element per thread
+      // reduce the workgroup size try to distribute amongst more dimensions.
+      if (shape.back() < vectorSize * workgroupSize[0]) {
+        int64_t flatWG = workgroupSize[0];
+        vectorSize = 1;
+        int64_t id = 0;
+        for (int64_t dim : llvm::reverse(shape)) {
+          if (dim < flatWG) {
+            skipInnerTiling++;
+            workgroupSize[id] = dim;
+          } else {
+            workgroupSize[id] = flatWG;
+            break;
+          }
+          flatWG = flatWG / dim;
+          id++;
+          if (flatWG <= 1 || id >= workgroupSize.size()) break;
+        }
+        break;
+      }
     }
   }
 
@@ -480,13 +564,24 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize;
   }
 
+  int64_t id = 0;
   // Set the inner most parallel loop to `lowerTs`.
   for (int64_t depth = numLoops; depth > 0; depth--) {
     if (partitionedLoopsSet.count(depth - 1)) {
-      workgroupTileSizes[depth - 1] = workgroupSize[0] * vectorSize;
+      if (skipInnerTiling > 0) {
+        // For dimensions that don't need to be distributed across blocks skip
+        // tiling by setting tile size to 0.
+        workgroupTileSizes[depth - 1] = 0;
+        skipInnerTiling--;
+        id++;
+        if (id >= workgroupSize.size()) break;
+        continue;
+      }
+      workgroupTileSizes[depth - 1] = workgroupSize[id] * vectorSize;
       break;
     }
   }
+
   if (linalgOp) {
     // Tile reduction dimension to 4 to allow doing load4 if the reduction size
     // is the most inner dimension.
@@ -899,6 +994,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(computeOp)) {
     return setSortConfig(entryPointFn, sortOp);
   }
+  if (auto packOp = dyn_cast<tensor::PackOp>(computeOp)) {
+    return setPackConfig(entryPointFn, packOp);
+  }
+
   return setRootDefaultConfig(entryPointFn, computeOp);
 }
 

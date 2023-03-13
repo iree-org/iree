@@ -106,6 +106,12 @@ def IREEComprehensiveBufferize :
   ];
 }
 
+def LowerUKernelOpsToCalls :
+    Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
+  let summary = "Lower micro-kernel wrapper ops into function calls";
+  let constructor = "mlir::iree_compiler::createLowerUKernelOpsToCallsPass()";
+}
+
 def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "func::FuncOp"> {
   let summary =
@@ -133,6 +139,12 @@ def SplitFullPartialTransfer :
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
   ];
+}
+
+def TestExecutablePreprocessing :
+    Pass<"iree-codegen-test-executable-preprocessing", ""> {
+  let summary = "Tests iree-hal-preprocess-executables-with behavior.";
+  let constructor = "mlir::iree_compiler::createTestExecutablePreprocessingPass()";
 }
 
 def TestPartitionableLoopsInterface :
@@ -220,6 +232,17 @@ def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
     Option<"epiloguePeeling", "epilogue-peeling", "bool",
             /*default=*/"true",
            "Try to use un-peeling epilogue when false, peeled epilouge o.w.">,
+    Option<"depth", "pipeline-depth", "int64_t",
+            /*default=*/"2",
+           "Number of stages ">,           
+    Option<"scheduleIndex", "schedule-index", "int64_t",
+            /*default=*/"0",
+           "Allows picking different schedule for the pipelining transformation.">,
+    Option<"transformFileName", "transform-file-name", "std::string",
+            /*default=*/"\"\"",
+            "Optional filename containing a transform dialect specification to "
+            "apply. If left empty, the IR is assumed to contain one top-level "
+            "transform dialect operation somewhere in the module.">,           
   ];
 }
 
@@ -324,6 +347,12 @@ def RematerializeParallelOps :
   let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
 }
 
+def InstrumentMemoryAccesses :
+    Pass<"iree-codegen-instrument-memory-accesses", "func::FuncOp"> {
+  let summary = "Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.";
+  let constructor = "mlir::iree_compiler::createInstrumentMemoryAccessesPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -366,6 +395,14 @@ def LLVMCPULowerExecutableTarget :
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
+}
+
+def LLVMCPULowerToUKernels :
+    Pass<"iree-llvmcpu-lower-to-ukernels", ""> {
+  let summary =
+      "Separate out parts of the IR that lower to a micro-kernel";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPULowerToUKernelsPass()";
 }
 
 def LLVMCPUMaterializeEncoding :
@@ -458,7 +495,7 @@ def LLVMGPUTileTensor :
 
 def LLVMGPUDistribute :
     Pass<"iree-llvmgpu-distribute", "func::FuncOp"> {
-  let summary = "Pass to distribute foreachthread ops.";
+  let summary = "Pass to distribute scf.forall ops.";
   let constructor = "mlir::iree_compiler::createLLVMGPUDistribute()";
 }
 
@@ -466,6 +503,12 @@ def LLVMGPUTensorAlloc :
     Pass<"iree-llvmgpu-alloc", "func::FuncOp"> {
   let summary = "Pass to create allocation for some values.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorAlloc()";
+}
+
+def LLVMGPUPackSharedMemoryAlloc :
+    Pass<"iree-llvmgpu-pack-shared-memory-alloc", "func::FuncOp"> {
+  let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
 }
 
 def LLVMGPUTensorCoreVectorization :

@@ -28,7 +28,6 @@ def IREEInput_Dialect : Dialect {
   }];
   let cppNamespace = "::mlir::iree_compiler::IREE::Input";
   let useDefaultTypePrinterParser = 1;
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 class IREEInput_Op<string mnemonic, list<Trait> traits = []> :

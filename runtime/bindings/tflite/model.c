@@ -11,7 +11,7 @@
 
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 static iree_status_t _TfLiteModelCalculateFunctionIOCounts(
     const iree_vm_function_signature_t* signature, int32_t* out_input_count,

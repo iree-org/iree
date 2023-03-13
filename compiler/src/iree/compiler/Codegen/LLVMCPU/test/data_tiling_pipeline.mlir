@@ -22,7 +22,7 @@ hal.executable private @elem_pack {
           linalg.yield %7 : f32
         } -> tensor<128x384xf32>
         %5 = tensor.empty() : tensor<16x384x8x1xf32>
-        %6 = iree_linalg_ext.pack %4 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %5 : (tensor<128x384xf32> tensor<16x384x8x1xf32>) -> tensor<16x384x8x1xf32>
+        %6 = tensor.pack %4 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %5 : tensor<128x384xf32> -> tensor<16x384x8x1xf32>
         flow.dispatch.tensor.store %6, %1, offsets = [0, 0, 0, 0], sizes = [16, 384, 8, 1], strides = [1, 1, 1, 1] : tensor<16x384x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<16x384x8x1xf32>>
         return
       }
@@ -32,5 +32,4 @@ hal.executable private @elem_pack {
 // CHECK: func.func @elem_pack
 // CHECK:   %[[READ:.+]] = vector.transfer_read
 // CHECK:   %[[ADD:.+]] = arith.addf %[[READ]], %[[READ]]
-// CHECK:   %[[BCAST:.+]] = vector.broadcast %[[ADD]]
-// CHECK:   vector.transfer_write %[[BCAST]], %{{.+}}
+// CHECK:   vector.transfer_write %[[ADD]], %{{.+}}

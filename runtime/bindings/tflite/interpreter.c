@@ -589,7 +589,7 @@ static iree_status_t _TfLiteInterpreterInvoke(TfLiteInterpreter* interpreter) {
   // remain where they currently are for the next invocation.
   for (iree_host_size_t i = 0; i < interpreter->model->output_count; ++i) {
     iree_hal_buffer_t* buffer = (iree_hal_buffer_t*)iree_vm_list_get_ref_deref(
-        interpreter->output_list, i, iree_hal_buffer_get_descriptor());
+        interpreter->output_list, i, &iree_hal_buffer_descriptor);
     TfLiteTensor* tensor = &interpreter->output_tensors[i];
     IREE_RETURN_IF_ERROR(_TfLiteTensorBind(tensor, buffer));
   }

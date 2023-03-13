@@ -25,6 +25,7 @@ iree_cc_library(
     "KernelConfig.cpp"
     "LLVMGPUDistribute.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
+    "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUTensorAlloc.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
@@ -48,6 +49,7 @@ iree_cc_library(
     MLIRArithToLLVM
     MLIRArithTransforms
     MLIRBufferizationDialect
+    MLIRComplexToStandard
     MLIRControlFlowToLLVM
     MLIRFuncDialect
     MLIRFuncToLLVM
@@ -91,6 +93,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
+    iree::compiler::Codegen::LLVMGPU::Utils
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::TransformDialectStrategies::GPU::TransformDialectStrategies
     iree::compiler::Codegen::Transforms

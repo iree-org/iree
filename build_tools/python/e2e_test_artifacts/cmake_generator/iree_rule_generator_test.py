@@ -40,7 +40,9 @@ class IreeRuleBuilderTest(unittest.TestCase):
         imported_model=tflite_imported_model,
         output_file_path=output_file_path)
 
-    self.assertEqual(rule.target_name, f"iree-imported-model-{tflite_model.id}")
+    self.assertEqual(
+        rule.target_name,
+        f"iree-imported-model-{tflite_imported_model.composite_id}")
     self.assertEqual(rule.output_file_path, output_file_path)
 
   def test_build_model_import_rule_linalg(self):
@@ -69,7 +71,7 @@ class IreeRuleBuilderTest(unittest.TestCase):
                      pathlib.PurePath(model_rule.file_path))
 
   def test_build_module_compile_rule(self):
-    model_a = common_definitions.Model(
+    model = common_definitions.Model(
         id="1234",
         name="tflite_m",
         tags=[],
@@ -77,8 +79,8 @@ class IreeRuleBuilderTest(unittest.TestCase):
         source_url="https://example.com/xyz.tflite",
         entry_function="main",
         input_types=["1xf32"])
-    imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
-    compile_config_a = iree_definitions.CompileConfig(
+    imported_model = iree_definitions.ImportedModel.from_model(model)
+    compile_config = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],
         compile_targets=[
@@ -88,6 +90,8 @@ class IreeRuleBuilderTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
+    gen_config = iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        imported_model=imported_model, compile_config=compile_config)
     model_import_rule = iree_rule_generator.IreeModelImportRule(
         target_name=f"iree-import-model-abcd",
         output_file_path=pathlib.PurePath("root/iree/abcd/1234.mlir"),
@@ -96,12 +100,10 @@ class IreeRuleBuilderTest(unittest.TestCase):
 
     rule = self._builder.build_module_compile_rule(
         model_import_rule=model_import_rule,
-        imported_model=imported_model_a,
-        compile_config=compile_config_a,
+        module_generation_config=gen_config,
         output_file_path=output_file_path)
 
-    self.assertEqual(rule.target_name,
-                     f"iree-module-{model_a.id}-{compile_config_a.id}")
+    self.assertEqual(rule.target_name, f"iree-module-{gen_config.composite_id}")
     self.assertEqual(rule.output_module_path, output_file_path)
 
   def test_build_target_path(self):
@@ -124,15 +126,24 @@ class IreeGeneratorTest(unittest.TestCase):
         entry_function="main",
         input_types=["1xf32"])
     model_b = common_definitions.Model(
-        id="5678",
+        id="5678_v1",
         name="tf_m",
         tags=[],
-        source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+        source_type=common_definitions.ModelSourceType.EXPORTED_TF_V1,
+        source_url="https://example.com/xyz_saved_model",
+        entry_function="predict",
+        input_types=["2xf32"])
+    model_c = common_definitions.Model(
+        id="5678_v2",
+        name="tf_m",
+        tags=[],
+        source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
         source_url="https://example.com/xyz_saved_model",
         entry_function="predict",
         input_types=["2xf32"])
     imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
     imported_model_b = iree_definitions.ImportedModel.from_model(model_b)
+    imported_model_c = iree_definitions.ImportedModel.from_model(model_c)
     compile_config_a = iree_definitions.CompileConfig(
         id="config_a",
         tags=["defaults"],
@@ -153,12 +164,14 @@ class IreeGeneratorTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_b, compile_config=compile_config_a)
-    gen_config_c = iree_definitions.ModuleGenerationConfig(
+    gen_config_c = iree_definitions.ModuleGenerationConfig.with_flag_generation(
         imported_model=imported_model_b, compile_config=compile_config_b)
+    gen_config_d = iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        imported_model=imported_model_c, compile_config=compile_config_b)
     model_rule_map = {
         model_a.id:
             model_rule_generator.ModelRule(
@@ -169,24 +182,37 @@ class IreeGeneratorTest(unittest.TestCase):
             model_rule_generator.ModelRule(
                 target_name=f"model-y",
                 file_path=pathlib.PurePath("y_saved_model"),
+                cmake_rules=["efg"]),
+        model_c.id:
+            model_rule_generator.ModelRule(
+                target_name=f"model-z",
+                file_path=pathlib.PurePath("z_saved_model"),
                 cmake_rules=["efg"])
     }
 
     cmake_rules = iree_rule_generator.generate_rules(
         package_name="${package}",
         root_path=pathlib.PurePath("root"),
-        module_generation_configs=[gen_config_a, gen_config_b, gen_config_c],
+        module_generation_configs=[
+            gen_config_a, gen_config_b, gen_config_c, gen_config_d
+        ],
         model_rule_map=model_rule_map)
 
     concated_cmake_rules = "\n".join(cmake_rules)
-    self.assertRegex(concated_cmake_rules, f"iree-imported-model-{model_a.id}")
-    self.assertRegex(concated_cmake_rules, f"iree-imported-model-{model_b.id}")
     self.assertRegex(concated_cmake_rules,
-                     f"iree-module-{model_a.id}-{compile_config_a.id}")
+                     f"iree-imported-model-{imported_model_a.composite_id}")
     self.assertRegex(concated_cmake_rules,
-                     f"iree-module-{model_b.id}-{compile_config_a.id}")
+                     f"iree-imported-model-{imported_model_b.composite_id}")
     self.assertRegex(concated_cmake_rules,
-                     f"iree-module-{model_b.id}-{compile_config_b.id}")
+                     f"iree-imported-model-{imported_model_c.composite_id}")
+    self.assertRegex(concated_cmake_rules,
+                     f"iree-module-{gen_config_a.composite_id}")
+    self.assertRegex(concated_cmake_rules,
+                     f"iree-module-{gen_config_b.composite_id}")
+    self.assertRegex(concated_cmake_rules,
+                     f"iree-module-{gen_config_c.composite_id}")
+    self.assertRegex(concated_cmake_rules,
+                     f"iree-module-{gen_config_d.composite_id}")
 
 
 if __name__ == "__main__":

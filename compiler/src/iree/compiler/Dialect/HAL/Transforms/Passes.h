@@ -25,6 +25,15 @@ namespace HAL {
 // Helpers
 //===----------------------------------------------------------------------===//
 
+enum class PipelinePhase {
+  // Runs the transform pipeline up to executable sources (pre translation).
+  ExecutableSources,
+  // Runs the transform pipeline until just after executable translation.
+  ExecutableTargets,
+  // Runs the full pipeline.
+  End,
+};
+
 // Adds a set of passes to the given pass manager that run the required HAL
 // transforms in the canonical order.
 //
@@ -35,8 +44,9 @@ namespace HAL {
 //   <run conversion to flow/sequencer/etc>
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
-void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   const TargetOptions &targetOptions);
+void buildHALTransformPassPipeline(
+    OpPassManager &passManager, const TargetOptions &targetOptions,
+    PipelinePhase compileTo = PipelinePhase::End);
 
 // Adds a set of passes to the given pass manager that run the head of the HAL
 // pipeline to assign devices, materialize interfaces, and translate
@@ -97,6 +107,26 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDumpExecutableSourcesPass(
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDumpExecutableBenchmarksPass(StringRef path);
 
+// Substitutes hal.executable ops by parsing |substitutions| in
+// `executable_name=file.xxx` strings. File paths may be absolute or relative to
+// the paths specified on `--iree-hal-executable-object-search-path=`.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
+    ArrayRef<std::string> substitutions = {});
+// Substitutes hal.executable ops with files in the given |searchPath| matching
+// the symbol name.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createSubstituteExecutablesPass(
+    std::string searchPath);
+
+// Preprocess each executable with either a pass pipeline or external tool.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createPreprocessExecutablesPass(std::string command);
+// Preprocesses each executable with a pass pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createPreprocessExecutablesWithPipelinePass(std::string pipeline);
+// Preprocesses each executable with an external tool.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createPreprocessExecutablesWithToolPass(std::string command);
+
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createTranslateExecutablesPass();
@@ -135,6 +165,10 @@ createSerializeTargetExecutablesPass(StringRef target, int debugLevel = 2,
 // Resource initialization, caching, and optimization
 //===----------------------------------------------------------------------===//
 
+// Materializes host and device dispatch instrumentation resources on stream IR.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createMaterializeDispatchInstrumentationPass(int64_t bufferSize);
+
 // Finds all resource lookups (such as hal.executable.lookup), materializes
 // their cache storage and initialization, and rewrites the lookups to
 // references.
@@ -166,12 +200,15 @@ inline void registerHALPasses() {
   createFixupLegacySyncPass();
   createLinkExecutablesPass();
   createLinkTargetExecutablesPass("");
+  createMaterializeDispatchInstrumentationPass(0);
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
+  createPreprocessExecutablesPass("");
   createResolveExportOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");
+  createSubstituteExecutablesPass();
   createTranslateExecutablesPass();
   createTranslateTargetExecutableVariantsPass("");
   createVerifyTargetEnvironmentPass();

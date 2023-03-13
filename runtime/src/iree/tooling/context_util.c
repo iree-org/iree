@@ -18,7 +18,7 @@
 #include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 #if defined(IREE_HAVE_VMVX_MODULE)
 #include "iree/modules/vmvx/module.h"
@@ -111,8 +111,9 @@ static iree_status_t iree_tooling_load_hal_async_module(
   }
   iree_hal_device_t* device = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_create_device_from_flags(default_device_uri, host_allocator,
-                                            &device));
+      z0, iree_hal_create_device_from_flags(
+              iree_hal_available_driver_registry(), default_device_uri,
+              host_allocator, &device));
 
   // Fetch the allocator from the device to pass back to the caller.
   iree_hal_allocator_t* device_allocator = iree_hal_device_allocator(device);

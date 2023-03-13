@@ -47,6 +47,7 @@ iree_compiler_cc_library(
     name = "MHLO",
     srcs = [
         "BroadcastingToLinalgPatterns.cpp",
+        "ConvertCollectiveOps.cpp",
         "ConvertComplexToReal.cpp",
         "ConvertMHLOToFlow.cpp",
         "ConvertMHLOToFlow.h",

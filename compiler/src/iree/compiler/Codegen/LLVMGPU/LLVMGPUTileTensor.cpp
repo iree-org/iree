@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -138,7 +139,7 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
     std::reverse(idDims.begin(), idDims.end());
     ArrayAttr mapping = rewriter.getArrayAttr(idDims);
     auto tilingResult =
-        linalg::tileToForeachThreadOp(rewriter, tilingOp, numThreads, mapping);
+        linalg::tileToForallOp(rewriter, tilingOp, numThreads, mapping);
     rewriter.replaceOp(tilingOp, tilingResult->tileOp->getResults());
   }
   return success();

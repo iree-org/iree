@@ -19,12 +19,12 @@ static iree_uk_matmul_tile_sizes_t
 iree_uk_query_matmul_tile_sizes_arm_64_i8i8i32(
     const iree_uk_query_tile_sizes_2d_params_t* params) {
 #ifdef IREE_UK_BUILD_ARM_64_I8MM
-  if (params->cpu_data[0] & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM) {
+  if (params->cpu_data[0] & IREE_CPU_DATA0_ARM_64_I8MM) {
     return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 8, .N = 8};
   }
 #endif
 #ifdef IREE_UK_BUILD_ARM_64_DOTPROD
-  if (params->cpu_data[0] & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD) {
+  if (params->cpu_data[0] & IREE_CPU_DATA0_ARM_64_DOTPROD) {
     return (iree_uk_matmul_tile_sizes_t){.M = 8, .K = 4, .N = 8};
   }
 #endif

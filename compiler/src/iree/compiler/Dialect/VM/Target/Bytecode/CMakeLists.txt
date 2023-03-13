@@ -34,6 +34,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Analysis
+    iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VM::Utils::CallingConvention

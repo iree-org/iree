@@ -46,12 +46,14 @@ cc_binary(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:benchmark",
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:trace_replay",
+        "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/tooling:yaml_util",
         "//runtime/src/iree/vm",
         "@com_github_yaml_libyaml//:yaml",
@@ -75,7 +77,19 @@ cc_binary(
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
+    ],
+)
+
+cc_binary(
+    name = "iree-dump-instruments",
+    srcs = ["iree-dump-instruments-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/schemas/instruments",
+        "//runtime/src/iree/schemas/instruments:dispatch_def_c_fbs",
     ],
 )
 
@@ -87,7 +101,7 @@ cc_binary(
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal/flatcc:debugging",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
     ],
 )
 
@@ -96,8 +110,8 @@ cc_binary(
     srcs = ["iree-opt-main.cc"],
     tags = ["hostonly"],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
-        "//compiler/src/iree/compiler/API2:Impl",
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:Impl",
     ],
 )
 
@@ -105,8 +119,8 @@ cc_binary(
     name = "iree-mlir-lsp-server",
     srcs = ["iree-mlir-lsp-server.cc"],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
-        "//compiler/src/iree/compiler/API2:Impl",
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:Impl",
     ],
 )
 
@@ -131,7 +145,7 @@ cc_binary(
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:bytecode_module",
+        "//runtime/src/iree/vm/bytecode:module",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
@@ -154,6 +168,7 @@ cc_binary(
         "//runtime/src/iree/tooling:comparison",
         "//runtime/src/iree/tooling:context_util",
         "//runtime/src/iree/tooling:device_util",
+        "//runtime/src/iree/tooling:instrument_util",
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
     ],
@@ -170,6 +185,7 @@ cc_binary(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:trace_replay",
+        "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/tooling:yaml_util",
         "//runtime/src/iree/vm",
         "@com_github_yaml_libyaml//:yaml",
@@ -198,6 +214,16 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-cpuinfo",
+    srcs = ["iree-cpuinfo.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/schemas:cpu_data",
+    ],
+)
+
+cc_binary(
     name = "iree-tblgen",
     srcs = [
         "//compiler/src/iree/compiler/Dialect/VM/Tools:GenSrcs",
@@ -220,7 +246,7 @@ cc_binary(
     srcs = ["iree-compile-main.cc"],
     tags = ["hostonly"],
     deps = [
-        "//compiler/src/iree/compiler/API2:Headers",
-        "//compiler/src/iree/compiler/API2:Impl",
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:Impl",
     ],
 )
