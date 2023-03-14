@@ -36,7 +36,6 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -400,10 +399,10 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 
-    transform::TrivialPatternRewriter rewriter(context);
+    IRRewriter rewriter(context);
     if (failed(tileAndFuseDispatchUsingSCFForOp(
-            cast<TilingInterface>(computeOps.back()), linalgTilingOptions,
-            rewriter))) {
+            rewriter, cast<TilingInterface>(computeOps.back()),
+            linalgTilingOptions))) {
       funcOp.emitOpError("Tile+Distribute failed");
       return signalPassFailure();
     }

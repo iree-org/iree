@@ -258,8 +258,8 @@ struct TilingResult {
 }  // namespace
 
 static FailureOr<TilingResult> tileDispatchUsingSCFFopOp(
-    TilingInterface op, linalg::LinalgTilingOptions options,
-    PatternRewriter &rewriter) {
+    RewriterBase &rewriter, TilingInterface op,
+    linalg::LinalgTilingOptions options) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(op);
 
@@ -459,13 +459,13 @@ static SmallVector<tensor::ExtractSliceOp> getAllFusableProducerUses(
 }
 
 FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
-    TilingInterface op, linalg::LinalgTilingOptions tilingOptions,
-    PatternRewriter &rewriter) {
+    RewriterBase &rewriter, TilingInterface op,
+    linalg::LinalgTilingOptions tilingOptions) {
   TileAndFuseResult tileAndFuseResult;
   auto fusableProducers = getAllFusableProducers(op);
   // Apply the tiling pattern.
   FailureOr<TilingResult> tilingResult =
-      tileDispatchUsingSCFFopOp(op, tilingOptions, rewriter);
+      tileDispatchUsingSCFFopOp(rewriter, op, tilingOptions);
   if (failed(tilingResult)) {
     return failure();
   }
