@@ -228,8 +228,9 @@ func.func @resolve_binding_subspan_zero_offset_memref() -> (memref<f32>, index, 
 // CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<f32>
-//     CHECK:   return %[[BINDING]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<196608xf32>
+//     CHECK:   %[[BASE_PTR:.+]] = iree_codegen.get_base_pointer %[[BINDING]]
+//     CHECK:   return %[[BASE_PTR]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
@@ -238,16 +239,19 @@ func.func @resolve_binding_subspan_offset_index_memref(%arg0 : index) -> (memref
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<512x384xindex, strided<[384, 1], offset:?>> -> memref<index>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<index>, index, index, index, index, index
 }
-//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1)>
+//     CHECK: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1)>
+//     CHECK: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1 + 196608)>
 //     CHECK: func @resolve_binding_subspan_offset_index_memref(
 // CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 // CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<index>
 //     CHECK:   %[[SIZEOF:.+]] = util.sizeof index
-//     CHECK:   %[[OFFSET:.+]] = affine.apply #[[MAP]]()[%arg0, %[[SIZEOF]]]
-//     CHECK:   return %[[BINDING]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+//     CHECK:   %[[OFFSET:.+]] = affine.apply #[[MAP0]]()[%arg0, %[[SIZEOF]]]
+//     CHECK:   %[[SUBSPAN_SIZE:.+]] = affine.apply #[[MAP1]]()[%arg0, %[[SIZEOF]]]
+//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SUBSPAN_SIZE]]}
+//     CHECK:   %[[BASE_PTR:.+]] = iree_codegen.get_base_pointer %[[BINDING]]
+//     CHECK:   return %[[BASE_PTR]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
@@ -257,11 +261,14 @@ func.func @resolve_binding_subspan_dyn_dims_memref(%arg0 : index, %arg1 : index)
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<?x?xindex> -> memref<index>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<index>, index, index, index, index, index
 }
+//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //     CHECK: func @resolve_binding_subspan_dyn_dims_memref(
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<index>
-//     CHECK:   return %[[BINDING]], %[[C0]], %arg0, %arg1, %arg1, %[[C1]]
+// CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[MAP]]()[%arg0, %arg1]
+//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SIZE]]}
+//     CHECK:   %[[BASE_PTR:.+]] = iree_codegen.get_base_pointer %[[BINDING]]
+//     CHECK:   return %[[BASE_PTR]], %[[C0]], %arg0, %arg1, %arg1, %[[C1]]
 
 // -----
 
@@ -275,7 +282,8 @@ func.func @resolve_alloca_static_memref() -> (memref<f32>, index, index, index, 
 //   CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:   %[[CAST:.+]] = builtin.unrealized_conversion_cast
+//   CHECK-DAG:   %[[ALLOCA:.+]] = memref.alloca()
+//       CHECK:   %[[CAST:.+]] = iree_codegen.get_base_pointer
 //       CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
@@ -289,7 +297,8 @@ func.func @resolve_alloca_dynamic_memref(%arg0 : index) -> (memref<f32>, index, 
 //   CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:   %[[CAST:.+]] = builtin.unrealized_conversion_cast
+//   CHECK-DAG:   %[[ALLOCA:.+]] = memref.alloca(%arg0)
+//       CHECK:   %[[CAST:.+]] = iree_codegen.get_base_pointer %[[ALLOCA]]
 //       CHECK:   return %[[CAST]], %[[C0]], %arg0, %[[C384]], %[[C384]], %[[C1]]
 
 // -----
@@ -301,10 +310,12 @@ func.func @resolve_global_memref() -> (memref<f32>, index, index, index, index, 
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<512x384xf32> -> memref<f32>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<f32>, index, index, index, index, index
 }
-// CHECK-LABEL: func @resolve_global_memref()
-//   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
-//   CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
-//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:   %[[CAST:.+]] = builtin.unrealized_conversion_cast
-//       CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+//     CHECK: memref.global "private" constant @[[CONSTANT:.+]] :
+//     CHECK: func @resolve_global_memref()
+// CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+// CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
+// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:   %[[GET_GLOBAL:.+]] = memref.get_global @[[CONSTANT]]
+//     CHECK:   %[[CAST:.+]] = iree_codegen.get_base_pointer %[[GET_GLOBAL]]
+//     CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
