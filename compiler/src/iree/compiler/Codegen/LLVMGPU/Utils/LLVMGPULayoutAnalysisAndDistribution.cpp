@@ -225,10 +225,7 @@ static MMAType getMMAType(ArrayRef<int64_t> aShape, ArrayRef<int64_t> bShape,
                           ArrayRef<int64_t> cShape) {
   if ((aShape[0] % 16 == 0) && (aShape[1] % 16 == 0) && (cShape[0] % 16 == 0) &&
       (cShape[1] % 8 == 0)) {
-    // B-matrix could be transposed
-    if (((bShape[0] % 16 == 0) && (bShape[1] % 8 == 0)) ||
-        ((bShape[0] % 8 == 0) && (bShape[1] % 16 == 0)))
-      return MMAType::M16N8K16;
+    if ((bShape[0] % 16 == 0) && (bShape[1] % 8 == 0)) return MMAType::M16N8K16;
   }
   return MMAType::NONE;
 }
@@ -245,8 +242,7 @@ void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
   MMAType mmaType = getMMAType(aShape, bShape, cShape);
   if (mmaType == MMAType::NONE) return;
   // Set layouts for A, B and C
-  auto setLayout = [&](Value matrix, MMAMatrixType matrixType,
-                       bool transpose = false) {
+  auto setLayout = [&](Value matrix, MMAMatrixType matrixType) {
     DimOrderArray dimOrder;
     for (int i = 0; i < 2; i++) {
       dimOrder[i] = getMMADimensions(mmaType, matrixType, i);
@@ -255,19 +251,11 @@ void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
         getMMACanonicalShape(mmaType, matrixType);
     Layout layout(dimOrder, canonicalShape);
     ArrayRef<int64_t> shape = matrix.getType().cast<ShapedType>().getShape();
-    if (transpose)
-      layout.updateBatchDims(shape[1], shape[0]);
-    else
-      layout.updateBatchDims(shape[0], shape[1]);
+    layout.updateBatchDims(shape[0], shape[1]);
     layoutMap.try_emplace(matrix, layout);
-    // Propagate to preceding transfer_read ops
-    if (auto readOp = matrix.getDefiningOp<vector::TransferReadOp>()) {
-      Value src = readOp.getSource();
-      layoutMap.try_emplace(src, layout);
-    }
   };
   setLayout(aMatrix, MMAMatrixType::AMatrix);
-  setLayout(bMatrix, MMAMatrixType::BMatrix, aShape[1] != bShape[0]);
+  setLayout(bMatrix, MMAMatrixType::BMatrix);
   setLayout(cMatrix, MMAMatrixType::CMatrix);
 }
 
@@ -367,10 +355,10 @@ void distributeContracts(vector::ContractionOp contractOp,
       loc, vecType, rewriter.getZeroAttr(vecType));
   int M = resultLayout.shape[DimType::Batch0];
   int N = resultLayout.shape[DimType::Batch1];
+  int canonicalM = resultLayout.canonicalShape[0];
+  int canonicalN = resultLayout.canonicalShape[1];
   int K = lhsLayout.shape[DimType::Batch1];
-  ArrayRef<int64_t> lhsShape = lhs.getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape = rhs.getType().cast<ShapedType>().getShape();
-  bool transpose = lhsShape[1] != rhsShape[0];
+  int canonicalK = lhsLayout.canonicalShape[1];
   auto cType = VectorType::get({vecShape[2], vecShape[3]}, elementType);
   for (int i = 0; i < M; i++) {
     for (int j = 0; j < N; j++) {
@@ -379,13 +367,11 @@ void distributeContracts(vector::ContractionOp contractOp,
       for (int k = 0; k < K; k++) {
         Value aMatrix = rewriter.create<vector::ExtractOp>(
             loc, simdToSimtMap.at(lhs), SmallVector<int64_t>{i, k});
-        SmallVector<int64_t> indices{k, j};
-        if (transpose) indices = {j, k};
         Value bMatrix = rewriter.create<vector::ExtractOp>(
-            loc, simdToSimtMap.at(rhs), indices);
+            loc, simdToSimtMap.at(rhs), SmallVector<int64_t>{k, j});
         cMatrix = rewriter.create<nvgpu::MmaSyncOp>(
             loc, aMatrix, bMatrix, cMatrix,
-            rewriter.getI64ArrayAttr({16, 8, 16}));
+            rewriter.getI64ArrayAttr({canonicalM, canonicalN, canonicalK}));
       }
       result = rewriter.create<vector::InsertOp>(loc, cMatrix, result,
                                                  SmallVector<int64_t>{i, j});
