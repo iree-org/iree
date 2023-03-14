@@ -19,6 +19,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "mma.mlir"
+    "mma_using_layout_analysis.mlir"
     "reduction.mlir"
     "reduction_eltwise.mlir"
     "reduction_v2.mlir"
@@ -34,6 +35,7 @@ iree_lit_test_suite(
     iree-opt
     iree-run-module
   DATA
+    mma_using_layout_analysis_codegen_spec.mlir
     reduction_codegen_spec.mlir
     reduction_eltwise_codegen_spec.mlir
     reduction_v2_codegen_spec.mlir
