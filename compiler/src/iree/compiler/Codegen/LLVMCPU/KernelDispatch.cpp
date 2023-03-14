@@ -1876,10 +1876,6 @@ static FailureOr<Operation *> getRootOperation(
 
 static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
                                               Operation *rootOp) {
-  // The check is not needed if we land
-  // https://github.com/openxla/iree/pull/12594
-  if (!rootOp) return success();
-
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp) return success();
 
