@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstdint>
+#include <iostream>
 #include <numeric>
 #include <set>
 #include <string>
@@ -26,9 +27,10 @@ struct uGPUKernel {
   std::array<INT, 3> InstShape;
   INT stages;
   bool has_linalg_fill;
+  bool writeback_to_global;
 
   uGPUKernel(std::string lhs, std::string result, std::array<INT, 3> tileSize,
-             INT numstages, bool hasFill) {
+             INT numstages, bool hasFill, bool writeback2Global) {
     // todo(guray) needs to be verification here.
     LHS = RHS = lhs;
     RESULT = result;
@@ -39,6 +41,7 @@ struct uGPUKernel {
     InstShape = {16, 8, 8};
     stages = numstages;
     has_linalg_fill = hasFill;
+    writeback_to_global = writeback2Global;
   }
 
   bool operator<(const uGPUKernel& e) const {
@@ -47,7 +50,8 @@ struct uGPUKernel {
     if ((ThreadblockShape[0] == e.ThreadblockShape[0] &&
          ThreadblockShape[1] == e.ThreadblockShape[1] &&
          ThreadblockShape[2] == e.ThreadblockShape[2] &&
-         has_linalg_fill == e.has_linalg_fill)) {
+         has_linalg_fill == e.has_linalg_fill &&
+         writeback_to_global == e.writeback_to_global)) {
       result = false;
     }
     return result;
@@ -78,6 +82,8 @@ struct uGPUKernel {
     ukname.append(std::to_string(stages));
     ukname.append("_");
     ukname.append(has_linalg_fill ? "true" : "false");
+    ukname.append("_");
+    ukname.append(writeback_to_global ? "true" : "false");
     return ukname;
   }
 };
@@ -89,21 +95,24 @@ struct uGPUKernel {
 struct uGPUContracts {
   std::set<uGPUKernel> ukernels;
 
+  void generateVariant(std::string lhs, std::string result,
+                       std::array<INT, 3> tileSize, INT stages) {
+    ukernels.insert(uGPUKernel(lhs, result, tileSize, stages, false, false));
+    ukernels.insert(uGPUKernel(lhs, result, tileSize, stages, true, true));
+    ukernels.insert(uGPUKernel(lhs, result, tileSize, stages, false, true));
+    ukernels.insert(uGPUKernel(lhs, result, tileSize, stages, true, false));
+  }
+
   uGPUContracts() {
     ukernels.clear();
-    int stages = 3;
     auto t = "float";
-    ukernels.insert(uGPUKernel(t, t, {128, 128, 32}, stages, true));
-    ukernels.insert(uGPUKernel(t, t, {128, 128, 32}, stages, false));
-    ukernels.insert(uGPUKernel(t, t, {128, 256, 32}, stages, true));
-    ukernels.insert(uGPUKernel(t, t, {128, 256, 32}, stages, false));
-    ukernels.insert(uGPUKernel(t, t, {256, 128, 32}, stages, true));
-    ukernels.insert(uGPUKernel(t, t, {256, 128, 32}, stages, false));
-    stages = 5;
-    ukernels.insert(uGPUKernel(t, t, {128, 128, 16}, stages, true));
-    ukernels.insert(uGPUKernel(t, t, {128, 128, 16}, stages, false));
-    ukernels.insert(uGPUKernel(t, t, {128, 128, 32}, stages, true));
-    ukernels.insert(uGPUKernel(t, t, {128, 128, 32}, stages, false));
+    // Pipeline Stages 3
+    generateVariant(t, t, {128, 128, 32}, 3);
+    generateVariant(t, t, {128, 256, 32}, 3);
+    generateVariant(t, t, {256, 128, 32}, 3);
+    // // Pipeline Stages 5
+    generateVariant(t, t, {128, 128, 16}, 5);
+    generateVariant(t, t, {128, 128, 32}, 5);
   }
 };
 
@@ -120,7 +129,7 @@ bool adduCUDAContracts(INT M, INT N, INT K, std::string lhs, std::string result,
       int nWarp = (kernel.ThreadblockShape[0] * kernel.ThreadblockShape[1]) /
                   (kernel.WarpShape[0] * kernel.WarpShape[1]);
       adder(kernel.ThreadblockShape[0], kernel.ThreadblockShape[1],
-            kernel.ThreadblockShape[2], kernel.stages, nWarp);
+            kernel.ThreadblockShape[2], nWarp, kernel.stages);
       found = true;
     }
   }

@@ -45,9 +45,10 @@ struct LLVMGPULowerToUKernelsPass
 static std::string generateMicrokernelName(ArrayRef<Operation *> combinedOps,
                                            StringRef typeName, int TILE_M,
                                            int TILE_N, int TILE_K,
-                                           int numstages, bool has_fill) {
+                                           int numstages, bool has_fill,
+                                           bool writeback_to_global) {
   uGPUKernel ukernel(typeName.str(), typeName.str(), {TILE_M, TILE_N, TILE_K},
-                     numstages, has_fill);
+                     numstages, has_fill, writeback_to_global);
   return ukernel.generate_ukernel_name();
 }
 
@@ -72,6 +73,7 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Operation *> combinedOps = {matmulOp};
+    Location loc = matmulOp.getLoc();
 
     Type elementType = matmulOp.getInputs()
                            .front()
@@ -83,17 +85,22 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
     if (failed(strType))
       return rewriter.notifyMatchFailure(matmulOp, "Not supported data type");
 
-    SmallVector<int64_t> tiles = getTileSizes(matmulOp, 0);
-    if (tiles.size() < 2)
-      return rewriter.notifyMatchFailure(matmulOp, "Tiling is not sufficient");
-
-    Location loc = matmulOp.getLoc();
     Value lhs = matmulOp.getDpsInputOperand(0)->get();
     Value rhs = matmulOp.getDpsInputOperand(1)->get();
     Value out = matmulOp.getDpsInitOperand(0)->get();
 
-    // fuse fill into matmul
-    Value fillValue;
+    // Step 1. Find out the tile sizes
+    SmallVector<int64_t> tiles = getTileSizes(matmulOp, 0);
+    if (tiles.size() < 2)
+      return rewriter.notifyMatchFailure(matmulOp, "Tiling is not sufficient");
+
+    // Step 2. Find out and make sure pipeline stages is present
+    if (!stages.has_value()) {
+      return matmulOp->emitError("Expects software pipeline depth\n");
+    }
+
+    // Step 3. Fuse linalg.fill with matmul
+    Optional<Value> fillValue = std::nullopt;
     auto fillOp = dyn_cast<linalg::FillOp>(out.getDefiningOp());
     bool hasFill;
     if (fillOp) {
@@ -105,36 +112,63 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
       fillValue = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getZeroAttr(elementType), elementType);
     }
-    if (!stages.has_value()) {
-      return matmulOp->emitError("Expects software pipeline depth\n");
+
+    // Step 4. Find out if there is any consumer. Consumer needs the result, so
+    // microkernel stores it back to the shared memory, otherwise, it could
+    // store to global memory for performance reasons
+    bool hasConsumer = true;
+    if (matmulOp->use_empty()) hasConsumer = false;
+    if (matmulOp->hasOneUse()) {
+      if (isa<IREE::Flow::DispatchTensorStoreOp>(
+              matmulOp->getUses().begin()->getOwner()))
+        hasConsumer = false;
     }
-    auto fnName =
-        generateMicrokernelName(combinedOps, strType.value(), tiles[0],
-                                tiles[1], tiles[2], stages.value(), hasFill);
 
-    SmallVector<Value> ins = {lhs, rhs, out};
-    SmallVector<Value> others, outs;
+    // Step 5. Generate a name for microkernel
+    auto fnName = generateMicrokernelName(
+        combinedOps, strType.value(), tiles[0], tiles[1], tiles[2],
+        stages.value(), hasFill, !hasConsumer);
 
-    // todo(guray) Verify that we have sufficient shared memory here
-    int shmemOut = tiles[0] * tiles[1];
-
-    int shmemIns =
-        ((tiles[0] * tiles[2]) + (tiles[1] * tiles[2])) * stages.value() -
-        shmemOut;
-    if (shmemIns > 0) {
-      Value insBuffer = rewriter.create<bufferization::AllocTensorOp>(
-          loc, RankedTensorType::get({shmemIns}, elementType), ValueRange{});
-
-      others.push_back(insBuffer);
-    } else {
-      others.push_back(out);
-    }
-    Value outBuffer = rewriter.create<bufferization::AllocTensorOp>(
+    // Step 6. Allocate shared memory for output
+    const int shmemSizeOut = tiles[0] * tiles[1];
+    Value shmemBufferOut = rewriter.create<bufferization::AllocTensorOp>(
         loc, RankedTensorType::get({tiles[0], tiles[1]}, elementType),
         ValueRange{});
-    outs.push_back(outBuffer);
-    others.push_back(fillValue);
 
+    // Step 7. Allocate shared memory for inputs. Here we reuse outputs shared
+    // memory, so we allocate only the remaining.
+    Value shmemBufferRemaining = out;
+    const int shmemSizeTotal =
+        ((tiles[0] * tiles[2]) + (tiles[1] * tiles[2])) * stages.value();
+    const int shmemSizeRemaining = shmemSizeTotal - shmemSizeOut;
+    if (shmemSizeRemaining > 0) {
+      shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
+          loc, RankedTensorType::get({shmemSizeRemaining}, elementType),
+          ValueRange{});
+    }
+    //  todo(guray) Verify that we have sufficient shared memory here
+
+    llvm::errs() << "Tile size: " << tiles[0] << ", " << tiles[1] << ", "
+                 << tiles[2] << ", stages = " << stages.value()
+                 << " ==> shmem_out:" << shmemSizeOut
+                 << ", shmem_remaining: " << shmemSizeRemaining << ", total = "
+                 << shmemSizeTotal * elementType.getIntOrFloatBitWidth() / 1024
+                 << "kb\n";
+
+    // Step 8. Fill the operands
+    SmallVector<Value> ins = {lhs, rhs};
+    SmallVector<Value> others, outs;
+    if (hasConsumer) {
+      ins.push_back(out);
+      outs.push_back(shmemBufferOut);
+    } else {
+      outs.push_back(out);
+      others.push_back(shmemBufferOut);
+    }
+    others.push_back(shmemBufferRemaining);
+    others.push_back(fillValue.value());
+
+    // Step 8. Generate the op
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
         matmulOp, matmulOp.getResultTypes(), StringRef(fnName), ins, outs,
         others);

@@ -7,6 +7,8 @@
 #ifndef UCUDA_GEMM_CUTLASS
 #define UCUDA_GEMM_CUTLASS
 
+#include "cutlass/epilogue/thread/linear_combination.h"
+#include "cutlass/epilogue/threadblock/default_epilogue_tensor_op.h"
 #include "cutlass/gemm/threadblock/default_mma.h"
 #include "cutlass/gemm/threadblock/default_mma_core_sm80.h"
 #include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
@@ -18,7 +20,8 @@
 
 template <class ElementA, class ElementB, class ElementC, int Tile_m,
           int Tile_n, int Tile_k, int Warp_m, int Warp_n, int Inst_m,
-          int Inst_n, int Inst_k, int Stages, bool hasLinalgFill>
+          int Inst_n, int Inst_k, int Stages, bool hasLinalgFill,
+          bool writeBack2Global>
 __forceinline__ __device__ void gemm_ukernel(
     ElementA* lhs, int64_t lhs_offset, int64_t lhs_dim2, ElementB* rhs,
     int64_t rhs_offset, int64_t rhs_dim2, ElementC* res, int64_t res_offset,
@@ -95,7 +98,7 @@ __forceinline__ __device__ void gemm_ukernel(
       params_B, rhs, {problem_size.k(), problem_size.n()}, tb_thread_id,
       tb_offset_B);
 
-  typename ThreadblockMma::Operator::IteratorC iterator_C(
+  typename ThreadblockMma::Operator::IteratorC iterator_LoadC(
       {res, problem_size.n()}, threadIdx.x);
 
   // Construct thread-scoped matrix multiply
@@ -109,7 +112,7 @@ __forceinline__ __device__ void gemm_ukernel(
 
   if (!hasLinalgFill) {
     // Set the offset
-    iterator_C.add_tile_offset(
+    iterator_LoadC.add_tile_offset(
         {(tb_tile_offset.m() * ThreadblockMma::WarpCount::kM) +
              (warp_id % ThreadblockMma::WarpCount::kM),
          (tb_tile_offset.n() * ThreadblockMma::WarpCount::kN) +
@@ -119,7 +122,7 @@ __forceinline__ __device__ void gemm_ukernel(
     accumSrc.clear();
 
     // Load C as source accumulator
-    iterator_C.load(accumSrc);
+    iterator_LoadC.load(accumSrc);
 
     // Compute threadblock-scoped matrix multiply-add
     mma(gemm_k_iterations, accumDest, iterator_A, iterator_B, accumSrc);
@@ -134,13 +137,54 @@ __forceinline__ __device__ void gemm_ukernel(
   cutlass::debug::dump_fragment(accum);
 #endif
 
-  /* Store result to shared memory */
-  int total_elements = accumDest.size();
-  ElementC* offset_shmem =
-      &GemmSharedStorageBase[tb_thread_id * total_elements];
-  for (int i = 0; i < accumDest.size(); ++i) {
-    offset_shmem[i] = accumDest[i];
-    if (hasLinalgFill) offset_shmem[i] += fillValue;
+  if (!writeBack2Global) {
+    /* Store result to shared memory */
+    int total_elements = accumDest.size();
+    ElementC* offset_shmem =
+        &GemmSharedStorageBase[tb_thread_id * total_elements];
+    for (int i = 0; i < accumDest.size(); ++i) {
+      offset_shmem[i] = accumDest[i];
+      if (hasLinalgFill) offset_shmem[i] += fillValue;
+    }
+  } else {
+    int const kElementsPerAccess = 128 / cutlass::sizeof_bits<ElementC>::value;
+
+    using EpilogueOutputOp = cutlass::epilogue::thread::LinearCombination<
+        ElementC, kElementsPerAccess, ElementC, ElementC>;
+
+    using Epilogue =
+        typename cutlass::epilogue::threadblock::DefaultEpilogueTensorOp<
+            ThreadblockShape, typename ThreadblockMma::Operator,
+            ThreadblockMma::Policy::kPartitionsK, EpilogueOutputOp,
+            EpilogueOutputOp::kCount>::Epilogue;
+
+    // assume identity swizzle
+    cutlass::MatrixCoord threadblock_offset{
+        tb_tile_offset.m() * ThreadblockMma::Shape::kM,
+        tb_tile_offset.n() * ThreadblockMma::Shape::kN};
+
+    // Create Layout
+    typename Epilogue::OutputTileIterator::Params params_D(
+        cutlass::layout::RowMajor::packed(
+            {problem_size.m(), problem_size.n()}));
+
+    // Tile iterator loading from source tensor.
+    typename Epilogue::OutputTileIterator iterator_D(
+        params_D, res, problem_size.mn(), tb_thread_id, threadblock_offset);
+
+    typename EpilogueOutputOp::Params params_output_op;
+
+    EpilogueOutputOp output_op(params_output_op);
+
+    // Reuse the same shared memory that we used for the inputs
+    typename Epilogue::SharedStorage* e_shared_storage =
+        reinterpret_cast<typename Epilogue::SharedStorage*>(
+            GemmSharedStorageBase);
+
+    Epilogue epilogue(*e_shared_storage, tb_thread_id, warp_id, lane_id);
+
+    // Execute the epilogue operator to update the destination tensor.
+    epilogue(output_op, iterator_D, accumDest);
   }
 }
 

@@ -12,15 +12,16 @@
 
 #if defined(KERNEL_NAME)
 
-#define CAT(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14) \
-  P1##_##P2##_##P3##_##P4##_##P5##_##P6##_##P7##_##P8##_##P9##_##P10##_##P11##_##P12##_##P13##_##P14
-#define TEMPLATE(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14) \
-  CAT(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14)
+#define CAT(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15) \
+  P1##_##P2##_##P3##_##P4##_##P5##_##P6##_##P7##_##P8##_##P9##_##P10##_##P11##_##P12##_##P13##_##P14##_##P15
+#define TEMPLATE(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, \
+                 P15)                                                         \
+  CAT(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15)
 
 #define KERNELNAME                                                       \
   TEMPLATE(KERNEL_NAME, ELEMENT_A, ELEMENT_B, ELEMENT_C, TILE_M, TILE_N, \
            TILE_K, WARP_M, WARP_N, INST_M, INST_N, INST_K, STAGES,       \
-           HAS_LINALG_FILL)
+           HAS_LINALG_FILL, WRITEBACK_TO_GLOBAL)
 
 #define STRINGIZE(x) "[uGPU Generating] " #x
 #define SSTRINGIZE(x) STRINGIZE(x)
@@ -37,24 +38,19 @@ __device__ void TEMPLATE(
     TILE_M, TILE_N, TILE_K, 
     WARP_M, WARP_N,  
     INST_M, INST_N, INST_K, 
-    STAGES, HAS_LINALG_FILL)(    
+    STAGES, HAS_LINALG_FILL, WRITEBACK_TO_GLOBAL)(    
     ELEMENT_A * lhs_base, ELEMENT_A* lhs_aligned, int64_t lhs_offset, int64_t lhs_start, int64_t lhs_dim2, 
     ELEMENT_B * rhs_base, ELEMENT_B* rhs_aligned, int64_t rhs_offset, int64_t rhs_start, int64_t rhs_dim2, 
     ELEMENT_C * res_base, ELEMENT_C* res_aligned, int64_t res_offset, int64_t res_start, int64_t res_dim2,
     ELEMENT_C* shm_base, ELEMENT_C* shm_aligned, int64_t shm_offset, int64_t shm_start, int64_t shm_dim2, 
     ELEMENT_C* rsh_base, ELEMENT_C* rsh_aligned, int64_t rsh_start, int64_t rsh_dim2, 
     ELEMENT_C initValue) {
-  
-    if(threadIdx.x+threadIdx.y+threadIdx.z == 0 &&
-      blockIdx.x+blockIdx.y+blockIdx.z == 0) {
-      printf("lhs_base=%p, rhs_base=%p, res_base=%p, shm_base=%p, rsh_base=%p\n",  lhs_base, rhs_base, res_base, shm_base, rsh_base);
-    }
   gemm_ukernel<
     ELEMENT_A, ELEMENT_B, ELEMENT_C,
     TILE_M, TILE_N, TILE_K, 
     WARP_M, WARP_N,  
     INST_M, INST_N, INST_K, 
-    STAGES, HAS_LINALG_FILL>(
+    STAGES, HAS_LINALG_FILL, WRITEBACK_TO_GLOBAL>(
         lhs_base, lhs_offset, lhs_dim2,
         rhs_base, rhs_offset, rhs_dim2,
         res_base, res_offset, res_dim2,

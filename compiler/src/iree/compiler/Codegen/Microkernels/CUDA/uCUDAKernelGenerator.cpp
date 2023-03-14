@@ -27,6 +27,7 @@ void generateUndefs(std::ofstream& ofs) {
   ofs << "#undef INST_K\n";
   ofs << "#undef STAGES\n";
   ofs << "#undef HAS_LINALG_FILL\n";
+  ofs << "#undef WRITEBACK_TO_GLOBAL\n";
 }
 
 void generateKernel(std::ofstream& ofs, uGPUKernel ukernel) {
@@ -48,6 +49,8 @@ void generateKernel(std::ofstream& ofs, uGPUKernel ukernel) {
   ofs << "#define STAGES  " << ukernel.stages << "\n";
   ofs << "#define HAS_LINALG_FILL  "
       << (ukernel.has_linalg_fill ? "true" : "false") << "\n";
+  ofs << "#define WRITEBACK_TO_GLOBAL  "
+      << (ukernel.writeback_to_global ? "true" : "false") << "\n";
 
   ofs << "#include GPUK_MATMUL_HEADER\n";
 }
