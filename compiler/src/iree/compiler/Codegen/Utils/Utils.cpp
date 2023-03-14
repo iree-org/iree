@@ -657,6 +657,10 @@ static std::optional<SmallVector<Value>> replaceNonTrivialUse(
   if (auto castOp = dyn_cast<memref::CastOp>(user)) {
     auto replacementType = replacement.getType().cast<MemRefType>();
     auto currentResultType = castOp.getResult().getType().cast<MemRefType>();
+    if (replacementType == currentResultType) {
+      // Cast is a no op, just return the replacement.
+      return SmallVector<Value>{replacement};
+    }
     auto newResultType = MemRefType::get(
         currentResultType.getShape(), currentResultType.getElementType(),
         replacementType.getLayout(), replacementType.getMemorySpace());
@@ -716,33 +720,36 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
     });
 
     llvm::SmallDenseSet<OpOperand *> preservedUses;
-    for (OpOperand &use : original.getUses()) {
-      Operation *user = use.getOwner();
-      // Some uses cannot be replaced.
-      if (isa<func::ReturnOp, scf::YieldOp>(user)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "\tUnhandled user : ";
-          user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-          llvm::dbgs() << "\n";
-        });
-        preservedUses.insert(&use);
-        continue;
-      }
 
-      // Some uses might be replace-able but require creating new versions
-      // of the users to pass verification.
-      std::optional<SmallVector<Value>> nonTrivialUse =
-          replaceNonTrivialUse(rewriter, loc, use, replacement);
-      if (nonTrivialUse) {
-        // Add the results of the new users created as replacements
-        // for the old users. Push this back on the to worklist.
-        preservedUses.insert(&use);
-        for (auto [v1, v2] :
-             llvm::zip_equal(user->getResults(), nonTrivialUse.value())) {
-          worklist.push_back({v1, v2});
+    if (original.getType() != replacement.getType()) {
+      for (OpOperand &use : original.getUses()) {
+        Operation *user = use.getOwner();
+        // Some uses cannot be replaced.
+        if (isa<func::ReturnOp, scf::YieldOp>(user)) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "\tUnhandled user : ";
+            user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+            llvm::dbgs() << "\n";
+          });
+          preservedUses.insert(&use);
+          continue;
         }
-        toDeleteUsers.push_back(user);
-        continue;
+
+        // Some uses might be replace-able but require creating new versions
+        // of the users to pass verification.
+        std::optional<SmallVector<Value>> nonTrivialUse =
+            replaceNonTrivialUse(rewriter, loc, use, replacement);
+        if (nonTrivialUse) {
+          // Add the results of the new users created as replacements
+          // for the old users. Push this back on the to worklist.
+          preservedUses.insert(&use);
+          for (auto [v1, v2] :
+               llvm::zip_equal(user->getResults(), nonTrivialUse.value())) {
+            worklist.push_back({v1, v2});
+          }
+          toDeleteUsers.push_back(user);
+          continue;
+        }
       }
     }
 
