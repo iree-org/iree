@@ -52,12 +52,11 @@ def sync_nightly():
                             commit=iree_commit)
   sync_iree_runtime_submodules(iree_path)
   jax_path = checkout_repo("jax", "https://github.com/google/jax.git")
-  tf_commit = probe_jax_tensorflow_commit(jax_path)
-  tf_commit = "HEAD" # TODO Disable once JAX syncs to a newer TF version
-  log(f"Jax is synced to tensorflow commit {tf_commit}")
-  tf_path = checkout_repo("tensorflow",
-                          "https://github.com/tensorflow/tensorflow.git",
-                          commit=tf_commit)
+  xla_commit = probe_jax_xla_commit(jax_path)
+  log(f"Jax is synced to xla commit {xla_commit}")
+  xla_path = checkout_repo("xla",
+                          "https://github.com/openxla/xla.git",
+                          commit=xla_commit)
   write_env(iree_compiler_dylib=dylib_path)
 
 
@@ -155,14 +154,14 @@ def probe_iree_compiler_dylib() -> str:
   raise ValueError(f"Could not find {dylib_basename} in {paths}")
 
 
-def probe_jax_tensorflow_commit(jax_path) -> str:
+def probe_jax_xla_commit(jax_path) -> str:
   with open(jax_path / "WORKSPACE", "rt") as f:
     contents = f.read()
   for m in re.finditer(
-      "https://github.com/tensorflow/tensorflow/archive/([0-9a-f]+).tar.gz",
+      "https://github.com/openxla/xla/archive/([0-9a-f]+).tar.gz",
       contents):
     return m[1]
-  raise ValueError(f"Unable to find tensorflow commit hash in {jax_path}")
+  raise ValueError(f"Unable to find xla commit hash in {jax_path}")
 
 
 def sync_iree_runtime_submodules(iree_path: Path):

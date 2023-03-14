@@ -20,8 +20,8 @@
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
-#include "tensorflow/compiler/xla/pjrt/c/pjrt_c_api.h"
-#include "tensorflow/compiler/xla/shape_util.h"
+#include "xla/pjrt/c/pjrt_c_api.h"
+#include "xla/shape_util.h"
 
 namespace iree::pjrt {
 

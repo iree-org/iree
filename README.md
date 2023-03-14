@@ -69,7 +69,7 @@ Build a compatible jaxlib:
 # working on it :/
 cd external/jax
 python build/build.py \
-  --bazel_options=--override_repository=org_tensorflow=$PWD/../tensorflow \
+  --bazel_options=--override_repository=xla=$PWD/../xla \
   --enable_tpu
 pip install dist/*.whl --force-reinstall
 ```

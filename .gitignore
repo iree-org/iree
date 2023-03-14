@@ -5,4 +5,5 @@ bazel-*
 env.bazelrc
 external/
 .vscode/
+__pycache__/
 user.bazelrc

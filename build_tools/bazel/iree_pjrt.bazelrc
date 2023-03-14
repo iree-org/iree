@@ -14,6 +14,10 @@
 build --copt="-fvisibility=hidden"
 build --copt="-fno-exceptions"
 
+# Required by OpenXLA
+# https://github.com/openxla/xla/issues/1323
+build --nocheck_visibility
+
 ###############################################################################
 # Configurations affecting the build.
 ###############################################################################

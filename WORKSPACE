@@ -3,13 +3,11 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Adds a local dependency on tensorflow."""
-
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+"""Adds a local dependency on xla."""
 
 local_repository(
-    name = "org_tensorflow",
-    path = "external/tensorflow",
+    name = "xla",
+    path = "external/xla",
 )
 
 local_repository(
@@ -17,22 +15,26 @@ local_repository(
     path = "external/iree",
 )
 
-# Import all of the tensorflow dependencies.
-load("@org_tensorflow//tensorflow:workspace3.bzl", "tf_workspace3")
+# Import all of the xla dependencies.
+load("@xla//:workspace4.bzl", "xla_workspace4")
 
-tf_workspace3()
+xla_workspace4()
 
-load("@org_tensorflow//tensorflow:workspace2.bzl", "tf_workspace2")
+load("@xla//:workspace3.bzl", "xla_workspace3")
 
-tf_workspace2()
+xla_workspace3()
 
-load("@org_tensorflow//tensorflow:workspace1.bzl", "tf_workspace1")
+load("@xla//:workspace2.bzl", "xla_workspace2")
 
-tf_workspace1()
+xla_workspace2()
 
-load("@org_tensorflow//tensorflow:workspace0.bzl", "tf_workspace0")
+load("@xla//:workspace1.bzl", "xla_workspace1")
 
-tf_workspace0()
+xla_workspace1()
+
+load("@xla//:workspace0.bzl", "xla_workspace0")
+
+xla_workspace0()
 
 # Setup IREE dependencies.
 load("@iree_core//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps", "configure_iree_cuda_deps")

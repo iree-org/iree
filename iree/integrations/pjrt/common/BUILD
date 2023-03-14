@@ -32,8 +32,8 @@ iree_pjrt_cc_library(
         "@iree_core//runtime/src/iree/modules/hal",
         "@iree_core//runtime/src/iree/vm",
         "@iree_core//runtime/src/iree/vm/bytecode:module",
-        "@org_tensorflow//tensorflow/compiler/xla:shape_util",
-        "@org_tensorflow//tensorflow/compiler/xla/pjrt/c:pjrt_c_api_hdrs",
+        "@xla//xla:shape_util",
+        "@xla//xla/pjrt/c:pjrt_c_api_hdrs",
     ],
 )
 

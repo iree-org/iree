@@ -13,7 +13,7 @@
 //#include "iree/vm/api.h"
 //#include "iree/integrations/pjrt/common/pjrt_plugin_defs.h"
 //#include "iree/integrations/pjrt/common/pjrt_plugin_impl.h"
-#include "tensorflow/compiler/xla/pjrt/c/pjrt_c_api.h"
+#include "xla/pjrt/c/pjrt_c_api.h"
 
 #if (defined(_WIN32) || defined(__CYGWIN__)) && \
     !defined(PJRT_PLUGIN_ENABLE_WINDOWS_DLL_DECLSPEC)
