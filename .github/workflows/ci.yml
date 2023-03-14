@@ -982,6 +982,19 @@ jobs:
           tar -C "${BUILD_TOOLS_DIR}/build-traced" \
             -xvf "${TRACY_CAPTURE_ARCHIVE}"
       - name: "Creating the benchmark tools archive"
+        # Here we pack a tracy-capture binary into each benchmark tools archive.
+        # This could be wasteful because multiple benchmark tools archives might
+        # pack the same tracy-capture binary. But it simplifies the process to
+        # fetch required tools to run benchmarks and we only have a few versions
+        # of the benchmark tools archives.
+        # Detailed reason: The generated benchmark matrix fetches the benchmark
+        # tools archive based on the target device. However, there is a scenario
+        # that the tracy-capture is running on a different host. E.g. Mobile
+        # benchmarks have the benchmark tool forwarding the data from the phones
+        # to the tracy-capture running on Linux host. Embedding the host of
+        # tracy-capture will overloads the benchmark matrix and puts too much
+        # unrelated machine setup in it. So we simply pack everything needed
+        # into each benchmark tools archive.
         id: archive
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM }}-${{ env.ARCH }}-benchmark-tools.tar
