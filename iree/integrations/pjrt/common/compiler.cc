@@ -10,7 +10,10 @@
 #endif
 #include "iree/integrations/pjrt/common/compiler.h"
 
+#include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <functional>
@@ -24,6 +27,35 @@ namespace iree::pjrt {
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+// Allocating a file descriptor for compiled binary varies on platform.
+class FdAlloc {
+ public:
+  FdAlloc() {
+#ifdef __APPLE__
+    // Apple devices do not support memfd_create.
+    strncpy(filename, "/tmp/output.vmfb.XXXXXX", 32);
+    fd = mkstemp(filename);
+    fchmod(fd, 0700);
+#else
+    fd = memfd_create("output.vmfb", 0);
+#endif
+  }
+
+  ~FdAlloc() {
+#ifdef __APPLE__
+    if (fd != -1) {
+      unlink(filename);
+    }
+#endif
+  }
+
+  int getFd() const { return fd; }
+
+ private:
+  char filename[32];
+  int fd;
+};
 
 class MMapCompilerOutput : public CompilerOutput {
  public:
@@ -135,8 +167,8 @@ class InprocessCompilerJob : public CompilerJob {
       return nullptr;
     }
 
-    // Setup temp file output.
-    output_fd_ = memfd_create("output.vmfb", 0);
+    FdAlloc fdAlloc;
+    output_fd_ = fdAlloc.getFd();
     if (output_fd_ == -1) {
       // TODO: Better error handling.
       return nullptr;

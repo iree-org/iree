@@ -6,6 +6,7 @@
 
 #include "iree/integrations/pjrt/common/dylib_platform.h"
 
+#include <array>
 #include <optional>
 #include <string>
 
