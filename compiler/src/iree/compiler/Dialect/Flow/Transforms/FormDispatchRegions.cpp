@@ -383,8 +383,8 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool isFusableWithConsumer(
-    OpOperand &fusedOperand,
-    const llvm::SmallBitVector &rootOuterParallelLoops) {
+    OpOperand &fusedOperand, const llvm::SmallBitVector &rootOuterParallelLoops,
+    bool fuseMultiUse) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
@@ -425,7 +425,8 @@ static bool isFusableWithConsumer(
   // all operations can bufferize without needing additional memory.
   for (OpOperand *inputOperand : consumerLinalgOp.getDpsInputOperands()) {
     if (inputOperand->get().getDefiningOp() != producer) continue;
-    if (isa<linalg::ConvolutionOpInterface>(producer) &&
+    if ((isa<linalg::ConvolutionOpInterface>(producer) ||
+         (!fuseMultiUse && isa<linalg::ContractionOpInterface>(producer))) &&
         !llvm::any_of(
             consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
               return canUseInOperandAsInitOperand(inputOperand, initOperand);
@@ -482,8 +483,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
         continue;
       }
 
-      if (isFusableWithConsumer(*(fusableUse.value()),
-                                rootOuterParallelLoops)) {
+      if (isFusableWithConsumer(*(fusableUse.value()), rootOuterParallelLoops,
+                                fuseMultiUse)) {
         updateRootTo(consumerOp);
         workList.push_back(consumerOp);
       }
