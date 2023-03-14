@@ -136,12 +136,17 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       RankedTensorType::get(expandedResultShape, indicesElementType);
 
   // Initialize the expanded output values
-  SmallVector<OpFoldResult> mixedSizes =
-      tensor::createDimValues(rewriter, loc, valuesExpanded);
-  Value emptyTensorOutputValues =
-      rewriter.create<mlir::tensor::EmptyOp>(loc, mixedSizes, valueElementType);
+  SmallVector<Value> dynSizes;
+  for (auto i : llvm::seq<int64_t>(0, valuesExpandedType.getRank())) {
+    if (valuesExpandedType.isDynamicDim(i)) {
+      dynSizes.push_back(
+          rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
+    }
+  }
+  Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputValuesExpandedType.getShape(), valueElementType, dynSizes);
   Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
-      loc, mixedSizes, indicesElementType);
+      loc, outputIndicesExpandedType.getShape(), indicesElementType, dynSizes);
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
