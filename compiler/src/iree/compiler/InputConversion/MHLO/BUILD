@@ -97,6 +97,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ShapeTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:Transforms",
         "@mlir-hlo//:chlo_legalize_to_hlo",
         "@mlir-hlo//:map_chlo_to_hlo_op",
