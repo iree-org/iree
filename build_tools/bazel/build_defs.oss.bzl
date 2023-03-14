@@ -84,6 +84,19 @@ def iree_compiler_cc_test(deps = [], **kwargs):
         **kwargs
     )
 
+def iree_compiler_cc_binary(deps = [], **kwargs):
+    """Used for cc_binary targets within the //compiler tree.
+
+    This is a pass-through to the native cc_binary which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_binary(
+        deps = deps + [
+            "//compiler/src:defs",
+        ],
+        **kwargs
+    )
+
 def iree_runtime_cc_library(deps = [], **kwargs):
     """Used for cc_library targets within the //runtime tree.
 
@@ -105,6 +118,20 @@ def iree_runtime_cc_test(deps = [], **kwargs):
     runtime specific options and deps.
     """
     native.cc_test(
+        deps = deps + [
+            # TODO: Rename to //runtime/src:defs to match compiler.
+            "//runtime/src:runtime_defines",
+        ],
+        **kwargs
+    )
+
+def iree_runtime_cc_binary(deps = [], **kwargs):
+    """Used for cc_binary targets within the //runtime tree.
+
+    This is a pass-through to the native cc_binary which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_binary(
         deps = deps + [
             # TODO: Rename to //runtime/src:defs to match compiler.
             "//runtime/src:runtime_defines",
