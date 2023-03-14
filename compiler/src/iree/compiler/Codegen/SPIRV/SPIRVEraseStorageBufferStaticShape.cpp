@@ -94,55 +94,6 @@ IREE::HAL::InterfaceBindingSubspanOp rewriteStorageBufferSubspanOp(
   return newOp;
 }
 
-/// Replace `origValue` with `replacementValue`. The replacement might
-/// require replacing the users of `origValue`. The results of the users
-/// themselves have to be replaced with results of the new users.
-void replaceUsesTransitively(RewriterBase &rewriter, Location loc,
-                             Value origValue, Value replacementValue) {
-  SmallVector<std::pair<Value, Value>> worklist;
-  worklist.push_back({origValue, replacementValue});
-
-  while (!worklist.empty()) {
-    auto [original, replacement] = worklist.pop_back_val();
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "//===------------------------------------------===//\n";
-      llvm::dbgs() << "Replacing: ";
-      original.print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
-
-    llvm::SmallDenseSet<OpOperand *> preservedUses;
-    for (OpOperand &use : original.getUses()) {
-      Operation *user = use.getOwner();
-      // Some uses cannot be replaced.
-      if (isa<func::ReturnOp, scf::YieldOp>(user)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "\tPreserved user: ";
-          user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-          llvm::dbgs() << "\n";
-        });
-        preservedUses.insert(&use);
-        continue;
-      }
-    }
-
-    // Replace all non-preserved uses.
-    rewriter.replaceUsesWithIf(original, replacement, [&](OpOperand &use) {
-      if (!preservedUses.count(&use)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "\t\tReplacing use in: ";
-          use.getOwner()->print(llvm::dbgs(),
-                                OpPrintingFlags().assumeVerified());
-          llvm::dbgs() << "\n";
-        });
-        return true;
-      }
-      return false;
-    });
-  }
-}
-
 }  // namespace
 
 void EraseStorageBufferStaticShapePass::runOnOperation() {
@@ -161,8 +112,8 @@ void EraseStorageBufferStaticShapePass::runOnOperation() {
   IRRewriter rewriter(funcOp.getContext());
   for (auto subspanOp : subspanOps) {
     auto newSubspanOp = rewriteStorageBufferSubspanOp(rewriter, subspanOp);
-    replaceUsesTransitively(rewriter, subspanOp.getLoc(), subspanOp,
-                            newSubspanOp);
+    replaceMemrefUsesAndPropagateType(rewriter, subspanOp.getLoc(), subspanOp,
+                                      newSubspanOp);
   }
 
   {

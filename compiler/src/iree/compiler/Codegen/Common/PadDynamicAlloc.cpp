@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,14 +32,15 @@ static Value skipAffineMaxZero(Value dim) {
   return *affineMax.getSymbolOperands().begin();
 }
 
-static LogicalResult padAlloc(memref::AllocOp allocOp) {
-  OpBuilder builder(allocOp);
+static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
+  IRRewriter rewriter(context);
+  rewriter.setInsertionPoint(allocOp);
   SmallVector<int64_t> shape = llvm::to_vector(allocOp.getType().getShape());
   SmallVector<OpFoldResult> sizes;
   size_t dynamicDimIdx = 0;
   for (int64_t &dimSize : shape) {
     if (dimSize != ShapedType::kDynamic) {
-      sizes.push_back(builder.getIndexAttr(dimSize));
+      sizes.push_back(rewriter.getIndexAttr(dimSize));
       continue;
     }
     Value dim = allocOp.getDynamicSizes()[dynamicDimIdx++];
@@ -56,13 +58,13 @@ static LogicalResult padAlloc(memref::AllocOp allocOp) {
   MemRefType allocType = MemRefType::get(shape, elType, AffineMap(),
                                          allocOp.getType().getMemorySpace());
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = builder.create<memref::AllocOp>(loc, allocType);
-  SmallVector<OpFoldResult> offsets(shape.size(), builder.getIndexAttr(0));
-  SmallVector<OpFoldResult> strides(shape.size(), builder.getIndexAttr(1));
-  Value subview = builder.create<memref::SubViewOp>(loc, paddedAlloc, offsets,
-                                                    sizes, strides);
-  replaceMemrefUsesAndPropagateType(allocOp, subview, builder);
-  allocOp->erase();
+  Value paddedAlloc = rewriter.create<memref::AllocOp>(loc, allocType);
+  SmallVector<OpFoldResult> offsets(shape.size(), rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> strides(shape.size(), rewriter.getIndexAttr(1));
+  Value subview = rewriter.create<memref::SubViewOp>(loc, paddedAlloc, offsets,
+                                                     sizes, strides);
+  replaceMemrefUsesAndPropagateType(rewriter, loc, allocOp, subview);
+  rewriter.eraseOp(allocOp);
   return success();
 }
 
@@ -71,12 +73,13 @@ namespace {
 struct PadDynamicAllocPass : public PadDynamicAllocBase<PadDynamicAllocPass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
+    MLIRContext *context = &getContext();
     SmallVector<memref::AllocOp> sharedMemAllocs;
     // Collect all the alloc operations.
     funcOp.walk(
         [&](memref::AllocOp allocOp) { sharedMemAllocs.push_back(allocOp); });
     for (memref::AllocOp alloc : sharedMemAllocs) {
-      if (failed(padAlloc(alloc))) return signalPassFailure();
+      if (failed(padAlloc(context, alloc))) return signalPassFailure();
     }
   }
 };

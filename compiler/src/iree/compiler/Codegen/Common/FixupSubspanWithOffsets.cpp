@@ -111,128 +111,6 @@ FailureOr<IREE::HAL::InterfaceBindingSubspanOp> rewriteSubspansWithOffset(
   return newOp;
 }
 
-/// Replaces a `use` with the `replacement` for cases where a simple substition
-/// might lead to verification errors.
-static std::optional<SmallVector<Value>> replaceNonTrivialUse(
-    RewriterBase &rewriter, Location loc, OpOperand &use, Value replacement) {
-  Operation *user = use.getOwner();
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(user);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\tReplacing in user by creating new user : ";
-    user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-    llvm::dbgs() << "\n";
-  });
-
-  if (auto castOp = dyn_cast<memref::CastOp>(user)) {
-    auto replacementType = replacement.getType().cast<MemRefType>();
-    auto currentResultType = castOp.getResult().getType().cast<MemRefType>();
-    auto newResultType = MemRefType::get(
-        currentResultType.getShape(), currentResultType.getElementType(),
-        replacementType.getLayout(), replacementType.getMemorySpace());
-    auto newCastOp =
-        rewriter.create<memref::CastOp>(loc, newResultType, replacement);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "\t\tNew user : ";
-      newCastOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
-    return SmallVector<Value>(newCastOp->result_begin(),
-                              newCastOp->result_end());
-  }
-  if (auto subviewOp = dyn_cast<memref::SubViewOp>(user)) {
-    auto currResultType = subviewOp.getResult().getType().cast<MemRefType>();
-    auto newSourceType = replacement.getType().cast<MemRefType>();
-    SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
-    SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
-    SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
-    MemRefType newResultType =
-        (currResultType.getRank() != newSourceType.getRank()
-             ? memref::SubViewOp::inferRankReducedResultType(
-                   currResultType.getShape(), newSourceType, offsets, sizes,
-                   strides)
-                   .cast<MemRefType>()
-             : nullptr);
-    auto newSubviewOp = rewriter.create<memref::SubViewOp>(
-        loc, newResultType, replacement, offsets, sizes, strides);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "\t\tNew user : ";
-      newSubviewOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
-    return SmallVector<Value>(newSubviewOp->result_begin(),
-                              newSubviewOp->result_end());
-  }
-  return std::nullopt;
-}
-
-/// Replace `origValue` with `replacementValue`. The replacement might
-/// require replacing the users of `origValue`. The results of the users
-/// themselves have to be replaced with results of the new users.
-static void replaceUsesTransitively(RewriterBase &rewriter, Location loc,
-                                    Value origValue, Value replacementValue) {
-  SmallVector<std::pair<Value, Value>> worklist;
-  worklist.push_back({origValue, replacementValue});
-
-  while (!worklist.empty()) {
-    auto [original, replacement] = worklist.pop_back_val();
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "//===------------------------------------------===//\n";
-      llvm::dbgs() << "Replacing : ";
-      original.print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
-
-    llvm::SmallDenseSet<OpOperand *> preservedUses;
-    for (OpOperand &use : original.getUses()) {
-      Operation *user = use.getOwner();
-      // Some uses cannot be replaced.
-      if (isa<func::ReturnOp, scf::YieldOp>(user)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "\tUnhandled user : ";
-          user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-          llvm::dbgs() << "\n";
-        });
-        preservedUses.insert(&use);
-        continue;
-      }
-
-      // Some uses might be replace-able but require creating new versions
-      // of the users to pass verification.
-      std::optional<SmallVector<Value>> nonTrivialUse =
-          replaceNonTrivialUse(rewriter, loc, use, replacement);
-      if (nonTrivialUse) {
-        // Add the results of the new users created as replacements
-        // for the old users. Push this back on the to worklist.
-        preservedUses.insert(&use);
-        for (auto [v1, v2] :
-             llvm::zip_equal(user->getResults(), nonTrivialUse.value())) {
-          worklist.push_back({v1, v2});
-        }
-        continue;
-      }
-    }
-
-    // Replace all non-preserved uses.
-    rewriter.replaceUsesWithIf(original, replacement, [&](OpOperand &use) {
-      if (!preservedUses.count(&use)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "\t\tReplacing use in :";
-          use.getOwner()->print(llvm::dbgs(),
-                                OpPrintingFlags().assumeVerified());
-          llvm::dbgs() << "\n";
-        });
-        return true;
-      }
-      return false;
-    });
-  }
-}
-
 /// Walks the function are rewrites all subspan pos that have non-zero offsets.
 LogicalResult rewriteAllSubspanOpsWithOffsets(func::FuncOp funcOp) {
   // Collect all subspan ops with memref return types and non-zero offsets.
@@ -250,8 +128,8 @@ LogicalResult rewriteAllSubspanOpsWithOffsets(func::FuncOp funcOp) {
     if (failed(newSubspanOp)) {
       return failure();
     }
-    replaceUsesTransitively(rewriter, subspanOp.getLoc(), subspanOp,
-                            newSubspanOp.value());
+    replaceMemrefUsesAndPropagateType(rewriter, subspanOp.getLoc(), subspanOp,
+                                      newSubspanOp.value());
   }
   return success();
 }

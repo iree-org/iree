@@ -636,33 +636,145 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                        {byteOffset, elementWidth});
 }
 
-void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
-                                       OpBuilder &builder) {
-  SmallVector<Operation *> opToDelete;
-  SmallVector<OpOperand *> operandsToReplace;
-  for (OpOperand &use : oldOp->getUses()) {
-    auto subviewUse = dyn_cast<memref::SubViewOp>(use.getOwner());
-    if (!subviewUse) {
-      // Save the operand to and replace outside the loop to not invalidate the
-      // iterator.
-      operandsToReplace.push_back(&use);
-      continue;
+//===---------------------------------------------------------------------===//
+// Replace Memref users (transitively)
+//===---------------------------------------------------------------------===//
+
+/// Replaces a `use` with the `replacement` for cases where a simple substition
+/// might lead to verification errors.
+static std::optional<SmallVector<Value>> replaceNonTrivialUse(
+    RewriterBase &rewriter, Location loc, OpOperand &use, Value replacement) {
+  Operation *user = use.getOwner();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(user);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\tReplacing in user by creating new user : ";
+    user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+    llvm::dbgs() << "\n";
+  });
+
+  if (auto castOp = dyn_cast<memref::CastOp>(user)) {
+    auto replacementType = replacement.getType().cast<MemRefType>();
+    auto currentResultType = castOp.getResult().getType().cast<MemRefType>();
+    if (replacementType == currentResultType) {
+      // Cast is a no op, just return the replacement.
+      return SmallVector<Value>{replacement};
     }
-    builder.setInsertionPoint(subviewUse);
-    Type newType = memref::SubViewOp::inferRankReducedResultType(
-        subviewUse.getType().getShape(), val.getType().cast<MemRefType>(),
-        subviewUse.getStaticOffsets(), subviewUse.getStaticSizes(),
-        subviewUse.getStaticStrides());
-    Value newSubview = builder.create<memref::SubViewOp>(
-        subviewUse->getLoc(), newType.cast<MemRefType>(), val,
-        subviewUse.getMixedOffsets(), subviewUse.getMixedSizes(),
-        subviewUse.getMixedStrides());
-    replaceMemrefUsesAndPropagateType(subviewUse, newSubview, builder);
-    opToDelete.push_back(use.getOwner());
+    auto newResultType = MemRefType::get(
+        currentResultType.getShape(), currentResultType.getElementType(),
+        replacementType.getLayout(), replacementType.getMemorySpace());
+    auto newCastOp =
+        rewriter.create<memref::CastOp>(loc, newResultType, replacement);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newCastOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return SmallVector<Value>(newCastOp->result_begin(),
+                              newCastOp->result_end());
   }
-  for (OpOperand *operand : operandsToReplace) operand->set(val);
-  // Clean up old subview ops.
-  for (Operation *op : opToDelete) op->erase();
+  if (auto subviewOp = dyn_cast<memref::SubViewOp>(user)) {
+    auto currResultType = subviewOp.getResult().getType().cast<MemRefType>();
+    auto newSourceType = replacement.getType().cast<MemRefType>();
+    SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
+    SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
+    MemRefType newResultType =
+        (currResultType.getRank() != newSourceType.getRank()
+             ? memref::SubViewOp::inferRankReducedResultType(
+                   currResultType.getShape(), newSourceType, offsets, sizes,
+                   strides)
+                   .cast<MemRefType>()
+             : nullptr);
+    auto newSubviewOp = rewriter.create<memref::SubViewOp>(
+        loc, newResultType, replacement, offsets, sizes, strides);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newSubviewOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return SmallVector<Value>(newSubviewOp->result_begin(),
+                              newSubviewOp->result_end());
+  }
+  return std::nullopt;
+}
+
+void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
+                                       Value origValue,
+                                       Value replacementValue) {
+  SmallVector<std::pair<Value, Value>> worklist;
+  SmallVector<Operation *> toDeleteUsers;
+  worklist.push_back({origValue, replacementValue});
+
+  while (!worklist.empty()) {
+    auto [original, replacement] = worklist.pop_back_val();
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "//===------------------------------------------===//\n";
+      llvm::dbgs() << "Replacing : ";
+      original.print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+
+    llvm::SmallDenseSet<OpOperand *> preservedUses;
+
+    if (original.getType() != replacement.getType()) {
+      for (OpOperand &use : original.getUses()) {
+        Operation *user = use.getOwner();
+        // Some uses cannot be replaced.
+        if (isa<func::ReturnOp, scf::YieldOp>(user)) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "\tUnhandled user : ";
+            user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+            llvm::dbgs() << "\n";
+          });
+          preservedUses.insert(&use);
+          continue;
+        }
+
+        // Some uses might be replace-able but require creating new versions
+        // of the users to pass verification.
+        std::optional<SmallVector<Value>> nonTrivialUse =
+            replaceNonTrivialUse(rewriter, loc, use, replacement);
+        if (nonTrivialUse) {
+          // Add the results of the new users created as replacements
+          // for the old users. Push this back on the to worklist.
+          preservedUses.insert(&use);
+          for (auto [v1, v2] :
+               llvm::zip_equal(user->getResults(), nonTrivialUse.value())) {
+            worklist.push_back({v1, v2});
+          }
+          toDeleteUsers.push_back(user);
+          continue;
+        }
+      }
+    }
+
+    // Replace all non-preserved uses.
+    rewriter.replaceUsesWithIf(original, replacement, [&](OpOperand &use) {
+      if (!preservedUses.count(&use)) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "\t\tReplacing use in :";
+          use.getOwner()->print(llvm::dbgs(),
+                                OpPrintingFlags().assumeVerified());
+          llvm::dbgs() << "\n";
+        });
+        return true;
+      }
+      return false;
+    });
+  }
+
+  // Iterate over delete-able operations in reverse and delete if
+  // there are no users.
+  for (auto deleteOp : llvm::reverse(toDeleteUsers)) {
+    if (deleteOp->use_empty()) {
+      rewriter.eraseOp(deleteOp);
+    }
+  }
 }
 
 void sinkOpsInCFG(const SmallVector<Operation *> &allocs,

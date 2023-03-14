@@ -165,12 +165,12 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               OpFoldResult byteOffset,
                                               Type elementType);
 
-/// Replace the uses of memref `oldOp` with the given `val` and for subview uses
-/// propagate the type change. Changing the memref type may require propagating
-/// it through subview ops so we cannot just do a replaceAllUse but need to
-/// propagate the type change and erase old subview ops.
-void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
-                                       OpBuilder &builder);
+/// Replace the uses of memref value `origValue` with the given
+/// `replacementValue`. Some uses of the memref value might require changes to
+/// the operation itself. Create new operations which can carry the change, and
+/// transitively replace their uses.
+void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
+                                       Value origValue, Value replacementValue);
 
 /// Sink given operations as close as possible to their uses.
 void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
