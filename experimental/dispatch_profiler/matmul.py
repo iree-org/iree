@@ -6,7 +6,7 @@ import operator
 import collections
 import subprocess
 from library import *
-
+from dispatch import *
 
 ###############################################################################
 # Data structure to describe a matrix multiplication operation including the
@@ -147,16 +147,14 @@ class EmitMatmulCompilationInfo:
 ###############################################################################
 # MLIR Emitter for the matmul operation.
 ###############################################################################
-
-
-# Emiter `linalg.matmul` operation.
-class EmitLinalgMatmulOperation:
+# Emiter `linalg.matmul` dispatch.
+class EmitLinalgMatmulDispatch:
 
   def __init__(self):
     self.mlir_dialect = MlirDialect.Linalg
 
     self.linalg_row_row_matmul_template = """
-// linalg.matmul operation row-row layout 
+// Dispatch linalg.matmul row-row layout 
 func.func @${operation_name}_${compilation_trait}(
   %lhs: tensor<${problem_m}x${problem_k}x${datatype_lhs}>,
   %rhs: tensor<${problem_k}x${problem_n}x${datatype_rhs}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
@@ -172,16 +170,17 @@ func.func @${operation_name}_${compilation_trait}(
 """
 
   # Emit the matmul operation in the MLIR dialect for a single compilation info.
-  def emit(self, matmul_operation, compilation_info):
+  def emit(self, matmul_dispatch):
+    matmul_operation = matmul_dispatch.operation.name()
     values = {
-        'operation_name': matmul_operation.name(),
-        'problem_m': str(matmul_operation.problem_shape[0]),
-        'problem_n': str(matmul_operation.problem_shape[1]),
-        'problem_k': str(matmul_operation.problem_shape[2]),
-        'datatype_lhs': DataTypeName[matmul_operation.lhs.datatype],
-        'datatype_rhs': DataTypeName[matmul_operation.rhs.datatype],
-        'datatype_result': DataTypeName[matmul_operation.result.datatype],
-        'compilation_trait': compilation_info.name()
+        'operation_name': matmul_dispatch.operation.name(),
+        'problem_m': str(matmul_dispatch.operation.problem_shape[0]),
+        'problem_n': str(matmul_dispatch.operation.problem_shape[1]),
+        'problem_k': str(matmul_dispatch.operation.problem_shape[2]),
+        'datatype_lhs': DataTypeName[matmul_dispatch.operation.lhs.datatype],
+        'datatype_rhs': DataTypeName[matmul_dispatch.operation.rhs.datatype],
+        'datatype_result': DataTypeName[matmul_dispatch.operation.result.datatype],
+        'compilation_trait': matmul_dispatch.configuration.name()
     }
 
     return SubstituteTemplate(self.linalg_row_row_matmul_template, values)
@@ -207,10 +206,11 @@ class EmitMhloMatmulOperation:
 ###############################################################################
 class EmitMatmulSourceMlir:
 
-  def __init__(self, operation_path, operation, configuration_list):
+  def __init__(self, operation_path, dispatch_collection):
     self.operation_path = operation_path
-    self.operation = operation
-    self.configuration_list = configuration_list
+    self.dispatch_collection = dispatch_collection
+    self.operation = dispatch_collection.operation
+    self.configuration_list = dispatch_collection.configuration_list
 
     self.operation_filepath = os.path.join(self.operation_path, \
                                            self.operation.name() + ".mlir")
@@ -226,11 +226,10 @@ class EmitMatmulSourceMlir:
     return self
 
   def emit(self):
-    # emit the matmul func.func dispatch (operation + configuration)
-    for configuration in self.configuration_list:
-      print("    Emitting matmul tuning parameters: " + configuration.name())
-      self.operation_file.write(EmitLinalgMatmulOperation().emit(self.operation,\
-                                                                 configuration))
+    # emit the matmul func.func for each dispatch (operation + configuration) 
+    for dispatch in self.dispatch_collection.get_dispatches():
+      print("    Emitting matmul tuning parameters: " + dispatch.configuration.name())
+      self.operation_file.write(EmitLinalgMatmulDispatch().emit(dispatch))
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.operation_file.close()
@@ -484,14 +483,13 @@ class MatmulOperationLauncher:
 
 
 ###############################################################################
-# Free functions to create a list of pre-backed matmul operations along with
+# Free functions to create a list of pre-baked matmul operations along with
 # tuning cofigurations. The functions below seperated based on the target backend
 # and the data type.
 ###############################################################################
 
-
 # Matmul sizes and tuning configs for GPU TensorCore F16 data type.
-def GpuMatmulTensorCoresF16(mainfest):
+def gpu_matmul_tensor_cores_f16(manifest):
 
   # Matmul tuning configurations for LLVM GPU TensorCore(F16)
   tile_descriptions = [
@@ -524,9 +522,6 @@ def GpuMatmulTensorCoresF16(mainfest):
       #[3456, 1024, 2048]
   ]
 
-  # Create matmul 'operation collection list' : [{operation -> [configurations]}].
-  operations_collection_list = []
-
   for problem_shape in problem_shapes:
     operation = MatmulOperation(
       problem_shape,\
@@ -534,15 +529,12 @@ def GpuMatmulTensorCoresF16(mainfest):
       TensorDescription(DataType.f16, LayoutType.RowMajor), \
       TensorDescription(DataType.f16, LayoutType.RowMajor))
 
-    mainfest.append_operation_collection(OperationCollection(\
+    manifest.append_dispatch_collection(DispatchCollection(\
       operation, configuration_list))
 
 
-###############################################################################
-
-
 # Matmul sizes and tuning configs for GPU TensorCore F16 data type.
-def GpuMatmulTensorCoresF32(mainfest):
+def gpu_matmul_tensor_cores_f32(mainfest):
 
   # Matmul tuning configurations for LLVM GPU TensorCore(F32)
   tile_descriptions = [
@@ -568,9 +560,6 @@ def GpuMatmulTensorCoresF32(mainfest):
       #[3456, 1024, 2048]
   ]
 
-  # Create matmul 'operation collection list' : [{operation -> [configurations]}].
-  operations_collection_list = []
-
   for problem_shape in problem_shapes:
     operation = MatmulOperation(
       problem_shape,\
@@ -578,6 +567,7 @@ def GpuMatmulTensorCoresF32(mainfest):
       TensorDescription(DataType.f32, LayoutType.RowMajor), \
       TensorDescription(DataType.f32, LayoutType.RowMajor))
 
-    mainfest.append_operation_collection(OperationCollection(\
+    mainfest.append_dispatch_collection(DispatchCollection(\
       operation, configuration_list))
 
+###############################################################################

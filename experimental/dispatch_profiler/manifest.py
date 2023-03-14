@@ -6,14 +6,17 @@ from library import *
 from matmul import *
 
 
-# Manifest class collects all the operations and configurations and emits \
-# them to the `generated` directory.
+
 class Manifest:
-  #
+  """Manifest class collects all the operations and configurations and emits 
+  them to the `generated` directory.
+  """
   def __init__(self, args):
     self.args = args
 
-    # operation_kind -> [operation_collection]
+    # Manifest organizes the dispatches in a dictionary of operation_kind to
+    # a list of dispatch_collection.
+    # operations: operation_kind -> [dispatch_collection]
     self.operations = {}
 
     # For operation kind-based filtering of dispatches.
@@ -81,27 +84,27 @@ class Manifest:
     # Return the result of the filter.
     return enabled
 
-  # Appends a single instance of OperationCollection to the manifest.
-  def append_operation_collection(self, operation_collection):
+  # Appends one instance of DispatchCollection to the manifest.
+  def append_dispatch_collection(self, dispatch_collection):
 
-    operation_kind = operation_collection.operation.operation_kind
+    operation_kind = dispatch_collection.operation.operation_kind
     if operation_kind not in self.operations.keys():
       self.operations[operation_kind] = []
 
-    filtered_operation_collection = OperationCollection(
-        operation_collection.operation, [])
-    for configuration in operation_collection.configuration_list:
-      if self.filter(operation_collection.operation, configuration):
-        filtered_operation_collection.configuration_list.append(configuration)
+    filtered_dispatch_collection = DispatchCollection(
+        dispatch_collection.operation, [])
+    for configuration in dispatch_collection.configuration_list:
+      if self.filter(dispatch_collection.operation, configuration):
+        filtered_dispatch_collection.configuration_list.append(configuration)
 
-    # Only append the filtered_operation_collection if it has an unfiltered configuration.
-    if len(filtered_operation_collection.configuration_list):
-      self.operations[operation_kind].append(filtered_operation_collection)
+    # Only append the filtered_dispatch_collection if it has an unfiltered configuration.
+    if len(filtered_dispatch_collection.configuration_list):
+      self.operations[operation_kind].append(filtered_dispatch_collection)
 
-  # Appends a list of OperationCollection to the manifest.
-  def append(self, operation_collection_list):
-    for operation_collection in operation_collection_list:
-      self.append_operation_collection(operation_collection)
+  # Appends a list of DispatchCollection to the manifest.
+  def append(self, dispatch_collection_list):
+    for dispatch_collection in dispatch_collection_list:
+      self.append_dispatch_collection(dispatch_collection)
 
   # Emits the operations in the Manifest to the build directory as MLIR source files.
   # The operations are emitted in the dialect specified by the mlir_dialect flag.
@@ -121,30 +124,28 @@ class Manifest:
 
     # For each operation_kind create a directory and emit the operations with
     # all the configurations in the configuration_list into their seperate directories.
-    for operation_kind, operation_collection_list in self.operations.items():
+    for operation_kind, dispatch_collection_list in self.operations.items():
 
       operation_kind_path = os.path.join(generated_path,
                                          OperationKindNames[operation_kind])
 
+      # If the directory with generated mlir already exists, delete it and create a new one.
       if os.path.exists(operation_kind_path):
         shutil.rmtree(operation_kind_path)
       os.makedirs(operation_kind_path)
 
-      for operation_collection in operation_collection_list:
+      for dispatch_collection in dispatch_collection_list:
 
         operation_path = os.path.join(operation_kind_path,
-                                      operation_collection.operation.name())
+                                      dispatch_collection.operation.name())
 
         if os.path.exists(operation_path):
           shutil.rmtree(operation_path)
         os.makedirs(operation_path)
 
-        with mlir_source_emitter[operation_kind](operation_path,\
-                            operation_collection.operation,\
-                            operation_collection.configuration_list)\
+        with mlir_source_emitter[operation_kind](operation_path, dispatch_collection)\
                             as mlir_source:
 
-          print(">> Generating MLIR operation: " +
-                operation_collection.operation.name())
-          # Emit mlir source file for the operation_collection.operation with all the configurations
+          print(">> Generating MLIR operation: " + dispatch_collection.operation.name())
+          # Emit mlir source file for the dispatch_collection.operation with all the configurations
           mlir_source.emit()

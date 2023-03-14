@@ -31,8 +31,8 @@ if __name__ == "__main__":
   manifest = Manifest(args)
 
   # Collect all the pre-defined dispatches in a manifest.
-  GpuMatmulTensorCoresF16(manifest)
-  GpuMatmulTensorCoresF32(manifest)
+  gpu_matmul_tensor_cores_f16(manifest)
+  gpu_matmul_tensor_cores_f32(manifest)
 
   # Emit the dispatches present in MLIR linalg dialect.
   manifest.emit(MlirDialect.Linalg)

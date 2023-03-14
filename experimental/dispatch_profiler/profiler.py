@@ -123,8 +123,8 @@ if __name__ == "__main__":
   manifest = Manifest(args)
 
   # Collect all the avialable operations in a manifest.
-  GpuMatmulTensorCoresF16(manifest)
-  GpuMatmulTensorCoresF32(manifest)
+  gpu_matmul_tensor_cores_f16(manifest)
+  gpu_matmul_tensor_cores_f32(manifest)
 
   # Performance report
   perf_report = PerformanceReport(args)
