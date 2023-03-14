@@ -1,9 +1,18 @@
+// Copyright 2023 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+
+#define DEBUG_TYPE "iree-llvmgpu-layout-analysis-and-distribution"
 
 namespace mlir::iree_compiler {
 
@@ -58,14 +67,13 @@ struct Layout {
   Layout(const DimOrderArray &orders,
          const std::array<int, maxTensorDims> &canonicalShape);
   // Reduces the layout along the tensor dim i
-  void reduceDim(int i);
   // Updates the batch dims of the layout given the tensor dims
   void updateBatchDims(int dim0, int dim1);
   // Computes the ith dimension expression for a given state
   AffineExpr computeDim(int i, const DimArray &state, OpBuilder &builder);
   bool operator==(const Layout &layout) const { return shape == layout.shape; }
   bool operator!=(const Layout &layout) const { return shape != layout.shape; }
-  std::string str() const;
+  void debugPrint(llvm::StringRef str) const;
 
   // Contains the shape of the layout
   DimArray shape;
@@ -161,15 +169,6 @@ Layout::Layout(const DimOrderArray &dimOrder,
   rank = dimOrder.size();
 }
 
-void Layout::reduceDim(int i) {
-  assert(rank > 0);
-  assert(order.size() > i);
-  for (auto dim : order[i]) {
-    shape[dim] = 1;
-  }
-  rank--;
-}
-
 void Layout::updateBatchDims(int dim0, int dim1) {
   shape[DimType::Batch0] = dim0 / canonicalShape[0];
   shape[DimType::Batch1] = dim1 / canonicalShape[1];
@@ -201,24 +200,26 @@ AffineExpr Layout::computeDim(int i, const DimArray &state,
   return dim;
 }
 
-std::string Layout::str() const {
-  std::stringstream ss;
-  for (int i = 0; i < DimType::NumDims; i++) {
-    ss << "  " << typeToString(i) << ": [" << shape[i] << "]";
-    bool isRow{false};
-    for (int k = 0; k < order[0].size(); k++) {
-      if (order[0][k] == i) {
-        isRow = true;
-        break;
+void Layout::debugPrint(llvm::StringRef str) const {
+  LLVM_DEBUG({
+    llvm::dbgs() << str << " = \n";
+    for (int i = 0; i < DimType::NumDims; i++) {
+      llvm::dbgs() << "   " << typeToString(i) << ": " << shape[i] << " ";
+      bool isRow{false};
+      for (int k = 0; k < order[0].size(); k++) {
+        if (order[0][k] == i) {
+          isRow = true;
+          break;
+        }
       }
+      if (isRow)
+        llvm::dbgs() << "(R)";
+      else
+        llvm::dbgs() << "(C)";
+      llvm::dbgs() << "  ";
     }
-    if (isRow)
-      ss << "(R)";
-    else
-      ss << "(C)";
-    ss << "  ";
-  }
-  return ss.str();
+    llvm::dbgs() << "\n";
+  });
 }
 
 static MMAType getMMAType(ArrayRef<int64_t> aShape, ArrayRef<int64_t> bShape,
@@ -242,7 +243,8 @@ void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
   MMAType mmaType = getMMAType(aShape, bShape, cShape);
   if (mmaType == MMAType::NONE) return;
   // Set layouts for A, B and C
-  auto setLayout = [&](Value matrix, MMAMatrixType matrixType) {
+  auto setLayout = [&](Value matrix, MMAMatrixType matrixType,
+                       llvm::StringRef name) {
     DimOrderArray dimOrder;
     for (int i = 0; i < 2; i++) {
       dimOrder[i] = getMMADimensions(mmaType, matrixType, i);
@@ -253,10 +255,11 @@ void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
     ArrayRef<int64_t> shape = matrix.getType().cast<ShapedType>().getShape();
     layout.updateBatchDims(shape[0], shape[1]);
     layoutMap.try_emplace(matrix, layout);
+    layout.debugPrint(name);
   };
-  setLayout(aMatrix, MMAMatrixType::AMatrix);
-  setLayout(bMatrix, MMAMatrixType::BMatrix);
-  setLayout(cMatrix, MMAMatrixType::CMatrix);
+  setLayout(aMatrix, MMAMatrixType::AMatrix, "aMatrix");
+  setLayout(bMatrix, MMAMatrixType::BMatrix, "bMatrix");
+  setLayout(cMatrix, MMAMatrixType::CMatrix, "cMatrix");
 }
 
 void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
