@@ -381,7 +381,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     SmallVector<OpFoldResult> strides(ty.getRank(), b.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes =
         tensor::createDimValues(b, b.getLoc(), adaptor.getOperand());
-    sizes.push_back(b.getIndexAttr(shape.back()));
+    sizes.back() = b.getIndexAttr(shape.back());
     auto real = b.create<tensor::ExtractSliceOp>(ty, results[0], offsets, sizes,
                                                  strides);
     auto imag = b.create<tensor::ExtractSliceOp>(ty, results[1], offsets, sizes,
