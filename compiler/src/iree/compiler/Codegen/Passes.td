@@ -47,6 +47,18 @@ def DecomposeLinalgGeneric :
   let constructor = "mlir::iree_compiler::createDecomposeLinalgGenericPass()";
 }
 
+def FixupSubspanWithOffsets :
+    Pass<"iree-codegen-fixup-subspan-with-offsets", "func::FuncOp"> {
+  let summary = "Fixes up `hal.interface.binding.subspan` ops with offsets";
+  let constructor =
+      "mlir::iree_compiler::createFixupSubspanWithOffsetsPass()";
+  let options = [
+    Option<"keepDeadSubspanOps", "keep-dead-subspan-ops",
+            "bool", /*default=*/"false",
+            "Flag to not remove dead subspan ops (used for testing only)">
+  ];
+}
+
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
@@ -505,6 +517,12 @@ def LLVMGPUTensorAlloc :
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorAlloc()";
 }
 
+def LLVMGPUPackSharedMemoryAlloc :
+    Pass<"iree-llvmgpu-pack-shared-memory-alloc", "func::FuncOp"> {
+  let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
+}
+
 def LLVMGPUTensorCoreVectorization :
     Pass<"iree-llvmgpu-tensorcore-vectorization", "func::FuncOp"> {
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
@@ -633,6 +651,12 @@ def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
   let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
+}
+
+def SPIRVEraseStorageBufferStaticShape :
+    Pass<"iree-spirv-erase-storage-buffer-static-shape", "func::FuncOp"> {
+  let summary = "Turn static shaped storage buffer subspan ops into dynamic shaped ones";
+  let constructor = "mlir::iree_compiler::createSPIRVEraseStorageBufferStaticShapePass()";
 }
 
 def SPIRVMapMemRefStorageClass :

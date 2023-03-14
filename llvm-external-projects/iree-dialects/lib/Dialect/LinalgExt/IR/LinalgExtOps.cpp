@@ -1937,14 +1937,17 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   // over the tile dimensions.
   for (auto dataTileDim :
        llvm::seq<unsigned>(getInputRank(), getOutputRank() - 1)) {
-    Value ub = outputShape[0][dataTileDim];
+    Value ub = getValueOrCreateConstantIndexOp(builder, loc,
+                                               outputShape[0][dataTileDim]);
     scf::ForOp loop = builder.create<scf::ForOp>(loc, zero, ub, one);
     builder.setInsertionPointToStart(loop.getBody());
     ivVec.push_back(loop.getInductionVar());
   }
   // The body of the innermost loops does the actual data movement.
-  builder.create<scf::ForOp>(loc, zero, outputShape[0].back(), one,
-                             ValueRange{},
+  builder.create<scf::ForOp>(loc, zero,
+                             getValueOrCreateConstantIndexOp(
+                                 builder, loc, outputShape[0].back()),
+                             one, ValueRange{},
                              [&](OpBuilder &bodyBuilder, Location bodyLoc,
                                  Value iv, ValueRange regionIterArgs) {
                                ivVec.push_back(iv);
@@ -2681,8 +2684,7 @@ LogicalResult SetEncodingOp::reifyResultShapes(
   OpBuilder::InsertionGuard g(builder);
   builder.setInsertionPoint(getOperation());
   reifiedReturnShapes.resize(1);
-  reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
-      builder, getLoc(), getDims(builder, getLoc(), getSource()));
+  reifiedReturnShapes[0] = getDims(builder, getLoc(), getSource());
   return success();
 }
 
@@ -2720,8 +2722,7 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
   OpBuilder::InsertionGuard g(builder);
   builder.setInsertionPoint(getOperation());
   reifiedReturnShapes.resize(1);
-  reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
-      builder, getLoc(), getDims(builder, getLoc(), getSource()));
+  reifiedReturnShapes[0] = getDims(builder, getLoc(), getSource());
   return success();
 }
 

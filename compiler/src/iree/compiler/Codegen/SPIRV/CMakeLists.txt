@@ -30,6 +30,7 @@ iree_cc_library(
     "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
     "SPIRVEmulateI64.cpp"
+    "SPIRVEraseStorageBufferStaticShape.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVMapMemRefStorageClass.cpp"
     "SPIRVTile.cpp"

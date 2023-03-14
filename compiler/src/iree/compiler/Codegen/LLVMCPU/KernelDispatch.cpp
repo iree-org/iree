@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -1936,6 +1937,11 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult setTranslationInfoAndRootConfig(
     func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
+  if (computeOps.empty()) {
+    // No compute operations found. Allow to pass through without a config.
+    return success();
+  }
+
   // First check if the operations have a preset pipeline. If the config is
   // preset, do not overwrite it.
   for (auto computeOp : computeOps) {
@@ -2005,13 +2011,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       continue;
     }
 
-    SmallVector<Operation *> computeOps;
-
-    // If there are no linalg ops, not using Linalg based lowering.
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return failure();
-    }
-
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
       return failure();
     }

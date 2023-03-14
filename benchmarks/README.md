@@ -1,12 +1,18 @@
-# IREE Benchmarks
+# IREE Benchmarks (Legacy)
 
-This directory contains configuration definition for IREE's continuous
-benchmarks suite. Benchmark results are posted to https://perf.iree.dev.
+**We are migrating to the new benchmark suites. Currently IREE benchmark CI
+(https://perf.iree.dev) is using the new one for x86_64, CUDA, and all
+compilation statistics targets. To reproduce those results, please see the
+[docs for IREE new benchmark suites](/docs/developers/developing_iree/benchmark_suites.md)**.
 
-The https://buildkite.com/iree/iree-benchmark Buildkite pipeline runs on each
-commit to the `main` branch and posts those results to the dashboard. The
-pipeline also runs on pull requests with the `buildkite:benchmark-*` label,
-posting results compared against their base commit as comments.
+This directory contains configuration definition for IREE's legacy benchmarks
+suite.
+
+The https://buildkite.com/iree/iree-benchmark-android Buildkite pipeline has not yet been migrated and runs
+Android benchmarks defined here on each commit to the `main` branch and posts
+results to the dashboard https://perf.iree.dev. The pipeline also runs on pull
+requests with the `buildkite:benchmark-android` label, posting results compared
+against their base commit as comments.
 
 ## Types of benchmarks
 

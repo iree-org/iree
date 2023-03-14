@@ -85,7 +85,7 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   // Slice out the original shape from the padded result to pass on to
   // consumers. The original linalg op is used to provide the dims for the reify
   // result shapes.
-  SmallVector<SmallVector<Value>> reifiedResultShapes;
+  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
   if (failed(cast<ReifyRankedShapedTypeOpInterface>(linalgOp.getOperation())
                  .reifyResultShapes(rewriter, reifiedResultShapes))) {
     return failure();
@@ -98,8 +98,7 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
     int64_t rank = paddedResult.getType().cast<RankedTensorType>().getRank();
     SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> sizes;
-    for (Value v : reifiedResultShapes[resultNumber])
-      sizes.push_back(getAsOpFoldResult(v));
+    for (OpFoldResult v : reifiedResultShapes[resultNumber]) sizes.push_back(v);
     SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
     paddedSubviewResults.push_back(rewriter.create<tensor::ExtractSliceOp>(
         loc, paddedResult, offsets, sizes, strides));
@@ -148,7 +147,7 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
 
   // Slice out the original shape from the padded result to pass on to
   // consumers.
-  SmallVector<SmallVector<Value>> reifiedResultShapes;
+  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
   if (failed(op.reifyResultShapes(rewriter, reifiedResultShapes))) {
     return failure();
   }
@@ -156,8 +155,7 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
   Value paddedSubviewResults;
   int64_t rank = paddedOp.getDestRank();
   SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
-  SmallVector<OpFoldResult> sizes =
-      getAsOpFoldResult(ValueRange(reifiedResultShapes[0]));
+  SmallVector<OpFoldResult> sizes = reifiedResultShapes[0];
   SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
   paddedSubviewResults = rewriter.create<tensor::ExtractSliceOp>(
       loc, paddedOp.getResult(), offsets, sizes, strides);

@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -40,15 +41,6 @@ static bool hasDefaultOrHALAddressSpace(MemRefType memrefType) {
   // space--the former is used by LLVMGPU while the latter is used by SPIR-V.
   if (intAttr && intAttr.getInt() == 0) return true;
   return addrSpace.isa<IREE::HAL::DescriptorTypeAttr>();
-}
-
-/// Returns true if the given `memrefType` has the numeric address space for
-/// GPU shared memory.
-static bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
-  auto addrSpace =
-      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
-  return addrSpace &&
-         addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
 }
 
 // Returns a new predicated operation to support unpeeled epilogue. Unpeeled

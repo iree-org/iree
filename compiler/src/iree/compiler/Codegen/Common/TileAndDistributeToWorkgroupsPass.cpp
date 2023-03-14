@@ -324,16 +324,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     auto exportOp = entryPoints.lookup(funcOp.getName());
     if (!exportOp) continue;
 
-    SmallVector<Operation *> computeOps;
-    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
-      funcOp.emitOpError("failed to get compute ops in dispatch");
-      return signalPassFailure();
-    }
-    if (!tiledLoops.empty()) {
-      // The entry point already has distribution to workgroups. Do nothing.
-      continue;
-    }
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     SmallVector<int64_t> tileSizes, staticLoopRanges, interchange;
     SmallVector<unsigned> partitionableLoops;
     Operation *dispatchRootOp = nullptr;

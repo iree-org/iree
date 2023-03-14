@@ -26,9 +26,6 @@ using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 namespace mlir {
 namespace iree_compiler {
 
-/// Flag defined in Passes.cpp.
-extern llvm::cl::opt<bool> llvmgpuUseMMASync;
-
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
 //====---------------------------------------------------------------------===//
@@ -46,21 +43,20 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   vector::populateVectorReductionToContractPatterns(patterns);
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeVectorSize(
-    Operation *op) {
-  if (llvmgpuUseMMASync) return getMmaNativeVectorSize(op);
-  return getWmmaNativeVectorSize(op);
-}
-
-static void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
+static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
+                                         bool useMmaSyncShape) {
   auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (!contract) return std::nullopt;
     return gpuMmaUnrollOrder(contract);
   };
+  auto getNativeShape = [useMmaSyncShape](Operation *op) {
+    if (useMmaSyncShape) return getMmaNativeVectorSize(op);
+    return getWmmaNativeVectorSize(op);
+  };
   vector::populateVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
-                    .setNativeShapeFn(getGPUTensorCoreNativeVectorSize)
+                    .setNativeShapeFn(getNativeShape)
                     .setUnrollTraversalOrderFn(unrollOrder));
 }
 
@@ -68,6 +64,8 @@ namespace {
 struct LLVMGPUTensorCoreVectorizationPass
     : public LLVMGPUTensorCoreVectorizationBase<
           LLVMGPUTensorCoreVectorizationPass> {
+  LLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType)
+      : tensorCoreType(tensorCoreType) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -96,33 +94,36 @@ struct LLVMGPUTensorCoreVectorizationPass
 
       // Step 3. Prepare vector operations to be lowered to native tensor core
       // operations (nvgpu.mmasync, nvgpu.ldmatrix).
-      if (llvmgpuUseMMASync) {
+      if (tensorCoreType == GPUTensorCoreType::MMA_SYNC) {
         RewritePatternSet vectorContractPatterns(funcOp.getContext());
         mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(
             vectorContractPatterns);
         mlir::populatePrepareVectorToMMAPatterns(vectorContractPatterns,
-                                                 llvmgpuUseMMASync);
+                                                 /*useMMASync=*/true);
         if (failed(applyPatternsAndFoldGreedily(
                 getOperation(), std::move(vectorContractPatterns)))) {
           return signalPassFailure();
         }
       }
-
+      bool useMmaSyncShape = tensorCoreType == GPUTensorCoreType::MMA_SYNC;
       // Step 4. Break and unroll warp tile size to native math and load sizes.
       RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(vectorUnrollPatterns);
+      populateVectorUnrollPatterns(vectorUnrollPatterns, useMmaSyncShape);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(vectorUnrollPatterns)))) {
         return signalPassFailure();
       }
     }
   }
+
+ private:
+  GPUTensorCoreType tensorCoreType;
 };
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUTensorCoreVectorizationPass() {
-  return std::make_unique<LLVMGPUTensorCoreVectorizationPass>();
+createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType) {
+  return std::make_unique<LLVMGPUTensorCoreVectorizationPass>(tensorCoreType);
 }
 
 }  // namespace iree_compiler

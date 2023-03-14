@@ -44,6 +44,7 @@ class CompilationInfoId(enum.Enum):
   NONE = ""
   LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
   LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
+  LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
   SPIRVVectorizeMali = "SPIRVVectorizeMali"
   SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
 
@@ -210,7 +211,7 @@ def get_test_compilation_infos(
     tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(32)
   elif compilation_info_id == CompilationInfoId.SPIRVVectorizeMali:
     tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(4)
-  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
+  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCoreMmaSync:
     tile_workgroup_size_pairs = []
     ## WarpShape = 2x2
     tile_workgroup_size_pairs.append(

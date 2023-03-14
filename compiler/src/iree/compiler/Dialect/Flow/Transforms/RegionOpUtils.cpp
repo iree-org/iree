@@ -69,7 +69,7 @@ static SmallVector<Range> getLoopRangesImpl(tensor::ExtractSliceOp sliceOp,
   LogicalResult status = sliceOp.reifyResultShapes(builder, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
-  return llvm::to_vector(llvm::map_range(resultDims[0], [&](Value v) {
+  return llvm::to_vector(llvm::map_range(resultDims[0], [&](OpFoldResult v) {
     return Range{zero, v, one};
   }));
 }
@@ -158,7 +158,7 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
     if (failed(reifyShapeOp.reifyResultShapes(b, dims))) return failure();
     for (int64_t i = 0; i < shapedType.getRank(); ++i)
       if (shapedType.isDynamicDim(i))
-        dynamicDims.push_back(dims[opResult.getResultNumber()][i]);
+        dynamicDims.push_back(dims[opResult.getResultNumber()][i].get<Value>());
     return success();
   }
 

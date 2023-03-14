@@ -74,6 +74,8 @@ static void populateTilingCopyToWorkgroupMemPatterns(
                                        .cast<MemRefType>();
 
         unsigned rank = dstMemRefType.getRank();
+        // Return empty tile size for zero dim tensor.
+        if (rank == 0) return tileSizesVal;
         int copyTileSize =
             copyVectorNumBits / dstMemRefType.getElementTypeBitWidth();
         for (unsigned i = 0; i < rank - 1; i++) {

@@ -63,6 +63,11 @@ createBufferizeCopyOnlyDispatchesPass();
 // one op in the body.
 std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 
+// Fixes resturn types of `hal.interface.binding.subspan` ops with non-zero
+// offsets.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createFixupSubspanWithOffsetsPass();
+
 /// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets
 /// on subspan ops to the consumer load/store ops, in preparation for lowering
 /// to backends that require linearized access.
@@ -442,13 +447,17 @@ LogicalResult verifyGPUMatmulSimtPassPipeline(
     ArrayRef<int64_t> workgroupSize);
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
-/// Lowering using tensorcore operations.
 LogicalResult verifyGPUMatmulTensorCorePipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
+/// Lowering using wmma tensorcore operations.
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
+
+/// Lowering using mma.sync tensorcore operations.
+void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
+                                               unsigned pipelineDepth);
 
 enum class GPUPromoteSharedMemPattern {
   ContractionOpPattern = 0,
@@ -499,9 +508,15 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
 
+enum class GPUTensorCoreType {
+  WMMA = 0,
+  MMA_SYNC = 1,
+};
+
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUTensorCoreVectorizationPass();
+createLLVMGPUTensorCoreVectorizationPass(
+    GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
@@ -512,10 +527,16 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
 /// Converts vector ops to gpu dialect.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU(
+    GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
 //. Pass to pad out tensors up to static dimensions.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
+
+// Pass to pack shared memory allocations in order to reduce shared memory
+// usage.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMGPUPackSharedMemoryAlloc();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes
@@ -628,6 +649,10 @@ createSPIRVCreateFastSlowPathPass();
 
 /// Emulates 64-bit integer ops with 32-bit integer ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
+
+/// Turns static shaped storage buffer subspan ops into dynamic shaped ones.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVEraseStorageBufferStaticShapePass();
 
 /// Pass to map MemRef memory spaces to SPIR-V storage classes.
 std::unique_ptr<OperationPass<func::FuncOp>>

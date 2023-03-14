@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -106,34 +105,6 @@ Optional<llvm::Triple> getTargetTriple(
   return llvm::Triple(triple.value().str());
 }
 
-/// Returns the CPU target features associated with the `hal.executable.variant`
-/// operation, if set.
-Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
-  if (!cpuFeatures) return std::nullopt;
-  return cpuFeatures->getValue();
-}
-
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isX86();
-}
-
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().getArch() == llvm::Triple::x86_64;
-}
-
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isAArch64();
-}
-
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isRISCV();
-}
-
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
 }
@@ -141,59 +112,6 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto enableMicrokernels = getConfigBoolAttr(targetAttr, "ukernels");
   return enableMicrokernels && enableMicrokernels->getValue();
-}
-
-bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto intrinsicsAttr =
-      getConfigBoolAttr(targetAttr, "prefer_intrinsics_over_asm");
-  return intrinsicsAttr && intrinsicsAttr->getValue();
-}
-
-// TODO(dcaballe): If we have to check for a significantly large number of
-// features in the future, we may want to consider a persistent state to carry
-// over processed HAL information or keeping the TTI instance alive and query
-// subtarget features data structure.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
-  Optional<StringRef> features = getCpuFeatures(targetAttr);
-  if (!features) {
-    return false;
-  }
-
-  // Find feature string in list of features, making sure that we don't match a
-  // sub-string.
-  std::stringstream sstream(features->str());
-  std::string str;
-  while (std::getline(sstream, str, ',')) {
-    if (str == feature) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+avx2");
-}
-
-bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+v");
-}
-
-bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+zve32x");
-}
-
-bool hasZve32fFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+zve32f");
-}
-
-bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+zve64x");
-}
-
-bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2");
 }
 
 bool isReadOnly(Value v) {
@@ -577,45 +495,21 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   return loopInfo;
 }
 
-LogicalResult getFilteredOps(
-    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
-    SmallVectorImpl<Operation *> &filteredOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  Region &region = funcOp.getFunctionBody();
-  if (!llvm::hasSingleElement(region)) {
-    return funcOp.emitError("unable dispatch function with multiple blocks");
-  }
-  Block *body = &region.front();
+SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
+  Block *body = &funcOp.getFunctionBody().front();
   auto forOps = body->getOps<scf::ForOp>();
   while (!forOps.empty()) {
-    if (!llvm::hasSingleElement(forOps)) return failure();
+    assert(llvm::hasSingleElement(forOps) &&
+           "expected dispatch function with single block");
     scf::ForOp forOp = *(forOps.begin());
-    if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
-      tiledLoops.emplace_back(std::move(tiledLoopInfo.value()));
-    }
     body = forOp.getBody();
     forOps = body->getOps<scf::ForOp>();
   }
-  for (Operation &op : body->getOperations()) {
-    if (filteringFn(&op)) {
-      filteredOps.push_back(&op);
-    }
+  SmallVector<Operation *> computeOps;
+  for (auto op : body->getOps<TilingInterface>()) {
+    computeOps.push_back(op);
   }
-  return success();
-}
-
-LogicalResult getComputeOps(
-    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  if (failed(getFilteredOps(
-          funcOp,
-          [](Operation *op) {
-            return isa<linalg::LinalgOp, TilingInterface>(op);
-          },
-          computeOps, tiledLoops))) {
-    return failure();
-  }
-  return success();
+  return computeOps;
 }
 
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
@@ -666,90 +560,254 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     const SmallVector<int64_t> &tileSizes) {
-  return {
-      [&tileSizes](OpBuilder &builder, Location loc,
-                   ArrayRef<Range> parallelLoopRanges) {
-        SmallVector<int64_t> nonZeroTileSizes;
-        for (int64_t size : tileSizes) {
-          if (size != 0) nonZeroTileSizes.push_back(size);
-        }
-        auto numParallelDims = parallelLoopRanges.size();
+  return {[&tileSizes](OpBuilder &builder, Location loc,
+                       ArrayRef<Range> parallelLoopRanges) {
+    SmallVector<int64_t> nonZeroTileSizes;
+    for (int64_t size : tileSizes) {
+      if (size != 0) nonZeroTileSizes.push_back(size);
+    }
+    auto numParallelDims = parallelLoopRanges.size();
 
-        SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-        Value splitDim;
-        for (size_t dim = 0; dim < numParallelDims; ++dim) {
-          if (numParallelDims > kNumMaxParallelDims &&
-              dim >= kNumMaxParallelDims - 1) {
-            if (!splitDim) {
-              splitDim =
-                  buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
-                      builder, 2);
-            }
-            Value size = getValueOrCreateConstantIndexOp(
-                builder, loc,
-                parallelLoopRanges[numParallelDims - dim - 1].size);
-            Value offset = getValueOrCreateConstantIndexOp(
-                builder, loc,
-                parallelLoopRanges[numParallelDims - dim - 1].offset);
-            AffineExpr d0, d1;
-            int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
-            bindSymbols(builder.getContext(), d0, d1);
-            Value numTiles = makeComposedAffineApply(
-                builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
-            Value dimValue;
-            if (dim == numParallelDims - 1)
-              dimValue = splitDim;
-            else {
-              dimValue =
-                  builder.create<arith::RemUIOp>(loc, splitDim, numTiles);
-              splitDim =
-                  builder.create<arith::DivUIOp>(loc, splitDim, numTiles);
-            }
-            procInfo[numParallelDims - dim - 1] = {
-                dimValue,
-                numTiles,
-                linalg::DistributionMethod::Cyclic,
-            };
-            continue;
-          }
-          procInfo[numParallelDims - dim - 1] = {
-              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
-                  builder, dim),
-              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(
-                  builder, dim),
-              linalg::DistributionMethod::Cyclic};
+    SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+    Value splitDim;
+    for (size_t dim = 0; dim < numParallelDims; ++dim) {
+      if (numParallelDims > kNumMaxParallelDims &&
+          dim >= kNumMaxParallelDims - 1) {
+        if (!splitDim) {
+          splitDim = buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
+              builder, 2);
         }
-        return procInfo;
-      }};
+        Value size = getValueOrCreateConstantIndexOp(
+            builder, loc, parallelLoopRanges[numParallelDims - dim - 1].size);
+        Value offset = getValueOrCreateConstantIndexOp(
+            builder, loc, parallelLoopRanges[numParallelDims - dim - 1].offset);
+        AffineExpr d0, d1;
+        int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
+        bindSymbols(builder.getContext(), d0, d1);
+        Value numTiles = makeComposedAffineApply(
+            builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
+        Value dimValue;
+        if (dim == numParallelDims - 1)
+          dimValue = splitDim;
+        else {
+          dimValue = builder.create<arith::RemUIOp>(loc, splitDim, numTiles);
+          splitDim = builder.create<arith::DivUIOp>(loc, splitDim, numTiles);
+        }
+        procInfo[numParallelDims - dim - 1] = {
+            dimValue,
+            numTiles,
+            linalg::DistributionMethod::Cyclic,
+        };
+        continue;
+      }
+      procInfo[numParallelDims - dim - 1] = {
+          buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(builder,
+                                                                     dim),
+          buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(builder,
+                                                                        dim),
+          linalg::DistributionMethod::Cyclic};
+    }
+    return procInfo;
+  }};
 }
 
-void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
-                                       OpBuilder &builder) {
-  SmallVector<Operation *> opToDelete;
-  SmallVector<OpOperand *> operandsToReplace;
-  for (OpOperand &use : oldOp->getUses()) {
-    auto subviewUse = dyn_cast<memref::SubViewOp>(use.getOwner());
-    if (!subviewUse) {
-      // Save the operand to and replace outside the loop to not invalidate the
-      // iterator.
-      operandsToReplace.push_back(&use);
-      continue;
+//===---------------------------------------------------------------------===//
+// Misc. utility functions
+//===---------------------------------------------------------------------===//
+
+OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
+                                              Location loc,
+                                              OpFoldResult byteOffset,
+                                              Type elementType) {
+  OpFoldResult elementWidth =
+      TypeSwitch<Type, OpFoldResult>(elementType)
+          .Case<ComplexType, FloatType, IntegerType, VectorType>(
+              [&](auto type) -> OpFoldResult {
+                return rewriter.getIndexAttr(
+                    IREE::Util::getRoundedElementByteWidth(elementType));
+              })
+          .Default([&](Type t) -> OpFoldResult {
+            return rewriter.create<IREE::Util::SizeOfOp>(loc, elementType)
+                .getResult();
+          });
+  AffineExpr s0, s1;
+  bindSymbols(rewriter.getContext(), s0, s1);
+  return makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
+                                       {byteOffset, elementWidth});
+}
+
+//===---------------------------------------------------------------------===//
+// Replace Memref users (transitively)
+//===---------------------------------------------------------------------===//
+
+/// Replaces a `use` with the `replacement` for cases where a simple substition
+/// might lead to verification errors.
+static std::optional<SmallVector<Value>> replaceNonTrivialUse(
+    RewriterBase &rewriter, Location loc, OpOperand &use, Value replacement) {
+  Operation *user = use.getOwner();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(user);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\tReplacing in user by creating new user : ";
+    user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+    llvm::dbgs() << "\n";
+  });
+
+  if (auto castOp = dyn_cast<memref::CastOp>(user)) {
+    auto replacementType = replacement.getType().cast<MemRefType>();
+    auto currentResultType = castOp.getResult().getType().cast<MemRefType>();
+    if (replacementType == currentResultType) {
+      // Cast is a no op, just return the replacement.
+      return SmallVector<Value>{replacement};
     }
-    builder.setInsertionPoint(subviewUse);
-    Type newType = memref::SubViewOp::inferRankReducedResultType(
-        subviewUse.getType().getShape(), val.getType().cast<MemRefType>(),
-        subviewUse.getStaticOffsets(), subviewUse.getStaticSizes(),
-        subviewUse.getStaticStrides());
-    Value newSubview = builder.create<memref::SubViewOp>(
-        subviewUse->getLoc(), newType.cast<MemRefType>(), val,
-        subviewUse.getMixedOffsets(), subviewUse.getMixedSizes(),
-        subviewUse.getMixedStrides());
-    replaceMemrefUsesAndPropagateType(subviewUse, newSubview, builder);
-    opToDelete.push_back(use.getOwner());
+    auto newResultType = MemRefType::get(
+        currentResultType.getShape(), currentResultType.getElementType(),
+        replacementType.getLayout(), replacementType.getMemorySpace());
+    auto newCastOp =
+        rewriter.create<memref::CastOp>(loc, newResultType, replacement);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newCastOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return SmallVector<Value>(newCastOp->result_begin(),
+                              newCastOp->result_end());
   }
-  for (OpOperand *operand : operandsToReplace) operand->set(val);
-  // Clean up old subview ops.
-  for (Operation *op : opToDelete) op->erase();
+  if (auto subviewOp = dyn_cast<memref::SubViewOp>(user)) {
+    auto currResultType = subviewOp.getResult().getType().cast<MemRefType>();
+    auto newSourceType = replacement.getType().cast<MemRefType>();
+    SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
+    SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
+    MemRefType newResultType =
+        (currResultType.getRank() != newSourceType.getRank()
+             ? memref::SubViewOp::inferRankReducedResultType(
+                   currResultType.getShape(), newSourceType, offsets, sizes,
+                   strides)
+                   .cast<MemRefType>()
+             : nullptr);
+    auto newSubviewOp = rewriter.create<memref::SubViewOp>(
+        loc, newResultType, replacement, offsets, sizes, strides);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newSubviewOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return SmallVector<Value>(newSubviewOp->result_begin(),
+                              newSubviewOp->result_end());
+  }
+  return std::nullopt;
+}
+
+void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
+                                       Value origValue,
+                                       Value replacementValue) {
+  SmallVector<std::pair<Value, Value>> worklist;
+  SmallVector<Operation *> toDeleteUsers;
+  worklist.push_back({origValue, replacementValue});
+
+  while (!worklist.empty()) {
+    auto [original, replacement] = worklist.pop_back_val();
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "//===------------------------------------------===//\n";
+      llvm::dbgs() << "Replacing : ";
+      original.print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+
+    llvm::SmallDenseSet<OpOperand *> preservedUses;
+
+    if (original.getType() != replacement.getType()) {
+      for (OpOperand &use : original.getUses()) {
+        Operation *user = use.getOwner();
+        // Some uses cannot be replaced.
+        if (isa<func::ReturnOp, scf::YieldOp>(user)) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "\tUnhandled user : ";
+            user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+            llvm::dbgs() << "\n";
+          });
+          preservedUses.insert(&use);
+          continue;
+        }
+
+        // Some uses might be replace-able but require creating new versions
+        // of the users to pass verification.
+        std::optional<SmallVector<Value>> nonTrivialUse =
+            replaceNonTrivialUse(rewriter, loc, use, replacement);
+        if (nonTrivialUse) {
+          // Add the results of the new users created as replacements
+          // for the old users. Push this back on the to worklist.
+          preservedUses.insert(&use);
+          for (auto [v1, v2] :
+               llvm::zip_equal(user->getResults(), nonTrivialUse.value())) {
+            worklist.push_back({v1, v2});
+          }
+          toDeleteUsers.push_back(user);
+          continue;
+        }
+      }
+    }
+
+    // Replace all non-preserved uses.
+    rewriter.replaceUsesWithIf(original, replacement, [&](OpOperand &use) {
+      if (!preservedUses.count(&use)) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "\t\tReplacing use in :";
+          use.getOwner()->print(llvm::dbgs(),
+                                OpPrintingFlags().assumeVerified());
+          llvm::dbgs() << "\n";
+        });
+        return true;
+      }
+      return false;
+    });
+  }
+
+  // Iterate over delete-able operations in reverse and delete if
+  // there are no users.
+  for (auto deleteOp : llvm::reverse(toDeleteUsers)) {
+    if (deleteOp->use_empty()) {
+      rewriter.eraseOp(deleteOp);
+    }
+  }
+}
+
+void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
+                  DominanceInfo &dominators) {
+  for (Operation *sinkOp : allocs) {
+    Block *dom = nullptr;
+    for (Operation *user : sinkOp->getUsers()) {
+      if (!dom) {
+        dom = user->getBlock();
+        // Find the block in the same region.
+        while (dom->getParent() != sinkOp->getParentRegion()) {
+          dom = dom->getParentOp()->getBlock();
+        }
+        continue;
+      }
+      dom = dominators.findNearestCommonDominator(dom, user->getBlock());
+    }
+    llvm::SmallDenseSet<Operation *> users;
+    for (Operation *user : sinkOp->getUsers()) {
+      while (user->getParentRegion() != sinkOp->getParentRegion()) {
+        user = user->getParentOp();
+      }
+      users.insert(user);
+    }
+    Operation *firstUse = dom->getTerminator();
+    for (Operation &op : dom->getOperations()) {
+      if (users.count(&op)) {
+        firstUse = &op;
+        break;
+      }
+    }
+    sinkOp->moveBefore(firstUse);
+  }
 }
 
 }  // namespace iree_compiler

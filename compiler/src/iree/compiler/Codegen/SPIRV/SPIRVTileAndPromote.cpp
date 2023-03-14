@@ -297,10 +297,7 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   MLIRContext *context = funcOp.getContext();
   if (!promoteCMatrix) return success();
 
-  SmallVector<Operation *> computeOps;
-  if (failed(getComputeOps(funcOp, computeOps)))
-    return funcOp.emitError("failed to get compute ops");
-
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   SmallVector<Operation *> linalgOps;
   for (Operation *op : computeOps) {
     if (isa<linalg::FillOp>(op)) continue;  // Don't care

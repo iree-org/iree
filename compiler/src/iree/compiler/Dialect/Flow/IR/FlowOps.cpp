@@ -495,7 +495,7 @@ LogicalResult DispatchTieShapeOp::verify() {
 
 LogicalResult DispatchTieShapeOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  SmallVector<Value> shape;
+  SmallVector<OpFoldResult> shape;
   unsigned dynamicIdx = 0;
   auto tensorType =
       getResult().getType().cast<IREE::Flow::DispatchTensorType>();
@@ -503,7 +503,7 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
     if (dim == ShapedType::kDynamic) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
     } else {
-      shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+      shape.push_back(b.getIndexAttr(dim));
     }
   }
   reifiedReturnShapes.push_back(shape);
@@ -635,7 +635,7 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
 LogicalResult DispatchTensorLoadOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   auto mixedSizes = getMixedSizes();
-  SmallVector<Value> shape;
+  SmallVector<OpFoldResult> shape;
   if (!mixedSizes.empty()) {
     // Slicing out a tile; return the size sliced.
     shape.reserve(mixedSizes.size());
@@ -644,8 +644,7 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
       if (droppedDims.test(mixedSize.index())) {
         continue;
       }
-      shape.push_back(
-          getValueOrCreateConstantIndexOp(b, getLoc(), mixedSize.value()));
+      shape.push_back(mixedSize.value());
     }
   } else {
     // Result size matches the source size (no slicing).
@@ -654,7 +653,7 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
       if (dim == ShapedType::kDynamic) {
         shape.push_back(getSourceDims()[dynamicIdx++]);
       } else {
-        shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+        shape.push_back(b.getIndexAttr(dim));
       }
     }
   }
@@ -1380,14 +1379,14 @@ LogicalResult TensorTieShapeOp::verify() {
 
 LogicalResult TensorTieShapeOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  SmallVector<Value> shape;
+  SmallVector<OpFoldResult> shape;
   unsigned dynamicIdx = 0;
   auto tensorType = getResult().getType().cast<RankedTensorType>();
   for (int64_t dim : tensorType.getShape()) {
     if (dim == ShapedType::kDynamic) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
     } else {
-      shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+      shape.push_back(b.getIndexAttr(dim));
     }
   }
   reifiedReturnShapes.push_back(shape);

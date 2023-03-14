@@ -62,9 +62,7 @@ static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
 
   SmallVector<IREE::Codegen::LoweringConfigAttr> configs;
   if (ifOps.empty()) {
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return funcOp.emitOpError("does not contain compute ops");
-    }
+    computeOps = getComputeOps(funcOp);
     for (Operation *op : computeOps) {
       if (auto config = getLoweringConfig(op)) configs.push_back(config);
     }

@@ -34,6 +34,7 @@ iree_lit_test_suite(
     "create_fast_slow_path.mlir"
     "distribute_to_invocations.mlir"
     "emulate_i64.mlir"
+    "erase_storage_buffer_static_shape.mlir"
     "illegal_configuration.mlir"
     "lowering_matmul_promotion.mlir"
     "lowering_reduction.mlir"
