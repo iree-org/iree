@@ -29,9 +29,11 @@ TARGET_DEVICE_NAME="${3:-${IREE_TARGET_DEVICE_NAME}}"
 BENCHMARK_RESULTS="${4:-${IREE_BENCHMARK_RESULTS}}"
 BENCHMARK_TRACES="${5:-${IREE_BENCHMARK_TRACES}}"
 
-# Give access to performance counters and kernel information.
-sudo sh -c "echo -1 > /proc/sys/kernel/perf_event_paranoid"
-sudo sh -c "echo 0 > /proc/sys/kernel/kptr_restrict"
+if [[ "$(uname)" == "Linux" ]]; then
+  # Give access to performance counters and kernel information on Linux.
+  sudo sh -c "echo -1 > /proc/sys/kernel/perf_event_paranoid"
+  sudo sh -c "echo 0 > /proc/sys/kernel/kptr_restrict"
+fi
 
 if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
