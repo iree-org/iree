@@ -491,12 +491,13 @@ func.func @nvidia_tenscore_schedule() {
 //          CHECK-NV:  gpu.barrier
 //  CHECK-NV-COUNT-8:  nvgpu.ldmatrix
 //          CHECK-NV:  scf.for
-//  CHECK-NV-COUNT-8:    nvgpu.ldmatrix
-// CHECK-NV-COUNT-64:    nvgpu.mma.sync
+//  CHECK-NV-COUNT-4:    nvgpu.ldmatrix
+// CHECK-NV-COUNT-32:    nvgpu.mma.sync
 //  CHECK-NV-COUNT-6:    nvgpu.device_async_copy
 //          CHECK-NV:    nvgpu.device_async_create_group
 //          CHECK-NV:    nvgpu.device_async_wait %{{.*}} {numGroups = 1 : i32}
 //          CHECK-NV:    gpu.barrier
 //  CHECK-NV-COUNT-8:    nvgpu.ldmatrix
+// CHECK-NV-COUNT-32:    nvgpu.mma.sync
 //          CHECK-NV:  }
 //          CHECK-NV:  vector.store
