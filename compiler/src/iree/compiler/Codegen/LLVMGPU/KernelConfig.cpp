@@ -106,22 +106,24 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
 static void getTensorCoreConfig(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
     int64_t N, int64_t K) {
-  // Tile sizes are skewed towards small matmul for now. Long term the plan is
-  // to not rely on hardcoded configurations.
+  // Based on early analysis we found that 128x256x32_3 gives acceptable
+  // performance across many of the large matrix sizes for f16 and fp32. This
+  // needs to be refined into a better startegy based on empircal data but this
+  // gives us a quick solution to achieve performance in the right order of
+  // magnitude for large square like cases.
+  int64_t parallelDim = M * N;
+  static constexpr int64_t kLargDimThreashold = 1536;
   if (isFp16) {
-    int64_t parallelDim = M * N;
-    static constexpr int64_t kLargDimThreashold = 1536;
-    // Based on early analysis we found that 128x256x32_3 gives acceptable
-    // performance across many of the large matrix sizes for f16. This needs to
-    // be refined into a better startegy based on empircal data but this gives
-    // us a quick solution to achieve performance in the right order of
-    // magnitude for large square like cases.
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
       tileSizes.push_back(
           TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
     }
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
+    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
+    }
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
