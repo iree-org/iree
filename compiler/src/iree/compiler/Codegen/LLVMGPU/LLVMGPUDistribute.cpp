@@ -61,9 +61,9 @@ struct LLVMGPUDistributePass
     };
 
     DiagnosedSilenceableFailure const result =
-        mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-            rewriter, funcOp, workgroupSize, threadIdGenerator, false,
-            std::nullopt, threadMappingAttributes);
+        mlir::transform::gpu::mapNestedForallToThreadsImpl(
+            rewriter, std::nullopt, funcOp, workgroupSize, false,
+            threadMappingAttributes, threadIdGenerator);
 
     if (!result.succeeded()) return signalPassFailure();
   }
