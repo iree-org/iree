@@ -448,6 +448,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     // Define the output types based on the results of CHLO TopK
     SmallVector<OpFoldResult> mixedSizes =
         tensor::createDimValues(rewriter, loc, adaptor.getOperand());
+    mixedSizes.back() = rewriter.getIndexAttr(adaptor.getK());
     Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
         loc, mixedSizes, valueElementType);
     Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
