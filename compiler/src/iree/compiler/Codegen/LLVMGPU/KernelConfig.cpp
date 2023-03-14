@@ -54,10 +54,17 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
         "tag attribute value for the transform dialect transform op container"),
     llvm::cl::init(""));
 
+/// Flag to force using WMMA tensorcore operations.
+llvm::cl::opt<bool> clGPUUseWMMA(
+    "iree-codegen-llvmgpu-use-wmma",
+    llvm::cl::desc("force use of wmma operations for tensorcore"),
+    llvm::cl::init(false));
+
 /// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
 llvm::cl::opt<bool> clGPUUseMMASync(
     "iree-codegen-llvmgpu-use-mma-sync",
-    llvm::cl::desc("use mma sync instead of wmma ops"), llvm::cl::init(false));
+    llvm::cl::desc("force use mma sync instead of wmma ops"),
+    llvm::cl::init(false));
 
 }  // namespace iree_compiler
 }  // namespace mlir
@@ -204,6 +211,29 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
   return true;
 }
 
+/// Decides which tensorcore operations to use.
+static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
+    bool isF16) {
+  // Currently mma.sync is on by default for fp16 only.
+  IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
+      isF16 ? IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCoreMmaSync
+            : IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCore;
+
+  // Override the decision based on cl flags.
+  assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
+  if (clGPUUseMMASync) {
+    codegenPipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUMatmulTensorCoreMmaSync;
+  }
+  if (clGPUUseWMMA) {
+    codegenPipeline =
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+  };
+  return codegenPipeline;
+}
+
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
                                        linalg::LinalgOp op,
                                        const TargetInfo &targetInfo) {
@@ -299,10 +329,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
           IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
-              clGPUUseMMASync ? IREE::Codegen::DispatchLoweringPassPipeline::
-                                    LLVMGPUMatmulTensorCoreMmaSync
-                              : IREE::Codegen::DispatchLoweringPassPipeline::
-                                    LLVMGPUMatmulTensorCore;
+              getTensorCorePipeline(isFp16);
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,

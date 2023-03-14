@@ -669,7 +669,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 32]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore pipeline_depth = 3>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync pipeline_depth = 3>
 //      CHECK: hal.executable.export public @large_matmul_f16
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [128 : index, 2 : index, 1 : index]
