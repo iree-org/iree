@@ -12,4 +12,4 @@ This directory contains the definitions of source models for e2e tests
     [build_tools/python/e2e_test_framework/unique_ids.py](/build_tools/python/e2e_test_framework/unique_ids.py).
 3.  Define a new model with GCS URL and model ID in `<source_type>_models.py`.
 4.  Optionally add the model to a model group in
-    [build_tools/python/e2e_test_framework/models/model_groups.py](build_tools/python/e2e_test_framework/models/model_groups.py).
+    [build_tools/python/e2e_test_framework/models/model_groups.py](/build_tools/python/e2e_test_framework/models/model_groups.py).
