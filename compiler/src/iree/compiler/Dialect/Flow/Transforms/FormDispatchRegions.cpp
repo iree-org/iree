@@ -502,7 +502,9 @@ static bool isFusableWithConsumer(
   // all operations can bufferize without needing additional memory.
   for (OpOperand *inputOperand : consumerLinalgOp.getDpsInputOperands()) {
     if (inputOperand->get().getDefiningOp() != producer) continue;
-    if (isa<linalg::ConvolutionOpInterface>(producer) &&
+    if ((isa<linalg::ConvolutionOpInterface>(producer) ||
+         (!options.fuseMultiUse &&
+          isa<linalg::ContractionOpInterface>(producer))) &&
         !llvm::any_of(
             consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
               return canUseInOperandAsInitOperand(inputOperand, initOperand);
