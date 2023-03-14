@@ -17,10 +17,22 @@ operation_launcher_map = {
 # Profiler main
 ###############################################################################
 # The main entry point for the profiler tool. This tool compiles, verifies, and
-# profiles IREE-compiled MLIR operations for a given backend device and tuning 
-# configuration. A few definitions to help read the data structures, comments,
-# and the profiler tool. 
-#
+# profiles IREE-compiled MLIR operations for a given backend device, compiler 
+# flags, and tuning configuration. 
+# 
+# The profiler tool is organized as follows:
+# Operation: A MLIR operation that is generated or consumed by the 
+#  dispatch_profiler. For example, linalg.matmul, linalg.conv2d, etc.
+# Configuration: A set of compile parameters that are used by iree-compile the 
+#  to choose a compilation pipeline (e.g. LLVMGPUTensorCore, LLVMGPUTensorCoreMmaSync, 
+#  LLVGPUCPU, etc.), performance tuning parameters (e.g. workgroup size, tile size etc.).
+# Dispatch: A combination of an operation and a configuration is launched by the
+#  dispatch profiler for verification and performance profiling. Note that a dispatch
+#  is not a MLIR operation it is binary executable that is launched by the profiler.
+#  Additionaly, the goal of the tool is to also profile the performance of the fusions 
+#  and a dispatch for fusion is a combination of multiple operations glued together and 
+#  compiled into a single dispatch.
+###############################################################################
 
 if __name__ == "__main__":
   ###############################################################################
