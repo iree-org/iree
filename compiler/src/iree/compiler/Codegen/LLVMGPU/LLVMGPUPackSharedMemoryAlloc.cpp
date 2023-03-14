@@ -35,12 +35,9 @@ static void addBarrier(func::FuncOp funcOp, Operation *alloc,
         needBarrier = true;
         break;
       }
-      if (isa<memref::AllocOp>(&op)) {
-        if (std::find(aliasGroup.begin(), aliasGroup.end(), &op) ==
-            aliasGroup.end()) {
-          needBarrier = true;
-          break;
-        }
+      if (isa<memref::AllocOp>(&op) && !llvm::is_contained(aliasGroup, &op)) {
+        needBarrier = true;
+        break;
       }
     }
   }

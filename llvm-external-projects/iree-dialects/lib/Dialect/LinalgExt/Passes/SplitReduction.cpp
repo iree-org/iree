@@ -17,6 +17,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
@@ -135,17 +136,12 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       RankedTensorType::get(expandedResultShape, indicesElementType);
 
   // Initialize the expanded output values
-  SmallVector<Value> dynSizes;
-  for (auto i : llvm::seq<int64_t>(0, valuesExpandedType.getRank())) {
-    if (valuesExpandedType.isDynamicDim(i)) {
-      dynSizes.push_back(
-          rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
-    }
-  }
-  Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
-      loc, outputValuesExpandedType.getShape(), valueElementType, dynSizes);
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::createDimValues(rewriter, loc, valuesExpanded);
+  Value emptyTensorOutputValues =
+      rewriter.create<mlir::tensor::EmptyOp>(loc, mixedSizes, valueElementType);
   Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
-      loc, outputIndicesExpandedType.getShape(), indicesElementType, dynSizes);
+      loc, mixedSizes, indicesElementType);
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
