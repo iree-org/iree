@@ -88,3 +88,35 @@ func.func @fix_dominance_on_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf
 //  CHECK-SAME:         ins(%[[GEMM]],
 //       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+// Tests that we don't fuse transposed elementwise ops--it will require extra allocation from bufferization to hold the matmul result.
+
+func.func @transposed_elementwise(%4: tensor<4096x512xf16>, %5: tensor<512x512xf16>, %6: tensor<512xf16>) -> tensor<512x4096xf16> {
+  %f0 = arith.constant 0.000000e+00 : f16
+  %empty0 = tensor.empty() : tensor<512x4096xf16>
+  %empty1 = tensor.empty() : tensor<4096x512xf16>
+  %fill = linalg.fill ins(%f0 : f16) outs(%empty1 : tensor<4096x512xf16>) -> tensor<4096x512xf16>
+  %matmul = linalg.matmul
+    ins(%4, %5 : tensor<4096x512xf16>, tensor<512x512xf16>)
+    outs(%fill : tensor<4096x512xf16>) -> tensor<4096x512xf16>
+  %generic = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, 
+                     affine_map<(d0, d1) -> (d1, d0)>], 
+    iterator_types = ["parallel", "parallel"]
+  } ins(%matmul, %6 : tensor<4096x512xf16>, tensor<512xf16>) outs(%empty0 : tensor<512x4096xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %12 = arith.addf %in, %in_0 : f16
+    linalg.yield %12 : f16
+  } -> tensor<512x4096xf16>
+  return %generic: tensor<512x4096xf16>
+}
+
+// CHECK-LABEL: func.func @transposed_elementwise
+// CHECK:         flow.dispatch.workgroups
+// CHECK:           linalg.matmul
+// CHECK:           flow.return
+// CHECK:         flow.dispatch.workgroups
+// CHECK:           linalg.generic
+// CHECK:           flow.return
