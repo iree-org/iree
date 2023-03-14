@@ -673,114 +673,6 @@ Optional<int64_t> getNumBytes(Type type) {
   return std::nullopt;
 }
 
-/// Folds the byte offset on subspan ops into the consumer load/store ops.
-template <typename OpType>
-struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
-  using OpRewritePattern<OpType>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(OpType op,
-                                PatternRewriter &rewriter) const override {
-    Value memref;
-    if constexpr (std::is_same<OpType, gpu::SubgroupMmaLoadMatrixOp>::value) {
-      memref = op.getSrcMemref();
-    } else if constexpr (std::is_same<OpType,
-                                      gpu::SubgroupMmaStoreMatrixOp>::value) {
-      memref = op.getDstMemref();
-    } else {
-      memref = op.getMemref();
-    }
-    // Look through memref cast ops. They can be generated during conversions.
-    while (auto castOp = memref.getDefiningOp<memref::CastOp>()) {
-      memref = castOp.getSource();
-    }
-    auto memrefType = memref.getType().template cast<MemRefType>();
-    if (!isRankZeroOrOneMemRef(memrefType)) {
-      return rewriter.notifyMatchFailure(op, "expected 0-D or 1-D memref");
-    }
-
-    auto subspanOp =
-        memref.template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp) return failure();
-
-    // If the subspan op has a zero byte offset then we are done.
-    if (!subspanOp.getByteOffset() ||
-        matchPattern(subspanOp.getByteOffset(), m_Zero())) {
-      return failure();
-    }
-
-    // Calculate the offset we need to add to the load/store op, in terms of how
-    // many elements.
-    Optional<int64_t> numBytes = getNumBytes(memrefType.getElementType());
-    if (!numBytes) {
-      return rewriter.notifyMatchFailure(op,
-                                         "cannot deduce element byte count");
-    }
-    // Create a new subspan op with zero byte offset at the original location.
-    auto ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointAfter(subspanOp);
-    Value zero = rewriter.create<arith::ConstantIndexOp>(memref.getLoc(), 0);
-
-    SmallVector<Value> dynamicDims(subspanOp.getDynamicDims().begin(),
-                                   subspanOp.getDynamicDims().end());
-    Type resultType = memrefType;
-    if (memrefType.getRank() == 0) {
-      // The current MemRef has rank zero but a non-zero
-      // offset. This only works in IREE's subspan ops--a
-      // subview of the underlying whole buffer. For such
-      // cases we'd need to make the type and offset
-      // consistent to utilize MLIR IR constructs. Turn
-      // the 0-D MemRef into a 1-D dynamic one.
-      resultType =
-          MemRefType::get(ShapedType::kDynamic, memrefType.getElementType(),
-                          AffineMap(), memrefType.getMemorySpace());
-      dynamicDims.push_back(
-          rewriter.create<arith::ConstantIndexOp>(memref.getLoc(), 1));
-    }
-    Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        memref.getLoc(), resultType, subspanOp.getSet(), subspanOp.getBinding(),
-        subspanOp.getDescriptorType(), zero, dynamicDims,
-        subspanOp.getAlignmentAttr(), nullptr);
-    rewriter.restoreInsertionPoint(ip);
-
-    MLIRContext *context = rewriter.getContext();
-    AffineExpr sym0, sym1;
-    bindSymbols(context, sym0, sym1);
-    auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
-    auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
-
-    Value byteValue = rewriter.create<arith::ConstantIndexOp>(memref.getLoc(),
-                                                              numBytes.value());
-    // We assume that upper layers guarantee the byte offset is perfectly
-    // divisible by the element byte count so the content is well aligned.
-    Value offset = rewriter.create<AffineApplyOp>(
-        op.getLoc(), divMap, ValueRange{subspanOp.getByteOffset(), byteValue});
-
-    // Get the new index by adding the old index with the offset.
-    Value newIndex = offset;
-    if (!op.getIndices().empty()) {
-      newIndex = rewriter.create<AffineApplyOp>(
-          op.getLoc(), addMap, ValueRange{op.getIndices().front(), newIndex});
-    }
-    if constexpr (std::is_same<OpType, gpu::SubgroupMmaLoadMatrixOp>::value) {
-      rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
-          op, op.getType(), newSubspan, newIndex, op.getLeadDimension(),
-          op.getTransposeAttr());
-    } else if constexpr (std::is_same<OpType,
-                                      gpu::SubgroupMmaStoreMatrixOp>::value) {
-      rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
-          op, op.getSrc(), newSubspan, newIndex, op.getLeadDimension(),
-          op.getTransposeAttr());
-    } else if constexpr (std::is_same<OpType, memref::LoadOp>::value) {
-      rewriter.replaceOpWithNewOp<memref::LoadOp>(
-          op, memrefType.getElementType(), ValueRange{newSubspan, newIndex});
-    } else {
-      rewriter.replaceOpWithNewOp<memref::StoreOp>(
-          op, TypeRange{}, ValueRange{op.getOperand(0), newSubspan, newIndex});
-    }
-    return success();
-  }
-};
-
 /// Erase alignment hints.
 struct RemoveAssumeAlignOp
     : public OpRewritePattern<memref::AssumeAlignmentOp> {
@@ -953,20 +845,6 @@ struct FlattenMemRefSubspanPass
     memref::populateFoldMemRefAliasOpPatterns(foldSubviewPatterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(foldSubviewPatterns)))) {
-      return signalPassFailure();
-    }
-
-    // Then fold byte offset on subspan ops into consumer load/store ops.
-    RewritePatternSet foldPatterns(context);
-    foldPatterns
-        .add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
-             FoldSubspanOffsetIntoLoadStore<memref::StoreOp>,
-             FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaLoadMatrixOp>,
-             FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaStoreMatrixOp>>(
-            context);
-
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(foldPatterns)))) {
       return signalPassFailure();
     }
 
