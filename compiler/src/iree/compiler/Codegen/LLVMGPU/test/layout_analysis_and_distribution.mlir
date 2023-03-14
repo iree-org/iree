@@ -60,21 +60,21 @@ builtin.module {
 // CHECK-DAG:      %[[D15:.+]] = affine.apply #[[MAP3]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D16:.+]] = memref.load %[[D0]][%[[D6]], %[[D15]]] : memref<16x16xf16>
 // CHECK:        %[[D17:.+]] = vector.broadcast %[[D16]] : f16 to vector<1xf16>
-// CHECK:        %[[D18:.+]] = vector.insert_strided_slice %[[D17]], %[[D14]] {offsets = [0, 0, 1, 0], strides = [1]} :
+// CHECK:        %[[D18:.+]] = vector.insert_strided_slice %[[D17]], %[[D14]] {offsets = [0, 0, 2, 0], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
 // CHECK-DAG:      %[[D19:.+]] = affine.apply #[[MAP4]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D20:.+]] = memref.load %[[D0]][%[[D6]], %[[D19]]] : memref<16x16xf16>
 // CHECK:        %[[D21:.+]] = vector.broadcast %[[D20]] : f16 to vector<1xf16>
-// CHECK:        %[[D22:.+]] = vector.insert_strided_slice %[[D21]], %[[D18]] {offsets = [0, 0, 1, 1], strides = [1]} :
+// CHECK:        %[[D22:.+]] = vector.insert_strided_slice %[[D21]], %[[D18]] {offsets = [0, 0, 2, 1], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
 // CHECK-DAG:      %[[D23:.+]] = affine.apply #[[MAP5]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D24:.+]] = memref.load %[[D0]][%[[D23]], %[[D7]]] : memref<16x16xf16>
 // CHECK:        %[[D25:.+]] = vector.broadcast %[[D24]] : f16 to vector<1xf16>
-// CHECK:        %[[D26:.+]] = vector.insert_strided_slice %[[D25]], %[[D22]] {offsets = [0, 0, 2, 0], strides = [1]} :
+// CHECK:        %[[D26:.+]] = vector.insert_strided_slice %[[D25]], %[[D22]] {offsets = [0, 0, 1, 0], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
 // CHECK:        %[[D27:.+]] = memref.load %[[D0]][%[[D23]], %[[D11]]] : memref<16x16xf16>
 // CHECK:        %[[D28:.+]] = vector.broadcast %[[D27]] : f16 to vector<1xf16>
-// CHECK:        %[[D29:.+]] = vector.insert_strided_slice %[[D28]], %[[D26]] {offsets = [0, 0, 2, 1], strides = [1]} :
+// CHECK:        %[[D29:.+]] = vector.insert_strided_slice %[[D28]], %[[D26]] {offsets = [0, 0, 1, 1], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
 // CHECK:        %[[D30:.+]] = memref.load %[[D0]][%[[D23]], %[[D15]]] : memref<16x16xf16>
 // CHECK:        %[[D31:.+]] = vector.broadcast %[[D30]] : f16 to vector<1xf16>

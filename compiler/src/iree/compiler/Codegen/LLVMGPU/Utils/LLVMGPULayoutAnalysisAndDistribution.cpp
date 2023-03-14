@@ -320,7 +320,7 @@ void distributeTransferReads(vector::TransferReadOp readOp,
             auto vectorType = VectorType::get({1}, elementType);
             Value v = rewriter.create<vector::BroadcastOp>(loc, vectorType, el);
             SmallVector<int64_t> offsets{
-                b0, b1, i * layout.shape[DimType::VecIdY] + j, k};
+                b0, b1, j * layout.shape[DimType::VecIdZ] + i, k};
             SmallVector<int64_t> strides{1};
             vector = rewriter.create<vector::InsertStridedSliceOp>(
                 loc, v, vector, offsets, strides);
@@ -413,7 +413,7 @@ void distributeTransferWrites(vector::TransferWriteOp writeOp,
             Value v = rewriter.create<vector::ExtractOp>(
                 loc, simdToSimtMap.at(vector),
                 SmallVector<int64_t>{b0, b1,
-                                     i * layout.shape[DimType::VecIdY] + j, k});
+                                     j * layout.shape[DimType::VecIdZ] + i, k});
             AffineExpr row = layout.computeDim(0, state, rewriter);
             AffineMap rowMap = AffineMap::get(3, 0, row, rewriter.getContext());
             Value rowIndex = rewriter.create<AffineApplyOp>(
