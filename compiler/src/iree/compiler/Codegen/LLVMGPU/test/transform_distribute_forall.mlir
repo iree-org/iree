@@ -13,6 +13,9 @@ hal.executable private @distribute {
       hal.return %arg1, %c1, %c1 : index, index, index
     }
     builtin.module {
+
+// TODO: this is currently broken, needs an upstream fix.
+//       CHECK: #[[$DIV32MOD8:.*]] = affine_map<()[s0] -> ((s0 floordiv 32) floordiv 8)>
 // CHECK-LABEL: func.func @distribute
       func.func @distribute() {
         %cst_0 = arith.constant dense<0.000000e+00> : vector<1xf16>
@@ -23,7 +26,7 @@ hal.executable private @distribute {
         memref.assume_alignment %1, 64 : memref<2xf16>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %subview = memref.subview %1[%workgroup_id_x] [1] [1] : memref<2xf16> to memref<1xf16, strided<[1], offset: ?>>
-// CHECK: %[[C32:.+]] = arith.constant 32 : index
+
 // CHECK: %[[TX:.+]] = gpu.thread_id  x
 // CHECK: %[[COND:.*]] = arith.cmpi ult
 // CHECK: scf.if %[[COND]] {
@@ -32,7 +35,8 @@ hal.executable private @distribute {
           vector.transfer_write %cst_0, %subview[%arg0]
           {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
         } {mapping = [#gpu.thread<x>]}
-// CHECK: %[[WX:.+]] = arith.divui %[[TX]], %[[C32]] : index
+
+// CHECK: %[[WX:.+]] = affine.apply #[[$DIV32MOD8]]()[%[[TX]]] : index
 // CHECK: vector.transfer_write %{{.*}}, %{{.*}}[%[[WX]]] {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
         scf.forall (%arg0) in (%c8) {
           vector.transfer_write %cst_0, %subview[%arg0]
@@ -46,7 +50,7 @@ hal.executable private @distribute {
         %17 = transform.structured.match ops{["func.func"]} in %variant_op 
           : (!pdl.operation) -> !pdl.operation
         transform.iree.map_nested_forall_to_gpu_threads %17 
-          workgroup_dims = [256, 1, 1] : (!pdl.operation) -> ()
+          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1] : (!pdl.operation) -> ()
 
         // Late canonicalizations to cleanup and pass the checks.
         // Needs to occur on the whole variant to perform cse on the workgroup_count region
