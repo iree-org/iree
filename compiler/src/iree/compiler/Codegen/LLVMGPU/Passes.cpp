@@ -41,6 +41,10 @@ llvm::cl::opt<bool> llvmgpuUseGPUPipeliner(
     "iree-codegen-llvmgpu-use-gpu-pipeliner",
     llvm::cl::desc("use the gpu pipeliner"), llvm::cl::init(true));
 
+llvm::cl::opt<bool> newLoweringOpt("iree-codegen-llvmgpu-new-lowering",
+                                   llvm::cl::desc("use new lowering"),
+                                   llvm::cl::init(false));
+
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
@@ -505,17 +509,19 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // <This needs to run before scf ->cf>
   pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
-  pm.addPass(memref::createRewriteAddressComputationPass());
-  pm.addPass(memref::createExpandStridedMetadataPass());
-  // decompose affine:
-  // Hoist loop invariant variables.
-  pm.addPass(createLoopInvariantCodeMotionPass());
-  // Decompose the `affine.apply`s.
-  pm.addPass(createDecomposeAffinePass());
-  // Hoist the resulting decompositions.
-  pm.addPass(createLoopInvariantCodeMotionPass());
-  // </This needs to run before scf ->cf>
-
+  if (newLoweringOpt) {
+    pm.addPass(memref::createRewriteAddressComputationPass());
+    pm.addPass(memref::createExpandStridedMetadataPass());
+    // decompose affine:
+    // Hoist loop invariant variables.
+    pm.addPass(createLoopInvariantCodeMotionPass());
+    // Decompose the `affine.apply`s.
+    pm.addPass(createDecomposeAffinePass());
+    // Hoist the resulting decompositions.
+    pm.addPass(createLoopInvariantCodeMotionPass());
+    pm.addPass(createLowerAffinePass());
+    // </This needs to run before scf ->cf>
+  }
   // SCF -> STD
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -527,6 +533,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
+  if (!newLoweringOpt) {
+    pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
+    pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+    pm.addPass(memref::createExpandStridedMetadataPass());
+  }
   pm.addPass(createLowerAffinePass());
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
