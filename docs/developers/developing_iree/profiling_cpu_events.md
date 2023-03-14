@@ -33,6 +33,17 @@ events) and software events from the kernel (such as page faults and context
 switches). Anyone may use this system call to implement a profiler, but Linux
 readily offers one, [`perf`](https://perf.wiki.kernel.org/index.php/Main_Page).
 
+### Preserving Artifacts
+
+By default IREE cleans up any temporary files it creates while running. Tools
+like perf, however, require those files exist even after the process has exited.
+The environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES` can be set to preserve
+the files. This is only needed for the CPU path when using the system loader.
+
+```shell
+export IREE_PRESERVE_DYLIB_TEMP_FILES=1
+```
+
 ### Desktop Linux
 
 On desktop Linux we can use
@@ -51,8 +62,8 @@ subsequent commands analyzing the profile. Example:
 
 ```shell
 perf record -o /tmp/perf.data \
-  ./iree/tools/iree-benchmark-module \
-    --driver=dylib \
+  ./tools/iree-benchmark-module \
+    --device=local-task \
     ... command-line arguments of iree-benchmark-module as usual ...
 ```
 
@@ -61,8 +72,8 @@ by, with the `-e` flag. For instance, to sample by L1 cache misses, one may do:
 
 ```shell
 perf record -o /tmp/perf.data -e L1-dcache-load-misses \
-  ./iree/tools/iree-benchmark-module \
-    --driver=dylib \
+  ./tools/iree-benchmark-module \
+    --device=local-task \
     ... command-line arguments of iree-benchmark-module as usual ...
 ```
 
@@ -139,7 +150,7 @@ First, we record on the device:
 adb shell \
   simpleperf record -e raw-l1d-cache-refill -o /data/local/tmp/perf.data \
     /data/local/tmp/iree-benchmark-module \
-      --driver=dylib \
+      --device=local-task \
       ... command-line arguments of iree-benchmark-module as usual ...
 ```
 

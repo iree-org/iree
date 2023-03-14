@@ -1,0 +1,11 @@
+sphinx==4.2.0
+myst-parser==0.15.2  # For markdown
+sphinx_rtd_theme==1.0.0
+commonmark==0.9.1
+enum_tools==0.6.4
+sphinx_toolbox==2.15.0
+
+# IREE Python API
+-f https://openxla.github.io/iree/pip-release-links.html
+iree-compiler
+iree-runtime

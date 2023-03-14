@@ -9,19 +9,13 @@ for IREE. Images are uploaded to
 To build an image, use `docker build`, e.g.:
 
 ```shell
-docker build build_tools/docker/cmake --tag cmake
+docker build --file build_tools/docker/dockerfiles/base.Dockerfile --tag base .
 ```
 
 To explore an image interactively, use `docker run`, e.g.
 
 ```shell
-docker run --interactive --tty --rm cmake
-```
-
-Production versions of the images can be downloaded from GCR:
-
-```shell
-docker pull gcr.io/iree-oss/cmake:prod
+docker run --interactive --tty --rm base
 ```
 
 You can find more information in the
@@ -53,13 +47,13 @@ image and all images it depends on as well as pushing them to GCR and updating
 all references to the image digest.
 
 ```shell
-python3 build_tools/docker/manage_images.py --image cmake
+python3 build_tools/docker/manage_images.py --image base
 ```
 
 For multiple images
 
 ```shell
-python3 build_tools/docker/manage_images.py --image cmake --image bazel
+python3 build_tools/docker/manage_images.py --image base --image nvidia
 ```
 
 There is also the special option `--image all` for all registered images.
@@ -93,21 +87,4 @@ python3 build_tools/docker/manage_images.py --image all
 4. Commit the changes and send a PR for review. The CI will use the updated
    digest references to test the new images.
 
-5. Merge your PR after is approved and all CI tests pass. **Please remember to
-   complete the step below**.
-
-### Part 3. Updating the `:prod` tag
-
-Kokoro builds preload images tagged with `prod` on VM creation, so after
-changing the images used, you should also update the images tagged as `prod`
-in GCR. This also makes development significantly easier for others who need to
-modify the `docker` images.
-
-6. We use `build_tools/docker/prod_digests.txt` as a source of truth for which
-   versions of the images on GCR should have the `:prod` tag. The following
-   command will ensure that you are at upstream HEAD on the `main` branch before
-   it updates the tags.
-
-    ```shell
-    python3 build_tools/docker/manage_prod.py
-    ```
+5. Merge your PR after is approved and all CI tests pass.

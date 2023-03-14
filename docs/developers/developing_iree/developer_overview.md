@@ -3,50 +3,60 @@
 This guide provides an overview of IREE's project structure and main tools for
 developers.
 
+** Note: project layout is evolving at the moment, see
+   https://github.com/openxla/iree/issues/8955 **
+
 ## Project Code Layout
 
-[iree/](https://github.com/google/iree/blob/main/iree/)
+[iree/](https://github.com/openxla/iree/blob/main/iree/)
 
 *   Core IREE project
 
-[integrations/](https://github.com/google/iree/blob/main/integrations/)
+[integrations/](https://github.com/openxla/iree/blob/main/integrations/)
 
 *   Integrations between IREE and other frameworks, such as TensorFlow
 
-[bindings/](https://github.com/google/iree/blob/main/bindings/)
+[runtime/](https://github.com/openxla/iree/tree/main/runtime/)
+
+*   IREE runtime code, with no dependencies on the compiler
+
+[bindings/](https://github.com/openxla/iree/blob/main/bindings/)
 
 *   Language and platform bindings, such as Python
+*   Also see [runtime/bindings/](https://github.com/openxla/iree/tree/main/runtime/bindings)
 
-[colab/](https://github.com/google/iree/blob/main/colab/)
+[samples/](https://github.com/openxla/iree/blob/main/samples/)
 
-*   Colab notebooks for interactively using IREE's Python bindings
+*   Samples built using IREE's runtime and compiler
+*   Also see the separate https://github.com/iree-org/iree-samples repository
 
-## IREE Code Layout
+## IREE Compiler Code Layout
 
-[iree/base/](https://github.com/google/iree/blob/main/iree/base/)
-
-*   Common types and utilities used throughout IREE
-
-[iree/compiler/](https://github.com/google/iree/blob/main/iree/compiler/)
+[iree/compiler/](https://github.com/openxla/iree/blob/main/iree/compiler/)
 
 *   IREE's MLIR dialects, LLVM compiler passes, module translation code, etc.
-    Code here should not depend on anything in the runtime
 
-[iree/hal/](https://github.com/google/iree/blob/main/iree/hal/)
+## IREE Runtime Code Layout
+
+[iree/base/](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/)
+
+*   Common types and utilities used throughout the runtime
+
+[iree/hal/](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/)
 
 *   **H**ardware **A**bstraction **L**ayer for IREE's runtime, with
     implementations for hardware and software backends
 
-[iree/schemas/](https://github.com/google/iree/blob/main/iree/schemas/)
+[iree/schemas/](https://github.com/openxla/iree/blob/main/runtime/src/iree/schemas/)
 
 *   Shared data storage format definitions, primarily using
     [FlatBuffers](https://google.github.io/flatbuffers/)
 
-[iree/tools/](https://github.com/google/iree/blob/main/iree/tools/)
+[tools/](https://github.com/openxla/iree/blob/main/tools/)
 
 *   Assorted tools used to optimize, translate, and evaluate IREE
 
-[iree/vm/](https://github.com/google/iree/blob/main/iree/vm/)
+[iree/vm/](https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/)
 
 *   Bytecode **V**irtual **M**achine used to work with IREE modules and invoke
     IREE functions
@@ -77,71 +87,62 @@ top of the file that specifies which passes should be performed and if
 `FileCheck` should be used to test the generated output.
 
 Here's an example of a small compiler pass running on a
-[test file](https://github.com/google/iree/blob/main/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir):
+[test file](https://github.com/openxla/iree/blob/main/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir):
 
 ```shell
-$ ../iree-build/iree/tools/iree-opt \
-  -split-input-file \
-  -print-ir-before-all \
-  -iree-drop-compiler-hints \
+$ ../iree-build/tools/iree-opt \
+  --split-input-file \
+  --mlir-print-ir-before-all \
+  --iree-drop-compiler-hints \
   $PWD/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir
 ```
 
 For a more complex example, here's how to run IREE's complete transformation
 pipeline targeting the VMVX backend on the
-[fullyconnected.mlir](https://github.com/google/iree/blob/main/iree/test/e2e/models/fullyconnected.mlir)
+[fullyconnected.mlir](https://github.com/openxla/iree/blob/main/tests/e2e/models/fullyconnected.mlir)
 model file:
 
 ```shell
-$ ../iree-build/iree/tools/iree-opt \
-  -iree-transformation-pipeline \
-  -iree-hal-target-backends=vmvx \
-  $PWD/iree/test/e2e/models/fullyconnected.mlir
+$ ../iree-build/tools/iree-opt \
+  --iree-transformation-pipeline \
+  --iree-hal-target-backends=vmvx \
+  $PWD/tests/e2e/models/fullyconnected.mlir
 ```
 
 Custom passes may also be layered on top of `iree-opt`, see
-[iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/main/iree/samples/custom_modules/dialect)
+[samples/custom_modules/dialect](https://github.com/openxla/iree/blob/main/samples/custom_modules/dialect)
 for a sample.
 
-### iree-translate
+### iree-compile
 
-`iree-translate` converts MLIR input into external formats like IREE modules. It
-is similar to
-[mlir-translate](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-translate),
-see "translation" in
-[MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#translation)
-for more information.
+`iree-compile` is IREE's main compiler driver for generating binaries from
+supported input MLIR assembly.
 
 For example, to translate `simple.mlir` to an IREE module:
 
 ```shell
-$ ../iree-build/iree/tools/iree-translate \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
-  $PWD/iree/samples/models/simple_abs.mlir \
+$ ../iree-build/tools/iree-compile \
+  --iree-hal-target-backends=vmvx \
+  $PWD/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
-
-Custom translations may also be layered on top of `iree-translate`, see
-[iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/main/iree/samples/custom_modules/dialect)
-for a sample.
 
 ### iree-run-module
 
 The `iree-run-module` program takes an already translated IREE module as input
 and executes an exported main function using the provided inputs.
 
-This program can be used in sequence with `iree-translate` to translate a
+This program can be used in sequence with `iree-compile` to translate a
 `.mlir` file to an IREE module and then execute it. Here is an example command
 that executes the simple `simple_abs_vmvx.vmfb` compiled from `simple_abs.mlir`
 above on IREE's VMVX driver:
 
 ```shell
-$ ../iree-build/iree/tools/iree-run-module \
-  --module_file=/tmp/simple_abs_vmvx.vmfb \
-  --driver=vmvx \
-  --entry_function=abs \
-  --function_input=f32=-2
+$ ../iree-build/tools/iree-run-module \
+  --module=/tmp/simple_abs_vmvx.vmfb \
+  --device=local-task \
+  --function=abs \
+  --input=f32=-2
 ```
 
 ### iree-check-module
@@ -150,21 +151,20 @@ The `iree-check-module` program takes an already translated IREE module as input
 and executes it as a series of
 [googletest](https://github.com/google/googletest) tests. This is the test
 runner for the IREE
-[check framework](https://github.com/google/iree/tree/main/docs/developing_iree/testing_guide.md#end-to-end-tests).
+[check framework](https://github.com/openxla/iree/tree/main/docs/developing_iree/testing_guide.md#end-to-end-tests).
 
 ```shell
-$ ../iree-build/iree/tools/iree-translate \
-  -iree-input-type=mhlo \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
-  $PWD/iree/test/e2e/xla_ops/abs.mlir \
+$ ../iree-build/tools/iree-compile \
+  --iree-input-type=mhlo \
+  --iree-hal-target-backends=vmvx \
+  $PWD/tests/e2e/xla_ops/abs.mlir \
   -o /tmp/abs.vmfb
 ```
 
 ```shell
-$ ../iree-build/iree/tools/iree-check-module \
+$ ../iree-build/tools/iree-check-module \
   /tmp/abs.vmfb \
-  --driver=vmvx
+  --device=local-task
 ```
 
 ### iree-run-mlir
@@ -177,13 +177,14 @@ does some additional work that usually must be explicit, like marking every
 function as exported by default and running all of them.
 
 For example, to execute the contents of
-[iree/samples/models/simple_abs.mlir](https://github.com/google/iree/blob/main/iree/samples/models/simple_abs.mlir):
+[samples/models/simple_abs.mlir](https://github.com/openxla/iree/blob/main/samples/models/simple_abs.mlir):
 
 ```shell
-$ ../iree-build/iree/tools/iree-run-mlir \
-  $PWD/iree/samples/models/simple_abs.mlir \
-  -function-input="f32=-2" \
-  -iree-hal-target-backends=vmvx
+# iree-run-mlir <compiler flags> [input.mlir] <runtime flags>
+$ ../iree-build/tools/iree-run-mlir \
+  --iree-hal-target-backends=vmvx \
+  $PWD/samples/models/simple_abs.mlir \
+  --input=f32=-2
 ```
 
 ### iree-dump-module
@@ -194,19 +195,12 @@ file.
 For example, to inspect the module translated above:
 
 ```shell
-$ ../iree-build/iree/tools/iree-dump-module /tmp/simple_abs_vmvx.vmfb
+$ ../iree-build/tools/iree-dump-module /tmp/simple_abs_vmvx.vmfb
 ```
 
 ### Useful generic flags
 
 There are a few useful generic flags when working with IREE tools:
-
-#### `--iree_minloglevel` and `--iree_v`
-
-These flags can control IREE tool output verbosity. `--iree_minloglevel` and
-`--iree_v` set the minimal and maximal verbosity levels respectively. They both
-accept a number where 0, 1, 2, 3 stands for info, warning, error, and fatal
-error respectively.
 
 #### Read inputs from a file
 
@@ -233,4 +227,4 @@ function.
 ### Useful Vulkan driver flags
 
 For IREE's Vulkan runtime driver, there are a few useful flags defined in
-[driver_module.cc](https://github.com/google/iree/blob/main/iree/hal/vulkan/registration/driver_module.cc):
+[driver_module.cc](https://github.com/openxla/iree/blob/main/iree/hal/drivers/vulkan/registration/driver_module.cc):

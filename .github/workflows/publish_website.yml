@@ -12,33 +12,43 @@ on:
       - main
     paths:
       - "docs/website/**"
-
-defaults:
-  run:
-    working-directory: docs/website
+      - "build_tools/scripts/generate_release_index.py"
+      - ".github/workflows/publish_website.yml"
+  # Regenerate the release pip index when a regular or pre-release is created or
+  # deleted.
+  release:
+    types: [published, unpublished]
 
 jobs:
   publish_website:
-    # Don't run this in everyone's forks.
-    if: github.repository == 'google/iree'
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
       - name: Fetching base gh-pages branch
         # We have to explicitly fetch the gh-pages branch as well to preserve history
         run: git fetch --no-tags --prune --depth=1 origin "gh-pages:gh-pages"
       - name: Setting up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
         with:
           python-version: 3.x
-      - name: Installing Material for MkDocs
-        run: pip install mkdocs-material
+          cache: 'pip'
+      - name: Installing dependencies
+        run: |
+          pip install \
+            mkdocs-material \
+            requests
+      - name: Generating release index
+        run: |
+          ./build_tools/scripts/generate_release_index.py \
+            --repo="${GITHUB_REPOSITORY}" \
+            --output=docs/website/docs/pip-release-links.html
       - name: Setting git config
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
           git config --local user.name "Website Publish Action"
       - name: Deploying to gh-pages
+        working-directory: docs/website
         run: mkdocs gh-deploy

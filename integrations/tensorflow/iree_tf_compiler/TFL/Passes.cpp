@@ -6,20 +6,33 @@
 
 #include "iree_tf_compiler/TFL/Passes.h"
 
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
-#include "tensorflow/compiler/mlir/tosa/tfl_passes.h"
+#include "tensorflow/compiler/mlir/tosa/tf_tfl_passes.h"
+#include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
 namespace mlir {
 namespace iree_integrations {
 namespace TFL {
 
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree_tf_compiler/TFL/Passes.h.inc"  // IWYU pragma: export
+}  // namespace
+
 // All IREE-specific passes that lower TFL representations before reaching the
 // IREE core should go here.
 void buildTFLImportPassPipeline(OpPassManager &pm) {
+  //----------------------------------------------------------------------------
+  // Guarantee the call once functions are preserved.
+  //----------------------------------------------------------------------------
+
+  pm.addPass(createRetainCallOnceFuncsPass());
+
   //----------------------------------------------------------------------------
   // Input IR cleanup
   //----------------------------------------------------------------------------
@@ -33,15 +46,22 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
 
   pm.addPass(createConvertModuleMetadataPass());
-  pm.nest<ModuleOp>().addPass(createConvertFunctionMetadataPass());
+  pm.nest<func::FuncOp>().addPass(createConvertFunctionMetadataPass());
 
   //----------------------------------------------------------------------------
   // Convert all TFL ops to TOSA ops
   //----------------------------------------------------------------------------
 
-  mlir::tosa::TOSATFLLegalizationPipelineOptions tosaOptions;
-  mlir::tosa::createTFLtoTOSALegalizationPipeline(pm, tosaOptions);
+  pm.addPass(createLowerGlobalTensorsPass());
+
+  mlir::tosa::TOSATFTFLLegalizationPipelineOptions tosaOptions;
+  // Temporary work-around for https://github.com/openxla/iree/issues/8974
+  tosaOptions.dequantize_tfl_softmax = true;
+  mlir::tosa::createTFTFLtoTOSALegalizationPipeline(pm, tosaOptions);
+
+  pm.nest<func::FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
   pm.addPass(createCanonicalizerPass());
+  pm.addPass(createReconcileUnrealizedCastsPass());
 
   //----------------------------------------------------------------------------
   // Lowering shape-related constructs
@@ -57,8 +77,8 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   // Remove the rest of the TFL goo and verify that all ops converted
   //----------------------------------------------------------------------------
 
+  pm.nest<func::FuncOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createStripModuleMetadataPass());
-  pm.nest<ModuleOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createVerifyFullyConvertedPass());
 }
 
@@ -69,6 +89,15 @@ void registerTFLImportPassPipeline() {
       [](OpPassManager &passManager) {
         buildTFLImportPassPipeline(passManager);
       });
+}
+
+void registerAllPasses() {
+  registerTFLImportPassPipeline();
+
+  // Generated.
+  registerPasses();
+
+  createVerifyFullyConvertedPass();
 }
 
 }  // namespace TFL

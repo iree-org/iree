@@ -4,32 +4,45 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.13.4)
-
-# Do not set MSVC warning flags like /W3 by default (since 3.15):
-#   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
-if(POLICY CMP0092)
-  cmake_policy(SET CMP0092 NEW)
-endif()
+cmake_minimum_required(VERSION 3.21...3.24)
 
 # LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
 # New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
 set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
+if(POLICY CMP0116)
+  cmake_policy(SET CMP0116 OLD)
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(iree ASM C CXX)
+project(IREE ASM C CXX)
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
+# LLVM defines this as a CACHE property and uses a policy that causes the
+# cache value to take precedence. This is causing us to mix 17/14 across
+# the boundary.
+# TODO: Remove this once the LLVM mechanism is updated. See:
+#   https://discourse.llvm.org/t/important-new-toolchain-requirements-to-build-llvm-will-most-likely-be-landing-within-a-week-prepare-your-buildbots/61447/9
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to" FORCE)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-if(${MSVC})
+if(MSVC)
   enable_language(ASM_MASM)
 else()
   enable_language(ASM)
 endif()
+
+# Set the default CMake build type so some of the build type dependent setting
+# in the submodules and functions (IREE assertion) can be set properly.
+set(DEFAULT_CMAKE_BUILD_TYPE "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
+  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+endif()
+
+include(CMakeDependentOption)
 
 #-------------------------------------------------------------------------------
 # Project component configuration
@@ -37,161 +50,336 @@ endif()
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
+option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the RenderDoc tool." OFF)
+option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
+option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
+
+# TODO(#8469): remove the dependency on cpuinfo entirely.
+option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ON)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
-option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
+option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 
-option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
-option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
-option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
-option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
-option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
-
-set(IREE_HAL_DRIVERS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
-set(IREE_TARGET_BACKENDS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
+option(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
 # Properties controlling version and naming of release artifacts.
-set(IREE_RELEASE_PACKAGE_SUFFIX "-dev" CACHE STRING "Suffix to append to distributed package names")
+set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
 set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
 set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
+option(IREE_EMBED_RELEASE_INFO "Embed the IREE version information in built artifacts." OFF)
 
-# Master enable for tensorflow build support.
-# Note that this is a normal CMake variable used to gate build features (not
-# a cache variable that is user-settable).
-set(IREE_ENABLE_TENSORFLOW OFF)
-if(${IREE_BUILD_TENSORFLOW_ALL} OR
-   ${IREE_BUILD_TENSORFLOW_COMPILER} OR
-   ${IREE_BUILD_TFLITE_COMPILER} OR
-   ${IREE_BUILD_XLA_COMPILER})
-  set(IREE_ENABLE_TENSORFLOW ON)
+# Using already built host binaries, such as for cross-compilation.
+set(IREE_HOST_BIN_DIR_DEFAULT "")
+if(IREE_HOST_BINARY_ROOT)
+  message(WARNING "IREE_HOST_BINARY_ROOT is deprecated. Use IREE_HOST_BIN_DIR"
+                  " pointing directly to the directory containing binaries"
+                  " instead.")
+  set(IREE_HOST_BIN_DIR_DEFAULT "${IREE_HOST_BINARY_ROOT}/bin")
 endif()
+set(IREE_HOST_BIN_DIR "${IREE_HOST_BIN_DIR_DEFAULT}" CACHE STRING "Path to directory containing IREE binary tools to use instead of building them from source.")
 
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
-# Default python bindings to enabled for some features.
-if(${IREE_ENABLE_TENSORFLOW})
-  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" ON)
-else()
-  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
-endif()
+# Properties building and controlling benchmark suites.
+option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
+# TODO(pzread): Currently IREE_ENABLE_COMPILATION_BENCHMARKS needs
+# IREE_BUILD_BENCHMARKS. Eventually we will decouple them.
+cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "Builds IREE benchmark suites for compilation statistics." OFF ${IREE_BUILD_BENCHMARKS} OFF)
 
-option(IREE_BUILD_OLD_PYTHON_COMPILER_API "Builds the original Python compiler API" ON)
+option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
+
+# Leave the old name around for a bit so that people can update their configs
+# and previous cached values will automatically carry over.
+# TODO(pzread): Remove this option after 2023-04-01
+option(IREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS "DEPRECATED alias for IREE_BUILD_E2E_TEST_ARTIFACTS" OFF)
+option(IREE_BUILD_E2E_TEST_ARTIFACTS "Builds IREE E2E test artifacts suite generated by the e2e test framework." "${IREE_BUILD_EXPERIMENTAL_E2E_TEST_ARTIFACTS}")
+
+# For development, builds LLVM (and in the future) the whole compiler as
+# individual shared libraries similar to if passing -DBUILD_SHARED_LIBS=ON
+# to a standalone LLVM build. This can dramatically reduce linking time and
+# makes the management of some dependencies more strict.
+# This option is considered experimental and should not be relied on until
+# CI coverage is established.
+option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for LLVM and the compiler (this is only suitable for development)" OFF)
+
+# Must be defined as an option (CMake does not do it automatically), even though
+# we override it for different parts of the tree.
+# This option is considered experimental and should not be relied on until
+# CI coverage is established.
+option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
 
 #-------------------------------------------------------------------------------
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
-option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
-option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
-option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
-option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disables old." OFF)
+option(IREE_BUILD_EXPERIMENTAL_VMVX_MMT4D "Enables MMT4D methods in the VMVX module." OFF)
+option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 
 #-------------------------------------------------------------------------------
-# Derived flags based on primary options
+# CUDA Toolkit.
+#
+# Using the (optional) CUDA support in the compiler and runtime requires the
+# NVIDIA CUDA Toolkit. The toolkit can either be installed ahead of time or
+# it can be automatically downloaded on certain host architectures.
 #-------------------------------------------------------------------------------
 
-option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILER})
-
-#-------------------------------------------------------------------------------
-# Target and backend configuration
-#-------------------------------------------------------------------------------
-
-# List of all HAL drivers to be built by default:
-set(IREE_ALL_HAL_DRIVERS
-  Cuda
-  DyLib
-  VMVX
-  Vulkan
-)
-
-if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
-  set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
-
-  # For Apple platforms we need to use Metal instead of Vulkan.
-  if(APPLE)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
-  endif()
-  # Remove Cuda from Android and Apple platforms.
-  if(ANDROID OR APPLE)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Cuda)
-  endif()
-endif()
-message(STATUS "Building HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
-
-# Default every IREE_HAL_DRIVER_* to OFF
-foreach(_backend ${IREE_ALL_HAL_DRIVERS})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  set(IREE_HAL_DRIVER_${uppercase_backend} OFF CACHE BOOL "" FORCE)
-endforeach()
-
-# Set IREE_HAL_DRIVER_* based on configuration
-foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
-  set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
-endforeach()
-
-# List of all target backends to be built by default:
-set(IREE_ALL_TARGET_BACKENDS
-  CUDA
-  DYLIB-LLVM-AOT
-  WASM-LLVM-AOT
-  Metal-SPIRV
-  ROCM
-  Vulkan-SPIRV
-  VMVX
-)
-
-if(${IREE_BUILD_COMPILER})
-  if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
-    set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
-  endif()
-  message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
+set(IREE_CUDA_AVAILABLE OFF)
+find_package(CUDAToolkit)
+if(CUDAToolkit_FOUND)
+  set(IREE_CUDA_AVAILABLE ON)
 else()
-  set(IREE_TARGET_BACKENDS_TO_BUILD "" CACHE STRING "" FORCE)
-  message(STATUS "Compiler is disabled, building no target backends")
+  # We can download the SDK in build_tools/third_party/cuda/CMakeLists.txt, if
+  # on a supported platform/arch.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64|amd64)")
+      set(IREE_CUDA_AVAILABLE ON)
+    endif()
+  endif()
 endif()
 
-# Default every IREE_TARGET_BACKEND_* to OFF
-foreach(_backend ${IREE_ALL_TARGET_BACKENDS})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  set(IREE_TARGET_BACKEND_${uppercase_backend} OFF CACHE BOOL "" FORCE)
-endforeach()
+#-------------------------------------------------------------------------------
+# Runtime HAL Driver Options
+# By default, all runtime drivers supported by the current platform which do
+# not require external deps are enabled by default. This can be changed with:
+#   -DIREE_HAL_DRIVER_DEFAULTS=OFF
+#-------------------------------------------------------------------------------
 
-# Set IREE_TARGET_BACKEND_* based on configuration
-foreach(_backend ${IREE_TARGET_BACKENDS_TO_BUILD})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
-  set(IREE_TARGET_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
-endforeach()
+# External HAL drivers; see runtime/src/iree/hal/drivers/CMakeLists.txt for more
+# information on how to declare external drivers.
+set(IREE_EXTERNAL_HAL_DRIVERS "" CACHE STRING "")
 
-list(APPEND CMAKE_MODULE_PATH
-  ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
-  ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
-)
+# Additional executable loader deps to add dependent libraries to any target
+# using the default executable loader registration utilities.
+# TODO(benvanik): extend the deps to encompass the built-in loaders too so that
+# we have one flag. We could also support a list of deps and automatically
+# generate the registration from that via a configure file.
+set(IREE_HAL_EXECUTABLE_LOADER_EXTRA_DEPS "" CACHE STRING "")
+
+option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
+
+# CUDA support is enabled by default if the platform supports the CUDA SDK and
+# not cross compiling. Note: a CUDA-compatible GPU with drivers is still
+# required to actually run CUDA workloads.
+set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
+  set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
+endif()
+
+# Vulkan support is enabled by default if the platform might support Vulkan.
+# Apple platforms support Metal instead of Vulkan, though MoltenVK may work.
+set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+if(APPLE)
+  set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
+endif()
+
+option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
+option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
+
+option(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS "Sets the default value for all runtime HAL executable loaders" ON)
+set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
+set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
+set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
+
+# Emscripten builds don't support embedded ELF libraries.
+if(EMSCRIPTEN)
+  set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT OFF)
+endif()
+
+# If forcing system libraries (for TSAN/debugging tools/etc) then ensure the
+# system library loader is linked in.
+if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
+  set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ON)
+endif()
+
+# If no local driver is enabled then we force all the loaders off; this allows
+# for simpler checks that don't need to see if both the driver and loader is
+# available.
+if(NOT IREE_HAL_DRIVER_LOCAL_SYNC AND NOT IREE_HAL_DRIVER_LOCAL_TASK)
+  set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT OFF)
+  set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT OFF)
+  set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT OFF)
+endif()
+
+option(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF "Enables the embedded dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT})
+option(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY "Enables the system dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT})
+option(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE "Enables the VMVX module loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT})
+
+if(IREE_BUILD_COMPILER)
+  # The compiler requires the local task driver with the VMVX loader.
+  set(IREE_HAL_DRIVER_LOCAL_TASK ON)
+  set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)
+endif()
+
+message(STATUS "IREE HAL drivers:")
+if(IREE_HAL_DRIVER_CUDA)
+  message(STATUS "  - cuda")
+endif()
+if(IREE_HAL_DRIVER_LOCAL_SYNC)
+  message(STATUS "  - local-sync")
+endif()
+if(IREE_HAL_DRIVER_LOCAL_TASK)
+  message(STATUS "  - local-task")
+endif()
+if(IREE_HAL_DRIVER_VULKAN)
+  message(STATUS "  - vulkan")
+endif()
+if(IREE_EXTERNAL_HAL_DRIVERS)
+  message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS}")
+endif()
+
+message(STATUS "IREE HAL local executable library loaders:")
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
+  message(STATUS "  - embedded-elf")
+endif()
+if(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
+  message(STATUS "  - system-library")
+endif()
+if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
+  message(STATUS "  - vmvx-module")
+endif()
+
+#-------------------------------------------------------------------------------
+# Experimental ROCM HAL driver
+#-------------------------------------------------------------------------------
+
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/rocm")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
+set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
+
+#-------------------------------------------------------------------------------
+# Compiler Target Options
+# By default, all compiler targets supported by the current platform are
+# enabled. Some compiler targets like CUDA will install external deps as
+# needed at configure time. This can be changed with:
+#   -DIREE_TARGET_BACKEND_DEFAULTS=OFF
+#-------------------------------------------------------------------------------
+
+option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ON)
+
+# The VMVX backend is always enabled.
+cmake_dependent_option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+
+# Supported default target backends.
+cmake_dependent_option(IREE_TARGET_BACKEND_LLVM_CPU "Enables the 'llvm-cpu' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_LLVM_CPU_WASM "Enables WebAssembly in the 'llvm-cpu' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_TARGET_BACKEND_LLVM_CPU} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+
+# Supported default target backends that are only available on certain
+# platforms.
+set(IREE_TARGET_BACKEND_CUDA_DEFAULT ${IREE_TARGET_BACKEND_DEFAULTS})
+if(NOT IREE_CUDA_AVAILABLE)
+  set(IREE_TARGET_BACKEND_CUDA_DEFAULT OFF)
+endif()
+cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ${IREE_TARGET_BACKEND_CUDA_DEFAULT} ${IREE_BUILD_COMPILER} OFF)
+
+# Non-default target backends either have additional dependencies or are
+# experimental/niche in some fashion.
+cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+# Disable WebGPU by default - it has complex deps and is under development.
+cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+
+#-------------------------------------------------------------------------------
+# Compiler Input Dialects
+#-------------------------------------------------------------------------------
+
+cmake_dependent_option(IREE_INPUT_MHLO "Builds support for compiling MHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
+
+if(IREE_BUILD_COMPILER)
+  message(STATUS "IREE compiler input dialects:")
+  if(IREE_INPUT_MHLO)
+    message(STATUS "  - MHLO")
+  endif()
+  if(IREE_INPUT_TORCH)
+    message(STATUS "  - Torch MLIR")
+  endif()
+  if(IREE_INPUT_TOSA)
+    message(STATUS "  - TOSA")
+  endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# Compiler Output Formats
+#-------------------------------------------------------------------------------
+
+cmake_dependent_option(IREE_OUTPUT_FORMAT_C "Enables the 'vm-c' output format, using MLIR EmitC" ON ${IREE_BUILD_COMPILER} OFF)
+
+if(IREE_BUILD_COMPILER)
+  message(STATUS "IREE compiler output formats:")
+  if(IREE_OUTPUT_FORMAT_C)
+    message(STATUS "  - C source module")
+  endif()
+  # The 'vm-bytecode' and 'vm-asm' formats are always enabled.
+  message(STATUS "  - VM Bytecode")
+  message(STATUS "  - VM MLIR Assembly")
+endif()
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
 #-------------------------------------------------------------------------------
 
-# Enable using lld as the linker for C/C++ targets. This affects IREE and all
-# dependency projects.
-option(IREE_ENABLE_LLD "Use lld when linking" OFF)
 option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
 option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
-option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
+option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules in tests" OFF)
+option(IREE_ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
+option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
+option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
+option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
 
-if(${IREE_ENABLE_CCACHE})
+# STREQUAL feels wrong here - we don't care about the exact true-value used,
+# ON or TRUE or something else. But we haven't been able to think of a less bad
+# alternative. https://github.com/openxla/iree/pull/8474#discussion_r840790062
+if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
+  message(SEND_ERROR
+      "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "
+      "simultaneously ON or OFF. "
+      "A discrepancy between the two would cause tests to crash as IREE "
+      "runtime code (controlled by IREE_ENABLE_TSAN) calls into test IREE "
+      "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
+endif()
+
+if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+  if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
+    message(SEND_ERROR
+        "When IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
+        "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
+        "TSAN instrumentation is not currently supported in embedded modules.")
+  endif()
+endif()
+
+if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
+  message(SEND_ERROR
+      "IREE_ENABLE_COMPILER_TRACING requires "
+      "-DIREE_LINK_COMPILER_SHARED_LIBRARY=OFF (the compiler library must not "
+      "be unloaded before Tracy finishes, static linking is one workaround)")
+endif()
+
+option(IREE_ENABLE_CCACHE
+    "[DEPRECATED: Use CMAKE_<LANG>_COMPILER_LAUNCHER configure options or environment variables instead.] Use ccache if installed."
+    OFF)
+
+if(IREE_ENABLE_CCACHE)
+  message(WARNING
+      "IREE_ENABLE_CCACHE is deprecated. Use CMAKE_<LANG>_COMPILER_LAUNCHER"
+      " configure options or environment variables instead.")
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+  else()
+    message(SEND_ERROR
+        "IREE_ENABLE_CCACHE was set, but executable `ccache` was not found.")
   endif()
 endif()
 
@@ -222,19 +410,18 @@ option(IREE_ENABLE_ASSERTIONS "Force unset of NDEBUG compile option" OFF)
 # Filter -DNDEBUG from CMAKE_CXX_FLAGS_* and CMAKE_C_FLAGS_* (if
 # CMAKE_BUILD_TYPE is not Debug).
 function(iree_fix_ndebug)
-  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
-  if(IREE_ENABLE_ASSERTIONS AND NOT "${uppercase_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" _UPPERCASE_CMAKE_BUILD_TYPE)
+  if(IREE_ENABLE_ASSERTIONS AND NOT "${_UPPERCASE_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
       # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
-      foreach (flags_var_to_scrub
-              CMAKE_CXX_FLAGS_${uppercase_CMAKE_BUILD_TYPE}
-              CMAKE_C_FLAGS_${uppercase_CMAKE_BUILD_TYPE})
-          set(original_flags "${${flags_var_to_scrub}}")
-          string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
-                  altered_flags "${original_flags}")
-          if(NOT "${original_flags}" STREQUAL "${altered_flags}")
+      foreach(_FLAGS_VAR_TO_SCRUB
+              CMAKE_CXX_FLAGS_${_UPPERCASE_CMAKE_BUILD_TYPE}
+              CMAKE_C_FLAGS_${_UPPERCASE_CMAKE_BUILD_TYPE})
+          set(_ORIGINAL_FLAGS "${${_FLAGS_VAR_TO_SCRUB}}")
+          string(REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " " _ALTERED_FLAGS "${_ORIGINAL_FLAGS}")
+          if(NOT "${_ORIGINAL_FLAGS}" STREQUAL "${_ALTERED_FLAGS}")
             message(STATUS
-              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${flags_var_to_scrub}: '${original_flags}' -> '${altered_flags}'")
-            set(${flags_var_to_scrub} "${altered_flags}" PARENT_SCOPE)
+              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${_FLAGS_VAR_TO_SCRUB}: '${_ORIGINAL_FLAGS}' -> '${_ALTERED_FLAGS}'")
+            set(${_FLAGS_VAR_TO_SCRUB} "${_ALTERED_FLAGS}" PARENT_SCOPE)
           endif()
       endforeach()
 
@@ -249,30 +436,37 @@ iree_fix_ndebug()
 # IREE utility definitions
 #-------------------------------------------------------------------------------
 
+list(APPEND CMAKE_MODULE_PATH
+  ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
+)
+
 include(iree_macros)
 include(iree_copts)
-include(sanitizers)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_import_binary)
+include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
-include(iree_third_party_cmake_options)
 include(iree_c_embed_data)
+include(iree_bitcode_library)
 include(iree_bytecode_module)
 include(iree_c_module)
 include(iree_python)
 include(iree_lit_test)
+include(iree_llvm)
 include(iree_add_all_subdirs)
 include(iree_check_test)
-include(iree_run_binary_test)
-include(iree_mlir_benchmark_suite)
-
-set(DEFAULT_CMAKE_BUILD_TYPE "Release")
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-  message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
-  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
-endif()
+include(iree_trace_runner_test)
+include(iree_native_test)
+include(iree_cc_binary_benchmark)
+include(iree_benchmark_suite)
+include(iree_microbenchmark_suite)
+include(iree_hal_cts_test_suite)
+include(iree_static_linker_test)
+include(iree_fetch_artifact)
+include(iree_run_module_test)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
@@ -294,17 +488,49 @@ mark_as_advanced(
   CMAKE_SHARED_LINKER_FLAGS_FASTBUILD
 )
 
+# Override the system's default linker.
+# See also: https://llvm.org/docs/CMake.html#llvm-use-linker.
+set(IREE_USE_LINKER "" CACHE STRING "")
+# Equivalent to setting -DIREE_USE_LINKER=lld.
+# Note that unlike LLVM's LLVM_ENABLE_LLD, this does _not_ build lld. You will
+# need to either install a recent version of lld or build it from source prior
+# to setting this option. See also: https://lld.llvm.org/#using-lld.
+# This option is disabled on Apple platforms, where lld is not supported.
+cmake_dependent_option(IREE_ENABLE_LLD "Override the system's default linker to lld" OFF "NOT APPLE" OFF)
+
 include(iree_setup_toolchain)
 
 #-------------------------------------------------------------------------------
-# Configure python early if there are any features that need it.
-# Note that doing this early ensures that dependencies that make incidental
-# use of Python (such as LLVM) resolve the same version.
+# Python
+# If building features that require Python development, find them early in
+# one invocation (some CMake versions are sensitive to resolving out of order).
+# Otherwise, for features that just require the interpreter, find that alone.
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_COMPILER} OR
-   ${IREE_BUILD_PYTHON_BINDINGS})
+if(IREE_BUILD_PYTHON_BINDINGS)
+  # After CMake 3.18, we are able to limit the scope of the search to just
+  # Development.Module. Searching for Development will fail in situations where
+  # the Python libraries are not available. When possible, limit to just
+  # Development.Module.
+  # See https://pybind11.readthedocs.io/en/stable/compiling.html#findpython-mode
+  #
+  # Configuring the Development.Module is flaky in multi-project setups.
+  # "Bootstrapping" by first looking for the optional Development component
+  # seems to be robust generally.
+  # See: https://reviews.llvm.org/D118148
+  find_package(Python3 COMPONENTS Interpreter Development)
+  find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
+elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+endif()
+
+# Extended Python environment checks.
+if(Python3_FOUND)
+  iree_detect_pyyaml()
+endif()
+
+if(IREE_BUILD_TESTS AND NOT IREE_PYYAML_FOUND)
+  message(WARNING "IREE's regression test suite requires PyYAML to run all tests. It is not installed, so some tests will be disabled.")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -312,16 +538,146 @@ endif()
 # This will only run if python3 is available.
 #-------------------------------------------------------------------------------
 
+option(IREE_ERROR_ON_MISSING_SUBMODULES "Error if submodules have not been initialized." ON)
+
 find_package(Python3 COMPONENTS Interpreter QUIET)
-if(Python3_FOUND)
+find_package(Git)
+if(IREE_ERROR_ON_MISSING_SUBMODULES AND Python3_FOUND AND Git_FOUND)
+  # Only check submodule status when the git commit changes.
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} scripts/git/check_submodule_init.py
+    COMMAND git rev-parse --short HEAD
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    RESULT_VARIABLE ret
-  )
-  if(NOT ret EQUAL "0")
-    message(FATAL_ERROR "check_submodule_init.py failed, see the logs above")
+    RESULT_VARIABLE SHORT_HASH_RESULT
+    OUTPUT_VARIABLE SHORT_HASH)
+  string(REGEX REPLACE "\n$" "" SHORT_HASH "${SHORT_HASH}")
+  if(SHORT_HASH_RESULT EQUAL "0" AND NOT "${IREE_GIT_SHORT_HASH}" STREQUAL "${SHORT_HASH}")
+    if(NOT IREE_BUILD_COMPILER)
+      set(CHECK_SUBMODULE_ARGS "--runtime_only")
+    endif()
+    execute_process(
+      COMMAND ${Python3_EXECUTABLE} build_tools/scripts/git/check_submodule_init.py ${CHECK_SUBMODULE_ARGS}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      RESULT_VARIABLE SUBMODULE_INIT_RESULT
+    )
+    if(NOT SUBMODULE_INIT_RESULT EQUAL "0")
+      message(FATAL_ERROR "check_submodule_init.py failed, see the logs above")
+    else()
+      set(IREE_GIT_SHORT_HASH "${SHORT_HASH}" CACHE STRING "" FORCE)
+    endif()
   endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# IREE top-level targets
+# We define these here because various things in the build tree adds
+# dependencies to them.
+#-------------------------------------------------------------------------------
+
+if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
+  # Add top-level custom targets to drive generating benchmark suites.
+
+  # iree-benchmark-import-models imports benchmark models from their source
+  # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
+  add_custom_target(iree-benchmark-import-models)
+
+  # iree-benchmark-suites fully prepares benchmark models for benchmarking:
+  #   * importing from source formats to IREE-compatible .mlir files
+  #   * compiling from .mlir files to benchmark-ready .vmfb files
+  #   * generating flagfiles for executing the benchmark .vmfb files
+  add_custom_target(iree-benchmark-suites)
+endif()
+
+# TODO(#11263): This conditional block should be merged with the block above
+# once we remove IREE_BUILD_BENCHMARKS.
+if(IREE_BUILD_E2E_TEST_ARTIFACTS)
+  # iree-e2e-compile-stats-suites compiles the benchmark models with specific
+  # flags to collect the compilation statistics.
+  add_custom_target(iree-e2e-compile-stats-suites)
+
+  # iree-e2e-test-artifacts builds all e2e test artifacts, including benchmarks
+  # and model tests.
+  add_custom_target(iree-e2e-test-artifacts)
+  add_dependencies(iree-e2e-test-artifacts
+    iree-benchmark-import-models
+    iree-benchmark-suites
+    iree-e2e-compile-stats-suites
+  )
+endif()
+
+if(IREE_BUILD_MICROBENCHMARKS)
+  # Add top-level custom targets to drive generating microbenchmark suites.
+  add_custom_target(iree-microbenchmark-suites)
+endif()
+
+if(IREE_BUILD_DOCS)
+  # Add a top-level custom target to drive generating all documentation.
+  # Register it to the default target given that IREE_BUILD_DOCS is explicitly
+  # requested.
+  add_custom_target(iree-doc ALL)
+endif()
+
+# Samples may require additional files to be built/configured and will add
+# dependencies to this target.
+# Note: These will be automatically built with test dependencies
+# (`iree-test-deps`).
+add_custom_target(iree-sample-deps
+  COMMENT
+    "Building IREE sample data targets"
+)
+
+# Testing rules that require generation will add dependencies to this target.
+# This allows them to be EXCLUDE_FROM_ALL but still invokable.
+add_custom_target(iree-test-deps
+  COMMENT
+    "Building IREE test deps"
+  DEPENDS
+    iree-sample-deps
+)
+
+# Testing rules that generate test scripts for iree-run-module-test will add
+# dependencies to this target. It is a subset of `iree-test-deps`.
+add_custom_target(iree-run-module-test-deps
+  COMMENT
+    "Building IREE run module test targets"
+)
+
+# Convenience target for running IREE tests.
+add_custom_target(iree-run-tests
+  COMMENT
+    "Run IREE unit tests"
+  WORKING_DIRECTORY
+    "${CMAKE_CURRENT_BINARY_DIR}"
+  USES_TERMINAL
+  COMMAND
+    "${CMAKE_COMMAND}" -E echo
+    "The 'iree-run-tests' target is a helper for running ctest. For advanced"
+    "options, build dependencies and invoke ctest independently as in:"
+  COMMAND
+    "${CMAKE_COMMAND}" -E echo
+    "  \\(cd ${CMAKE_CURRENT_BINARY_DIR} \\&\\& cmake --build . --target iree-test-deps \\&\\& ctest --output-on-failure\\)"
+  COMMAND
+    "${CMAKE_COMMAND}" -E echo
+    "Run tests in parallel by setting a variable like CTEST_PARALLEL_LEVEL=25."
+  COMMAND
+    "${CMAKE_CTEST_COMMAND}"
+    --output-on-failure
+)
+add_dependencies(iree-run-tests iree-test-deps)
+
+#-------------------------------------------------------------------------------
+# CUDA configuration for both the compiler and runtime.
+# We do this at the top level so that we can fail fast and make global
+# decisions that effect both compiler and runtime. It also helps with error
+# messaging to do this all in one place, since we can provide very targeted
+# advice.
+#-------------------------------------------------------------------------------
+
+set(IREE_CUDA_LIBDEVICE_PATH "" CACHE FILEPATH "Absolute path to an appropriate libdevice.*.bc (needed to build the IREE cuda compiler target)")
+
+# If any CUDA features are being built, try to locate a CUDA SDK. We will fall
+# back to this as needed for specific features.
+if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
+  add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 endif()
 
 #-------------------------------------------------------------------------------
@@ -330,79 +686,65 @@ endif()
 
 if(NOT IREE_BUILD_COMPILER)
   message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
-elseif(TARGET LLVMSupport)
-  message(STATUS "Not adding IREE bundled LLVM because it has already been included")
-  if(NOT TARGET MLIRIR)
-    message(FATAL_ERROR "Detected externally provided LLVM project but could not find MLIR projects (is it enabled/installed?)")
-  endif()
 else()
-  message(STATUS "Adding bundled LLVM source dependency")
-  iree_set_llvm_cmake_options()
+  # Force enable BUILD_SHARED_LIBS for the compiler if instructed.
+  set(_IREE_ORIG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+  if(IREE_COMPILER_BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+  endif()
 
-  # Disable LLVM's warnings.
-  set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
+  # Get the main LLVM deps.
+  if(IREE_BUILD_BUNDLED_LLVM)
+    iree_llvm_configure_bundled()
+  else()
+    iree_llvm_configure_installed()
+  endif()
 
-  # Stash cmake build type in case LLVM messes with it.
-  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+  # Also add a library that can be depended on to get LLVM includes setup
+  # properly. bazel_to_cmake targets this for some header only pseudo deps.
+  add_library(IREELLVMIncludeSetup INTERFACE)
+  target_include_directories(IREELLVMIncludeSetup INTERFACE
+    ${LLVM_INCLUDE_DIRS}
+    ${MLIR_INCLUDE_DIRS}
+    ${LLD_INCLUDE_DIRS}
+  )
+
+  # Splice the includes setup into base LLVM libraries so that using them
+  # gets everything nice and tidy. It would be super if some day, LLVM
+  # libraries set their right usage requirements for includes. In the meantime
+  # we add usage requirements to libraries at the root of all things LLVM.
+  iree_llvm_add_usage_requirements(LLVMSupport IREELLVMIncludeSetup)
+  iree_llvm_add_usage_requirements(MLIRSupport IREELLVMIncludeSetup)
 
   # Add default external projects.
-  iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
-  iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  iree_llvm_add_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+  if(IREE_INPUT_TORCH)
+    iree_llvm_add_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
+  endif()
 
-  add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
+  # Ensure that LLVM-based dependencies needed for testing are included.
+  add_dependencies(iree-test-deps FileCheck)
+  if(IREE_LLD_TARGET)
+    add_dependencies(iree-test-deps ${IREE_LLD_TARGET})
+  endif()
+  if(IREE_CLANG_TARGET)
+    add_dependencies(iree-test-deps ${IREE_CLANG_TARGET})
+  endif()
 
-  # Reset CMAKE_BUILD_TYPE to its previous setting.
-  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
-
-  # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
-
-  # Add the bundled include directories for cmake files looking for them.
-  list(APPEND LLVM_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-  )
-  list(APPEND MLIR_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
-  )
-
-  function(_hack_llvm_include_paths)
-    set(_common_include_dirs
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir-hlo/include>
-    )
-    # Avoid globally modifying paths by instead adding the include paths to the
-    # rules that really should have them in the first place.
-    target_include_directories(LLVMSupport PUBLIC ${_common_include_dirs})
-    target_include_directories(MLIRSupport PUBLIC ${_common_include_dirs})
-  endfunction()
-  _hack_llvm_include_paths()
+  set(BUILD_SHARED_LIBS ${_IREE_ORIG_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
 endif()
 
 #-------------------------------------------------------------------------------
-# Python bindings.
-#-------------------------------------------------------------------------------
-
-if(IREE_BUILD_PYTHON_BINDINGS)
-  # Note: Optional because python libs can be manually specified.
-  find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-endif()
-
-#-------------------------------------------------------------------------------
-# Other dependencies.
+# Other dependencies
 #-------------------------------------------------------------------------------
 
 include(external_cc_library)
 include(flatbuffer_c_library)
 
-add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
 iree_set_googletest_cmake_options()
@@ -411,124 +753,155 @@ add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 if(IREE_ENABLE_THREADING)
   iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
-  iree_set_cpuinfo_cmake_options()
-  add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+  if(IREE_ENABLE_CPUINFO)
+    iree_set_cpuinfo_cmake_options()
+    add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+  endif()
 endif()
 
-iree_set_flatcc_cmake_options()
-add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
+# This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
+add_subdirectory(build_tools/third_party/flatcc)
 
-add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+if(IREE_HAL_DRIVER_CUDA)
+  add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
+endif()
 
-# TODO(scotttodd): Iterate some more and find a better place for this.
-if (NOT CMAKE_CROSSCOMPILING)
-  install(TARGETS iree-flatcc-cli
-          COMPONENT iree-flatcc-cli
-          RUNTIME DESTINATION bin)
+if(IREE_HAL_DRIVER_VULKAN)
+  add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_BUILD_COMPILER)
   add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
 endif()
 
-if(IREE_ENABLE_EMITC)
-  add_subdirectory(build_tools/third_party/mlir-emitc EXCLUDE_FROM_ALL)
-endif()
-
 if(IREE_BUILD_TESTS)
-  enable_testing(iree)
+  include(iree_configure_testing)
 endif()
 
-if(IREE_BUILD_PYTHON_BINDINGS AND NOT pybind11_FOUND)
-  add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+if(IREE_BUILD_PYTHON_BINDINGS)
+  if(NOT TARGET pybind11::module)
+    message(STATUS "Using bundled pybind11")
+    add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+  else()
+    message(STATUS "Not including bundled pybind11 (already configured)")
+  endif()
 endif()
 
-if(IREE_TARGET_BACKEND_METAL-SPIRV)
+if(IREE_TARGET_BACKEND_METAL_SPIRV)
   iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
 endif()
 
-#-------------------------------------------------------------------------------
-# IREE top-level targets
-#-------------------------------------------------------------------------------
-
-if(${IREE_BUILD_BENCHMARKS})
-  # Add a top-level custom target to drive generating benchmark suites.
-  add_custom_target(iree-benchmark-suites)
-endif()
-
-if(${IREE_BUILD_DOCS})
-  # Add a top-level custom target to drive generating all documentation.
-  # Register it to the default target given that IREE_BUILD_DOCS is explicitly
-  # requested.
-  add_custom_target(iree-doc ALL)
+if(IREE_TARGET_BACKEND_WEBGPU)
+  # Tint is needed to compile SPIR-V into WGSL source code.
+  # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
+  iree_set_spirv_headers_cmake_options()
+  add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
 endif()
 
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
 
+if(IREE_ENABLE_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY clang-tidy -warnings-as-errors=*)
+endif()
+
 add_subdirectory(build_tools/embed_data/)
 
-add_subdirectory(iree/base)
-add_subdirectory(iree/hal)
-add_subdirectory(iree/modules)
-add_subdirectory(iree/runtime)
-add_subdirectory(iree/schemas)
-add_subdirectory(iree/task)
-add_subdirectory(iree/testing)
-add_subdirectory(iree/test)
-add_subdirectory(iree/vm)
+if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
+  find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
+  if(IREE_IMPORT_TFLITE_PATH)
+    message(STATUS "Found ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
+  else()
+    message(STATUS "iree-import-tflite not found. Some benchmarks may not configure")
+  endif()
+  find_program(IREE_IMPORT_TF_PATH iree-import-tf)
+  if(IREE_IMPORT_TF_PATH)
+    message(STATUS "Found ${IREE_IMPORT_TF_PATH} to generate benchmark artifacts")
+  else()
+    message(STATUS "iree-import-tf not found. Some benchmarks may not configure")
+  endif()
+endif()
 
-if(${IREE_BUILD_BENCHMARKS})
+# Note: Test deps are not built as part of all (use the iree-test-deps target).
+add_subdirectory(tests EXCLUDE_FROM_ALL)
+
+if(IREE_BUILD_BENCHMARKS)
   add_subdirectory(benchmarks)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL_ROCM})
-  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
-  add_subdirectory(experimental/rocm)
+# tools/ can depend on compiler/ and runtime/.
+# Note: tools sub directory is added before compiler/ so that phony targets for
+# files with the same names from different rules are disambiguated towards
+# those in tools/.
+add_subdirectory(tools)
+add_subdirectory(compiler)
+add_subdirectory(runtime)
+
+if(IREE_ENABLE_CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY "")
 endif()
 
-if(${IREE_BUILD_COMPILER})
-  add_subdirectory(iree/compiler)
-endif()
-
-add_subdirectory(iree/tools)
-
-# Order constraint: The python bindings install tools targets from iree/tools
-# and must come after it.
-if(${IREE_BUILD_PYTHON_BINDINGS})
-  add_subdirectory(bindings/python)
-endif()
-
-if(${IREE_BUILD_BINDINGS_TFLITE})
-  add_subdirectory(bindings/tflite)
-endif()
-
-if(${IREE_BUILD_SAMPLES})
-  add_subdirectory(iree/samples)
-endif()
-
-if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
-  # NOTE: Currently liburing is only used by the experimental remoting
-  # support, so keeping it scoped here. If this broadens, then include along
-  # with other dependencies as normal.
-  if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    message(STATUS "Enabling liburing")
-    add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
+if(IREE_BUILD_TRACY)
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux")
+    message(WARNING "Building Tracy (IREE_BUILD_TRACY) on non-Linux is unsupported and may fail below.")
   endif()
-  add_subdirectory(experimental/remoting)
+  add_subdirectory(build_tools/third_party/tracy ${CMAKE_CURRENT_BINARY_DIR}/tracy)
+  if(NOT TARGET IREETracyCaptureServer)
+    message(SEND_ERROR "Could not build Tracy. Either unset IREE_BUILD_TRACY or look for missing dependencies above and install them.")
+  endif()
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS})
-  add_subdirectory(experimental/bindings/java)
+# Order constraint: The python bindings install tools targets from tools/
+# and tracy, and must come after it.
+if(IREE_BUILD_PYTHON_BINDINGS)
+  # Write out a .env file to make IDEs and developers happy.
+  # Yes, we are writing this to the source dir. It is only for IDEs and if
+  # it gets clobbered, it is fine (it is also ignored in .gitignore).
+  set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env" CONTENT "${_PYTHONPATH_ENV}")
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env" CONTENT "${_PYTHONPATH_ENV}")
+  # Similarly, write out .env.bat for Windows.
+  set(_PYTHONPATH_ENV_BAT "set PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env.bat" CONTENT "${_PYTHONPATH_ENV_BAT}")
 endif()
 
-if(${IREE_ENABLE_TENSORFLOW})
-  add_subdirectory(integrations/tensorflow)
+if(IREE_BUILD_BINDINGS_TFLITE)
+  add_subdirectory(runtime/bindings/tflite)
+endif()
+
+if(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES)
+  add_subdirectory(experimental/web)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
     CACHE INTERNAL "IREE: Include Directories" FORCE)
+
+#-------------------------------------------------------------------------------
+# IREE benchmark tools
+#-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/benchmarks)
+
+#-------------------------------------------------------------------------------
+# IREE build tools python modules
+#-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/python)
+
+#-------------------------------------------------------------------------------
+# Samples
+#-------------------------------------------------------------------------------
+
+# samples/ can depend on anything, so we include it last
+if(IREE_BUILD_SAMPLES)
+  add_subdirectory(samples)
+endif()
+
+if(IREE_BUILD_TESTS)
+  iree_create_ctest_customization()
+endif()

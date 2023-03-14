@@ -1,0 +1,44 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "sync_driver",
+    srcs = [
+        "sync_device.c",
+        "sync_driver.c",
+        "sync_event.c",
+        "sync_semaphore.c",
+    ],
+    hdrs = [
+        "sync_device.h",
+        "sync_driver.h",
+        "sync_event.h",
+        "sync_semaphore.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local",
+        "//runtime/src/iree/hal/local:executable_environment",
+        "//runtime/src/iree/hal/utils:buffer_transfer",
+        "//runtime/src/iree/hal/utils:deferred_command_buffer",
+        "//runtime/src/iree/hal/utils:semaphore_base",
+    ],
+)

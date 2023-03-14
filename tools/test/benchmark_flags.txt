@@ -1,0 +1,19 @@
+// RUN: ( iree-benchmark-module --help || [[ $? == 1 ]] )  | FileCheck --check-prefix=HELP %s
+// HELP: --module
+// HELP: --benchmark_list_tests
+
+// RUN: ( iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --benchmark_list_tests --device=local-task --benchmark_list_tests ) | FileCheck --check-prefix=LIST-BENCHMARKS %s
+module {
+  // LIST-BENCHMARKS: BM_foo1
+  func.func @foo1() -> tensor<4xf32> {
+    %input = util.unfoldable_constant dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf32>
+    %result = math.exp %input : tensor<4xf32>
+    return %result : tensor<4xf32>
+  }
+  // LIST-BENCHMARKS: BM_foo2
+  func.func @foo2() -> tensor<4xf32> {
+    %input = util.unfoldable_constant dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf32>
+    %result = math.absf %input : tensor<4xf32>
+    return %result : tensor<4xf32>
+  }
+}

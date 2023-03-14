@@ -1,0 +1,33 @@
+// Copyright 2021 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+namespace iree;
+
+// 'WGSL Executable'.
+file_identifier "WGSL";
+file_extension "wgsl";
+
+// Contents of one WGPUShaderModule, possibly with multiple entry points.
+// Entry points have the name "dN" where N is the executable-wide entry point
+// ordinal.
+table WGSLShaderModuleDef {
+  // WGSL source code.
+  code:string;
+
+  // Optional `source-map-v3` format source map.
+  source_map:string;
+}
+
+table WGSLExecutableDef {
+  // An ordered list of shader modules, each containing 1+ entry points.
+  shader_modules:[WGSLShaderModuleDef];
+
+  // A mapping of executable entry point ordinals to the shader module in which
+  // they reside.
+  entry_points:[int];
+}
+
+root_type WGSLExecutableDef;

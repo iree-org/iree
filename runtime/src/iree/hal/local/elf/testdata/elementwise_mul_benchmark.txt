@@ -1,0 +1,13 @@
+--executable_format=embedded-elf
+--executable_file=iree/hal/local/elf/testdata/elementwise_mul_x86_64.so
+--entry_point=0
+--workgroup_count_x=1
+--workgroup_count_y=1
+--workgroup_count_z=1
+--workgroup_size_x=1
+--workgroup_size_y=1
+--workgroup_size_z=1
+--max_concurrency=1
+--binding=4xf32=1,2,3,4
+--binding=4xf32=100,200,300,400
+--binding=4xf32=0,0,0,0

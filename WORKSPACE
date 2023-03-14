@@ -16,10 +16,10 @@ load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 # Skylib
 http_archive(
     name = "bazel_skylib",
-    sha256 = "97e70364e9249702246c0e9444bccdc4b847bed1eb03c5a3ece4f83dfe6abc44",
+    sha256 = "74d544d96f4a5bb630d465ca8bbcfe231e3594e5aae57e1edbf17a6eb3ca2506",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
-        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.3.0/bazel-skylib-1.3.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.3.0/bazel-skylib-1.3.0.tar.gz",
     ],
 )
 
@@ -46,41 +46,9 @@ llvm_disable_optional_support_deps()
 ###############################################################################
 
 ###############################################################################
-# Find and configure the Vulkan SDK, if installed.
-load("//build_tools/third_party/vulkan_sdk:repo.bzl", "vulkan_sdk_setup")
-
-maybe(
-    vulkan_sdk_setup,
-    name = "vulkan_sdk",
-)
-###############################################################################
 # All other IREE submodule dependencies
 
-load("//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")
+load("//build_tools/bazel:workspace.bzl", "configure_iree_cuda_deps", "configure_iree_submodule_deps")
 
 configure_iree_submodule_deps()
-
-###############################################################################
-# bazel toolchains rules for remote execution (https://releases.bazel.build/bazel-toolchains.html).
-http_archive(
-    name = "bazel_toolchains",
-    sha256 = "8c9728dc1bb3e8356b344088dfd10038984be74e1c8d6e92dbb05f21cabbb8e4",
-    strip_prefix = "bazel-toolchains-3.7.1",
-    urls = [
-        "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.7.1/bazel-toolchains-3.7.1.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/releases/download/3.7.1/bazel-toolchains-3.7.1.tar.gz",
-    ],
-)
-
-load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
-
-rbe_autoconfig(
-    name = "rbe_default",
-    base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
-    digest = "sha256:62b161e79413f0f59ae3845c377b10e60a4a639f3d32569a82b620f017837a68",
-    registry = "gcr.io",
-    repository = "iree-oss/rbe-toolchain",
-    use_checked_in_confs = "Force",
-)
-
-###############################################################################
+configure_iree_cuda_deps()

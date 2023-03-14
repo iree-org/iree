@@ -6,10 +6,11 @@ compiler and runtime that lowers Machine Learning (ML) models to a unified IR
 that scales up to meet the needs of the datacenter and down to satisfy the
 constraints and special considerations of mobile and edge deployments.
 
-See [our website](https://google.github.io/iree/) for project details, user
+See [our website](https://openxla.github.io/iree/) for project details, user
 guides, and instructions on building from source.
 
 I'm a teapot
+
 
 #### Project Status
 
@@ -21,7 +22,7 @@ of feedback on any [communication channels](#communication-channels)!
 
 ## Communication Channels
 
-*   [GitHub issues](https://github.com/google/iree/issues): Feature requests,
+*   [GitHub issues](https://github.com/openxla/iree/issues): Feature requests,
     bugs, and other work tracking
 *   [IREE Discord server](https://discord.gg/26P4xW4): Daily development
     discussions with the core team and collaborators
@@ -35,33 +36,17 @@ of feedback on any [communication channels](#communication-channels)!
     sometimes is referred to in certain MLIR discussions. Useful if you are also
     interested in MLIR evolution.
 
-## Build Status
-
-
-CI System | Build System  | Platform   | Architecture         | Configuration / Component    | Status
-:-------: | :-----------: | :--------: | :------------------: | :--------------------------: | :----:
-Kokoro    | Bazel         | Linux      | x86-64               |                              | [![kokoro status bazel/linux/x86-swiftshader/core](https://storage.googleapis.com/iree-oss-build-badges/bazel/linux/x86-swiftshader/core/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/linux/x86-swiftshader/core/main_result.html)
-Kokoro    | CMake & Bazel | Linux      | x86-64 (swiftshader) | Integrations                 | [![kokoro status cmake-bazel/linux/x86-swiftshader](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-swiftshader/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-swiftshader/main_result.html)
-Kokoro    | CMake & Bazel | Linux      | x86-64 (turing)      | Integrations                 | [![kokoro status cmake-bazel/linux/x86-turing](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-turing/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-turing/main_result.html)
-Kokoro    | CMake         | Linux      | x86-64 (swiftshader) |                              | [![kokoro status cmake/linux/x86-swiftshader](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader/main_result.html)
-Kokoro    | CMake         | Linux      | x86-64 (swiftshader) | asan                         | [![kokoro status cmake/linux/x86-swiftshader-asan](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader-asan/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader-asan/main_result.html)
-Kokoro    | CMake         | Linux      | x86-64 (turing)      |                              | [![kokoro status cmake/linux/x86-turing](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-turing/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-turing/main_result.html)
-Kokoro    | CMake         | Android    | arm64-v8a            | Runtime (build only)         | [![kokoro status cmake/android/arm64-v8a](https://storage.googleapis.com/iree-oss-build-badges/cmake/android/arm64-v8a/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/android/arm64-v8a/main_result.html)
-Kokoro    | CMake         | Bare Metal | risc-v-32            | Runtime                      | [![kokoro status cmake/baremetal/riscv32](https://storage.googleapis.com/iree-oss-build-badges/cmake/baremetal/riscv32/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/baremetal/riscv32/main_result.html)
-Kokoro    | CMake         | Linux      | risc-v-64            | Runtime                      | [![kokoro status cmake/linux/riscv64](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/riscv64/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/riscv64/main_result.html)
-Buildkite | CMake         | Android    | arm64-v8a            | Runtime                      | [![buildkite status iree-android-arm64-v8a](https://badge.buildkite.com/a73df0ba9f4aa132650dd6676bc1e6c20d3d99ed6b24db2179.svg?branch=main)](https://buildkite.com/iree/iree-android-arm64-v8a)
-BuildKite | CMake         | Android    | arm64-v8a            | Runtime Benchmarks           | [![buildkite status iree-benchmark](https://badge.buildkite.com/62e504b93171f4a19e5c46f8b9a99eb5dba050666640fbc21b.svg?branch=main)](https://buildkite.com/iree/iree-benchmark)
-BuildKite | CMake         | Linux      | x86-64               | Tracing + Standalone Runtime | [![buildkite status iree-build-configurations](https://badge.buildkite.com/3bc03ad54a6b785b3fdd0dd3d67fd93ed22ef2b538cb34adc3.svg?branch=main)](https://buildkite.com/iree/iree-build-configurations)
-
 ## Architecture Overview
 
-![IREE Architecture](docs/website/docs/assets/images/iree_architecture.svg)
+<!-- TODO(scotttodd): switch to <picture> once better supported? https://github.blog/changelog/2022-05-19-specify-theme-context-for-images-in-markdown-beta/ -->
+![IREE Architecture](docs/website/docs/assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
+![IREE Architecture](docs/website/docs/assets/images/iree_architecture.svg#gh-light-mode-only)
 
-See [our website](https://google.github.io/iree/) for more information.
+See [our website](https://openxla.github.io/iree/) for more information.
 
 ## Presentations and Talks
 
-*   2021-06-09: IREE Runtime Design Tech Talk ([recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) and [slides](https://drive.google.com/file/d/1CA-FRRjZUbDFS4pGPiLT86lwghNxMN2M/view?usp=sharing))
+*   2021-06-09: IREE Runtime Design Tech Talk ([recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) and [slides](https://drive.google.com/file/d/1ikgOdZxnMz1ExqwrAiuTY9exbe3yMWbB/view?usp=sharing))
 *   2020-08-20: IREE CodeGen: MLIR Open Design Meeting Presentation
     ([recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing)
     and

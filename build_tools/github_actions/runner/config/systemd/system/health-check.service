@@ -1,0 +1,16 @@
+[Unit]
+Description=Health Check Server
+After=gh-runner.target network.target
+
+[Service]
+User=root
+Group=root
+EnvironmentFile=/etc/environment
+ExecStart=/runner-root/config/health_server/health_server.py
+Restart=no
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=5min
+
+[Install]
+WantedBy=runner-setup.target

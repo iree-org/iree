@@ -1,0 +1,14 @@
+// Copyright 2022 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/hal/drivers/init.h"
+
+${_INIT_EXTERNAL_REGISTER_DECLS}
+iree_status_t iree_hal_register_external_drivers(
+    iree_hal_driver_registry_t* registry) {
+  ${_INIT_EXTERNAL_REGISTER_CALLS}
+  return iree_ok_status();
+}

@@ -56,6 +56,8 @@ Build and install on your host machine:
 
 ``` shell
 cmake -GNinja -B ../iree-build/ \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
   -DCMAKE_INSTALL_PREFIX=../iree-build/install \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   .
@@ -66,7 +68,7 @@ cmake --build ../iree-build/ --target install
 
 The following instruction shows how to build for a RISC-V 64-bit Linux machine.
 For other RISC-V targets, please refer to
-[riscv.toolchain.cmake](https://github.com/google/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
+[riscv.toolchain.cmake](https://github.com/openxla/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
 as a reference of how to set up the cmake configuration.
 
 #### RISC-V 64-bit Linux target
@@ -74,11 +76,13 @@ as a reference of how to set up the cmake configuration.
 ```shell
 cmake -GNinja -B ../iree-build-riscv/ \
   -DCMAKE_TOOLCHAIN_FILE="./build_tools/cmake/riscv.toolchain.cmake" \
-  -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build-host/install) \
-  -DRISCV_CPU=rv64 \
+  -DIREE_HOST_BIN_DIR=$(realpath ../iree-build/install/bin) \
+  -DRISCV_CPU=linux-riscv_64 \
   -DIREE_BUILD_COMPILER=OFF \
   -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
+  -DIREE_ENABLE_CPUINFO=OFF \
   .
+cmake --build ../iree-build-riscv/
 ```
 
 ## Running IREE bytecode modules on the RISC-V system
@@ -86,7 +90,7 @@ cmake -GNinja -B ../iree-build-riscv/ \
 !!! note
     The following instructions are meant for the RISC-V 64-bit Linux
     target. For the bare-metal target, please refer to
-    [simple_embedding](https://github.com/google/iree/blob/main/iree/samples/simple_embedding)
+    [simple_embedding](https://github.com/openxla/iree/blob/main/samples/simple_embedding)
     to see how to build a ML workload for a bare-metal machine.
 
 Set the path to qemu-riscv64 Linux emulator binary in the `QEMU_BIN` environment
@@ -97,13 +101,12 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.
 export QEMU_BIN=<path to qemu-riscv64 binary>
 ```
 
-Invoke the host compiler tools to produce a bytecode module flatbuffer:
+Invoke the host compiler tools to produce a bytecode module FlatBuffer:
 
 ``` shell
-../iree-build/install/bin/iree-translate \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
-  iree/samples/models/simple_abs.mlir \
+../iree-build/install/bin/iree-compile \
+  --iree-hal-target-backends=vmvx \
+  samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
@@ -113,11 +116,11 @@ Run the RISC-V emulation:
 ${QEMU_BIN} \
   -cpu rv64 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
-  ../iree-build-riscv/iree/tools/iree-run-module \
-  --driver=vmvx \
-  --module_file=/tmp/simple_abs_vmvx.vmfb \
-  --entry_function=abs \
-  --function_input=f32=-5
+  ../iree-build-riscv/tools/iree-run-module \
+  --device=local-task \
+  --module=/tmp/simple_abs_vmvx.vmfb \
+  --function=abs \
+  --input=f32=-5
 ```
 
 ## Optional configuration
@@ -127,41 +130,40 @@ ${QEMU_BIN} \
  toolchain and the emulator, build the tools from the following sources:
 
 * RISC-V toolchain is built from
-[https://github.com/llvm/llvm-project](https://github.com/llvm/llvm-project) (main branch).
-  * Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
-    GNU linker, and C libraries. You need to build GNU toolchain first.
-  * Clone GNU toolchain from:
-  [https://github.com/riscv/riscv-gnu-toolchain](https://github.com/riscv/riscv-gnu-toolchain)
-    (master branch). Switch the "riscv-binutils" submodule to `rvv-1.0.x-zfh`
-    branch manually.
+<https://github.com/llvm/llvm-project> (main branch).
+    * Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
+      GNU linker, and C libraries. You need to build GNU toolchain first.
+    * Clone GNU toolchain from:
+      <https://github.com/riscv/riscv-gnu-toolchain>
+      (master branch). Switch the "riscv-binutils" submodule to
+      `git://sourceware.org/git/binutils-gdb.git` (master branch) manually.
 * RISC-V QEMU is built from
 [https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
 
 The SIMD code can be generated following the
-[IREE dynamic library CPU HAL driver flow](../deployment-configurations/cpu-dylib.md)
+[IREE CPU flow](../deployment-configurations/cpu.md)
 with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
-iree/tools/iree-translate \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=dylib-llvm-aot \
-  -iree-llvm-target-triple=riscv64 \
-  -iree-llvm-target-cpu=generic-rv64 \
-  -iree-llvm-target-abi=lp64d \
-  -iree-llvm-target-cpu-features="+m,+a,+f,+d,+experimental-v" \
-  -riscv-v-vector-bits-min=256 -riscv-v-fixed-length-vector-lmul-max=8 \
-  iree_input.mlir -o mobilenet-dylib.vmfb
+tools/iree-compile \
+  --iree-hal-target-backends=llvm-cpu \
+  --iree-llvmcpu-target-triple=riscv64 \
+  --iree-llvmcpu-target-cpu=generic-rv64 \
+  --iree-llvmcpu-target-abi=lp64d \
+  --iree-llvmcpu-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
+  --riscv-v-fixed-length-vector-lmul-max=8 \
+  iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
 Then run on the RISC-V QEMU:
 
 ```shell hl_lines="2 5"
 ${QEMU_BIN} \
-  -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+  -cpu rv64,x-v=true,x-k=true,vlen=512,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
-  ../iree-build-riscv/iree/tools/iree-run-module \
-  --driver=dylib \
-  --module_file=mobilenet-dylib.vmfb \
-  --entry_function=predict \
-  --function_input="1x224x224x3xf32=0"
+  ../iree-build-riscv/tools/iree-run-module \
+  --device=local-task \
+  --module=mobilenet_cpu.vmfb \
+  --function=predict \
+  --input="1x224x224x3xf32=0"
 ```

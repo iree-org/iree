@@ -1,0 +1,55 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        [
+            "annotate_dispatch_arguments.mlir",
+            "convert_to_stream.mlir",
+            "dump_statistics.mlir",
+            "elide_async_copies.mlir",
+            "elide_timepoints_coverage.mlir",
+            "elide_timepoints_immediate.mlir",
+            "emplace_allocations.mlir",
+            "encode_device_tensors.mlir",
+            "encode_host_tensors.mlir",
+            "fold_globals.mlir",
+            "fold_uniform_operands.mlir",
+            "fuse_dispatch_bindings.mlir",
+            "fuse_dispatch_bindings_noalias.mlir",
+            "layout_slices.mlir",
+            "materialize_builtins.mlir",
+            "materialize_copy_on_write.mlir",
+            "memoize_channels.mlir",
+            "outline_constants.mlir",
+            "pack_allocations.mlir",
+            "pack_constants.mlir",
+            "pack_dispatch_operands.mlir",
+            "propagate_subviews.mlir",
+            "propagate_timepoints.mlir",
+            "refine_usage.mlir",
+            "schedule_allocation.mlir",
+            "schedule_concurrency.mlir",
+            "schedule_execution.mlir",
+            "specialize_dispatches.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+    cfg = "//compiler:lit.cfg.py",
+    tools = [
+        "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

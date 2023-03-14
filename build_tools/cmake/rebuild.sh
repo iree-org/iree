@@ -30,16 +30,30 @@ cd build
 
 CMAKE_ARGS=(
   "-G" "Ninja"
+  # Let's make linking fast
+  "-DIREE_ENABLE_LLD=ON"
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
 
   # Enable docs build on the CI. The additional builds are pretty fast and
   # give us early warnings for some types of website publication errors.
   "-DIREE_BUILD_DOCS=ON"
 
-  # Enable building the python bindings on CI. Most heavy targets are gated on
-  # IREE_ENABLE_TENSORFLOW, so what's left here should be fast.
+  # Enable building the python bindings on CI.
   "-DIREE_BUILD_PYTHON_BINDINGS=ON"
+
+  # Enable assertions. We wouldn't want to be testing *only* with assertions
+  # enabled, but at the moment only certain CI builds are using this script,
+  # e.g. ASan builds are not using this, so by enabling assertions here, we
+  # get a reasonable mix of {builds with asserts, builds with other features
+  # such as ASan but without asserts}.
+  "-DIREE_ENABLE_ASSERTIONS=ON"
 )
 
-"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" ..
-"$CMAKE_BIN" --build .
+"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
+echo "Building all"
+echo "------------"
+"$CMAKE_BIN" --build . -- -k 0
+
+echo "Building test deps"
+echo "------------------"
+"$CMAKE_BIN" --build . --target iree-test-deps -- -k 0

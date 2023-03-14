@@ -30,7 +30,7 @@ typedef struct iree_hal_rocm_driver_t {
 // Pick a fixed lenght size for device names.
 #define IREE_MAX_ROCM_DEVICE_NAME_LENGTH 100
 
-extern const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable;
+static const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable;
 
 static iree_hal_rocm_driver_t* iree_hal_rocm_driver_cast(
     iree_hal_driver_t* base_value) {
@@ -115,8 +115,8 @@ static uint8_t* iree_hal_rocm_populate_device_info(
 
 static iree_status_t iree_hal_rocm_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
-    iree_hal_device_info_t** out_device_infos,
-    iree_host_size_t* out_device_info_count) {
+    iree_host_size_t* out_device_info_count,
+    iree_hal_device_info_t** out_device_infos) {
   iree_hal_rocm_driver_t* driver = iree_hal_rocm_driver_cast(base_driver);
   // Query the number of available ROCM devices.
   int device_count = 0;
@@ -135,9 +135,9 @@ static iree_status_t iree_hal_rocm_driver_query_available_devices(
     uint8_t* buffer_ptr =
         (uint8_t*)device_infos + device_count * sizeof(iree_hal_device_info_t);
     for (iree_host_size_t i = 0; i < device_count; ++i) {
-      hipDevice_t device;
-      iree_status_t status = ROCM_RESULT_TO_STATUS(
-          &driver->syms, hipDeviceGet(&device, i), "hipDeviceGet");
+      hipDevice_t device = 0;
+      status = ROCM_RESULT_TO_STATUS(&driver->syms, hipDeviceGet(&device, i),
+                                     "hipDeviceGet");
       if (!iree_status_is_ok(status)) break;
       buffer_ptr = iree_hal_rocm_populate_device_info(
           device, &driver->syms, buffer_ptr, &device_infos[i]);
@@ -150,6 +150,18 @@ static iree_status_t iree_hal_rocm_driver_query_available_devices(
     iree_allocator_free(host_allocator, device_infos);
   }
   return status;
+}
+
+static iree_status_t iree_hal_rocm_driver_dump_device_info(
+    iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
+    iree_string_builder_t* builder) {
+  iree_hal_rocm_driver_t* driver = iree_hal_rocm_driver_cast(base_driver);
+  hipDevice_t device = (hipDevice_t)device_id;
+  if (!device) return iree_ok_status();
+  // TODO: dump detailed device info.
+  (void)driver;
+  (void)device;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_driver_select_default_device(
@@ -172,8 +184,9 @@ static iree_status_t iree_hal_rocm_driver_select_default_device(
   return status;
 }
 
-static iree_status_t iree_hal_rocm_driver_create_device(
+static iree_status_t iree_hal_rocm_driver_create_device_by_id(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
+    iree_host_size_t param_count, const iree_string_pair_t* params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_rocm_driver_t* driver = iree_hal_rocm_driver_cast(base_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -201,8 +214,24 @@ static iree_status_t iree_hal_rocm_driver_create_device(
   return status;
 }
 
-const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable = {
+static iree_status_t iree_hal_rocm_driver_create_device_by_path(
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
+    iree_string_view_t device_path, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  if (!iree_string_view_is_empty(device_path)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "device paths not yet implemented");
+  }
+  return iree_hal_rocm_driver_create_device_by_id(
+      base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
+      host_allocator, out_device);
+}
+
+static const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable = {
     .destroy = iree_hal_rocm_driver_destroy,
     .query_available_devices = iree_hal_rocm_driver_query_available_devices,
-    .create_device = iree_hal_rocm_driver_create_device,
+    .dump_device_info = iree_hal_rocm_driver_dump_device_info,
+    .create_device_by_id = iree_hal_rocm_driver_create_device_by_id,
+    .create_device_by_path = iree_hal_rocm_driver_create_device_by_path,
 };

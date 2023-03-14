@@ -16,6 +16,9 @@ rules:
   truthy: disable
   # We have lots of long strings and command lines.
   line-length: disable
+  comments:
+    # Formatters may do this (e.g. Prettier does) and it seems like the most
+    # trivial thing to get a failing check for.
+    min-spaces-from-content: 1
 
-ignore:
-  /third_party/*
+ignore: /third_party/*

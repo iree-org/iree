@@ -1,0 +1,123 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# HAL implementation using Vulkan and (likely) SPIR-V executables.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "vulkan",
+    srcs = [
+        "api.cc",
+        "builtin_executables.cc",
+        "builtin_executables.h",
+        "command_queue.h",
+        "debug_reporter.cc",
+        "debug_reporter.h",
+        "descriptor_pool_cache.cc",
+        "descriptor_pool_cache.h",
+        "descriptor_set_arena.cc",
+        "descriptor_set_arena.h",
+        "direct_command_buffer.cc",
+        "direct_command_buffer.h",
+        "direct_command_queue.cc",
+        "direct_command_queue.h",
+        "extensibility_util.cc",
+        "extensibility_util.h",
+        "handle_util.h",
+        "internal_vk_mem_alloc.cc",
+        "internal_vk_mem_alloc.h",
+        "native_event.cc",
+        "native_event.h",
+        "native_executable.cc",
+        "native_executable.h",
+        "native_pipeline_layout.cc",
+        "native_pipeline_layout.h",
+        "native_semaphore.cc",
+        "native_semaphore.h",
+        "nop_executable_cache.cc",
+        "nop_executable_cache.h",
+        "status_util.c",
+        "status_util.h",
+        "tracing.cc",
+        "tracing.h",
+        "vma_allocator.cc",
+        "vma_allocator.h",
+        "vma_buffer.cc",
+        "vma_buffer.h",
+        "vulkan_device.cc",
+        "vulkan_driver.cc",
+        "vulkan_headers.h",
+    ],
+    hdrs = [
+        # TODO(benvanik): hide all but api.h.
+        "api.h",
+        "vulkan_device.h",
+        "vulkan_driver.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":dynamic_symbols",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/vulkan/builtin",
+        "//runtime/src/iree/hal/drivers/vulkan/util:arena",
+        "//runtime/src/iree/hal/drivers/vulkan/util:intrusive_list",
+        "//runtime/src/iree/hal/drivers/vulkan/util:ref_ptr",
+        "//runtime/src/iree/hal/utils:buffer_transfer",
+        "//runtime/src/iree/hal/utils:resource_set",
+        "//runtime/src/iree/hal/utils:semaphore_base",
+        "//runtime/src/iree/schemas:spirv_executable_def_c_fbs",
+        "@vulkan_headers",
+        "@vulkan_memory_allocator//:impl_header_only",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "dynamic_symbols",
+    srcs = [
+        "dynamic_symbols.cc",
+        "vulkan_headers.h",
+    ],
+    hdrs = [
+        "dynamic_symbols.h",
+    ],
+    textual_hdrs = [
+        "dynamic_symbol_tables.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/hal/drivers/vulkan/util:ref_ptr",
+        "@vulkan_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "dynamic_symbols_test",
+    srcs = ["dynamic_symbols_test.cc"],
+    tags = ["driver=vulkan"],
+    deps = [
+        ":dynamic_symbols",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

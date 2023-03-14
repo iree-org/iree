@@ -117,8 +117,8 @@ accelerators vs. what should run on the host. The canonical example is
 loop iteration counter and comparison.
 
 ```mlir
-%start = constant dense<1> : tensor<i32>
-%bound = constant dense<3> : tensor<i32>
+%start = arith.constant dense<1> : tensor<i32>
+%bound = arith.constant dense<3> : tensor<i32>
 %res = "mhlo.while"(%start) ( {
 ^bb0(%count: tensor<i32>):
   %1 = "mhlo.compare"(%count, %bound) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
@@ -136,9 +136,9 @@ loop should continue:
 
 ```mlir
 func @main() -> tensor<i32> attributes {iree.reflection = {f = "I1!R6!B3!t6", fv = "1"}} {
-  %cst = constant dense<1> : tensor<i32>
-  %cst_0 = constant dense<3> : tensor<i32>
-  %cst_1 = constant dense<1> : vector<3xi32>
+  %cst = arith.constant dense<1> : tensor<i32>
+  %cst_0 = arith.constant dense<3> : tensor<i32>
+  %cst_1 = arith.constant dense<1> : vector<3xi32>
   br ^bb1(%cst : tensor<i32>)
 ^bb1(%2: tensor<i32>):  // 2 preds: ^bb0, ^bb2
   %3 = flow.ex.stream.fragment(%arg0 = %cst_1 : vector<3xi32>, %arg1 = %2 : tensor<i32>, %arg2 = %cst_0 : tensor<i32>) -> tensor<i1> {
@@ -267,7 +267,7 @@ The corresponding `flow` IR:
   flow.stream.append[%s0](...) {
     flow.tensor.update ...
   }
-  %b = cmpi ne %some_flag, ...
+  %b = arith.cmpi ne %some_flag, ...
   cond_br %b, ^a(%s0), ^b(%s0)
 ^a(%s1):
   flow.stream.append[%s1](...) {
@@ -640,14 +640,14 @@ maximum concurrency (by having a very large ringbuffer) or maximum memory usage
 
 Allocating tensors from the ringbuffer does not require sophisticated runtime
 packing as we can emit IR to calculate required sizes for dynamically shaped
-tensors. Whether a basic block reserves `%sz = constant 42 : index` bytes or
-`%sz = std.muli %cst, %dyn_dim : index` bytes doesn't materially change how the
-allocations are performed. Since almost all usage involves simple write head
+tensors. Whether a basic block reserves `%sz = arith.constant 42 : index` bytes
+or `%sz = std.muli %cst, %dyn_dim : index` bytes doesn't materially change how
+the allocations are performed. Since almost all usage involves simple write head
 bumps there is no need for ahead-of-time memory planning or large fixed
 allocations, and since no buffer within the ringbuffer can alias we can have
-coarse (_read: low overhead_) guarantees about the availability of certain
-regions of the ringbuffer (_"when this event is signaled all prior ringbuffer
-writes have completed"_).
+coarse (*read: low overhead*) guarantees about the availability of certain
+regions of the ringbuffer (*"when this event is signaled all prior ringbuffer
+writes have completed"*).
 
 Usually any planning we may want to perform can be done in IR via code motion.
 For example applying traditional algorithms used to reduce register pressure
@@ -860,7 +860,7 @@ MLIR's transformation pipeline. Instead of embedding `vm.call` ops that are
 dispatched at runtime to things like the HAL we can instead lower to
 `llvm::CallInst` to runtime-resolved function pointers. This still enables all
 of the flexibility of heterogeneous/runtime-determined devices, pluggable
-diagnostics, and backend composition without any need for flatbuffers or the VM
+diagnostics, and backend composition without any need for FlatBuffers or the VM
 bytecode interpreter.
 
 The VM was designed to make such a lowering easy and the C-style struct-based

@@ -6,6 +6,7 @@
 
 #include "iree_tf_compiler/MHLO/Passes.h"
 #include "llvm/Support/JSON.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -20,7 +21,7 @@ namespace iree_integrations {
 namespace MHLO {
 
 class EmitDefaultIREEABIPass
-    : public PassWrapper<EmitDefaultIREEABIPass, OperationPass<FuncOp>> {
+    : public PassWrapper<EmitDefaultIREEABIPass, OperationPass<func::FuncOp>> {
  public:
   StringRef getArgument() const override {
     return "iree-mhlo-emit-default-iree-abi";
@@ -41,7 +42,8 @@ class EmitDefaultIREEABIPass
     }
 
     json::Array refArgs;
-    for (Type t : funcOp.getArgumentTypes()) {
+    SmallVector<Type> argTypes = flattenTypes(funcOp.getArgumentTypes());
+    for (Type t : argTypes) {
       auto descriptor = mapTypeToJsonTypeRecord(t);
       if (!descriptor) {
         funcOp.emitWarning()
@@ -53,7 +55,8 @@ class EmitDefaultIREEABIPass
     }
 
     json::Array refReturns;
-    for (Type t : funcOp.getCallableResults()) {
+    SmallVector<Type> resultTypes = flattenTypes(funcOp.getCallableResults());
+    for (Type t : resultTypes) {
       auto descriptor = mapTypeToJsonTypeRecord(t);
       if (!descriptor) {
         funcOp.emitWarning()
@@ -76,19 +79,35 @@ class EmitDefaultIREEABIPass
     funcOp->setAttr("iree.abi", builder.getStringAttr(refStr));
   }
 
+  SmallVector<Type> flattenTypes(ArrayRef<Type> types) {
+    SmallVector<Type> flattened;
+    std::function<void(ArrayRef<Type>)> helper =
+        [&](ArrayRef<Type> types) -> void {
+      for (Type t : types) {
+        if (auto tt = t.dyn_cast<TupleType>()) {
+          helper(tt.getTypes());
+        } else {
+          flattened.push_back(t);
+        }
+      }
+    };
+    helper(types);
+    return flattened;
+  }
+
   llvm::Optional<json::Value> mapTypeToJsonTypeRecord(Type type) {
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      auto typeValue = mapTypeToJsonTypeRecord(shapedType.getElementType());
       json::Array record({
           json::Value("ndarray"),
-          mapTypeToJsonTypeRecord(shapedType.getElementType()),
+          typeValue ? *typeValue : json::Value(nullptr),
           shapedType.hasRank() ? json::Value(shapedType.getRank())
                                : json::Value(nullptr),
       });
       if (shapedType.hasRank()) {
         for (auto dim : shapedType.getShape()) {
-          record.push_back(dim == ShapedType::kDynamicSize
-                               ? json::Value(nullptr)
-                               : json::Value(dim));
+          record.push_back(dim == ShapedType::kDynamic ? json::Value(nullptr)
+                                                       : json::Value(dim));
         }
       }
       return json::Value(std::move(record));
@@ -108,11 +127,11 @@ class EmitDefaultIREEABIPass
       return json::Value(std::move(name));
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createEmitDefaultIREEABIPass() {
   return std::make_unique<EmitDefaultIREEABIPass>();
 }
 

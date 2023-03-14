@@ -23,39 +23,82 @@ Notes:
   documentation](https://clang.llvm.org/docs/AddressSanitizer.html#memory-leak-detection)
   on leak detection. It is only enabled by default on some platforms.
 
-## Enabling the sanitizers
+## Support status and how to enable each sanitizer
 
-In the CMake build system of IREE, at least on Linux and Android, enabling these
-sanitizers is a simple matter of passing one of these options to the initial
-CMake command:
+### ASan (AddressSanitizer)
+
+Enabling ASan in the IREE build is a simple matter of setting the
+`IREE_ENABLE_ASAN` CMake option:
 
 ```
--DIREE_ENABLE_ASAN=ON
+cmake -DIREE_ENABLE_ASAN=ON ...
 ```
 
-or
+### TSan (ThreadSanitizer)
+
+To enable TSan, at the moment, the following 3 CMake options must be set:
+
+```
+cmake \
+  -DIREE_ENABLE_TSAN=ON \
+  -DIREE_BYTECODE_MODULE_ENABLE_TSAN=ON \
+  -DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON \
+  -DIREE_BUILD_SAMPLES=OFF \
+  ...
+```
+
+In practice, `IREE_ENABLE_TSAN` alone would be enough for many targets, but not
+all. The problem is that a IREE runtime built with `IREE_ENABLE_TSAN` cannot
+load a IREE compiled LLVM/CPU module unless the following flags were passed to
+the IREE compiler: `--iree-llvmcpu-sanitize=thread` and
+`--iree-llvmcpu-link-embedded=false`.
+
+The CMake options `IREE_BYTECODE_MODULE_ENABLE_TSAN` and
+`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` ensure that the above flags are
+passed to the IREE compiler when building modules used in tests, benchmarks,
+etc. (anything that internally uses the CMake `iree_bytecode_module` macro).
+
+The CMake option `IREE_BUILD_SAMPLES=OFF` is needed because samples [currently
+assume](https://github.com/openxla/iree/pull/8893) that the embedded linker is
+used, so they are incompatible with
+`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON`.
+
+At the moment, CMake logic heavy-handedly enforces that whenever
+`IREE_ENABLE_TSAN` is set, these other two CMake variables are also set.
+That ensures that all tests succeed: no test is expected to fail with TSan.
+
+If you know what you're doing (i.e. if you are not building targets that
+internally involve a LLVM/CPU `iree_bytecode_module`), feel free to locally comment out
+the CMake error and only set `IREE_ENABLE_TSAN`. Also see a
+[past attempt]((https://github.com/openxla/iree/pull/8966) to relax that CMake
+validation.
+
+### MSan (MemorySanitizer)
+
+In theory that should be a simple matter of
 
 ```
 -DIREE_ENABLE_MSAN=ON
 ```
 
-or
+However, that requires making and using a custom
+build of libc++ with MSan as explained in
+[this documentation](https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo).
+
+As of April 2022, all of IREE's tests succeeded with MSan on Linux/x86-64,
+provided that the `vulkan` driver was disabled (due to lack of MSan
+instrumentation in the NVIDIA Vulkan driver).
+
+### UBSan (UndefinedBehaviorSanitizer)
+
+Enabling UBSan in the IREE build is a simple matter of setting the
+`IREE_ENABLE_UBSAN` CMake option:
 
 ```
--DIREE_ENABLE_TSAN=ON
+cmake -DIREE_ENABLE_UBSAN=ON ...
 ```
 
-These sanitizers will be most helpful on builds with debug info, so consider
-using
-
-```
--DCMAKE_BUILD_TYPE=RelWithDebInfo
-```
-
-instead of just `Release`. It's also fine to use sanitizers on `Debug` builds,
-of course --- if the issue that you're tracking down reproduces at all in a
-debug build! Sanitizers are often used to track down subtle issues that may only
-manifest themselves in certain build configurations.
+Note that both ASan and UBSan can be enabled in the same build.
 
 ## Symbolizing the reports
 
@@ -72,11 +115,11 @@ On Android it's more complicated due to
 [this](https://github.com/android/ndk/issues/753) Android NDK issue.
 Fortunately, we have a script to perform the symbolization. Copy the raw output
 from the sanitizer and feed it into the `stdin` of the
-`scripts/android_symbolize.sh` script, with the `ANDROID_NDK` environment
+`build_tools/scripts/android_symbolize.sh` script, with the `ANDROID_NDK` environment
 variable pointing to the NDK root directory, like this:
 
 ```shell
-ANDROID_NDK=~/android-ndk-r21d ./scripts/android_symbolize.sh < /tmp/asan.txt
+ANDROID_NDK=~/android-ndk-r21d ./build_tools/scripts/android_symbolize.sh < /tmp/asan.txt
 ```
 
 Where `/tmp/asan.txt` is where you've pasted the raw sanitizer report.

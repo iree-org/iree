@@ -16,16 +16,13 @@
 // reflection metadata with full type mapping describing this situation and
 // makes the original TF exported functions private.
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/JSON.h"
+#include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -34,7 +31,6 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Transforms/Utils.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
 
@@ -70,8 +66,8 @@ json::Value mapTypeToJsonTypeRecord(Type type) {
     });
     if (shapedType.hasRank()) {
       for (auto dim : shapedType.getShape()) {
-        record.push_back(dim == ShapedType::kDynamicSize ? json::Value(nullptr)
-                                                         : json::Value(dim));
+        record.push_back(dim == ShapedType::kDynamic ? json::Value(nullptr)
+                                                     : json::Value(dim));
       }
     }
     return record;
@@ -123,19 +119,20 @@ struct StructureLevel {
   }
 
   Type getIrType(Builder builder) {
-    auto variantType = IREE::Util::VariantType::get(builder.getContext());
+    auto variantType = IREE::Input::VariantType::get(builder.getContext());
     if (type == LevelType::Value) {
       if (valueType.isa<TensorType>()) {
-        return IREE::HAL::BufferViewType::get(builder.getContext());
+        return IREE::Input::BufferViewType::get(builder.getContext());
       }
       return valueType;
     } else if (type == LevelType::List || type == LevelType::Tuple) {
-      return IREE::Util::ListType::get(variantType);
+      return IREE::Input::ListType::get(variantType.getContext(), variantType);
     } else if (type == LevelType::Dict) {
-      return IREE::Util::ListType::get(variantType);
+      return IREE::Input::ListType::get(variantType.getContext(), variantType);
     }
 
-    llvm_unreachable("Unknown LevelType");
+    assert(false && "Unknown LevelType");
+    return Type();
   }
 
   // For List/Dict/Tuple levels, returns the size of the list that is needed
@@ -151,7 +148,8 @@ struct StructureLevel {
       return children.size();
     }
 
-    llvm_unreachable("Unsupported LevelType for getNeededListSize");
+    assert(false && "Unsupported LevelType for getNeededListSize");
+    return 0;
   }
 
   // Creates a JSON reflection type record describing this entity.
@@ -174,12 +172,10 @@ struct StructureLevel {
         json::Array typeRecord;
         typeRecord.push_back(
             json::Value(type == LevelType::List ? "slist" : "stuple"));
-        int lastIndex = 0;
         for (auto &child : children) {
           for (int j = children.size(); j < child.ikey; ++j) {
             typeRecord.push_back(json::Value(nullptr));
           }
-          lastIndex = child.valueIndex;
           typeRecord.push_back(child.createReflectionType());
         }
         return json::Value(std::move(typeRecord));
@@ -196,7 +192,7 @@ struct StructureLevel {
         return json::Value(std::move(typeRecord));
       }
       default:
-        llvm_unreachable("Unsupported LevelType");
+        assert(false && "Unsupported LevelType");
     }
 
     return json::Value(nullptr);
@@ -211,9 +207,9 @@ struct StructureLevel {
       assert(valueIndex < callArgs.size() && "mismatched number of call args");
       assert(!callArgs[valueIndex] && "duplicate argument bindings");
       auto value = thisValue;
-      if (value.getType().isa<IREE::HAL::BufferViewType>()) {
-        value = builder.createOrFold<IREE::HAL::TensorCastOp>(loc, valueType,
-                                                              thisValue);
+      if (value.getType().isa<IREE::Input::BufferViewType>()) {
+        value = builder.createOrFold<IREE::Input::BufferViewToTensorOp>(
+            loc, valueType, thisValue);
       }
       callArgs[valueIndex] = value;
       return;
@@ -239,7 +235,7 @@ struct StructureLevel {
       }
       return;
     }
-    llvm_unreachable("unhandled StructureLevel type");
+    assert(false && "unhandled StructureLevel type");
   }
 
   // Emits operations to recursively create this structure from the given
@@ -252,63 +248,64 @@ struct StructureLevel {
              "mismatched number of call returns");
       Value value = callReturns[valueIndex];
       if (valueType.isa<TensorType>()) {
-        value = builder.createOrFold<IREE::HAL::TensorCastOp>(
+        value = builder.createOrFold<IREE::Input::TensorToBufferViewOp>(
             loc, getIrType(builder), value);
       }
       return value;
     }
     // Recurse into sequence (index can be sparse on child ikey).
     if (type == LevelType::List || type == LevelType::Tuple) {
-      Value listSizeValue =
-          builder.create<ConstantOp>(loc, builder.getIndexType(),
-                                     builder.getIndexAttr(getNeededListSize()));
-      Value listValue = builder.create<IREE::Util::ListCreateOp>(
+      Value listSizeValue = builder.create<arith::ConstantOp>(
+          loc, builder.getIndexType(),
+          builder.getIndexAttr(getNeededListSize()));
+      Value listValue = builder.create<IREE::Input::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
-      builder.create<IREE::Util::ListResizeOp>(loc, listValue, listSizeValue);
+      builder.create<IREE::Input::ListResizeOp>(loc, listValue, listSizeValue);
       for (StructureLevel &child : children) {
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
-        Value indexValue = builder.create<ConstantOp>(
+        Value indexValue = builder.create<arith::ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(child.ikey));
-        builder.create<IREE::Util::ListSetOp>(loc, listValue, indexValue,
-                                              childValue);
+        builder.create<IREE::Input::ListSetOp>(loc, listValue, indexValue,
+                                               childValue);
       }
       return listValue;
     }
 
     // Recurse into dict (modeled as a dense tuple of children).
     if (type == LevelType::Dict) {
-      Value listSizeValue =
-          builder.create<ConstantOp>(loc, builder.getIndexType(),
-                                     builder.getIndexAttr(getNeededListSize()));
-      Value listValue = builder.create<IREE::Util::ListCreateOp>(
+      Value listSizeValue = builder.create<arith::ConstantOp>(
+          loc, builder.getIndexType(),
+          builder.getIndexAttr(getNeededListSize()));
+      Value listValue = builder.create<IREE::Input::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
-      builder.create<IREE::Util::ListResizeOp>(loc, listValue, listSizeValue);
+      builder.create<IREE::Input::ListResizeOp>(loc, listValue, listSizeValue);
       for (auto it : llvm::enumerate(children)) {
         StructureLevel &child = it.value();
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
-        Value indexValue = builder.create<ConstantOp>(
+        Value indexValue = builder.create<arith::ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(it.index()));
-        builder.create<IREE::Util::ListSetOp>(loc, listValue, indexValue,
-                                              childValue);
+        builder.create<IREE::Input::ListSetOp>(loc, listValue, indexValue,
+                                               childValue);
       }
       return listValue;
     }
-    llvm_unreachable("unhandled StructureLevel type");
+    assert(false && "unhandled StructureLevel type");
+    return Value();
   }
 
   // Emits operations to load this instance from a parent list value at the
   // given index.
   Value emitGetFromList(Location loc, OpBuilder &builder, Value parentList,
                         int index) {
-    Value indexValue = builder.create<ConstantOp>(loc, builder.getIndexType(),
-                                                  builder.getIndexAttr(index));
-    Value itemValue = builder.create<IREE::Util::ListGetOp>(
+    Value indexValue = builder.create<arith::ConstantOp>(
+        loc, builder.getIndexType(), builder.getIndexAttr(index));
+    Value itemValue = builder.create<IREE::Input::ListGetOp>(
         loc, getIrType(builder), parentList, indexValue);
     // TODO: Null check, etc. How does that work if returning a tensor? Need
     // to box somehow?
-    if (itemValue.getType().isa<IREE::HAL::BufferViewType>()) {
-      itemValue = builder.createOrFold<IREE::HAL::TensorCastOp>(loc, valueType,
-                                                                itemValue);
+    if (itemValue.getType().isa<IREE::Input::BufferViewType>()) {
+      itemValue = builder.createOrFold<IREE::Input::BufferViewToTensorOp>(
+          loc, valueType, itemValue);
     }
     return itemValue;
   }
@@ -393,8 +390,9 @@ struct StructureLevel {
 
   StructureLevel *allocateChild(Location loc, int childIndex,
                                 bool asTuple = false) {
-    if (type == LevelType::None)
+    if (type == LevelType::None) {
       type = asTuple ? LevelType::Tuple : LevelType::List;
+    }
     if (type != LevelType::List && type != LevelType::Tuple) {
       emitError(loc) << "structure path mismatch: dereference a non-sequence "
                      << "with a sequence key " << childIndex;
@@ -411,13 +409,14 @@ struct StructureLevel {
   }
 };
 
-LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
+LogicalResult materializeABIWrapper(ModuleOp module, func::FuncOp internalFunc,
                                     StringRef exportedName) {
   Location loc = internalFunc.getLoc();
   OpBuilder builder(internalFunc);
-  const Identifier savedModelIndexPathIdent =
-      builder.getIdentifier("tf_saved_model.index_path");
-  FunctionType internalFuncType = internalFunc.getType();
+  const StringAttr savedModelIndexPathIdent =
+      builder.getStringAttr("tf_saved_model.index_path");
+  FunctionType internalFuncType =
+      internalFunc.getFunctionType().cast<FunctionType>();
   json::Array refArgs;
   json::Array refReturns;
 
@@ -493,7 +492,8 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // Create the wrapper function.
   FunctionType wrapperFuncType =
       builder.getFunctionType(wrapperArgTypes, wrapperResultTypes);
-  auto wrapperFunc = builder.create<FuncOp>(loc, exportedName, wrapperFuncType);
+  auto wrapperFunc =
+      builder.create<func::FuncOp>(loc, exportedName, wrapperFuncType);
   SymbolTable::setSymbolVisibility(wrapperFunc,
                                    SymbolTable::Visibility::Public);
   Block *entryBlock = wrapperFunc.addEntryBlock();
@@ -516,8 +516,8 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // Emit the call to the internal func.
   ResultRange internalResults =
       builder
-          .create<CallOp>(loc, internalFunc.getType().getResults(),
-                          internalFunc.getName(), callArgs)
+          .create<func::CallOp>(loc, internalFuncType.getResults(),
+                                internalFunc.getName(), callArgs)
           .getResults();
 
   // And then unflatten the results for return from the wrapper.
@@ -546,7 +546,7 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
 
   assert(llvm::all_of(wrapperReturns, [](Value v) { return v != nullptr; }) &&
          "not all call returns mapped");
-  builder.create<ReturnOp>(loc, wrapperReturns);
+  builder.create<func::ReturnOp>(loc, wrapperReturns);
 
   // Add ABI attribute.
   {
@@ -571,10 +571,8 @@ class SavedModelToIREEABIPass
     : public PassWrapper<SavedModelToIREEABIPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Flow::FlowDialect, iree_compiler::IREE::Util::UtilDialect,
-                IREE::HAL::HALDialect,
-                mlir::tf_saved_model::TensorFlowSavedModelDialect>();
+    registry.insert<iree_compiler::IREE::Input::IREEInputDialect,
+                    mlir::tf_saved_model::TensorFlowSavedModelDialect>();
   }
 
   StringRef getArgument() const override {
@@ -593,12 +591,12 @@ class SavedModelToIREEABIPass
 
   LogicalResult run() {
     mlir::Builder builder(getOperation());
-    const Identifier savedModelIndexPathIdent =
-        builder.getIdentifier("tf_saved_model.index_path");
+    const StringAttr savedModelIndexPathIdent =
+        builder.getStringAttr("tf_saved_model.index_path");
     (void)savedModelIndexPathIdent;
 
     // Handle saved model exported functions.
-    for (auto func : getOperation().getOps<FuncOp>()) {
+    for (auto func : getOperation().getOps<func::FuncOp>()) {
       // Transfer exported names to IREE.
       auto exportedNames = mlir::tf_saved_model::GetExportedNames(func);
       if (exportedNames.empty()) continue;

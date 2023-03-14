@@ -12,13 +12,12 @@
 #
 #   bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh
 #
-# The parent directory for the installation can be overridden using the first
-# positional argument:
+# The installation directory can be overridden using the first positional
+# argument:
 #
 #   bash build_tools/third_party/swiftshader/build_vk_swiftshader.sh <parent-dir>
 #
-# If the `.swiftshader` installation dir already exists, it will be deleted and
-# rebuilt.
+# If the installation dir already exists, it will be deleted and rebuilt.
 #
 # Note that you will need a working CMake installation for this script to
 # succeed. On Windows, Visual Studio 2019 is recommended.
@@ -40,58 +39,67 @@
 # See https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
 # for further details about the Vulkan loader and ICDs.
 
+set -euo pipefail
+
 set +e  # Ignore errors if not found.
 CYGPATH="$(which cygpath 2>/dev/null)"
 set -e
 
-if [[ -z "${CYGPATH?}" ]]; then
+# This isn't an argument so that we can set the swiftshader commit in one place
+# for the whole project.
+SWIFTSHADER_COMMIT=dd7bb92b9a7a813ebc2da9fe3f6484c34cc69363
+SWIFTSHADER_SRC_DIR="$(mktemp --directory --tmpdir swiftshader_src_XXXXXX)"
+SWIFTSHADER_BUILD_DIR="$(mktemp --directory --tmpdir swiftshader_build_XXXXXX)"
+
+if [[ -z "${CYGPATH}" ]]; then
   # Anything that isn't Windows.
-  BASE_DIR="${1:-${HOME?}}"
-  SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}/.swiftshader"
+  SWIFTSHADER_INSTALL_DIR="${1:-${HOME}/.swiftshader}"
+  PLATFORM_DIR="${SWIFTSHADER_BUILD_DIR}/Linux"
+  SET_VK_ICD_CMD="export VK_ICD_FILENAMES=${SWIFTSHADER_INSTALL_DIR}/vk_swiftshader_icd.json"
 else
   # Windows.
-  BASE_DIR="${1:-${USERPROFILE?}}"
-  SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}"'\.swiftshader'
+  SWIFTSHADER_INSTALL_DIR="${1:-${USERPROFILE}\.swiftshader}"
+  PLATFORM_DIR="${SWIFTSHADER_BUILD_DIR}"'\Windows\'
+  SET_VK_ICD_CMD='set VK_ICD_FILENAMES='"${SWIFTSHADER_INSTALL_DIR}"'\vk_swiftshader_icd.json'
 fi
 
-SWIFTSHADER_COMMIT=755b78dc66b2362621a78b6964a9df3af94e960c
-SWIFTSHADER_DIR="$(mktemp --directory --tmpdir swiftshader_XXXXXX)"
+#  Shallow clone the specific swiftshader commit.
+cd "${SWIFTSHADER_SRC_DIR}"
+git init --quiet
+git remote add origin https://github.com/google/swiftshader
+git fetch --depth 1 origin "${SWIFTSHADER_COMMIT}"
+git -c advice.detachedHead=false checkout "${SWIFTSHADER_COMMIT}"
 
-#  Clone swiftshader and checkout the appropriate commit.
-git clone https://github.com/google/swiftshader "${SWIFTSHADER_DIR?}"
-cd "${SWIFTSHADER_DIR?}"
-git pull origin master --ff-only
-git checkout "${SWIFTSHADER_COMMIT?}"
-
-# Install swiftshader in SWIFTSHADER_INSTALL_DIR.
-# Options:
-#   - 64 bit platform and host compiler
-#   - Build Vulkan only, don't build GL
-#   - Don't build samples or tests
-
-echo "Installing to ${SWIFTSHADER_INSTALL_DIR?}"
-if [[ -d "${SWIFTSHADER_INSTALL_DIR?}" ]]; then
-  echo "  Install directory already exists, cleaning it"
-  rm -rf "${SWIFTSHADER_INSTALL_DIR?}"
-fi
-
-cmake -B "${SWIFTSHADER_INSTALL_DIR?}" \
+# Build in a temporary directory
+cmake -B "${SWIFTSHADER_BUILD_DIR}" \
     -GNinja \
-    -DSWIFTSHADER_BUILD_VULKAN=ON \
-    -DSWIFTSHADER_BUILD_EGL=OFF \
-    -DSWIFTSHADER_BUILD_GLESv2=OFF \
-    -DSWIFTSHADER_BUILD_GLES_CM=OFF \
-    -DSWIFTSHADER_BUILD_PVR=OFF \
     -DSWIFTSHADER_BUILD_TESTS=OFF \
-    "${SWIFTSHADER_DIR?}"
-
+    -DSWIFTSHADER_WARNINGS_AS_ERRORS=OFF \
+    .
 # Build the project, choosing just the vk_swiftshader target.
-cmake --build "${SWIFTSHADER_INSTALL_DIR?}" --config Release --target vk_swiftshader
+cmake --build "${SWIFTSHADER_BUILD_DIR}" --config Release --target vk_swiftshader -- -k 0
+
+
+echo "Installing to ${SWIFTSHADER_INSTALL_DIR}"
+if [[ -d "${SWIFTSHADER_INSTALL_DIR}" ]]; then
+  echo "  Install directory already exists, cleaning it"
+  rm -rf "${SWIFTSHADER_INSTALL_DIR}"
+fi
+
+if ! [[ -d "${PLATFORM_DIR}" ]]; then
+  echo "Build failed to create expected directory '${PLATFORM_DIR}'" >&2
+  exit 1
+fi
+
+# Copy the actual built artifacts into the installation directory
+cp -rf "${PLATFORM_DIR}" "${SWIFTSHADER_INSTALL_DIR}"
+
+# Keep track of the commit we are using.
+echo "${SWIFTSHADER_COMMIT}" > "${SWIFTSHADER_INSTALL_DIR}/git-commit"
+
+# Cleanup
+rm -rf "${SWIFTSHADER_SRC_DIR}" "${SWIFTSHADER_BUILD_DIR}"
 
 echo
 echo "Ensure the following variable is set in your enviroment:"
-if [[ -d "${SWIFTSHADER_INSTALL_DIR?}/Linux/" ]]; then
-  echo "  export VK_ICD_FILENAMES=${SWIFTSHADER_INSTALL_DIR?}/Linux/vk_swiftshader_icd.json"
-else
-  echo '  set VK_ICD_FILENAMES='"${SWIFTSHADER_INSTALL_DIR?}"'\Windows\vk_swiftshader_icd.json'
-fi
+echo "  " "${SET_VK_ICD_CMD}"

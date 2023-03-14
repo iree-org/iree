@@ -1,0 +1,36 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+musldir=${MUSL_DIR}
+include $(musldir)/Makefile
+
+IREE_BASE_SRCS = $(addprefix $(srcdir)/, \
+	src/fenv/fenv.c \
+	src/math/ceilf.c \
+	src/math/floorf.c \
+	src/math/fmaf.c \
+	src/math/fmodf.c \
+	src/math/powf.c \
+	src/math/expf.c \
+	src/math/powf_data.c \
+	src/math/exp2f_data.c \
+	src/math/roundf.c \
+	src/math/__math_invalidf.c \
+	src/math/__math_oflowf.c \
+	src/math/__math_uflowf.c \
+	src/math/__math_xflowf.c)
+IREE_BASE_LLS = $(patsubst $(srcdir)/%,%.ll,$(basename $(IREE_BASE_SRCS)))
+IREE_BASE_BCS = $(patsubst $(srcdir)/%,%.bc,$(basename $(IREE_BASE_SRCS)))
+IREE_LL_FILES = $(addprefix obj/, $(IREE_BASE_LLS))
+IREE_CFLAGS=-Xclang -disable-llvm-passes -fno-ident -fvisibility=hidden -target wasm32
+LL_CMD = $(CC) $(CFLAGS_ALL) $(IREE_CFLAGS) -S -emit-llvm -o $@ -c $<
+
+obj/%.ll: $(musldir)/%.c obj/include/bits/alltypes.h
+	$(LL_CMD)
+
+iree: $(IREE_LL_FILES)
+	$(info $$IREE_BASE_SRCS is [${IREE_BASE_SRCS}])
+	$(info $$IREE_LL_FILES is [${IREE_LL_FILES}])

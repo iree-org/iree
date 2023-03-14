@@ -19,6 +19,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
@@ -42,9 +43,15 @@ enum ImportType {
   savedmodel_v1,
 };
 
+enum class OutputFormat {
+  none,
+  mlir_ir,
+  mlir_bytecode,
+};
+
 }  // namespace
 
-static OwningModuleRef importSavedModelV2(
+static OwningOpRef<mlir::ModuleOp> importSavedModelV2(
     MLIRContext &context, const std::string &inputPath,
     const std::string &savedModelExportedNames) {
   tensorflow::SavedModelV2Bundle bundle;
@@ -73,10 +80,10 @@ static OwningModuleRef importSavedModelV2(
     return nullptr;
   }
 
-  return loadedModule.ConsumeValueOrDie();
+  return std::move(loadedModule).value();
 }
 
-static OwningModuleRef importSavedModelV1(
+static OwningOpRef<mlir::ModuleOp> importSavedModelV1(
     MLIRContext &context, const std::string &inputPath,
     const std::string &savedModelExportedNames,
     const std::string &savedModelTags) {
@@ -117,11 +124,14 @@ static OwningModuleRef importSavedModelV1(
     return nullptr;
   }
 
-  return loadedModule.ConsumeValueOrDie();
+  return std::move(loadedModule).value();
 }
 
 int main(int argc, char **argv) {
   tensorflow::InitMlir y(&argc, &argv);
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
 
   static cl::opt<std::string> inputPath(
       cl::Positional, cl::desc("<saved model directory>"), cl::Required);
@@ -134,6 +144,15 @@ int main(int argc, char **argv) {
                            "Import a TensorFlow SavedModel V2 (directory)"),
                  clEnumVal(savedmodel_v1,
                            "Import a TensorFlow SavedModel V1 (directory)")));
+
+  // The output format flag is the master control for what we do with the
+  // in-memory compiled form.
+  llvm::cl::opt<OutputFormat> outputFormat(
+      "output-format", llvm::cl::desc("Format of imported output"),
+      llvm::cl::values(clEnumValN(OutputFormat::mlir_bytecode, "mlir-bytecode",
+                                  "MLIR Bytecode (default)"),
+                       clEnumValN(OutputFormat::mlir_ir, "mlir-ir", "MLIR IR")),
+      llvm::cl::init(OutputFormat::mlir_bytecode));
 
   static llvm::cl::opt<std::string> savedModelExportedNames(
       "tf-savedmodel-exported-names",
@@ -182,7 +201,7 @@ int main(int argc, char **argv) {
   llvm::SourceMgr sourceMgr;
   mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
 
-  OwningModuleRef module;
+  OwningOpRef<mlir::ModuleOp> module;
 
   auto saveToFile = [&](llvm::StringRef savePath) -> LogicalResult {
     auto outputFile = openOutputFile(savePath);
@@ -190,11 +209,22 @@ int main(int argc, char **argv) {
       llvm::errs() << "Could not open output file: " << savePath << "\n";
       return failure();
     }
-    OpPrintingFlags printFlags;
-    module->print(outputFile->os(), printFlags);
-    outputFile->os() << "\n";
-    outputFile->keep();
-    return success();
+
+    if (outputFormat == OutputFormat::mlir_ir) {
+      OpPrintingFlags printFlags;
+      module->print(outputFile->os(), printFlags);
+      outputFile->os() << "\n";
+      outputFile->keep();
+      return success();
+    }
+
+    if (outputFormat == OutputFormat::mlir_bytecode) {
+      mlir::writeBytecodeToFile(*module, outputFile->os());
+      outputFile->keep();
+      return success();
+    }
+    llvm::errs() << "Unknown output format\n";
+    return failure();
   };
 
   // First stage import.
@@ -207,7 +237,7 @@ int main(int argc, char **argv) {
                                   savedModelTags);
       break;
     default:
-      llvm_unreachable("unsupported import type enum");
+      assert(false && "unsupported import type enum");
   }
   if (!module) return 1;
 
@@ -218,7 +248,8 @@ int main(int argc, char **argv) {
 
   // Run passes.
   {
-    PassManager pm(&context, PassManager::Nesting::Implicit);
+    PassManager pm(&context, module.get()->getName().getStringRef(),
+                   PassManager::Nesting::Implicit);
     applyPassManagerCLOptions(pm);
 
     if (prettifyTfDebugInfo) {
@@ -233,16 +264,6 @@ int main(int argc, char **argv) {
     }
     if (!saveTempMidLevelImport.empty()) {
       if (failed(saveToFile(saveTempMidLevelImport))) return 10;
-    }
-  }
-  {
-    PassManager pm(&context, PassManager::Nesting::Implicit);
-    applyPassManagerCLOptions(pm);
-    iree_integrations::MHLO::buildMHLOImportPassPipeline(pm);
-    if (failed(pm.run(*module))) {
-      llvm::errs() << "Running iree-import-tf MHLO Import pass pipeline failed "
-                      "(see diagnostics)\n";
-      return 2;
     }
   }
 

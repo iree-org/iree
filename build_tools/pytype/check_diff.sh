@@ -26,7 +26,9 @@ fi
 
 # We seperate the python files into multiple pytype calls because otherwise
 # Ninja gets confused. See https://github.com/google/pytype/issues/198
-BASE=$(echo "${FILES?}" | grep -vP '^(\./)?integrations/*$')
+BASE=$(echo "${FILES?}" | \
+       grep -vP '^(\./)?integrations/*$' | \
+       grep -vP '(\./)?setup\.py$')
 IREE_TF=$(echo "${FILES?}" | \
           grep -P '^(\./)?integrations/tensorflow/bindings/python/iree/tf/.*')
 IREE_XLA=$(echo "${FILES?}" | \
@@ -44,10 +46,15 @@ function check_files() {
     return "${1?}"
   fi
 
-  # We disable import-error because pytype doesn't have access to bazel.
-  # We disable pyi-error because of the way the bindings imports work.
+  # We disable import-error and module-attr because pytype doesn't have access
+  # to all dependencies and pyi-error because of the way the bindings imports
+  # work.
+  # xargs is set to high arg limits to avoid multiple pytype invocations and
+  # will hard fail if the limits are exceeded.
+  # See https://github.com/bazelbuild/bazel/issues/12479
   echo "${@:2}" | \
-    xargs python3 -m pytype --disable=import-error,pyi-error -j $(nproc)
+    xargs --max-args 1000000 --max-chars 1000000 --exit \
+      python3 -m pytype --disable=import-error,pyi-error,module-attr -j $(nproc)
   EXIT_CODE="$?"
   echo
   if [[ "${EXIT_CODE?}" -gt "${1?}" ]]; then

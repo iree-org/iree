@@ -1,0 +1,1 @@
+# RUN: %PYTHON -m iree_tfl_tests.mnasnet_test --artifacts_dir=%t

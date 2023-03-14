@@ -26,10 +26,6 @@ Enables instrumented runtime tracing. Defaults to `OFF`.
 Enables instrumented compiler tracing. This requires that
 `IREE_ENABLE_RUNTIME_TRACING` also be set. Defaults to `OFF`.
 
-#### `IREE_ENABLE_EMITC`:BOOL
-
-Enables the build of the out-of-tree MLIR dialect EmitC. Defaults to `OFF`.
-
 #### `IREE_BUILD_COMPILER`:BOOL
 
 Builds the IREE compiler. Defaults to `ON`.
@@ -58,26 +54,33 @@ Builds the IREE TFLite C API compatibility shim. Defaults to `ON`.
 
 Builds the IREE TFLite Java bindings with the C API compatibility shim. Defaults to `ON`.
 
-#### `IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS`:BOOL
-
-Builds the experimental java bindings. Defaults to `OFF`.
-
 #### `IREE_BUILD_EXPERIMENTAL_REMOTING`:BOOL
 
 Builds experimental remoting component. Defaults to `OFF`.
 
-#### `IREE_HAL_DRIVERS_TO_BUILD`:STRING
+#### `IREE_HAL_DRIVER_DEFAULTS`:BOOL
 
-Semicolon-separated list of HAL drivers to build, or `all` for building all HAL
-drivers. Case-insensitive. If an empty list is provided, will build no HAL
-drivers. Defaults to `all`. Example: `-DIREE_HAL_DRIVERS_TO_BUILD=Vulkan;VMLA`.
+Default setting for each `IREE_HAL_DRIVER_*` option.
 
-#### `IREE_TARGET_BACKENDS_TO_BUILD`:STRING
+#### `IREE_HAL_DRIVER_*`:BOOL
 
-Semicolon-separated list of target backend to build, or `all` for building all
-compiler target backends. Case-insensitive. If an empty list is provided, will
-build no target backends. Defaults to `all`. Example:
-`-DIREE_TARGET_BACKENDS_TO_BUILD=Vulkan-SPIRV;VMLA`.
+Individual options enabling the build for each runtime HAL driver.
+
+#### `IREE_TARGET_BACKEND_DEFAULTS`:BOOL
+
+Default setting for each `IREE_TARGET_BACKEND_*` option.
+
+#### `IREE_TARGET_BACKEND_*`:BOOL
+
+Individual options enabling the build for each compiler target backend.
+
+#### `IREE_INPUT_*`:BOOL
+
+Individual options enabling each set of input dialects.
+
+#### `IREE_OUTPUT_FORMAT_C`:BOOL
+
+Enables the vm-c compiler output format, using MLIR EmitC. Defaults to `ON`.
 
 #### `IREE_DEV_MODE`:BOOL
 
@@ -106,53 +109,15 @@ the current build type is Debug and the compiler supports it.
 Enable [thread sanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html) if
 the current build type is Debug and the compiler supports it.
 
-#### `IREE_MLIR_DEP_MODE`:STRING
+#### `IREE_ENABLE_UBSAN`:BOOL
 
-Defines the MLIR dependency mode. Case-sensitive. Can be `BUNDLED`, `DISABLED`
-or `INSTALLED`. Defaults to `BUNDLED`. If set to `INSTALLED`, the variable
-`MLIR_DIR` needs to be passed and that LLVM needs to be compiled with
-`LLVM_ENABLE_RTTI` set to `ON`.
-
-#### `IREE_BUILD_TENSORFLOW_COMPILER`:BOOL
-
-Enables building of the TensorFlow to IREE compiler under
-`integrations/tensorflow`, including some native binaries and Python packages.
-Note that TensorFlow's build system is bazel and this will require having
-previously built (or installed) the iree-import-tf at the path specified by
-`IREE_TF_TOOLS_ROOT`.
-
-#### `IREE_BUILD_TFLITE_COMPILER`:BOOL
-
-Enables building of the TFLite to IREE compiler under `integrations/tensorflow`,
-including some native binaries and Python packages. Note that TensorFlow's build
-system is bazel and this will require having previously built (or installed) the
-iree-import-tf at the path specified by `IREE_TF_TOOLS_ROOT`.
-
-#### `IREE_BUILD_XLA_COMPILER`:BOOL
-
-Enables building of the XLA to IREE compiler under `integrations/tensorflow`,
-including some native binaries and Python packages. Note that TensorFlow's build
-system is bazel and this will require having previously built (or installed) the
-iree-import-tf at the path specified by `IREE_TF_TOOLS_ROOT`.
-
-#### `IREE_TF_TOOLS_ROOT`:STRING
-
-Path to prebuilt TensorFlow integration binaries to be used by the Python
-bindings. Defaults to
-"${CMAKE_SOURCE_DIR}/integrations/tensorflow/bazel-bin/iree_tf_compiler", which
-is where they would be placed by a `bazel build` invocation.
-
-## MLIR-specific CMake Options and Variables
-
-#### `MLIR_DIR`:STRING
-
-Specifies the path where to look for the installed MLIR/LLVM packages. Required
-if `IREE_MLIR_DEP_MODE` is set to `INSTALLED`.
+Enable [undefiend behavior sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)
+if the current build type is Debug and the compiler supports it.
 
 ## Cross-compilation
 
 When cross compiling (using a toolchain file like
 [`android.toolchain.cmake`](https://android.googlesource.com/platform/ndk/+/master/build/cmake/android.toolchain.cmake)),
 first build and install IREE's tools for your host configuration, then use the
-`IREE_HOST_BINARY_ROOT` CMake option to point the cross compiled build at the
+`IREE_HOST_BIN_DIR` CMake option to point the cross compiled build at the
 host tools.

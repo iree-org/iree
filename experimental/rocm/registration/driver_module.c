@@ -13,14 +13,11 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
-#define IREE_HAL_ROCM_DRIVER_ID 0x524f434d0au  // ROCM
-
 static iree_status_t iree_hal_rocm_driver_factory_enumerate(
-    void *self, const iree_hal_driver_info_t **out_driver_infos,
-    iree_host_size_t *out_driver_info_count) {
+    void *self, iree_host_size_t *out_driver_info_count,
+    const iree_hal_driver_info_t **out_driver_infos) {
   // NOTE: we could query supported ROCM versions or featuresets here.
   static const iree_hal_driver_info_t driver_infos[1] = {{
-      .driver_id = IREE_HAL_ROCM_DRIVER_ID,
       .driver_name = iree_string_view_literal("rocm"),
       .full_name = iree_string_view_literal("ROCM (dynamic)"),
   }};
@@ -30,25 +27,20 @@ static iree_status_t iree_hal_rocm_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_rocm_driver_factory_try_create(
-    void *self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
+    void *self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t **out_driver) {
   IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = NULL;
-  if (driver_id != IREE_HAL_ROCM_DRIVER_ID) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("rocm"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "no driver with ID %016" PRIu64
-                            " is provided by this factory",
-                            driver_id);
+                            "no driver '%.*s' is provided by this factory",
+                            (int)driver_name.size, driver_name.data);
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  // When we expose more than one driver (different rocm versions, etc) we
-  // can name them here:
-  iree_string_view_t identifier = iree_make_cstring_view("rocm");
-
   iree_hal_rocm_driver_options_t driver_options;
   iree_hal_rocm_driver_options_initialize(&driver_options);
   iree_status_t status = iree_hal_rocm_driver_create(
-      identifier, &driver_options, allocator, out_driver);
+      driver_name, &driver_options, host_allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

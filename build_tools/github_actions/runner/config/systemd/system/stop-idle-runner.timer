@@ -1,0 +1,17 @@
+[Unit]
+Description=Checks whether to stop the runner service at intervals
+
+[Timer]
+# Trigger 30 minutes after activation of the timer (via `systemctl start` on it
+# or a service that `Wants` it and every 15 minutes after the corresponding
+# service completes. Both timings are subject to systemd AccuracySec (default
+# +/-1 minute).
+OnActiveSec=30m
+OnUnitInactiveSec=15m
+
+[Install]
+# TODO(gcmn): Re-enable once we've debugged this causing actions failures.
+# WantedBy=timers.target runner-setup.target
+# This install command just exists to make it possible to call enable on this
+# without an error (effectively a noop)
+Also=stop-idle-runner.service

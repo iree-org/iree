@@ -4,16 +4,18 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Keep this in sync with build_tools/scripts/lint.sh
+
 name: Lint
 
 on: [pull_request]
 
 jobs:
   bazel_to_cmake:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Running bazel_to_cmake for IREE core
         run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --verbosity=2
       - name: Running bazel_to_cmake for IREE TF Integration Tests
@@ -25,10 +27,10 @@ jobs:
           git diff HEAD --exit-code
 
   buildifier:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
@@ -43,17 +45,17 @@ jobs:
           # Fail if the script fails (unfixable lint warnings) or it creates a
           # diff (fixable lint warnings or formatting).
           EXIT_CODE=0
-          ./scripts/run_buildifier.sh "${GITHUB_BASE_REF?}" || EXIT_CODE=1
+          ./build_tools/scripts/run_buildifier.sh "${GITHUB_BASE_REF?}" || EXIT_CODE=1
           git diff --exit-code
           exit "${EXIT_CODE?}"
 
   yapf:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Setting up python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
@@ -71,15 +73,15 @@ jobs:
           printf "  git diff -U0 "${GITHUB_BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n"
 
   pytype:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Setting up python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
         with:
           # Pytype does not support python3.9, which this action defaults to.
-          python-version: '3.8'
+          python-version: "3.8"
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
@@ -89,49 +91,73 @@ jobs:
         run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
 
   clang-format:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Installing dependencies
         run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends clang-format-9
           wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format -O /tmp/git-clang-format
           chmod +x /tmp/git-clang-format
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Running clang-format on changed source files
         run: |
-          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-9 --style=file
+          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-12 --style=file
           git diff --exit-code
 
-  submodules:
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@v2
-      - name: Checking submodules
-        run: ./scripts/git/submodule_versions.py check
-
   tabs:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Checking tabs
-        run: ./scripts/check_tabs.sh "${GITHUB_BASE_REF?}"
+        run: ./build_tools/scripts/check_tabs.sh "${GITHUB_BASE_REF?}"
 
   yamllint:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-      - name: yaml-lint
-        uses: ibiqlik/action-yamllint@v1
-        with:
-          strict: true
-          file_or_dir: .github/**/*.yml build_tools/buildkite/**/*.yml
+      - name: Checking out repository
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: Fetching Base Branch
+        # We have to explicitly fetch the base branch as well
+        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
+      - name: yamllint
+        run: ./build_tools/scripts/run_yamllint.sh "${GITHUB_BASE_REF?}"
+
+  markdownlint:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: Downloading markdownlint
+        run: npm install -g markdownlint-cli
+      - name: Running markdownlint
+        run: ./build_tools/scripts/run_markdownlint.sh
+
+  path_lengths:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: Running check_path_lengths
+        run: ./build_tools/scripts/check_path_lengths.py
+
+  generated_cmake_files:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: Generating CMake files
+        run: |
+          ./build_tools/scripts/generate_cmake_files.sh
+      - name: Checking Diff
+        run: |
+          # Make sure to run build_tools/scripts/generate_cmake_files.sh and
+          # pick up new files that have been added.
+          git add -A
+          git diff HEAD --exit-code

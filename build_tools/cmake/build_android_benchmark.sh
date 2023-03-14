@@ -12,31 +12,44 @@
 # Host binaries (e.g. compiler tools) will be built and installed in build-host/
 # Android binaries (e.g. tests) will be built in build-android/.
 
-set -x
-set -e
+set -xeuo pipefail
 
 # Print the UTC time when set -x is on.
 export PS4='[$(date -u "+%T %Z")] '
 
 # Check these exist and print the versions for later debugging.
-export CMAKE_BIN="$(which cmake)"
-"${CMAKE_BIN?}" --version
-"${CC?}" --version
-"${CXX?}" --version
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+"${CMAKE_BIN}" --version
+"${CC}" --version
+"${CXX}" --version
 ninja --version
 python3 --version
-echo "Android NDK path: ${ANDROID_NDK?}"
-
-ROOT_DIR=$(git rev-parse --show-toplevel)
-cd ${ROOT_DIR?}
+echo "Android NDK path: ${ANDROID_NDK}"
 
 echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
+git submodule sync
+git submodule update --init --jobs 8 --depth 1
+
+ROOT_DIR=$(git rev-parse --show-toplevel)
+cd "${ROOT_DIR}"
+
+# BUILD the iree-import-tflite binary for importing models to benchmark from
+# TFLite FlatBuffers.
+cd "${ROOT_DIR}/integrations/tensorflow"
+BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
+BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
+"${BAZEL_CMD[@]}" build \
+      //iree_tf_compiler:iree-import-tflite \
+      //iree_tf_compiler:iree-import-tf \
+      --config=generic_clang \
+      --config=remote_cache_bazel_tf_ci
+# So the benchmark build below can find the importer binaries that were built.
+export PATH="$PWD/bazel-bin/iree_tf_compiler:$PATH"
 
 # --------------------------------------------------------------------------- #
 # Build for the host.
 
-cd ${ROOT_DIR?}
+cd "${ROOT_DIR}"
 
 if [ -d "build-host" ]
 then
@@ -48,21 +61,28 @@ fi
 cd build-host
 
 # Configure, build, install.
-"${CMAKE_BIN?}" -G Ninja .. \
+"${CMAKE_BIN}" -G Ninja .. \
   -DCMAKE_INSTALL_PREFIX=./install \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
+  -DIREE_BUILD_MICROBENCHMARKS=ON \
   -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN?}" --build . --target install
+
+"${CMAKE_BIN}" --build . --target install -- -k 0
 # Also generate artifacts for benchmarking on Android.
-"${CMAKE_BIN?}" --build . --target iree-benchmark-suites
+"${CMAKE_BIN}" --build . --target \
+  iree-benchmark-suites-android-arm64-v8a \
+  iree-benchmark-suites-android-adreno \
+  iree-benchmark-suites-android-mali \
+  -- -k 0
+"${CMAKE_BIN}" --build . --target iree-microbenchmark-suites -- -k 0
 # --------------------------------------------------------------------------- #
 
 # --------------------------------------------------------------------------- #
 # Build for the target (Android).
 
-cd ${ROOT_DIR?}
+cd "${ROOT_DIR}"
 
 if [ -d "build-android" ]
 then
@@ -74,20 +94,20 @@ fi
 cd build-android
 
 # Configure towards 64-bit Android 10, then build.
-"${CMAKE_BIN?}" -G Ninja .. \
-  -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK?}/build/cmake/android.toolchain.cmake \
+"${CMAKE_BIN}" -G Ninja .. \
+  -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM=android-29 \
-  -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
+  -DIREE_HOST_BIN_DIR="${PWD}/../build-host/install/bin" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN?}" --build . --target iree-benchmark-module
+"${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0
 
 # --------------------------------------------------------------------------- #
 # Build for the target (Android) with tracing.
 
-cd ${ROOT_DIR?}
+cd "${ROOT_DIR}"
 
 if [ -d "build-android-trace" ]
 then
@@ -99,13 +119,13 @@ fi
 cd build-android-trace
 
 # Configure towards 64-bit Android 10, then build.
-"${CMAKE_BIN?}" -G Ninja .. \
-  -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK?}/build/cmake/android.toolchain.cmake \
+"${CMAKE_BIN}" -G Ninja .. \
+  -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM=android-29 \
-  -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
+  -DIREE_HOST_BIN_DIR="${PWD}/../build-host/install/bin" \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN?}" --build . --target iree-benchmark-module
+"${CMAKE_BIN}" --build . --target iree-benchmark-module -- -k 0

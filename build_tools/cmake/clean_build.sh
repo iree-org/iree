@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2019 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -15,4 +17,4 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 
 cd ${ROOT_DIR?}
 rm -rf build/
-./build_tools/cmake/rebuild.sh
+./build_tools/cmake/rebuild.sh "$@"

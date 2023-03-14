@@ -6,68 +6,67 @@
 
 #include "iree-dialects-c/Dialects.h"
 
-#include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
+#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
+#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
 #include "mlir/CAPI/Support.h"
 #include "mlir/CAPI/Utils.h"
 #include "mlir/CAPI/Wrap.h"
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Support/LLVM.h"
+
+using namespace mlir;
+using namespace mlir::iree_compiler::IREE;
 
 //===----------------------------------------------------------------------===//
 // IREEDialect
 //===----------------------------------------------------------------------===//
 
-MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREE, iree, mlir::iree::IREEDialect)
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
+    IREEInput, iree_input, mlir::iree_compiler::IREE::Input::IREEInputDialect)
 
-//===----------------------------------------------------------------------===//
-// IREEPyDMDialect
-//===----------------------------------------------------------------------===//
+//===--------------------------------------------------------------------===//
+// IREELinalgExt
+//===--------------------------------------------------------------------===//
 
-MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREEPyDM, iree_pydm,
-                                      mlir::iree_pydm::IREEPyDMDialect)
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
+    IREELinalgExt, iree_linalg_ext,
+    mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect)
 
-bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type) {
-  return unwrap(type).isa<mlir::iree_pydm::PrimitiveType>();
+//===--------------------------------------------------------------------===//
+// IREELinalgTransform
+//===--------------------------------------------------------------------===//
+
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
+    IREELinalgTransform, iree_linalg_transform,
+    mlir::linalg::transform::LinalgTransformDialect)
+
+void mlirIREELinalgTransformRegisterPasses() {
+  mlir::linalg::transform::registerTransformDialectInterpreterPass();
+  mlir::linalg::transform::registerLinalgTransformExpertExpansionPass();
+  mlir::linalg::transform::registerDropSchedulePass();
+}
+//===--------------------------------------------------------------------===//
+// TransformDialect
+//===--------------------------------------------------------------------===//
+
+void ireeRegisterTransformExtensions(MlirContext context) {
+  MLIRContext *ctx = unwrap(context);
+  DialectRegistry registry;
+  registry.addExtensions<
+      mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension,
+      mlir::transform_ext::StructuredTransformOpsExtension>();
+  ctx->appendDialectRegistry(registry);
 }
 
-#define IREEPYDM_DEFINE_NULLARY_TYPE(Name)                      \
-  bool mlirTypeIsAIREEPyDM##Name(MlirType type) {               \
-    return unwrap(type).isa<mlir::iree_pydm::Name##Type>();     \
-  }                                                             \
-  MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx) {       \
-    return wrap(mlir::iree_pydm::Name##Type::get(unwrap(ctx))); \
-  }
-
-IREEPYDM_DEFINE_NULLARY_TYPE(Bool)
-IREEPYDM_DEFINE_NULLARY_TYPE(Bytes)
-IREEPYDM_DEFINE_NULLARY_TYPE(Integer)
-IREEPYDM_DEFINE_NULLARY_TYPE(ExceptionResult)
-IREEPYDM_DEFINE_NULLARY_TYPE(FreeVarRef)
-IREEPYDM_DEFINE_NULLARY_TYPE(List)
-IREEPYDM_DEFINE_NULLARY_TYPE(None)
-IREEPYDM_DEFINE_NULLARY_TYPE(Real)
-IREEPYDM_DEFINE_NULLARY_TYPE(Str)
-IREEPYDM_DEFINE_NULLARY_TYPE(Tuple)
-IREEPYDM_DEFINE_NULLARY_TYPE(Type)
-
-bool mlirTypeIsAIREEPyDMObject(MlirType type) {
-  return unwrap(type).isa<mlir::iree_pydm::ObjectType>();
-}
-
-MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
-  if (!primitive.ptr) {
-    return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), nullptr));
-  }
-
-  auto cppType = unwrap(primitive).cast<mlir::iree_pydm::PrimitiveType>();
-  return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), cppType));
-}
-
-void mlirIREEPyDMBuildLowerToIREEPassPipeline(MlirOpPassManager passManager) {
-  auto *passManagerCpp = unwrap(passManager);
-  // TODO: Should be a pass pipeline, not loose passes in the C impl.
-  passManagerCpp->addPass(mlir::iree_pydm::createConvertIREEPyDMToIREEPass());
+void mlirIREETransformRegisterPasses() {
+  mlir::linalg::transform::registerDropSchedulePass();
+  mlir::linalg::transform::registerTransformDialectInterpreterPass();
 }

@@ -1,0 +1,54 @@
+name: Oneshot candidate release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tag_release:
+    name: "Tag candidate release"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+
+      - name: Compute version
+        run: |
+          git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+          package_version="$(printf '%(%Y%m%d)T.${{ github.run_number }}')"
+          tag_name="candidate-${package_version}"
+          echo "package_version=${package_version}" >> $GITHUB_ENV
+          echo "tag_name=${tag_name}" >> $GITHUB_ENV
+
+      - name: Updating candidate tag
+        run: |
+          git tag "${tag_name}"
+
+      - name: Pushing changes
+        uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6 # v0.6.0
+        with:
+          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          branch: ${{ github.ref_name }}
+          tags: true
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        with:
+          tag_name: ${{ env.tag_name }}
+          release_name: iree candidate ${{ env.tag_name }}
+          body: |
+            Automatic candidate release of iree.
+          draft: true
+          prerelease: true
+
+      - name: "Invoke workflow :: Build Native Release Packages"
+        uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7 # v1
+        with:
+          workflow: Build Native Release Packages
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          ref: "${{ env.tag_name }}"
+          inputs: '{"package_suffix": "", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'

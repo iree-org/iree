@@ -6,12 +6,21 @@ operating systems, including Android, Linux, and Windows. Vulkan is also
 cross-vendor: it is supported by most GPU vendors, including AMD, ARM, Intel,
 NVIDIA, and Qualcomm.
 
-!!! todo
-
-    Add IREE's GPU support matrix: what GPUs are supported; what GPUs are well
-    optimized; etc.
-
 <!-- TODO(??): when to use CPU vs GPU -->
+
+## Support matrix
+
+As IREE and the compiler ecosystem it operates within matures, more
+target specific optimizations will be implemented. At this stage, expect
+reasonable performance across all GPUs and for improvements to be
+made over time for specific vendors and architectures.
+
+GPU Vendor | Category | Performance | Focus Architecture
+:--------: | :------: | :---------: | :----------------:
+ARM Mali GPU | Mobile |  Good | Valhall
+Qualcomm Adreno GPU | Mobile | Reasonable | 640+
+AMD GPU | Desktop/server | Reasonable | -
+NVIDIA GPU | Desktop/server | Reasonable | -
 
 ## Prerequisites
 
@@ -40,7 +49,6 @@ verified by the following steps:
     If the showed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
 
-
 === "Windows"
 
     Run the following command in a shell:
@@ -55,7 +63,6 @@ verified by the following steps:
     If the showed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
 
-
 ## Get runtime and compiler
 
 ### Get IREE runtime with Vulkan HAL driver
@@ -64,7 +71,6 @@ Next you will need to get an IREE runtime that supports the Vulkan HAL driver
 so it can execute the model on GPU via Vulkan.
 
 <!-- TODO(??): vcpkg -->
-
 
 #### Build runtime from source
 
@@ -75,9 +81,8 @@ platforms.
 
 <!-- TODO(??): a way to verify Vulkan is compiled in and supported -->
 
-If you want to explicitly specify HAL drivers to support, you will need to add
-`Vulkan` to the `IREE_HAL_DRIVERS_TO_BUILD` CMake list variable when
-configuring (for target).
+Ensure that the `IREE_HAL_DRIVER_VULKAN` CMake option is `ON` when configuring
+for the target.
 
 ### Get compiler for SPIR-V exchange format
 
@@ -88,21 +93,23 @@ binary exchange format, which the model must be compiled into.
 
 #### Download as Python package
 
-Python packages for various IREE functionalities are regularly published on
-IREE's [GitHub Releases][iree-releases] page.  Right now these are just
-snapshots of the `main` development branch.
-
-You can install the Python package containing the SPIR-V compiler by
+Python packages for various IREE functionalities are regularly published
+to [PyPI][pypi]. See the [Python Bindings][python-bindings] page for more
+details. The core `iree-compiler` package includes the SPIR-V compiler:
 
 ``` shell
-python -m pip install iree-compiler-snapshot \
-    -f https://github.com/google/iree/releases
+python -m pip install iree-compiler
 ```
 
 !!! tip
-    `iree-translate` is installed as `/path/to/python/site-packages/iree/tools/core/iree-translate`.
-    You can find out the full path to the `site-packages` directory via the
-    `python -m site` command.
+    `iree-compile` is installed to your python module installation path. If you
+    pip install with the user mode, it is under `${HOME}/.local/bin`, or
+    `%APPDATA%Python` on Windows. You may want to include the path in your
+    system's `PATH` environment variable.
+
+    ``` shell
+    export PATH=${HOME}/.local/bin:${PATH}
+    ```
 
 #### Build compiler from source
 
@@ -111,9 +118,8 @@ to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
 page for Android. The SPIR-V compiler backend is compiled in by default on all
 platforms.
 
-If you want to explicitly specify HAL drivers to support, you will need to add
-`Vulkan-SPIRV` to the `IREE_TARGET_BACKENDS_TO_BUILD` CMake list variable when
-configuring (for host).
+Ensure that the `IREE_TARGET_BACKEND_VULKAN_SPIRV` CMake option is `ON` when
+configuring for the host.
 
 ## Compile and run the model
 
@@ -133,21 +139,32 @@ weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
 
 #### Compile using the command-line
 
-In the build directory, run the following command:
+Run the following command (passing `--iree-input-type=` as needed for your
+import tool):
 
-``` shell hl_lines="3"
-iree/tools/iree-translate \
-    -iree-mlir-to-vm-bytecode-module \
-    -iree-hal-target-backends=vulkan-spirv \
+``` shell hl_lines="2 3"
+iree-compile \
+    --iree-hal-target-backends=vulkan-spirv \
+    --iree-vulkan-target-triple=<...> \
+    --iree-input-type=mhlo \
     iree_input.mlir -o mobilenet-vulkan.vmfb
 ```
 
-!!! todo
+where `iree_input.mlir` is the imported program.
 
-    Choose the suitable target triple for the current GPU
+Note that a target triple of the form `<vendor/arch>-<product>-<os>` is needed
+to compile towards each GPU architecture. If no triple is specified then a safe but
+more limited default will be used.
+We don't support the full spectrum here[^1]; the following table summarizes the
+currently recognized ones:
 
-where `iree_input.mlir` is the model's initial MLIR representation generated by
-IREE's TensorFlow importer.
+GPU Vendor | Target Triple
+:--------: | :-----------:
+ARM Mali GPU | `valhall-g78-android30`
+Qualcomm Adreno GPU | `adreno-unknown-android30`
+AMD GPU | e.g., `rdna1-5700xt-linux`
+NVIDIA GPU | e..g, `ampere-rtx3080-windows`
+SwiftShader CPU | `cpu-swiftshader-unknown`
 
 ### Run the model
 
@@ -156,18 +173,17 @@ IREE's TensorFlow importer.
 In the build directory, run the following command:
 
 ``` shell hl_lines="2"
-iree/tools/iree-run-module \
-    --driver=vulkan \
-    --module_file=mobilenet-vulkan.vmfb \
-    --entry_function=predict \
-    --function_input="1x224x224x3xf32=0"
+tools/iree-run-module \
+    --device=vulkan \
+    --module=mobilenet-vulkan.vmfb \
+    --function=predict \
+    --input="1x224x224x3xf32=0"
 ```
 
 The above assumes the exported function in the model is named as `predict` and
 it expects one 224x224 RGB image. We are feeding in an image with all 0 values
 here for brevity, see `iree-run-module --help` for the format to specify
 concrete values.
-
 
 <!-- TODO(??): Vulkan profiles / API versions / extensions -->
 
@@ -177,13 +193,17 @@ concrete values.
 
 <!-- TODO(??): troubleshooting -->
 
+[^1]: It's also impossible to capture all details of a Vulkan implementation
+with a target triple, given the allowed variances on extensions, properties,
+limits, etc. So the target triple is just an approximation for usage.
+
 [android-cc]: ../building-from-source/android.md
 [get-started]: ../building-from-source/getting-started.md
-[iree-releases]: https://github.com/google/iree/releases/
 [mlir]: https://mlir.llvm.org/
+[pypi]: https://pypi.org/user/google-iree-pypi-deploy/
+[python-bindings]: ../bindings/python.md
 [spirv]: https://www.khronos.org/registry/spir-v/
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
-[tf-import]: ../ml-frameworks/tensorflow.md
-[tflite-import]: ../ml-frameworks/tensorflow-lite.md
+[tf-import]: ../getting-started/tensorflow.md
 [vulkan]: https://www.khronos.org/vulkan/
 [vulkan-sdk]: https://vulkan.lunarg.com/sdk/home/

@@ -1,61 +1,66 @@
 site_name: IREE
-site_url: https://google.github.io/iree/
+site_url: https://openxla.github.io/iree/
+repo_url: https://github.com/openxla/iree
+repo_name: openxla/iree
 
 theme:
   name: material
+  logo: assets/images/openxla-logo-lockup-white.svg
+  logo_alt: IREE
   icon:
     repo: fontawesome/brands/github
-    logo: iree/ghost
-  favicon: ghost.svg
+  font:
+    text: Noto
+    code: Noto Sans Mono
+  favicon: assets/images/favicon.png
+
+  # Note: this includes symlinks to forked files in third_party/mkdocs-material/
   custom_dir: overrides
 
   features:
-    - navigation.instant  # Faster loading
+    - content.code.annotate # Allow inline annotations
+    - content.code.copy     # Enable copy button
+    - content.tabs.link     # Link content tabs across site (e.g. Windows/Linux)
 
-    # TODO(scotttodd): join mkdocs-material insiders for this
-    - navigation.tracking  # Update URL in address bar with the active anchor
+    - navigation.instant  # Ajax-style dynamic loading (faster)
+    - navigation.tracking # Update URL in address bar with the active anchor
+    - navigation.sections # Group sections without collapsible buttons
+    - navigation.top      # "Back to top" button
+    - navigation.indexes  # section names can link to index.md pages
 
     # TODO(scotttodd): decide if we want this
     #     these move sections from the left nav to tabs below the header
     # - navigation.tabs
     # - navigation.tabs.sticky  # insiders only
 
-    # TODO(scotttodd): remove this if the number of pages grows too much
-    - navigation.sections  # Group sections without collapsible buttons
-
-    - navigation.top  # Back to top button
-
-    # Insiders only: navigation indices
-    #     1) supply index.md page under each section
-    #     2) list each index.md page in the `nav:` section below
-    # - navigation.indexes
+    - toc.follow # Scroll the TOC panel to follow the reader
 
   palette:
-    # Light mode
+    # Light mode (scheme overrides in openxla.css)
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
       toggle:
-        icon: material/toggle-switch-off-outline
+        icon: material/brightness-7
         name: Switch to dark mode
-    # Dark mode
+    # Dark mode (scheme overrides in openxla.css)
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue
-      accent: blue
       toggle:
-        icon: material/toggle-switch
+        icon: material/brightness-4
         name: Switch to light mode
 
-repo_url: https://github.com/google/iree
-repo_name: google/iree
-edit_uri: ""  # Omit edit button (linking to GitHub) from each document
-
 extra:
+  # TODO(scotttodd): https://openxla.github.io/community (when hosted)
+  community_homepage: https://github.com/openxla/community
+  community_site_name: OpenXLA
+
+  # TODO(scotttodd): join mkdocs-material insiders and remove notice?
+  #   (we *can* remove the notice without joining)
+  # generator: false
+
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/google/iree
+      link: https://github.com/openxla/iree
       name: IREE on GitHub
     - icon: fontawesome/brands/discord
       link: https://discord.gg/26P4xW4
@@ -63,12 +68,12 @@ extra:
     - icon: fontawesome/solid/users
       link: https://groups.google.com/forum/#!forum/iree-discuss
       name: IREE Discuss Google Group
-  generator: false  # TODO(scotttodd): join mkdocs-material insiders for this
 
 extra_css:
   - assets/stylesheets/extra.css
+  - assets/stylesheets/openxla.css
 
-copyright: Copyright &copy; 2021 The IREE Authors
+copyright: Copyright &copy; 2023 The IREE Authors
 
 markdown_extensions:
   - abbr
@@ -83,38 +88,53 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
-  - pymdownx.tabbed
   - pymdownx.superfences
-  - pymdownx.tabbed
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - tables
-  - toc:
-      permalink: true  # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
+  - toc:  # Table of Contents
+      permalink: 'link'  # Use Material font's "link" icon; see openxla.css
 
 # Navigation with explicit ordering and nesting.
 # https://www.mkdocs.org/user-guide/configuration/#nav
+# Note: may include external links and titles are optional for internal links
 nav:
-  - Home: 'index.md'
-  - 'ML frameworks':
-      - TensorFlow: 'ml-frameworks/tensorflow.md'
-      - TensorFlow Lite: 'ml-frameworks/tensorflow-lite.md'
-      - JAX: 'ml-frameworks/jax.md'
-  - 'Deployment configurations':
-      - CPU - Dylib: 'deployment-configurations/cpu-dylib.md'
-      - CPU - Bare-Metal: 'deployment-configurations/bare-metal.md'
-      - GPU - Vulkan: 'deployment-configurations/gpu-vulkan.md'
-  - 'Building from source':
-      # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
-      - 'building-from-source/getting-started.md'
-      - Optional features: 'building-from-source/optional-features.md'
-      - Android cross-compilation: 'building-from-source/android.md'
-      - RISC-V cross-compilation: 'building-from-source/riscv.md'
-  - 'Bindings':
-      - C API: 'bindings/c-api.md'
-      - Python: 'bindings/python.md'
-      - TensorFlow Lite: 'bindings/tensorflow-lite.md'
-  - 'Community':
-      - Projects: 'community/projects.md'
-  - 'Blog':
-      - TFLite Support via TOSA: 'blog/2021-07-19-tflite-tosa.md'
+  - Home: "index.md"
+  - "Getting Started":
+      - "getting-started/index.md"
+      - TensorFlow: "getting-started/tensorflow.md"
+      - TensorFlow Lite: "getting-started/tflite.md"
+      - JAX: "getting-started/jax.md"
+      - PyTorch: "getting-started/pytorch.md"
+  - "Deployment configurations":
+      - "deployment-configurations/index.md"
+      - CPU: "deployment-configurations/cpu.md"
+      - CPU - Bare-Metal: "deployment-configurations/bare-metal.md"
+      - GPU - Vulkan: "deployment-configurations/gpu-vulkan.md"
+      - GPU - CUDA/ROCm: "deployment-configurations/gpu-cuda-rocm.md"
+  - "Building from source":
+      - "building-from-source/index.md"
+      - "building-from-source/getting-started.md"
+      - "building-from-source/python-bindings-and-importers.md"
+      - "building-from-source/android.md"
+      - "building-from-source/ios.md"
+      - "building-from-source/riscv.md"
+  - "Bindings":
+      - "bindings/index.md"
+      - C API: "bindings/c-api.md"
+      - Python: "bindings/python.md"
+      - TensorFlow Lite: "bindings/tensorflow-lite.md"
+  - "Extensions":
+      - "extensions/index.md"
+  - "Blog":
+      - "blog/index.md"
+      - CUDA backend: "blog/2021-10-15-cuda-backend.md"
+      - Work in progress on Matrix Multiplication on CPU: "blog/2021-10-13-mmt4d.md"
+      - TFLite Support via TOSA: "blog/2021-07-19-tflite-tosa.md"
+  - "Reference":
+      - Glossary: "reference/glossary.md"
+      - Optimization Options: "reference/optimization-options.md"
+  - "Community":
+      - "community/index.md"

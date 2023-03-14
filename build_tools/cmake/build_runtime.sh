@@ -5,30 +5,75 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build IREE's runtime using CMake. Designed for CI, but can be run manually.
-# This uses previously cached build results and does not clear build
-# directories.
+# Build only the IREE runtime using CMake for the host
+#
+# Designed for CI, but can be run locally. The desired build directory can be
+# passed as the first argument. Otherwise, it uses the environment variable
+# IREE_TARGET_BUILD_DIR, defaulting to "build-runtime". It reuses the build
+# directory if it already exists. Expects to be run from the root of the IREE
+# repository.
 
-set -e
-set -x
+set -xeuo pipefail
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
-cd ${ROOT_DIR?}
+BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-runtime}}"
+BUILD_PRESET="${BUILD_PRESET:-test}"
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-"${CMAKE_BIN?}" --version
-ninja --version
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
-if [ -d "build-runtime" ]
-then
-  echo "build-runtime directory already exists. Will use cached results there."
-else
-  echo "build-runtime directory does not already exist. Creating a new one."
-  mkdir build-runtime
+declare -a args
+args=(
+  "-G" "Ninja"
+  "-B" "${BUILD_DIR}"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  "-DIREE_BUILD_COMPILER=OFF"
+)
+
+case "${BUILD_PRESET}" in
+  test)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=ON
+      -DIREE_BUILD_SAMPLES=ON
+    )
+    ;;
+  benchmark)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=OFF
+      -DIREE_BUILD_SAMPLES=OFF
+      -DIREE_BUILD_TESTS=OFF
+    )
+    ;;
+  benchmark-with-tracing)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=OFF
+      -DIREE_BUILD_SAMPLES=OFF
+      -DIREE_BUILD_TESTS=OFF
+      -DIREE_ENABLE_RUNTIME_TRACING=ON
+    )
+    ;;
+  *)
+    echo "Unknown build preset: ${BUILD_PRESET}"
+    exit 1
+    ;;
+esac
+
+"${CMAKE_BIN}" "${args[@]}"
+
+case "${BUILD_PRESET}" in
+  test)
+    "${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
+    ;;
+  benchmark|benchmark-with-tracing)
+    "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-benchmark-module -- -k 0
+    ;;
+  *)
+    echo "Unknown build preset: ${BUILD_PRESET}"
+    exit 1
+    ;;
+esac
+
+if (( IREE_USE_CCACHE == 1 )); then
+  ccache --show-stats
 fi
-cd build-runtime
-
-"${CMAKE_BIN?}" -G Ninja .. \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_BUILD_COMPILER=OFF
-"${CMAKE_BIN?}" --build .

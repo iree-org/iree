@@ -53,12 +53,47 @@ endfunction()
 # Sets ${PACKAGE_NS} to the IREE-root relative package name in C++ namespace
 # format (::).
 #
-# Example when called from iree/base/CMakeLists.txt:
-#   iree::base
+# Examples:
+#   compiler/src/iree/compiler/Utils/CMakeLists.txt -> iree::compiler::Utils
+#   runtime/src/iree/base/CMakeLists.txt -> iree::base
+#   tests/e2e/CMakeLists.txt -> iree::tests::e2e
 function(iree_package_ns PACKAGE_NS)
-  string(REPLACE ${IREE_ROOT_DIR} "" _PACKAGE ${CMAKE_CURRENT_LIST_DIR})
-  string(SUBSTRING ${_PACKAGE} 1 -1 _PACKAGE)
-  string(REPLACE "/" "::" _PACKAGE_NS ${_PACKAGE})
+  # Get the relative path of the current dir (i.e. runtime/src/iree/vm).
+  string(REPLACE ${IREE_ROOT_DIR} "" _IREE_RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+  string(SUBSTRING ${_IREE_RELATIVE_PATH} 1 -1 _IREE_RELATIVE_PATH)
+
+  if(NOT ${CMAKE_CURRENT_LIST_DIR} MATCHES "^${IREE_ROOT_DIR}/.*")
+    # Function is being called from outside IREE. Use the source-relative path.
+    # Please check the README.md to see the potential risk.
+    string(REPLACE ${PROJECT_SOURCE_DIR} "" _SOURCE_RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+    string(SUBSTRING ${_SOURCE_RELATIVE_PATH} 1 -1 _SOURCE_RELATIVE_PATH)
+    set(_PACKAGE "${_SOURCE_RELATIVE_PATH}")
+
+  # If changing the directory/package mapping rules, please also implement
+  # the corresponding rule in:
+  #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
+  # Some sub-trees form their own roots for package purposes. Rewrite them.
+  elseif(_IREE_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
+    # compiler/src/iree/compiler -> iree/compiler
+    set(_PACKAGE "${CMAKE_MATCH_1}")
+  elseif(_IREE_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
+    # runtime/src/iree/base -> iree/base
+    set(_PACKAGE "${CMAKE_MATCH_1}")
+  elseif(_IREE_RELATIVE_PATH MATCHES "^tools$")
+    # Special case for tools/ -> "" (empty string)
+    # For example, tools/iree-compile -> iree-compile (no namespace)
+    set(_PACKAGE "")
+  else()
+    # Default to prefixing with iree/
+    set(_PACKAGE "iree/${_IREE_RELATIVE_PATH}")
+  endif()
+
+  string(REPLACE "/" "::" _PACKAGE_NS "${_PACKAGE}")
+
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "iree_package_ns(): map ${_IREE_RELATIVE_PATH} -> ${_PACKAGE_NS}")
+  endif()
+
   set(${PACKAGE_NS} ${_PACKAGE_NS} PARENT_SCOPE)
 endfunction()
 
@@ -68,7 +103,7 @@ endfunction()
 #   iree_base
 function(iree_package_name PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
-  string(REPLACE "::" "_" _PACKAGE_NAME ${_PACKAGE_NS})
+  string(REPLACE "::" "_" _PACKAGE_NAME "${_PACKAGE_NS}")
   set(${PACKAGE_NAME} ${_PACKAGE_NAME} PARENT_SCOPE)
 endfunction()
 
@@ -88,43 +123,10 @@ endfunction()
 #   base
 function(iree_package_dir PACKAGE_DIR)
   iree_package_ns(_PACKAGE_NS)
-  string(FIND ${_PACKAGE_NS} "::" _END_OFFSET REVERSE)
+  string(FIND "${_PACKAGE_NS}" "::" _END_OFFSET REVERSE)
   math(EXPR _END_OFFSET "${_END_OFFSET} + 2")
   string(SUBSTRING ${_PACKAGE_NS} ${_END_OFFSET} -1 _PACKAGE_DIR)
   set(${PACKAGE_DIR} ${_PACKAGE_DIR} PARENT_SCOPE)
-endfunction()
-
-# iree_get_executable_path
-#
-# Gets the path to an executable in a cross-compilation-aware way. This
-# should be used when accessing binaries that are used as part of the build,
-# such as for generating files used for later build steps.
-#
-# Paramters:
-# - OUTPUT_PATH_VAR: variable name for receiving the path to the built target.
-# - EXECUTABLE: the executable to get its path. Note that this needs to be the
-#     name of the executable target when not cross compiling and the basename of
-#     the binary when importing a binary from a host build. Thus this should be
-#     the global unqualified name of the binary, not the fully-specified name.
-function(iree_get_executable_path OUTPUT_PATH_VAR EXECUTABLE)
-  if (NOT DEFINED IREE_HOST_BINARY_ROOT OR TARGET "${EXECUTABLE}")
-    # We can either expect the target to be defined as part of this CMake
-    # invocation (if not cross compiling) or the target is defined already.
-    set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
-  else()
-    # The target won't be directly defined by this CMake invocation so check
-    # for an already built executable at IREE_HOST_BINARY_ROOT. If we find it,
-    # add it as an imported target so it gets picked up on later invocations.
-    set(_EXECUTABLE_PATH "${IREE_HOST_BINARY_ROOT}/bin/${EXECUTABLE}${IREE_HOST_EXECUTABLE_SUFFIX}")
-    if (EXISTS ${_EXECUTABLE_PATH})
-      add_executable("${EXECUTABLE}" IMPORTED GLOBAL)
-      set_property(TARGET "${EXECUTABLE}" PROPERTY IMPORTED_LOCATION "${_EXECUTABLE_PATH}")
-      set(${OUTPUT_PATH_VAR} "$<TARGET_FILE:${EXECUTABLE}>" PARENT_SCOPE)
-    else()
-      message(FATAL_ERROR "Could not find '${EXECUTABLE}' at '${_EXECUTABLE_PATH}'. "
-              "Ensure that IREE_HOST_BINARY_ROOT points to installed binaries.")
-    endif()
-  endif()
 endfunction()
 
 #-------------------------------------------------------------------------------
@@ -154,7 +156,7 @@ function(iree_select_compiler_opts OPTS)
     _IREE_SELECTS
     ""
     ""
-    "ALL;CLANG;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
+    "ALL;CLANG;CLANG_GTE_10;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
   )
   # OPTS is a variable containing the *name* of the variable being populated, so
   # we need to dereference it twice.
@@ -169,6 +171,9 @@ function(iree_select_compiler_opts OPTS)
       list(APPEND _OPTS ${_IREE_SELECTS_MSVC_OR_CLANG_CL})
     else()
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG})
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+        list(APPEND _OPTS ${_IREE_SELECTS_CLANG_GTE_10})
+      endif()
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG_OR_GCC})
     endif()
   elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -189,8 +194,8 @@ endfunction()
 #
 # Parameters:
 # NAME: name of the target to add data dependencies to
-# DATA: List of targets and/or files in the source tree. Files should use the
-#       same format as targets (i.e. iree::package::subpackage::file.txt)
+# DATA: List of targets and/or files in the source tree (relative to the
+# project root).
 function(iree_add_data_dependencies)
   cmake_parse_arguments(
     _RULE
@@ -209,11 +214,12 @@ function(iree_add_data_dependencies)
       add_dependencies(${_RULE_NAME} ${_DATA_LABEL})
     else()
       # Not a target, assume to be a file instead.
-      string(REPLACE "::" "/" _FILE_PATH ${_DATA_LABEL})
+      set(_FILE_PATH ${_DATA_LABEL})
 
       # Create a target which copies the data file into the build directory.
       # If this file is included in multiple rules, only create the target once.
       string(REPLACE "::" "_" _DATA_TARGET ${_DATA_LABEL})
+      string(REPLACE "/" "_" _DATA_TARGET ${_DATA_TARGET})
       if(NOT TARGET ${_DATA_TARGET})
         set(_INPUT_PATH "${PROJECT_SOURCE_DIR}/${_FILE_PATH}")
         set(_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${_FILE_PATH}")
@@ -224,6 +230,81 @@ function(iree_add_data_dependencies)
 
       add_dependencies(${_RULE_NAME} ${_DATA_TARGET})
     endif()
+  endforeach()
+endfunction()
+
+#-------------------------------------------------------------------------------
+# Emscripten
+#-------------------------------------------------------------------------------
+
+# A global counter to guarantee unique names for js library files.
+set(_LINK_JS_COUNTER 1)
+
+# Links a JavaScript library to a target using --js-library=file.js.
+#
+# This function is only supported when running under Emscripten (emcmake).
+# This implementation is forked from `em_add_tracked_link_flag()` in
+# https://github.com/emscripten-core/emscripten/blob/main/cmake/Modules/Platform/Emscripten.cmake
+# with changes to be compatible with IREE project style and CMake conventions.
+#
+# Parameters:
+# TARGET: Name of the target to link against
+# SRCS: List of JavaScript source files to link
+function(iree_link_js_library)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "TARGET"
+    "SRCS"
+    ${ARGN}
+  )
+
+  # Convert from aliased, possibly package-relative, names to target names.
+  iree_package_ns(_PACKAGE_NS)
+  string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _RULE_TARGET ${_RULE_TARGET})
+  string(REPLACE "::" "_" _RULE_TARGET ${_RULE_TARGET})
+
+  foreach(_SRC_FILE ${_RULE_SRCS})
+    # If the JS file is changed, we want to relink dependent binaries, but
+    # unfortunately it is not possible to make a link step depend directly on a
+    # source file. Instead, we must make a dummy no-op build target on that
+    # source file, and make the original target depend on that dummy target.
+
+    # Sanitate the source .js filename to a good dummy filename.
+    get_filename_component(_JS_NAME "${_SRC_FILE}" NAME)
+    string(REGEX REPLACE "[/:\\\\.\ ]" "_" _DUMMY_JS_TARGET ${_JS_NAME})
+    set(_DUMMY_LIB_NAME ${_RULE_TARGET}_${_LINK_JS_COUNTER}_${_DUMMY_JS_TARGET})
+    set(_DUMMY_C_NAME "${CMAKE_BINARY_DIR}/${_DUMMY_JS_TARGET}_tracker.c")
+
+    # Create a new static library target that with a single dummy .c file.
+    add_library(${_DUMMY_LIB_NAME} STATIC ${_DUMMY_C_NAME})
+    # Make the dummy .c file depend on the .js file we are linking, so that if
+    # the .js file is edited, the dummy .c file, and hence the static library
+    # will be rebuild (no-op). This causes the main application to be
+    # relinked, which is what we want. This approach was recommended by
+    # http://www.cmake.org/pipermail/cmake/2010-May/037206.html
+    add_custom_command(
+      OUTPUT ${_DUMMY_C_NAME}
+      COMMAND ${CMAKE_COMMAND} -E touch ${_DUMMY_C_NAME}
+      DEPENDS ${_SRC_FILE}
+    )
+    target_link_libraries(${_RULE_TARGET}
+      PUBLIC
+        ${_DUMMY_LIB_NAME}
+    )
+
+    # Link the js-library to the target.
+    # When a linked library starts with a "-" cmake will just add it to the
+    # linker command line as it is. The advantage of doing it this way is
+    # that the js-library will also be automatically linked to targets that
+    # depend on this target.
+    get_filename_component(_SRC_ABSOLUTE_PATH "${_SRC_FILE}" ABSOLUTE)
+    target_link_libraries(${_RULE_TARGET}
+      PUBLIC
+        "--js-library \"${_SRC_ABSOLUTE_PATH}\""
+    )
+
+    math(EXPR _LINK_JS_COUNTER "${_LINK_JS_COUNTER} + 1")
   endforeach()
 endfunction()
 
@@ -245,7 +326,7 @@ endfunction()
 #   TO_EXE_NAME: The executable name to output in the current binary dir.
 function(iree_symlink_tool)
   cmake_parse_arguments(
-    ARG
+    _RULE
     ""
     "TARGET;FROM_TOOL_TARGET;TO_EXE_NAME"
     ""
@@ -255,16 +336,16 @@ function(iree_symlink_tool)
   # Transform TARGET
   iree_package_ns(_PACKAGE_NS)
   iree_package_name(_PACKAGE_NAME)
-  set(_TARGET "${_PACKAGE_NAME}_${ARG_TARGET}")
-  set(_FROM_TOOL_TARGET ${ARG_FROM_TOOL_TARGET})
-  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
+  set(_TARGET "${_PACKAGE_NAME}_${_RULE_TARGET}")
+  set(_FROM_TOOL_TARGET ${_RULE_FROM_TOOL_TARGET})
+  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
   get_filename_component(_TO_TOOL_DIR "${_TO_TOOL_PATH}" DIRECTORY)
 
 
   add_custom_command(
     TARGET "${_TARGET}"
     BYPRODUCTS
-      "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
+      "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
     COMMAND
       ${CMAKE_COMMAND} -E make_directory "${_TO_TOOL_DIR}"
     COMMAND
@@ -279,26 +360,95 @@ endfunction()
 # Tests
 #-------------------------------------------------------------------------------
 
-# iree_add_test_environment_properties
+# iree_check_defined
 #
-# Adds test environment variable properties based on the current build options.
+# A lightweight way to check that all the given variables are defined. Useful
+# in cases like checking that a function has been passed all required arguments.
+# Doesn't give usage-specific error messages, but still significantly better
+# than no error checking.
+# Variable names should be passed directly without quoting or dereferencing.
+# Example:
+#   iree_check_defined(_SOME_VAR _AND_ANOTHER_VAR)
+macro(iree_check_defined)
+  foreach(_VAR ${ARGN})
+    if(NOT DEFINED "${_VAR}")
+      message(SEND_ERROR "${_VAR} is not defined")
+    endif()
+  endforeach()
+endmacro()
+
+# iree_validate_required_arguments
 #
-# Parameters:
-# TEST_NAME: the test name, e.g. iree/base:math_test
-function(iree_add_test_environment_properties TEST_NAME)
-  # IREE_*_DISABLE environment variables may used to skip test cases which
-  # require both a compiler target backend and compatible runtime HAL driver.
-  #
-  # These variables may be set by the test environment, typically as a property
-  # of some continuous execution test runner or by an individual developer, or
-  # here by the build system.
-  #
-  # Tests which only depend on a compiler target backend or a runtime HAL
-  # driver, but not both, should generally use a different method of filtering.
-  if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}" OR NOT "${IREE_HAL_DRIVER_VULKAN}")
-    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_VULKAN_DISABLE=1")
+# Validates that no arguments went unparsed or were given no values and that all
+# required arguments have values. Expects to be called after
+# cmake_parse_arguments and verifies that the variables it creates have been
+# populated as appropriate.
+function(iree_validate_required_arguments
+         PREFIX
+         REQUIRED_ONE_VALUE_KEYWORDS
+         REQUIRED_MULTI_VALUE_KEYWORDS)
+  if(DEFINED ${PREFIX}_UNPARSED_ARGUMENTS)
+    message(SEND_ERROR "Unparsed argument(s): '${${PREFIX}_UNPARSED_ARGUMENTS}'")
   endif()
-  if(NOT "${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}" OR NOT "${IREE_HAL_DRIVER_DYLIB}")
-    set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_LLVMAOT_DISABLE=1")
+  if(DEFINED ${PREFIX}_KEYWORDS_MISSING_VALUES)
+    message(SEND_ERROR
+            "No values for field(s) '${${PREFIX}_KEYWORDS_MISSING_VALUES}'")
   endif()
+
+  foreach(_KEYWORD IN LISTS REQUIRED_ONE_VALUE_KEYWORDS REQUIRED_MULTI_VALUE_KEYWORDS)
+    if(NOT DEFINED ${PREFIX}_${_KEYWORD})
+      message(SEND_ERROR "Missing required argument ${_KEYWORD}")
+    endif()
+  endforeach()
+endfunction()
+
+# iree_compile_flags_for_patform
+#
+# Helper function to add necessary compile flags based on platform-specific
+# configurations. Note the flags are added for cpu backends only.
+function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
+  if(NOT (IN_FLAGS MATCHES "iree-hal-target-backends=llvm-cpu" OR
+          IN_FLAGS MATCHES "iree-hal-target-backends=vmvx"))
+    set(${OUT_FLAGS} "" PARENT_SCOPE)
+    return()
+  endif()
+
+  if(ANDROID AND NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
+    # Android's CMake toolchain defines some variables that we can use to infer
+    # the appropriate target triple from the configured settings:
+    # https://developer.android.com/ndk/guides/cmake#android_platform
+    #
+    # In typical CMake fashion, the various strings are pretty fuzzy and can
+    # have multiple values like "latest", "android-25"/"25"/"android-N-MR1".
+    #
+    # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
+    # should pretty consistently be just a number we can use for target triple.
+    set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
+    list(APPEND _FLAGS "--iree-llvmcpu-target-triple=${_TARGET_TRIPLE}")
+  endif()
+
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+     CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+     NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
+    # RV64 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+         NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
+    # RV32 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
+  endif()
+
+  if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
+    set(_EMSCRIPTEN_TEST_DEFAULT_FLAGS
+      "--iree-llvmcpu-target-triple=wasm32-unknown-emscripten"
+    )
+    list(APPEND _FLAGS ${_EMSCRIPTEN_TEST_DEFAULT_FLAGS})
+  endif()
+
+  set(${OUT_FLAGS} "${_FLAGS}" PARENT_SCOPE)
 endfunction()

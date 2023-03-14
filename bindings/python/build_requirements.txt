@@ -1,8 +1,0 @@
-# Python package requirements for building as a user.
-# The CI adds additional packages, but these should be suitable for users.
-# Usage:
-#   python -m pip install -r bindings/python/build_requirements.txt
-
-numpy>=1.19.4
-pybind11>=2.6.1
-wheel

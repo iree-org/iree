@@ -12,7 +12,7 @@ namespace iree_integrations {
 namespace TF {
 
 class StripAssertsPass
-    : public PassWrapper<StripAssertsPass, OperationPass<FuncOp>> {
+    : public PassWrapper<StripAssertsPass, OperationPass<func::FuncOp>> {
  public:
   StringRef getArgument() const override { return "iree-tf-strip-asserts"; }
 
@@ -33,7 +33,7 @@ class StripAssertsPass
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createStripAssertsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createStripAssertsPass() {
   return std::make_unique<StripAssertsPass>();
 }
 

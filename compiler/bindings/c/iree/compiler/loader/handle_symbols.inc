@@ -1,0 +1,38 @@
+// Copyright 2022 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+HANDLE_SYMBOL(ireeCompilerErrorDestroy)
+HANDLE_SYMBOL(ireeCompilerErrorGetMessage)
+HANDLE_SYMBOL(ireeCompilerGetAPIVersion)
+HANDLE_SYMBOL(ireeCompilerGlobalInitialize)
+HANDLE_SYMBOL(ireeCompilerGlobalShutdown)
+HANDLE_SYMBOL(ireeCompilerEnumerateRegisteredHALTargetBackends)
+HANDLE_SYMBOL(ireeCompilerInvocationCreate)
+HANDLE_SYMBOL(ireeCompilerInvocationEnableCallbackDiagnostics)
+HANDLE_SYMBOL(ireeCompilerInvocationEnableConsoleDiagnostics)
+HANDLE_SYMBOL(ireeCompilerInvocationDestroy)
+HANDLE_SYMBOL(ireeCompilerInvocationSetCrashHandler)
+HANDLE_SYMBOL(ireeCompilerInvocationParseSource)
+HANDLE_SYMBOL(ireeCompilerInvocationSetCompileToPhase)
+HANDLE_SYMBOL(ireeCompilerInvocationSetVerifyIR)
+HANDLE_SYMBOL(ireeCompilerInvocationPipeline)
+HANDLE_SYMBOL(ireeCompilerInvocationOutputIR)
+HANDLE_SYMBOL(ireeCompilerInvocationOutputVMBytecode)
+HANDLE_SYMBOL(ireeCompilerInvocationOutputVMCSource)
+HANDLE_SYMBOL(ireeCompilerInvocationOutputHALExecutable)
+HANDLE_SYMBOL(ireeCompilerSessionCreate)
+HANDLE_SYMBOL(ireeCompilerSessionDestroy)
+HANDLE_SYMBOL(ireeCompilerSessionSetFlags)
+HANDLE_SYMBOL(ireeCompilerSessionGetFlags)
+HANDLE_SYMBOL(ireeCompilerSourceDestroy)
+HANDLE_SYMBOL(ireeCompilerSourceOpenFile)
+HANDLE_SYMBOL(ireeCompilerSourceWrapBuffer)
+HANDLE_SYMBOL(ireeCompilerSourceSplit)
+HANDLE_SYMBOL(ireeCompilerOutputDestroy)
+HANDLE_SYMBOL(ireeCompilerOutputOpenFile)
+HANDLE_SYMBOL(ireeCompilerOutputOpenFD)
+HANDLE_SYMBOL(ireeCompilerOutputKeep)
+HANDLE_SYMBOL(ireeCompilerOutputWrite)

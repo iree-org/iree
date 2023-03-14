@@ -16,7 +16,7 @@ XLA IR).
 ### iree-import-tf
 
 `iree-import-tf` provides a single entry-point for compiling TensorFlow saved
-models to "IREE Input Dialects" that can be fed to `iree-translate` or
+models to "IREE Input Dialects" that can be fed to `iree-compile` or
 `iree-opt` and operated on further.
 
 #### Usage

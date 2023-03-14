@@ -28,40 +28,52 @@ test --test_output=errors
 startup --windows_enable_symlinks
 build --enable_runfiles
 
-
 # TODO: Transition to the explicit init_py mechanism. See #2405
 # This is commented out while considering transition path but left as a
 # breadcrumb.
 # build --incompatible_default_to_explicit_init_py
 
 ###############################################################################
+# Build settings flag aliases. See https://bazel.build/rules/config
+###############################################################################
+build --flag_alias=iree_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:link_shared
+# Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING.
+# Builds the runtime with tracing support enabled.
+build --flag_alias=iree_enable_runtime_tracing=@tracy_client//:runtime_enable
+
+###############################################################################
 # Options for "generic_gcc" builds
 ###############################################################################
 
-# C++14 standard version is required.
-build:generic_gcc --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
+# C++17 standard version is required.
+build:generic_gcc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 
+# TODO: OSS assert builds of TF became non functional around 1/27/2022. RIP.
 # Default to adding back asserts in optimized builds.
 # This is a good compromise between runtime and debugability.
-build:generic_gcc --copt=-UNDEBUG
+#build:generic_gcc --copt=-UNDEBUG
 
 # Disable warnings we don't care about or that generally have a low signal/noise
 # ratio.
 build:generic_gcc --copt=-Wno-unused-but-set-parameter
 build:generic_gcc --copt=-Wno-comment
 build:generic_gcc --copt=-Wno-attributes
+# NOTE: from a TF dep: external/upb/upb/upb.c and fails on GCC 10.
+build:generic_gcc --copt=-Wno-stringop-truncation
 
 ###############################################################################
 # Options for "generic_clang" builds: these options should generally apply to
 # either clang or gcc and are curated based on need.
 ###############################################################################
 
-# C++14 standard version is required.
-build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
+# C++17 standard version is required.
+build:generic_clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 
+# TODO: OSS assert builds of TF became non functional around 1/27/2022. RIP.
 # Default to adding back asserts in optimized builds.
 # This is a good compromise between runtime and debugability.
-build:generic_clang --copt=-UNDEBUG
+#build:generic_clang --copt=-UNDEBUG
 
 # Treat warnings as errors...
 build:generic_clang --copt=-Werror --host_copt=-Werror
@@ -89,7 +101,6 @@ build:generic_clang --copt=-Wall
 # ratio.
 build:generic_clang --copt=-Wno-ambiguous-member-template
 build:generic_clang --copt=-Wno-char-subscripts
-build:generic_clang --copt=-Wno-deprecated-declarations
 build:generic_clang --copt=-Wno-extern-c-compat # Matches upstream. Cannot impact due to extern C inclusion method.
 build:generic_clang --copt=-Wno-gnu-alignof-expression
 build:generic_clang --copt=-Wno-gnu-variable-sized-type-not-at-end
@@ -135,6 +146,10 @@ build:generic_clang --copt=-Wthread-safety
 build:generic_clang --copt=-Wthread-safety-beta
 build:generic_clang --copt=-Wunused-comparison
 build:generic_clang --copt=-Wvla
+
+# Treat backrefs during linking as errors.
+build:generic_clang --linkopt=-Wl,--warn-backrefs
+build:generic_clang --linkopt=-Wl,--fatal-warnings
 
 ###############################################################################
 # Additional options for MacOS based clang builds.
@@ -230,96 +245,50 @@ build:sanitizer --copt=-fno-omit-frame-pointer
 build:x86opt --copt=-mavx2
 
 ###############################################################################
-# Configuration for building or caching remotely using Remote Build Execution
-# (RBE) https://cloud.google.com/remote-build-execution/
+# Configuration for caching remotely using Remote Build Execution (RBE)
+# https://cloud.google.com/remote-build-execution/
 # Based on https://github.com/bazelbuild/bazel-toolchains/blob/master/bazelrc/bazel-1.0.0.bazelrc
-# Usage of remote executors requires permissions in the cloud project (ask gcmn).
-# Local execution with remote caching is limited to the CI to ensure a stable
-# environment.
+# Writing to the remote cache is limited to the CI to ensure a stable
+# environment. Reading from the remote cache building in a place other than the
+# CI is at your own risk. To do so pass `--noremote_upload_local_results` in
+# addition to the config for the appropriate cache.
+# We gave up on remote execution due to the amount of toolchain configuration
+# required.
 ###############################################################################
 
-# Options for connecting to the IREE GCP remote build project.
+# Config for executing locally and caching the results to the remote cache.
+# This requires permissions to write to the remote cache, which only the CI
+# machines have.
 
 # Enable authentication. This will pick up application default credentials by
 # default. You can use --google_credentials=some_file.json to use a service
 # account credential instead.
-build:_rbe_base --google_default_credentials=true
+build:_remote_cache_base --google_default_credentials=true
 # Point to the remote instance constructed in the iree-oss project
-build:_rbe_base --remote_instance_name=projects/iree-oss/instances/default_instance
+build:_remote_cache_base --remote_instance_name=projects/iree-oss/instances/default_instance
 
-### Remote Caching ###
-# Config for executing locally and caching the results to the remote cache.
-# This requires permissions to write to the remote cache, which only the CI
-# machines have.
-build:_remote_cache_base --config=_rbe_base
 build:_remote_cache_base --remote_cache=grpcs://remotebuildexecution.googleapis.com
 
-# --config=remote_cache_tf_integrations
-build:remote_cache_tf_integrations --config=_remote_cache_base
+# --config=remote_cache_bazel_ci
+build:remote_cache_bazel_ci --config=_remote_cache_base
 # The cache key specifies the environment, which in this case points to the
-# specific docker container the TF build is run in. The image URL is included
-# for clarity and so that this reference is automatically updated by
+# specific docker container the CI Bazel builds are run in. The image URL is
+# included for clarity and so that this reference is automatically updated by
 # manage_images.py
-build:remote_cache_tf_integrations --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/cmake-bazel-frontends-swiftshader@sha256:da13c13dc427d9d2bdcba0ee70615088a89b5efd383625d9945eaf2ec17890bd"}'
+build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:b3cce73eb9f41d67981bc8f00e98fd66fe3487caec1bcbf38d4039dcc61e499d"}'
+build:remote_cache_bazel_tf_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478"}'
 
-### Remote Execution ###
-# --config=rbe Execute and cache builds remotely.
-build:rbe --config=_rbe_base
-
-# Local disk cache is incompatible with remote execution until we are on a Bazel
-# version that includes https://github.com/bazelbuild/bazel/pull/13852.
-build:rbe --disk_cache=""
-
-# Depending on how many machines are in the remote execution instance, setting
-# this higher can make builds faster by allowing more jobs to run in parallel.
-# Setting it too high can result in jobs that timeout, however, while waiting
-# for a remote machine to execute them.
-# Our pool autoscales from 25 to 200 jobs
-build:rbe --jobs=150
-
-# Flags related to specifying the platform, toolchain and java properties.
-# These flags must be adapted to work with toolchain containers other than
-# rbe-ubuntu16-04
-# References to "rbe_default" matches rbe_autoconfig(name="rbe_default") in
-# WORKSPACE
-build:rbe --host_javabase=@rbe_default//java:jdk
-build:rbe --javabase=@rbe_default//java:jdk
-build:rbe --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
-build:rbe --java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
-build:rbe --crosstool_top=@rbe_default//cc:toolchain
-build:rbe --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-# Platform flags:
-# The toolchain container used for execution is defined in the target indicated
-# by "extra_execution_platforms", "host_platform" and "platforms".
-# More about platforms: https://docs.bazel.build/versions/master/platforms.html
-build:rbe --extra_toolchains=@rbe_default//config:cc-toolchain
-build:rbe --extra_execution_platforms=@rbe_default//config:platform
-build:rbe --host_platform=@rbe_default//config:platform
-build:rbe --platforms=@rbe_default//config:platform
-
-build:rbe --define=EXECUTOR=remote
-
-# Enable remote execution so actions are performed on the remote systems.
-build:rbe --remote_executor=grpcs://remotebuildexecution.googleapis.com
-
-# Enforce stricter environment rules, which eliminates some non-hermetic
-# behavior and therefore improves both the remote cache hit rate and the
-# correctness and repeatability of the build.
-build:rbe --incompatible_strict_action_env=true
-
-# Set a higher timeout value, just in case.
-build:rbe --remote_timeout=3600
 
 ###############################################################################
 # Configuration for uploading build results to Result Store UI
 # https://cloud.google.com/remote-build-execution/docs/results-ui/getting-started-results-ui
-# Can be used either with or without --config=rbe.
+# Can be used either with or without remote caching.
 ###############################################################################
 
 # Options for connecting to the IREE GCP remote build project. These are
-# repeated separately from _rbe_base to avoid warnings about configs being
-# expanded more than once when a remote execution/caching config is used
-# together with result store.
+# repeated separately from _remote_cache_base to avoid warnings about configs
+# being expanded more than once when a remote caching config is used together
+# with result store (even though the warnings are spurious).
 
 build:rs --google_default_credentials=true
 build:rs --remote_instance_name=projects/iree-oss/instances/default_instance
@@ -403,10 +372,3 @@ build:msvc2019 --per_file_copt=tensorflow@/Zc:preprocessor
 # Assume the newer version and alias to --config=windows
 build:msvc --config=msvc2019
 build:windows --config=msvc
-
-###############################################################################
-# disable metal stuff for non Darwin platforms
-###############################################################################
-common:non_darwin --deleted_packages=//iree/hal/metal,//iree/hal/metal/registration
-build:non_darwin --test_tag_filters="-driver=metal"
-###############################################################################

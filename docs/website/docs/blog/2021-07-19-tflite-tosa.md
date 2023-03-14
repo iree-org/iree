@@ -1,7 +1,7 @@
- Monday, July 19, 2021<br>
- By Rob Suderman and Jenni Kilduff
+Monday, July 19, 2021<br>
+By Rob Suderman and Jenni Kilduff
 
-## TFLite Support via TOSA
+# TFLite Support via TOSA
 
 IREE can now execute [TensorFlow Lite](https://www.tensorflow.org/lite)
 (TFLite) models through the use of
@@ -9,10 +9,10 @@ IREE can now execute [TensorFlow Lite](https://www.tensorflow.org/lite)
 tensor operations, and a part of [MLIR](https://mlir.llvm.org/) core. TOSA’s
 high-level representation of tensor operations provides a common front-end for
 ingesting models from different frameworks. In this case we ingest a TFLite
-flatbuffer and compile it to TOSA IR, which IREE takes as an input format to
+FlatBuffer and compile it to TOSA IR, which IREE takes as an input format to
 compile to its various backends.
 
-![Compilation diagram](./2021-07-19-tflite-tosa-compilation-diagram.png){ align=left }
+![Compilation diagram](./2021-07-19-tflite-tosa-compilation-diagram.png){align=left}
 
 Using TFLite as a frontend for IREE provides an alternative ingestion method for
 already existing models that could benefit from IREE’s design. This enables
@@ -34,11 +34,11 @@ quantization, along with dynamic shape support.
 ## Examples
 
 TFLite with IREE is available in Python and Java.  We have a
-[colab notebook](https://colab.sandbox.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb)
+[colab notebook](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
 that shows how to use IREE’s python bindings and TFLite compiler tools to
-compile a pre-trained TFLite model from a flatbuffer and run using IREE.  We
+compile a pre-trained TFLite model from a FlatBuffer and run using IREE.  We
 also have an
 [Android Java app](https://github.com/not-jenni/iree-android-tflite-demo) that
 was forked from an existing TFLite demo app, swapping out the TFLite library
 for our own AAR.  More information on IREE’s TFLite frontend is available
-[here](../ml-frameworks/tensorflow-lite.md).
+[here](../getting-started/tflite.md).

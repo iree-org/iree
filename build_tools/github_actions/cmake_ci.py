@@ -152,32 +152,10 @@ def invoke_generate():
       f'-DPYTHON_EXECUTABLE:FILEPATH={sys.executable}',
       f'-DPython3_INCLUDE_DIR:PATH={sysconfig.get_path("include")}',
       f'-DPYTHON_INCLUDE_DIR:PATH={sysconfig.get_path("include")}',
-      f'-DIREE_RELEASE_PACKAGE_SUFFIX:STRING={version_info.get("package-suffix") or "-dev"}',
+      f'-DIREE_RELEASE_PACKAGE_SUFFIX:STRING={version_info.get("package-suffix") or ""}',
       f'-DIREE_RELEASE_VERSION:STRING={version_info.get("package-version") or "0.0.1a1"}',
       f'-DIREE_RELEASE_REVISION:STRING={version_info.get("iree-revision") or "HEAD"}',
   ]
-
-  ### HACK: Add a Python3_LIBRARY because cmake needs it, but it legitimately
-  ### does not exist on manylinux (or any linux static python).
-  # Need to explicitly tell cmake about the python library.
-  python_libdir = sysconfig.get_config_var('LIBDIR')
-  python_library = sysconfig.get_config_var('LIBRARY')
-  if python_libdir and not os.path.isabs(python_library):
-    python_library = os.path.join(python_libdir, python_library)
-
-  # On manylinux, python is a static build, which should be fine, but CMake
-  # disagrees. Fake it by letting it see a library that will never be needed.
-  if python_library and not os.path.exists(python_library):
-    python_libdir = os.path.join(tempfile.gettempdir(), 'fake_python', 'lib')
-    os.makedirs(python_libdir, exist_ok=True)
-    python_library = os.path.join(python_libdir,
-                                  sysconfig.get_config_var('LIBRARY'))
-    with open(python_library, 'wb') as f:
-      pass
-
-  if python_library:
-    cmake_args.append(f'-DPython3_LIBRARY:PATH={python_library}')
-    cmake_args.append(f'-DPYTHON_LIBRARY:PATH={python_library}')
 
   ### Detect generator.
   if use_tool_path('ninja'):

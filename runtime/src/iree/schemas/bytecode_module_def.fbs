@@ -1,0 +1,298 @@
+// Copyright 2019 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+namespace iree.vm;
+
+// IREE bytecode module.
+file_identifier "IREE";
+file_extension "vmfb";
+
+// Available runtime features supported by the active VM implementation.
+enum FeatureBits:uint32 (bit_flags) {
+  // 32-bit floating point extension.
+  EXT_F32 = 0,  // 1u << 0
+  // 64-bit floating point extension.
+  EXT_F64 = 1,  // 1u << 1
+}
+
+// Arbitrary key/value reflection attribute.
+table AttrDef {
+  key:string;
+  value:string;
+}
+
+// Defines a type within the type table.
+table TypeDef {
+  // Fully-qualified name of the type, such as `hal.buffer`.
+  full_name:string;
+}
+
+// Defines a function signature.
+table FunctionSignatureDef {
+  // The VM calling convention declaration used to marshal arguments and
+  // results into and out of the function.
+  // Optional for imports and internal functions but required for exports.
+  //
+  // See iree/vm/module.h for more information.
+  calling_convention:string;
+
+  // Function-level attributes, if any.
+  // These are typically used to communicate additional ABI metadata needed
+  // for dynamic invocation and host language mapping.
+  // See: docs/developers/design_docs/function_abi.md
+  attrs:[AttrDef];
+}
+
+// Defines the behavior of dependency resolution.
+enum ModuleDependencyFlagBits:uint32 (bit_flags) {
+  // Module is required and must have the minimum version specified.
+  // Individual imports may still be optional.
+  REQUIRED = 0,  // 1u << 0
+  // Module is optional and if not present the module will still load. All
+  // methods imported from the module must also be marked optional.
+  OPTIONAL = 1,  // 1u << 1
+}
+
+// Describes a module's dependency on another module.
+table ModuleDependencyDef {
+  // Name of the module (`hal`, etc).
+  name:string;
+
+  // Minimum required version in order to satisfy the dependency.
+  minimum_version:uint32;
+
+  // Flags controlling the dependency resolution behavior.
+  flags:ModuleDependencyFlagBits = REQUIRED;
+}
+
+enum ImportFlagBits:uint32 (bit_flags) {
+  REQUIRED = 0,  // 1u << 0
+  OPTIONAL = 1,  // 1u << 1
+}
+
+// Defines a runtime-resolved import function.
+table ImportFunctionDef {
+  // Fully-qualified name of the function (including the module namespace).
+  full_name:string;
+
+  // Signature of the function expected used for verifying that imports match.
+  signature:FunctionSignatureDef;
+
+  // Flags controlling the behavior of import resolution.
+  flags:ImportFlagBits = REQUIRED;
+}
+
+// Defines a runtime-resolved export function.
+table ExportFunctionDef {
+  // Local name of the function (excluding the module namespace).
+  local_name:string;
+
+  // Ordinal in the internal_functions table that implements this function.
+  internal_ordinal:int32;
+}
+
+table UncompressedDataDef {
+}
+
+union CompressionTypeDef {
+  UncompressedDataDef,
+}
+
+// Read-only data segment.
+// The data may be embedded directly in the FlatBuffer or point to a reference
+// relative to the FlatBuffer in memory.
+table RodataSegmentDef {
+  // The compression format used for the data, including required decompression
+  // arguments. Omitted if the data is uncompressed.
+  compression_type:CompressionTypeDef;
+
+  // Contents in a format defined by CompressionTypeDef.
+  embedded_data:[uint8];
+
+  // Offset of the data following the FlatBuffer (rounded up to 64B).
+  // The offset is relative to the size of the FlatBuffer.
+  external_data_offset:uint64;
+  external_data_length:uint64;
+}
+
+// Read-write data segment.
+table RwdataSegmentDef {
+  // Total byte capacity.
+  byte_size:int32;
+}
+
+// Defines the per-instance module state.
+table ModuleStateDef {
+  // Bytes used for global primitive value storage. All are initialized to zero
+  // on module state allocation.
+  global_bytes_capacity:int32;
+
+  // Total number of global ref values.
+  global_ref_count:int32;
+}
+
+// Static function descriptor used for stack frame allocation.
+struct FunctionDescriptor {
+  // Offset and length within the larger bytecode data block.
+  bytecode_offset:int32;
+  bytecode_length:int32;
+
+  // Features required in order to execute this function.
+  // Note that this may be a superset of the module-level features if some
+  // functions are conditionally executed based on runtime-derived capabilities.
+  requirements:FeatureBits;
+
+  // Unused, must be 0.
+  reserved:int16;
+
+  // Total number of blocks in the function.
+  block_count:int16;
+
+  // Total number of i32 registers used by the function.
+  i32_register_count:int16;
+  // Total number of ref registers used by the function.
+  ref_register_count:int16;
+}
+
+// mlir/IR/BuiltinLocationAttributes.td : CallSiteLoc
+table CallSiteLocDef {
+  callee:int32;
+  caller:int32;
+}
+
+// mlir/IR/BuiltinLocationAttributes.td : FileLineColLoc
+table FileLineColLocDef {
+  filename:string;
+  line:int32;
+  column:int32;
+}
+
+// mlir/IR/BuiltinLocationAttributes.td : FusedLoc
+table FusedLocDef {
+  metadata:string;
+  locations:[int32];
+}
+
+// mlir/IR/BuiltinLocationAttributes.td : FusedLoc
+table NameLocDef {
+  name:string;
+  child_location:int32;
+}
+
+// A location - possibly nested.
+union LocationTypeDef {
+  CallSiteLocDef,
+  FileLineColLocDef,
+  FusedLocDef,
+  NameLocDef,
+}
+
+// Maps a relative bytecode offset within a function to a source location.
+struct BytecodeLocationDef {
+  // Bytecode offset of the start of the operation.
+  bytecode_offset:int32;
+  // Index into the debug database location_table.
+  location:int32;
+}
+
+// Debug data for a single function mapping back into source IR.
+table FunctionSourceMapDef {
+  // Original function name in the module which may not match the exported name.
+  local_name:string;
+
+  // Operation locations for all ops within the function.
+  locations:[BytecodeLocationDef];
+}
+
+// VM debug information database.
+table DebugDatabaseDef {
+  // Location table. Source maps reference this table.
+  location_table:[LocationTypeDef];
+
+  // Internal function source maps; 1:1 with the module function_descriptors.
+  functions:[FunctionSourceMapDef];
+}
+
+// Defines a bytecode module containing the information required to serve the
+// iree_vm_module_interface_t interface.
+//
+// Modules are similar to shared objects in that they provide a set of exported
+// functions that can be queried and called externally as well as any number of
+// internal function definitions. Imports can also be used to have the loader
+// dynamically link in exports of other modules upon loading.
+//
+// Modules can contain read-only segments containing (optionally) compressed
+// data that is used by the module. Read-write segments define uninitialized
+// reservations and are similar to .bss, and custom initializer functions can
+// be embedded to treat them as if they were .data segments.
+//
+// State can be defined per active runtime context (effectively like
+// thread-local storage) using ModuleStateDef. The runtime will prepare this
+// state and maintain it for the lifetime of contexts and ensure that ops that
+// use it (such as vm.global.load.*) are always associated with the appropriate
+// state.
+table BytecodeModuleDef {
+  // Module namespace used for fully-qualified function lookups.
+  name:string (required);
+
+  // Version of the module as reported to the runtime.
+  // Dependees can specify minimum versions that they require in order to
+  // resolve.
+  version:uint32;
+
+  // Features required to load and run bytecode from the module.
+  // Some functions may have additional requirements for when there are multiple
+  // variants selected based on runtime feature detection.
+  requirements:FeatureBits = 0;
+
+  // Module-level attributes, if any.
+  attrs:[AttrDef];
+
+  // Type table mapping type IDs used within the module to type signatures.
+  types:[TypeDef];
+
+  // Dependent modules.
+  dependencies:[ModuleDependencyDef];
+
+  // Imported function definitions used to resolve imports.
+  imported_functions:[ImportFunctionDef];
+
+  // Exported function definitions used to resolve imports.
+  exported_functions:[ExportFunctionDef];
+
+  // All local function signatures (internal and exports).
+  function_signatures:[FunctionSignatureDef];
+
+  // Read-only data segments (like non-code .text).
+  // May optionally be compressed and decompressed by the loader.
+  rodata_segments:[RodataSegmentDef];
+
+  // Read-write data segments of uninitialized memory (like .bss).
+  rwdata_segments:[RwdataSegmentDef];
+
+  // Global module state information (like TLS).
+  module_state:ModuleStateDef;
+
+  // References to ranges in the bytecode contents buffer where each internal
+  // function is located. This table is kept unnested within InternalFunctionDef
+  // to avoid the need to walk the FlatBuffer hierarchy at runtime when
+  // resolving call targets. Multiple functions may alias the same ranges in
+  // bytecode_data.
+  function_descriptors:[FunctionDescriptor];
+
+  // Bytecode version required by the embedded bytecode data.
+  // Two 16-bit ints representing major and minor version, with minor versions
+  // being backwards compatible.
+  bytecode_version:uint32;
+
+  // Bytecode contents. One large buffer containing all of the function op data.
+  bytecode_data:[uint8];
+
+  // Optional module debug database.
+  debug_database:DebugDatabaseDef;
+}
+
+root_type BytecodeModuleDef;

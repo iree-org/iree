@@ -1,0 +1,13 @@
+Checks: >
+        -*,
+        clang-diagnostic-*,
+        misc-*,
+        llvm-*,
+        -misc-unused-parameters,
+        -misc-non-private-member-variables-in-classes,
+        -misc-no-recursion,
+        -misc-unused-using-decls,
+        -llvm-else-after-return,
+        -llvm-include-order,
+        -llvm-qualified-auto
+

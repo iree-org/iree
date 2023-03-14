@@ -6,42 +6,42 @@ on:
   workflow_dispatch:
     inputs:
       release_id:
-        description: 'Release id to publish'
+        description: "Release id to publish"
         required: true
       package_version:
-        description: 'Version of the package'
+        description: "Version of the package"
         required: true
       build_run_id:
-        description: 'Run ID for the build_package.yml workflow that triggered this workflow'
+        description: "Run ID for the build_package.yml workflow that triggered this workflow"
         required: true
 
 jobs:
   validate_packages:
     name: "Validate packages"
     # TODO(jennik): Look into testing windows and macos builds.
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Download packages
         id: download_packages
-        uses: dawidd6/action-download-artifact@v2
+        uses: dawidd6/action-download-artifact@b2abf1705491048a2d7074f7d90513044fd25d39 # v2
         with:
           github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
           workflow: build_package.yml
           run_id: ${{ github.event.inputs.build_run_id }}
       - name: Extract and display downloaded files
         run: |
-          tar -xf artifact/iree-dist-snapshot-${{ github.event.inputs.package_version }}-linux-x86_64.tar.xz
+          tar -xf artifact/iree-dist-${{ github.event.inputs.package_version }}-linux-x86_64.tar.xz
           pwd
           ls -R
       - name: Set up python
         id: set_up_python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
         with:
-          python-version: '3.x'
+          python-version: "3.8"
       - name: Install python packages
         id: install_python_packages
         run: |
-          python -m pip install -f file://$PWD/artifact/ iree-compiler-snapshot iree-jax-snapshot iree-runtime-snapshot iree-tools-tflite-snapshot iree-tools-tf-snapshot iree-tools-xla-snapshot
+          python -m pip install -f file://$PWD/artifact/ iree-compiler iree-runtime iree-tools-tflite iree-tools-tf iree-tools-xla
       - name: Run iree-benchmark-module
         id: run_iree_benchmark_module
         run: ./bin/iree-benchmark-module --help
@@ -66,25 +66,25 @@ jobs:
       - name: Run iree-tblgen
         id: run_iree_tblgen
         run: ./bin/iree-tblgen --help
-      - name: Run iree-translate
-        id: run_iree_translate
-        run: ./bin/iree-translate --help
+      - name: Run iree-compile
+        id: run_iree-compile
+        run: ./bin/iree-compile --help
 
   publish_release:
     name: "Publish release"
     needs: validate_packages
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Publish Release
         id: publish_release
-        uses: eregon/publish-release@v1
+        uses: eregon/publish-release@d6aee8c288e653387d895ee64d559fc0dd63339d # v1.0.3
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
 
       - name: Checking out repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           # Get all history. Otherwise the latest-snapshot branch can't be
@@ -92,7 +92,8 @@ jobs:
           fetch-depth: 0
 
       - name: Updating latest-snapshot branch
-        uses: ad-m/github-push-action@v0.6.0
+        uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6 # v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: latest-snapshot
+          force: true

@@ -68,7 +68,7 @@
 ### P1 O: [Perf burndown] Bring up and execute perf burndown process for MobileBERT workload
 
 +   P1 KR: IREE CPU codegen achieves near peak throughput on all of the MobileBERT matmul shapes
-    + At least the ones with > 4% weight in the above profile. 
+    + At least the ones with > 4% weight in the above profile.
 +   P1 KR: Ensure that IREE CPU codegen achieves decent performance on softmax. That means matching TFLite performance on the softmax layers in the MobileBERT model.
 +   P1 KR: Able to benchmark and profile the whole MobileBERT workload in both TFLite and IREE and compare results.
 +   P1 KR: Performed at least 2 cycles of: (a) assess whole workload performance (b) identify key source of performance delta between TFLite and IREE (c) fix the issue (d) repeat.
@@ -87,14 +87,14 @@
 
 +   P1 KR: Able to perform IREE profiling using Tracy
 
-    + See [https://github.com/google/iree/issues/1886](https://github.com/google/iree/issues/1886), [https://github.com/wolfpld/tracy](https://github.com/wolfpld/tracy)
+    + See [https://github.com/openxla/iree/issues/1886](https://github.com/openxla/iree/issues/1886), [https://github.com/wolfpld/tracy](https://github.com/wolfpld/tracy)
 
 +   P1 KR: Able to map time spent in execution to back to source using Tracy
-    +   See https://github.com/google/iree/issues/1199
+    +   See https://github.com/openxla/iree/issues/1199
     +   Source layer (source python, HLO, HAL, etc) is configurable at compile time.
 
 +   P1 KR: Able to track compile-time performance-related statistics
-    + See [https://github.com/google/iree/issues/1409](https://github.com/google/iree/issues/1409)
+    + See [https://github.com/openxla/iree/issues/1409](https://github.com/openxla/iree/issues/1409)
     + Initial stats to track: number of executables, the serialized size of constant data, the serialized size of the executables, the number of host readbacks (flow.tensor.load), backend specific stats like the number of split dispatches in the SPIR-V backend, dynamic shape info like the number of tensors with dynamic shapes that survive after shape propagation
 
 +   P1 KR: Internal and external contributors able to confidently assess performance impact of a change.
@@ -105,7 +105,7 @@
 
 ### P1 O: [Perf burndown] Identify target workload for IREE perf credibility burndown
 
-Note: This is in preparation for a 2021Q1 objective: Establish IREE's credibility at delivering competitive production levels of performance on a realistic use case.  
+Note: This is in preparation for a 2021Q1 objective: Establish IREE's credibility at delivering competitive production levels of performance on a realistic use case.
 
 +   P1 KR: Defined criteria for evaluating workloads for the burndown.
 +   P1 KR: Evaluated criteria (including performance analysis) for all candidate workloads.
@@ -144,7 +144,7 @@ Note: This is in preparation for a 2021Q1 objective: Establish IREE's credibilit
 
 ### P1 O: [User-facing] Prepare to support real-world use cases
 
-Notes: Keep a pulse on deployment user journeys, continue to gather requirements from interested users, set ourselves on a path to production use on at least one platform.  
+Notes: Keep a pulse on deployment user journeys, continue to gather requirements from interested users, set ourselves on a path to production use on at least one platform.
 
 +   P1 KR: A new sample application showing high-level IREE behavior
 
@@ -186,11 +186,11 @@ Notes: Keep a pulse on deployment user journeys, continue to gather requirements
 
 +   P1 KR: Support Linalg fusion on buffers using stack allocations.
 +   P1 KR: Improve AOT linking and support automatic toolchain discovery
-    
+
     +   Link all executables in a single dylib.
     +   Support exporting/loading dylib to standalone binary.
 
-### P1 O: [MLIR codegen] Retargetable codegeneration (Vector dialect-based approach) 
+### P1 O: [MLIR codegen] Retargetable codegeneration (Vector dialect-based approach)
 
 +   P1 KR: Develop mechanisms to distribute vector operation at workgroup level to vector operation at subgroup level / work item level
 +   P1 KR: Handle distribution of producer-consumer vector operations to implement fusion

@@ -1,0 +1,6 @@
+functions-framework>=3.2
+flask>=2.1
+google-cloud-error-reporting>=1.6
+google-cloud-compute>=1.8
+google-auth>=2.15
+requests>=2.27

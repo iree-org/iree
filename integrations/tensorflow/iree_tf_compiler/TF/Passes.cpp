@@ -6,9 +6,7 @@
 
 #include "iree_tf_compiler/TF/Passes.h"
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
+#include "mhlo/transforms/passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -80,7 +78,7 @@ void buildTFImportPassPipeline(OpPassManager &pm, bool useTosa) {
   // Lowering shape-related constructs.
   //----------------------------------------------------------------------------
   // pm.addPass(iree_compiler::Shape::createConvertHLOToShapePass());
-  // TODO(GH-2277): Lower HLO shape constraints instead of eliding them here.
+  // TODO(#2277): Lower HLO shape constraints instead of eliding them here.
   pm.addPass(createRemoveShapeConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   // pm.addPass(iree_compiler::Shape::createConvertShapeToShapexPass());

@@ -4,25 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Note that project-wide, bazel repo aliases are used. Various scripts and helpers operate on the
-# following prefixes textually, so avoid doing any systematic construction that would break the
-# matching.
-#
-#  "@absl_py//absl/"
-#  "@bazel_skylib//"
-#  "@com_google_benchmark//"
-#  "@cpuinfo//"
-#  "@cuda//"
-#  "@com_github_dvidelabs_flatcc//"
-#  "@com_google_googletest//"
-#  "@llvm-project//"
-#  "@mlir-hlo//"
-#  "@iree_pybind11//"
-#  "@spirv_cross//"
-#  "@com_google_tracing_framework_cpp//"
-#  "@vulkan_headers//"
-#  "@com_github_yaml_libyaml//"
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],

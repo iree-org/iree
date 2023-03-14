@@ -1,0 +1,15 @@
+[Unit]
+Description=GitHub Actions Runner Remover
+DefaultDependencies=no
+Before=halt.target shutdown.target reboot.target
+
+[Service]
+User=runner
+Group=runner
+Type=oneshot
+EnvironmentFile=/etc/environment
+ExecStart=/runner-root/config/systemd/scripts/deregister.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=halt.target shutdown.target reboot.target

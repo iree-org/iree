@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you want to cite IREE, feel free to use this"
+title: "IREE"
+abstract: >-
+  An MLIR-based compiler and runtime for ML models from multiple frameworks.
+date-released: 2019-09-18
+authors:
+  - name: "The IREE Authors"
+contact:
+  - family-names: Vanik
+    given-names: Ben
+    email: benvanik@google.com
+    affiliation: Google
+  - family-names: Laurenzo
+    given-names: Stella
+    email: laurenzo@google.com
+    affiliation: Google
+license: "Apache-2.0 WITH LLVM-exception"
+url: "https://openxla.github.io/iree/"
+repository-code: "https://github.com/openxla/iree"
+keywords:
+  - compiler
+  - "machine learning"
+  - "deep learning"
+  - "artificial intelligence"

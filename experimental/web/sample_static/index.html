@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+Copyright 2022 The IREE Authors
+
+Licensed under the Apache License v2.0 with LLVM Exceptions.
+See https://llvm.org/LICENSE.txt for license information.
+SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+-->
+
+<head>
+  <meta charset="utf-8" />
+  <title>IREE Static Web Sample</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="./ghost.svg" type="image/svg+xml">
+
+  <script src="./easeljs.min.js"></script>
+  <script src="./iree_api.js"></script>
+</head>
+
+<body style="background-color: #2b2c30; color: #ABB2BF">
+  <h1>IREE Static Web Sample</h1>
+
+  <canvas id="drawingCanvas" width="256" height="256"
+          style="border:2px solid #000000; background-color: #FFFFFF;"
+          oncontextmenu="return false;">
+  </canvas>
+  <canvas id="rescaledCanvas" width="28" height="28"
+          style="border:2px solid #000000; background-color: #FFFFFF;">
+  </canvas>
+
+  <br>
+  <div style="border:2px solid #000000; background-color: #CCCCCC; padding: 8px; color: #111111; width:440px">
+    <button id="predictButton" disabled onclick="predictDigit()">Predict handwritten digit</button>
+    <button id="clearCanvasButton" onclick="clearCanvas()">Clear canvas</button>
+    <br>
+    Prediction result: <div id="predictionResult" style="display:inline"></div>
+  </div>
+
+  <script>
+    // <canvas> drawing using easeljs forked from:
+    //   https://createjs.com/demos/easeljs/curveto
+    //   https://github.com/CreateJS/EaselJS/blob/master/examples/CurveTo.html
+
+    const predictButtonElement = document.getElementById('predictButton');
+    const predictionResultElement = document.getElementById('predictionResult');
+    const drawingCanvasElement = document.getElementById("drawingCanvas");
+    const rescaledCanvasElement = document.getElementById("rescaledCanvas");
+    const rescaledCanvasContext = rescaledCanvasElement.getContext("2d");
+    let stage;
+    let drawingCanvasShape;
+    let oldPt, oldMidPt;
+    let titleText;
+    let ireeInitialized = false;
+    const primaryColor = "#000000";
+    const eraseColor = "#FFFFFF";
+    const stroke = 32;
+
+    function predictDigit() {
+      // TODO(scotttodd): debounce / rate limit this?
+      ireePredictDigit(getRescaledCanvasData()).then((result) => {
+        predictionResultElement.innerHTML = result;
+      }).catch((error) => {
+        console.error('error predicting digit:', error);
+        predictionResultElement.innerHTML = "<b>" + error + "</b>";
+      });
+    }
+
+    function clearCanvas() {
+      stage.clear();
+      stage.removeAllChildren();
+
+      drawingCanvasShape = new createjs.Shape();
+      stage.addChild(drawingCanvasShape);
+      stage.update();
+
+      updateRescaledCanvas();
+    }
+
+    function initDrawing() {
+      rescaledCanvasContext.imageSmoothingEnabled = false;
+      rescaledCanvasContext.mozImageSmoothingEnabled = false;
+      rescaledCanvasContext.webkitImageSmoothingEnabled = false;
+      rescaledCanvasContext.msImageSmoothingEnabled = false;
+
+      stage = new createjs.Stage(drawingCanvasElement);
+      stage.autoClear = false;
+      stage.enableDOMEvents(true);
+
+      createjs.Touch.enable(stage);
+      createjs.Ticker.framerate = 24;
+
+      stage.addEventListener("stagemousedown", handleMouseDown);
+      stage.addEventListener("stagemouseup", handleMouseUp);
+
+      drawingCanvasShape = new createjs.Shape();
+      stage.addChild(drawingCanvasShape);
+
+      // Add instruction text.
+      titleText = new createjs.Text("Click and Drag to draw", "18px Arial", "#000000");
+      titleText.x = 30;
+      titleText.y = 100;
+      stage.addChild(titleText);
+
+      stage.update();
+    }
+
+    function handleMouseDown(event) {
+      if (!event.primary && !event.secondary) { return; }
+
+      if (stage.contains(titleText)) {
+        stage.clear();
+        stage.removeChild(titleText);
+      }
+
+      oldPt = new createjs.Point(stage.mouseX, stage.mouseY);
+      oldMidPt = oldPt.clone();
+      stage.addEventListener("stagemousemove", handleMouseMove);
+    }
+
+    function handleMouseMove(event) {
+      if (!event.primary && !event.secondary) { return; }
+
+      const midPt = new createjs.Point(
+        oldPt.x + stage.mouseX >> 1, oldPt.y + stage.mouseY >> 1);
+
+      const color = event.nativeEvent.which == 1 ? primaryColor : eraseColor;
+      drawingCanvasShape.graphics.clear()
+          .setStrokeStyle(stroke, 'round', 'round')
+          .beginStroke(color).moveTo(midPt.x, midPt.y)
+          .curveTo(oldPt.x, oldPt.y, oldMidPt.x, oldMidPt.y);
+
+      oldPt.x = stage.mouseX;
+      oldPt.y = stage.mouseY;
+      oldMidPt.x = midPt.x;
+      oldMidPt.y = midPt.y;
+
+      stage.update();
+      updateRescaledCanvas();
+
+      if (ireeInitialized) {
+        predictDigit();
+      }
+    }
+
+    function handleMouseUp(event) {
+      if (!event.primary && !event.default) { return; }
+      stage.removeEventListener("stagemousemove", handleMouseMove);
+    }
+
+    function updateRescaledCanvas() {
+      rescaledCanvasContext.clearRect(
+        0, 0, rescaledCanvasElement.width, rescaledCanvasElement.height);
+      rescaledCanvasContext.drawImage(
+          drawingCanvasElement,
+          /*sx=*/0, /*sy=*/0,
+          /*sWidth=*/256, /*sHeight=*/256,
+          /*dx=*/0, /*dy=*/0,
+          /*dWidth=*/28, /*dHeight=*/28);
+    }
+
+    function getRescaledCanvasData() {
+      return rescaledCanvasContext.getImageData(0, 0, 28, 28);
+    }
+
+    initDrawing();
+
+    ireeInitializeWorker().then((result) => {
+      predictButtonElement.disabled = false;
+      ireeInitialized = true;
+    }).catch((error) => {
+      console.error("Failed to initialize IREE, error: '" + error + "'");
+    });
+  </script>
+</body>
+
+</html>

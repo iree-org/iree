@@ -26,6 +26,9 @@ RC_PFN_DECL(hipModuleLaunchKernel, hipFunction_t, unsigned int, unsigned int,
             unsigned int, hipStream_t, void **, void **)
 RC_PFN_DECL(hipMemset, void *, int, size_t)
 RC_PFN_DECL(hipMemsetAsync, void *, int, size_t, hipStream_t)
+RC_PFN_DECL(hipMemsetD32Async, void *, int, size_t, hipStream_t)
+RC_PFN_DECL(hipMemsetD16Async, void *, short, size_t, hipStream_t)
+RC_PFN_DECL(hipMemsetD8Async, void *, char, size_t, hipStream_t)
 RC_PFN_DECL(hipMemcpy, void *, const void *, size_t, hipMemcpyKind)
 RC_PFN_DECL(hipMemcpyAsync, void *, const void *, size_t, hipMemcpyKind,
             hipStream_t)

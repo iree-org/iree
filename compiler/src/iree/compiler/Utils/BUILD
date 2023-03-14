@@ -1,0 +1,69 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Utilities for working with IREE MLIR types.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_cc_library(
+    name = "Utils",
+    srcs = [
+        "ConversionUtils.cpp",
+        "FlatbufferUtils.cpp",
+        "ModuleUtils.cpp",
+        "OptionUtils.cpp",
+        "PassUtils.cpp",
+        "StringUtils.cpp",
+        "ToolUtils.cpp",
+        "TracingUtils.cpp",
+    ],
+    hdrs = [
+        "ADTExtras.h",
+        "ConversionUtils.h",
+        "FlatbufferUtils.h",
+        "IndexSet.h",
+        "ModuleUtils.h",
+        "OptionUtils.h",
+        "PassUtils.h",
+        "PatternUtils.h",
+        "StringUtils.h",
+        "ToolUtils.h",
+        "TracingUtils.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal/flatcc:building",
+        "//runtime/src/iree/base/internal/flatcc:debugging",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "UtilsTest",
+    srcs = ["ADTExtrasTest.cpp"],
+    deps = [
+        ":Utils",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "@llvm-project//llvm:Support",
+    ],
+)

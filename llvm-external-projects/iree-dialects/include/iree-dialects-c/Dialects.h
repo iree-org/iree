@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_C_DIALECTS_H
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_C_DIALECTS_H
+#ifndef IREE_DIALECTS_C_DIALECTS_H
+#define IREE_DIALECTS_C_DIALECTS_H
 
 #include "mlir-c/IR.h"
 #include "mlir-c/Pass.h"
-#include "mlir-c/Registration.h"
+#include "mlir-c/RegisterEverything.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,44 +19,36 @@ extern "C" {
 // IREEDialect
 //===----------------------------------------------------------------------===//
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREE, iree);
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREEInput, iree_input);
 
-//===----------------------------------------------------------------------===//
-// IREEPyDMDialect
-//===----------------------------------------------------------------------===//
+//===--------------------------------------------------------------------===//
+// IREELinalgExt
+//===--------------------------------------------------------------------===//
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREEPyDM, iree_pydm);
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREELinalgExt, iree_linalg_ext);
 
-MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type);
+//===--------------------------------------------------------------------===//
+// LinalgTransform
+//===--------------------------------------------------------------------===//
 
-#define IREEPYDM_DECLARE_NULLARY_TYPE(Name)                         \
-  MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDM##Name(MlirType type); \
-  MLIR_CAPI_EXPORTED MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx);
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(LinalgTransform, iree_linalg_transform);
 
-IREEPYDM_DECLARE_NULLARY_TYPE(Bool)
-IREEPYDM_DECLARE_NULLARY_TYPE(Bytes)
-IREEPYDM_DECLARE_NULLARY_TYPE(Integer)
-IREEPYDM_DECLARE_NULLARY_TYPE(ExceptionResult)
-IREEPYDM_DECLARE_NULLARY_TYPE(FreeVarRef)
-IREEPYDM_DECLARE_NULLARY_TYPE(List)
-IREEPYDM_DECLARE_NULLARY_TYPE(None)
-IREEPYDM_DECLARE_NULLARY_TYPE(Real)
-IREEPYDM_DECLARE_NULLARY_TYPE(Str)
-IREEPYDM_DECLARE_NULLARY_TYPE(Tuple)
-IREEPYDM_DECLARE_NULLARY_TYPE(Type)
+/// Register all passes for LinalgTransform.
+MLIR_CAPI_EXPORTED void mlirIREELinalgTransformRegisterPasses();
 
-#undef IREEPYDM_DECLARE_NULLARY_TYPE
+//===--------------------------------------------------------------------===//
+// TransformDialect
+//===--------------------------------------------------------------------===//
 
-MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDMObject(MlirType type);
-MLIR_CAPI_EXPORTED MlirType mlirIREEPyDMObjectTypeGet(MlirContext context,
-                                                      MlirType primitive);
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Transform, transform);
 
-/// Builds a pass pipeline which lowers the iree_pydm dialect to IREE.
-MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildLowerToIREEPassPipeline(
-    MlirOpPassManager passManager);
+MLIR_CAPI_EXPORTED void ireeRegisterTransformExtensions(MlirContext context);
+
+/// Register all passes for the transform dialect.
+MLIR_CAPI_EXPORTED void mlirIREETransformRegisterPasses();
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_C_DIALECTS_H
+#endif // IREE_DIALECTS_C_DIALECTS_H

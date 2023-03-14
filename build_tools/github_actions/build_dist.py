@@ -38,8 +38,6 @@ a directory and:
   source .venv/bin/activate
 
   python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-pure-pkgs
   python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
@@ -68,7 +66,8 @@ if BINDIST_DIR is None:
   BINDIST_DIR = os.path.join(WORK_DIR, "bindist")
 THIS_DIR = os.path.realpath(os.path.dirname(__file__))
 CMAKE_CI_SCRIPT = os.path.join(THIS_DIR, "cmake_ci.py")
-BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "bindings", "python",
+BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "runtime", "bindings",
+                                      "python", "iree", "runtime",
                                       "build_requirements.txt")
 CI_REQUIREMENTS_TXT = os.path.join(THIS_DIR, "ci_requirements.txt")
 CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
@@ -85,7 +84,7 @@ def load_version_info():
 try:
   version_info = load_version_info()
 except FileNotFoundError:
-  print("version_info.json found. Using defaults")
+  print("version_info.json not found. Using defaults")
   version_info = {
       "package-version": "0.1dev1",
       "package-suffix": "-dev",
@@ -117,9 +116,6 @@ def configure_bazel():
 def build_main_dist():
   """Builds the main distribution binaries.
 
-  Also builds python packages associated with the full distribution:
-    - iree-install/python_packages/iree_compiler
-
   Additional packages that are installable as part of a full build and do not
   benefit from a more restricted build can be added here.
   """
@@ -131,17 +127,22 @@ def build_main_dist():
 
   # CMake configure.
   print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_COMPILER=ON",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-  ],
-                 check=True)
+  subprocess.run(
+      [
+          sys.executable,
+          CMAKE_CI_SCRIPT,
+          f"-B{BUILD_DIR}",
+          "--log-level=VERBOSE",
+          f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
+          # On some distributions, this will install to lib64. We would like
+          # consistency in built packages, so hard-code it.
+          "-DCMAKE_INSTALL_LIBDIR=lib",
+          f"-DCMAKE_BUILD_TYPE=Release",
+          f"-DIREE_BUILD_COMPILER=ON",
+          f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
+          f"-DIREE_BUILD_SAMPLES=OFF",
+      ],
+      check=True)
 
   print("*** Building ***")
   subprocess.run([
@@ -157,7 +158,7 @@ def build_main_dist():
   print("*** Packaging ***")
   dist_entries = [
       "bin",
-      "tests",
+      "lib",
   ]
   dist_archive = os.path.join(
       BINDIST_DIR, f"iree-dist{version_info['package-suffix']}"
@@ -171,199 +172,6 @@ def build_main_dist():
       tf.add(os.path.join(INSTALL_DIR, entry), arcname=entry, recursive=True)
 
 
-def build_py_pure_pkgs():
-  """Performs a minimal build sufficient to produce pure python packages.
-
-  This installs the following packages:
-    - iree-install/python_packages/iree_jax
-
-  Since these are pure python packages, it is expected that they will be built
-  on a single examplar (i.e. Linux) distribution.
-  """
-  install_python_requirements()
-
-  # Clean up install and build trees.
-  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  remove_cmake_cache()
-
-  # CMake configure.
-  print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_COMPILER=OFF",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-      f"-DIREE_BUILD_TESTS=OFF",
-  ],
-                 check=True)
-
-  print("*** Building ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      "--build",
-      BUILD_DIR,
-      "--target",
-      "install-IreePythonPackage-jax",
-  ],
-                 check=True)
-
-
-def build_py_runtime_pkg():
-  """Builds the iree-install/python_packages/iree_runtime package.
-
-  This includes native, python-version dependent code and is designed to
-  be built multiple times.
-  """
-  install_python_requirements()
-
-  # Clean up install and build trees.
-  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  remove_cmake_cache()
-
-  # CMake configure.
-  print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_COMPILER=OFF",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-      f"-DIREE_BUILD_TESTS=OFF",
-  ],
-                 check=True)
-
-  print("*** Building ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      "--build",
-      BUILD_DIR,
-      "--target",
-      "install-IreePythonPackage-runtime-stripped",
-  ],
-                 check=True)
-
-
-def bazel_build_tf_binary(target):
-  """Builds a binary in the IREE-TF Workspace and returns the filepath."""
-  install_python_requirements()
-  configure_bazel()
-
-  # Builds a runnable target and returns the path to the executable. Yes this is
-  # really the best Bazel gives us.
-  # See https://github.com/bazelbuild/bazel/issues/8739
-  cmd = [
-      "bazel",
-      "run",
-      "--run_under=echo",
-      "--config=release",
-      "--keep_going",
-      target,
-  ]
-  process = subprocess.run(cmd,
-                           cwd=TF_INTEGRATIONS_DIR,
-                           check=True,
-                           stdout=subprocess.PIPE,
-                           universal_newlines=True)
-
-  if len(process.stdout.splitlines()) != 1:
-    raise RuntimeError(
-        f"Unexpected output from `{' '.join(cmd)}`:\n{process.stdout}")
-  bin_path = process.stdout.strip()
-  if not os.path.isfile(bin_path):
-    raise RuntimeError("{bin_path} is not a file.")
-
-  return bin_path
-
-
-def build_py_xla_compiler_tools_pkg():
-  """Builds the iree-install/python_packages/iree_tools_xla package."""
-  install_python_requirements()
-  configure_bazel()
-
-  # Clean up install and build trees.
-  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  remove_cmake_cache()
-
-  print("*** Building XLA import tool with Bazel ***")
-  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-xla")
-
-  # CMake configure.
-  print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_XLA_COMPILER=ON",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-      f"-DIREE_BUILD_TESTS=OFF",
-  ],
-                 check=True)
-
-  print("*** Building ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      "--build",
-      BUILD_DIR,
-      "--target",
-      "install-IreePythonPackage-tools-xla-stripped",
-  ],
-                 check=True)
-
-
-def build_py_tflite_compiler_tools_pkg():
-  """Builds the iree-install/python_packages/iree_tools_tflite package."""
-  install_python_requirements()
-  configure_bazel()
-
-  # Clean up install and build trees.
-  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  remove_cmake_cache()
-
-  print("*** Building TFLite import tool with Bazel ***")
-  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-tflite")
-
-  # CMake configure.
-  print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_TFLITE_COMPILER=ON",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-      f"-DIREE_BUILD_TESTS=OFF",
-  ],
-                 check=True)
-
-  print("*** Building ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      "--build",
-      BUILD_DIR,
-      "--target",
-      "install-IreePythonPackage-tools-tflite-stripped",
-  ],
-                 check=True)
-
-
 def build_py_tf_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_tf package."""
   install_python_requirements()
@@ -374,46 +182,36 @@ def build_py_tf_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building TF import tool with Bazel ***")
-  binpath = bazel_build_tf_binary("//iree_tf_compiler:iree-import-tf")
+  cmd = [
+      "bazel",
+      "build",
+      "--config=release",
+      "--keep_going",
+      "//iree_tf_compiler:importer-binaries",
+  ]
+  process = subprocess.run(cmd, cwd=TF_INTEGRATIONS_DIR, check=True)
 
-  # CMake configure.
-  print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      f"-DIREE_TF_TOOLS_ROOT={os.path.dirname(binpath)}",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_TENSORFLOW_COMPILER=ON",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-      f"-DIREE_BUILD_TESTS=OFF",
-  ])
-
-  print("*** Building ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      "--build",
-      BUILD_DIR,
-      "--target",
-      "install-IreePythonPackage-tools-tf-stripped",
-  ],
+  print("*** Symlinking built binaries ***")
+  subprocess.run(["bash", "symlink_binaries.sh"],
+                 cwd=TF_INTEGRATIONS_DIR,
                  check=True)
+  os.makedirs(BINDIST_DIR, exist_ok=True)
+
+  for project in ["iree_tflite", "iree_tf", "iree_xla"]:
+    print(f"*** Building wheel for {project} ***")
+    subprocess.run(
+        [
+            sys.executable, "-m", "pip", "wheel",
+            os.path.join(TF_INTEGRATIONS_DIR, "python_projects", project)
+        ],
+        cwd=BINDIST_DIR,
+        check=True,
+    )
 
 
 command = sys.argv[1]
 if command == "main-dist":
   build_main_dist()
-elif command == "py-runtime-pkg":
-  build_py_runtime_pkg()
-elif command == "py-pure-pkgs":
-  build_py_pure_pkgs()
-elif command == "py-xla-compiler-tools-pkg":
-  build_py_xla_compiler_tools_pkg()
-elif command == "py-tflite-compiler-tools-pkg":
-  build_py_tflite_compiler_tools_pkg()
 elif command == "py-tf-compiler-tools-pkg":
   build_py_tf_compiler_tools_pkg()
 else:

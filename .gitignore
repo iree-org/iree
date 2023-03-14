@@ -1,10 +1,11 @@
 # Python
+.env
 *.pyc
 **/.ipynb_checkpoints/
 .pytype/
+**/__pycache__/**
 
 # Visual Studio files
-.env
 .vs/
 .vscode/
 *.sdf
@@ -27,6 +28,7 @@ build-*/
 configured.bazelrc
 user.bazelrc
 version_info.json
+CMakeUserPresets.json
 
 # Dear ImGui Ini files
 imgui.ini
@@ -48,6 +50,9 @@ compile_commands.json
 *.venv
 .venv
 
+# Python deployment artifacts
+*.whl
+
 # Android Studio / Gradle files
 .cxx
 .gradle
@@ -61,4 +66,11 @@ mkdocs/site/
 docs/website/site/
 
 # Temporary files
-iree/compiler/Dialect/HAL/Target/LLVM/librt/bin/librt.ll
+iree/builtins/**/bin/*.ll
+
+# Archive files
+*.tar
+*.tar.*
+
+# Local cache files
+llvm-external-projects/iree-dialects/.cache

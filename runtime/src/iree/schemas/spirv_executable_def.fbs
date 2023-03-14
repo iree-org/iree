@@ -1,0 +1,27 @@
+// Copyright 2019 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+namespace iree;
+
+// 'SPIR-V Executable'.
+file_identifier "SPVE";
+file_extension "spve";
+
+// A SPIR-V shader module and runtime pipeline layout description.
+// This information is used to create the VkShaderModule, VkPipelineLayout, and
+// any required VkDescriptorSetLayouts.
+table SpirVExecutableDef {
+  // A map of entry point ordinals to string names as used in the shader module.
+  entry_points:[string];
+
+  // Required subgroup size for each entry point. 0 means no requirement.
+  subgroup_sizes:[uint32];
+
+  // SPIR-V code words.
+  code:[uint32];
+}
+
+root_type SpirVExecutableDef;

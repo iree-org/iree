@@ -1,0 +1,38 @@
+name: ➕ Feature Request
+description: Ask for a new feature to be added
+labels: ["awaiting-triage", "enhancement ➕"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        :star2: Thanks for taking the time to file this request! :star2:
+
+        We also work closely with upstream communities like the MLIR project, which uses the [MLIR Discourse forum](https://discourse.llvm.org/c/mlir/31) for coordination.
+  - type: textarea
+    id: overview
+    attributes:
+      label: Request description
+      description: |
+        What would you like added or changed?
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: What component(s) does this issue relate to?
+      description: |
+        If you're not sure, that's okay! This helps us route issues to the right developers.
+      multiple: true
+      options:
+        - Frontends
+        - MLIR
+        - Python
+        - Compiler
+        - Runtime
+        - Other
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context about your request here.
+      placeholder: For example, is a similar feature already implemented?

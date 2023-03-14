@@ -8,29 +8,22 @@ set(TF_MLIR_HLO_SOURCE_DIR
   "${IREE_SOURCE_DIR}/third_party/mlir-hlo/"
 )
 set(TF_MLIR_HLO_BINARY_DIR
-  "${IREE_BINARY_DIR}/third_party/mlir-hlo/"
+  "${IREE_BINARY_DIR}/llvm-external-projects/mlir-hlo"
 )
 
 external_cc_library(
   PACKAGE
     tensorflow
   NAME
-    mlir_hlo
+    external_mhlo_includes
   ROOT
     ${TF_MLIR_HLO_SOURCE_DIR}
-  DEPS
-    MhloDialect
-    MhloInferShapeEqualityOpInterface
-    LmhloDialect
-    ChloPasses
-    MhloToStandard
-    MhloPasses
-    MhloLhloToLinalg
-    MLIRMhloUtils
   INCLUDES
-    "${TF_MLIR_HLO_SOURCE_DIR}/"
+    "${TF_MLIR_HLO_SOURCE_DIR}"
     "${TF_MLIR_HLO_SOURCE_DIR}/include/"
-    "${TF_MLIR_HLO_BINARY_DIR}/"
+    "${TF_MLIR_HLO_SOURCE_DIR}/stablehlo/"
+    "${TF_MLIR_HLO_BINARY_DIR}"
     "${TF_MLIR_HLO_BINARY_DIR}/include/"
+    "${TF_MLIR_HLO_BINARY_DIR}/stablehlo/"
   PUBLIC
 )

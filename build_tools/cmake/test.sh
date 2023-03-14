@@ -18,19 +18,16 @@ fi
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-# Respect the user setting, but default to turning off the vulkan tests
-# and turning on the llvmaot ones.
+# Respect the user setting, but default to turning on Vulkan.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
-export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
-# CUDA is off by default.
+# Respect the user setting, but default to turning off CUDA.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
-# We test on SwiftShader, which does not support this extension.
+# We test on SwiftShader as a baseline, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
-# over from Bazel tags), every test should be labeled with the directory it is
-# in.
+# over from Bazel tags), every test should be labeled with its directory.
 declare -a label_exclude_args=(
   # Exclude specific labels.
   # Put the whole label with anchors for exact matches.
@@ -53,9 +50,6 @@ declare -a label_exclude_args=(
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=vulkan$")
 fi
-if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then
-  label_exclude_args+=("^driver=dylib$")
-fi
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
 fi
@@ -67,4 +61,12 @@ fi
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 cd "$BUILD_DIR"
-ctest --timeout 900 --output-on-failure --label-exclude "${label_exclude_regex?}"
+echo "******************** Running main project ctests ************************"
+ctest \
+  --timeout 900 \
+  --output-on-failure \
+  --no-tests=error \
+  --label-exclude "${label_exclude_regex?}"
+
+echo "******************** llvm-external-projects tests ***********************"
+cmake --build . --target check-iree-dialects -- -k 0

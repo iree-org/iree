@@ -17,9 +17,6 @@ package(
 cc_binary(
     name = "generate_embed_data",
     srcs = ["generate_embed_data_main.cc"],
-    deps = [
-        "//iree/base/internal:flags",
-    ],
 )
 
 c_embed_data(
@@ -50,7 +47,7 @@ cc_test(
     deps = [
         ":testembed1",
         ":testembed2",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

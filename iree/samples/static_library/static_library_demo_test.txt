@@ -1,2 +1,0 @@
-// RUN: (static_library_demo) | IreeFileCheck %s
-// CHECK-LABEL: static_library_run passed

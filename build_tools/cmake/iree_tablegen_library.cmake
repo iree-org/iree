@@ -35,16 +35,28 @@ function(iree_tablegen_library)
   set(LLVM_TARGET_DEFINITIONS ${_RULE_TD_FILE})
   set(_INCLUDE_DIRS
     "${MLIR_INCLUDE_DIRS}"
-    "${IREE_SOURCE_DIR}"
+    "${IREE_SOURCE_DIR}/compiler/src"
+    "${IREE_BINARY_DIR}/compiler/src"
   )
   list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
   list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
   set(_OUTPUTS)
   while(_RULE_OUTS)
-    list(GET _RULE_OUTS 0 _COMMAND)
-    list(REMOVE_AT _RULE_OUTS 0)
-    list(GET _RULE_OUTS 0 _FILE)
-    list(REMOVE_AT _RULE_OUTS 0)
+    # Eat any number of flags (--a --b ...) and a single file.
+    # Flags only impact the successively declared file.
+    set(_COMMAND)
+    set(_FILE)
+    while(_RULE_OUTS AND NOT _FILE)
+      list(GET _RULE_OUTS 0 _PART)
+      list(REMOVE_AT _RULE_OUTS 0)
+      if(${_PART} MATCHES "^-.*")
+        # Flag (- or --).
+        list(APPEND _COMMAND ${_PART})
+      else()
+        # File path.
+        set(_FILE ${_PART})
+      endif()
+    endwhile()
     tablegen(${_TBLGEN} ${_FILE} ${_COMMAND} ${_INCLUDE_DIRS})
     list(APPEND _OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${_FILE})
   endwhile()

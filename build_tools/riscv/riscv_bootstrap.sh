@@ -11,10 +11,8 @@
 set -e
 set -o pipefail
 
-BOOTSTRAP_SCRIPT_PATH=$(dirname "$0")
-BOOTSTRAP_WORK_DIR=${BOOTSTRAP_SCRIPT_PATH}/.bootstrap
-
-PREBUILT_DIR=${HOME}/riscv
+PREBUILT_DIR="${HOME}/riscv"
+IREE_ARTIFACT_URL="https://storage.googleapis.com/iree-shared-files"
 
 read -p "Enter the riscv tools root path(press enter to use default path:${PREBUILT_DIR}): " INPUT_PATH
 if [[ "${INPUT_PATH}" ]]; then
@@ -22,99 +20,70 @@ if [[ "${INPUT_PATH}" ]]; then
 fi
 echo "The riscv tool prefix path: ${PREBUILT_DIR}"
 
+BOOTSTRAP_WORK_DIR="${PREBUILT_DIR}/.bootstrap"
+
 if [[ "${OSTYPE}" == "linux-gnu" ]]; then
-  RISCV_CLANG_TOOLCHAIN_FILE_ID=13q6sYVlae-hRrgj7SNlvbJFYI3Q8sCI4
-  RISCV_CLANG_TOOLCHAIN_FILE_NAME=rvv-llvm-toolchain.tar.bz2
-  QEMU_FILE_ID=1JkLana7CGeD2wfwn8shHQxcYrv3j1l9s
-  QEMU_FILE_NAME=riscv-qemu-v5.2.0-rvv-rvb-zfh-856da0e-linux-ubuntu.tar.gz
+  RISCV_CLANG_TOOLCHAIN_FILE_NAME="toolchain_iree_20220918.tar.gz"
+  RISCV_CLANG_TOOLCHAIN_FILE_SHA="f73ae47b7f04df37e53c1737b5baa93f8e063a6602f6e5a022df3e3ae7af11e6"
+
+  QEMU_FILE_NAME="qemu-riscv.tar.gz"
+  QEMU_FILE_SHA="6e0bca77408e606add8577d6f1b6709f6ef3165b0e241ed2ba191183dfc931ec"
 
   TOOLCHAIN_PATH_PREFIX=${PREBUILT_DIR}/toolchain/clang/linux/RISCV
   QEMU_PATH_PREFIX=${PREBUILT_DIR}/qemu/linux/RISCV
-elif [[ "${OSTYPE}" == "darwin"* ]]; then
-  RISCV_CLANG_TOOLCHAIN_FILE_ID=empty
-  RISCV_CLANG_TOOLCHAIN_FILE_NAME=empty
-  QEMU_FILE_ID=empty
-  QEMU_FILE_NAME=empty
-
-  TOOLCHAIN_PATH_PREFIX=${PREBUILT_DIR}/toolchain/clang/darwin/RISCV
-  QEMU_PATH_PREFIX=${PREBUILT_DIR}/qemu/darwin/RISCV
-
-  echo "We haven't had the darwin prebuilt binary yet. Skip this script."
-  exit 1
 else
   echo "${OSTYPE} is not supported."
   exit 1
 fi
 
 function cleanup {
-  if [[ -d ${BOOTSTRAP_WORK_DIR} ]]; then
-    rm -rf ${BOOTSTRAP_WORK_DIR}
+  if [[ -d "${BOOTSTRAP_WORK_DIR}" ]]; then
+    rm -rf "${BOOTSTRAP_WORK_DIR}"
   fi
 }
 
 # Call the cleanup function when this tool exits.
 trap cleanup EXIT
 
-wget_google_drive() {
-  local file_id="$1"
-  local file_name="$2"
-  local install_path="$3"
-  local tar_option="$4"
-
-  wget --save-cookies ${BOOTSTRAP_WORK_DIR}/cookies.txt \
-    "https://docs.google.com/uc?export=download&id="$file_id -O- | \
-    sed -En "s/.*confirm=([0-9A-Za-z_]+).*/\1/p" > ${BOOTSTRAP_WORK_DIR}/confirm.txt
-  wget --progress=bar:force:noscroll --load-cookies ${BOOTSTRAP_WORK_DIR}/cookies.txt \
-    "https://docs.google.com/uc?export=download&id=$file_id&confirm=`cat ${BOOTSTRAP_WORK_DIR}/confirm.txt`" -O- | \
-    tar $tar_option - --no-same-owner --strip-components=1 -C $install_path
-}
-
+# Download and install the toolchain from IREE-OSS GCS
 download_file() {
-  # server name or google drive file_id
-  local file_download_info="$1"
-  local file_name="$2"
-  local install_path="$3"
-  # download method(e.g. wget_google_drive)
-  local download_method="$4"
+  local file_name="$1"
+  local install_path="$2"
+  local file_sha="$3"
 
-  echo "Install $2 to $3"
-  if [[ -e $3/file_info.txt ]]; then
+  echo "Install $1 to $2"
+  if [[ "$(ls -A $2)" ]]; then
     read -p "The file already exists. Keep it (y/n)? " replaced
     case ${replaced:0:1} in
       y|Y )
-        echo "Skip download $2."
+        echo "Skip download $1."
         return
       ;;
       * )
-        rm -rf $3
+        rm -rf "$2"
       ;;
     esac
   fi
 
-  local tar_option=""
-  if [[ "${file_name##*.}" == "gz" ]]; then
-    tar_option="zxpf"
-  elif [[ "${file_name##*.}" == "bz2" ]]; then
-    tar_option="jxpf"
-  fi
-  echo "tar option: $tar_option"
-
-  echo "Download $file_name ..."
+  echo "Download ${file_name} ..."
   mkdir -p $install_path
-  $download_method $file_download_info $file_name $install_path $tar_option
-
-  echo "$file_download_info $file_name" > $install_path/file_info.txt
+  wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" \
+    "${IREE_ARTIFACT_URL}/${file_name}" && \
+    echo "${file_sha} ${BOOTSTRAP_WORK_DIR}/${file_name}" | sha256sum -c -
+  echo "Extract ${file_name} ..."
+  tar -C "${install_path}" -xf "${BOOTSTRAP_WORK_DIR}/${file_name}" --no-same-owner \
+    --strip-components=1
 }
 
-mkdir -p ${BOOTSTRAP_WORK_DIR}
+mkdir -p "${BOOTSTRAP_WORK_DIR}"
 
 read -p "Install RISCV clang toolchain(y/n)? " answer
 case ${answer:0:1} in
   y|Y )
-    download_file ${RISCV_CLANG_TOOLCHAIN_FILE_ID} \
-                  ${RISCV_CLANG_TOOLCHAIN_FILE_NAME} \
-                  ${TOOLCHAIN_PATH_PREFIX} \
-                  wget_google_drive
+    download_file "${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" \
+                  "${TOOLCHAIN_PATH_PREFIX}" \
+                  "${RISCV_CLANG_TOOLCHAIN_FILE_SHA}"
+
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo " PLEASE run 'export RISCV_TOOLCHAIN_ROOT=${TOOLCHAIN_PATH_PREFIX}'   "
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -127,10 +96,9 @@ esac
 read -p "Install RISCV qemu(y/n)? " answer
 case ${answer:0:1} in
   y|Y )
-    download_file $QEMU_FILE_ID \
-                  ${QEMU_FILE_NAME} \
-                  ${QEMU_PATH_PREFIX} \
-                  wget_google_drive
+    download_file "${QEMU_FILE_NAME}" \
+                  "${QEMU_PATH_PREFIX}" \
+                  "${QEMU_FILE_SHA}"
   ;;
   * )
     echo "Skip RISCV qemu."

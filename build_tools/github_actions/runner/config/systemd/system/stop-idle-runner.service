@@ -1,0 +1,19 @@
+[Unit]
+Description=Stop the gh-runner service if it is idle and the autoscaler recommends scaling down
+After=gh-runner.target network.target
+RefuseManualStart=true
+
+[Service]
+User=root
+Group=root
+Type=oneshot
+EnvironmentFile=/etc/environment
+ExecStart=/runner-root/config/systemd/scripts/stop_idle_runner.sh
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=5min
+
+# The [Install] section for this unit mostly just exits so that we can call
+# enable on it without getting an error.
+[Install]
+Also=stop-idle-runner.timer

@@ -14,26 +14,25 @@ It measures timing for the whole process of invoking a function through the VM,
 including allocating and freeing output buffers. This is a high-level benchmark
 of an entire invocation flow. It provides a big picture view, but depends on
 many different variables, like an integration test. For finer-grained
-measurements more akin to unit tests, see [Microbenchmarks](#microbenchmarks).
+measurements more akin to unit tests, see [Executable Benchmarks](#executable-benchmarks).
 
 To use `iree-benchmark-module`, generate an IREE module for the target backend:
 
 ```shell
-$ bazel run //iree/tools:iree-translate -- \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-hal-target-backends=vmvx \
-  $PWD/iree/samples/models/simple_abs.mlir \
+$ bazel run //tools:iree-compile -- \
+  --iree-hal-target-backends=vmvx \
+  $PWD/samples/models/simple_abs.mlir \
   -o /tmp/module.fb
 ```
 
 and then benchmark an exported function in that module:
 
 ```shell
-$ bazel run //iree/tools:iree-benchmark-module -- \
-  --module_file=/tmp/module.fb \
-  --driver=vmvx \
-  --entry_function=abs \
-  --function_input=f32=-2
+$ bazel run //tools:iree-benchmark-module -- \
+  --module=/tmp/module.fb \
+  --device=local-task \
+  --function=abs \
+  --input=f32=-2
 ```
 
 You'll see output like
@@ -62,7 +61,7 @@ generally build an optimized build (`-c opt` in Bazel) and
 [disable CPU scaling](#cpu-configuration).
 
 ```shell
-$ bazel build -c opt //iree/tools:iree-benchmark-module
+$ bazel build -c opt //tools:iree-benchmark-module
 ```
 
 Another thing to consider is that depending on where you are running the
@@ -76,11 +75,11 @@ programs such as Chrome and Bazel.
 Now we'll actually invoke the binary:
 
 ```shell
-$ ./bazel-bin/iree/tools/iree-benchmark-module \
-  --module_file=/tmp/module.fb \
-  --driver=vmvx \
-  --entry_function=abs \
-  --function_input=f32=-2
+$ ./bazel-bin/tools/iree-benchmark-module \
+  --module=/tmp/module.fb \
+  --device=local-task \
+  --function=abs \
+  --input=f32=-2
 ```
 
 ```shell
@@ -107,12 +106,11 @@ dispatch functions, generate an IREE module with the
 `-iree-flow-export-benchmark-funcs` flag set:
 
 ```shell
-$ build/iree/tools/iree-translate \
-  -iree-input-type=mhlo \
-  -iree-mlir-to-vm-bytecode-module \
-  -iree-flow-export-benchmark-funcs \
-  -iree-hal-target-backends=vmvx \
-  iree/test/e2e/models/fullyconnected.mlir \
+$ build/tools/iree-compile \
+  --iree-input-type=mhlo \
+  --iree-flow-export-benchmark-funcs \
+  --iree-hal-target-backends=vmvx \
+  tests/e2e/models/fullyconnected.mlir \
   -o /tmp/fullyconnected.vmfb
 ```
 
@@ -120,9 +118,9 @@ and then benchmark all exported dispatch functions (and all exported functions)
 in that module:
 
 ```shell
-$ build/iree/tools/iree-benchmark-module
-  --module_file=/tmp/fullyconnected.vmfb
-  --driver=vmvx
+$ build/tools/iree-benchmark-module
+  --module=/tmp/fullyconnected.vmfb
+  --device=local-task
 ```
 
 If no `entry_function` is specified, `iree-benchmark-module` will register a
@@ -158,7 +156,7 @@ model execution. So its performance is of crucial importance. We strive to
 introduce as little overhead as possible and have several benchmark binaries
 dedicated for evaluating the VM's performance. These benchmark binaries are
 named as `*_benchmark` in the
-[`iree/vm/`](https://github.com/google/iree/tree/main/iree/vm) directory. They
+[`iree/vm/`](https://github.com/openxla/iree/tree/main/iree/vm) directory. They
 also use the Google Benchmark library as the above.
 
 ## CPU Configuration
@@ -312,5 +310,70 @@ $ for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
     "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; \
 done
 ```
+
+#### Android Scripts
+
+We provide a few scripts to set clockspeeds on Android (under
+`build_tools/benchmarks`). These are somewhat device-specific:
+* The `set_android_scaling_governor.sh` work on all CPUs, but the default
+  governor name may be different across devices.
+* The `set_*_gpu_scaling_policy.sh` script used should match the actual GPU on
+  your device.
+
+Sample configuration steps for Pixel 6:
+1. Copy all scripts to the device:
+   ```shell
+   adb push build_tools/benchmarks/*.sh /data/local/tmp
+   ```
+1. Launch interactive adb shell as super user:
+   ```shell
+   adb shell
+   oriole:/ # su
+   oriole:/ # cd /data/local/tmp
+   ```
+1. Pin frequencies (high clockspeeds):
+   ```shell
+   oriole:/ # ./set_android_scaling_governor.sh
+    CPU info (before changing governor):
+    cpu     governor        cur     min     max
+    ------------------------------------------------
+    cpu0    sched_pixel     1098000 300000  1803000
+    cpu1    sched_pixel     1598000 300000  1803000
+    cpu2    sched_pixel     1598000 300000  1803000
+    cpu3    sched_pixel     1098000 300000  1803000
+    cpu4    sched_pixel     400000  400000  2253000
+    cpu5    sched_pixel     400000  400000  2253000
+    cpu6    sched_pixel     500000  500000  2802000
+    cpu7    sched_pixel     500000  500000  2802000
+    Setting CPU frequency governor to performance
+    CPU info (after changing governor):
+    cpu     governor        cur     min     max
+    ------------------------------------------------
+    cpu0    performance     1803000 300000  1803000
+    cpu1    performance     1803000 300000  1803000
+    cpu2    performance     1803000 300000  1803000
+    cpu3    performance     1803000 300000  1803000
+    cpu4    performance     2253000 400000  2253000
+    cpu5    performance     2253000 400000  2253000
+    cpu6    performance     2802000 500000  2802000
+    cpu7    performance     2802000 500000  2802000
+   oriole:/data/local/tmp # ./set_pixel6_gpu_scaling_policy.sh
+    GPU info (before changing frequency scaling policy):
+    policy                                  cur     min     max
+    --------------------------------------------------------------
+    coarse_demand [adaptive] always_on      251000  151000  848000
+    Setting GPU frequency scaling policy to performance
+    GPU info (after changing frequency scaling policy):
+    policy                                  cur     min     max
+    --------------------------------------------------------------
+    coarse_demand adaptive [always_on]      848000  151000  848000
+   ```
+1. Restore default frequencies:
+   ```shell
+   oriole:/ # ./set_android_scaling_governor.sh sched_pixel
+   ...
+   oriole:/ # ./set_pixel6_gpu_scaling_policy.sh default
+   ...
+   ```
 
 TODO(scotttodd): Windows instructions

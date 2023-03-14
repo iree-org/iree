@@ -1,0 +1,58 @@
+name: 🐞 Bug Report
+description: Report an issue
+labels: ["awaiting-triage", "bug 🐞"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        :star2: Thanks for taking the time to report this issue! :star2:
+
+        Please search through [other recent issues](https://github.com/openxla/iree/issues) to see if your report overlaps with an existing issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: |
+        Also tell us, what did you expect to happen?
+
+        For compiler errors, we like to see the MLIR output leading up to whatever error occurred.
+      placeholder: Tell us what you see! Please also copy/paste or link to any relevant log output.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducing
+    attributes:
+      label: Steps to reproduce your issue
+      description: |
+        For compiler errors, we like to see the input IR and the commands that you ran.
+      value: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+  - type: dropdown
+    id: component
+    attributes:
+      label: What component(s) does this issue relate to?
+      description: |
+        If you're not sure, that's okay! This helps us route issues to the right developers.
+      multiple: true
+      options:
+        - Frontends
+        - MLIR
+        - Python
+        - Compiler
+        - Runtime
+        - Other
+  - type: textarea
+    id: version
+    attributes:
+      label: Version information
+      description: What version of our software are you running?
+      placeholder: This could be a git commit hash or release version number.
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context about the problem here.
+      placeholder: For example, did what you were trying work before?

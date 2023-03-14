@@ -4,11 +4,17 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT ${IREE_BUILD_EXPERIMENTAL_ROCM})
-  return()
+iree_add_all_subdirs()
+
+if(NOT ROCM_HEADERS_API_ROOT)
+  set(ROCM_HEADERS_API_ROOT "/opt/rocm/include")
 endif()
 
-iree_add_all_subdirs()
+if(EXISTS ${ROCM_HEADERS_API_ROOT})
+  message(STATUS "ROCm Header Path: ${ROCM_HEADERS_API_ROOT}")
+else()
+  message(SEND_ERROR "Could not locate ROCm: ${ROCM_HEADERS_API_ROOT}")
+endif()
 
 iree_cc_library(
   NAME
@@ -27,37 +33,39 @@ iree_cc_library(
     "rocm_driver.c"
     "rocm_event.c"
     "rocm_event.h"
-    "descriptor_set_layout.c"
-    "descriptor_set_layout.h"
     "event_semaphore.c"
     "event_semaphore.h"
-    "executable_layout.c"
-    "executable_layout.h"
     "direct_command_buffer.c"
     "direct_command_buffer.h"
     "native_executable.c"
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
+    "pipeline_layout.c"
+    "pipeline_layout.h"
     "status_util.c"
     "status_util.h"
   INCLUDES
     "${CMAKE_CURRENT_LIST_DIR}/../.."
     "${PROJECT_BINARY_DIR}"
+    "${ROCM_HEADERS_API_ROOT}"
   DEPS
     ::dynamic_symbols
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
     iree::base::tracing
     iree::hal
+    iree::hal::utils::buffer_transfer
+    iree::hal::utils::semaphore_base
     iree::schemas::rocm_executable_def_c_fbs
+  COPTS
+    "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC
 )
-
-add_definitions(-D__HIP_PLATFORM_HCC__)
 
 iree_cc_library(
   NAME
@@ -70,9 +78,11 @@ iree_cc_library(
     "rocm_headers.h"
     "dynamic_symbols.c"
   INCLUDES
+    "${ROCM_HEADERS_API_ROOT}"
     "${CMAKE_CURRENT_LIST_DIR}/../.."
+  COPTS
+    "-D__HIP_PLATFORM_HCC__=1"
   DEPS
-    rocm_headers
     iree::base::core_headers
     iree::base::internal::dynamic_library
     iree::base::tracing
@@ -91,6 +101,6 @@ iree_cc_test(
     iree::testing::gtest_main
   LABELS
     "driver=rocm"
+  COPTS
+    "-D__HIP_PLATFORM_HCC__=1"
 )
-
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -12,27 +12,23 @@
 set -e
 set -x
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
-cd ${ROOT_DIR?}
+BUILD_DIR="${1:-${IREE_TRACING_BUILD_DIR:-build-tracing}}"
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-"${CMAKE_BIN?}" --version
-ninja --version
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
-if [ -d "build-tracing" ]
-then
-  echo "build-tracing directory already exists. Will use cached results there."
-else
-  echo "build-tracing directory does not already exist. Creating a new one."
-  mkdir build-tracing
-fi
-cd build-tracing
-
-# Note: https://github.com/google/iree/issues/6404 prevents us from building
+# Note: https://github.com/openxla/iree/issues/6404 prevents us from building
 # tests with these other settings. Many tests invoke the compiler tools with
 # MLIR threading enabled, which crashes with compiler tracing enabled.
-"${CMAKE_BIN?}" -G Ninja .. \
+"${CMAKE_BIN?}" -B "${BUILD_DIR}" \
+  -G Ninja . \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
   -DIREE_BUILD_COMPILER=OFF
-"${CMAKE_BIN?}" --build .
+"${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
+
+if (( IREE_USE_CCACHE == 1 )); then
+  ccache --show-stats
+fi

@@ -1,0 +1,39 @@
+// Copyright 2021 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+namespace iree;
+
+// 'CUDA Executable'.
+file_identifier "CUDA";
+file_extension "cuda";
+
+// A struct for the kernel block size along each dimensions.
+struct CUDABlockSizeDef {
+  x:uint32;
+  y:uint32;
+  z:uint32;
+}
+
+table CUDAExecutableDef {
+  // A map of entry point ordinals to string names as used in the shader
+  // library.
+  entry_points:[string];
+
+  // Block sizes for each entry point.
+  //
+  // Currently the thread group size/block size is decided during code gen but
+  // in CUDA it is set by the runtime.
+  block_sizes:[CUDABlockSizeDef];
+  // Size of dynamic shared memory.
+  shared_memory_size:[uint32];
+
+  // PTX string of the module.
+  ptx_image:string;
+  
+  // TODO(thomasraoux): Add potential cuBin binary specialized for some targets.
+}
+
+root_type CUDAExecutableDef;

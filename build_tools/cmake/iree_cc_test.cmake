@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
-include(iree_installed_test)
 
 # iree_cc_test()
 #
@@ -13,6 +12,11 @@ include(iree_installed_test)
 #
 # Parameters:
 # NAME: name of target. This name is used for the generated executable and
+#     CTest target.
+# ARGS: List of command line arguments to pass to the test binary.
+#     Note: flag passing is only enforced through CTest, so manually running
+#     the test binaries (such as under a debugger) will _not_ pass any
+#     arguments without extra setup.
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
@@ -56,7 +60,7 @@ function(iree_cc_test)
     _RULE
     ""
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS"
+    "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;TIMEOUT"
     ${ARGN}
   )
 
@@ -123,10 +127,13 @@ function(iree_cc_test)
 
   list(APPEND _RULE_DEPS "gmock")
 
-  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-  set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
+  # Implicit deps.
+  if(IREE_IMPLICIT_DEFS_CC_DEPS)
+    list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
+  endif()
 
-  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
+  set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
 
   # Case for cross-compiling towards Android.
   if(ANDROID)
@@ -134,13 +141,14 @@ function(iree_cc_test)
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
 
     # Define a custom target for pushing and running the test on Android device.
-    set(_TEST_NAME ${_TEST_NAME}_on_android_device)
+    set(_NAME_PATH ${_NAME_PATH}_on_android_device)
     add_test(
       NAME
-        ${_TEST_NAME}
+        ${_NAME_PATH}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
         "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_NAME}>"
+        ${_RULE_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match
@@ -151,25 +159,38 @@ function(iree_cc_test)
         TEST_EXECUTABLE=$<TARGET_FILE:${_NAME}>
         TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
     )
-    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
-    set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
-  else(ANDROID)
-    iree_add_installed_test(
-      TEST_NAME "${_TEST_NAME}"
-      LABELS "${_RULE_LABELS}"
+    set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
+  elseif((CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" OR
+          CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32") AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The test target needs to run within the QEMU emulator for RV64 Linux
+    # crosscompile build or on-device.
+    add_test(
+      NAME
+        ${_NAME_PATH}
       COMMAND
-        # We run all our tests through a custom test runner to allow temp
-        # directory cleanup upon test completion.
-        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
+       "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv_test.sh"
         "$<TARGET_FILE:${_NAME}>"
-      INSTALLED_COMMAND
-        # Must match install destination below.
-        "${_PACKAGE_PATH}/$<TARGET_FILE_NAME:${_NAME}>"
+        ${_RULE_ARGS}
     )
+    iree_configure_test(${_NAME_PATH})
+  else(ANDROID)
+    add_test(
+      NAME
+        ${_NAME_PATH}
+      COMMAND
+        "$<TARGET_FILE:${_NAME}>"
+        ${_RULE_ARGS}
+      )
+
+    iree_configure_test(${_NAME_PATH})
   endif(ANDROID)
 
-  install(TARGETS ${_NAME}
-    DESTINATION "tests/${_PACKAGE_PATH}"
-    COMPONENT Tests
-  )
+  if (NOT DEFINED _RULE_TIMEOUT)
+    set(_RULE_TIMEOUT 60)
+  endif()
+
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
 endfunction()

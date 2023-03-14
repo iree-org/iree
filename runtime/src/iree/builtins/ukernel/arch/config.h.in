@@ -1,0 +1,2 @@
+#cmakedefine IREE_UK_POINTER_SIZE ${IREE_UK_POINTER_SIZE}
+#cmakedefine IREE_UK_ARCH_ARM_64

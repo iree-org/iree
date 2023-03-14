@@ -14,21 +14,25 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
-#include "mlir-hlo/Dialect/mhlo/IR/register.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mhlo/IR/register.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/SymbolTable.h"
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
-#include "tensorflow/compiler/mlir/xla/hlo_to_mlir_hlo.h"
 #include "tensorflow/compiler/xla/service/hlo.pb.h"
 #include "tensorflow/compiler/xla/service/hlo_parser.h"
+#include "tensorflow/compiler/xla/translate/hlo_to_mhlo/hlo_to_mlir_hlo.h"
 #include "tensorflow/core/platform/protobuf.h"
 
 using namespace llvm;
@@ -41,6 +45,12 @@ enum XlaFormat {
   text_proto,
   hlo_text,
   mlir_text,
+};
+
+enum class OutputFormat {
+  none,
+  mlir_ir,
+  mlir_bytecode,
 };
 
 // Error collector that prints errors.
@@ -93,6 +103,9 @@ LogicalResult ReadHloTextFormatFromStream(std::istream *in,
 }  // namespace
 
 int main(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
   llvm::InitLLVM y(argc, argv);
 
   static cl::opt<std::string> inputPath(
@@ -117,6 +130,15 @@ int main(int argc, char **argv) {
           clEnumVal(hlo_text, "Parse an HLO module in its native text format"),
           clEnumVal(mlir_text, "Parse MLIR text containing MHLO ops")));
 
+  // The output format flag is the master control for what we do with the
+  // in-memory compiled form.
+  llvm::cl::opt<OutputFormat> outputFormat(
+      "output-format", llvm::cl::desc("Format of imported output"),
+      llvm::cl::values(clEnumValN(OutputFormat::mlir_bytecode, "mlir-bytecode",
+                                  "MLIR Bytecode (default)"),
+                       clEnumValN(OutputFormat::mlir_ir, "mlir-ir", "MLIR IR")),
+      llvm::cl::init(OutputFormat::mlir_bytecode));
+
   // Register any command line options.
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
@@ -135,7 +157,7 @@ int main(int argc, char **argv) {
       fileInputStream->open(inputPath, std::ios::in | std::ios::binary);
       if (!fileInputStream->is_open()) {
         llvm::errs() << "Unable to open input file " << inputPath << "\n";
-        return llvm::None;
+        return std::nullopt;
       }
       inputStream = fileInputStream.get();
     }
@@ -144,9 +166,11 @@ int main(int argc, char **argv) {
 
   DialectRegistry registry;
   mlir::mhlo::registerAllMhloDialects(registry);
-  registry.insert<mlir::StandardOpsDialect>();
+  registry.insert<mlir::func::FuncDialect, mlir::arith::ArithDialect,
+                  mlir::math::MathDialect>();
   MLIRContext context;
-  OwningModuleRef module = ModuleOp::create(mlir::UnknownLoc::get(&context));
+  OwningOpRef<mlir::ModuleOp> module =
+      ModuleOp::create(mlir::UnknownLoc::get(&context));
   context.appendDialectRegistry(registry);
   context.loadAllAvailableDialects();
 
@@ -220,12 +244,12 @@ int main(int argc, char **argv) {
         return 1;
       }
       sourceMgr.AddNewSourceBuffer(std::move(file), SMLoc());
-      module = parseSourceFile(sourceMgr, &context);
+      module = parseSourceFile<ModuleOp>(sourceMgr, &context);
       if (!module) return 2;
       break;
     }
     default:
-      llvm_unreachable("illegal XlaFormat");
+      assert(false && "illegal XlaFormat");
   }
 
   // Find the entry function and annotate it as exported.
@@ -233,7 +257,7 @@ int main(int argc, char **argv) {
   // function.
   std::string entryName = "main";
   SymbolTable symbolTable(module.get());
-  auto mainFunc = symbolTable.lookup<FuncOp>(entryName);
+  auto mainFunc = symbolTable.lookup<func::FuncOp>(entryName);
   if (!mainFunc) {
     llvm::errs() << "Unable to find main function '" << entryName
                  << "' in converted module.\n";
@@ -248,11 +272,22 @@ int main(int argc, char **argv) {
       llvm::errs() << "Could not open output file: " << savePath << "\n";
       return failure();
     }
-    OpPrintingFlags printFlags;
-    module->print(outputFile->os(), printFlags);
-    outputFile->os() << "\n";
-    outputFile->keep();
-    return success();
+
+    if (outputFormat == OutputFormat::mlir_ir) {
+      OpPrintingFlags printFlags;
+      module->print(outputFile->os(), printFlags);
+      outputFile->os() << "\n";
+      outputFile->keep();
+      return success();
+    }
+
+    if (outputFormat == OutputFormat::mlir_bytecode) {
+      mlir::writeBytecodeToFile(*module, outputFile->os());
+      outputFile->keep();
+      return success();
+    }
+    llvm::errs() << "Unknown output format\n";
+    return failure();
   };
 
   // Save temp output.
@@ -261,7 +296,8 @@ int main(int argc, char **argv) {
   }
 
   // Run passes.
-  PassManager pm(&context, PassManager::Nesting::Implicit);
+  PassManager pm(&context, module.get()->getName().getStringRef(),
+                 PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
   applyDefaultTimingPassManagerCLOptions(pm);
 
@@ -269,7 +305,7 @@ int main(int argc, char **argv) {
 
   // Note that we emit the ABI last since any needed function-level
   // transformations (i.e. de-tupling, etc) should have been done.
-  pm.addNestedPass<FuncOp>(
+  pm.addNestedPass<func::FuncOp>(
       iree_integrations::MHLO::createEmitDefaultIREEABIPass());
 
   if (failed(pm.run(*module))) {

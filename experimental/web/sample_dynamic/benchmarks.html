@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+Copyright 2022 The IREE Authors
+
+Licensed under the Apache License v2.0 with LLVM Exceptions.
+See https://llvm.org/LICENSE.txt for license information.
+SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+-->
+
+<head>
+  <meta charset="utf-8" />
+  <title>IREE Dynamic Web Benchmarks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="./ghost.svg" type="image/svg+xml">
+
+  <style>
+    body {
+      padding: 16px;
+    }
+  </style>
+
+  <!-- https://getbootstrap.com/ for some webpage styling-->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+
+  <script src="./iree_api.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <h1>IREE Dynamic Web Benchmarks</h1>
+
+    <p>
+      <br><b>Note:</b> Some outputs are logged to the console.</p>
+    </p>
+
+    <!-- TODO: button to run startup benchmarks -->
+    <!-- TODO: button to run inference benchmarks -->
+    <!-- TODO: button to run all benchmarks -->
+    <!-- TODO: UI to set number of iterations -->
+
+  </div>
+
+  <script>
+
+    async function runProgramBenchmarks(programPath, functionName, inputs) {
+      // Program loading.
+      // The IREE runtime has already been initialized, so this:
+      //   * issues an XMLHttpRequest for the program data
+      //   * passes the program data in via the WebAssembly heap
+      //   * creates an IREE "runtime session" and loads the program into it
+      console.log("Running benchmarks for program '" + programPath +
+                  "' and function '" + functionName + "'");
+      const startLoadTime = performance.now();
+      const program = await ireeLoadProgram(programPath);
+      const totalLoadTime = performance.now() - startLoadTime;
+      console.log("  Application load time (including overheads): " +
+                  totalLoadTime.toFixed(3) + "ms");
+
+      // Function calling.
+      // The runtime is initialized and the program is loaded, so this:
+      //   * passes the inputs in as a string from JS to Wasm
+      //   * parses the inputs string into buffer data
+      //   * invokes the function
+      //   * formats the function outputs into a string and passes that to JS
+      const startCallTime = performance.now();
+      const iterations = 1;
+      const resultObject =
+          await ireeCallFunction(program, functionName, inputs, iterations);
+      const totalCallTime = performance.now() - startCallTime;
+      console.log("  Application call time (including overheads): " +
+                  totalCallTime.toFixed(3) + "ms");
+    }
+
+    async function runAllBenchmarks() {
+      await runProgramBenchmarks("deeplabv3_wasm.vmfb", "main", "1x257x257x3xf32");
+      await runProgramBenchmarks("mobile_ssd_v2_float_coco_wasm.vmfb", "main", "1x320x320x3xf32");
+      await runProgramBenchmarks("posenet_wasm.vmfb", "main", "1x353x257x3xf32");
+      await runProgramBenchmarks("mobilebertsquad_wasm.vmfb", "main", ["1x384xi32", "1x384xi32", "1x384xi32"]);
+      await runProgramBenchmarks("mobilenet_v2_1.0_224_wasm.vmfb", "main", "1x224x224x3xf32");
+      await runProgramBenchmarks("MobileNetV3SmallStaticBatch_wasm.vmfb", "main", "1x224x224x3xf32");
+    }
+
+    async function main() {
+      // General runtime initialization.
+      // The IREE API script has already been loaded, so this:
+      //   * initializes a Web Worker
+      //   * loads the IREE runtime worker script
+      //   * loads the IREE runtime JavaScript bundle (compiled via Emscripten)
+      //   * instantiates the IREE runtime WebAssembly module
+      //   * initializes the IREE runtime (runtime context, HAL devices, etc.)
+      //   * (if threading is enabled) creates worker thread Web Workers
+      const startInitTime = performance.now();
+      await ireeInitializeWorker();
+      const totalInitTime = performance.now() - startInitTime;
+      console.log("IREE runtime initialized after " + totalInitTime.toFixed(3) + "ms");
+
+      await runAllBenchmarks();
+    }
+
+    console.log("=== Running benchmarks ===");
+    main().then(() => { console.log("=== Finished running benchmarks ==="); })
+          .catch((error) => { console.error("Error: '" + error + "'"); });
+
+  </script>
+</body>
+
+</html>

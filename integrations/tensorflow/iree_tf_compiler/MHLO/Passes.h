@@ -7,6 +7,7 @@
 #ifndef IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_MHLO_PASSES_H_
 #define IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_MHLO_PASSES_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -27,10 +28,7 @@ void registerMHLOImportPassPipeline();
 // Annotates an appropriate iree.abi attribute on public functions that
 // operate exclusively on tensor types. This corresponds to the expectations
 // of MHLO and is suitable for such programs.
-std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass();
-
-// Flattens tuple values in function signatures and blocks.
-std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createEmitDefaultIREEABIPass();
 
 //===----------------------------------------------------------------------===//
 // Registration
@@ -40,7 +38,6 @@ inline void registerAllPasses() {
   registerMHLOImportPassPipeline();
 
   createEmitDefaultIREEABIPass();
-  createFlattenTuplesInCFGPass();
 }
 
 }  // namespace MHLO

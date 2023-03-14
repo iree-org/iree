@@ -25,15 +25,10 @@ def run_command(command: Sequence[str],
     # Dummy CompletedProess with successful returncode.
     return subprocess.CompletedProcess(command, returncode=0)
 
-  if capture_output:
-    # TODO(#4131) python>=3.7: Use capture_output=True.
-    run_kwargs["stdout"] = subprocess.PIPE
-    run_kwargs["stderr"] = subprocess.PIPE
-
-  # TODO(#4131) python>=3.7: Replace 'universal_newlines' with 'text'.
   completed_process = subprocess.run(command,
-                                     universal_newlines=text,
+                                     text=text,
                                      check=check,
+                                     capture_output=capture_output,
                                      **run_kwargs)
   return completed_process
 

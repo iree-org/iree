@@ -72,10 +72,12 @@ set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG_OR_GCC
     "-fvisibility=hidden"
+
     # NOTE: The RTTI setting must match what LLVM was compiled with (defaults
     # to RTTI disabled).
     "$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>"
     "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>"
+
   MSVC_OR_CLANG_CL
     # Exclude a bunch of rarely-used APIs, such as crypto/DDE/shell.
     # https://docs.microsoft.com/en-us/windows/win32/winprog/using-the-windows-headers
@@ -125,6 +127,12 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # but it's better to not get spurious failures during LTCG.
     # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
     "/bigobj"
+
+    # Use the modern C preprocessor to more closely match standards/clang/gcc behavior.
+    "/Zc:preprocessor"
+
+    # Enable C11 standards conforming mode.
+    "$<$<COMPILE_LANGUAGE:C>:/std:c11>"
 )
 
 # Compiler diagnostics.
@@ -143,7 +151,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # signal/noise ratio.
     "-Wno-ambiguous-member-template"
     "-Wno-char-subscripts"
-    "-Wno-deprecated-declarations"
     "-Wno-extern-c-compat" # Matches upstream. Cannot impact due to extern C inclusion method.
     "-Wno-gnu-alignof-expression"
     "-Wno-gnu-variable-sized-type-not-at-end"
@@ -182,6 +189,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wliteral-conversion"
     "-Wnon-virtual-dtor"
     "-Woverloaded-virtual"
+    "-Wpointer-arith"
     "-Wself-assign"
     "-Wstring-conversion"
     "-Wtautological-overlap-compare"
@@ -190,20 +198,20 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wunused-comparison"
     "-Wvla"
 
-  # Disable some warnings to get GCC to build. Until we have a CI for this, we
-  # just need it for releases and extra diagnostics (or Werror) only bring pain.
-  # TODO(#6959): Trim these down and add -Werror -Wall once we have a CI.
+    # Clang is lax by default on SIMD vector typing. GCC is strict by default.
+    "-fno-lax-vector-conversions"
+
+  # TODO(#6959): Enable -Werror once we have a presubmit CI.
   GCC
-    "-Wno-unused-but-set-parameter"
+    "-Wall"
+    "-Wno-address-of-packed-member"
     "-Wno-comment"
-    "-Wno-attributes"
-    "-Wno-strict-prototypes"
-    "-Wno-shadow-uncaptured-local"
-    "-Wno-gnu-zero-variadic-macro-arguments"
-    "-Wno-shadow-field-in-constructor"
-    "-Wno-unreachable-code-return"
-    "-Wno-missing-variable-declarations"
-    "-Wno-gnu-label-as-value"
+    "-Wno-format-zero-length"
+    # Technically UB but needed for intrusive ptrs
+    $<$<COMPILE_LANGUAGE:CXX>:-Wno-invalid-offsetof>
+    $<$<COMPILE_LANGUAGE:C>:-Wno-pointer-sign>
+    "-Wno-sign-compare"
+    "-Wno-unused-function"
 
   MSVC_OR_CLANG_CL
     # Default warning level (severe + significant + production quality).
@@ -268,13 +276,29 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 
 # Set some things back to warnings that are really annoying as build errors
 # during active development (but we still want as errors on CI).
-if (IREE_DEV_MODE)
+if(IREE_DEV_MODE)
   iree_select_compiler_opts(IREE_DEFAULT_COPTS
     CLANG_OR_GCC
       "-Wno-error=unused-parameter"
       "-Wno-error=unused-variable"
   )
 endif()
+
+# Debug information and __FILE__ macros get expanded with full paths by default.
+# This results in binaries that differ based on what directories they are built
+# from and that's annoying.
+#
+# For now in all configurations we make __FILE__ macros relative. We could also
+# make debug information relative using -fdebug-prefix-map but deterministic
+# builds are most interesting in release modes that have debug info stripped.
+get_filename_component(_IREE_ROOT_NAME ${IREE_ROOT_DIR} NAME)
+iree_select_compiler_opts(IREE_DEFAULT_COPTS
+  # TODO(benvanik): make this CLANG_OR_GCC once clang-9 is no longer supported.
+  CLANG_GTE_10
+    "-fmacro-prefix-map=${IREE_ROOT_DIR}=${_IREE_ROOT_NAME}"
+  GCC
+    "-fmacro-prefix-map=${IREE_ROOT_DIR}=${_IREE_ROOT_NAME}"
+)
 
 # On MSVC, CMake sets /GR by default (enabling RTTI), but we set /GR-
 # (disabling it) above. To avoid Command line warning D9025 which warns about
@@ -285,20 +309,35 @@ endif()
 # compatible solution.
 #
 # See also:
-#   https://github.com/google/iree/issues/4665.
+#   https://github.com/openxla/iree/issues/4665.
 #   https://discourse.cmake.org/t/how-to-fix-build-warning-d9025-overriding-gr-with-gr/878
 #   https://gitlab.kitware.com/cmake/cmake/-/issues/20610
 if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
-if(NOT ANDROID AND ${IREE_ENABLE_THREADING})
+if(NOT ANDROID AND IREE_ENABLE_THREADING)
   iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
     CLANG_OR_GCC
       "-lpthread"
   )
 else()
   # Android provides its own pthreads support with no linking required.
+endif()
+
+# Emscripten needs -pthread specified in link _and_ compile options when using
+# atomics, shared memory, or pthreads. If we bring our own threading impl and
+# try to omit this, we get this error:
+#   `--shared-memory is disallowed because it was not compiled with 'atomics'
+#    or 'bulk-memory' features`
+# TODO(scotttodd): Figure out how to use atomics and/or shared memory without
+#                  Specifying this flag
+# https://emscripten.org/docs/porting/pthreads.html#compiling-with-pthreads-enabled
+if(EMSCRIPTEN AND IREE_ENABLE_THREADING)
+  iree_select_compiler_opts(IREE_DEFAULT_COPTS
+    ALL
+      "-pthread"
+  )
 endif()
 
 if(ANDROID)
@@ -316,40 +355,32 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
-    "-natvis:${CMAKE_SOURCE_DIR}/iree/iree.natvis"
+    "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
-# Add to LINKOPTS on a binary to configure it for X/Wayland/Windows/etc
-# depending on the target cross-compilation platform.
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-  set(IREE_TARGET_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
-else()
-  set(IREE_TARGET_GUI_LINKOPTS "")
+# Our Emscripten library code uses dynCall, which needs these link flags.
+# TODO(scotttodd): Find a way to refactor this, this is nasty to always set :(
+if(EMSCRIPTEN)
+  iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
+    ALL
+      "-sDYNCALLS=1"
+      "-sEXPORTED_RUNTIME_METHODS=['dynCall']"
+  )
 endif()
 
 #-------------------------------------------------------------------------------
 # Size-optimized build flags
 #-------------------------------------------------------------------------------
 
-  # TODO(#898): add a dedicated size-constrained configuration.
-if(${IREE_SIZE_OPTIMIZED})
+# TODO(#898): add a dedicated size-constrained configuration.
+if(IREE_SIZE_OPTIMIZED)
   iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
-    CLANG_OR_GCC
-      "-DIREE_STATUS_MODE=0"
-      "-DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
-      "-DIREE_VM_EXT_I64_ENABLE=0"
-      "-DIREE_VM_EXT_F32_ENABLE=0"
     MSVC_OR_CLANG_CL
       "/GS-"
       "/GL"
       "/Gw"
       "/Gy"
       "/DNDEBUG"
-      "/DIREE_STATUS_MODE=0"
-      "/DIREE_FLAGS_ENABLE_CLI=0"
-      "/DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
-      "/DIREE_VM_EXT_I64_ENABLE=0"
-      "/DIREE_VM_EXT_F32_ENABLE=0"
       "/Os"
       "/Oy"
       "/Zi"
@@ -362,12 +393,23 @@ if(${IREE_SIZE_OPTIMIZED})
       "-opt:ref,icf"
   )
   # TODO(#898): make this only impact the runtime (IREE_RUNTIME_DEFAULT_...).
+  # These flags come from iree/base/config.h:
   set(IREE_DEFAULT_COPTS
       "${IREE_DEFAULT_COPTS}"
-      "${IREE_SIZE_OPTIMIZED_DEFAULT_COPTS}")
+      "${IREE_SIZE_OPTIMIZED_DEFAULT_COPTS}"
+      "-DIREE_STATUS_MODE=0"
+      "-DIREE_STATISTICS_ENABLE=0"
+      "-DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
+      "-DIREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=0"
+      "-DIREE_VM_BACKTRACE_ENABLE=0"
+      "-DIREE_VM_BYTECODE_VERIFICATION_ENABLE=0"
+      "-DIREE_VM_EXT_F32_ENABLE=0"
+      "-DIREE_VM_EXT_F64_ENABLE=0"
+  )
   set(IREE_DEFAULT_LINKOPTS
       "${IREE_DEFAULT_LINKOPTS}"
-      "${IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS}")
+      "${IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS}"
+  )
 endif()
 
 #-------------------------------------------------------------------------------
@@ -386,21 +428,27 @@ endif()
 # Compiler: MSVC
 #-------------------------------------------------------------------------------
 
-# TODO(benvanik): MSVC options.
+if(MSVC)
+  if("${CMAKE_C_COMPILER_LAUNCHER}" MATCHES "ccache" OR
+     "${CMAKE_CXX_COMPILER_LAUNCHER}" MATCHES "ccache")
+    # Disable separate PDB file generation (for debug info) when using ccache.
+    # ccache silently falls back to the real compiler when an unsupported flag
+    # like /Zi is encountered.
+    message(STATUS "Replacing /Zi with /Z7 since ccache is in use and does not support /Zi")
+    # https://learn.microsoft.com/en-us/cpp/build/reference/z7-zi-zi-debug-information-format
+    string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+  endif()
+endif()
 
 #-------------------------------------------------------------------------------
 # Third party: llvm-project
 #-------------------------------------------------------------------------------
 
-set(MLIR_TABLEGEN_EXE mlir-tblgen)
-# iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
-# tools in LLVM.
-iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
-
-#-------------------------------------------------------------------------------
-# Third party: mlir-emitc
-#-------------------------------------------------------------------------------
-
-if(IREE_ENABLE_EMITC)
-  add_definitions(-DIREE_HAVE_EMITC_DIALECT)
+if(IREE_BUILD_COMPILER)
+  # iree-tblgen is not defined using the add_tablegen mechanism as other
+  # TableGen tools in LLVM.
+  set(IREE_TABLEGEN_EXE "$<TARGET_FILE:iree-tblgen>")
 endif()

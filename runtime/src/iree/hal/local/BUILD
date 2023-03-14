@@ -1,0 +1,115 @@
+# Copyright 2020 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Default implementations for HAL types that use the host resources.
+# These are generally just wrappers around host heap memory and host threads.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "executable_environment",
+    srcs = ["executable_environment.c"],
+    hdrs = ["executable_environment.h"],
+    deps = [
+        ":executable_library",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "executable_library",
+    hdrs = ["executable_library.h"],
+)
+
+cc_binary_benchmark(
+    name = "executable_library_benchmark",
+    srcs = ["executable_library_benchmark.c"],
+    deps = [
+        ":executable_environment",
+        ":executable_library",
+        ":local",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local/loaders/registration",
+        "//runtime/src/iree/testing:benchmark",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "executable_library_test",
+    srcs = [
+        "executable_library_demo.c",
+        "executable_library_demo.h",
+        "executable_library_test.c",
+    ],
+    deps = [
+        ":executable_environment",
+        ":executable_library",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/internal:cpu",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "executable_loader",
+    srcs = [
+        "executable_loader.c",
+        "local_executable.c",
+    ],
+    hdrs = [
+        "executable_loader.h",
+        "local_executable.h",
+    ],
+    deps = [
+        ":executable_environment",
+        ":executable_library",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "local",
+    srcs = [
+        "inline_command_buffer.c",
+        "local_executable_cache.c",
+        "local_pipeline_layout.c",
+    ],
+    hdrs = [
+        "executable_loader.h",
+        "inline_command_buffer.h",
+        "local_executable.h",
+        "local_executable_cache.h",
+        "local_pipeline_layout.h",
+    ],
+    deps = [
+        ":executable_environment",
+        ":executable_library",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/base/internal:fpu_state",
+        "//runtime/src/iree/hal",
+    ],
+)

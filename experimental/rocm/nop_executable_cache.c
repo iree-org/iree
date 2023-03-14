@@ -18,7 +18,7 @@ typedef struct iree_hal_rocm_nop_executable_cache_t {
   iree_hal_rocm_context_wrapper_t* context;
 } iree_hal_rocm_nop_executable_cache_t;
 
-extern const iree_hal_executable_cache_vtable_t
+static const iree_hal_executable_cache_vtable_t
     iree_hal_rocm_nop_executable_cache_vtable;
 
 static iree_hal_rocm_nop_executable_cache_t*
@@ -72,15 +72,15 @@ static bool iree_hal_rocm_nop_executable_cache_can_prepare_format(
 
 static iree_status_t iree_hal_rocm_nop_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* base_executable_cache,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   iree_hal_rocm_nop_executable_cache_t* executable_cache =
       iree_hal_rocm_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_rocm_native_executable_create(
-      executable_cache->context, executable_spec, out_executable);
+      executable_cache->context, executable_params, out_executable);
 }
 
-const iree_hal_executable_cache_vtable_t
+static const iree_hal_executable_cache_vtable_t
     iree_hal_rocm_nop_executable_cache_vtable = {
         .destroy = iree_hal_rocm_nop_executable_cache_destroy,
         .can_prepare_format =

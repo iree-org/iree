@@ -13,38 +13,43 @@
 # ./build-host/install. Emscripten binaries (e.g. .wasm and .js files) will be
 # built in ./build-emscripten/.
 
-set -x
-set -e
+set -xeuo pipefail
 
 if ! command -v emcmake &> /dev/null
 then
     echo "'emcmake' not found, setup environment according to https://emscripten.org/docs/getting_started/downloads.html"
-    exit
+    exit 1
 fi
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-"${CMAKE_BIN?}" --version
-ninja --version
+BUILD_DIR="build-emscripten"
+IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
-cd ${ROOT_DIR?}
+source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_ccache.sh
 
-if [ -d "build-emscripten" ]
-then
-  echo "build-emscripten directory already exists. Will use cached results there."
-else
-  echo "build-emscripten directory does not already exist. Creating a new one."
-  mkdir build-emscripten
-fi
-cd build-emscripten
+cd "${BUILD_DIR}"
 
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
-  -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
-  -DIREE_HAL_DRIVERS_TO_BUILD=VMVX\;DyLib \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DIREE_HOST_BIN_DIR="${IREE_HOST_BIN_DIR}" \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_TESTS=OFF \
+  -DIREE_HAL_DRIVER_DEFAULTS=OFF \
+  -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
+  -DIREE_HAL_DRIVER_LOCAL_TASK=ON \
+  -DIREE_ENABLE_CPUINFO=OFF \
+  -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=ON
 
-# TODO(scotttodd): expand this list of targets
-"${CMAKE_BIN?}" --build . --target iree_samples_simple_embedding_simple_embedding_vmvx_sync
+echo "Building default targets"
+echo "------------------------"
+"${CMAKE_BIN?}" --build . -- -k 0
+
+echo "Building test deps"
+echo "------------------"
+"${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0
+
+if (( IREE_USE_CCACHE == 1 )); then
+  ccache --show-stats
+fi

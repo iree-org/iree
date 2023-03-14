@@ -1,2 +1,3 @@
-add_subdirectory(IREE)
-add_subdirectory(IREEPyDM)
+add_subdirectory(Input)
+add_subdirectory(LinalgExt)
+add_subdirectory(LinalgTransform)

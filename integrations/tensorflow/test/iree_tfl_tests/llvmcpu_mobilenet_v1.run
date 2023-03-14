@@ -1,0 +1,2 @@
+# REQUIRES: llvmcpu
+# RUN: %PYTHON -m iree_tfl_tests.mobilenet_v1_test --target_backend=llvmcpu --artifacts_dir=%t

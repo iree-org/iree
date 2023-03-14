@@ -1,0 +1,6 @@
+A snapshot of the public C API header located here:
+https://github.com/baldurk/renderdoc/blob/v1.22/renderdoc/api/app/renderdoc_app.h
+
+This declaration-only header is required to query the dynamically injected
+RenderDoc API at runtime. See the documentation for more information:
+https://renderdoc.org/docs/in_application_api.html
