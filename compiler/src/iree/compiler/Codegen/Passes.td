@@ -653,6 +653,12 @@ def SPIRVEmulateI64 :
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
 }
 
+def SPIRVEraseStorageBufferStaticShape :
+    Pass<"iree-spirv-erase-storage-buffer-static-shape", "func::FuncOp"> {
+  let summary = "Turn static shaped storage buffer subspan ops into dynamic shaped ones";
+  let constructor = "mlir::iree_compiler::createSPIRVEraseStorageBufferStaticShapePass()";
+}
+
 def SPIRVMapMemRefStorageClass :
     Pass<"iree-spirv-map-memref-storage-class", "func::FuncOp"> {
   let summary = "Map MemRef memory spaces to SPIR-V storage classes";
