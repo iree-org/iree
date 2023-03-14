@@ -100,8 +100,8 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
-          rewriter, target, workgroupSize, threadIdGenerator, true, transformOp,
-          threadMappingAttributes);
+          rewriter, transformOp, target, workgroupSize, true,
+          threadMappingAttributes, threadIdGenerator);
 
   if (diag.succeeded()) {
     auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
@@ -136,8 +136,8 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
                                      workgroupSize[1], workgroupSize[2]};
     diag = mlir::transform::gpu::mapNestedForallToThreadsImpl(
-        rewriter, target, numWarps, warpIdGenerator, true, transformOp,
-        warpMappingAttributes);
+        rewriter, transformOp, target, numWarps, true, warpMappingAttributes,
+        warpIdGenerator);
   }
 
   auto walkResult = target->walk([&warpMappingAttributes](
@@ -788,8 +788,8 @@ transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
   IRRewriter rewriter(getContext());
   int64_t depth(getDepth());
   FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
-      forOp, PipeliningSchedulingStrategy::loadGlobalStage0, false, depth,
-      rewriter);
+      rewriter, forOp, PipeliningSchedulingStrategy::loadGlobalStage0, false,
+      depth);
   if (failed(pipelinedFor)) return emitDefaultSilenceableFailure(forOp);
   results.push_back(pipelinedFor.value());
   return DiagnosedSilenceableFailure::success();

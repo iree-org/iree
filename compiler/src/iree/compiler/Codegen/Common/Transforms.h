@@ -34,13 +34,14 @@ struct IREETileAndFuseResult {
   SmallVector<Operation *> tiledAndFusedOps;
   SmallVector<scf::ForOp> loops;
 };
+
 FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
-    TilingInterface op, linalg::LinalgTilingOptions tilingOptions,
-    RewriterBase &rewriter);
+    RewriterBase &rewriter, TilingInterface op,
+    linalg::LinalgTilingOptions tilingOptions);
 
 FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
-    scf::ForOp forOp, PipeliningSchedulingStrategy startegy, bool peelEpilogue,
-    int64_t depth, RewriterBase &rewriter);
+    RewriterBase &rewriter, scf::ForOp forOp,
+    PipeliningSchedulingStrategy startegy, bool peelEpilogue, int64_t depth);
 
 /// Populate patterns related to clean up the IR after tile and distribute to
 /// workgroups.
