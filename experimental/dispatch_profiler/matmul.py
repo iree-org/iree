@@ -8,29 +8,27 @@ import subprocess
 from library import *
 from dispatch import *
 
-###############################################################################
-# Data structure to describe a matrix multiplication operation including the
-# shape, datatype, and layout of the operands and the result. This data structure
-# is *independent* of the compilation strategy and tiling parameters, and only
-# describes the parameter that changes the functionality of matmul operation.
-###############################################################################
+
+################################################################################
 class MatmulOperation:
-  """Data structure to describe a matrix multiplication operation including the
-     shape, datatype, and layout of the operands and the result. This data 
-     structure is *independent* of the compilation strategy and tiling parameters, 
-     and only describes the parameter that changes the functionality of matmul 
+  """Data structure to describe a matrix multiplication operation. 
+     This includes the shape, datatype, and layout of the operands. This data 
+     structure is *independent* of the compilation passes and tiling configuration. 
+     It strictly contains the parameter that changes the functionality of matmul 
      operation.
   """
+
   def __init__(self, problem_shape, lhs, rhs, result):
-    # Initializes a matrix multiplication operation with the specified shape.
-    # problem_shape: A tuple representing the matrix multiplication problem shape
-    #                in the format (M, N, K), where M is the number of rows in the
-    #                lhs matrix, N is the number of columns in the rhs matrix, and
-    #                K is the number of columns in the lhs matrix and rows in the
-    #                rhs matrix.
-    # lhs: A TensorDescription object representing the left-hand-side matrix operand.
-    # rhs: A TensorDescription object representing the right-hand-side matrix operand.
-    # result: A TensorDescription object representing the result matrix operand.
+    """Initializes a matrix multiplication operation.
+    Matrix-multiple operation: `result[M, N] = lhs[M, K] * rhs[K, N]`
+    problem_shape: A tuple representing the matrix multiplication problem shape
+      in the format (M, N, K), where M is the number of rows in the lhs matrix, 
+      N is the number of columns in the rhs matrix, and K is the number of columns 
+      in the lhs matrix and rows in the rhs matrix.
+    lhs: A TensorDescription object representing the left-hand-side matrix operand.
+    rhs: A TensorDescription object representing the right-hand-side matrix operand.
+    result: A TensorDescription object representing the result matrix operand.
+    """
     self.problem_shape = problem_shape  # Matmul problem shape [M, N, K]
     self.M = problem_shape[0]
     self.N = problem_shape[1]
@@ -41,10 +39,18 @@ class MatmulOperation:
     self.result = result  # TensorDescription
     self.operation_kind = OperationKind.Matmul
 
-  # Procedurally generated name for the matmul operation. The name uniquely
-  # identifies a matmul operation with matmul shape, lhs dataype and layout,
-  # rhs datatype and layout, and result datatype and layout.
+  def __eq__(self, other):
+    return self.problem_shape == other.problem_shape and \
+           self.lhs == other.lhs and \
+           self.rhs == other.rhs and \
+           self.result == other.result
+
   def name(self):
+    """Procedurally generated name for the matmul operation.
+    The name uniquely identifies a matmul operation with matmul shape, 
+    lhs dataype and layout, rhs datatype and layout, and result
+    datatype and layout.
+    """
     return "matmul_{m}x{n}x{k}_"\
       "{typeLhs}{layoutLhs}_"\
       "{typeRhs}{layoutRhs}_"\
@@ -60,45 +66,45 @@ class MatmulOperation:
       layoutResult=ShortLayoutTypeName[self.result.layout]
     )
 
-  # Returns the shape of the lhs numpy array as a string in the format "MxKxDataType".
   def lhs_npy_shape(self):
+    """Returns the shape of the lhs numpy array as a string in the format "MxKxDataType"."""
     return f"{self.M}x{self.K}x{DataTypeName[self.lhs.datatype]}"
 
-
-  # Returns the shape of the rhs numpy array as a string in the format "KxNxDataType".
   def rhs_npy_shape(self):
+    """Returns the shape of the rhs numpy array as a string in the format "KxNxDataType"."""
     return f"{self.K}x{self.N}x{DataTypeName[self.rhs.datatype]}"
 
-  # Returns the shape of the result numpy array as a string in the format "MxNxDataType".
   def result_npy_shape(self):
+    """Returns the shape of the result numpy array as a string in the format "MxNxDataType"."""
     return f"{self.M}x{self.N}x{DataTypeName[self.result.datatype]}"
 
-  # Returns the number of bytes read/written by the matmul operation.
   def bytes(self):
+    """Returns the number of bytes read/written by the matmul operation."""
     bytes = (DataTypeSizeInBits[self.lhs.datatype] * self.M // 8) * self.K + \
             (DataTypeSizeInBits[self.rhs.datatype] * self.K // 8) * self.N + \
             (DataTypeSizeInBits[self.result.datatype] * self.M // 8) * self.N
     return bytes
 
-  # Returns the number of floating point operations performed by the matmul operation.
   def flops(self):
+    """Returns the number of floating point operations performed by the matmul operation."""
     return 2 * self.M * self.N * self.K
 
 
-###############################################################################
-# Data structure to *only* describe the compilation strategy and the tiling
-# parameters for a matrix multiplication operation that influences the
-# performance of the compiledmatmul operation. This data structure should be
-# independent of the matmul operation functionality, or any change in this data
-# structure should not affect the functionality of the matmul operation.
-###############################################################################
 class MatmulCompilationInfo:
-  #
+  """Data structure strictly describes the compilation passes and the tiling configurations. 
+  For a matrix multiplication operation, compilation passes and tiling configuration 
+  influences the performance of the compiled matmul operation, but the functionality. 
+  This data structure should be independent of the matmul operation functionality. 
+  
+  Any change in this data structure should not affect the functionality of the matmul operation, i.e., 
+  we should be able to use the same reference results for a matrix operation compiled with different 
+  compilation info.
+  """
+
   def __init__(self, tile_description, translation_info):
     self.tile_description = tile_description  # TileDescription
     self.translation_info = translation_info  # TranslationInfo
 
-  #
   def name(self):
     return "tile_config_{tbm}x{tbn}_{tbk}x{stages}_{translation_info}".format(
         tbm=self.tile_description.threadblock_shape[0],
@@ -108,10 +114,9 @@ class MatmulCompilationInfo:
         translation_info=TranslationInfoName[self.translation_info])
 
 
-###############################################################################
-# Emitters for the matmul compilation info.
-###############################################################################
+################################################################################
 class EmitMatmulCompilationInfo:
+  """Emitters for the matmul compilation info."""
 
   def __init__(self):
     self.compilation_info_template = """
@@ -123,7 +128,6 @@ class EmitMatmulCompilationInfo:
 >
 """
 
-  #
   def emit(self, compilation_info):
     values = {
         'compilation_info_name':
@@ -150,10 +154,10 @@ class EmitMatmulCompilationInfo:
 
 
 ###############################################################################
-# MLIR Emitter for the matmul operation.
+#############       MLIR Emitter for the matmul operation.     ###############
 ###############################################################################
-# Emiter `linalg.matmul` dispatch.
 class EmitLinalgMatmulDispatch:
+  """Emitters for the `linalg.matmul` dispatch."""
 
   def __init__(self):
     self.mlir_dialect = MlirDialect.Linalg
@@ -174,18 +178,26 @@ func.func @${operation_name}_${compilation_trait}(
 }
 """
 
-  # Emit the matmul operation in the MLIR dialect for a single compilation info.
   def emit(self, matmul_dispatch):
+    """Emit the matmul operation in the MLIR dialect for a single compilation info"""
     matmul_operation = matmul_dispatch.operation.name()
     values = {
-        'operation_name': matmul_dispatch.operation.name(),
-        'problem_m': str(matmul_dispatch.operation.problem_shape[0]),
-        'problem_n': str(matmul_dispatch.operation.problem_shape[1]),
-        'problem_k': str(matmul_dispatch.operation.problem_shape[2]),
-        'datatype_lhs': DataTypeName[matmul_dispatch.operation.lhs.datatype],
-        'datatype_rhs': DataTypeName[matmul_dispatch.operation.rhs.datatype],
-        'datatype_result': DataTypeName[matmul_dispatch.operation.result.datatype],
-        'compilation_trait': matmul_dispatch.configuration.name()
+        'operation_name':
+            matmul_dispatch.operation.name(),
+        'problem_m':
+            str(matmul_dispatch.operation.problem_shape[0]),
+        'problem_n':
+            str(matmul_dispatch.operation.problem_shape[1]),
+        'problem_k':
+            str(matmul_dispatch.operation.problem_shape[2]),
+        'datatype_lhs':
+            DataTypeName[matmul_dispatch.operation.lhs.datatype],
+        'datatype_rhs':
+            DataTypeName[matmul_dispatch.operation.rhs.datatype],
+        'datatype_result':
+            DataTypeName[matmul_dispatch.operation.result.datatype],
+        'compilation_trait':
+            matmul_dispatch.configuration.name()
     }
 
     return SubstituteTemplate(self.linalg_row_row_matmul_template, values)
@@ -204,12 +216,8 @@ class EmitMhloMatmulOperation:
 
 
 ###############################################################################
-# Emitters for the matmul operation MLIR source files with different tuning
-# configurations. The matmul operation MLIR is currently generated as
-# `linalg.matmul` using, EmitLinalgMatmulOperation but can be trivially
-# extended to other dialects.
-###############################################################################
 class EmitMatmulSourceMlir:
+  """Emitters for the matmul operation MLIR source files."""
 
   def __init__(self, operation_path, dispatch_collection):
     self.operation_path = operation_path
@@ -231,9 +239,10 @@ class EmitMatmulSourceMlir:
     return self
 
   def emit(self):
-    # emit the matmul func.func for each dispatch (operation + configuration) 
+    """Emit the matmul func.func for each dispatch (operation + configuration)"""
     for dispatch in self.dispatch_collection.get_dispatches():
-      print("    Emitting matmul tuning parameters: " + dispatch.configuration.name())
+      print("    Emitting matmul tuning parameters: " +
+            dispatch.configuration.name())
       self.operation_file.write(EmitLinalgMatmulDispatch().emit(dispatch))
 
   def __exit__(self, exc_type, exc_value, traceback):
@@ -241,16 +250,16 @@ class EmitMatmulSourceMlir:
 
 
 ###############################################################################
-# Reference implementation for the matmul operation in numpy.
-###############################################################################
 class ReferenceMatmulOperation:
-  """ReferenceMatmulOperation class has the following responsibilities:
+  """Reference implementation for the matmul operation in numpy.
+      ReferenceMatmulOperation class has the following responsibilities:
        1) Generates matmul operation inputs as np.array for a desired 
           distribution.
        2) Runs the matmul reference operation in np.matmul.
        3) Generates the matmul operation expected output as np.array.
        4) Additional, generate input and output filename strings.
   """
+
   def __init__(self, matmul_operation, dist_lhs, dist_rhs):
     self.matmul_operation = matmul_operation
     # Problem shape.
@@ -312,13 +321,14 @@ class ReferenceMatmulOperation:
 
 
 ###############################################################################
-# MatmulOperationLauncher class has the following responsibilities:
-# 1) Launches compilation of the matmul for a verification or profiling runs.
-# 2) Launches the verification by running the IREE compiled matmul operation
-#    and the python nmpy.matmul.
-# 3) Launches the profiling by running the IREE compiled matmul operation.
-###############################################################################
 class MatmulOperationLauncher:
+  """Launches the compilation and execution of the matmul operation.
+  MatmulOperationLauncher class has the following responsibilities:
+    1) Launches compilation of the matmul for a verification or profiling runs.
+    2) Launches the verification by running the IREE compiled matmul operation
+       and the python nmpy.matmul.
+    3) Launches the profiling by running the IREE compiled matmul operation.
+  """
 
   def __init__(self, args, operation):
     self.operation = operation
@@ -339,17 +349,18 @@ class MatmulOperationLauncher:
                                          operation.name() + '.mlir')
 
     # path to iree-compile tool. (for compiling the input mlir file to vmfb)
-    self.iree_compile_path = os.path.join(args.build_dir, 'tools/iree-compile')
+    self.iree_compile_path = os.path.join(args.build_dir, 'tools',
+                                          'iree-compile')
     self.force_compile = False if args.force_compile in ['False', 'false', '0'
                                                         ] else True
 
     # path to iree-benchmark-module tool. (for performance benchmarking and profiling)
-    self.iree_benchmark_module_path = os.path.join(
-        args.build_dir, 'tools/iree-benchmark-module')
+    self.iree_benchmark_module_path = os.path.join(args.build_dir, 'tools',
+                                                   'iree-benchmark-module')
 
     # path to iree-run-module tool. (for verification)
-    self.iree_run_module_path = os.path.join(args.build_dir,
-                                             'tools/iree-run-module')
+    self.iree_run_module_path = os.path.join(args.build_dir, 'tools',
+                                             'iree-run-module')
 
     # output vmfb files for the operation.
     self.vmfb_verify_file = os.path.join(self.operation_path,
@@ -358,27 +369,26 @@ class MatmulOperationLauncher:
         self.operation_path,
         self.operation.name() + '_benchmark.vmfb')
 
-  # Compile the matmul operation to a vmfb file for benchmarking.
   def compile(self, compilation_mode):
+    """Compiles the matmul operation to a vmfb file for profiling."""
 
-    cmd_template = \
-    "${iree_compile_path} ${source_mlir_file} --iree-hal-target-backends=${device} "\
-    "--iree-hal-cuda-llvm-target-arch=sm_80 --iree-hal-benchmark-dispatch-repeat-count=${benchmark-dispatch-repeat-count} "\
-    "--iree-codegen-llvmgpu-use-mma-sync=true -o ${vmfb_file}"
+    benchmark_dispatch_repeat_count = self.benchmark_dispatch_repeat_count if compilation_mode == CompilationMode.Profile else 1
+    vmfb_file = self.vmfb_benchmark_file if compilation_mode == CompilationMode.Profile else self.vmfb_verify_file
 
-    benchmark_dispatch_repeat_count = self.benchmark_dispatch_repeat_count if compilation_mode == CompilationMode.Benchmark else 1
-    vmfb_file = self.vmfb_benchmark_file if compilation_mode == CompilationMode.Benchmark else self.vmfb_verify_file
-
-    values = {
-        'iree_compile_path': self.iree_compile_path,
-        'source_mlir_file': self.source_mlir_file,
-        'device': self.device,
-        'benchmark-dispatch-repeat-count': str(benchmark_dispatch_repeat_count),
-        'vmfb_file': vmfb_file
-    }
+    cmd = \
+    "{iree_compile_path} {source_mlir_file} "\
+    "--iree-hal-target-backends={device} "\
+    "--iree-hal-cuda-llvm-target-arch=sm_80 "\
+    "--iree-hal-benchmark-dispatch-repeat-count={benchmark_dispatch_repeat_count} "\
+    "-o {vmfb_file}".format(
+        iree_compile_path=self.iree_compile_path,
+        source_mlir_file=self.source_mlir_file,
+        device=self.device,
+        benchmark_dispatch_repeat_count=benchmark_dispatch_repeat_count,
+        vmfb_file=vmfb_file
+    )
 
     if not os.path.exists(vmfb_file) or self.force_compile:
-      cmd = SubstituteTemplate(cmd_template, values)
       print(">> Compilation command for " +
             CompilationModeNames[compilation_mode] + " : " + cmd)
       subprocess.getoutput(cmd)
@@ -388,19 +398,10 @@ class MatmulOperationLauncher:
         print("Skipping compilation of matmul operation: " + vmfb_file +
               " since it already exists.")
 
-  # Verify a matmul operation with a given configuration.
   def verify(self, configuration):
+    """Verifies the matmul operation with a given configuration."""
     # First compile the operation to a vmfb file.
     self.compile(CompilationMode.Verify)
-
-    # Template for the verification command using iree-run-module as the verification tool.
-    cmd_templete = \
-    "${iree_run_module_path} --module=${vmfb_file} --device=${device} --function=${function_name} "\
-    "--input=@${lhs_npy_file} --input=@${rhs_npy_file} "\
-    "--expected_output=@${expected_result_npy_file}"
-
-    # Function name operation + configuration.
-    function_name = self.operation.name() + "_" + configuration.name()
 
     # Verify using random data distribution.
     # TODO 1) make input distribution configurable through command line.
@@ -418,17 +419,21 @@ class MatmulOperationLauncher:
     # Run the reference implementation and generate npy files
     reference_op.run_and_save(self.operation_path)
 
-    values = {
-        'iree_run_module_path': self.iree_run_module_path,
-        'vmfb_file': self.vmfb_verify_file,
-        'device': self.device,
-        'function_name': function_name,
-        'lhs_npy_file': lhs_npy_file,
-        'rhs_npy_file': rhs_npy_file,
-        'expected_result_npy_file': expected_result_npy_file
-    }
-    # Create the verification command.
-    cmd = SubstituteTemplate(cmd_templete, values)
+    # Command-line for using iree-run-module as the verification tool.
+    cmd = \
+    "{iree_run_module_path} --module={vmfb_file} --device={device} --function={function_name} "\
+    "--input=@{lhs_npy_file} --input=@{rhs_npy_file} "\
+    "--expected_output=@{expected_result_npy_file}".format(
+        iree_run_module_path = self.iree_run_module_path,
+        vmfb_file = self.vmfb_verify_file,
+        device = self.device,
+        function_name = self.operation.name() + "_" + configuration.name(),
+        lhs_npy_file = os.path.join(self.operation_path, reference_op.filename_lhs),
+        rhs_npy_file = os.path.join(self.operation_path, reference_op.filename_rhs),
+        expected_result_npy_file = os.path.join(self.operation_path, reference_op.reference_filename_result)
+    )
+
+    # Print the command if verbose.
     if self.verbose:
       print(">> Verification command: " + cmd)
 
@@ -448,39 +453,34 @@ class MatmulOperationLauncher:
 
     return verification_result
 
-  # Profile a matmul operation given a tuning configuration.
   def profile(self, configuration):
+    """Profiles the matmul operation with a given configuration."""
     # First compile the operation to a vmfb file.
-    self.compile(CompilationMode.Benchmark)
+    self.compile(CompilationMode.Profile)
 
-    # Template for the benchmarking command using iree-benchmark-module as the benchmarking tool.
-    cmd_templete = \
-    "${iree_benchmark_module_path} --module=${vmfb_file} --device=${device} "\
-    "--benchmark_repetitions=${benchmark_repetitions} --batch_size=${batch_size} --function=${function_name} "\
-    "--input=${lhs_npy_shape} --input=${rhs_npy_shape}"
+    # Command-line for using iree-benchmark-module as the profiling tool.
+    cmd = \
+      "{iree_benchmark_module_path} --module={vmfb_file} --device={device} "\
+      "--benchmark_repetitions={benchmark_repetitions} --batch_size={batch_size} --function={function_name} "\
+      "--input={lhs_npy_shape} --input={rhs_npy_shape}".format(
+        iree_benchmark_module_path = self.iree_benchmark_module_path,
+        vmfb_file = self.vmfb_benchmark_file,
+        device = self.device,
+        benchmark_repetitions = self.benchmark_repetitions,
+        batch_size = self.batch_size,
+        function_name = self.operation.name() + "_" + configuration.name(),
+        lhs_npy_shape = self.operation.lhs_npy_shape(),
+        rhs_npy_shape = self.operation.rhs_npy_shape()
+      )
 
-    # Benchmark function name operation + configuration.
-    function_name = self.operation.name() + "_" + configuration.name()
-
-    # Benchmark using random npy array data distribution.
-    lhs_npy_shape = self.operation.lhs_npy_shape()
-    rhs_npy_shape = self.operation.rhs_npy_shape()
-
-    values = {
-        'iree_benchmark_module_path': self.iree_benchmark_module_path,
-        'vmfb_file': self.vmfb_benchmark_file,
-        'device': self.device,
-        'benchmark_repetitions': str(self.benchmark_repetitions),
-        'batch_size': str(self.batch_size),
-        'function_name': function_name,
-        'lhs_npy_shape': lhs_npy_shape,
-        'rhs_npy_shape': rhs_npy_shape
-    }
-
-    cmd = SubstituteTemplate(cmd_templete, values)
+    # Print the command if verbose.
     if self.verbose:
       print(">> Profiling command: " + cmd)
+
+    # Launch profiling.
     cmd_output = subprocess.getoutput(cmd)
+
+    # Parse the profiling output.
     m = re.search(r"real_time_median\s+(?P<runtime>\d+.\d+)\s+ms", cmd_output)
     if m is None:
       raise Exception("Failed to parse runtime from benchmark result: " +
@@ -495,9 +495,9 @@ class MatmulOperationLauncher:
 # and the data type.
 ###############################################################################
 
-# Matmul sizes and tuning configs for GPU TensorCore F16 data type.
-def gpu_matmul_tensor_cores_f16(manifest):
 
+def gpu_matmul_tensor_cores_f16(manifest):
+  """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
   # Matmul tuning configurations for LLVM GPU TensorCore(F16)
   tile_descriptions = [
 
@@ -515,6 +515,7 @@ def gpu_matmul_tensor_cores_f16(manifest):
 
   # compilation info configuration list.
   configuration_list = []
+  #translation_info = TranslationInfo.LLVMGPUMatmulTensorCore
   translation_info = TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync
   for tile_description in tile_descriptions:
     configuration_list.append(
@@ -523,10 +524,10 @@ def gpu_matmul_tensor_cores_f16(manifest):
   # Matmul problems.
   problem_shapes = [
       #[128, 128, 256],
-      [256, 256, 256],
+      #[256, 256, 256],
       #[2560, 2560, 2560],
       [1024, 512, 2048],
-      #[3456, 1024, 2048]
+      [3456, 1024, 2048]
   ]
 
   for problem_shape in problem_shapes:
@@ -540,20 +541,22 @@ def gpu_matmul_tensor_cores_f16(manifest):
       operation, configuration_list))
 
 
-# Matmul sizes and tuning configs for GPU TensorCore F16 data type.
+################################################################################
 def gpu_matmul_tensor_cores_f32(mainfest):
-
+  """Appends a list of matmul dispatches for GPU TensorCore F32 data type."""
   # Matmul tuning configurations for LLVM GPU TensorCore(F32)
   tile_descriptions = [
       TileDescription([128, 256, 16], 3, [128, 2, 1]),
       #TileDescription([256, 128, 16], 3, [64, 4, 1]), # This tile does not iree-compile.
       TileDescription([128, 128, 16], 5, [64, 2, 1]),
+      TileDescription([128, 128, 32], 3, [64, 2, 1]),
       TileDescription([128, 128, 32], 4, [64, 2, 1]),
       TileDescription([64, 64, 64], 3, [64, 2, 1]),
   ]
 
   # compilation info configuration list.
   configuration_list = []
+  #translation_info = TranslationInfo.LLVMGPUMatmulTensorCore
   translation_info = TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync
   for tile_description in tile_descriptions:
     configuration_list.append(
@@ -562,9 +565,10 @@ def gpu_matmul_tensor_cores_f32(mainfest):
   # Matmul problems.
   problem_shapes = [
       #[128, 128, 256],
-      [256, 256, 256],
+      #[256, 256, 256],
       #[1024, 512, 2048],
-      #[3456, 1024, 2048]
+      [2560, 2560, 2560]
+      [3456, 1024, 2048]
   ]
 
   for problem_shape in problem_shapes:
@@ -577,4 +581,5 @@ def gpu_matmul_tensor_cores_f32(mainfest):
     mainfest.append_dispatch_collection(DispatchCollection(\
       operation, configuration_list))
 
-###############################################################################
+
+##############################################################################

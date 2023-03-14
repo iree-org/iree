@@ -1,6 +1,7 @@
 from library import *
 
 
+################################################################################
 class Dispatch:
   """
   Dispatch: A combination of an operation and a configuration is launched by 
@@ -10,6 +11,7 @@ class Dispatch:
     performance of the fusions and a dispatch for fusion is a combination of 
     multiple operations glued together and compiled into a single dispatch.
   """
+
   def __init__(self, operation, configuration):
     self.operation = operation
     self.configuration = configuration
@@ -17,7 +19,8 @@ class Dispatch:
 
   def name(self):
     return self.operation.name() + '_' + self.configuration.name()
-  
+
+
 ################################################################################
 class DispatchCollection:
   """
@@ -29,18 +32,28 @@ class DispatchCollection:
     in the collection and compile with single run of iree-compile and them 
     into a single executable
   """
+
   def __init__(self, operation, configuration_list):
     self.operation = operation
     self.configuration_list = configuration_list
-    
 
-  # Return the dispatches in the collection.
   def get_dispatches(self):
+    """Returns a list of dispatches in the collection."""
     dispatches = []
     for configuration in self.configuration_list:
       dispatches.append(Dispatch(self.operation, configuration))
     return dispatches
-  
-  # Returns number of dispatches in the collection.
+
+  def append(self, dispatch):
+    """Appends a dispatch to the collection."""
+    if dispatch.operation != self.operation:
+      print(self.operation.name())
+      print(dispatch.operation.name())
+      raise ValueError("operation (%s) does not match the "\
+                       "dispatch collection operation name (%s)."\
+                       % (self.operation.name(), dispatch.operation.name()))
+    self.configuration_list.append(dispatch.configuration)
+
   def num_of_dispatches(self):
+    """Returns number of dispatches in the collection."""
     return len(self.configuration_list)

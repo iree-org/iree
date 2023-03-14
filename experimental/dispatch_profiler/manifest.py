@@ -6,17 +6,16 @@ from library import *
 from matmul import *
 
 
-
 class Manifest:
-  """Manifest class collects all the operations and configurations and emits 
-  them to the `generated` directory.
+  """Manifest collects, filters, and stores dispatches in a data structure.
+     Manifest organizes the dispatches in a dictionary of `OperationKind` 
+     to a list of `DispatchCollection`.
+
+     OperationKind -> [DispatchCollection]
   """
+
   def __init__(self, args):
     self.args = args
-
-    # Manifest organizes the dispatches in a dictionary of operation_kind to
-    # a list of dispatch_collection.
-    # operations: operation_kind -> [dispatch_collection]
     self.operations = {}
 
     # For operation kind-based filtering of dispatches.
@@ -42,10 +41,8 @@ class Manifest:
     else:
       self.dispatch_names = [x for x in args.dispatches.split(',') if x != '']
 
-
-  # Returns true if all substrings appear in the haystack in order
   def _filter_string_matches(self, filter_string, haystack):
-
+    """Returns true if all substrings appear in the haystack in order"""
     substrings = filter_string.split('*')
     for sub in substrings:
       idx = haystack.find(sub)
@@ -54,11 +51,14 @@ class Manifest:
       haystack = haystack[idx + len(sub):]
     return True
 
-  # Filters the dispatches (operation, specific configuration) \
-  # in the manifest based various criteria.
-  def filter(self, operation, configuration):
+  def filter(self, dispatch):
+    """Filters Dispatche based various criteria."""
 
-    # If no filter is enabled then return True.
+    # Get the operation and configuration from the dispatch.
+    operation = dispatch.operation
+    configuration = dispatch.configuration
+
+    # If the operation is not in the enabled list, return False.
     enabled = True
 
     # If operation_kind filter is enabled and the \
@@ -71,7 +71,7 @@ class Manifest:
     # dispatch name (operation+configuration) against all regexs \
     # in self.dispatch_names.
     if len(self.dispatch_names):
-      name = operation.name() + '_' + configuration.name()
+      name = dispatch.name()
       enabled = False
 
       # compare against each regex included in self.dispatch_names.
@@ -83,31 +83,35 @@ class Manifest:
     # Return the result of the filter.
     return enabled
 
-  # Appends one instance of DispatchCollection to the manifest.
   def append_dispatch_collection(self, dispatch_collection):
-
+    """Appends one instance of DispatchCollection to the manifest."""
     operation_kind = dispatch_collection.operation.operation_kind
     if operation_kind not in self.operations.keys():
       self.operations[operation_kind] = []
 
+    # Get all the dispatches from the dispatch_collection.
+    dispatches = dispatch_collection.get_dispatches()
+
+    # Filter dispatches based on the filter criteria.
     filtered_dispatch_collection = DispatchCollection(
         dispatch_collection.operation, [])
-    for configuration in dispatch_collection.configuration_list:
-      if self.filter(dispatch_collection.operation, configuration):
-        filtered_dispatch_collection.configuration_list.append(configuration)
+    for dispatch in dispatches:
+      if self.filter(dispatch):
+        filtered_dispatch_collection.append(dispatch)
 
     # Only append the filtered_dispatch_collection if it has an unfiltered configuration.
     if len(filtered_dispatch_collection.configuration_list):
       self.operations[operation_kind].append(filtered_dispatch_collection)
 
-  # Appends a list of DispatchCollection to the manifest.
   def append(self, dispatch_collection_list):
+    """Appends one instance of DispatchCollection to the manifest."""
     for dispatch_collection in dispatch_collection_list:
       self.append_dispatch_collection(dispatch_collection)
 
-  # Emits the operations in the Manifest to the build directory as MLIR source files.
-  # The operations are emitted in the dialect specified by the mlir_dialect flag.
   def emit(self, mlir_dialect=MlirDialect.Linalg):
+    """Emits the operations in the Manifest to the build directory as MLIR source files.
+        The operations are emitted in the dialect specified by the `mlir_dialect` flag.
+    """
     mlir_source_emitter = {
         OperationKind.Matmul: EmitMatmulSourceMlir,
         #OperationKind.Conv2d : EmitConv2dSourceMlir, TODO: Add conv2d
@@ -145,6 +149,7 @@ class Manifest:
         with mlir_source_emitter[operation_kind](operation_path, dispatch_collection)\
                             as mlir_source:
 
-          print(">> Generating MLIR operation: " + dispatch_collection.operation.name())
+          print(">> Generating MLIR operation: " +
+                dispatch_collection.operation.name())
           # Emit mlir source file for the dispatch_collection.operation with all the configurations
           mlir_source.emit()

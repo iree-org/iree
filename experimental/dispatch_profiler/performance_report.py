@@ -4,8 +4,8 @@ import numpy as np
 from collections import namedtuple
 
 
-# Performance results class is used to store the performance results of a single run.
 class PerformanceResult:
+  """Performance result of a single run."""
 
   def __init__(self, operation, configuration, verification_result, runtime):
     self.operation = operation
@@ -16,9 +16,8 @@ class PerformanceResult:
     self.runtime = runtime  # in milliseconds
     self.gflops = float(self.flops) / self.runtime / 1.0e6
 
-  # Prints the performance result to the console.
   def print(self):
-
+    """Prints the performance result to the console."""
     runtime = (str(self.runtime) if self.runtime != -1.0 else 'Not run')
     gflops = (str(float(round(self.gflops, 2)))
               if self.runtime != -1.0 else 'Not run')
@@ -36,8 +35,8 @@ class PerformanceResult:
     print('Runtime(ms)   : %s' % runtime)
     print('GFLOP/s       : %s' % gflops)
 
-  # Returns a dictionary with the performance result. Used for csv writing.
   def create_dict_entry(self):
+    """Returns a dictionary with the performance result."""
     runtime = self.runtime if self.runtime != -1.0 else ''
     gflops = (float(round(self.gflops, 2))
               if self.runtime != -1.0 else 'Not run')
@@ -53,10 +52,10 @@ class PerformanceResult:
     }
 
 
-# Performance report class is used to store the performance results of multiple runs as
-# a report. The report can be written to a csv file.
 class PerformanceReport:
-  #
+  """Performance report class is used to store the performance results of multiple runs.
+  The report can be written to a csv file."""
+
   def __init__(self, args):
     self.args = args
 
@@ -73,16 +72,12 @@ class PerformanceReport:
     if args.tags != '':
       self.tags = args.tags.split(',')
 
-  # Appends a performance result to the report.
-  def append_perf_result(self, performance_result):
-    self.perf_result_vector.append(performance_result)
+    # If the args.output set, open the file and write the header.
+    if self.output_file_path != '':
+      open_mode = 'a' if self.append else 'w'
+      self.csv_file = open(self.output_file_path, open_mode)
 
-  # Writes the performance report to a csv file.
-  def write_csv(self):
-    open_mode = 'a' if self.append else 'w'
-
-    with open(self.output_file_path, open_mode) as csv_file:
-      # Create the csv header.
+      # Create and write the header.
       common_header = ['Provider', 'Operation', 'Configuration']
       performance_header = [
           'Verification', 'Bytes', 'Flops', 'Runtime(ms)', 'GFLOP/s'
@@ -95,23 +90,31 @@ class PerformanceReport:
         csv_header = tag_header + csv_header
 
       # Create the csv dictionary writer.
-      csv_writer = csv.DictWriter(csv_file, fieldnames=csv_header)
+      self.csv_writer = csv.DictWriter(self.csv_file, fieldnames=csv_header)
 
       # Write the header if the file is being created.
       if open_mode == 'w':
-        csv_writer.writeheader()
+        self.csv_writer.writeheader()
 
-      # Write the performance results.
-      for perf_result in self.perf_result_vector:
-        # Create the row entries for performance result.
-        csv_dict_row = perf_result.create_dict_entry()
-
-        # Create the row entries for tags.
-        for tag in self.tags:
-          tag_key, tag_value = tag.split(':')
-          csv_dict_row[tag_key] = tag_value
-
-        # Write the row.
-        csv_writer.writerow(csv_dict_row)
-
+  def __del__(self):
+    """If the args.output set, close the file."""
+    if self.output_file_path != '':
       print('Writing performance report to %s' % self.output_file_path)
+      self.csv_file.close()
+
+  def append_perf_result(self, performance_result):
+    """Appends a performance result to the report. 
+    Additionaly, if args.output set, write the csv_row entry."""
+    self.perf_result_vector.append(performance_result)
+
+    if self.output_file_path != '':
+      # Create the row entries for performance result.
+      csv_dict_row = performance_result.create_dict_entry()
+
+      # Create the row entries for tags.
+      for tag in self.tags:
+        tag_key, tag_value = tag.split(':')
+        csv_dict_row[tag_key] = tag_value
+
+      # Write the row.
+      self.csv_writer.writerow(csv_dict_row)

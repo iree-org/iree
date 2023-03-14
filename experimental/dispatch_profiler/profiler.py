@@ -12,26 +12,24 @@ operation_launcher_map = {
 }
 ###############################################################################
 
-
 ###############################################################################
-# Profiler main
+# Profiler main : The main entry point for the profiler tool.
 ###############################################################################
-# The main entry point for the profiler tool. This tool compiles, verifies, and
-# profiles IREE-compiled MLIR operations for a given backend device, compiler 
-# flags, and tuning configuration. 
-# 
-# The profiler tool is organized as follows:
-# Operation: A MLIR operation that is generated or consumed by the 
+# This tool compiles, verifies, and profiles IREE-compiled MLIR operations for
+# a given backend device, compiler flags, and tuning configuration.
+#
+# The dispatch profiler tool is organized based on below defintions:
+# Operation: A MLIR operation that is generated or consumed by the
 #       dispatch_profiler. For example, linalg.matmul, linalg.conv2d, etc.
-# Configuration: A set of compile parameters that are used by iree-compile the 
-#       to choose a compilation pipeline (e.g. LLVMGPUTensorCore, 
-#       LLVMGPUTensorCoreMmaSync, LLVGPUCPU, etc.), performance tuning parameters 
+# Configuration: A set of compile parameters that are used by iree-compile the
+#       to choose a compilation pipeline (e.g. LLVMGPUTensorCore,
+#       LLVMGPUTensorCoreMmaSync, LLVGPUCPU, etc.), performance tuning parameters
 #       (e.g. workgroup size, tile size etc.).
 # Dispatch: A combination of an operation and a configuration is launched by the
-#       dispatch profiler for verification and performance profiling. Note that 
-#       a dispatch is not a MLIR operation it is binary executable that is launched 
-#       by the profiler. Additionaly, the goal of the tool is to also profile the 
-#       performance of the fusions and a dispatch for fusion is a combination of 
+#       dispatch profiler for verification and performance profiling. Note that
+#       a dispatch is not a MLIR operation it is binary executable that is launched
+#       by the profiler. Additionaly, the goal of the tool is to also profile the
+#       performance of the fusions and a dispatch for fusion is a combination of
 #       multiple operations glued together and compiled into a single dispatch.
 ###############################################################################
 
@@ -100,7 +98,7 @@ if __name__ == "__main__":
   parser.add_argument("--tags", default='', \
                       help="Inserts leading columns in output table and uniform "\
                         "values for each column. Useful for generating pivot tables.")
-  
+
   # Parse the command line arguments.
   args = parser.parse_args()
   ###############################################################################
@@ -142,29 +140,26 @@ if __name__ == "__main__":
         # Compile the operation dispatches for verification and profiling.
         if compile_only:
           operation_launcher.compile(CompilationMode.Verify)
-          operation_launcher.compile(CompilationMode.Benchmark)
+          operation_launcher.compile(CompilationMode.Profile)
 
-        # Initialize verification and profiling results.
-        verification_result = 'Not run' if not verification_enabled else 'Failed'
-        runtime = -1.0
+        else:
+          # Initialize verification and profiling results.
+          verification_result = 'Not run' if not verification_enabled else 'Failed'
+          runtime = -1.0
 
-        # Launch the operation dispatches for verification and profiling.
-        if verification_enabled:
-          verification_result = operation_launcher.verify(configuration)
-        if profiling_enabled:
-          runtime = operation_launcher.profile(configuration)
+          # Launch the operation dispatches for verification and profiling.
+          if verification_enabled:
+            verification_result = operation_launcher.verify(configuration)
+          if profiling_enabled:
+            runtime = operation_launcher.profile(configuration)
 
-        # Save and print the performance result.
-        if verification_enabled or profiling_enabled:
-          # Create and print a performance result.
-          result = PerformanceResult(operation_collection.operation,
-                                     configuration, verification_result,
-                                     runtime)
-          result.print()
+          # Save and print the performance result.
+          if verification_enabled or profiling_enabled:
+            # Create and print a performance result.
+            result = PerformanceResult(operation_collection.operation,
+                                       configuration, verification_result,
+                                       runtime)
+            result.print()
 
-          # Append the performance result to the performance report.
-          perf_report.append_perf_result(result)
-
-  # Write the performance report to a csv file.
-  if args.output != '':
-    perf_report.write_csv()
+            # Append the performance result to the performance report.
+            perf_report.append_perf_result(result)

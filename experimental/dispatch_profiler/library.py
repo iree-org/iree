@@ -11,17 +11,19 @@ from collections import namedtuple
 
 # The file is organized as follows:
 # 1. Enumerated `Type`s grouped together for categories, For e.g. [Arch]Type, [Data]Type etc.
-# 2. Dictonaries `Names` mapping the enumeration values to their string names. 
+# 2. Dictonaries `Names` mapping the enumeration values to their string names.
 #    For e.g. [Arch]TypeNames, [Data]TypeNames etc.
-# 3. `Tags` for each enumeration value to be used in the generated MLIR source files. 
+# 3. `Tags` for each enumeration value to be used in the generated MLIR source files.
 #    For e.g. [TranslationInfo]Tags
 ###################################################################################################
+
 
 # Architecure types
 ###################################################################################################
 class ArchType(enum.Enum):
   Cpu = auto()
   Gpu = auto()
+
 
 ArchTypeNames = {
     ArchType.Cpu: "cpu",
@@ -34,11 +36,13 @@ class GpuArchType(enum.Enum):
   rocm = auto()
   spirv = auto()
 
+
 GpuArchTypeNames = {
     GpuArchType.nvptx: "nvptx",
     GpuArchType.rocm: "rocm",
     GpuArchType.spirv: "spirv",
 }
+
 
 # Operation kinds
 ###################################################################################################
@@ -46,10 +50,12 @@ class OperationKind(enum.Enum):
   Matmul = auto()
   Conv2d = auto()
 
+
 OperationKindNames = {
     OperationKind.Matmul: 'matmul',
     OperationKind.Conv2d: 'conv2d'
 }
+
 
 # MLIR dialects
 ###################################################################################################
@@ -63,15 +69,17 @@ MlirDialectNames = {
     MlirDialect.Mhlo: 'mhlo',
 }
 
+
 # Compilation modes (verification or benchmarking/profiling)
 ###################################################################################################
 class CompilationMode(enum.Enum):
   Verify = auto()
-  Benchmark = auto()
+  Profile = auto()
+
 
 CompilationModeNames = {
     CompilationMode.Verify: 'verify',
-    CompilationMode.Benchmark: 'benchmark',
+    CompilationMode.Profile: 'profile',
 }
 
 
@@ -171,10 +179,14 @@ class TranslationInfo(enum.Enum):
   LLVMGPUMatmulTensorCore = auto()
   LLVMGPUMatmulTensorCoreMmaSync = auto()
 
+
 TranslationInfoTag = {
-    TranslationInfo.LLVMGPUMatmulSIMT: "LLVMGPUMatmulSIMT",
-    TranslationInfo.LLVMGPUMatmulTensorCore: "LLVMGPUMatmulTensorCore",
-    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "LLVMGPUMatmulTensorCoreMmaSync",
+    TranslationInfo.LLVMGPUMatmulSIMT:
+        "LLVMGPUMatmulSIMT",
+    TranslationInfo.LLVMGPUMatmulTensorCore:
+        "LLVMGPUMatmulTensorCore",
+    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync:
+        "LLVMGPUMatmulTensorCoreMmaSync",
 }
 
 TranslationInfoName = {
@@ -182,6 +194,7 @@ TranslationInfoName = {
     TranslationInfo.LLVMGPUMatmulTensorCore: "tensorcore_wmma",
     TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "tensorcore_mma_sync",
 }
+
 
 # Distribution of values in a tensor.
 ###################################################################################################
@@ -192,6 +205,7 @@ class Distribution(enum.Enum):
   Sequential = auto()
   Identity = auto()
   Random = auto()
+
 
 DistributionName = {
     Distribution.Empty: "empty",
@@ -205,12 +219,14 @@ DistributionName = {
 ###################################################################################################
 # The next part of this file contains the data structures for describing a tensor, tiles etc that
 # are built using the above enumerations. These data structures are used to create compose bigger
-# data structures that describe an operation or a sequence of operations, along with compilation 
+# data structures that describe an operation or a sequence of operations, along with compilation
 # pipeling to form a collection of dispatches to profiled.
 ###################################################################################################
 
+
 class TensorDescription:
   """A class for tensor description."""
+
   def __init__(self, datatype, layout):
     self.datatype = datatype
     self.layout = layout
@@ -222,6 +238,7 @@ class TensorDescription:
 
 class TileDescription:
   """A class for tile description."""
+
   def __init__(self, threadblock_shape, stages, block_dim):
     self.threadblock_shape = threadblock_shape  # in number of elements in M, N, K
     self.stages = stages  # number of shared memory stages in tile K
