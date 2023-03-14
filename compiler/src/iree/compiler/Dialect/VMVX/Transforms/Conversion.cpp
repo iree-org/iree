@@ -115,7 +115,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
   }
 };
 
-} // namespace
+}  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();
