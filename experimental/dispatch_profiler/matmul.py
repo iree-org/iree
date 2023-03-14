@@ -15,7 +15,12 @@ from dispatch import *
 # describes the parameter that changes the functionality of matmul operation.
 ###############################################################################
 class MatmulOperation:
-  #
+  """Data structure to describe a matrix multiplication operation including the
+     shape, datatype, and layout of the operands and the result. This data 
+     structure is *independent* of the compilation strategy and tiling parameters, 
+     and only describes the parameter that changes the functionality of matmul 
+     operation.
+  """
   def __init__(self, problem_shape, lhs, rhs, result):
     # Initializes a matrix multiplication operation with the specified shape.
     # problem_shape: A tuple representing the matrix multiplication problem shape
@@ -57,25 +62,25 @@ class MatmulOperation:
 
   # Returns the shape of the lhs numpy array as a string in the format "MxKxDataType".
   def lhs_npy_shape(self):
-    return str(self.M) + "x" + str(self.K) + "x" + \
-      str(DataTypeName[self.lhs.datatype])
+    return f"{self.M}x{self.K}x{DataTypeName[self.lhs.datatype]}"
+
 
   # Returns the shape of the rhs numpy array as a string in the format "KxNxDataType".
   def rhs_npy_shape(self):
-    return str(self.K) + "x" + str(self.N) + "x" + \
-      str(DataTypeName[self.rhs.datatype])
+    return f"{self.K}x{self.N}x{DataTypeName[self.rhs.datatype]}"
 
   # Returns the shape of the result numpy array as a string in the format "MxNxDataType".
   def result_npy_shape(self):
-    return str(self.M) + "x" + str(self.N) + "x" + \
-      str(DataTypeName[self.result.datatype])
+    return f"{self.M}x{self.N}x{DataTypeName[self.result.datatype]}"
 
+  # Returns the number of bytes read/written by the matmul operation.
   def bytes(self):
     bytes = (DataTypeSizeInBits[self.lhs.datatype] * self.M // 8) * self.K + \
             (DataTypeSizeInBits[self.rhs.datatype] * self.K // 8) * self.N + \
             (DataTypeSizeInBits[self.result.datatype] * self.M // 8) * self.N
     return bytes
 
+  # Returns the number of floating point operations performed by the matmul operation.
   def flops(self):
     return 2 * self.M * self.N * self.K
 
@@ -96,10 +101,10 @@ class MatmulCompilationInfo:
   #
   def name(self):
     return "tile_config_{tbm}x{tbn}_{tbk}x{stages}_{translation_info}".format(
-        tbm=str(self.tile_description.threadblock_shape[0]),
-        tbn=str(self.tile_description.threadblock_shape[1]),
-        tbk=str(self.tile_description.threadblock_shape[2]),
-        stages=str(self.tile_description.stages),
+        tbm=self.tile_description.threadblock_shape[0],
+        tbn=self.tile_description.threadblock_shape[1],
+        tbk=self.tile_description.threadblock_shape[2],
+        stages=self.tile_description.stages,
         translation_info=TranslationInfoName[self.translation_info])
 
 
@@ -236,14 +241,16 @@ class EmitMatmulSourceMlir:
 
 
 ###############################################################################
-# ReferenceMatmulOperation class has the following responsibilities:
-# 1) Generates matmul operation inputs as np.array for a desired distribution.
-# 2) Runs the matmul reference operation in np.matmul.
-# 3) Generates the matmul operation expected output as np.array.
-# 4) Additional, generate input and output filename strings.
+# Reference implementation for the matmul operation in numpy.
 ###############################################################################
 class ReferenceMatmulOperation:
-
+  """ReferenceMatmulOperation class has the following responsibilities:
+       1) Generates matmul operation inputs as np.array for a desired 
+          distribution.
+       2) Runs the matmul reference operation in np.matmul.
+       3) Generates the matmul operation expected output as np.array.
+       4) Additional, generate input and output filename strings.
+  """
   def __init__(self, matmul_operation, dist_lhs, dist_rhs):
     self.matmul_operation = matmul_operation
     # Problem shape.
@@ -263,22 +270,22 @@ class ReferenceMatmulOperation:
     # filename for the lhs, rhs, inital_result, and result matrices.
     self.filename_lhs = "m{problem_m}xk{problem_k}_"\
       "{tensor_description}_{dist}_lhs.npy".format(
-      problem_m=str(self.M),
-      problem_k=str(self.K),
+      problem_m=self.M,
+      problem_k=self.K,
       tensor_description=self.matmul_operation.lhs.name(),
       dist=DistributionName[self.dist_lhs])
 
     self.filename_rhs = "k{problem_k}xn{problem_n}_"\
       "{tensor_description}_{dist}_rhs.npy".format(
-      problem_k=str(self.K),
-      problem_n=str(self.N),
+      problem_k=self.K,
+      problem_n=self.N,
       tensor_description=self.matmul_operation.rhs.name(),
       dist=DistributionName[self.dist_rhs])
 
     self.reference_filename_result = "m{problem_m}xn{problem_n}_"\
       "{tensor_description}_reference_result.npy".format(
-      problem_m=str(self.M),
-      problem_n=str(self.N),
+      problem_m=self.M,
+      problem_n=self.N,
       tensor_description=self.matmul_operation.result.name())
 
   # Generates input data, runs reference numpy.matmul, and save npy files to the output directory.
@@ -518,7 +525,7 @@ def gpu_matmul_tensor_cores_f16(manifest):
       #[128, 128, 256],
       [256, 256, 256],
       #[2560, 2560, 2560],
-      #[1024, 512, 2048],
+      [1024, 512, 2048],
       #[3456, 1024, 2048]
   ]
 

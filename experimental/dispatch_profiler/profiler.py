@@ -22,16 +22,17 @@ operation_launcher_map = {
 # 
 # The profiler tool is organized as follows:
 # Operation: A MLIR operation that is generated or consumed by the 
-#  dispatch_profiler. For example, linalg.matmul, linalg.conv2d, etc.
+#       dispatch_profiler. For example, linalg.matmul, linalg.conv2d, etc.
 # Configuration: A set of compile parameters that are used by iree-compile the 
-#  to choose a compilation pipeline (e.g. LLVMGPUTensorCore, LLVMGPUTensorCoreMmaSync, 
-#  LLVGPUCPU, etc.), performance tuning parameters (e.g. workgroup size, tile size etc.).
+#       to choose a compilation pipeline (e.g. LLVMGPUTensorCore, 
+#       LLVMGPUTensorCoreMmaSync, LLVGPUCPU, etc.), performance tuning parameters 
+#       (e.g. workgroup size, tile size etc.).
 # Dispatch: A combination of an operation and a configuration is launched by the
-#  dispatch profiler for verification and performance profiling. Note that a dispatch
-#  is not a MLIR operation it is binary executable that is launched by the profiler.
-#  Additionaly, the goal of the tool is to also profile the performance of the fusions 
-#  and a dispatch for fusion is a combination of multiple operations glued together and 
-#  compiled into a single dispatch.
+#       dispatch profiler for verification and performance profiling. Note that 
+#       a dispatch is not a MLIR operation it is binary executable that is launched 
+#       by the profiler. Additionaly, the goal of the tool is to also profile the 
+#       performance of the fusions and a dispatch for fusion is a combination of 
+#       multiple operations glued together and compiled into a single dispatch.
 ###############################################################################
 
 if __name__ == "__main__":
@@ -49,7 +50,7 @@ if __name__ == "__main__":
                         "operations and npy files.This should be same that used "\
                         "to call generated.py")
   parser.add_argument("--operation_kind", default="all", help="Specifies the "\
-                      "operation kinds to generate (matmul, conv2d, all)")
+                      "operation kinds to generate.", choices=["matmul", "conv2d", "all"])
   parser.add_argument("--verbose", default='False', \
                       help='Prints verbose output and commands executed.')
 
@@ -100,8 +101,6 @@ if __name__ == "__main__":
                       help="Inserts leading columns in output table and uniform "\
                         "values for each column. Useful for generating pivot tables.")
   
-
-
   # Parse the command line arguments.
   args = parser.parse_args()
   ###############################################################################

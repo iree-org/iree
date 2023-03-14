@@ -43,8 +43,7 @@ class Manifest:
       self.dispatch_names = [x for x in args.dispatches.split(',') if x != '']
 
 
-# Returns true if all substrings appear in the haystack in order
-
+  # Returns true if all substrings appear in the haystack in order
   def _filter_string_matches(self, filter_string, haystack):
 
     substrings = filter_string.split('*')

@@ -14,7 +14,7 @@ if __name__ == "__main__":
                       help="IREE top-level build directory is used to generate "\
                         "operations and npy files")
   parser.add_argument("--operation_kind", default="all", help="Specifies the "\
-                      "operation kinds to generate (matmul, conv2d, all)")
+                      "operation kinds to generate.", choices=["matmul", "conv2d", "all"])
   parser.add_argument("--dispatches", default='', help="Comma delimited list to "\
                       "filter dispatches by name. A dispatch is a combination of "\
                       "operation and tuning configuration.")
@@ -30,7 +30,8 @@ if __name__ == "__main__":
   # Manifests metadata for a group of accompanying operations and configurations.
   manifest = Manifest(args)
 
-  # Collect all the pre-defined dispatches in a manifest.
+  # Collect all the pre-defined dispatches in a manifest for various operations 
+  # kinds and device backends.
   gpu_matmul_tensor_cores_f16(manifest)
   gpu_matmul_tensor_cores_f32(manifest)
 

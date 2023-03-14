@@ -1,5 +1,5 @@
 import enum
-from enum import auto as enum_auto
+from enum import auto
 import re
 import numpy as np
 from collections import namedtuple
@@ -10,7 +10,7 @@ from collections import namedtuple
 # reference implementations, and numpy input/output files.
 
 # The file is organized as follows:
-# 1. Enumerations `Type` grouped together for a category, For e.g. [Arch]Type, [Data]Type etc.
+# 1. Enumerated `Type`s grouped together for categories, For e.g. [Arch]Type, [Data]Type etc.
 # 2. Dictonaries `Names` mapping the enumeration values to their string names. 
 #    For e.g. [Arch]TypeNames, [Data]TypeNames etc.
 # 3. `Tags` for each enumeration value to be used in the generated MLIR source files. 
@@ -20,52 +20,44 @@ from collections import namedtuple
 # Architecure types
 ###################################################################################################
 class ArchType(enum.Enum):
-  Cpu = enum_auto()
-  Gpu = enum_auto()
+  Cpu = auto()
+  Gpu = auto()
 
-
-#
 ArchTypeNames = {
     ArchType.Cpu: "cpu",
     ArchType.Gpu: "gpu",
 }
 
 
-#
 class GpuArchType(enum.Enum):
-  nvptx = enum_auto()
-  rocm = enum_auto()
-  spirv = enum_auto()
+  nvptx = auto()
+  rocm = auto()
+  spirv = auto()
 
-
-#
 GpuArchTypeNames = {
     GpuArchType.nvptx: "nvptx",
     GpuArchType.rocm: "rocm",
     GpuArchType.spirv: "spirv",
 }
 
-
 # Operation kinds
 ###################################################################################################
 class OperationKind(enum.Enum):
-  Matmul = enum_auto()
-  Conv2d = enum_auto()
+  Matmul = auto()
+  Conv2d = auto()
 
-
-#
 OperationKindNames = {
     OperationKind.Matmul: 'matmul',
     OperationKind.Conv2d: 'conv2d'
 }
 
 # MLIR dialects
+###################################################################################################
 class MlirDialect(enum.Enum):
-  Linalg = enum_auto()
-  Mhlo = enum_auto()
+  Linalg = auto()
+  Mhlo = auto()
 
 
-#
 MlirDialectNames = {
     MlirDialect.Linalg: 'linalg',
     MlirDialect.Mhlo: 'mhlo',
@@ -74,43 +66,39 @@ MlirDialectNames = {
 # Compilation modes (verification or benchmarking/profiling)
 ###################################################################################################
 class CompilationMode(enum.Enum):
-  Verify = enum_auto()
-  Benchmark = enum_auto()
+  Verify = auto()
+  Benchmark = auto()
 
-
-#
 CompilationModeNames = {
     CompilationMode.Verify: 'verify',
     CompilationMode.Benchmark: 'benchmark',
 }
 
 
-
 # Enumerations for data types and layouts
 ###################################################################################################
 class DataType(enum.Enum):
-  b1 = enum_auto()
-  u4 = enum_auto()
-  u8 = enum_auto()
-  u16 = enum_auto()
-  u32 = enum_auto()
-  u64 = enum_auto()
-  s4 = enum_auto()
-  s8 = enum_auto()
-  s16 = enum_auto()
-  s32 = enum_auto()
-  s64 = enum_auto()
-  e4m3 = enum_auto()
-  e5m2 = enum_auto()
-  f16 = enum_auto()
-  bf16 = enum_auto()
-  f32 = enum_auto()
-  tf32 = enum_auto()
-  f64 = enum_auto()
-  invalid = enum_auto()
+  b1 = auto()
+  u4 = auto()
+  u8 = auto()
+  u16 = auto()
+  u32 = auto()
+  u64 = auto()
+  s4 = auto()
+  s8 = auto()
+  s16 = auto()
+  s32 = auto()
+  s64 = auto()
+  e4m3 = auto()
+  e5m2 = auto()
+  f16 = auto()
+  bf16 = auto()
+  f32 = auto()
+  tf32 = auto()
+  f64 = auto()
+  invalid = auto()
 
 
-#
 DataTypeName = {
     DataType.b1: "b1",
     DataType.u4: "u4",
@@ -160,13 +148,14 @@ DataTypeSizeInBits = {
 
 
 class LayoutType(enum.Enum):
-  ColumnMajor = enum_auto()
-  RowMajor = enum_auto()
-  NHWC = enum_auto()
-  NCWH = enum_auto()
+  ColumnMajor = auto()
+  RowMajor = auto()
+  NHWC = auto()
+  NCWH = auto()
 
 
-# cuBLAS layout type names convenctions ()
+# cuBLAS/cuDNN layout type names convention is followed for the layout names.
+# https://docs.nvidia.com/cuda/cublas/index.html#cublasoperation-t
 ShortLayoutTypeName = {
     LayoutType.ColumnMajor: 'n',
     LayoutType.RowMajor: 't',
@@ -177,21 +166,17 @@ ShortLayoutTypeName = {
 
 # Compilation pipelines/translation info.
 ###################################################################################################
-#
 class TranslationInfo(enum.Enum):
-  LLVMGPUMatmulSIMT = enum_auto()
-  LLVMGPUMatmulTensorCore = enum_auto()
-  LLVMGPUMatmulTensorCoreMmaSync = enum_auto()
+  LLVMGPUMatmulSIMT = auto()
+  LLVMGPUMatmulTensorCore = auto()
+  LLVMGPUMatmulTensorCoreMmaSync = auto()
 
-
-#
 TranslationInfoTag = {
     TranslationInfo.LLVMGPUMatmulSIMT: "LLVMGPUMatmulSIMT",
     TranslationInfo.LLVMGPUMatmulTensorCore: "LLVMGPUMatmulTensorCore",
     TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "LLVMGPUMatmulTensorCoreMmaSync",
 }
 
-#
 TranslationInfoName = {
     TranslationInfo.LLVMGPUMatmulSIMT: "simt",
     TranslationInfo.LLVMGPUMatmulTensorCore: "tensorcore_wmma",
@@ -200,17 +185,14 @@ TranslationInfoName = {
 
 # Distribution of values in a tensor.
 ###################################################################################################
-#
 class Distribution(enum.Enum):
-  Empty = enum_auto()
-  Zeros = enum_auto()
-  Ones = enum_auto()
-  Sequential = enum_auto()
-  Identity = enum_auto()
-  Random = enum_auto()
+  Empty = auto()
+  Zeros = auto()
+  Ones = auto()
+  Sequential = auto()
+  Identity = auto()
+  Random = auto()
 
-
-#
 DistributionName = {
     Distribution.Empty: "empty",
     Distribution.Zeros: "zeros",
@@ -226,9 +208,9 @@ DistributionName = {
 # data structures that describe an operation or a sequence of operations, along with compilation 
 # pipeling to form a collection of dispatches to profiled.
 ###################################################################################################
-# A class for tensor description.
-class TensorDescription:
 
+class TensorDescription:
+  """A class for tensor description."""
   def __init__(self, datatype, layout):
     self.datatype = datatype
     self.layout = layout
@@ -237,9 +219,9 @@ class TensorDescription:
     return "%s%s" % (DataTypeName[self.datatype],
                      ShortLayoutTypeName[self.layout])
 
-# A class tile description.
-class TileDescription:
 
+class TileDescription:
+  """A class for tile description."""
   def __init__(self, threadblock_shape, stages, block_dim):
     self.threadblock_shape = threadblock_shape  # in number of elements in M, N, K
     self.stages = stages  # number of shared memory stages in tile K
@@ -250,20 +232,12 @@ class TileDescription:
                             self.threadblock_shape[1],
                             self.threadblock_shape[2], self.stages)
 
-# A collection of indpendent dispatches. A dispatch is operation description + configuration.
-# A single mlir file is generated per operation enumerating multiple dispatches, one for each
-# configuration in the list. Total number of dispatches by one instaces of OperationCollection
-# is len(configuration_list).
-OperationCollection = namedtuple('OperationCollection',
-                                 ['operation', 'configuration_list'])
-
 
 ###################################################################################################
 # The following part contains utility functions for which are used by the profiler tool.
 # These function may be moved as the need for create a proper structure for the
 # functionality they provide becomes apparent and necessary as we move forward.
 ###################################################################################################
-
 # Helper function to generate a npy file name from a distribution and shape.
 def get_np_array(tensor_description, shape, dist):
   if dist == Distribution.Empty:
