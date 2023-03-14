@@ -8,7 +8,7 @@ compilation statistics targets. To reproduce those results, please see the
 This directory contains configuration definition for IREE's legacy benchmarks
 suite.
 
-The https://buildkite.com/iree/iree-benchmark-android Buildkite pipeline runs
+The https://buildkite.com/iree/iree-benchmark-android Buildkite pipeline has not yet been migrated and runs
 Android benchmarks defined here on each commit to the `main` branch and posts
 results to the dashboard https://perf.iree.dev. The pipeline also runs on pull
 requests with the `buildkite:benchmark-android` label, posting results compared

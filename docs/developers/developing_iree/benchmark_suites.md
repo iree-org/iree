@@ -1,12 +1,12 @@
 # IREE Benchmark Suites
 
-**We are in progress to replace the legacy benchmark suites. Currently this new
+**We are in the progress of replacing the legacy benchmark suites. Currently these new
 benchmark suites only support `x86_64`, `CUDA`, and `compilation statistics`
 benchmarks. For working with the legacy benchmark suites, see
 [IREE Benchmarks (Legacy)](/benchmarks/README.md)**.
 
 IREE Benchmarks Suites is a collection of benchmarks for IREE developers to
-track performance improvements/regressions during the development.
+track performance improvements/regressions during development.
 
 The benchmark suites are run for each commit on the main branch and the results
 are uploaded to https://perf.iree.dev for regression analysis (for the current
@@ -16,7 +16,7 @@ re-run the CI workflow to trigger the benchmark runs. The results will be
 compared with https://perf.iree.dev and post in the comments.
 
 Information about the configrations and definitions of the benchmark suites can
-be found [here](/build_tools/python/benchmark_suites/iree/README.md).
+be found in the [Benchmark Suites README](/build_tools/python/benchmark_suites/iree/README.md).
 
 ## Running Benchmark Suites Locally
 
@@ -117,7 +117,7 @@ build_tools/benchmarks/collect_compilation_statistics.py \
   --output=compile_stats_results.json
 ```
 
-Note that you need to use **ninja** (https://ninja-build.org/) to build the
+Note that you need to use [Ninja](https://ninja-build.org/) to build the
 benchmark suites as the tool collects information from its build log.
 
 ### Show Execution / Compilation Benchmark Results
