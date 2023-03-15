@@ -1905,20 +1905,16 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n"
                          << "The corresponding indexing map is: " << idxMap
                          << "\n");
+    assert(idxMap.isIdentity() && "unexpected codegen input");
 
     for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
       SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
       ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
       for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-        if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
-
-        auto dimExpr = idxMap.getResult(pos).dyn_cast<AffineDimExpr>();
-        if (!dimExpr) return WalkResult::interrupt();
-        int mappedPos = dimExpr.getPosition();
-        tileSizes[mappedPos] = tileSizes[mappedPos] / size;
-        tileSizes[mappedPos] = std::max<int64_t>(tileSizes[mappedPos], 1);
-        LLVM_DEBUG(KD_DBGS() << "Scale # " << mappedPos << " tile size to "
-                             << tileSizes[mappedPos] << "\n");
+        tileSizes[pos] = tileSizes[pos] / size;
+        tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+        LLVM_DEBUG(KD_DBGS() << "Scale # " << pos << " tile size to "
+                             << tileSizes[pos] << "\n");
       }
     }
 
