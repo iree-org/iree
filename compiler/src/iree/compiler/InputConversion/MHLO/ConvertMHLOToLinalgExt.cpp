@@ -20,6 +20,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -293,14 +294,10 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     auto realType = real.getType().cast<ShapedType>();
     auto rank = realType.getRank();
 
-    SmallVector<Value> dynSizes;
-    for (auto en : llvm::enumerate(realType.getShape())) {
-      if (en.value() == ShapedType::kDynamic) {
-        dynSizes.push_back(b.create<tensor::DimOp>(real, en.index()));
-      }
-    }
-    Value emptyTensor = b.create<tensor::EmptyOp>(
-        realType.getShape(), realType.getElementType(), dynSizes);
+    SmallVector<OpFoldResult> mixedSizes =
+        tensor::createDimValues(b, b.getLoc(), real);
+    Value emptyTensor =
+        b.create<tensor::EmptyOp>(mixedSizes, realType.getElementType());
 
     SmallVector<AffineMap> maps;
     maps.push_back(
@@ -382,16 +379,9 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     auto ty = RankedTensorType::get(shape, operandType.getElementType());
     SmallVector<OpFoldResult> offsets(ty.getRank(), b.getIndexAttr(0));
     SmallVector<OpFoldResult> strides(ty.getRank(), b.getIndexAttr(1));
-    SmallVector<OpFoldResult> sizes;
-    Value operand = adaptor.getOperand();
-    for (auto dim : llvm::enumerate(operandType.getShape().drop_back())) {
-      if (dim.value() != ShapedType::kDynamic) {
-        sizes.push_back(b.getIndexAttr(dim.value()));
-      } else {
-        sizes.push_back(b.createOrFold<tensor::DimOp>(operand, dim.index()));
-      }
-    }
-    sizes.push_back(b.getIndexAttr(shape.back()));
+    SmallVector<OpFoldResult> sizes =
+        tensor::createDimValues(b, b.getLoc(), adaptor.getOperand());
+    sizes.back() = b.getIndexAttr(shape.back());
     auto real = b.create<tensor::ExtractSliceOp>(ty, results[0], offsets, sizes,
                                                  strides);
     auto imag = b.create<tensor::ExtractSliceOp>(ty, results[1], offsets, sizes,
@@ -415,15 +405,10 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
     if (!ty) return failure();
 
     Location loc = op.getLoc();
-    SmallVector<Value> dynSizes;
-    for (auto en : llvm::enumerate(ty.getShape())) {
-      if (en.value() == ShapedType::kDynamic) {
-        dynSizes.push_back(rewriter.create<tensor::DimOp>(
-            loc, adaptor.getOperands()[0], en.index()));
-      }
-    }
-    Value emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, ty.getShape(), ty.getElementType(), dynSizes);
+    SmallVector<OpFoldResult> mixedSizes =
+        tensor::createDimValues(rewriter, loc, adaptor.getOperands()[0]);
+    Value emptyTensor =
+        rewriter.create<tensor::EmptyOp>(loc, mixedSizes, ty.getElementType());
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
         op, op->getResultTypes(), adaptor.getOperands(), emptyTensor,
         op.getDimensions());
@@ -461,17 +446,13 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
 
     // Create and initialize output tensors for LinalgExt TopK results
     // Define the output types based on the results of CHLO TopK
-    SmallVector<Value> dynSizes;
-    for (auto en : llvm::enumerate(inputValuesType.getShape())) {
-      if (en.value() == ShapedType::kDynamic) {
-        dynSizes.push_back(rewriter.create<tensor::DimOp>(
-            loc, adaptor.getOperand(), en.index()));
-      }
-    }
+    SmallVector<OpFoldResult> mixedSizes =
+        tensor::createDimValues(rewriter, loc, adaptor.getOperand());
+    mixedSizes.back() = rewriter.getIndexAttr(adaptor.getK());
     Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
-        loc, outputValuesType.getShape(), valueElementType, dynSizes);
+        loc, mixedSizes, valueElementType);
     Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
-        loc, outputIndicesType.getShape(), indicesElementType, dynSizes);
+        loc, mixedSizes, indicesElementType);
     // Initialize indices to 0 and values to negative infinity
     Attribute negInfAttr;
     if (auto intType = valueElementType.dyn_cast<IntegerType>()) {

@@ -630,8 +630,7 @@ LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
   // Ensure we have 3 block sizes, one for each id.
   Value one;
   for (auto attr : {bX, bY, bZ}) {
-    if (std::find(blockMapping.begin(), blockMapping.end(), attr) ==
-        blockMapping.end()) {
+    if (!llvm::is_contained(blockMapping, attr)) {
       blockMapping.push_back(attr);
       one = one ? one : rewriter.create<arith::ConstantIndexOp>(loc, 1);
       numBlocks.push_back(one);

@@ -22,19 +22,10 @@ using namespace IREE::LinalgExt;
 
 static Operation *sliceTensor(Location loc, Value expanded, Value original,
                               OpBuilder &builder) {
-  auto originalType = original.getType().cast<RankedTensorType>();
-  auto rank = originalType.getRank();
-  SmallVector<OpFoldResult> offsets(rank, builder.getI64IntegerAttr(0));
-  SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
-  SmallVector<OpFoldResult> sizes(rank);
-  for (int i = 0, e = rank; i < e; ++i) {
-    if (!originalType.isDynamicDim(i)) {
-      sizes[i] = builder.getI64IntegerAttr(originalType.getDimSize(i));
-    } else {
-      sizes[i] = builder.create<tensor::DimOp>(loc, original, i).getResult();
-    }
-  }
-
+  SmallVector<OpFoldResult> sizes =
+      tensor::createDimValues(builder, loc, original);
+  SmallVector<OpFoldResult> offsets(sizes.size(), builder.getI64IntegerAttr(0));
+  SmallVector<OpFoldResult> strides(sizes.size(), builder.getI64IntegerAttr(1));
   return builder.create<tensor::ExtractSliceOp>(loc, expanded, offsets, sizes,
                                                 strides);
 }
