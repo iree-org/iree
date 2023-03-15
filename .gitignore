@@ -7,3 +7,4 @@ external/
 .vscode/
 __pycache__/
 user.bazelrc
+__pycache__/

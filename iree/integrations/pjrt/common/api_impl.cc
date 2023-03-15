@@ -1499,11 +1499,22 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
   iree_status_t status = iree_ok_status();
   for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
     auto& inv = invs[dev_index];
-    status = iree_vm_invoke(
+    auto new_status = iree_vm_invoke(
         inv.res_exe->vm_context.get(), inv.res_exe->main_function,
         IREE_VM_INVOCATION_FLAG_NONE,
         /*policy=*/nullptr, inv.inputs.get(), inv.outputs.get(), allocator);
-    if (!iree_status_is_ok(status)) break;
+    // Any invocation that fails needs a barrier so that signal fence is incremented
+    // otherwise future waits will fail. We do this instead of incrementing as only
+    // a subset of devices may fail.
+    if (!iree_status_is_ok(new_status)) {
+      status = new_status;
+      // We can ignore the error as we are already erroring out earlier.
+      IREE_IGNORE_ERROR(iree_hal_device_queue_barrier(
+        inv.res_exe->device_instance->device(),
+        IREE_HAL_QUEUE_AFFINITY_ANY,
+        iree_hal_fence_semaphore_list(inv.wait_fence.get()),
+        iree_hal_fence_semaphore_list(inv.signal_fence.get())));
+    }
   }
 
   // Process results.
