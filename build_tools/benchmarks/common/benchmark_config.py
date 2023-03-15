@@ -15,6 +15,9 @@ BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
 CAPTURES_REL_PATH = "captures"
 E2E_TEST_ARTIFACTS_REL_PATH = "e2e_test_artifacts"
 
+DEFAULT_EXECUTION_BENCHMARK_CONFIG = "execution_benchmark_config.json"
+DEFAULT_COMPILATION_BENCHMARK_CONFIG = "compilation_benchmark_config.json"
+
 
 @dataclass
 class TraceCaptureConfig:

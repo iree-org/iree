@@ -19,13 +19,12 @@ import shlex
 import subprocess
 from typing import List, Optional, Sequence
 
+import common.benchmark_config
 from e2e_test_artifacts import model_artifacts, iree_artifacts
 from e2e_test_framework import serialization
 from e2e_test_framework.definitions import iree_definitions
 
 IREE_COMPILER_NAME = "iree-compile"
-DEFAULT_EXECUTION_BENCHMARK_CONFIG = "execution_benchmark_config.json"
-DEFAULT_COMPILATION_BENCHMARK_CONFIG = "compilation_benchmark_config.json"
 
 
 def _convert_to_cmd_string(cmds: Sequence[str]) -> str:
@@ -104,12 +103,14 @@ def _dump_cmds_handler(e2e_test_artifacts_dir: pathlib.Path,
                        compilation_benchmark_config: Optional[pathlib.Path],
                        benchmark_id: Optional[str], **_unused_args):
   if execution_benchmark_config is None:
-    config_path = e2e_test_artifacts_dir / DEFAULT_EXECUTION_BENCHMARK_CONFIG
+    config_path = (e2e_test_artifacts_dir /
+                   common.benchmark_config.DEFAULT_EXECUTION_BENCHMARK_CONFIG)
     if config_path.exists():
       execution_benchmark_config = config_path
 
   if compilation_benchmark_config is None:
-    config_path = e2e_test_artifacts_dir / DEFAULT_COMPILATION_BENCHMARK_CONFIG
+    config_path = (e2e_test_artifacts_dir /
+                   common.benchmark_config.DEFAULT_COMPILATION_BENCHMARK_CONFIG)
     if config_path.exists():
       compilation_benchmark_config = config_path
 

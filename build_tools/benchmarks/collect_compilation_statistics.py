@@ -198,18 +198,26 @@ def get_module_map_from_benchmark_suite(
   return module_map
 
 
-def _legacy_get_module_map_and_build_log(args: argparse.Namespace):
+def _legacy_get_module_map_and_build_log(build_dir: pathlib.Path,
+                                         **_unused_args):
   module_map = get_module_map_from_benchmark_suite(
-      args.build_dir / benchmark_config.BENCHMARK_SUITE_REL_PATH)
-  return module_map, args.build_dir / NINJA_BUILD_LOG
+      build_dir / benchmark_config.BENCHMARK_SUITE_REL_PATH)
+  return module_map, build_dir / NINJA_BUILD_LOG
 
 
-def _alpha_get_module_map_and_build_log(args: argparse.Namespace):
-  config_data = args.compilation_benchmark_config.open("r")
+def _alpha_get_module_map_and_build_log(
+    e2e_test_artifacts_dir: pathlib.Path, build_log: pathlib.Path,
+    compilation_benchmark_config: Optional[pathlib.Path], **_unused_args):
+  if compilation_benchmark_config is None:
+    compilation_benchmark_config = (
+        e2e_test_artifacts_dir /
+        benchmark_config.DEFAULT_COMPILATION_BENCHMARK_CONFIG)
+
+  config_data = compilation_benchmark_config.open("r")
   module_map = get_module_map_from_compilation_benchmark_config(
       compilation_benchmark_config_data=config_data,
-      e2e_test_artifacts_dir=args.e2e_test_artifacts_dir)
-  return module_map, args.build_log
+      e2e_test_artifacts_dir=e2e_test_artifacts_dir)
+  return module_map, build_log
 
 
 def _check_dir_path(path_str: str) -> pathlib.Path:
@@ -262,8 +270,8 @@ def _parse_arguments():
   alpha_parser.add_argument(
       "--compilation_benchmark_config",
       type=_check_file_path,
-      required=True,
-      help="Exported compilation benchmark config of e2e test artifacts.")
+      help="Exported compilation benchmark config of e2e test artifacts. "
+      "Search in e2e_test_artifacts_dir if not set.")
   alpha_parser.add_argument("--build_log",
                             type=_check_file_path,
                             required=True,
@@ -277,7 +285,7 @@ def _parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  module_map, build_log_path = args.get_module_map_and_build_log(args)
+  module_map, build_log_path = args.get_module_map_and_build_log(**vars(args))
   with build_log_path.open("r") as log_file:
     target_build_time_map = parse_compilation_time_from_ninja_log(log_file)
 
