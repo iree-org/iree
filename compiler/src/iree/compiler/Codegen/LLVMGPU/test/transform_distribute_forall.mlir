@@ -48,7 +48,7 @@ hal.executable private @distribute {
         %18 = transform.iree.map_nested_forall_to_gpu_threads %17 {workgroup_size = [256, 1, 1]}
 
         // Late canonicalizations to cleanup and pass the checks.
-        // Needs to occur on the whole variant to perform cse on the workgroup_count region
+        // Needs to occur on the whole variant to perform cse on the workgroup_count region.
         transform.iree.apply_patterns %variant_op
           { canonicalization, tiling_canonicalization, licm, cse }   
       }
