@@ -22,6 +22,7 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
+    "ExtractAddressComputationGPUPass.cpp"
     "KernelConfig.cpp"
     "LLVMGPUDistribute.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
