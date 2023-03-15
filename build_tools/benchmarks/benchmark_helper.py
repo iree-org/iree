@@ -24,6 +24,8 @@ from e2e_test_framework import serialization
 from e2e_test_framework.definitions import iree_definitions
 
 IREE_COMPILER_NAME = "iree-compile"
+DEFAULT_EXECUTION_BENCHMARK_CONFIG = "execution_benchmark_config.json"
+DEFAULT_COMPILATION_BENCHMARK_CONFIG = "compilation_benchmark_config.json"
 
 
 def _convert_to_cmd_string(cmds: Sequence[str]) -> str:
@@ -101,6 +103,20 @@ def _dump_cmds_handler(e2e_test_artifacts_dir: pathlib.Path,
                        execution_benchmark_config: Optional[pathlib.Path],
                        compilation_benchmark_config: Optional[pathlib.Path],
                        benchmark_id: Optional[str], **_unused_args):
+  if execution_benchmark_config is None:
+    config_path = e2e_test_artifacts_dir / DEFAULT_EXECUTION_BENCHMARK_CONFIG
+    if config_path.exists():
+      execution_benchmark_config = config_path
+
+  if compilation_benchmark_config is None:
+    config_path = e2e_test_artifacts_dir / DEFAULT_COMPILATION_BENCHMARK_CONFIG
+    if config_path.exists():
+      compilation_benchmark_config = config_path
+
+  if (execution_benchmark_config is None and
+      compilation_benchmark_config is None):
+    raise ValueError("No benchmark config found.")
+
   lines = []
 
   if execution_benchmark_config is not None:
@@ -149,31 +165,26 @@ def _parse_arguments() -> argparse.Namespace:
   dump_cmds_parser = subparser.add_parser(
       "dump-cmds",
       help="Dump the commands to compile and run benchmarks manually.")
-  dump_cmds_parser.add_argument(
-      "--e2e_test_artifacts_dir",
-      type=pathlib.PurePath,
-      default=pathlib.Path(),
-      help="E2E test artifacts root path used in the outputs of artifact paths")
+  dump_cmds_parser.add_argument("--e2e_test_artifacts_dir",
+                                type=pathlib.Path,
+                                default=pathlib.Path(),
+                                help="E2E test artifacts root path")
   dump_cmds_parser.add_argument("--benchmark_id",
                                 type=str,
                                 help="Only dump the benchmark with this id")
   dump_cmds_parser.add_argument(
       "--execution_benchmark_config",
       type=pathlib.Path,
-      help="Config file exported from export_benchmark_config.py execution")
+      help="Config file exported from export_benchmark_config.py execution. "
+      "Search in e2e_test_artifacts_dir if not set")
   dump_cmds_parser.add_argument(
       "--compilation_benchmark_config",
       type=pathlib.Path,
-      help="Config file exported from export_benchmark_config.py compilation")
+      help="Config file exported from export_benchmark_config.py compilation. "
+      "Search in e2e_test_artifacts_dir if not set")
   dump_cmds_parser.set_defaults(handler=_dump_cmds_handler)
 
-  args = parser.parse_args()
-  if (args.execution_benchmark_config is None and
-      args.compilation_benchmark_config is None):
-    parser.error("At least one of --execution_benchmark_config or "
-                 "--compilation_benchmark_config must be set.")
-
-  return args
+  return parser.parse_args()
 
 
 def main(args: argparse.Namespace):
