@@ -218,12 +218,14 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
               return true;
             });
     if (failed(dimBound)) {
-      llvm_unreachable("reifyBounds failed");
+      return failure();
+      // llvm_unreachable("reifyBounds failed");
     }
 
     if (auto val = dimBound->dyn_cast<Value>()) {
-      val.dump();
-      llvm_unreachable("bound is a Value");
+      return failure();
+      // val.dump();
+      // llvm_unreachable("bound is a Value");
     }
 
     LDBG("Getting vector sizes for:\n" << linalgOp << "\n");
