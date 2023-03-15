@@ -1058,3 +1058,13 @@ iree_status_t iree_vm_list_register_types(iree_vm_instance_t* instance) {
   return iree_vm_instance_register_type(instance, &descriptor,
                                         &iree_vm_list_registration);
 }
+
+iree_status_t iree_vm_list_resolve_types(iree_vm_instance_t* instance) {
+  iree_vm_list_registration =
+      iree_vm_instance_lookup_type(instance, IREE_SV("vm.list"));
+  return iree_vm_list_registration
+             ? iree_ok_status()
+             : iree_make_status(
+                   IREE_STATUS_INTERNAL,
+                   "VM type `vm.list` not registered with the instance");
+}

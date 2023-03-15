@@ -67,6 +67,9 @@ iree_string_view_t iree_file_path_stem(iree_string_view_t path);
 // Returns the part of the basename of |path| after to the final `.`.
 iree_string_view_t iree_file_path_extension(iree_string_view_t path);
 
+// Returns true if |path| _likely_ represents a system dynamic library.
+bool iree_file_path_is_dynamic_library(iree_string_view_t path);
+
 //===----------------------------------------------------------------------===//
 // URIs
 //===----------------------------------------------------------------------===//

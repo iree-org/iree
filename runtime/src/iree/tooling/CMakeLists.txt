@@ -89,6 +89,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::file_io
     iree::base::internal::flags
+    iree::base::internal::path
     iree::base::tracing
     iree::hal
     iree::hal::local::loaders::registration
@@ -99,6 +100,7 @@ iree_cc_library(
     iree::modules::vmvx
     iree::vm
     iree::vm::bytecode::module
+    iree::vm::dynamic::module
   PUBLIC
 )
 

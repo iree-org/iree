@@ -163,8 +163,8 @@ $ ../iree-build/tools/iree-compile \
 
 ```shell
 $ ../iree-build/tools/iree-check-module \
-  /tmp/abs.vmfb \
-  --device=local-task
+  --device=local-task \
+  --module=/tmp/abs.vmfb
 ```
 
 ### iree-run-mlir

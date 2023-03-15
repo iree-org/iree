@@ -408,7 +408,7 @@ void RegisterDispatchBenchmark(const std::string& function_name,
 // benchmarking.
 class IREEBenchmark {
  public:
-  IREEBenchmark() = default;
+  IREEBenchmark() { iree_tooling_module_list_initialize(&module_list_); }
 
   ~IREEBenchmark() {
     IREE_TRACE_SCOPE0("IREEBenchmark::dtor");
@@ -416,7 +416,7 @@ class IREEBenchmark {
     // Order matters. Tear down modules first to release resources.
     inputs_.reset();
     context_.reset();
-    main_module_.reset();
+    iree_tooling_module_list_reset(&module_list_);
     instance_.reset();
 
     // Tear down device last in order to get accurate statistics.
@@ -433,7 +433,7 @@ class IREEBenchmark {
   iree_status_t Register() {
     IREE_TRACE_SCOPE0("IREEBenchmark::Register");
 
-    if (!instance_ || !device_allocator_ || !context_ || !main_module_) {
+    if (!instance_ || !device_allocator_ || !context_ || !module_list_.count) {
       IREE_RETURN_IF_ERROR(Init());
     }
 
@@ -455,12 +455,11 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(
         iree_tooling_create_instance(host_allocator, &instance_));
 
-    IREE_RETURN_IF_ERROR(iree_tooling_load_module_from_flags(
-        instance_.get(), host_allocator, &main_module_));
+    IREE_RETURN_IF_ERROR(iree_tooling_load_modules_from_flags(
+        instance_.get(), host_allocator, &module_list_));
 
     IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
-        instance_.get(), /*user_module_count=*/1,
-        /*user_modules=*/&main_module_,
+        instance_.get(), module_list_.count, module_list_.values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
         &context_, &device_, &device_allocator_));
 
@@ -471,9 +470,11 @@ class IREEBenchmark {
   iree_status_t RegisterSpecificFunction(const std::string& function_name) {
     IREE_TRACE_SCOPE0("IREEBenchmark::RegisterSpecificFunction");
 
+    iree_vm_module_t* main_module =
+        iree_tooling_module_list_back(&module_list_);
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
-        main_module_.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
+        main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_string_view_t{function_name.data(), function_name.size()},
         &function));
 
@@ -498,12 +499,14 @@ class IREEBenchmark {
 
   iree_status_t RegisterAllExportedFunctions() {
     IREE_TRACE_SCOPE0("IREEBenchmark::RegisterAllExportedFunctions");
+    iree_vm_module_t* main_module =
+        iree_tooling_module_list_back(&module_list_);
     iree_vm_module_signature_t signature =
-        iree_vm_module_signature(main_module_.get());
+        iree_vm_module_signature(main_module);
     for (iree_host_size_t i = 0; i < signature.export_function_count; ++i) {
       iree_vm_function_t function;
       IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
-          main_module_.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
+          main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
       iree_string_view_t function_name = iree_vm_function_name(&function);
 
       // We run anything with the 'benchmark' attribute.
@@ -569,7 +572,7 @@ class IREEBenchmark {
   iree::vm::ref<iree_vm_context_t> context_;
   iree::vm::ref<iree_hal_device_t> device_;
   iree::vm::ref<iree_hal_allocator_t> device_allocator_;
-  iree::vm::ref<iree_vm_module_t> main_module_;
+  iree_tooling_module_list_t module_list_;
   iree::vm::ref<iree_vm_list_t> inputs_;
 };
 }  // namespace

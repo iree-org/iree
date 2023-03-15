@@ -13,7 +13,7 @@
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_partial_codegen_spec.mlir | \
-// RUN: iree-run-module --function=softmax_partial --device=cuda | \
+// RUN: iree-run-module --module=- --function=softmax_partial --device=cuda | \
 // RUN: FileCheck %s
 
 !tmp_tensor_t = tensor<16x128xf32>

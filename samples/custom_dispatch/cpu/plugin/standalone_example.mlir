@@ -11,6 +11,7 @@
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
 // RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/standalone_plugin.sos \
+// RUN:     --module=- \
 // RUN:     --function=mixed_invocation \
 // RUN:     --input=8xf32=2 \
 // RUN:     --input=8xf32=4 | \

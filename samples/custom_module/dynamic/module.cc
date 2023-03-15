@@ -1,15 +1,16 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "module.h"
-
 #include <cstdio>
 
 #include "iree/base/api.h"
+#include "iree/hal/api.h"
+#include "iree/modules/hal/types.h"
 #include "iree/vm/api.h"
+#include "iree/vm/dynamic/api.h"
 #include "iree/vm/native_module_cc.h"
 
 // NOTE: this module is written in C++ using the native module wrapper and uses
@@ -41,9 +42,16 @@ typedef struct iree_custom_string_t {
 // Runtime type descriptor for the !custom.string describing how to manage it
 // and destroy it. The type ID is allocated at runtime and does not need to
 // match the compiler ID.
+IREE_VM_DECLARE_TYPE_ADAPTERS(iree_custom_string, iree_custom_string_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_custom_string, iree_custom_string_t);
 
-extern "C" iree_status_t iree_custom_string_create(
+// Creates a new !custom.string object with a copy of the given |value|.
+// Applications could use this and any other methods we wanted to expose to
+// interop with the loaded VM modules - such as passing in/out the objects.
+// We don't need this for the demo but creating the custom object, appending it
+// to the invocation input list, and then consuming it in the compiled module
+// is straightforward.
+static iree_status_t iree_custom_string_create(
     iree_string_view_t value, iree_allocator_t allocator,
     iree_custom_string_t** out_string) {
   IREE_ASSERT_ARGUMENT(out_string);
@@ -60,7 +68,7 @@ extern "C" iree_status_t iree_custom_string_create(
   return iree_ok_status();
 }
 
-extern "C" void iree_custom_string_destroy(void* ptr) {
+static void iree_custom_string_destroy(void* ptr) {
   iree_custom_string_t* string = (iree_custom_string_t*)ptr;
   iree_allocator_free(string->allocator, ptr);
 }
@@ -70,7 +78,7 @@ static iree_vm_ref_type_descriptor_t iree_custom_string_descriptor_storage = {
 
 // Registers types provided by the custom module.
 // We must call this before any of our types can be resolved.
-iree_status_t iree_custom_module_basic_register_types(
+static iree_status_t iree_custom_module_basic_register_types(
     iree_vm_instance_t* instance) {
   iree_custom_string_descriptor_storage.destroy = iree_custom_string_destroy;
   iree_custom_string_descriptor_storage.type_name = IREE_SV("custom.string");
@@ -82,6 +90,9 @@ iree_status_t iree_custom_module_basic_register_types(
                                         &iree_custom_string_registration);
 }
 
+// Unregisters types previously registered.
+// In dynamic modules it's critical that types are unregistered before the
+// library is unloaded.
 static void iree_custom_module_basic_unregister_types(
     iree_vm_instance_t* instance) {
   iree_vm_instance_unregister_type(instance,
@@ -110,27 +121,22 @@ class CustomModuleState final {
 
   // Creates a new string with a copy of the given string data.
   // No NUL terminator is required.
-  StatusOr<vm::ref<iree_custom_string_t>> StringCreate(
-      iree_string_view_t data) {
+  StatusOr<vm::ref<iree_custom_string_t>> StringFromTensor(
+      vm::ref<iree_hal_buffer_view_t> buffer_view) {
+    char string_buffer[512];
+    iree_host_size_t string_length = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_format(
+        buffer_view.get(), 128, IREE_ARRAYSIZE(string_buffer), string_buffer,
+        &string_length));
+
     vm::ref<iree_custom_string_t> string;
-    IREE_RETURN_IF_ERROR(
-        iree_custom_string_create(data, host_allocator_, &string));
+    IREE_RETURN_IF_ERROR(iree_custom_string_create(
+        iree_make_string_view(string_buffer, string_length), host_allocator_,
+        &string));
     fprintf(stdout, "CREATE %.*s\n", static_cast<int>(string->value.size),
             string->value.data);
     fflush(stdout);
     return std::move(string);
-  }
-
-  // Returns the length of the string in characters.
-  StatusOr<int64_t> StringLength(const vm::ref<iree_custom_string_t> string) {
-    if (!string) {
-      // Passed in refs may be null.
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null string arg");
-    }
-    fprintf(stdout, "LENGTH %.*s = %zu\n", static_cast<int>(string->value.size),
-            string->value.data, string->value.size);
-    fflush(stdout);
-    return static_cast<int64_t>(string->value.size);
   }
 
   // Prints the contents of the string to stdout.
@@ -142,12 +148,6 @@ class CustomModuleState final {
     return OkStatus();
   }
 
-  // Prints the contents of the string; only exported in debug mode.
-  Status StringDPrint(const vm::ref<iree_custom_string_t> string) {
-    if (!string) return OkStatus();  // no-op
-    return StringPrint(std::move(string));
-  }
-
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
@@ -156,17 +156,9 @@ class CustomModuleState final {
 
 // Function table mapping imported function names to their implementation.
 static const vm::NativeFunction<CustomModuleState> kCustomModuleFunctions[] = {
-    vm::MakeNativeFunction("string.create", &CustomModuleState::StringCreate),
-    vm::MakeNativeFunction("string.length", &CustomModuleState::StringLength),
+    vm::MakeNativeFunction("string.from_tensor",
+                           &CustomModuleState::StringFromTensor),
     vm::MakeNativeFunction("string.print", &CustomModuleState::StringPrint),
-
-#if !NDEBUG
-    // This is an optional method that we purposefully compile out in release
-    // builds to demonstrate fallback paths. Consuming modules can query as to
-    // whether the function exists at runtime and call fallbacks/change their
-    // behavior.
-    vm::MakeNativeFunction("string.dprint", &CustomModuleState::StringDPrint),
-#endif  // !NDEBUG
 };
 
 // The module instance that will be allocated and reused across contexts.
@@ -187,37 +179,64 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
   // Creates per-context state when the module is added to a new context.
   // May be called from any thread.
   StatusOr<std::unique_ptr<CustomModuleState>> CreateState(
-      iree_allocator_t allocator) override {
-    auto state = std::make_unique<CustomModuleState>(allocator);
+      iree_allocator_t host_allocator) override {
+    auto state = std::make_unique<CustomModuleState>(host_allocator);
     return state;
   }
 };
 
 }  // namespace
 
+// Creates a native custom module that can be reused in multiple contexts.
+// The module itself may hold state that can be shared by all instantiated
+// copies but it will require the module to provide synchronization; usually
+// it's safer to just treat the module as immutable and keep state within the
+// instantiated module states instead.
+//
 // Note that while we are using C++ bindings internally we still expose the
-// module as a C instance. This hides the details of our implementation.
-extern "C" iree_status_t iree_custom_module_basic_create(
-    iree_vm_instance_t* instance, iree_allocator_t allocator,
-    iree_vm_module_t** out_module) {
-  IREE_ASSERT_ARGUMENT(out_module);
-  *out_module = NULL;
+// module as a C instance. This hides the details of our implementation and
+// is required for working across the dynamic library boundary.
+extern "C" IREE_VM_DYNAMIC_MODULE_EXPORT iree_status_t create_custom_module(
+    iree_vm_dynamic_module_version_t max_version, iree_vm_instance_t* instance,
+    iree_host_size_t param_count, const iree_string_pair_t* params,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
+  // Ensure the version matches; the version will change if the VM module
+  // interface changes and existing libraries are incompatible.
+  if (max_version != IREE_VM_DYNAMIC_MODULE_VERSION_LATEST) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "unsupported runtime version %u, module compiled with version %u",
+        max_version, IREE_VM_DYNAMIC_MODULE_VERSION_LATEST);
+  }
 
-  // Register the types used by the module.
-  // The CustomModule destructor will unregister them when it's done.
-  // Unregistration isn't strictly required in some cases but is good practice.
-  iree_custom_module_basic_register_types(instance);
+#if IREE_TRACING_FEATURES
+  // Today Tracy cannot be used with custom dynamic modules as it'll try to
+  // create a new tracing context distinct from the hosting application. Custom
+  // module libraries should be built with tracing disabled.
+  fprintf(stderr,
+          "Tracy is not currently supported in custom dynamic modules\n");
+#endif  // IREE_TRACING_FEATURES
 
+  // Ensure HAL types are available. We need to do this as we're being
+  // dynamically loaded and can't automatically access the hosting process
+  // variables.
+  IREE_RETURN_IF_ERROR(iree_hal_module_resolve_all_types(instance));
+
+  // Register custom types used by the module against the instance.
+  // Note that this function must be safe to call multiple times as the module
+  // may be loaded multiple times.
+  IREE_RETURN_IF_ERROR(iree_custom_module_basic_register_types(instance));
+
+  // Create the custom module and return it to the runtime.
   // NOTE: this isn't using the allocator here and that's bad as it leaves
   // untracked allocations and pulls in the system allocator that may differ
   // from the one requested by the user.
   // TODO(benvanik): std::allocator wrapper around iree_allocator_t so this can
   // use that instead.
   auto module = std::make_unique<CustomModule>(
-      "custom", /*version=*/0, instance, allocator,
+      "custom", /*version=*/0, instance, host_allocator,
       iree::span<const vm::NativeFunction<CustomModuleState>>(
           kCustomModuleFunctions));
-
   *out_module = module.release()->interface();
   return iree_ok_status();
 }

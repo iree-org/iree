@@ -16,16 +16,6 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
-// Module loading
-//===----------------------------------------------------------------------===//
-
-// Loads the module file specified by --module=.
-// Returns a retained reference to the loaded module handle.
-iree_status_t iree_tooling_load_module_from_flags(
-    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
-    iree_vm_module_t** out_module);
-
-//===----------------------------------------------------------------------===//
 // Module management
 //===----------------------------------------------------------------------===//
 
@@ -48,6 +38,14 @@ void iree_tooling_module_list_clone(
 // Resets |list|, releasing all retained modules.
 void iree_tooling_module_list_reset(iree_tooling_module_list_t* list);
 
+// Pushes |module| onto the end of |list| and retains a reference.
+iree_status_t iree_tooling_module_list_push_back(
+    iree_tooling_module_list_t* list, iree_vm_module_t* module);
+
+// Returns the last module in the module list or NULL if the list is empty.
+iree_vm_module_t* iree_tooling_module_list_back(
+    const iree_tooling_module_list_t* list);
+
 // Resolves module dependencies required by |user_modules| and produces a
 // flattened list of all resolved modules.
 //
@@ -62,6 +60,16 @@ iree_status_t iree_tooling_resolve_modules(
     iree_allocator_t host_allocator, iree_tooling_module_list_t* resolved_list,
     iree_hal_device_t** out_device,
     iree_hal_allocator_t** out_device_allocator);
+
+//===----------------------------------------------------------------------===//
+// Module loading
+//===----------------------------------------------------------------------===//
+
+// Loads modules in the order specified by the --module= flag.
+// Appends the modules to the |list|.
+iree_status_t iree_tooling_load_modules_from_flags(
+    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
+    iree_tooling_module_list_t* list);
 
 //===----------------------------------------------------------------------===//
 // Context management

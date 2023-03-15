@@ -96,15 +96,16 @@ iree_status_t Run(int* out_exit_code) {
   IREE_RETURN_IF_ERROR(iree_tooling_create_instance(host_allocator, &instance),
                        "creating instance");
 
-  vm::ref<iree_vm_module_t> main_module;
-  IREE_RETURN_IF_ERROR(iree_tooling_load_module_from_flags(
-      instance.get(), host_allocator, &main_module));
+  iree_tooling_module_list_t module_list;
+  iree_tooling_module_list_initialize(&module_list);
+  IREE_RETURN_IF_ERROR(iree_tooling_load_modules_from_flags(
+      instance.get(), host_allocator, &module_list));
 
   vm::ref<iree_vm_context_t> context;
   vm::ref<iree_hal_device_t> device;
   vm::ref<iree_hal_allocator_t> device_allocator;
   IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
-      instance.get(), /*user_module_count=*/1, /*user_modules=*/&main_module,
+      instance.get(), module_list.count, module_list.values,
       /*default_device_uri=*/iree_string_view_empty(), host_allocator, &context,
       &device, &device_allocator));
 
@@ -116,7 +117,8 @@ iree_status_t Run(int* out_exit_code) {
   } else {
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_name(
-            main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
+            iree_tooling_module_list_back(&module_list),
+            IREE_VM_FUNCTION_LINKAGE_EXPORT,
             iree_string_view_t{function_name.data(), function_name.size()},
             &function),
         "looking up function '%s'", function_name.c_str());
@@ -196,7 +198,7 @@ iree_status_t Run(int* out_exit_code) {
   // Release resources before gathering statistics.
   inputs.reset();
   outputs.reset();
-  main_module.reset();
+  iree_tooling_module_list_reset(&module_list);
   context.reset();
 
   if (device_allocator && FLAG_print_statistics) {

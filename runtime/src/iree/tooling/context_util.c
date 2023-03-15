@@ -12,6 +12,7 @@
 
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
@@ -20,6 +21,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
 #include "iree/vm/bytecode/module.h"
+#include "iree/vm/dynamic/module.h"
 
 #if defined(IREE_HAVE_VMVX_MODULE)
 #include "iree/modules/vmvx/module.h"
@@ -29,36 +31,32 @@
 // Module loading
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): module repeated flag. We could then allow the user to specify
-// either files or builtin module names in order to customize things. When we
-// support multiple types of dynamically loadable modules (lua/etc) we could
-// also allow mixes and use file ID snooping to choose a loader.
-IREE_FLAG(string, module, "-",
-          "File containing the module to load. Defaults to stdin (`-`).");
+IREE_FLAG_LIST(
+    string, module,
+    "A VM module to load; either a vmfb containing a compiled bytecode module\n"
+    "or a native system library containing a dynamic native module. Modules\n"
+    "are registered in the order defined by the flags with all dependencies\n"
+    "for a module needing to have been registered prior to the dependent\n"
+    "module. HAL modules are added automatically when required.");
 
-iree_status_t iree_tooling_load_module_from_flags(
-    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
-    iree_vm_module_t** out_module) {
-  IREE_ASSERT_ARGUMENT(instance);
-  IREE_ASSERT_ARGUMENT(out_module);
-  *out_module = NULL;
+static iree_status_t iree_tooling_load_bytecode_module(
+    iree_vm_instance_t* instance, iree_string_view_t path,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, FLAG_module);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
 
   // Fetch the file contents into memory.
   // We could map the memory here if we wanted to and were coming from a file
   // on disk.
   iree_file_contents_t* file_contents = NULL;
-  if (strcmp(FLAG_module, "-") == 0) {
-    // Reading from stdin. We print it out here because people often get
-    // confused when the tool hangs waiting for input.
-    fprintf(stderr, "Reading module contents from stdin...\n");
+  if (iree_string_view_equal(path, IREE_SV("-"))) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_stdin_read_contents(host_allocator, &file_contents));
   } else {
+    char path_str[2048] = {0};
+    iree_string_view_to_cstring(path, path_str, sizeof(path_str));
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_file_read_contents(FLAG_module, host_allocator, &file_contents));
+        z0, iree_file_read_contents(path_str, host_allocator, &file_contents));
   }
 
   // Try to load the module as bytecode (all we have today that we can use).
@@ -74,8 +72,83 @@ iree_status_t iree_tooling_load_module_from_flags(
   } else {
     iree_file_contents_free(file_contents);
   }
+
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+static iree_status_t iree_tooling_load_dynamic_module(
+    iree_vm_instance_t* instance, iree_string_view_t path,
+    iree_string_view_t export_name, iree_string_view_t params,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, path.data, path.size);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, params.data, params.size);
+
+  // Split up params list - comes in `key=value&key=value` form.
+  iree_host_size_t param_count = 0;
+  iree_uri_split_params(params, 0, &param_count, NULL);
+  iree_string_pair_t* param_list = NULL;
+  if (param_count > 0) {
+    param_list =
+        (iree_string_pair_t*)iree_alloca(param_count * sizeof(*param_list));
+    iree_uri_split_params(params, param_count, &param_count, param_list);
+  }
+
+  iree_status_t status = iree_vm_dynamic_module_load_from_file(
+      instance, path, export_name, param_count, param_list, host_allocator,
+      out_module);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_tooling_load_modules_from_flags(
+    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
+    iree_tooling_module_list_t* list) {
+  IREE_ASSERT_ARGUMENT(instance);
+  IREE_ASSERT_ARGUMENT(list);
+  iree_host_size_t new_count = list->count + FLAG_module_list().count;
+  if (new_count > list->capacity) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "too many modules; currently only %zu are "
+                            "supported but at least %zu are requested",
+                            list->capacity, new_count);
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  for (iree_host_size_t i = 0; i < FLAG_module_list().count; ++i) {
+    // We support `file.so@export_name?params` syntax to allow loading multiple
+    // modules from the same shared library and passing in parameters. When
+    // omitted we'll use the default export name.
+    iree_string_view_t path, export_name, params;
+    iree_string_view_split(FLAG_module_list().values[i], '@', &path,
+                           &export_name);
+    iree_string_view_split(export_name, '?', &export_name, &params);
+
+    // Load the module based on its (guessed) type.
+    iree_vm_module_t* module = NULL;
+    if (iree_file_path_is_dynamic_library(path)) {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0,
+          iree_tooling_load_dynamic_module(instance, path, export_name, params,
+                                           host_allocator, &module),
+          "loading dynamic module at '%.*s'", (int)path.size, path.data);
+    } else {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0,
+          iree_tooling_load_bytecode_module(instance, path, host_allocator,
+                                            &module),
+          "loading bytecode module at '%.*s'", (int)path.size, path.data);
+    }
+
+    // Store loaded module in the list. It'll be the caller's responsibility to
+    // clean it up even if we fail while loading more.
+    list->values[list->count++] = module;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -265,18 +338,11 @@ void iree_tooling_module_list_clone(
   }
 }
 
-// Pushes |module| onto the end of |list| and retains a reference.
-static iree_status_t iree_tooling_module_list_push_back(
-    iree_tooling_module_list_t* list, iree_vm_module_t* module) {
-  if (list->count + 1 > list->capacity) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "resolved module list capacity %" PRIhsz
-                            " too small to fit all resolved modules",
-                            list->capacity);
+void iree_tooling_module_list_reset(iree_tooling_module_list_t* list) {
+  for (iree_host_size_t i = 0; i < list->count; ++i) {
+    iree_vm_module_release(list->values[i]);
   }
-  iree_vm_module_retain(module);
-  list->values[list->count++] = module;
-  return iree_ok_status();
+  list->count = 0;
 }
 
 // Returns true if |list| contains a module with the given |module_name|.
@@ -291,11 +357,22 @@ static bool iree_tooling_module_list_contains(
   return false;
 }
 
-void iree_tooling_module_list_reset(iree_tooling_module_list_t* list) {
-  for (iree_host_size_t i = 0; i < list->count; ++i) {
-    iree_vm_module_release(list->values[i]);
+iree_status_t iree_tooling_module_list_push_back(
+    iree_tooling_module_list_t* list, iree_vm_module_t* module) {
+  if (list->count + 1 > list->capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "resolved module list capacity %" PRIhsz
+                            " too small to fit all resolved modules",
+                            list->capacity);
   }
-  list->count = 0;
+  iree_vm_module_retain(module);
+  list->values[list->count++] = module;
+  return iree_ok_status();
+}
+
+iree_vm_module_t* iree_tooling_module_list_back(
+    const iree_tooling_module_list_t* list) {
+  return list->count ? list->values[list->count - 1] : NULL;
 }
 
 typedef struct {

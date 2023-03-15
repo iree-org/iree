@@ -14,7 +14,9 @@
 
 // Defined in their respective files:
 iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance);
+iree_status_t iree_vm_buffer_resolve_types(iree_vm_instance_t* instance);
 iree_status_t iree_vm_list_register_types(iree_vm_instance_t* instance);
+iree_status_t iree_vm_list_resolve_types(iree_vm_instance_t* instance);
 
 // Registers the builtin VM types. This must be called on startup. Safe to call
 // multiple times.
@@ -22,6 +24,13 @@ static iree_status_t iree_vm_register_builtin_types(
     iree_vm_instance_t* instance) {
   IREE_RETURN_IF_ERROR(iree_vm_buffer_register_types(instance));
   IREE_RETURN_IF_ERROR(iree_vm_list_register_types(instance));
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t
+iree_vm_resolve_builtin_types(iree_vm_instance_t* instance) {
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_resolve_types(instance));
+  IREE_RETURN_IF_ERROR(iree_vm_list_resolve_types(instance));
   return iree_ok_status();
 }
 

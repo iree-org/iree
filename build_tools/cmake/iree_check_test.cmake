@@ -151,7 +151,7 @@ function(iree_check_test)
     SRC
       "${_RUNNER_TARGET}"
     ARGS
-      "{{${_MODULE_FILE_NAME}}}"
+      "--module={{${_MODULE_FILE_NAME}}}"
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}

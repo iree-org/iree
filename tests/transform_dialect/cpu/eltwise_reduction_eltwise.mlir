@@ -55,7 +55,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu  \
 // RUN:     --iree-codegen-llvmcpu-enable-transform-dialect-jit | \
-// RUN: iree-run-module --function=reduce --device=local-task --input="32x256xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=local-task --input="32x256xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 //      CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
