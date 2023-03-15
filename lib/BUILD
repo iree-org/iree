@@ -6,7 +6,6 @@
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary")
 
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
