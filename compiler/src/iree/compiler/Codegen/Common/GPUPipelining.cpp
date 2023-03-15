@@ -19,7 +19,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#define DEBUG_TYPE "iree-gpu-nvidia-ampere-mainloop-schedule"
+#define DEBUG_TYPE "iree-gpu-pipelining"
 
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
@@ -245,10 +245,6 @@ struct WarpMmaOp {
 /// to generate an optimal schedule interleaving Global Memory loads, Shared
 /// Memory loads, and math operations.
 struct MainLoopInfo {
-  //
-  // Data members
-  //
-
   // Mainloop asyncronous copy operations:
   // `cp.async` GlobalMemory -> SharedMemory
   llvm::SetVector<Operation*> copyGlobalToSharedOps;
@@ -276,10 +272,6 @@ struct MainLoopInfo {
   // scheduling).
   bool isSchedulable = false;
 
-  //
-  // Methods
-  //
-
   // Populates the dependent operations in ``dependentOps`` for the given a op
   // recursively that are in the same block and not added to the backward slice
   // of some other op.
@@ -303,6 +295,8 @@ struct MainLoopInfo {
                                Block* block) {
     if (!op) return;
 
+    // If the operation is a ldmatrix or ld.shared, then add it to the set of
+    // the current kgroup load operations.
     if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(op)) {
       if (op->getBlock() == block) {
         loadOperations.insert(op);
@@ -310,9 +304,23 @@ struct MainLoopInfo {
       return;
     }
 
+    // If the operation is not a ldmatrix or ld.shared, then it has to be a
+    // vector.extract_strided_slice or vector.insert operation  to recurse up
+    // the chain to find the ldmatrix or ld.shared Shared Memory load operation.
+    if (!isa<vector::ExtractStridedSliceOp, vector::InsertOp>(op)) {
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "Unable to find Shared Memory load for MmaSyncOp. Thus, the "
+               "Shared Memory load into the register operand will not be "
+               "pipelined."
+            << "\n";
+      });
+      return;
+    }
+
     // Recurse upwards towards the definition until a Shared Memory load is
-    // found. Assumption here is that only single operand operations are
-    // leading up to a Shared Memory load.
+    // found. Only vector.extract_strided_slice or vector.insert operations
+    // leading up to a Shared Memory loads are considered.
     Operation* defOp = op->getOperand(0).getDefiningOp();
 
     backtrackToFindSmemLoad(defOp, loadOperations, block);
@@ -346,7 +354,6 @@ struct MainLoopInfo {
     vistMmaSyncOp((op->getUses().begin())->getOwner(), ++kgroup);
   }
 
-  // Ctor.
   MainLoopInfo(scf::ForOp forOp) : isSchedulable(true) { analyze(forOp); }
 
   // Iterate through the mainloop and collect `cp.async`, `cp.commit_group`,
@@ -379,7 +386,7 @@ struct MainLoopInfo {
       if (isa<nvgpu::MmaSyncOp>(op)) {
         // MmaSyncOp visitor traverses the chain of mma operations and separates
         // them into kgroups.
-        vistMmaSyncOp(&op, 0 /*kgroup*/);
+        vistMmaSyncOp(&op, 0 /*kgroup=0*/);
       }
     }
 
@@ -392,8 +399,9 @@ struct MainLoopInfo {
       return;
     }
 
-    // Collect the dependent operations for cp.async in the mainloop order for
-    // coarse-grained software pipeling.
+    // Collect the dependent operations for `cp.async` in the mainloop order for
+    // coarse-grained software pipeling. The deps are collected in stage order,
+    // i.e., `cp.async`'s deps in stage 0 are collected first.
     for (Operation& op : forOp.getBody()->getOperations()) {
       if (isa<nvgpu::DeviceAsyncCopyOp>(&op)) {
         backwardSliceOfDependentOps(copyGlobalToSharedOpDeps, &op,
@@ -432,8 +440,9 @@ struct MainLoopInfo {
 };
 
 /// Prints the given `funcOp` after a leading `step` comment header.
-void debugMainloopSchedule(MainLoopInfo& mainloop, int numStages,
-                           std::vector<std::pair<Operation*, unsigned>>& ops) {
+static void debugMainloopSchedule(
+    MainLoopInfo& mainloop, int numStages,
+    std::vector<std::pair<Operation*, unsigned>>& ops) {
   LLVM_DEBUG({
     llvm::dbgs() << "//--- Mainloop schedule generated for Nvidia Ampere "
                     "mma.sync TensorCore Pipeline. ---//\n";

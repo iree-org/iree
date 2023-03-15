@@ -81,7 +81,6 @@ hal.executable @mma_fused_fp16 {
 //          CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<8xf16>, 3>
 //          CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
 
-
 // -----
 
 
@@ -147,13 +146,16 @@ hal.executable @mma_fused_f32 {
 //          CHECK:   nvvm.cp.async.commit.group
 //          CHECK:   nvvm.cp.async.wait.group 2
 //  CHECK-COUNT-1:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)> 
 //          CHECK:   llvm.br
 //  CHECK-COUNT-1:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)> 
 //  CHECK-COUNT-2:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, multiplicandAPtxType = #nvvm.mma_type<tf32>, multiplicandBPtxType = #nvvm.mma_type<tf32>, shape = #nvvm.shape<m = 16, n = 8, k = 8>} : (i32, i32, f32) -> !llvm.struct<(f32, f32, f32, f32)>
 //  CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //          CHECK:   nvvm.cp.async.commit.group
 //          CHECK:   nvvm.cp.async.wait.group 2
 //  CHECK-COUNT-1:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)> 
 //  CHECK-COUNT-2:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, multiplicandAPtxType = #nvvm.mma_type<tf32>, multiplicandBPtxType = #nvvm.mma_type<tf32>, shape = #nvvm.shape<m = 16, n = 8, k = 8>} : (i32, i32, f32) -> !llvm.struct<(f32, f32, f32, f32)>
 //          CHECK:   llvm.br
 //      CHECK-NOT:   nvvm.mma.sync
