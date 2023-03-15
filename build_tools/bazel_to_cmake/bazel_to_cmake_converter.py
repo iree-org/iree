@@ -452,8 +452,11 @@ class BuildFileFunctions(object):
                             f"{includes_block}"
                             f")\n\n")
 
-  # Effectively an alias in IREE code.
-  iree_cc_binary = cc_binary
+  def iree_runtime_cc_binary(self, deps=[], **kwargs):
+    self.cc_binary(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+
+  def iree_compiler_cc_binary(self, deps=[], **kwargs):
+    self.cc_binary(deps=deps + ["//compiler/src:defs"], **kwargs)
 
   def c_embed_data(self,
                    name,
