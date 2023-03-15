@@ -29,3 +29,47 @@ set(ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/e2e_test_artifacts")
 include(generated_e2e_test_fetch_models.cmake)
 
 include(generated_e2e_test_iree_artifacts.cmake)
+
+################################################################################
+# Exports benchmark config files                                               #
+################################################################################
+set(_EXECUTION_BENCHMARK_CONFIG_FILE
+  "${ROOT_ARTIFACTS_DIR}/execution_benchmark_config.json")
+add_custom_command(
+  OUTPUT "${_EXECUTION_BENCHMARK_CONFIG_FILE}"
+  COMMAND
+    "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/benchmarks/export_benchmark_config.py"
+      execution
+      --output "${_EXECUTION_BENCHMARK_CONFIG_FILE}"
+  DEPENDS
+    "${IREE_ROOT_DIR}/build_tools/benchmarks/export_benchmark_config.py"
+  COMMENT "Exporting ${_EXECUTION_BENCHMARK_CONFIG_FILE}"
+  VERBATIM
+)
+set(_EXECUTION_BENCHMARK_CONFIG_TARGET_NAME
+  "${_PACKAGE_NAME}_iree-execution-benchmark-config")
+add_custom_target("${_EXECUTION_BENCHMARK_CONFIG_TARGET_NAME}"
+  DEPENDS "${_EXECUTION_BENCHMARK_CONFIG_FILE}"
+)
+add_dependencies(iree-benchmark-suites
+  "${_EXECUTION_BENCHMARK_CONFIG_TARGET_NAME}")
+
+set(_COMPILATION_BENCHMARK_CONFIG_FILE "${ROOT_ARTIFACTS_DIR}/compilation_benchmark_config.json")
+add_custom_command(
+  OUTPUT "${_COMPILATION_BENCHMARK_CONFIG_FILE}"
+  COMMAND
+    "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/benchmarks/export_benchmark_config.py"
+      compilation
+      --output "${_COMPILATION_BENCHMARK_CONFIG_FILE}"
+  DEPENDS
+    "${IREE_ROOT_DIR}/build_tools/benchmarks/export_benchmark_config.py"
+  COMMENT "Exporting ${_COMPILATION_BENCHMARK_CONFIG_FILE}"
+  VERBATIM
+)
+set(_COMPILATION_BENCHMARK_CONFIG_TARGET_NAME
+  "${_PACKAGE_NAME}_iree-compilation-benchmark-config")
+add_custom_target("${_COMPILATION_BENCHMARK_CONFIG_TARGET_NAME}"
+  DEPENDS "${_COMPILATION_BENCHMARK_CONFIG_FILE}"
+)
+add_dependencies(iree-e2e-compile-stats-suites
+  "${_COMPILATION_BENCHMARK_CONFIG_TARGET_NAME}")

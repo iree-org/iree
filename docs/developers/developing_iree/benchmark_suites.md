@@ -51,19 +51,12 @@ cmake --build "${IREE_BUILD_DIR}" --target \
 
 ### Run Benchmarks
 
-Export the execution benchmark config:
-
-```sh
-build_tools/benchmarks/export_benchmark_config.py execution > exec_config.json
-```
-
 Run benchmarks (currently only support running on a Linux host):
 
 ```sh
 build_tools/benchmarks/run_benchmarks_on_linux.py \
   --normal_benchmark_tool_dir="${IREE_BUILD_DIR}/tools" \
   --e2e_test_artifacts_dir="${IREE_BUILD_DIR}/e2e_test_artifacts" \
-  --execution_benchmark_config=exec_config.json \
   --target_device_name="<target_device_name, e.g. c2-standard-16>" \
   --output=benchmark_results.json \
   --verbose \
@@ -93,7 +86,6 @@ Filters can be used to select the benchmarks:
 build_tools/benchmarks/run_benchmarks_on_linux.py \
   --normal_benchmark_tool_dir="${IREE_BUILD_DIR}/tools" \
   --e2e_test_artifacts_dir="${IREE_BUILD_DIR}/e2e_test_artifacts" \
-  --execution_benchmark_config=exec_config.json \
   --target_device_name="c2-standard-16" \
   --output=benchmark_results.json \
   --verbose \
@@ -107,16 +99,11 @@ build_tools/benchmarks/run_benchmarks_on_linux.py \
 
 Export the compilation benchmark config:
 
-```sh
-build_tools/benchmarks/export_benchmark_config.py compilation > comp_config.json
-```
-
 Generate the compilation statistics:
 
 ```sh
 build_tools/benchmarks/collect_compilation_statistics.py \
   alpha \
-  --compilation_benchmark_config=comp_config.json \
   --e2e_test_artifacts_dir="${IREE_BUILD_DIR}/e2e_test_artifacts" \
   --build_log="${IREE_BUILD_DIR}/.ninja_log" \
   --output=compile_stats_results.json
@@ -149,8 +136,17 @@ Run the helper tool to dump all commands from benchmark configs:
 
 ```sh
 build_tools/benchmarks/benchmark_helper.py dump-cmds \
-  --execution_benchmark_config=exec_config.json \
-  --compilation_benchmark_config=comp_config.json \
+  --e2e_test_artifacts_dir="${IREE_BUILD_DIR}/e2e_test_artifacts" \
+  --benchmark_id="<benchmark_id>"
+```
+
+Or if you only have the benchmark configs (by default they are generated under
+"${IREE_BUILD_DIR}/e2e_test_artifacts"):
+
+```sh
+build_tools/benchmarks/benchmark_helper.py dump-cmds \
+  --execution_benchmark_config="<execution_benchmark_config.json>" \
+  --compilation_benchmark_config="<compilation_benchmark_config.json>" \
   --benchmark_id="<benchmark_id>"
 ```
 
