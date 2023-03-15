@@ -25,7 +25,8 @@ static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,
 
 // Resolves a type through either builtin rules or the ref registered types.
 static bool iree_vm_bytecode_module_resolve_type(
-    iree_vm_TypeDef_table_t type_def, iree_vm_type_def_t* out_type) {
+    iree_vm_instance_t* instance, iree_vm_TypeDef_table_t type_def,
+    iree_vm_type_def_t* out_type) {
   memset(out_type, 0, sizeof(*out_type));
   flatbuffers_string_t full_name = iree_vm_TypeDef_full_name(type_def);
   if (!flatbuffers_string_len(full_name)) {
@@ -71,7 +72,7 @@ static bool iree_vm_bytecode_module_resolve_type(
       type_name = iree_make_cstring_view("vm.list");
     }
     const iree_vm_ref_type_descriptor_t* type_descriptor =
-        iree_vm_ref_lookup_registered_type(type_name);
+        iree_vm_instance_lookup_type(instance, type_name);
     if (type_descriptor) {
       out_type->ref_type = type_descriptor->type;
       return true;
@@ -84,12 +85,14 @@ static bool iree_vm_bytecode_module_resolve_type(
 // |type_table| can be omitted to just perform verification that all types are
 // registered.
 static iree_status_t iree_vm_bytecode_module_resolve_types(
-    iree_vm_TypeDef_vec_t type_defs, iree_vm_type_def_t* type_table) {
+    iree_vm_instance_t* instance, iree_vm_TypeDef_vec_t type_defs,
+    iree_vm_type_def_t* type_table) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
     iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
-    if (!iree_vm_bytecode_module_resolve_type(type_def, &type_table[i])) {
+    if (!iree_vm_bytecode_module_resolve_type(instance, type_def,
+                                              &type_table[i])) {
       status = iree_make_status(IREE_STATUS_NOT_FOUND,
                                 "no type registered with name '%s'",
                                 iree_vm_TypeDef_full_name(type_def));
@@ -882,8 +885,8 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->def = module_def;
 
   module->type_count = iree_vm_TypeDef_vec_len(type_defs);
-  iree_status_t resolve_status =
-      iree_vm_bytecode_module_resolve_types(type_defs, module->type_table);
+  iree_status_t resolve_status = iree_vm_bytecode_module_resolve_types(
+      instance, type_defs, module->type_table);
   if (!iree_status_is_ok(resolve_status)) {
     iree_allocator_free(allocator, module);
     IREE_TRACE_ZONE_END(z0);

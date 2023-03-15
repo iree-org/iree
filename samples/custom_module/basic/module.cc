@@ -75,7 +75,8 @@ extern "C" iree_status_t iree_custom_module_basic_register_types(
   iree_custom_string_descriptor.offsetof_counter =
       offsetof(iree_custom_string_t, ref_object.counter);
   iree_custom_string_descriptor.destroy = iree_custom_string_destroy;
-  return iree_vm_ref_register_type(&iree_custom_string_descriptor);
+  return iree_vm_instance_register_type(instance,
+                                        &iree_custom_string_descriptor);
 }
 
 //===----------------------------------------------------------------------===//

@@ -343,7 +343,7 @@ std::optional<emitc::ApplyOp> createVmTypeDefPtr(
         /*type=*/
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "const iree_vm_ref_type_descriptor_t")),
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_lookup_registered_type"),
+        /*callee=*/StringAttr::get(ctx, "iree_vm_instance_lookup_type"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{typeNameCStringView.getResult(0)});

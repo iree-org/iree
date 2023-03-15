@@ -494,11 +494,11 @@ class opaque_ref {
   }                                                            \
   }
 
-#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)  \
-  descriptor.type_name = iree_make_cstring_view(name);    \
-  descriptor.offsetof_counter = type::offsetof_counter(); \
-  descriptor.destroy = type::DirectDestroy;               \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
+#define IREE_VM_REGISTER_CC_TYPE(instance, type, name, descriptor) \
+  descriptor.type_name = iree_make_cstring_view(name);             \
+  descriptor.offsetof_counter = type::offsetof_counter();          \
+  descriptor.destroy = type::DirectDestroy;                        \
+  IREE_RETURN_IF_ERROR(iree_vm_instance_register_type(instance, &descriptor));
 
 //===----------------------------------------------------------------------===//
 // ref-type registration and declaration for core VM types

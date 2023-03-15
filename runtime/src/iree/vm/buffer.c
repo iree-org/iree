@@ -323,5 +323,5 @@ iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
   iree_vm_buffer_descriptor.offsetof_counter =
       offsetof(iree_vm_buffer_t, ref_object.counter);
   iree_vm_buffer_descriptor.type_name = iree_make_cstring_view("vm.buffer");
-  return iree_vm_ref_register_type(&iree_vm_buffer_descriptor);
+  return iree_vm_instance_register_type(instance, &iree_vm_buffer_descriptor);
 }

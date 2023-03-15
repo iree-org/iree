@@ -381,11 +381,15 @@ IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context) {
   }
 }
 
+IREE_API_EXPORT iree_vm_instance_t* iree_vm_context_instance(
+    const iree_vm_context_t* context) {
+  IREE_ASSERT_ARGUMENT(context);
+  return context->instance;
+}
+
 IREE_API_EXPORT iree_vm_context_id_t
 iree_vm_context_id(const iree_vm_context_t* context) {
-  if (!context) {
-    return -1;
-  }
+  if (!context) return -1;
   return context->context_id;
 }
 

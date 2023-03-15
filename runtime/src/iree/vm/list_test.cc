@@ -130,19 +130,20 @@ using ::iree::testing::status::StatusIs;
 using testing::Eq;
 
 template <typename T>
-static void RegisterRefType(iree_vm_ref_type_descriptor_t* descriptor,
+static void RegisterRefType(iree_vm_instance_t* instance,
+                            iree_vm_ref_type_descriptor_t* descriptor,
                             const char* type_name) {
   if (descriptor->type == IREE_VM_REF_TYPE_NULL) {
     descriptor->type_name = iree_make_cstring_view(type_name);
     descriptor->offsetof_counter = T::offsetof_counter();
     descriptor->destroy = T::DirectDestroy;
-    IREE_CHECK_OK(iree_vm_ref_register_type(descriptor));
+    IREE_CHECK_OK(iree_vm_instance_register_type(instance, descriptor));
   }
 }
 
 static void RegisterRefTypes(iree_vm_instance_t* instance) {
-  RegisterRefType<A>(&test_a_descriptor, "AType");
-  RegisterRefType<B>(&test_b_descriptor, "BType");
+  RegisterRefType<A>(instance, "AType", &test_a_descriptor);
+  RegisterRefType<B>(instance, "BType", &test_b_descriptor);
 }
 
 template <typename T, typename V>

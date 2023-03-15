@@ -19,6 +19,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_vm_instance_t iree_vm_instance_t;
+
 // Defines the type of the reference-counted pointer.
 // This is used to verify that operations dealing with the variant ref struct
 // are correct at runtime. We don't allow control over the ref types from the
@@ -125,14 +127,15 @@ IREE_API_EXPORT void iree_vm_ref_object_release(
 // reference count goes to 0. NULL can be used to no-op the destruction if the
 // type is not owned by the VM.
 //
-// TODO(benvanik): keep names alive for user types?
 // NOTE: the name is not retained and must be kept live by the caller. Ideally
 // it is stored in static read-only memory in the binary.
-//
-// WARNING: this function is not thread-safe and should only be used at startup
-// to register the types. Do not call this while any refs may be alive.
-IREE_API_EXPORT iree_status_t
-iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor);
+IREE_API_EXPORT iree_status_t iree_vm_instance_register_type(
+    iree_vm_instance_t* instance, iree_vm_ref_type_descriptor_t* descriptor);
+
+// Unregisters a user-defined type with the IREE C ref system.
+// No iree_vm_ref_t instances must be live in the program referencing the type.
+IREE_API_EXPORT void iree_vm_instance_unregister_type(
+    iree_vm_instance_t* instance, iree_vm_ref_type_descriptor_t* descriptor);
 
 // Returns the type name for the given type, if found.
 IREE_API_EXPORT iree_string_view_t
@@ -140,7 +143,8 @@ iree_vm_ref_type_name(iree_vm_ref_type_t type);
 
 // Returns the registered type descriptor for the given type, if found.
 IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*
-iree_vm_ref_lookup_registered_type(iree_string_view_t full_name);
+iree_vm_instance_lookup_type(iree_vm_instance_t* instance,
+                             iree_string_view_t full_name);
 
 // Returns a NULL ref wrapper.
 static inline iree_vm_ref_t iree_vm_ref_null(void) {
@@ -292,7 +296,7 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
 #include "iree/vm/ref_cc.h"
 #else
 #define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
-#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)
+#define IREE_VM_REGISTER_CC_TYPE(instance, type, name, descriptor)
 #define IREE_VM_DECLARE_CC_TYPE_ADAPTERS(name, T)
 #endif  // __cplusplus
 

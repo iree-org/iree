@@ -287,8 +287,8 @@ static iree_status_t module_b_create(iree_vm_instance_t* instance,
 
   // Resolve types used by the module once so that we can share it across all
   // instances of the module.
-  module->types[0] =
-      iree_vm_ref_lookup_registered_type(iree_make_cstring_view("vm.buffer"));
+  module->types[0] = iree_vm_instance_lookup_type(
+      instance, iree_make_cstring_view("vm.buffer"));
   if (!module->types[0]) {
     iree_allocator_free(allocator, module);
     return iree_make_status(

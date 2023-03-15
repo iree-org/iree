@@ -248,7 +248,7 @@ Attribute CompiledBinary::convertVariantToAttribute(
       return convertedAttr;
     } else {
       iree_string_view_t typeName =
-          iree_vm_ref_type_name(variant.type.ref_type);
+          iree_vm_ref_type_name(runtime.instance.get(), variant.type.ref_type);
       emitError(loc) << "unrecognized evaluated ref type: "
                      << StringRef(typeName.data, typeName.size);
       return {};
