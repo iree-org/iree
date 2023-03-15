@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/Patterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -95,6 +96,8 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
                                  patterns,
                                  IREE::Util::BufferType::get(&getContext()));
+    populateGenericStructuralConversionPatterns(context, conversionTarget,
+                                                typeConverter, patterns);
     patterns.insert<ConvertGetBasePointerOp>(typeConverter, context);
 
     // Use the default 64-bit lowering for TOSA's ApplyScale operator:

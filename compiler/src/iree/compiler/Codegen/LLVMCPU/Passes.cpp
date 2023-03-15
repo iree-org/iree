@@ -465,6 +465,10 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager,
                              /*useFuseTensorPadWithConsumerPass=*/false);
 
+  if (enableMicrokernels) {
+    passManager.nest<ModuleOp>().addPass(createLLVMCPULowerToUKernelsPass());
+  }
+
   // Tensor-level micro-kernel optimizations.
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
@@ -483,6 +487,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
 
   // Convert buffer-level microkernels.
   if (enableMicrokernels) {
+    nestedModulePM.addPass(createLowerUKernelOpsToCallsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
         createVMVXLowerLinalgMicrokernelsPass());
   }

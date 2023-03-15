@@ -79,6 +79,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
       createFixupSubspanWithOffsetsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createResolveBufferDescriptorsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createCleanupBufferAllocViewPass());
 
   // Flatten and cleanup memrefs.
   nestedModulePM.addNestedPass<func::FuncOp>(

@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "link_executables.mlir"
     "lower_linalg_microkernels.mlir"
     "materialize_encoding.mlir"
+    "pipeline.mlir"
   TOOLS
     FileCheck
     iree-opt
