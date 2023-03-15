@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 package(
@@ -17,7 +17,7 @@ package(
 # Hello World!
 #===------------------------------------------------------------------------===#
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "hello_world_file",
     srcs = ["hello_world_explained.c"],
     defines = [
@@ -42,7 +42,7 @@ endif()
     inline = True,
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "hello_world_embedded",
     srcs = ["hello_world_explained.c"],
     defines = [
@@ -60,7 +60,7 @@ native_test(
     src = ":hello_world_embedded",
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "hello_world_terse",
     srcs = ["hello_world_terse.c"],
     deps = [

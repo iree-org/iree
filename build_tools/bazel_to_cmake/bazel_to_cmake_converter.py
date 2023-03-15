@@ -248,7 +248,7 @@ class BuildFileFunctions(object):
   def exports_files(self, *args, **kwargs):
     pass
 
-  def td_library(self, *args, **kwargs):
+  def iree_td_library(self, *args, **kwargs):
     pass
 
   # Technically we could do something with a CMake equivalent but we have no use
