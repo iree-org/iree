@@ -110,26 +110,6 @@ class BenchmarkConfigTest(unittest.TestCase):
       self.assertEqual(config.root_benchmark_dir,
                        pathlib.Path(e2e_test_artifacts_dir))
 
-  def test_build_from_args_with_execution_benchmark_config_and_build_dir(self):
-    with tempfile.TemporaryDirectory() as e2e_test_artifacts_dir:
-      exec_bench_config = pathlib.Path(
-          e2e_test_artifacts_dir) / "exec_bench_config.json"
-      exec_bench_config.touch()
-      args = common_arguments.Parser().parse_args([
-          f"--tmp_dir={self.tmp_dir}",
-          f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
-          f"--execution_benchmark_config={exec_bench_config}",
-          f"--target_device_name=device_a",
-          str(self.build_dir)
-      ])
-
-      config = benchmark_config.BenchmarkConfig.build_from_args(
-          args=args, git_commit_hash="abcd")
-
-      self.assertEqual(
-          config.root_benchmark_dir,
-          self.build_dir / benchmark_config.E2E_TEST_ARTIFACTS_REL_PATH)
-
 
 if __name__ == "__main__":
   unittest.main()

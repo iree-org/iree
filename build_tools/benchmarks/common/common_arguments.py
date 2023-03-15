@@ -11,6 +11,8 @@ import argparse
 import pathlib
 from typing import List, Optional, Sequence
 
+from common import benchmark_config
+
 
 def _check_dir_path(path):
   path = pathlib.Path(path)
@@ -168,20 +170,27 @@ class Parser(argparse.ArgumentParser):
       self, arg_strs: Optional[Sequence[str]] = None) -> argparse.Namespace:
     args = super().parse_args(arg_strs)
 
-    # TODO(#11076): Remove these checks and make --execution_benchmark_config
-    # and --target_device_name required args.
-    use_new_benchmark_suite = (args.execution_benchmark_config is not None or
-                               args.target_device_name is not None)
-    if use_new_benchmark_suite:
-      if (args.execution_benchmark_config is None or
-          args.target_device_name is None):
-        self.error(
-            "--execution_benchmark_config and --target_device_name must be set together."
-        )
-    elif args.e2e_test_artifacts_dir is not None:
+    # TODO(#11076): Remove these checks and make --e2e_test_artifacts_dir and
+    # --target_device_name required args, once we split parsers into legacy
+    # and new.
+    use_legacy_benchmark_suite = (args.execution_benchmark_config is None and
+                                  args.target_device_name is None and
+                                  args.e2e_test_artifacts_dir is None)
+    if use_legacy_benchmark_suite:
+      return args
+
+    if args.e2e_test_artifacts_dir is None:
       self.error(
-          "--e2e_test_artifacts_dir requires --execution_benchmark_config and --target_device_name."
-      )
+          "--e2e_test_artifacts_dir is required to use new benchmark suites.")
+
+    if args.target_device_name is None:
+      self.error(
+          "--target_device_name is required to use new benchmark suites.")
+
+    if args.execution_benchmark_config is None:
+      args.execution_benchmark_config = (
+          args.e2e_test_artifacts_dir /
+          benchmark_config.DEFAULT_EXECUTION_BENCHMARK_CONFIG)
 
     return args
 

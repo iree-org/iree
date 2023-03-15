@@ -114,12 +114,7 @@ class BenchmarkConfig:
     if args.e2e_test_artifacts_dir is not None:
       root_benchmark_dir = args.e2e_test_artifacts_dir
     else:
-      # TODO(#11076): Remove legacy path.
-      build_dir = args.build_dir.resolve()
-      if args.execution_benchmark_config is not None:
-        root_benchmark_dir = build_dir / E2E_TEST_ARTIFACTS_REL_PATH
-      else:
-        root_benchmark_dir = build_dir / BENCHMARK_SUITE_REL_PATH
+      root_benchmark_dir = args.build_dir / BENCHMARK_SUITE_REL_PATH
 
     return BenchmarkConfig(root_benchmark_dir=root_benchmark_dir,
                            benchmark_results_dir=per_commit_tmp_dir /
