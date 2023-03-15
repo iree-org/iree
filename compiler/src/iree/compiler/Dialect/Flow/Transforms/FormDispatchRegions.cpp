@@ -453,7 +453,23 @@ static bool isFusableWithConsumer(
   // all operations can bufferize without needing additional memory.
   for (OpOperand *inputOperand : consumerLinalgOp.getDpsInputOperands()) {
     if (inputOperand->get().getDefiningOp() != producer) continue;
-    if (isa<linalg::ConvolutionOpInterface>(producer) &&
+    // #TODO(#12431): The following check is for disallowing fusion cases where
+    // fusing a `named_op` -> `elementwise_op` results in buffer allocation.
+    // This only happens if the operations dont get vectorized, and needs
+    // to be bufferized using tensor ops. The way to avoid the stack allocation
+    // is to reuse the buffer for the result of the elementwise op to
+    // the named op. This is really a backend issue, but for quantized cases
+    // backends are far from handling this effectively.
+    auto opFilter = [](Operation *producer) {
+      if (isa<linalg::ConvolutionOpInterface>(producer)) {
+        return true;
+      }
+      if (auto genericOp = dyn_cast<linalg::GenericOp>(producer)) {
+        return genericOp.getNumParallelLoops() != genericOp.getNumLoops();
+      }
+      return false;
+    };
+    if (opFilter(producer) &&
         !llvm::any_of(
             consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
               return canUseInOperandAsInitOperand(inputOperand, initOperand);
