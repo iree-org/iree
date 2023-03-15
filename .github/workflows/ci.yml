@@ -192,7 +192,7 @@ jobs:
   build_test_all_windows:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
-    runs-on: managed-windows-cpu
+    runs-on: windows-2022-64core
     defaults:
       run:
         shell: bash
@@ -416,7 +416,7 @@ jobs:
   build_test_runtime_windows:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
-    runs-on: managed-windows-cpu
+    runs-on: windows-2022-64core
     defaults:
       run:
         shell: bash
