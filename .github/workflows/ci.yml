@@ -938,6 +938,10 @@ jobs:
       e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
       e2e-test-artifacts-build-log: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
       e2e-test-artifacts-build-log-gcs-artifact: ${{ steps.upload.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+      compilation-benchmark-config: ${{ steps.export.outputs.compilation-benchmark-config }}
+      compilation-benchmark-config-gcs-artifact: ${{ steps.upload.outputs.compilation-benchmark-config-gcs-artifact }}
+      execution-benchmark-config: ${{ steps.export.outputs.execution-benchmark-config }}
+      execution-benchmark-config-gcs-artifact: ${{ steps.upload.outputs.execution-benchmark-config-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
@@ -964,6 +968,23 @@ jobs:
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
+      - name: "Exporting benchmark configs"
+        id: export
+        if: needs.setup.outputs.benchmark-presets != ''
+        env:
+          COMPILATION_BENCHMARK_CONFIG: ${{ steps.build.outputs.e2e-test-artifacts-dir }}/compilation_benchmark_config.json
+          EXECUTION_BENCHMARK_CONFIG: ${{ steps.build.outputs.e2e-test-artifacts-dir }}/execution_benchmark_config.json
+          BENCHMARK_PRESETS: ${{ needs.setup.outputs.benchmark-presets }}
+        run: |
+          build_tools/benchmarks/export_benchmark_config.py \
+            compilation \
+            --output="${COMPILATION_BENCHMARK_CONFIG}"
+          build_tools/benchmarks/export_benchmark_config.py \
+            execution \
+            --benchmark_presets="${BENCHMARK_PRESETS}" \
+            --output="${EXECUTION_BENCHMARK_CONFIG}"
+          echo "compilation-benchmark-config=${COMPILATION_BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
+          echo "execution-benchmark-config=${EXECUTION_BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading e2e test artifacts"
         id: upload
         env:
@@ -977,13 +998,15 @@ jobs:
           # Not archiving the directory to allow fetching each file as needed
           # separately.
           find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
-            -name "iree_*" -o -name "model_*.mlir" | \
+            -name "iree_*" -o -name "model_*.mlir" -o -name "*.json" | \
             gcloud storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
               "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
           echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "compilation-benchmark-config-gcs-artifact=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/compilation_benchmark_config.json" >> "${GITHUB_OUTPUT}"
+          echo "execution-benchmark-config-gcs-artifact=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/execution_benchmark_config.json" >> "${GITHUB_OUTPUT}"
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
@@ -999,40 +1022,33 @@ jobs:
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
       E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log }}
       E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+      COMPILATION_BENCHMARK_CONFIG: ${{ needs.build_e2e_test_artifacts.outputs.compilation-benchmark-config }}
+      COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ needs.build_e2e_test_artifacts.outputs.compilation-benchmark-config-gcs-artifact }}
     outputs:
       compile-stats-results: ${{ steps.collect.outputs.compile-stats-results }}
       compile-stats-results-gcs-artifact: ${{ steps.upload.outputs.compile-stats-results-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Exporting configs"
-        id: "export"
-        env:
-          COMPILATION_CONFIG: "compilation-config.json"
-        run: |
-          ./build_tools/benchmarks/export_benchmark_config.py \
-            compilation \
-            --output="${COMPILATION_CONFIG}"
-          echo "compilation-config=${COMPILATION_CONFIG}" >> "${GITHUB_OUTPUT}"
       - name: "Downloading assets"
         id: "download-assets"
-        env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
         run: |
           gcloud storage cp \
             "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
             "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
           mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
+          gcloud storage cp \
+            "${COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT}" \
+            "${COMPILATION_BENCHMARK_CONFIG}"
           jq -r \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
             '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
-            "${COMPILATION_CONFIG}" | \
+            "${COMPILATION_BENCHMARK_CONFIG}" | \
             gcloud storage cp -r --read-paths-from-stdin \
               "${E2E_TEST_ARTIFACTS_DIR}"
       - name: "Collecting compilation statistics"
         id: collect
         env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
           GENERATION_CONFIG: generation-config.json
           COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
         run: |
@@ -1040,19 +1056,14 @@ jobs:
           ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
             --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
             --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
-            --compilation_benchmark_config="${COMPILATION_CONFIG}" \
             --output="${COMPILE_STATS_RESULTS}"
           echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading benchmark results"
         id: upload
         env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
           COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
           COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
         run: |
-          # Upload files with two commands since they go into different GCS
-          # directories.
-          gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
           gcloud storage cp \
             "${COMPILE_STATS_RESULTS}" \
             "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"
@@ -1069,6 +1080,8 @@ jobs:
       runner-env: ${{ needs.setup.outputs.runner-env }}
       e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      execution-benchmark-config: ${{ needs.build_e2e_test_artifacts.outputs.execution-benchmark-config }}
+      execution-benchmark-config-gcs-artifact: ${{ needs.build_e2e_test_artifacts.outputs.execution-benchmark-config-gcs-artifact }}
       benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
 

@@ -197,7 +197,7 @@ Execution and compilation benchmark configs can be downloaded at:
 
 ```sh
 # Execution benchmark config:
-gcloud storage cp gs://iree-github-actions-postsubmit-artifacts/.../.../benchmark-config.json .
+gcloud storage cp gs://iree-github-actions-postsubmit-artifacts/.../.../e2e-test-artifacts/execution_benchmark_config.json .
 # Compilation benchmark config:
-gcloud storage cp gs://iree-github-actions-postsubmit-artifacts/.../.../compilation-config.json .
+gcloud storage cp gs://iree-github-actions-postsubmit-artifacts/.../.../e2e-test-artifacts/compilation_benchmark_config.json .
 ```
