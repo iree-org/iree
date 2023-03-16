@@ -99,7 +99,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   };
 
   DiagnosedSilenceableFailure diag =
-      mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+      mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, target, workgroupSize, threadIdGenerator, true, transformOp,
           threadMappingAttributes);
 
@@ -135,7 +135,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     };
     SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
                                      workgroupSize[1], workgroupSize[2]};
-    diag = mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+    diag = mlir::transform::gpu::mapNestedForallToThreadsImpl(
         rewriter, target, numWarps, warpIdGenerator, true, transformOp,
         warpMappingAttributes);
   }

@@ -606,7 +606,7 @@ static FailureOr<scf::ForOp> applyPipelining(
   scf::ForLoopPipeliningPattern pattern(options, forOp->getContext());
   IRRewriter rewriter(forOp->getContext());
   rewriter.setInsertionPoint(forOp);
-  return pattern.returningMatchAndRewrite(forOp, rewriter);
+  return pipelineForLoop(rewriter, forOp, options);
 }
 namespace {
 struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {

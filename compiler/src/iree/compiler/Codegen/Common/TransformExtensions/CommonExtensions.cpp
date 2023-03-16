@@ -38,6 +38,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -634,7 +635,7 @@ LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
            static_cast<int64_t>(b.cast<gpu::GPUBlockMappingAttr>().getBlock());
   };
   SmallVector<Value> gridDimValues =
-      scf::ForallOp::getValuesSortedByKey(blockMapping, numBlocks, comparator);
+      getValuesSortedByKey(blockMapping, numBlocks, comparator);
 
   // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
