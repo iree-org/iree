@@ -22,7 +22,6 @@
 #include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -786,7 +785,7 @@ DiagnosedSilenceableFailure
 transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
     scf::ForOp forOp, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  transform::TrivialPatternRewriter rewriter(getContext());
+  IRRewriter rewriter(getContext());
   int64_t depth(getDepth());
   FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
       forOp, PipeliningSchedulingStrategy::loadGlobalStage0, false, depth,

@@ -14,7 +14,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -32,7 +31,7 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   if (tileSize.empty() || dims.size() != 1 ||
       tileSize.back() == op.getStaticLoopRanges()[dims.back()])
     return success();
-  transform::TrivialPatternRewriter rewriter(op.getContext());
+  IRRewriter rewriter(op.getContext());
   SmallVector<OpFoldResult> sizes;
   for (int64_t size : tileSize) {
     sizes.push_back(rewriter.getIndexAttr(size));
@@ -45,7 +44,7 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
 }
 
 static LogicalResult tileFusedOps(linalg::GenericOp op) {
-  transform::TrivialPatternRewriter rewriter(op.getContext());
+  IRRewriter rewriter(op.getContext());
   rewriter.setInsertionPoint(op);
   SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
   if (tileSizes.empty()) return success();
