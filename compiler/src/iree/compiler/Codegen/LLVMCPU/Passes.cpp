@@ -487,11 +487,9 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   // SplitReductionPass takes care of banked-tiling.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLinalgSplitReductionPass(clEnableReassociateFpReductions));
-  {
-    LinalgFusePassOptions options;
-    options.tilingLevel = numLevels - 1;
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-  }
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTileAndFusePass(numLevels - 1));
   if (clEnablePadConsumerFusion) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createFuseTensorPadWithConsumerPass());
@@ -532,7 +530,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  // Run LinalgFusePass firstly in case that we have fill + conv + generic
+  // Run LLVMTileAndFuse firstly in case that we have fill + conv + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
   // get tiled if the case is conv + generic op. In this case, we have to tile
   // along reduction dim again, which needs them to be Linalg ops form.
