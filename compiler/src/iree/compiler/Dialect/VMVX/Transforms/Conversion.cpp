@@ -4,7 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/Patterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -32,6 +35,21 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VMVX {
+
+namespace {
+
+// Make `iree_codegen.get_base_pointer` a no-op during VMVX lowering.
+struct ConvertGetBasePointerOp
+    : public OpConversionPattern<IREE::Codegen::GetBasePointerOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::Codegen::GetBasePointerOp basePointerOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(basePointerOp, adaptor.getSource());
+    return success();
+  }
+};
 
 // Runs conversion with registered input dialects.
 class ConversionPass : public ConversionBase<ConversionPass> {
@@ -61,6 +79,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     // Ensure all input dialects go away.
     ConversionTarget conversionTarget(*context);
     conversionTarget.addIllegalDialect<tensor::TensorDialect>();
+    conversionTarget.addIllegalDialect<IREE::Codegen::IREECodegenDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
     conversionTarget.addLegalDialect<IREE::VMVX::VMVXDialect>();
     conversionTarget
@@ -77,6 +96,9 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
                                  patterns,
                                  IREE::Util::BufferType::get(&getContext()));
+    populateGenericStructuralConversionPatterns(context, conversionTarget,
+                                                typeConverter, patterns);
+    patterns.insert<ConvertGetBasePointerOp>(typeConverter, context);
 
     // Use the default 64-bit lowering for TOSA's ApplyScale operator:
     //   This lowering widens integer types to 64-bit an performs the non-fused
@@ -95,6 +117,8 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     }
   }
 };
+
+}  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();

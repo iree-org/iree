@@ -14,6 +14,8 @@
 # Programs with a dependency on the compiler are not designed to run on device
 # platforms (e.g. Android), so they are tagged "hostonly".
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary", "iree_runtime_cc_binary")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -22,7 +24,7 @@ package(
 
 exports_files(["lit.cfg.py"])
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-benchmark-module",
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
@@ -39,7 +41,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-benchmark-trace",
     srcs = ["iree-benchmark-trace-main.c"],
     deps = [
@@ -60,7 +62,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-check-module",
     testonly = True,
     srcs = ["iree-check-module-main.cc"],
@@ -81,7 +83,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-dump-instruments",
     srcs = ["iree-dump-instruments-main.c"],
     deps = [
@@ -93,7 +95,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-dump-module",
     srcs = ["iree-dump-module-main.c"],
     deps = [
@@ -105,7 +107,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_compiler_cc_binary(
     name = "iree-opt",
     srcs = ["iree-opt-main.cc"],
     tags = ["hostonly"],
@@ -115,7 +117,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_compiler_cc_binary(
     name = "iree-mlir-lsp-server",
     srcs = ["iree-mlir-lsp-server.cc"],
     deps = [
@@ -124,11 +126,15 @@ cc_binary(
     ],
 )
 
+# The only place we cross the streams between compiler and runtime. This
+# includes a JIT compiler step and uses neither of the iree_*_cc_binary rules,
+# but rather directly depends on both the compiler and runtime include rules.
 cc_binary(
     name = "iree-run-mlir",
     srcs = ["iree-run-mlir-main.cc"],
     tags = ["hostonly"],
     deps = [
+        "//compiler/src:defs",
         "//compiler/src/iree/compiler/ConstEval",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/VM/Target:init_targets",
@@ -136,6 +142,7 @@ cc_binary(
         "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",
+        "//runtime/src:runtime_defines",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
@@ -156,7 +163,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-run-module",
     srcs = ["iree-run-module-main.cc"],
     deps = [
@@ -174,7 +181,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-run-trace",
     srcs = ["iree-run-trace-main.c"],
     deps = [
@@ -192,7 +199,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-e2e-matmul-test",
     srcs = ["iree-e2e-matmul-test.c"],
     deps = [
@@ -213,7 +220,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "iree-cpuinfo",
     srcs = ["iree-cpuinfo.c"],
     deps = [
@@ -223,7 +230,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_compiler_cc_binary(
     name = "iree-tblgen",
     srcs = [
         "//compiler/src/iree/compiler/Dialect/VM/Tools:GenSrcs",
@@ -241,7 +248,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+iree_compiler_cc_binary(
     name = "iree-compile",
     srcs = ["iree-compile-main.cc"],
     tags = ["hostonly"],

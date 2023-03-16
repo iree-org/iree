@@ -15,7 +15,8 @@ namespace iree_compiler {
 
 /// Padd out the inner dimension of the allocOp in order reduce the chances to
 /// have bank conflicts when reading 2D shapes within shared memory.
-static void padAlloc(memref::AllocOp allocOp, int64_t paddingSizeBits) {
+static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
+                     int64_t paddingSizeBits) {
   int64_t innerDim = allocOp.getType().getShape().back();
   if (ShapedType::isDynamic(innerDim)) return;
   Type elType = allocOp.getType().getElementType();
@@ -28,15 +29,16 @@ static void padAlloc(memref::AllocOp allocOp, int64_t paddingSizeBits) {
   MemRefType allocType =
       MemRefType::get(shape, elType, MemRefLayoutAttrInterface{},
                       allocOp.getType().getMemorySpace());
-  OpBuilder builder(allocOp);
+  IRRewriter rewriter(context);
+  rewriter.setInsertionPoint(allocOp);
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = builder.create<memref::AllocOp>(loc, allocType);
+  Value paddedAlloc = rewriter.create<memref::AllocOp>(loc, allocType);
   SmallVector<int64_t> offsets(shape.size(), 0);
   SmallVector<int64_t> strides(shape.size(), 1);
-  Value subview = builder.create<memref::SubViewOp>(
+  Value subview = rewriter.create<memref::SubViewOp>(
       loc, paddedAlloc, offsets, allocOp.getType().getShape(), strides);
-  replaceMemrefUsesAndPropagateType(allocOp, subview, builder);
-  allocOp->erase();
+  replaceMemrefUsesAndPropagateType(rewriter, loc, allocOp, subview);
+  rewriter.eraseOp(allocOp);
 }
 
 namespace {
@@ -58,6 +60,7 @@ struct GPUReduceBankConflictsPass
 
   void runOnOperation() override {
     auto funcOp = getOperation();
+    MLIRContext *context = &getContext();
     SmallVector<memref::AllocOp> sharedMemAllocs;
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
@@ -72,7 +75,7 @@ struct GPUReduceBankConflictsPass
       }
     });
     for (memref::AllocOp alloc : sharedMemAllocs)
-      padAlloc(alloc, paddingSizeBits);
+      padAlloc(context, alloc, paddingSizeBits);
   }
 };
 }  // namespace

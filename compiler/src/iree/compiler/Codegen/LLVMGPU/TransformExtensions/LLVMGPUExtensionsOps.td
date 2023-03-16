@@ -23,7 +23,7 @@ def MapNestedForallToGpuThreadsOp :
   let description = [{
     Target the whole hal.executable_variant op and rewrite all scf.forall
     to distributed gpu.thread_id and translation_info attribute.
-    
+
     This op will handle all the scf.forall using gpu.thread or gpu.warp
     mapping.
 
@@ -404,7 +404,7 @@ def PipelineSharedMemoryCopiesOp : Op<
   let description = [{
     This applies software pipelining to a given scf.for loop. The pipelining
     strategy will look for a copy to shared memory and pipeline it to overlap
-    it with the rest of the loop. 
+    it with the rest of the loop.
     It is user responsability to ensure that there are no dependency between
     `depth` iterations of the loop by using multi-buffering.
 
@@ -472,6 +472,45 @@ def CreateAsyncGroupsOp :
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
+}
+
+def LayoutAnalysisAndDistributionOp :
+  Op<Transform_Dialect, "iree.layout_analysis_and_distribution",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    Targets the whole func op and does the following:
+
+    1. First, computes the layouts of the of any vector.contract ops
+       that could lower to mma.syncs. Then, propagates these layouts to
+       neighboring ops.
+
+    2. Next, it lowers each of these ops based on their layout.
+
+    The layout is represented as an 8D vector with the following shape:
+    batch0, batch1, laneidz, laneidy, laneidx, vecidz, vecidy, vecidx
+
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs Variadic<PDL_Operation>:$result);
+
+  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+
 }
 
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS

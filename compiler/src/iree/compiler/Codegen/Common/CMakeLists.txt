@@ -90,6 +90,7 @@ iree_cc_library(
     "ConcretizePadResultShape.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
+    "FixupSubspanWithOffsets.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"

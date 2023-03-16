@@ -82,6 +82,7 @@ iree_cc_library(
     MLIRShapeToStandard
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorUtils
     MLIRTransforms
     MhloDialect
     MhloPasses

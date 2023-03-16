@@ -9,7 +9,6 @@
 
 #include <memory>
 
-#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
@@ -62,6 +61,11 @@ createBufferizeCopyOnlyDispatchesPass();
 // Decomposes linalg generics on tensors into generics containing no more than
 // one op in the body.
 std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
+
+// Fixes resturn types of `hal.interface.binding.subspan` ops with non-zero
+// offsets.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createFixupSubspanWithOffsetsPass();
 
 /// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets
 /// on subspan ops to the consumer load/store ops, in preparation for lowering
@@ -644,6 +648,10 @@ createSPIRVCreateFastSlowPathPass();
 
 /// Emulates 64-bit integer ops with 32-bit integer ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
+
+/// Turns static shaped storage buffer subspan ops into dynamic shaped ones.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVEraseStorageBufferStaticShapePass();
 
 /// Pass to map MemRef memory spaces to SPIR-V storage classes.
 std::unique_ptr<OperationPass<func::FuncOp>>

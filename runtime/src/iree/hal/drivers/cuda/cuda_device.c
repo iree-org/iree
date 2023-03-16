@@ -110,6 +110,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->params = *params;
   device->device = cu_device;
   device->stream = stream;
+  device->context_wrapper.cu_device = cu_device;
   device->context_wrapper.cu_context = context;
   device->context_wrapper.host_allocator = host_allocator;
   iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,

@@ -53,12 +53,13 @@ static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
   if (!nprocs_str) {
     return iree_ok_status();
   }
-
-  int nprocs = atoi(nprocs_str);
-  if (nprocs <= 0) {
+  int32_t nprocs = -1;
+  bool parsed =
+      iree_string_view_atoi_int32(iree_make_cstring_view(nprocs_str), &nprocs);
+  if (!parsed || nprocs <= 0) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_CUDA_NCCL_NPROCS has invalid value '%s'; expected integer >= 0",
+        "IREE_CUDA_NCCL_NPROCS has invalid value '%s'; expected integer > 0",
         nprocs_str);
   }
   params->nccl_default_count = nprocs;
@@ -70,8 +71,10 @@ static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
         IREE_STATUS_INVALID_ARGUMENT,
         "IREE_CUDA_NCCL_PROCID must be set when IREE_CUDA_NCCL_NPROCS is set.");
   }
-  int procid = atoi(procid_str);
-  if (procid < 0 || procid >= nprocs) {
+  int32_t procid = -1;
+  parsed =
+      iree_string_view_atoi_int32(iree_make_cstring_view(procid_str), &procid);
+  if (!parsed || procid < 0 || procid >= nprocs) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "IREE_CUDA_NCCL_PROCID has invalid value '%s'; expected integer >= 0",

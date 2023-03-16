@@ -199,7 +199,10 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
 
   // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
   // because we don't use upstream memref descriptors.
+  pm.addNestedPass<func::FuncOp>(createFixupSubspanWithOffsetsPass());
   pm.addPass(createFlattenMemRefSubspanPass());
+  pm.addNestedPass<func::FuncOp>(
+      createSPIRVEraseStorageBufferStaticShapePass());
 }
 
 /// Adds passes to perform the final SPIR-V conversion.

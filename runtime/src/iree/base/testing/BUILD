@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_binary", "iree_runtime_cc_test")
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "dynamic_library_test_library.so",
     testonly = True,
     srcs = ["dynamic_library_test_library.cc"],

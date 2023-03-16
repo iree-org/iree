@@ -808,5 +808,19 @@ DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
+//===---------------------------------------------------------------------===//
+// LayoutAnalysisAndDistributionOp.
+//===---------------------------------------------------------------------===//
+DiagnosedSilenceableFailure
+transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
+    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  iree_compiler::doLayoutAnalysisAndDistribution(rewriter,
+                                                 cast<func::FuncOp>(target));
+  results.push_back(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.cpp.inc"

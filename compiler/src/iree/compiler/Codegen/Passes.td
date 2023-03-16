@@ -47,6 +47,18 @@ def DecomposeLinalgGeneric :
   let constructor = "mlir::iree_compiler::createDecomposeLinalgGenericPass()";
 }
 
+def FixupSubspanWithOffsets :
+    Pass<"iree-codegen-fixup-subspan-with-offsets", "func::FuncOp"> {
+  let summary = "Fixes up `hal.interface.binding.subspan` ops with offsets";
+  let constructor =
+      "mlir::iree_compiler::createFixupSubspanWithOffsetsPass()";
+  let options = [
+    Option<"keepDeadSubspanOps", "keep-dead-subspan-ops",
+            "bool", /*default=*/"false",
+            "Flag to not remove dead subspan ops (used for testing only)">
+  ];
+}
+
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
@@ -234,7 +246,7 @@ def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
            "Try to use un-peeling epilogue when false, peeled epilouge o.w.">,
     Option<"depth", "pipeline-depth", "int64_t",
             /*default=*/"2",
-           "Number of stages ">,           
+           "Number of stages ">,
     Option<"scheduleIndex", "schedule-index", "int64_t",
             /*default=*/"0",
            "Allows picking different schedule for the pipelining transformation.">,
@@ -242,7 +254,7 @@ def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
             /*default=*/"\"\"",
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
-            "transform dialect operation somewhere in the module.">,           
+            "transform dialect operation somewhere in the module.">,
   ];
 }
 
@@ -639,6 +651,12 @@ def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
   let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
+}
+
+def SPIRVEraseStorageBufferStaticShape :
+    Pass<"iree-spirv-erase-storage-buffer-static-shape", "func::FuncOp"> {
+  let summary = "Turn static shaped storage buffer subspan ops into dynamic shaped ones";
+  let constructor = "mlir::iree_compiler::createSPIRVEraseStorageBufferStaticShapePass()";
 }
 
 def SPIRVMapMemRefStorageClass :

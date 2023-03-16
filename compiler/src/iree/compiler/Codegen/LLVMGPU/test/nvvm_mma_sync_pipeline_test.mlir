@@ -3,7 +3,6 @@
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect via mma.sync path.
 
-
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -67,13 +66,15 @@ hal.executable @mma_fused_fp16 {
 //  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //          CHECK:   nvvm.cp.async.commit.group
 //          CHECK:   nvvm.cp.async.wait.group 2
-//  CHECK-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-2:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
 //          CHECK:   llvm.br
-//  CHECK-COUNT-4:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, shape = #nvvm.shape<m = 16, n = 8, k = 16>} : (vector<2xf16>, vector<2xf16>, vector<2xf16>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>)>
+//  CHECK-COUNT-2:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-2:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, shape = #nvvm.shape<m = 16, n = 8, k = 16>} : (vector<2xf16>, vector<2xf16>, vector<2xf16>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>)>
 //  CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //          CHECK:   nvvm.cp.async.commit.group
 //          CHECK:   nvvm.cp.async.wait.group 2
-//  CHECK-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-2:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-2:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, shape = #nvvm.shape<m = 16, n = 8, k = 16>} : (vector<2xf16>, vector<2xf16>, vector<2xf16>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>)>
 //          CHECK:   llvm.br
 //      CHECK-NOT:   nvvm.mma.sync
 //  CHECK-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf16>, 3>
@@ -90,7 +91,7 @@ hal.executable @mma_fused_fp16 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-hal.executable @mma_fused {
+hal.executable @mma_fused_f32 {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -134,7 +135,7 @@ hal.executable @mma_fused {
 }
 
 // mma.sync.1688.f32.tf32 / TensorCore(f32):
-//    CHECK-LABEL: hal.executable public @mma_fused
+//    CHECK-LABEL: hal.executable public @mma_fused_f32
 //          CHECK:   hal.executable.variant public @cuda
 //      CHECK-NOT:   llvm.store
 //  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
@@ -144,13 +145,18 @@ hal.executable @mma_fused {
 //  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //          CHECK:   nvvm.cp.async.commit.group
 //          CHECK:   nvvm.cp.async.wait.group 2
-//  CHECK-COUNT-2:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-1:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)> 
 //          CHECK:   llvm.br
-//  CHECK-COUNT-4:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, multiplicandAPtxType = #nvvm.mma_type<tf32>, multiplicandBPtxType = #nvvm.mma_type<tf32>, shape = #nvvm.shape<m = 16, n = 8, k = 8>} : (i32, i32, f32) -> !llvm.struct<(f32, f32, f32, f32)>
+//  CHECK-COUNT-1:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)> 
+//  CHECK-COUNT-2:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, multiplicandAPtxType = #nvvm.mma_type<tf32>, multiplicandBPtxType = #nvvm.mma_type<tf32>, shape = #nvvm.shape<m = 16, n = 8, k = 8>} : (i32, i32, f32) -> !llvm.struct<(f32, f32, f32, f32)>
 //  CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //          CHECK:   nvvm.cp.async.commit.group
 //          CHECK:   nvvm.cp.async.wait.group 2
-//  CHECK-COUNT-2:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-1:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)>
+//  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)> 
+//  CHECK-COUNT-2:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, multiplicandAPtxType = #nvvm.mma_type<tf32>, multiplicandBPtxType = #nvvm.mma_type<tf32>, shape = #nvvm.shape<m = 16, n = 8, k = 8>} : (i32, i32, f32) -> !llvm.struct<(f32, f32, f32, f32)>
 //          CHECK:   llvm.br
 //      CHECK-NOT:   nvvm.mma.sync
 //  CHECK-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf32>, 3>

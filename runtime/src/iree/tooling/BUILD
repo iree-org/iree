@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "buffer_view_matchers",
     srcs = ["buffer_view_matchers.c"],
     hdrs = ["buffer_view_matchers.h"],
@@ -38,7 +38,7 @@ iree_runtime_cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "comparison",
     srcs = ["comparison.cc"],
     hdrs = ["comparison.h"],
@@ -55,7 +55,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "comparison_test",
     srcs = ["comparison_test.cc"],
     deps = [
@@ -71,7 +71,7 @@ cc_test(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "context_util",
     srcs = ["context_util.c"],
     hdrs = ["context_util.h"],
@@ -92,7 +92,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "device_util",
     srcs = ["device_util.c"],
     hdrs = ["device_util.h"],
@@ -107,7 +107,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "instrument_util",
     srcs = ["instrument_util.c"],
     hdrs = ["instrument_util.h"],
@@ -122,7 +122,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "numpy_io",
     srcs = ["numpy_io.c"],
     hdrs = ["numpy_io.h"],
@@ -148,7 +148,7 @@ iree_runtime_cc_test(
 )
 
 # TODO(benvanik): fold these into iree/runtime and use that instead.
-cc_library(
+iree_runtime_cc_library(
     name = "vm_util",
     srcs = ["vm_util.c"],
     hdrs = ["vm_util.h"],
@@ -164,7 +164,7 @@ cc_library(
     ],
 )
 
-cc_test(
+iree_runtime_cc_test(
     name = "vm_util_test",
     srcs = ["vm_util_test.cc"],
     deps = [
@@ -188,7 +188,7 @@ if(IREE_ENABLE_THREADING)
     inline = True,
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "trace_replay",
     srcs = ["trace_replay.c"],
     hdrs = ["trace_replay.h"],
@@ -209,7 +209,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "yaml_util",
     srcs = ["yaml_util.c"],
     hdrs = ["yaml_util.h"],

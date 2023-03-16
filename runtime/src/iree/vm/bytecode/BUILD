@@ -7,7 +7,7 @@
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
-# load("//build_tools/bazel:iree_tablegen.bzl", "iree_gentbl_cc_library")
+# load(//build_tools/bazel:build_defs.oss.bzl, "iree_gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],

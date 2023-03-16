@@ -8,7 +8,7 @@
 # These are not part of the IREE API. Though they may be used by external
 # projects their API may change at any time.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -170,7 +170,7 @@ iree_runtime_cc_library(
     ],
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "flags_demo",
     srcs = ["flags_demo.c"],
     deps = [

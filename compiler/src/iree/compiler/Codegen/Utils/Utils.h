@@ -132,26 +132,10 @@ struct LoopTilingAndDistributionInfo {
 ///   }
 /// }
 ///
-/// Returns the list of filtered operations in the functions. If there are no
-/// `scf.for` operations in the function return the linalg operations in the
-/// body of the function if it has a single basic block. Return failure in all
-/// other cases.
-using RootOpFilteringFn = std::function<bool(Operation *)>;
-LogicalResult getFilteredOps(
-    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
-    SmallVectorImpl<Operation *> &filteredOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
-
-/// Specialization of `getFilteredOps` for filtering `LinalgOp`s and
-/// `LinagExtOp`s.
-LogicalResult getComputeOps(
-    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
-inline LogicalResult getComputeOps(func::FuncOp funcOp,
-                                   SmallVectorImpl<Operation *> &computeOps) {
-  SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-  return getComputeOps(funcOp, computeOps, tiledLoops);
-}
+/// Returns the list of TilingInterface ops in the functions. If there are no
+/// `scf.for` operations in the function return the TilingInterface operations
+/// in the body of the function if it has a single basic block.
+SmallVector<Operation *> getComputeOps(func::FuncOp funcOp);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.
@@ -170,12 +154,23 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     const SmallVector<int64_t> &tileSizes);
 
-/// Replace the uses of memref `oldOp` with the given `val` and for subview uses
-/// propagate the type change. Changing the memref type may require propagating
-/// it through subview ops so we cannot just do a replaceAllUse but need to
-/// propagate the type change and erase old subview ops.
-void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
-                                       OpBuilder &builder);
+//===---------------------------------------------------------------------===//
+// Misc. utility functions.
+//===---------------------------------------------------------------------===//
+
+/// Convert byte offset into offsets in terms of number of elements based
+/// on `elementType`
+OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
+                                              Location loc,
+                                              OpFoldResult byteOffset,
+                                              Type elementType);
+
+/// Replace the uses of memref value `origValue` with the given
+/// `replacementValue`. Some uses of the memref value might require changes to
+/// the operation itself. Create new operations which can carry the change, and
+/// transitively replace their uses.
+void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
+                                       Value origValue, Value replacementValue);
 
 /// Sink given operations as close as possible to their uses.
 void sinkOpsInCFG(const SmallVector<Operation *> &allocs,

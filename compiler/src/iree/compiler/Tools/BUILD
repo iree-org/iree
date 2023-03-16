@@ -25,7 +25,7 @@ config_setting(
     },
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "init_input_passes_and_dialects",
     srcs = [
         "init_input_dialects.cc",
@@ -65,7 +65,7 @@ iree_compiler_cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "init_iree_passes_and_dialects",
     hdrs = [
         "init_iree_dialects.h",
@@ -108,7 +108,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "init_mlir_passes_and_dialects",
     hdrs = [
         "init_mlir_dialects.h",
@@ -151,7 +151,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "init_passes_and_dialects",
     hdrs = [
         "init_dialects.h",
@@ -167,7 +167,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "init_compiler_modules",
     hdrs = ["init_compiler_modules.h"],
     deps = [
@@ -182,7 +182,7 @@ config_setting(
     },
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "init_targets",
     srcs = ["init_targets.cc"],
     hdrs = ["init_targets.h"],
@@ -208,7 +208,7 @@ cc_library(
     }),
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "init_llvmir_translations",
     hdrs = [
         "init_llvmir_translations.h",
@@ -219,7 +219,7 @@ cc_library(
     ],
 )
 
-cc_library(
+iree_compiler_cc_library(
     name = "iree_compile_lib",
     srcs = [
         "iree_compile_lib.cc",

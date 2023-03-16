@@ -54,10 +54,17 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
         "tag attribute value for the transform dialect transform op container"),
     llvm::cl::init(""));
 
+/// Flag to force using WMMA tensorcore operations.
+llvm::cl::opt<bool> clGPUUseWMMA(
+    "iree-codegen-llvmgpu-use-wmma",
+    llvm::cl::desc("force use of wmma operations for tensorcore"),
+    llvm::cl::init(false));
+
 /// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
 llvm::cl::opt<bool> clGPUUseMMASync(
     "iree-codegen-llvmgpu-use-mma-sync",
-    llvm::cl::desc("use mma sync instead of wmma ops"), llvm::cl::init(false));
+    llvm::cl::desc("force use mma sync instead of wmma ops"),
+    llvm::cl::init(false));
 
 }  // namespace iree_compiler
 }  // namespace mlir
@@ -106,22 +113,24 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
 static void getTensorCoreConfig(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
     int64_t N, int64_t K) {
-  // Tile sizes are skewed towards small matmul for now. Long term the plan is
-  // to not rely on hardcoded configurations.
+  // Based on early analysis we found that 128x256x32_3 gives acceptable
+  // performance across many of the large matrix sizes for f16 and fp32. This
+  // needs to be refined into a better startegy based on empircal data but this
+  // gives us a quick solution to achieve performance in the right order of
+  // magnitude for large square like cases.
+  int64_t parallelDim = M * N;
+  static constexpr int64_t kLargDimThreashold = 1536;
   if (isFp16) {
-    int64_t parallelDim = M * N;
-    static constexpr int64_t kLargDimThreashold = 1536;
-    // Based on early analysis we found that 128x256x32_3 gives acceptable
-    // performance across many of the large matrix sizes for f16. This needs to
-    // be refined into a better startegy based on empircal data but this gives
-    // us a quick solution to achieve performance in the right order of
-    // magnitude for large square like cases.
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
       tileSizes.push_back(
           TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
     }
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
+    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
+    }
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
@@ -200,6 +209,29 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
     }
   }
   return true;
+}
+
+/// Decides which tensorcore operations to use.
+static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
+    bool isF16) {
+  // Currently mma.sync is on by default for fp16 only.
+  IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
+      isF16 ? IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCoreMmaSync
+            : IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCore;
+
+  // Override the decision based on cl flags.
+  assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
+  if (clGPUUseMMASync) {
+    codegenPipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUMatmulTensorCoreMmaSync;
+  }
+  if (clGPUUseWMMA) {
+    codegenPipeline =
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+  };
+  return codegenPipeline;
 }
 
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
@@ -297,10 +329,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
           IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
-              clGPUUseMMASync ? IREE::Codegen::DispatchLoweringPassPipeline::
-                                    LLVMGPUMatmulTensorCoreMmaSync
-                              : IREE::Codegen::DispatchLoweringPassPipeline::
-                                    LLVMGPUMatmulTensorCore;
+              getTensorCorePipeline(isFp16);
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,
@@ -1012,11 +1041,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
-    SmallVector<Operation *> computeOps;
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return funcOp.emitOpError("failed to get compute ops");
-    }
-
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     Operation *rootOperation = nullptr;
     // Find the root operation. linalg.generic and linalg.fill are not root
     // operations if there are other compute operations present.

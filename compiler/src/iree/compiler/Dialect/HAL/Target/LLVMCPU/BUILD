@@ -119,12 +119,12 @@ iree_compiler_cc_library(
     srcs = ["LinkerTool.cpp"],
     hdrs = ["LinkerTool.h"],
     deps = platform_trampoline_deps("LinkerTools", "compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU") + [
+        ":LLVMTargetOptions",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:Support",
-        ":LLVMTargetOptions",
     ],
 )
 

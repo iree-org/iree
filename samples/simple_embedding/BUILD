@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
@@ -22,7 +22,7 @@ if(IREE_HAL_DRIVER_LOCAL_SYNC AND IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE AND
     inline = True,
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "simple_embedding_vmvx_sync",
     srcs = [
         "device_vmvx_sync.c",
@@ -70,7 +70,7 @@ if(IREE_HAL_DRIVER_LOCAL_SYNC AND IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF AND
     inline = True,
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "simple_embedding_embedded_sync",
     srcs = [
         "device_embedded_sync.c",
@@ -177,7 +177,7 @@ if(IREE_HAL_DRIVER_LOCAL_TASK AND IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
     inline = True,
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "simple_embedding_embedded",
     srcs = [
         "device_embedded.c",
@@ -222,7 +222,7 @@ if(IREE_HAL_DRIVER_VULKAN AND
     inline = True,
 )
 
-cc_binary(
+iree_runtime_cc_binary(
     name = "simple_embedding_vulkan",
     srcs = [
         "device_vulkan.c",
@@ -274,7 +274,7 @@ endif()
 #     inline = True,
 # )
 
-# cc_binary(
+# iree_runtime_cc_binary(
 #     name = "simple_embedding_cuda",
 #     srcs = [
 #         "device_cuda.c",

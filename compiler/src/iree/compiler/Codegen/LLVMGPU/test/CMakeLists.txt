@@ -24,6 +24,7 @@ iree_lit_test_suite(
     "elementwise_pipeline.mlir"
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
+    "layout_analysis_and_distribution.mlir"
     "legalize.mlir"
     "linalg_transform.mlir"
     "nvvm_mma_sync_pipeline_test.mlir"

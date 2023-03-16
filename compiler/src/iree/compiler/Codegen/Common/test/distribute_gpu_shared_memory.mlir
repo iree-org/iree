@@ -158,3 +158,41 @@ hal.executable private @unaligned_shared_memory_copy  {
     }
   }
 }
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>
+]>
+
+hal.executable private @zero_dim_shared_memory_copy  {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @zero_dim_shared_memory_copy layout(#pipeline_layout) attributes {
+      workgroup_size = [32: index, 8: index, 1:index]
+    } {
+    ^bb0(%arg0: !hal.device, %arg1 : index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      // CHECK-LABEL: func.func @zero_dim_shared_memory_copy
+      //  CHECK-SAME: (%[[GLOBAL_MEM:.+]]: memref<f32>, %[[SHARED_MEM:.+]]: memref<f32>)
+      func.func @zero_dim_shared_memory_copy(%global : memref<f32>, %shared : memref<f32>) {
+        //      CHECK:       linalg.generic
+        // CHECK-SAME:         ins(%[[GLOBAL_MEM]]
+        // CHECK-SAME:         outs(%[[SHARED_MEM]]
+        linalg.generic {
+          indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>],
+          iterator_types = []
+        }
+          ins(%global : memref<f32>)
+          outs(%shared : memref<f32>)
+          attrs =  {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
+        ^bb0(%in: f32, %out: f32):
+          linalg.yield %in : f32
+        }
+        return
+      }
+    }
+  }
+}

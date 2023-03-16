@@ -4,10 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
 #include "iree/compiler/Utils/IndexSet.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -16,6 +20,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-vmvx-resolve-buffer-descriptor"
 
 namespace mlir::iree_compiler::IREE::VMVX {
 
@@ -112,24 +118,8 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
       getStridesFromSizes(rewriter, loc, resultDescriptor.sizes);
 
   // Offset.
-  Type elementType = memRefType.getElementType();
-  OpFoldResult elementWidth =
-      TypeSwitch<Type, OpFoldResult>(elementType)
-          .Case<ComplexType, IntegerType, FloatType>(
-              [&](auto type) -> OpFoldResult {
-                return rewriter.getIndexAttr(
-                    IREE::Util::getRoundedElementByteWidth(
-                        memRefType.getElementType()));
-              })
-          .Default([&](Type t) -> OpFoldResult {
-            return rewriter.create<IREE::Util::SizeOfOp>(loc, elementType)
-                .getResult();
-          });
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  resultDescriptor.offset = makeComposedFoldedAffineApply(
-      rewriter, loc, s0.floorDiv(s1),
-      ArrayRef<OpFoldResult>{binding.getByteOffset(), elementWidth});
+  resultDescriptor.offset = convertByteOffsetToElementOffset(
+      rewriter, loc, binding.getByteOffset(), memRefType.getElementType());
   return resultDescriptor;
 }
 
@@ -340,6 +330,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     if (memRefType.getRank() < 1) return failure();
 
     auto loc = op.getLoc();
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(binding);
     FailureOr<DescriptorInfo> resultDescriptor =
         resolveBufferDescriptorForInterfaceBinding(binding, rewriter, loc);
     if (failed(resultDescriptor)) {
@@ -349,33 +341,92 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
 
     replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
 
-    // Base buffer. Use a 1D memref for hal.interface.binding.subspan.
+    // For the base buffer of the `hal.interface.binding.subspan` create a 1D
+    // buffer with zero offset. For example, if the
+    // `hal.interface.binding.subspan` is
+    //
+    // ```mlir
+    //  hal.interface.binding.subspan set(0) binding(1) offset(%offset)
+    //      : memref<?x?xf32, strided<[?, 1], offset: 64]>>{%s0, %s1}
+    // ```
+    //
+    // convert it to
+    //
+    // ```mlir
+    //  #map = affine_map<()[s0, s1, s2] -> (s0 + s1 * s2)>
+    //  %linearSize = affine.apply #map()[%offset, %s0, %s1]
+    //  %c0 = arith.constant 0 : index
+    //  hal.interface.binding.subspan set(0) binding(1) offset(%c0)
+    //      : memref<?xf32>{%linearSize}
+    // ```
+    //
+    // Only the base pointer of this subspan is needed, so creating a
+    // subspan with zero offset (with original offset folded into the size)
+    // is realistic representation of what the IR needs.
     AffineMap mulMap = getMulMap(rewriter.getContext());
     OpFoldResult linearizedMemrefSize = rewriter.getIndexAttr(1);
     for (auto size : resultDescriptor->sizes) {
       linearizedMemrefSize = makeComposedFoldedAffineApply(
           rewriter, loc, mulMap, {linearizedMemrefSize, size});
     }
+    AffineMap addMap = getAddMap(rewriter.getContext());
+    linearizedMemrefSize = makeComposedFoldedAffineApply(
+        rewriter, loc, addMap,
+        {linearizedMemrefSize, resultDescriptor->offset});
+
     SmallVector<int64_t> staticLinearShape;
     SmallVector<Value> dynamicLinearShape;
     dispatchIndexOpFoldResult(linearizedMemrefSize, dynamicLinearShape,
                               staticLinearShape);
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(binding);
 
-    Value newOffset = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value linearInterfaceBinding =
+    IREE::HAL::InterfaceBindingSubspanOp linearInterfaceBinding;
+    auto newBufferType =
+        MemRefType::get(staticLinearShape, memRefType.getElementType(),
+                        MemRefLayoutAttrInterface(), Attribute());
+
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    linearInterfaceBinding =
         rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-            loc, op.getBaseBuffer().getType(), binding.getSetAttr(),
-            binding.getBindingAttr(), binding.getDescriptorTypeAttr(),
-            newOffset, /*dynamicDims =*/ValueRange{},
+            loc, newBufferType, binding.getSetAttr(), binding.getBindingAttr(),
+            binding.getDescriptorTypeAttr(), zero, dynamicLinearShape,
             binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
-    rewriter.replaceAllUsesWith(op.getBaseBuffer(), linearInterfaceBinding);
+    Value basePointer = rewriter.create<IREE::Codegen::GetBasePointerOp>(
+        loc, op.getBaseBuffer().getType(), linearInterfaceBinding);
+    rewriter.replaceAllUsesWith(op.getBaseBuffer(), basePointer);
 
     rewriter.eraseOp(op);
     return success();
   }
 };
+
+/// Template function to handle replacement of base pointer of buffer
+/// descriptors.
+template <typename OpTy>
+static Value getBaseBufferReplacementForDescriptor(OpTy descriptorOp,
+                                                   RewriterBase &rewriter,
+                                                   Location loc, Value source);
+
+/// Template specialization for `vmvx.get_buffer_descriptor` op to
+/// generate a `builtin.unrealized_conversion_cast`.
+template <>
+Value getBaseBufferReplacementForDescriptor<GetBufferDescriptorOp>(
+    GetBufferDescriptorOp descriptorOp, RewriterBase &rewriter, Location loc,
+    Value source) {
+  return rewriter
+      .create<UnrealizedConversionCastOp>(
+          loc, descriptorOp.getBaseBuffer().getType(), source)
+      .getResult(0);
+}
+
+/// Template specialization for `memref.extract_strided_metadata` op to
+/// generate a `iree_codegen.get_base_address`.
+template <>
+Value getBaseBufferReplacementForDescriptor<memref::ExtractStridedMetadataOp>(
+    memref::ExtractStridedMetadataOp descriptorOp, RewriterBase &rewriter,
+    Location loc, Value source) {
+  return rewriter.create<IREE::Codegen::GetBasePointerOp>(
+      loc, descriptorOp.getBaseBuffer().getType(), source);
+}
 
 // Allocations always return a non-offset memref and are matched by this
 // pattern.
@@ -402,12 +453,9 @@ struct FromAllocation : public OpRewritePattern<OpTy> {
     replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
 
     // Base buffer.
-    rewriter.replaceAllUsesWith(
-        op.getBaseBuffer(),
-        rewriter
-            .template create<UnrealizedConversionCastOp>(
-                loc, op.getBaseBuffer().getType(), alloca.getResult())
-            .getResult(0));
+    Value replacement = getBaseBufferReplacementForDescriptor(
+        op, rewriter, loc, alloca.getResult());
+    rewriter.replaceAllUsesWith(op.getBaseBuffer(), replacement);
 
     rewriter.eraseOp(op);
     return success();
@@ -439,17 +487,18 @@ struct FromGlobal : public OpRewritePattern<OpTy> {
     replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
 
     // Base buffer.
-    rewriter.replaceAllUsesWith(
-        op.getBaseBuffer(),
-        rewriter
-            .template create<UnrealizedConversionCastOp>(
-                loc, op.getBaseBuffer().getType(), global.getResult())
-            .getResult(0));
+    Value replacement = getBaseBufferReplacementForDescriptor(
+        op, rewriter, loc, global.getResult());
+    rewriter.replaceAllUsesWith(op.getBaseBuffer(), replacement);
 
     rewriter.eraseOp(op);
     return success();
   }
 };
+
+//===---------------------------------------------------------------------===//
+// Pass To resovle descriptors.
+//===---------------------------------------------------------------------===//
 
 class ResolveBufferDescriptorsPass
     : public ResolveBufferDescriptorsBase<ResolveBufferDescriptorsPass> {
@@ -457,7 +506,8 @@ class ResolveBufferDescriptorsPass
   ResolveBufferDescriptorsPass() = default;
   ResolveBufferDescriptorsPass(const ResolveBufferDescriptorsPass &) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::VMVX::VMVXDialect>();
+    registry.insert<AffineDialect, IREE::Codegen::IREECodegenDialect,
+                    IREE::VMVX::VMVXDialect>();
   }
 
   void runOnOperation() override {
