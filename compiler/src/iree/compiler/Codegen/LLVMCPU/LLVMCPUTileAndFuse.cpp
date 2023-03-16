@@ -198,7 +198,6 @@ LogicalResult applyTileAndFuse(PatternRewriter &rewriter, Operation *rootOp,
 
 void LLVMCPUTileAndFusePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  transform::TrivialPatternRewriter rewriter(context);
   auto funcOp = getOperation();
 
   TilingInterface consumerOp;
