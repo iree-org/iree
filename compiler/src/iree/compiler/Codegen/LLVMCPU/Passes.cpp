@@ -487,9 +487,12 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   // SplitReductionPass takes care of banked-tiling.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLinalgSplitReductionPass(clEnableReassociateFpReductions));
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel = numLevels - 1;
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+  }
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTileAndFusePass(numLevels - 1));
   if (clEnablePadConsumerFusion) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createFuseTensorPadWithConsumerPass());
