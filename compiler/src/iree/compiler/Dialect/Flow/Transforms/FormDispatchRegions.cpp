@@ -347,11 +347,9 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
   return std::nullopt;
 }
 
-/// Returns true if the operands are fusable under the aggressive fusion
-/// heuristics.
-static bool areOpsAggresiveFusable(
-    Operation *producer, Operation *consumer,
-    const llvm::SmallBitVector &rootOuterParallelLoops, bool aggressiveFusion) {
+/// Returns true if the operands are fusable.
+static bool areOpsFusable(Operation *producer, Operation *consumer,
+                          const llvm::SmallBitVector &rootOuterParallelLoops) {
   // Collect all the uses from producer to consumer.
   SmallVector<OpOperand *> allUses;
   for (OpOperand &producerUse : producer->getUses()) {
@@ -410,9 +408,8 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool isFusableWithConsumer(
-    OpOperand &fusedOperand, const llvm::SmallBitVector &rootOuterParallelLoops,
-    bool aggressiveFusion) {
-  // Logics with aggressive fusion heuristics.
+    OpOperand &fusedOperand,
+    const llvm::SmallBitVector &rootOuterParallelLoops) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
@@ -444,8 +441,7 @@ static bool isFusableWithConsumer(
     return false;
   }
 
-  if (!areOpsAggresiveFusable(producer, consumer, rootOuterParallelLoops,
-                              aggressiveFusion)) {
+  if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
     return false;
   }
 
@@ -464,14 +460,14 @@ static bool isFusableWithConsumer(
   }
 
   // Check if the iteration spaces of the producer and consumer are same.
-  // TODO: This is unnecessary requirement, but needed to pass tests right now
-  if (!aggressiveFusion) {
-    auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
-    auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
-    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
-      return false;
-    }
+  // TODO(#12664): This is unnecessary requirement, but we need a better config
+  // to tile the consumer with a larger iteration space.
+  auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
+  auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
+  if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+    return false;
   }
+
   return true;
 }
 
@@ -511,8 +507,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
         continue;
       }
 
-      if (isFusableWithConsumer(*(fusableUse.value()), rootOuterParallelLoops,
-                                aggressiveFusion)) {
+      if (isFusableWithConsumer(*(fusableUse.value()),
+                                rootOuterParallelLoops)) {
         updateRootTo(consumerOp);
         workList.push_back(consumerOp);
       }
@@ -522,8 +518,7 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 
 /// Method to check if the consumer of a use can be fused with its producer.
 static bool isFusableWithProducer(
-    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops,
-    bool aggressiveFusion) {
+    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
@@ -542,7 +537,7 @@ static bool isFusableWithProducer(
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
   if (consumerLinalgOp.isDpsInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
-    if (!aggressiveFusion || !isa<linalg::GenericOp>(consumer) ||
+    if (!isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {
       return false;
     }
@@ -550,8 +545,7 @@ static bool isFusableWithProducer(
     return false;
   }
 
-  return areOpsAggresiveFusable(producer, consumer, rootOuterParallelLoops,
-                                aggressiveFusion);
+  return areOpsFusable(producer, consumer, rootOuterParallelLoops);
 }
 
 /// Starting from the `root` op, traverse the operand use-def chain
@@ -577,8 +571,7 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
           producer, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
-      if (!isFusableWithProducer(operand, rootOuterParallelLoops,
-                                 aggressiveFusion)) {
+      if (!isFusableWithProducer(operand, rootOuterParallelLoops)) {
         continue;
       }
 
