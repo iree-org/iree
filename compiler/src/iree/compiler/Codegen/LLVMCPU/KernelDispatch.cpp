@@ -1912,6 +1912,7 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
       SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
       ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
       for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+        if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
         tileSizes[pos] = tileSizes[pos] / size;
         tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
         LLVM_DEBUG(KD_DBGS() << "Scale # " << pos << " tile size to "
