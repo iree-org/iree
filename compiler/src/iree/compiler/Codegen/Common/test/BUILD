@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "iree_comprehensive_bufferize.mlir",
             "lower_ukernel_to_calls.mlir",
             "pad_dynamic_alloc.mlir",
+            "polynomial_approximation.mlir",
             "rematerialize_parallel_ops.mlir",
             "reduce_bank_conflicts.mlir",
             "reductions.mlir",
