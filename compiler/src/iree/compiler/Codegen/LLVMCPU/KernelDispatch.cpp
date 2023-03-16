@@ -1902,6 +1902,7 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     OpResult result = packOp.getSource().cast<OpResult>();
     auto idxMap = linalgOp.getMatchingIndexingMap(
         linalgOp.getDpsInitOperand(result.getResultNumber()));
+    (void)idxMap;
     LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n"
                          << "The corresponding indexing map is: " << idxMap
                          << "\n");
