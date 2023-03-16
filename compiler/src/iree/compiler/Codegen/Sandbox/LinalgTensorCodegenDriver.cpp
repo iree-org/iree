@@ -209,14 +209,11 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
               Operation *defOp = isa<BlockArgument>(value)
                                      ? value.getParentRegion()->getParentOp()
                                      : value.getDefiningOp();
-              if (!defOp) {
+              if (!defOp || isa<func::FuncOp>(defOp)) {
                 return true;
               }
-              if (isa<tensor::ExtractSliceOp, memref::SubViewOp, AffineMinOp,
-                      AffineApplyOp, scf::ForOp>(defOp)) {
-                return false;
-              }
-              return true;
+
+              return false;
             });
     if (failed(dimBound)) {
       llvm_unreachable("reifyBounds failed");
@@ -227,10 +224,12 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
       llvm_unreachable("bound is a Value");
     }
 
-    LDBG("Getting vector sizes for:\n" << linalgOp << "\n");
-    dimSize = dimBound->get<Attribute>().cast<IntegerAttr>().getInt();
+    // TODO(dcaballe): UBs are exclusive by default. Use new attribute in
+    // interface.
+    dimSize = dimBound->get<Attribute>().cast<IntegerAttr>().getInt() - 1;
     vectorSizes.push_back(dimSize);
-    LDBG("Inferred vector size: " << dimSize << "\n");
+    LDBG("Inferred vector size '" << dimSize << "' for dimension '" << dim
+                                  << "'\n");
   }
 
   return vectorSizes;
