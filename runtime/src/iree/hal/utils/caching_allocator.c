@@ -258,10 +258,23 @@ static iree_status_t iree_hal_caching_allocator_pool_acquire(
   }
   iree_slim_mutex_unlock(&pool->mutex);
   if (existing_buffer) {
-    // Found a buffer - return it.
-    *out_buffer = existing_buffer;
+    // Found a buffer - return it after writing in initial_data (if any).
+    // We can only do this if the buffer supports mapping and expect unmappable
+    // buffers to have been filtered out earlier up.
+    iree_status_t status = iree_ok_status();
+    if (!iree_const_byte_span_is_empty(initial_data)) {
+      status = iree_hal_buffer_map_write(existing_buffer, 0, initial_data.data,
+                                         initial_data.data_length);
+    }
+    if (iree_status_is_ok(status)) {
+      // Return the initialized buffer.
+      *out_buffer = existing_buffer;
+    } else {
+      // Release the buffer back to the pool.
+      iree_hal_buffer_release(existing_buffer);
+    }
     IREE_TRACE_ZONE_END(z0);
-    return iree_ok_status();
+    return status;
   }
 
   // Trim first before allocating so that we don't go over peak.
@@ -275,15 +288,6 @@ static iree_status_t iree_hal_caching_allocator_pool_acquire(
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_allocator_allocate_buffer(
       pool->device_allocator, *params, allocation_size, initial_data, &buffer);
-
-  // If initial data was provided then write it into the buffer.
-  // We can only do this if the buffer supports mapping and expect unmappable
-  // buffers to have been filtered out earlier up.
-  if (iree_status_is_ok(status) &&
-      !iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_buffer_map_write(buffer, 0, initial_data.data,
-                                       initial_data.data_length);
-  }
 
   // If the allocation failed then remove the size from the total.
   if (iree_status_is_ok(status)) {
