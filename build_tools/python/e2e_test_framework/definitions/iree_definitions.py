@@ -8,8 +8,7 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-import hashlib
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework import serialization, unique_ids
@@ -60,15 +59,38 @@ class CompileTarget(object):
   target_architecture: common_definitions.DeviceArchitecture
   target_abi: TargetABI
 
+  def __str__(self):
+    return (f"{self.target_architecture}-"
+            f"{self.target_abi.name}-"
+            f"{self.target_backend.name}").lower()
+
 
 @serialization.serializable(type_key="iree_compile_configs")
 @dataclass(frozen=True)
 class CompileConfig(object):
   """Describes the options to build a module."""
   id: str
+  name: str
   tags: List[str]
   compile_targets: List[CompileTarget]
   extra_flags: List[str] = dataclasses.field(default_factory=list)
+
+  def __str__(self):
+    return self.name
+
+  @staticmethod
+  def build(id: str,
+            tags: Sequence[str],
+            compile_targets: Sequence[CompileTarget],
+            extra_flags: Optional[Sequence[str]] = None):
+    name = ",".join(str(target) for target in compile_targets)
+    name += "[" + ",".join(tags) + "]"
+    extra_flags = [] if extra_flags is None else list(extra_flags)
+    return CompileConfig(id=id,
+                         name=name,
+                         tags=list(tags),
+                         compile_targets=list(compile_targets),
+                         extra_flags=extra_flags)
 
 
 @serialization.serializable(type_key="iree_module_execution_configs")
@@ -76,10 +98,30 @@ class CompileConfig(object):
 class ModuleExecutionConfig(object):
   """Describes the options to run a module."""
   id: str
+  name: str
   tags: List[str]
   loader: RuntimeLoader
   driver: RuntimeDriver
   extra_flags: List[str] = dataclasses.field(default_factory=list)
+
+  def __str__(self):
+    return self.name
+
+  @staticmethod
+  def build(id: str,
+            tags: Sequence[str],
+            loader: RuntimeLoader,
+            driver: RuntimeDriver,
+            extra_flags: Optional[Sequence[str]] = None):
+    name = f"{driver.name}({loader.name})".lower()
+    name += "[" + ",".join(tags) + "]"
+    extra_flags = [] if extra_flags is None else list(extra_flags)
+    return ModuleExecutionConfig(id=id,
+                                 name=name,
+                                 tags=list(tags),
+                                 loader=loader,
+                                 driver=driver,
+                                 extra_flags=extra_flags)
 
 
 class ImportTool(Enum):
@@ -107,9 +149,13 @@ IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
 class ImportConfig(object):
   """Config to import the model."""
   id: str
+  name: str
   tool: ImportTool
   dialect_type: MLIRDialectType
   import_flags: List[str] = dataclasses.field(default_factory=list)
+
+  def __str__(self):
+    return self.name
 
   def materialize_import_flags(self,
                                model: common_definitions.Model) -> List[str]:
@@ -122,6 +168,7 @@ class ImportConfig(object):
 
 DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
+    name="tf_v1",
     tool=ImportTool.TF_IMPORTER,
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
@@ -132,6 +179,7 @@ DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
 DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
     tool=ImportTool.TF_IMPORTER,
+    name="tf_v2",
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v2",
@@ -140,12 +188,14 @@ DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
 
 DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TFLITE_DEFAULT,
+    name="tflite",
     tool=ImportTool.TFLITE_IMPORTER,
     dialect_type=MLIRDialectType.TOSA,
     import_flags=["--output-format=mlir-bytecode"])
 
 DEFAULT_LINALG_MLIR_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT,
+    name="linalg",
     tool=ImportTool.NONE,
     dialect_type=MLIRDialectType.NONE)
 
@@ -167,8 +217,12 @@ MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {
 class ImportedModel(object):
   """Describes an imported MLIR model."""
   composite_id: str
+  name: str
   model: common_definitions.Model
   import_config: ImportConfig
+
+  def __str__(self):
+    return self.name
 
   @staticmethod
   def from_model(model: common_definitions.Model):
@@ -177,7 +231,9 @@ class ImportedModel(object):
       raise ValueError(f"Unsupported model source type: {model.source_type}.")
 
     composite_id = unique_ids.hash_composite_id([model.id, config.id])
+    name = f"{model}({config})"
     return ImportedModel(composite_id=composite_id,
+                         name=name,
                          model=model,
                          import_config=config)
 
@@ -188,6 +244,7 @@ class ImportedModel(object):
 class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   composite_id: str
+  name: str
   imported_model: ImportedModel
   compile_config: CompileConfig
   # Full list of flags to compile with, derived from sub-components, with
@@ -196,17 +253,21 @@ class ModuleGenerationConfig(object):
   # serialized JSON.
   compile_flags: List[str]
 
+  def __str__(self):
+    return self.name
+
   def materialize_compile_flags(self):
     """Materialize flags with dependent values."""
     return self.compile_flags
 
   @staticmethod
-  def with_flag_generation(imported_model: ImportedModel,
-                           compile_config: CompileConfig):
+  def build(imported_model: ImportedModel, compile_config: CompileConfig):
     composite_id = unique_ids.hash_composite_id(
         [imported_model.composite_id, compile_config.id])
+    name = f"{imported_model}_{compile_config}"
     return ModuleGenerationConfig(
         composite_id=composite_id,
+        name=name,
         imported_model=imported_model,
         compile_config=compile_config,
         compile_flags=_generate_compile_flags(
@@ -228,6 +289,7 @@ class E2EModelRunTool(Enum):
 class E2EModelRunConfig(object):
   """Describes an e2e run."""
   composite_id: str
+  name: str
   module_generation_config: ModuleGenerationConfig
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
@@ -239,6 +301,9 @@ class E2EModelRunConfig(object):
   run_flags: List[str]
   tool: E2EModelRunTool
 
+  def __str__(self):
+    return self.name
+
   def materialize_run_flags(self, gpu_id: str = "0"):
     """Materialize flags with dependent values."""
     return [
@@ -247,21 +312,23 @@ class E2EModelRunConfig(object):
     ]
 
   @staticmethod
-  def with_flag_generation(module_generation_config: ModuleGenerationConfig,
-                           module_execution_config: ModuleExecutionConfig,
-                           target_device_spec: common_definitions.DeviceSpec,
-                           input_data: common_definitions.ModelInputData,
-                           tool: E2EModelRunTool):
+  def build(module_generation_config: ModuleGenerationConfig,
+            module_execution_config: ModuleExecutionConfig,
+            target_device_spec: common_definitions.DeviceSpec,
+            input_data: common_definitions.ModelInputData,
+            tool: E2EModelRunTool):
     composite_id = unique_ids.hash_composite_id([
         module_generation_config.composite_id, module_execution_config.id,
         target_device_spec.id, input_data.id
     ])
+    name = f"{module_generation_config}_{module_execution_config}_{input_data}_{target_device_spec}"
     run_flags = generate_run_flags(
         imported_model=module_generation_config.imported_model,
         input_data=input_data,
         module_execution_config=module_execution_config,
         gpu_id=E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER)
     return E2EModelRunConfig(composite_id=composite_id,
+                             name=name,
                              module_generation_config=module_generation_config,
                              module_execution_config=module_execution_config,
                              target_device_spec=target_device_spec,

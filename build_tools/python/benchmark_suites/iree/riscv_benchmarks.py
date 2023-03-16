@@ -18,7 +18,7 @@ class Linux_RV64_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.LLVM_CPU,
       target_architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
       target_abi=iree_definitions.TargetABI.LINUX_GNU)
-  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_RV64_GENERIC_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[RV64_CPU_TARGET])
@@ -37,7 +37,7 @@ class Linux_RV64_Benchmarks(object):
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.MODELS
@@ -52,7 +52,7 @@ class Linux_RV32_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.LLVM_CPU,
       target_architecture=common_definitions.DeviceArchitecture.RV32_GENERIC,
       target_abi=iree_definitions.TargetABI.LINUX_GNU)
-  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_RV32_GENERIC_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[RV32_CPU_TARGET])
@@ -68,7 +68,7 @@ class Linux_RV32_Benchmarks(object):
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.MODELS

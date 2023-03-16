@@ -7,7 +7,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
+from typing import List, Optional, Sequence
 from e2e_test_framework import serialization, unique_ids
 import dataclasses
 
@@ -24,6 +24,9 @@ class _ArchitectureInfo(object):
   type: ArchitectureType
   architecture: str
   microarchitecture: str
+
+  def __str__(self):
+    return f"{self.type.name}-{self.architecture}-{self.microarchitecture}"
 
 
 class DeviceArchitecture(_ArchitectureInfo, Enum):
@@ -104,6 +107,12 @@ class DeviceSpec(object):
   """Benchmark device specification."""
   id: str
 
+  # Unique name of the device spec.
+  name: str
+
+  # Tags to describe the device.
+  tags: List[str]
+
   # Device name. E.g., Pixel-6.
   device_name: str
 
@@ -122,6 +131,28 @@ class DeviceSpec(object):
   # these parameters to set up the devices. E.g. set CPU mask.
   device_parameters: List[str] = dataclasses.field(default_factory=list)
 
+  def __str__(self):
+    return self.name
+
+  @staticmethod
+  def build(id: str,
+            tags: Sequence[str],
+            device_name: str,
+            host_environment: HostEnvironment,
+            architecture: DeviceArchitecture,
+            device_parameters: Optional[Sequence[str]] = None):
+    name = "{device_name}[{tags}]".format(device_name=device_name,
+                                          tags=",".join(tags))
+    device_parameters = [] if device_parameters is None else list(
+        device_parameters)
+    return DeviceSpec(id=id,
+                      name=name,
+                      tags=list(tags),
+                      device_name=device_name,
+                      host_environment=host_environment,
+                      architecture=architecture,
+                      device_parameters=device_parameters)
+
 
 @serialization.serializable(type_key="models")
 @dataclass(frozen=True)
@@ -138,6 +169,9 @@ class Model(object):
   # Input types. E.g., ["100x100xf32", "200x200x5xf32"].
   input_types: List[str]
 
+  def __str__(self):
+    return self.name
+
 
 @serialization.serializable(type_key="model_input_data")
 @dataclass(frozen=True)
@@ -153,12 +187,15 @@ class ModelInputData(object):
   data_format: InputDataFormat
   source_url: str
 
+  def __str__(self):
+    return self.name
+
 
 # All-zeros dummy input data. Runners will generate the zeros input with proper
 # shapes.
 ZEROS_MODEL_INPUT_DATA = ModelInputData(id=unique_ids.MODEL_INPUT_DATA_ZEROS,
                                         model_id="",
-                                        name="zero_dummy_input",
+                                        name="zeros",
                                         tags=[],
                                         data_format=InputDataFormat.ZEROS,
                                         source_url="")

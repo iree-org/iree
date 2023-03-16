@@ -21,16 +21,16 @@ class Android_Adreno_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.VULKAN_SPIRV,
       target_architecture=common_definitions.DeviceArchitecture.ADRENO_GENERIC,
       target_abi=iree_definitions.TargetABI.VULKAN_ANDROID31)
-  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ADRENO_GENERIC_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[ADRENO_GPU_COMPILE_TARGET])
-  FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ADRENO_GENERIC_FUSE_PADDING,
       tags=["experimental-flags", "fuse-padding"],
       compile_targets=[ADRENO_GPU_COMPILE_TARGET],
       extra_flags=["--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"])
-  FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.
       IREE_COMPILE_CONFIG_ANDROID_ADRENO_GENERIC_FUSE_PADDING_REPEATED_KERNEL,
       tags=["experimental-flags", "fuse-padding", "repeated-kernel"],
@@ -51,19 +51,19 @@ class Android_Adreno_Benchmarks(object):
         tflite_models.MOBILENET_V3SMALL,
     ]
     default_gen_configs = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in default_models
     ]
     fuse_padding_gen_configs = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.FUSE_PADDING_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in default_models
     ]
     fuse_padding_repeated_kernel_gen_configs = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in [
