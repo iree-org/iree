@@ -114,6 +114,23 @@ def check_description_and_show_diff(original_description: str,
       current_description.splitlines(keepends=True))
   description_diffs = "".join(description_diffs)
 
+  if description_diffs != "":
+    description_diffs = textwrap.dedent("""\
+    ```diff
+    {}
+    ```
+    """).format(description_diffs)
+
+  if original_labels == current_labels:
+    label_diffs = ""
+  else:
+    label_diffs = textwrap.dedent("""\
+    ```
+    Original labels: {original_labels}
+    Current labels: {current_labels}
+    ```
+    """).format(original_labels=original_labels, current_labels=current_labels)
+
   write_job_summary(
       textwrap.dedent("""\
   :pushpin: Using the PR description and labels different from the original PR event that started this workflow.
@@ -121,15 +138,11 @@ def check_description_and_show_diff(original_description: str,
   <details>
   <summary>Click to show diff (original vs. current)</summary>
 
-  ```diff
   {description_diffs}
-  ```
 
-  Original labels: {original_labels}
-  Current labels: {current_labels}
+  {label_diffs}
   </details>""").format(description_diffs=description_diffs,
-                        original_labels=original_labels,
-                        current_labels=current_labels))
+                        label_diffs=label_diffs))
 
 
 def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
