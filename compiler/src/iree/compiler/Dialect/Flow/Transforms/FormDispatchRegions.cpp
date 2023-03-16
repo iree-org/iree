@@ -459,6 +459,15 @@ static bool isFusableWithConsumer(
     }
   }
 
+  // Check if the iteration spaces of the producer and consumer are same.
+  // TODO(#12664): This is unnecessary requirement, but we need a better config
+  // to tile the consumer with a larger iteration space.
+  auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
+  auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
+  if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+    return false;
+  }
+
   return true;
 }
 
