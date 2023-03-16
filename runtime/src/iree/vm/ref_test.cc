@@ -56,13 +56,11 @@ static iree_vm_ref_t MakeRef(InstancePtr& instance, const char* type_name) {
   // Safe to do multiple times, so we do it to ensure the tests don't care what
   // order they run in/don't need to preregister types.
   static iree_vm_ref_type_descriptor_t descriptor = {0};
-  if (descriptor.type == IREE_VM_REF_TYPE_NULL) {
-    descriptor.type_name = iree_make_cstring_view(type_name);
-    descriptor.offsetof_counter = T::offsetof_counter();
-    descriptor.destroy = T::DirectDestroy;
-    IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor));
-    T::kTypeID = descriptor.type;
-  }
+  descriptor.type_name = iree_make_cstring_view(type_name);
+  descriptor.offsetof_counter = T::offsetof_counter();
+  descriptor.destroy = T::DirectDestroy;
+  IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor));
+  T::kTypeID = (iree_vm_ref_type_t)&descriptor;
 
   iree_vm_ref_t ref = {0};
   IREE_CHECK_OK(iree_vm_ref_wrap_assign(new T(), T::kTypeID, &ref));
@@ -71,21 +69,20 @@ static iree_vm_ref_t MakeRef(InstancePtr& instance, const char* type_name) {
 
 static int32_t ReadCounter(iree_vm_ref_t* ref) {
   return iree_atomic_load_int32(
-      (iree_atomic_ref_count_t*)(((uintptr_t)ref->ptr) + ref->offsetof_counter),
+      (iree_atomic_ref_count_t*)ref->ptr + ref->offsetof_counter,
       iree_memory_order_seq_cst);
 }
 
 static iree_vm_ref_type_t kCTypeID = IREE_VM_REF_TYPE_NULL;
 static void RegisterTypeC(InstancePtr& instance) {
   static iree_vm_ref_type_descriptor_t descriptor = {0};
-  if (descriptor.type == IREE_VM_REF_TYPE_NULL) {
-    descriptor.type_name = iree_make_cstring_view("CType");
-    descriptor.offsetof_counter = offsetof(ref_object_c_t, ref_object.counter);
-    descriptor.destroy =
-        +[](void* ptr) { delete reinterpret_cast<ref_object_c_t*>(ptr); };
-    IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor));
-    kCTypeID = descriptor.type;
-  }
+  descriptor.type_name = iree_make_cstring_view("CType");
+  descriptor.offsetof_counter = offsetof(ref_object_c_t, ref_object.counter) /
+                                IREE_VM_REF_COUNTER_ALIGNMENT;
+  descriptor.destroy =
+      +[](void* ptr) { delete reinterpret_cast<ref_object_c_t*>(ptr); };
+  IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor));
+  kCTypeID = (iree_vm_ref_type_t)&descriptor;
 }
 
 // Tests type registration and lookup.
@@ -133,8 +130,8 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
   allocated_derived_types = 0;
 
   iree_vm_ref_t ref = {0};
-  IREE_EXPECT_OK(
-      iree_vm_ref_wrap_assign(new DerivedType(), descriptor.type, &ref));
+  IREE_EXPECT_OK(iree_vm_ref_wrap_assign(
+      new DerivedType(), (iree_vm_ref_type_t)&descriptor, &ref));
   EXPECT_EQ(1, ReadCounter(&ref));
   EXPECT_EQ(1, allocated_derived_types);
 
@@ -142,16 +139,6 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
 
   iree_vm_ref_release(&ref);
   EXPECT_EQ(0, allocated_derived_types);
-}
-
-// Tests that wrapping a type that has not been registered fails.
-TEST(VMRefTest, WrappingRequriesTypeRegistration) {
-  iree_vm_ref_t ref = {0};
-  int dummy = 0;
-  iree_status_t status = iree_vm_ref_wrap_assign(
-      &dummy, static_cast<iree_vm_ref_type_t>(1234), &ref);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
-  iree_status_free(status);
 }
 
 // Tests that wrapping releases any existing ref in out_ref.

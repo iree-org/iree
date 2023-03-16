@@ -315,13 +315,10 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
 }
 
 iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
-  if (iree_vm_buffer_descriptor.type != IREE_VM_REF_TYPE_NULL) {
-    // Already registered.
-    return iree_ok_status();
-  }
   iree_vm_buffer_descriptor.destroy = iree_vm_buffer_destroy;
   iree_vm_buffer_descriptor.offsetof_counter =
-      offsetof(iree_vm_buffer_t, ref_object.counter);
+      offsetof(iree_vm_buffer_t, ref_object.counter) /
+      IREE_VM_REF_COUNTER_ALIGNMENT;
   iree_vm_buffer_descriptor.type_name = iree_make_cstring_view("vm.buffer");
   return iree_vm_instance_register_type(instance, &iree_vm_buffer_descriptor);
 }

@@ -33,32 +33,31 @@ static bool iree_vm_bytecode_module_resolve_type(
     return false;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i8")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_I8;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I8);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i16")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_I16;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I16);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i32")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_I32;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i64")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_I64;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I64);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("f32")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_F32;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F32);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("f64")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_F64;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F64);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(
                  full_name, iree_make_cstring_view("!vm.opaque")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_NONE;
-    out_type->ref_type = IREE_VM_REF_TYPE_NULL;
+    *out_type = iree_vm_make_undefined_type_def();
     return true;
   } else if (full_name[0] == '!') {
     // Note that we drop the ! prefix:
@@ -74,7 +73,8 @@ static bool iree_vm_bytecode_module_resolve_type(
     const iree_vm_ref_type_descriptor_t* type_descriptor =
         iree_vm_instance_lookup_type(instance, type_name);
     if (type_descriptor) {
-      out_type->ref_type = type_descriptor->type;
+      *out_type =
+          iree_vm_make_ref_type_def((iree_vm_ref_type_t)type_descriptor);
       return true;
     }
   }

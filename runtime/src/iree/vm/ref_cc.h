@@ -34,6 +34,7 @@ namespace vm {
 template <typename T>
 struct ref_type_descriptor {
   static const iree_vm_ref_type_descriptor_t* get();
+  static iree_vm_ref_type_t type();
 };
 
 // Users may override this with their custom types to allow the packing code to
@@ -163,7 +164,9 @@ class RefObject {
   // If the type has virtual methods (dtors/etc) then it should be 4 or 8
   // (depending on pointer width). It may be other things, and instead of too
   // much crazy magic we just rely on offsetof doing the right thing here.
-  static constexpr size_t offsetof_counter() { return offsetof(T, counter_); }
+  static constexpr size_t offsetof_counter() {
+    return offsetof(T, counter_) / IREE_VM_REF_COUNTER_ALIGNMENT;
+  }
 
  protected:
   RefObject() { ref_ptr_add_ref(static_cast<T*>(this)); }
@@ -236,26 +239,26 @@ class ref {
 
  public:
   IREE_ATTRIBUTE_ALWAYS_INLINE iree_vm_ref_type_t type() const noexcept {
-    return ref_type_descriptor<T>::get()->type;
+    return ref_type_descriptor<T>::type();
   }
 
   IREE_ATTRIBUTE_ALWAYS_INLINE ref() noexcept
       : ref_({
             0,
             ref_type_descriptor<T>::get()->offsetof_counter,
-            ref_type_descriptor<T>::get()->type,
+            ref_type_descriptor<T>::type(),
         }) {}
   IREE_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept  // NOLINT
       : ref_({
             0,
             ref_type_descriptor<T>::get()->offsetof_counter,
-            ref_type_descriptor<T>::get()->type,
+            ref_type_descriptor<T>::type(),
         }) {}
   IREE_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept  // NOLINT
       : ref_({
             p,
             ref_type_descriptor<T>::get()->offsetof_counter,
-            ref_type_descriptor<T>::get()->type,
+            ref_type_descriptor<T>::type(),
         }) {}
   IREE_ATTRIBUTE_ALWAYS_INLINE ~ref() noexcept { ref_type_release<T>(get()); }
 
@@ -489,6 +492,9 @@ class opaque_ref {
   struct ref_type_descriptor<T> {                              \
     static inline const iree_vm_ref_type_descriptor_t* get() { \
       return &name##_descriptor;                               \
+    }                                                          \
+    static inline iree_vm_ref_type_t type() {                  \
+      return reinterpret_cast<iree_vm_ref_type_t>(get());      \
     }                                                          \
   };                                                           \
   }                                                            \

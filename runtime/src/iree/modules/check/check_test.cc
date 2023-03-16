@@ -180,7 +180,7 @@ class CheckTest : public ::testing::Test {
   iree_status_t InvokeValue(const char* function_name,
                             std::vector<iree_vm_value_t> args) {
     IREE_RETURN_IF_ERROR(
-        iree_vm_list_create(/*element_type=*/nullptr, args.size(),
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), args.size(),
                             iree_allocator_system(), &inputs_));
     for (auto& arg : args) {
       IREE_RETURN_IF_ERROR(iree_vm_list_push_value(inputs_.get(), &arg));
@@ -191,7 +191,7 @@ class CheckTest : public ::testing::Test {
   iree_status_t Invoke(const char* function_name,
                        std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
     IREE_RETURN_IF_ERROR(
-        iree_vm_list_create(/*element_type=*/nullptr, args.size(),
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), args.size(),
                             iree_allocator_system(), &inputs_));
     for (auto& arg : args) {
       iree_vm_ref_t arg_ref = iree_hal_buffer_view_move_ref(arg.get());

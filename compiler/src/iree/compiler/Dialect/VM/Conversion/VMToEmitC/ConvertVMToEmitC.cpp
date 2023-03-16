@@ -2795,7 +2795,7 @@ class ConstRefRodataOpConversion
     auto typeIdOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_vm_buffer_type_id"),
+        /*callee=*/StringAttr::get(ctx, "iree_vm_buffer_type"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
@@ -3727,13 +3727,13 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
 
   std::optional<CNames> extractCNames(SrcOpTy op) const {
     if (isa<IREE::VM::ListAllocOp>(op)) {
-      return CNames{"iree_vm_list_t", "iree_vm_list_type_id",
+      return CNames{"iree_vm_list_t", "iree_vm_list_type",
                     "iree_vm_list_create"};
     } else if (isa<IREE::VM::BufferAllocOp>(op)) {
-      return CNames{"iree_vm_buffer_t", "iree_vm_buffer_type_id",
+      return CNames{"iree_vm_buffer_t", "iree_vm_buffer_type",
                     "iree_vm_buffer_create"};
     } else if (isa<IREE::VM::BufferCloneOp>(op)) {
-      return CNames{"iree_vm_buffer_t", "iree_vm_buffer_type_id",
+      return CNames{"iree_vm_buffer_t", "iree_vm_buffer_type",
                     "iree_vm_buffer_clone"};
     }
     return std::nullopt;

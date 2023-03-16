@@ -145,8 +145,9 @@ Status RunModule(const IreeModuleInvocation& invocation) {
       iree_allocator_system(), &inputs));
 
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
-                                           iree_allocator_system(), &outputs));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                           16, iree_allocator_system(),
+                                           &outputs));
 
   LOGI("Execute @%s", function_name.c_str());
   IREE_RETURN_IF_ERROR(

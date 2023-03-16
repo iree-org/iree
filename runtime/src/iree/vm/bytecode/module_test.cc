@@ -136,7 +136,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
       const char* function_name, std::vector<iree_vm_value_t> inputs) {
     ref<iree_vm_list_t> input_list;
     IREE_RETURN_IF_ERROR(
-        iree_vm_list_create(/*element_type=*/nullptr, inputs.size(),
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), inputs.size(),
                             iree_allocator_system(), &input_list));
     IREE_RETURN_IF_ERROR(iree_vm_list_resize(input_list.get(), inputs.size()));
     for (iree_host_size_t i = 0; i < inputs.size(); ++i) {
@@ -145,8 +145,9 @@ class VMBytecodeModuleTest : public ::testing::Test {
     }
 
     ref<iree_vm_list_t> output_list;
-    IREE_RETURN_IF_ERROR(iree_vm_list_create(
-        /*element_type=*/nullptr, 8, iree_allocator_system(), &output_list));
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             8, iree_allocator_system(),
+                                             &output_list));
 
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
@@ -170,7 +171,7 @@ class VMBytecodeModuleTest : public ::testing::Test {
       const char* function_name, std::vector<iree_vm_ref_t> inputs) {
     ref<iree_vm_list_t> input_list;
     IREE_RETURN_IF_ERROR(
-        iree_vm_list_create(/*element_type=*/nullptr, inputs.size(),
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), inputs.size(),
                             iree_allocator_system(), &input_list));
     IREE_RETURN_IF_ERROR(iree_vm_list_resize(input_list.get(), inputs.size()));
     for (iree_host_size_t i = 0; i < inputs.size(); ++i) {
@@ -179,8 +180,9 @@ class VMBytecodeModuleTest : public ::testing::Test {
     }
 
     ref<iree_vm_list_t> output_list;
-    IREE_RETURN_IF_ERROR(iree_vm_list_create(
-        /*element_type=*/nullptr, 8, iree_allocator_system(), &output_list));
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             8, iree_allocator_system(),
+                                             &output_list));
 
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(

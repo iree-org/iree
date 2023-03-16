@@ -87,9 +87,10 @@ class VmVariantList : public ApiRefCounted<VmVariantList, iree_vm_list_t> {
  public:
   static VmVariantList Create(iree_host_size_t capacity) {
     iree_vm_list_t* list;
-    CheckApiStatus(iree_vm_list_create(/*element_type=*/nullptr, capacity,
-                                       iree_allocator_system(), &list),
-                   "Error allocating variant list");
+    CheckApiStatus(
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), capacity,
+                            iree_allocator_system(), &list),
+        "Error allocating variant list");
     return VmVariantList::StealFromRawPtr(list);
   }
 
@@ -182,8 +183,8 @@ class VmRef {
   //----------------------------------------------------------------------------
   // Binds the reference protocol to a VmRefObject bound class.
   // This defines three attributes:
-  //   __iree_vm_type_id__()
-  //        Gets the type id from the object.
+  //   __iree_vm_type__()
+  //        Gets the type from the object.
   //   [readonly property] __iree_vm_ref__ :
   //        Gets a VmRef from the object.
   //   __iree_vm_cast__(ref) :
@@ -200,13 +201,13 @@ class VmRef {
   // reference object. It takes some of the C helper functions that are defined
   // for each type and is generic.
   //----------------------------------------------------------------------------
-  static const char* const kTypeIdAttr;
+  static const char* const kTypeAttr;
   static const char* const kRefAttr;
   static const char* const kCastAttr;
 
-  template <typename PyClass, typename TypeIdFunctor, typename RetainRefFunctor,
+  template <typename PyClass, typename TypeFunctor, typename RetainRefFunctor,
             typename DerefFunctor, typename IsaFunctor>
-  static void BindRefProtocol(PyClass& cls, TypeIdFunctor type_id,
+  static void BindRefProtocol(PyClass& cls, TypeFunctor type,
                               RetainRefFunctor retain_ref, DerefFunctor deref,
                               IsaFunctor isa) {
     using WrapperType = typename PyClass::type;
@@ -214,7 +215,7 @@ class VmRef {
     auto ref_lambda = [=](WrapperType& self) {
       return VmRef::Steal(retain_ref(self.raw_ptr()));
     };
-    cls.def_static(VmRef::kTypeIdAttr, [=]() { return type_id(); });
+    cls.def_static(VmRef::kTypeAttr, [=]() { return type(); });
     cls.def_property_readonly(VmRef::kRefAttr, ref_lambda);
     cls.def_property_readonly("ref", ref_lambda);
     cls.def_static(VmRef::kCastAttr, [=](VmRef& ref) -> py::object {

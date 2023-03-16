@@ -30,39 +30,30 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 // Type registration
 //===----------------------------------------------------------------------===//
 
-#define IREE_VM_REGISTER_HAL_C_TYPE(instance, type, name, destroy_fn,     \
-                                    descriptor)                           \
-  descriptor.type_name = iree_make_cstring_view(name);                    \
-  descriptor.offsetof_counter = offsetof(iree_hal_resource_t, ref_count); \
-  descriptor.destroy = (iree_vm_ref_destroy_t)destroy_fn;                 \
+#define IREE_VM_REGISTER_HAL_C_TYPE(instance, type, name, destroy_fn,      \
+                                    descriptor)                            \
+  descriptor.type_name = iree_make_cstring_view(name);                     \
+  descriptor.offsetof_counter = offsetof(iree_hal_resource_t, ref_count) / \
+                                IREE_VM_REF_COUNTER_ALIGNMENT;             \
+  descriptor.destroy = (iree_vm_ref_destroy_t)destroy_fn;                  \
   IREE_RETURN_IF_ERROR(iree_vm_instance_register_type(instance, &descriptor));
 
 static iree_status_t iree_hal_module_register_common_types(
     iree_vm_instance_t* instance) {
-  static bool has_registered = false;
-  if (has_registered) return iree_ok_status();
-
   IREE_VM_REGISTER_HAL_C_TYPE(instance, iree_hal_buffer_t, "hal.buffer",
                               iree_hal_buffer_recycle,
                               iree_hal_buffer_descriptor);
   IREE_VM_REGISTER_HAL_C_TYPE(instance, iree_hal_buffer_view_t,
                               "hal.buffer_view", iree_hal_buffer_view_destroy,
                               iree_hal_buffer_view_descriptor);
-
-  has_registered = true;
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_module_register_executable_types(
     iree_vm_instance_t* instance) {
-  static bool has_registered = false;
-  if (has_registered) return iree_ok_status();
-
   IREE_VM_REGISTER_HAL_C_TYPE(instance, iree_hal_executable_t, "hal.executable",
                               iree_hal_executable_destroy,
                               iree_hal_executable_descriptor);
-
-  has_registered = true;
   return iree_ok_status();
 }
 
@@ -80,9 +71,6 @@ iree_hal_module_register_loader_types(iree_vm_instance_t* instance) {
 
 IREE_API_EXPORT iree_status_t
 iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
-  static bool has_registered = false;
-  if (has_registered) return iree_ok_status();
-
   IREE_RETURN_IF_ERROR(iree_hal_module_register_common_types(instance));
   IREE_RETURN_IF_ERROR(iree_hal_module_register_executable_types(instance));
 
@@ -115,13 +103,33 @@ iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
                               iree_hal_semaphore_destroy,
                               iree_hal_semaphore_descriptor);
 
-  has_registered = true;
   return iree_ok_status();
 }
 
 //===--------------------------------------------------------------------===//
 // Utilities
 //===--------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_hal_buffer_t* iree_vm_list_get_buffer_assign(
+    const iree_vm_list_t* list, iree_host_size_t i) {
+  return (iree_hal_buffer_t*)iree_vm_list_get_ref_deref(
+      list, i, iree_hal_buffer_descriptor);
+}
+
+IREE_API_EXPORT iree_hal_buffer_t* iree_vm_list_get_buffer_retain(
+    const iree_vm_list_t* list, iree_host_size_t i) {
+  iree_hal_buffer_t* value = iree_vm_list_get_buffer_assign(list, i);
+  iree_hal_buffer_retain(value);
+  return value;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_retain(
+    iree_vm_list_t* list, iree_host_size_t i, iree_hal_buffer_t* value) {
+  iree_vm_ref_t value_ref;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_ref_wrap_assign(value, iree_hal_buffer_type(), &value_ref));
+  return iree_vm_list_set_ref_retain(list, i, &value_ref);
+}
 
 IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_assign(
     const iree_vm_list_t* list, iree_host_size_t i) {
@@ -139,7 +147,7 @@ IREE_API_EXPORT iree_hal_buffer_view_t* iree_vm_list_get_buffer_view_retain(
 IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_view_retain(
     iree_vm_list_t* list, iree_host_size_t i, iree_hal_buffer_view_t* value) {
   iree_vm_ref_t value_ref;
-  IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-      value, iree_hal_buffer_view_type_id(), &value_ref));
+  IREE_RETURN_IF_ERROR(
+      iree_vm_ref_wrap_assign(value, iree_hal_buffer_view_type(), &value_ref));
   return iree_vm_list_set_ref_retain(list, i, &value_ref);
 }

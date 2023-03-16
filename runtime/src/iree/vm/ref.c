@@ -19,14 +19,13 @@
 
 static inline volatile iree_atomic_ref_count_t* iree_vm_get_raw_counter_ptr(
     void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
-  return (volatile iree_atomic_ref_count_t*)(((uintptr_t)(ptr)) +
-                                             type_descriptor->offsetof_counter);
+  return (volatile iree_atomic_ref_count_t*)ptr +
+         type_descriptor->offsetof_counter;
 }
 
 static inline volatile iree_atomic_ref_count_t* iree_vm_get_ref_counter_ptr(
     iree_vm_ref_t* ref) {
-  return (volatile iree_atomic_ref_count_t*)(((uintptr_t)ref->ptr) +
-                                             ref->offsetof_counter);
+  return (volatile iree_atomic_ref_count_t*)ref->ptr + ref->offsetof_counter;
 }
 
 IREE_API_EXPORT void iree_vm_ref_object_retain(
@@ -50,6 +49,11 @@ IREE_API_EXPORT void iree_vm_ref_object_release(
   }
 }
 
+IREE_API_EXPORT iree_string_view_t
+iree_vm_ref_type_name(iree_vm_ref_type_t type) {
+  return ((const iree_vm_ref_type_descriptor_t*)type)->type_name;
+}
+
 // A table of type descriptors registered at startup.
 // These provide quick dereferencing of destruction functions and type names for
 // debugging. Note that this just points to registered descriptors (or NULL) for
@@ -60,21 +64,18 @@ IREE_API_EXPORT void iree_vm_ref_object_release(
 static const iree_vm_ref_type_descriptor_t*
     iree_vm_ref_type_descriptors[IREE_VM_MAX_TYPE_ID] = {0};
 
-// Returns the type descriptor (or NULL) for the given type ID.
-static const iree_vm_ref_type_descriptor_t* iree_vm_ref_get_type_descriptor(
-    iree_vm_ref_type_t type) {
-  if (type >= IREE_VM_MAX_TYPE_ID) {
-    return NULL;
-  }
-  return iree_vm_ref_type_descriptors[type];
-}
-
 IREE_API_EXPORT iree_status_t iree_vm_instance_register_type(
     iree_vm_instance_t* instance, iree_vm_ref_type_descriptor_t* descriptor) {
+  // HACK: until properly registering we do this scan each time.
+  // Callers shouldn't be registering types in tight loops anyway.
   for (int i = 1; i <= IREE_VM_MAX_TYPE_ID; ++i) {
+    if (iree_vm_ref_type_descriptors[i] == descriptor) {
+      // Already registered.
+      return iree_ok_status();
+    }
     if (!iree_vm_ref_type_descriptors[i]) {
+      // Store in free slot.
       iree_vm_ref_type_descriptors[i] = descriptor;
-      descriptor->type = i;
       return iree_ok_status();
     }
   }
@@ -96,19 +97,12 @@ IREE_API_EXPORT void iree_vm_instance_unregister_type(
   }
 }
 
-IREE_API_EXPORT iree_string_view_t
-iree_vm_ref_type_name(iree_vm_ref_type_t type) {
-  if (type == 0 || type >= IREE_VM_MAX_TYPE_ID) {
-    return iree_string_view_empty();
-  }
-  return iree_vm_ref_type_descriptors[type]->type_name;
-}
-
 IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*
 iree_vm_instance_lookup_type(iree_vm_instance_t* instance,
                              iree_string_view_t full_name) {
   for (int i = 1; i <= IREE_VM_MAX_TYPE_ID; ++i) {
-    if (iree_string_view_equal(iree_vm_ref_type_descriptors[i]->type_name,
+    if (iree_vm_ref_type_descriptors[i] &&
+        iree_string_view_equal(iree_vm_ref_type_descriptors[i]->type_name,
                                full_name)) {
       return iree_vm_ref_type_descriptors[i];
     }
@@ -132,7 +126,7 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_wrap_assign(void* ptr,
                                                       iree_vm_ref_type_t type,
                                                       iree_vm_ref_t* out_ref) {
   const iree_vm_ref_type_descriptor_t* type_descriptor =
-      iree_vm_ref_get_type_descriptor(type);
+      (const iree_vm_ref_type_descriptor_t*)type;
   if (!type_descriptor) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "type not registered");
@@ -235,7 +229,7 @@ IREE_API_EXPORT void iree_vm_ref_release(iree_vm_ref_t* ref) {
   volatile iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(ref);
   if (iree_atomic_ref_count_dec(counter) == 1) {
     const iree_vm_ref_type_descriptor_t* type_descriptor =
-        iree_vm_ref_get_type_descriptor(ref->type);
+        (const iree_vm_ref_type_descriptor_t*)ref->type;
     if (type_descriptor->destroy) {
       // NOTE: this makes us not re-entrant, but I think that's OK.
       iree_vm_ref_trace("DESTROY", ref);

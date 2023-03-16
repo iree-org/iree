@@ -97,10 +97,10 @@ iree_status_t Run() {
 
   // Setup call inputs with our buffers.
   iree_vm_list_t* inputs = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(
-                           /*element_type=*/NULL,
-                           /*capacity=*/2, iree_allocator_system(), &inputs),
-                       "can't allocate input vm list");
+  IREE_RETURN_IF_ERROR(
+      iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                          /*capacity=*/2, iree_allocator_system(), &inputs),
+      "can't allocate input vm list");
 
   iree_vm_ref_t arg0_buffer_view_ref =
       iree_hal_buffer_view_move_ref(arg0_buffer_view);
@@ -114,10 +114,10 @@ iree_status_t Run() {
   // Prepare outputs list to accept the results from the invocation.
   // The output vm list is allocated statically.
   iree_vm_list_t* outputs = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(
-                           /*element_type=*/NULL,
-                           /*capacity=*/1, iree_allocator_system(), &outputs),
-                       "can't allocate output vm list");
+  IREE_RETURN_IF_ERROR(
+      iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                          /*capacity=*/1, iree_allocator_system(), &outputs),
+      "can't allocate output vm list");
 
   // Synchronously invoke the function.
   IREE_RETURN_IF_ERROR(iree_vm_invoke(

@@ -73,11 +73,12 @@ iree_status_t iree_tooling_process_instrument_data(
   // list and use that across all of them.
   iree_vm_list_t* iovec_list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_create(NULL, 8, host_allocator, &iovec_list));
+      z0, iree_vm_list_create(iree_vm_make_undefined_type_def(), 8,
+                              host_allocator, &iovec_list));
 
   iree_vm_list_t* input_list = NULL;
-  iree_status_t status =
-      iree_vm_list_create(NULL, 8, host_allocator, &input_list);
+  iree_status_t status = iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             8, host_allocator, &input_list);
   if (iree_status_is_ok(status)) {
     iree_vm_ref_t iovec_list_ref = iree_vm_list_retain_ref(iovec_list);
     status = iree_vm_list_push_ref_move(input_list, &iovec_list_ref);

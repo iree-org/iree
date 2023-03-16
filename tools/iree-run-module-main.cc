@@ -136,8 +136,8 @@ iree_status_t Run(int* out_exit_code) {
       &finish_fence));
 
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
-                                           host_allocator, &outputs));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                           16, host_allocator, &outputs));
 
   printf("EXEC @%s\n", function_name.c_str());
   IREE_RETURN_IF_ERROR(

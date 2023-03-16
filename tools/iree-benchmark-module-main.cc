@@ -167,7 +167,7 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
   IREE_TRACE_FRAME_MARK();
 
   vm::ref<iree_vm_list_t> outputs;
-  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
                                     iree_allocator_system(), &outputs));
 
   // Benchmarking loop.
@@ -289,7 +289,7 @@ static void BenchmarkAsyncFunction(
 
         // Setup empty outputs.
         vm::ref<iree_vm_list_t> outputs;
-        IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
+        IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
                                           host_allocator, &outputs));
         invocation_outputs.push_back(std::move(outputs));
       }
@@ -362,13 +362,13 @@ static void BenchmarkDispatchFunction(const std::string& benchmark_name,
   IREE_TRACE_FRAME_MARK();
 
   vm::ref<iree_vm_list_t> inputs;
-  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
                                     iree_allocator_system(), &inputs));
   iree_vm_value_t batch_size = iree_vm_value_make_i32(FLAG_batch_size);
   IREE_CHECK_OK(iree_vm_list_push_value(inputs.get(), &batch_size));
 
   vm::ref<iree_vm_list_t> outputs;
-  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
                                     iree_allocator_system(), &outputs));
 
   // Benchmarking loop.

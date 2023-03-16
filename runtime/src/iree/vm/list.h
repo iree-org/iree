@@ -61,10 +61,10 @@ IREE_API_EXPORT void iree_vm_list_deinitialize(iree_vm_list_t* list);
 // and ensure that all elements set match the type or IREE_VM_REF_TYPE_ANY to
 // indicate that any ref type is allowed.
 //
-// |element_type| can be set to iree_vm_type_def_make_variant_type (or null) to
-// indicate that the list stores variants (each element can differ in type).
+// |element_type| can be set to iree_vm_make_undefined_type_def to indicate that
+// the list stores variants (each element can differ in type).
 IREE_API_EXPORT iree_status_t iree_vm_list_create(
-    const iree_vm_type_def_t* element_type, iree_host_size_t initial_capacity,
+    const iree_vm_type_def_t element_type, iree_host_size_t initial_capacity,
     iree_allocator_t allocator, iree_vm_list_t** out_list);
 
 // Shallowly clones |source| into |out_target|.

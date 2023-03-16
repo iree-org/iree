@@ -67,13 +67,11 @@ extern "C" void iree_custom_string_destroy(void* ptr) {
 
 extern "C" iree_status_t iree_custom_module_basic_register_types(
     iree_vm_instance_t* instance) {
-  if (iree_custom_string_descriptor.type) {
-    return iree_ok_status();  // Already registered.
-  }
   iree_custom_string_descriptor.type_name =
       iree_make_cstring_view("custom.string");
   iree_custom_string_descriptor.offsetof_counter =
-      offsetof(iree_custom_string_t, ref_object.counter);
+      offsetof(iree_custom_string_t, ref_object.counter) /
+      IREE_VM_REF_COUNTER_ALIGNMENT;
   iree_custom_string_descriptor.destroy = iree_custom_string_destroy;
   return iree_vm_instance_register_type(instance,
                                         &iree_custom_string_descriptor);

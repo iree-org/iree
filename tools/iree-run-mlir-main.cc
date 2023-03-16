@@ -371,8 +371,8 @@ Status EvaluateFunction(iree_vm_context_t* context, iree_hal_device_t* device,
 
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
-                                           host_allocator, &outputs));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                           16, host_allocator, &outputs));
 
   // Synchronously invoke the function.
   IREE_RETURN_IF_ERROR(iree_vm_invoke(
