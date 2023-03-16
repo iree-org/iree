@@ -554,6 +554,12 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+    if (clEnablePadConsumerFusion) {
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createFuseTensorPadWithConsumerPass());
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createConcretizePadResultShapePass());
+    }
   }
 
   // Add the sandbox single tiling expert to tile.
