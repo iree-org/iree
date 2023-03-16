@@ -116,7 +116,7 @@ def check_description_and_show_diff(original_description: str,
 
   write_job_summary(
       textwrap.dedent("""\
-  :pushpin: Using the PR description and labels different from the original PR event started this workflow.
+  :pushpin: Using the PR description and labels different from the original PR event that started this workflow.
 
   <details>
   <summary>Click to show diff (original vs. current)</summary>
