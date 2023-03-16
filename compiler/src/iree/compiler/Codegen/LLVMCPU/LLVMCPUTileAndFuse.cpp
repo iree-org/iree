@@ -234,6 +234,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   }
 
   auto options = scf::SCFTilingOptions().setTileSizes(tilingSizes);
+  transform::TrivialPatternRewriter rewriter(context);
   if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
     return signalPassFailure();
