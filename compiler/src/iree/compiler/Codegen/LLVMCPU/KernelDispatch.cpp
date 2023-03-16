@@ -864,12 +864,8 @@ static LogicalResult setMatmulMaskingRootConfig(
 
   // TODO(dcaballe): Tile size configuration copied from MatmulPadRootConfig.
   const SmallVectorImpl<int64_t> &workgroupTileSizes = inputTileSizes.back();
-  SmallVector<int64_t> parallelTileSizes;
-  for (int64_t workgroupSize : workgroupTileSizes) {
-    parallelTileSizes.push_back(
-        roundUpToPow2(workgroupSize, /*predicate =*/true));
-  }
-
+  SmallVector<int64_t> parallelTileSizes(workgroupTileSizes.begin(),
+                                         workgroupTileSizes.end());
   parallelTileSizes.back() = 0;
 
   // TODO(hanchung): Make logic more heuristic. Padding hurts performance a
