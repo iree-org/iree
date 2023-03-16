@@ -97,14 +97,18 @@ jobs:
           # the JSON strings and later use fromJSON to decode them.
           echo "pr-title=$(jq '.title' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
           echo "pr-body=$(jq '.body' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
-
+          # Use --compact-output to avoid multiline JSON.
+          echo "pr-labels=$(jq --compact-output '.labels | map(.name)' \
+            ${PR_JSON})" >> "${GITHUB_OUTPUT}"
       - name: "Configuring CI options"
         id: configure
         env:
           PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
           PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
+          PR_LABELS: ${{ steps.fetch-pr.outputs.pr-labels || '[]' }}
           ORIGINAL_PR_TITLE: ${{ github.event.pull_request.title }}
           ORIGINAL_PR_BODY: ${{ github.event.pull_request.body }}
+          ORIGINAL_PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           # Just informative logging. There should only be two commits in the
           # history here, but limiting the depth helps when copying from a local
