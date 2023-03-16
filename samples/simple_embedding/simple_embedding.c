@@ -32,8 +32,8 @@ extern const iree_const_byte_span_t load_bytecode_module_data();
 
 iree_status_t Run() {
   iree_vm_instance_t* instance = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_RETURN_IF_ERROR(iree_vm_instance_create(
+      IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &instance));
   IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(instance));
 
   iree_hal_device_t* device = NULL;
@@ -126,8 +126,7 @@ iree_status_t Run() {
 
   // Get the result buffers from the invocation.
   iree_hal_buffer_view_t* ret_buffer_view =
-      (iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
-          outputs, 0, &iree_hal_buffer_view_descriptor);
+      iree_vm_list_get_buffer_view_assign(outputs, 0);
   if (ret_buffer_view == NULL) {
     return iree_make_status(IREE_STATUS_NOT_FOUND,
                             "can't find return buffer view");

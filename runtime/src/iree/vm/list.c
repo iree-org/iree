@@ -269,11 +269,11 @@ iree_vm_list_clone(iree_vm_list_t* source, iree_allocator_t host_allocator,
 }
 
 IREE_API_EXPORT void iree_vm_list_retain(iree_vm_list_t* list) {
-  iree_vm_ref_object_retain(list, &iree_vm_list_descriptor);
+  iree_vm_ref_object_retain(list, iree_vm_list_descriptor);
 }
 
 IREE_API_EXPORT void iree_vm_list_release(iree_vm_list_t* list) {
-  iree_vm_ref_object_release(list, &iree_vm_list_descriptor);
+  iree_vm_ref_object_release(list, iree_vm_list_descriptor);
 }
 
 IREE_API_EXPORT iree_vm_type_def_t
@@ -1049,10 +1049,12 @@ IREE_API_EXPORT iree_status_t iree_vm_list_push_variant_move(
 }
 
 iree_status_t iree_vm_list_register_types(iree_vm_instance_t* instance) {
-  iree_vm_list_descriptor.destroy = iree_vm_list_destroy;
-  iree_vm_list_descriptor.offsetof_counter =
-      offsetof(iree_vm_list_t, ref_object.counter) /
-      IREE_VM_REF_COUNTER_ALIGNMENT;
-  iree_vm_list_descriptor.type_name = iree_make_cstring_view("vm.list");
-  return iree_vm_instance_register_type(instance, &iree_vm_list_descriptor);
+  static const iree_vm_ref_type_descriptor_t descriptor = {
+      .destroy = iree_vm_list_destroy,
+      .type_name = IREE_SVL("vm.list"),
+      .offsetof_counter = offsetof(iree_vm_list_t, ref_object.counter) /
+                          IREE_VM_REF_COUNTER_ALIGNMENT,
+  };
+  iree_vm_list_descriptor = &descriptor;
+  return iree_vm_instance_register_type(instance, &descriptor);
 }

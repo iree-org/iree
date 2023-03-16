@@ -27,8 +27,8 @@ namespace {
 class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_ASSERT_OK(
-        iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_ASSERT_OK(iree_vm_instance_create(
+        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &instance_));
     IREE_ASSERT_OK(iree_hal_module_register_all_types(instance_));
 
     iree_hal_driver_t* hal_driver = nullptr;

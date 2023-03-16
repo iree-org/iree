@@ -424,7 +424,8 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
 
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_instance_create(host_allocator, &instance));
+      z0, iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT, host_allocator,
+                                  &instance));
 
   // HACK: to load modules we need the types registered even though we don't
   // know if the types are used.

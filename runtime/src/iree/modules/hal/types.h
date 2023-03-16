@@ -36,19 +36,32 @@ extern "C" {
 #endif  // __cplusplus
 
 // Registers the custom types used by the inline HAL module.
-// WARNING: not thread-safe; call at startup before using.
 IREE_API_EXPORT iree_status_t
 iree_hal_module_register_inline_types(iree_vm_instance_t* instance);
 
 // Registers the custom types used by the dynamic HAL executable loader module.
-// WARNING: not thread-safe; call at startup before using.
 IREE_API_EXPORT iree_status_t
 iree_hal_module_register_loader_types(iree_vm_instance_t* instance);
 
 // Registers the custom types used by the full HAL module.
-// WARNING: not thread-safe; call at startup before using.
+// This should only be called in the hosting executable/library that has the
+// IREE VM/HAL compiled in.
 IREE_API_EXPORT iree_status_t
 iree_hal_module_register_all_types(iree_vm_instance_t* instance);
+
+// Resolves the custom types used by the inline HAL module.
+IREE_API_EXPORT iree_status_t
+iree_hal_module_resolve_inline_types(iree_vm_instance_t* instance);
+
+// Resolves the custom types used by the dynamic HAL executable loader module.
+IREE_API_EXPORT iree_status_t
+iree_hal_module_resolve_loader_types(iree_vm_instance_t* instance);
+
+// Resolves all HAL types by looking them up on the instance.
+// This should only be called in dynamically-loaded libraries that contain only
+// the HAL shims.
+IREE_API_EXPORT iree_status_t
+iree_hal_module_resolve_all_types(iree_vm_instance_t* instance);
 
 // TODO(benvanik): generate these list helpers:
 

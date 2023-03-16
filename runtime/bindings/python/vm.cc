@@ -59,7 +59,8 @@ VmInstance VmInstance::Create() {
   IREE_TRACE_SCOPE0("VmInstance::Create");
 
   iree_vm_instance_t* instance = NULL;
-  auto status = iree_vm_instance_create(iree_allocator_system(), &instance);
+  auto status = iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance);
   CheckApiStatus(status, "Error creating instance");
 
   // The python bindings assume the HAL is always available for use.

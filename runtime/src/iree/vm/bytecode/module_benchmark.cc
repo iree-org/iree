@@ -76,7 +76,8 @@ static iree_status_t RunFunction(benchmark::State& state,
                                  std::vector<int32_t> i32_args,
                                  int result_count, int64_t batch_size = 1) {
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
 
   iree_vm_module_t* import_module = NULL;
   IREE_CHECK_OK(native_import_module_create(instance, iree_allocator_system(),
@@ -134,7 +135,8 @@ static iree_status_t RunFunction(benchmark::State& state,
 
 static void BM_ModuleCreate(benchmark::State& state) {
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
 
   while (state.KeepRunning()) {
     const auto* module_file_toc =
@@ -159,7 +161,8 @@ BENCHMARK(BM_ModuleCreate);
 
 static void BM_ModuleCreateState(benchmark::State& state) {
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
 
   const auto* module_file_toc =
       iree_vm_bytecode_module_benchmark_module_create();
@@ -189,7 +192,8 @@ BENCHMARK(BM_ModuleCreateState);
 
 static void BM_FullModuleInit(benchmark::State& state) {
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
 
   while (state.KeepRunning()) {
     const auto* module_file_toc =

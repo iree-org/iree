@@ -83,9 +83,9 @@ static Attribute createAttributeFromRawData(Location loc,
 
 }  // namespace
 
-CompiledBinary::CompiledBinary() {}
+CompiledBinary::CompiledBinary() = default;
 
-CompiledBinary::~CompiledBinary() {}
+CompiledBinary::~CompiledBinary() = default;
 
 void CompiledBinary::deinitialize() {
   hal_module.reset();
@@ -312,7 +312,8 @@ Runtime::Runtime() {
   IREE_CHECK_OK(
       iree_hal_driver_registry_allocate(iree_allocator_system(), &registry));
   IREE_CHECK_OK(iree_hal_local_task_driver_module_register(registry));
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
   IREE_CHECK_OK(iree_hal_module_register_all_types(instance.get()));
 }
 

@@ -1356,8 +1356,8 @@ int main(int argc, char** argv) {
   }
 
   iree_vm_instance_t* instance = NULL;
-  iree_status_t status =
-      iree_vm_instance_create(iree_allocator_system(), &instance);
+  iree_status_t status = iree_vm_instance_create(
+      IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &instance);
   if (iree_status_is_ok(status)) {
     status = run_trace_files(argc - 1, argv + 1, instance);
   }

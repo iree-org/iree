@@ -623,7 +623,8 @@ iree_status_t iree_hal_vmvx_module_loader_create_isolated(
 
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_instance_create(host_allocator, &instance));
+      z0, iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT, host_allocator,
+                                  &instance));
 
   iree_status_t status = iree_hal_vmvx_module_loader_create(
       instance, user_module_count, user_modules, host_allocator,

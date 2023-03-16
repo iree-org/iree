@@ -20,7 +20,8 @@ using InstancePtr =
     std::unique_ptr<iree_vm_instance_t, decltype(&iree_vm_instance_release)>;
 static InstancePtr MakeInstance() {
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
   return InstancePtr(instance, iree_vm_instance_release);
 }
 
@@ -473,6 +474,29 @@ TEST(VMRefTest, EqualityDifferentTypes) {
   EXPECT_EQ(0, iree_vm_ref_equal(&b_ref, &a_ref));
   iree_vm_ref_release(&b_ref);
   iree_vm_ref_release(&a_ref);
+}
+
+}  // namespace
+
+IREE_VM_DECLARE_TYPE_ADAPTERS(ref_object_c, ref_object_c_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(ref_object_c, ref_object_c_t);
+
+namespace {
+
+// Tests that C++ ref<T> instances can be initialized even if the type is not
+// yet registered. This happens if whatever C++ object/scope owns the instance
+// has fields that are initialized prior to the instance/module loading.
+TEST(VMRefTest, UnregisteredType) {
+  iree::vm::ref<ref_object_c_t> null_ref;
+  EXPECT_FALSE(null_ref);
+  EXPECT_EQ(nullptr, null_ref.get());
+  EXPECT_EQ(nullptr, null_ref.release());
+  EXPECT_EQ(0, null_ref.type());
+  null_ref.reset();  // don't die
+  auto retained_ref = iree::vm::retain_ref<ref_object_c_t>(nullptr);
+  EXPECT_FALSE(retained_ref);
+  auto assigned_ref = iree::vm::assign_ref<ref_object_c_t>(nullptr);
+  EXPECT_FALSE(assigned_ref);
 }
 
 }  // namespace

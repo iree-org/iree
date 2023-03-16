@@ -21,6 +21,9 @@ extern "C" {
 
 typedef struct iree_vm_instance_t iree_vm_instance_t;
 
+// Enable additional expensive checks to track down ref counting issues.
+// #define IREE_VM_REF_PARANOID
+
 // Number of least significant bits available in an iree_vm_ref_type_t value.
 // These can be used for any purpose.
 #define IREE_VM_REF_TYPE_TAG_BITS 3
@@ -63,10 +66,16 @@ typedef struct iree_vm_ref_type_descriptor_t {
   iree_string_view_t type_name;
   // Offset from ptr in units of IREE_VM_REF_COUNTER_ALIGNMENT to the start of
   // an iree_atomic_ref_count_t representing the current reference count.
-  uint8_t offsetof_counter : IREE_VM_REF_TYPE_TAG_BITS;
+  uintptr_t offsetof_counter : IREE_VM_REF_TYPE_TAG_BITS;
+  uintptr_t reserved : IREE_VM_REF_TYPE_PTR_BITS;
 } iree_vm_ref_type_descriptor_t;
 
+// Type-erased reference counted type descriptor.
 typedef uintptr_t iree_vm_ref_type_t;
+
+// Returns the type name for the given type, if found.
+IREE_API_EXPORT iree_string_view_t
+iree_vm_ref_type_name(iree_vm_ref_type_t type);
 
 // Base for iree_vm_ref_t object targets.
 //
@@ -132,30 +141,6 @@ IREE_API_EXPORT void iree_vm_ref_object_retain(
 // the iree_vm_ref_t-based methods.
 IREE_API_EXPORT void iree_vm_ref_object_release(
     void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor);
-
-// Registers a user-defined type with the IREE C ref system.
-// The provided destroy function will be used to destroy objects when their
-// reference count goes to 0. NULL can be used to no-op the destruction if the
-// type is not owned by the VM.
-//
-// NOTE: the name is not retained and must be kept live by the caller. Ideally
-// it is stored in static read-only memory in the binary.
-IREE_API_EXPORT iree_status_t iree_vm_instance_register_type(
-    iree_vm_instance_t* instance, iree_vm_ref_type_descriptor_t* descriptor);
-
-// Unregisters a user-defined type with the IREE C ref system.
-// No iree_vm_ref_t instances must be live in the program referencing the type.
-IREE_API_EXPORT void iree_vm_instance_unregister_type(
-    iree_vm_instance_t* instance, iree_vm_ref_type_descriptor_t* descriptor);
-
-// Returns the type name for the given type, if found.
-IREE_API_EXPORT iree_string_view_t
-iree_vm_ref_type_name(iree_vm_ref_type_t type);
-
-// Returns the registered type descriptor for the given type, if found.
-IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*
-iree_vm_instance_lookup_type(iree_vm_instance_t* instance,
-                             iree_string_view_t full_name);
 
 // Returns a NULL ref wrapper.
 static inline iree_vm_ref_t iree_vm_ref_null(void) {
@@ -252,18 +237,28 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
 // Type adapter utilities for interfacing with the VM
 //===----------------------------------------------------------------------===//
 
+#if defined(IREE_VM_REF_PARANOID)
+#define IREE_VM_REF_ASSERT(expr) IREE_ASSERT(expr)
+#else
+#define IREE_VM_REF_ASSERT(expr)
+#endif  // IREE_VM_REF_PARANOID
+
 // TODO(benvanik): make these macros standard/document them.
 #define IREE_VM_DECLARE_TYPE_ADAPTERS(name, T)                              \
-  IREE_API_EXPORT_VARIABLE iree_vm_ref_type_descriptor_t name##_descriptor; \
+  IREE_API_EXPORT_VARIABLE const iree_vm_ref_type_descriptor_t*             \
+      name##_descriptor;                                                    \
   static inline iree_vm_ref_type_t name##_type() {                          \
-    return (iree_vm_ref_type_t)&name##_descriptor;                          \
+    IREE_VM_REF_ASSERT(name##_descriptor);                                  \
+    return (iree_vm_ref_type_t)name##_descriptor;                           \
   }                                                                         \
   static inline bool name##_isa(const iree_vm_ref_t ref) {                  \
-    return (iree_vm_ref_type_t)&name##_descriptor == ref.type;              \
+    IREE_VM_REF_ASSERT(name##_descriptor);                                  \
+    return (iree_vm_ref_type_t)name##_descriptor == ref.type;               \
   }                                                                         \
   IREE_API_EXPORT iree_vm_ref_t name##_retain_ref(T* value);                \
   IREE_API_EXPORT iree_vm_ref_t name##_move_ref(T* value);                  \
   static inline T* name##_deref(const iree_vm_ref_t ref) {                  \
+    IREE_VM_REF_ASSERT(name##_descriptor);                                  \
     return IREE_LIKELY(name##_isa(ref)) ? (T*)ref.ptr : NULL;               \
   }                                                                         \
   IREE_API_EXPORT iree_status_t name##_check_deref(const iree_vm_ref_t ref, \
@@ -274,25 +269,29 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
 
 // TODO(benvanik): make these macros standard/document them.
 #define IREE_VM_DEFINE_TYPE_ADAPTERS(name, T)                               \
-  iree_vm_ref_type_descriptor_t name##_descriptor = {0};                    \
+  const iree_vm_ref_type_descriptor_t* name##_descriptor = {0};             \
   IREE_API_EXPORT iree_vm_ref_t name##_retain_ref(T* value) {               \
+    IREE_VM_REF_ASSERT(name##_descriptor);                                  \
     iree_vm_ref_t ref = {0};                                                \
     iree_vm_ref_wrap_retain(value, name##_type(), &ref);                    \
     return ref;                                                             \
   }                                                                         \
   IREE_API_EXPORT iree_vm_ref_t name##_move_ref(T* value) {                 \
+    IREE_VM_REF_ASSERT(name##_descriptor);                                  \
     iree_vm_ref_t ref = {0};                                                \
     iree_vm_ref_wrap_assign(value, name##_type(), &ref);                    \
     return ref;                                                             \
   }                                                                         \
   IREE_API_EXPORT iree_status_t name##_check_deref(const iree_vm_ref_t ref, \
                                                    T** out_ptr) {           \
+    IREE_VM_REF_ASSERT(name##_descriptor);                                  \
     IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, name##_type()));            \
     *out_ptr = (T*)ref.ptr;                                                 \
     return iree_ok_status();                                                \
   }                                                                         \
   IREE_API_EXPORT iree_status_t name##_check_deref_or_null(                 \
       const iree_vm_ref_t ref, T** out_ptr) {                               \
+    IREE_VM_REF_ASSERT(name##_descriptor);                                  \
     if (ref.type != IREE_VM_REF_TYPE_NULL) {                                \
       IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, name##_type()));          \
       *out_ptr = (T*)ref.ptr;                                               \
@@ -307,7 +306,6 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
 #include "iree/vm/ref_cc.h"
 #else
 #define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
-#define IREE_VM_REGISTER_CC_TYPE(instance, type, name, descriptor)
 #define IREE_VM_DECLARE_CC_TYPE_ADAPTERS(name, T)
 #endif  // __cplusplus
 

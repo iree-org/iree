@@ -11,7 +11,8 @@
 
 extern "C" int main(int argc, char** argv) {
   iree_vm_instance_t* instance = nullptr;
-  iree_vm_instance_create(iree_allocator_system(), &instance);
+  iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                          iree_allocator_system(), &instance);
 
   const auto* module_file_toc =
       iree_vm_bytecode_module_size_benchmark_module_create();

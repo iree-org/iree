@@ -92,7 +92,8 @@ class ModuleLoader {
 Status RunModule(const IreeModuleInvocation& invocation) {
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance),
+      iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                              iree_allocator_system(), &instance),
       "creating instance");
   IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(instance),
                        "registering HAL types");

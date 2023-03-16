@@ -110,7 +110,8 @@ using testing::Eq;
 class VMBytecodeModuleTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
 
     const auto* module_file_toc = iree_vm_bytecode_module_test_module_create();
     IREE_CHECK_OK(iree_vm_bytecode_module_create(

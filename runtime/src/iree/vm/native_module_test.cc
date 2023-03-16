@@ -27,7 +27,8 @@ namespace {
 class VMNativeModuleTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
 
     // Create both modules shared instances. These are generally immutable and
     // can be shared by multiple contexts.
