@@ -43,10 +43,6 @@ static llvm::cl::opt<bool> clCheckLinalgVectorization(
         "Runs the pass to check if all the Linalg ops are vectorized"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableHoistPadding(
-    "iree-llvmcpu-enable-hoist-padding",
-    llvm::cl::desc("Flag to enable hoist padding"), llvm::cl::init(false));
-
 // TODO(#10820): Delete the flag. This should be a nop pass to default pipeline
 // while tensor.pad op is lowered to fill + insert_slice before Codegen.
 // However, it causes regressions in terms of compilation time. Skip the passes
@@ -395,7 +391,6 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
 
   pad("linalg.fill");
   pad("", /*setAnchorOpToRootOp=*/true);
-  // TODO(hanchung): pack and hoist padding for linalg.generic op.
   pad("linalg.generic");
 
   {
@@ -408,27 +403,11 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  if (!clEnableHoistPadding) {
+  {
     LinalgFusePassOptions options;
     options.padReductionDims = true;
     options.setAnchorOpToRootOp = true;
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-  } else {
-    {
-      LinalgFusePassOptions options;
-      options.padReductionDims = true;
-      options.setAnchorOpToRootOp = true;
-      options.packPaddings = {1, 1, 0};
-      nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    }
-
-    LinalgFusePassOptions options;
-    options.pad = true;
-    options.setAnchorOpToRootOp = true;
-    options.hoistPaddings = SmallVector<int64_t>{2, 3, 0};
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   // Fold dim(pad) away before vectorization.
@@ -745,9 +724,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
       createHoistStaticallyBoundAllocationsPass());
 
   // Checking stack allocation before converting to CF dialect is easier.
-  // Do not check allocation if hoist-padding is enabled. It intends to allocate
-  // big stack buffers for better accessing.
-  if (clCheckIRBeforeLLVMConversion && !clEnableHoistPadding) {
+  if (clCheckIRBeforeLLVMConversion) {
     passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
   }
 
