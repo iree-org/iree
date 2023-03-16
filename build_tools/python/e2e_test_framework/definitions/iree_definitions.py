@@ -83,8 +83,10 @@ class CompileConfig(object):
             tags: Sequence[str],
             compile_targets: Sequence[CompileTarget],
             extra_flags: Optional[Sequence[str]] = None):
-    name = ",".join(str(target) for target in compile_targets)
-    name += "[" + ",".join(tags) + "]"
+    target_part = ",".join(str(target) for target in compile_targets)
+    tag_part = ",".join(tags)
+    # Format: [<target_name>,...][<tag>,...]
+    name = f"[{target_part}][{tag_part}]"
     extra_flags = [] if extra_flags is None else list(extra_flags)
     return CompileConfig(id=id,
                          name=name,
@@ -113,8 +115,10 @@ class ModuleExecutionConfig(object):
             loader: RuntimeLoader,
             driver: RuntimeDriver,
             extra_flags: Optional[Sequence[str]] = None):
-    name = f"{driver.name}({loader.name})".lower()
-    name += "[" + ",".join(tags) + "]"
+    runtime_part = f"{driver.name}({loader.name})".lower()
+    tag_part = ",".join(tags)
+    # Format: <driver>(<loader>)[<tag>,...]
+    name = f"{runtime_part}[{tag_part}]"
     extra_flags = [] if extra_flags is None else list(extra_flags)
     return ModuleExecutionConfig(id=id,
                                  name=name,
@@ -231,6 +235,7 @@ class ImportedModel(object):
       raise ValueError(f"Unsupported model source type: {model.source_type}.")
 
     composite_id = unique_ids.hash_composite_id([model.id, config.id])
+    # Format: <model_name>(<import_config_name>)
     name = f"{model}({config})"
     return ImportedModel(composite_id=composite_id,
                          name=name,
@@ -264,7 +269,8 @@ class ModuleGenerationConfig(object):
   def build(imported_model: ImportedModel, compile_config: CompileConfig):
     composite_id = unique_ids.hash_composite_id(
         [imported_model.composite_id, compile_config.id])
-    name = f"{imported_model}_{compile_config}"
+    # Format: <imported_model_name> <compile_config_name>
+    name = f"{imported_model} {compile_config}"
     return ModuleGenerationConfig(
         composite_id=composite_id,
         name=name,
@@ -321,7 +327,8 @@ class E2EModelRunConfig(object):
         module_generation_config.composite_id, module_execution_config.id,
         target_device_spec.id, input_data.id
     ])
-    name = f"{module_generation_config}_{module_execution_config}_{input_data}_{target_device_spec}"
+    # Format: <module_generation_config_name> <module_execution_config_name> with <input_data_name> @ <target_device_spec_name>
+    name = f"{module_generation_config} {module_execution_config} with {input_data} @ {target_device_spec}"
     run_flags = generate_run_flags(
         imported_model=module_generation_config.imported_model,
         input_data=input_data,

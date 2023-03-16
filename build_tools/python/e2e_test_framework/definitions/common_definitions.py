@@ -26,7 +26,7 @@ class _ArchitectureInfo(object):
   microarchitecture: str
 
   def __str__(self):
-    return f"{self.type.name}-{self.architecture}-{self.microarchitecture}"
+    return f"{self.architecture}-{self.microarchitecture}"
 
 
 class DeviceArchitecture(_ArchitectureInfo, Enum):
@@ -110,11 +110,11 @@ class DeviceSpec(object):
   # Unique name of the device spec.
   name: str
 
-  # Tags to describe the device.
-  tags: List[str]
-
   # Device name. E.g., Pixel-6.
   device_name: str
+
+  # Tags to describe the device spec.
+  tags: List[str]
 
   # Host environment where the IREE runtime is running. For CPU device type,
   # this is usually the same as the device that workloads are dispatched to.
@@ -136,13 +136,14 @@ class DeviceSpec(object):
 
   @staticmethod
   def build(id: str,
-            tags: Sequence[str],
             device_name: str,
+            tags: Sequence[str],
             host_environment: HostEnvironment,
             architecture: DeviceArchitecture,
             device_parameters: Optional[Sequence[str]] = None):
-    name = "{device_name}[{tags}]".format(device_name=device_name,
-                                          tags=",".join(tags))
+    tag_part = tags = ",".join(tags)
+    # Format: <device_name>[<tag>,...]
+    name = f"{device_name}[{tag_part}]"
     device_parameters = [] if device_parameters is None else list(
         device_parameters)
     return DeviceSpec(id=id,
