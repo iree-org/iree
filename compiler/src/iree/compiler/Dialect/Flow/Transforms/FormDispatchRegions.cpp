@@ -246,6 +246,7 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 /// identity.
 static bool isIdentityMapWithZeros(AffineMap map) {
   if (map.getNumSymbols() != 0) return false;
+  if (map.isEmpty()) return false;
   unsigned dimsSeen = 0;
   for (auto result : map.getResults()) {
     bool isValidExpr = TypeSwitch<AffineExpr, bool>(result)
