@@ -25,34 +25,33 @@ def CPU_Mmt4dTilingExpert
     : I32EnumAttrCase<"Mmt4dTilingExpert", 5>;
 def CPU_BufferOpsTileAndVectorize
     : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 6>;
-def CPU_TripleTilingExpert : I32EnumAttrCase<"CPUTripleTilingExpert", 7>;
 
 def CPU_DataTiling
-    : I32EnumAttrCase<"CPUDataTiling", 8>;
+    : I32EnumAttrCase<"CPUDataTiling", 7>;
 
-def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 9>;
-def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 10>;
-def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 11>;
-def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
-def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 13>;
-def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
-def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 15>;
-def LLVMGPU_MatmulTensorCoreMmaSync : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 16>;
+def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 8>;
+def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 9>;
+def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 10>;
+def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 11>;
+def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 12>;
+def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 13>;
+def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 14>;
+def LLVMGPU_MatmulTensorCoreMmaSync : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 15>;
 
 def SPIRV_BaseDistribute
-    : I32EnumAttrCase<"SPIRVBaseDistribute", 17>;
+    : I32EnumAttrCase<"SPIRVBaseDistribute", 16>;
 def SPIRV_BaseVectorize
-    : I32EnumAttrCase<"SPIRVBaseVectorize", 18>;
+    : I32EnumAttrCase<"SPIRVBaseVectorize", 17>;
 def SPIRV_MatmulPromoteVectorize
-    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 19>;
+    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 18>;
 def SPIRV_CooperativeMatrixVectorize
-    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 20>;
+    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 19>;
 def SPIRV_SubgroupReduce
-    : I32EnumAttrCase<"SPIRVSubgroupReduce", 21>;
+    : I32EnumAttrCase<"SPIRVSubgroupReduce", 20>;
 def SPIRV_WinogradVectorize
-    : I32EnumAttrCase<"SPIRVWinogradVectorize", 22>;
+    : I32EnumAttrCase<"SPIRVWinogradVectorize", 21>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 23>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 22>;
 
 
 def Linalg_TransformDialectCodegen
@@ -69,8 +68,8 @@ def DispatchLoweringPassPipelineEnum
             CPU_Default, CPU_DoubleTilingExpert, CPU_DoubleTilingPadExpert,
             CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
             CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
-            CPU_TripleTilingExpert, CPU_DataTiling, LLVMGPU_SimpleDistribute,
-            LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+            CPU_DataTiling, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
+            LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
             LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
             LLVMGPU_PackUnPack, LLVMGPU_MatmulTensorCoreMmaSync,
             SPIRV_BaseDistribute, SPIRV_BaseVectorize,

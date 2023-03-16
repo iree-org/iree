@@ -89,11 +89,6 @@ static llvm::cl::opt<bool> enableVectorPeeling(
     "iree-codegen-enable-vector-peeling",
     llvm::cl::desc("Enable peeling for vectorization"), llvm::cl::init(true));
 
-static llvm::cl::opt<bool> enableTripleTilingPipeline(
-    "iree-llvmcpu-enable-triple-tiling-pipeline",
-    llvm::cl::desc("enable triple tiling expert for matmul kernels"),
-    llvm::cl::init(false));
-
 // Non-static options are used in other places.
 llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
     "iree-codegen-llvmcpu-use-transform-dialect",
@@ -192,12 +187,6 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
   // Generic strategies.
 
   if (linalgOp.hasBufferSemantics()) {
-    return VectorPreProcStrategy::None;
-  }
-
-  // TripleTilingPipeline is only for experimental for now. It's not mature
-  // enough to work well with other strategies.
-  if (enableTripleTilingPipeline) {
     return VectorPreProcStrategy::None;
   }
 
@@ -738,59 +727,18 @@ static LogicalResult setMatmulPadRootConfig(
       DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
 }
 
-// Returns true if all the tiling sizes are divisible by the next level of
-// tile sizes.
-static bool isNoPadMultiTilingBeneficial(linalg::ContractionOpInterface op,
-                                         TileSizesListType tileSizes) {
-  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  int numLoops = linalgOp.getNumLoops();
-  if (numLoops != 3) return false;
-
-  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  if (llvm::any_of(shape,
-                   [](int64_t v) { return v == ShapedType::kDynamic; })) {
-    return false;
-  }
-
-  auto tryToFullyTile = [&](SmallVectorImpl<int64_t> &arr,
-                            ArrayRef<int64_t> tiles) -> bool {
-    for (int i = 0; i < numLoops; ++i) {
-      if (tiles[i] == 0) continue;
-      if (arr[i] % tiles[i] != 0) return false;
-      arr[i] = tiles[i];
-    }
-    return true;
-  };
-
-  for (auto sizes : tileSizes) {
-    if (!tryToFullyTile(shape, sizes)) return false;
-  }
-
-  return true;
-}
-
-static DispatchLoweringPassPipeline getNoPadMultiTilingExpert(
-    VectorPreProcStrategy strategy, int numLevels) {
+static DispatchLoweringPassPipeline getNoPadTilingExpert(
+    VectorPreProcStrategy strategy) {
   if (strategy == VectorPreProcStrategy::Peeling) {
     return DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
   }
-  switch (numLevels) {
-    case (2):
-      return DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-    case (3):
-      return DispatchLoweringPassPipeline::CPUTripleTilingExpert;
-    default:
-      llvm_unreachable("Unexpected number of levels");
-  }
+  return DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
 }
 
 static LogicalResult setMatmulNoPadRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     const TileSizesListTypeRef inputTileSizes, int vectorSize,
     VectorPreProcStrategy vecPreProcStrategy) {
-  size_t numTuples = inputTileSizes.size();
-  assert(numTuples >= 2 && "Expected two or more tile size tuples");
-
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
   // Iterate over the inner tile size tuples to check that their sizes divides
@@ -842,8 +790,7 @@ static LogicalResult setMatmulNoPadRootConfig(
                        << newTileSizes << "\n");
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, newTileSizes,
-      getNoPadMultiTilingExpert(vecPreProcStrategy, numTuples));
+      entryPointFn, op, newTileSizes, getNoPadTilingExpert(vecPreProcStrategy));
 }
 
 static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
@@ -1034,18 +981,6 @@ static LogicalResult setRootConfig(
   if (usePaddingPipeline) {
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   workgroupTileSizes, vectorSize);
-  }
-  // TODO(hanchung): We should make the tile sizes be related to memory
-  // hierarchy. They are derived from experiments for now.
-  if (enableTripleTilingPipeline) {
-    SmallVector<int64_t> l1TileSizes = {0, 0, 384};
-    TileSizesListType tripleTileSizes = {flowTileSizes, l1TileSizes,
-                                         workgroupTileSizes};
-    if (isNoPadMultiTilingBeneficial(contractionOp, tripleTileSizes)) {
-      return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
-                                      tripleTileSizes, vectorSize,
-                                      vecPreProcStrategy);
-    }  // else fall back to the default configuration.
   }
   return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
                                   vectorSize, vecPreProcStrategy);
