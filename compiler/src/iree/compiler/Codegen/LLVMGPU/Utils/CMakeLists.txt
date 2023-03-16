@@ -16,12 +16,15 @@ iree_cc_library(
   HDRS
     "LLVMGPUUtils.h"
   SRCS
+    "LLVMGPULayoutAnalysisAndDistribution.cpp"
     "LLVMGPUUtils.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineDialect
     MLIRFuncDialect
     MLIRGPUOps
     MLIRIR
+    MLIRMemRefDialect
     MLIRNVGPUDialect
     MLIRVectorDialect
   PUBLIC

@@ -246,7 +246,7 @@ def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
            "Try to use un-peeling epilogue when false, peeled epilouge o.w.">,
     Option<"depth", "pipeline-depth", "int64_t",
             /*default=*/"2",
-           "Number of stages ">,           
+           "Number of stages ">,
     Option<"scheduleIndex", "schedule-index", "int64_t",
             /*default=*/"0",
            "Allows picking different schedule for the pipelining transformation.">,
@@ -254,7 +254,7 @@ def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
             /*default=*/"\"\"",
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
-            "transform dialect operation somewhere in the module.">,           
+            "transform dialect operation somewhere in the module.">,
   ];
 }
 
