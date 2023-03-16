@@ -22,7 +22,7 @@ transform.sequence failures(propagate) {
   // Get the function to which to apply to.
   %func_2 = transform.structured.match ops{["linalg.matmul"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   %func_3 = transform.get_closest_isolated_parent %func_2 : (!pdl.operation) -> !pdl.operation
-  %func_4 = transform.iree.map_nested_forall_to_gpu_threads %func_3 { workgroup_size = [10, 11]}
+  %func_4 = transform.iree.map_nested_forall_to_gpu_threads %func_3 workgroup_dims = [10, 11]
 
   // Late canonicalizations to cleanup and pass the checks
   %func_5 = transform.iree.apply_patterns %func_4

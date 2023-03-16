@@ -89,15 +89,17 @@ def MapNestedForallToGpuThreadsOp :
   }];
 
   let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$workgroup_size);
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims,
+                   DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$warp_dims);
   let results = (outs PDL_Operation:$result);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = [{
+    $target
+    `workgroup_dims` `=` $workgroup_dims
+    (`warp_dims` `=` $warp_dims^)?
+    attr-dict
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target, "ArrayRef<int64_t>":$workgroupSize)>
-  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(

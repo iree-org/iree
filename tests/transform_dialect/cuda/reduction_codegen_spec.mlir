@@ -63,8 +63,7 @@ transform.sequence failures(propagate) {
   %func_5 = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
   %func_6 = transform.iree.forall_to_workgroup %func_5
-  %func_7 = transform.iree.map_nested_forall_to_gpu_threads %func_6
-      { workgroup_size = [32, 2, 1] }
+  %func_7 = transform.iree.map_nested_forall_to_gpu_threads %func_6 workgroup_dims = [32, 2, 1]
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================

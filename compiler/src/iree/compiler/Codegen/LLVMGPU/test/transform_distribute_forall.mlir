@@ -13,31 +13,40 @@ hal.executable private @distribute {
       hal.return %arg1, %c1, %c1 : index, index, index
     }
     builtin.module {
+
+//       CHECK: #[[$MAP:.*]] = affine_map<()[s0] -> ((s0 floordiv 32) floordiv 8)>
 // CHECK-LABEL: func.func @distribute
       func.func @distribute() {
         %cst_0 = arith.constant dense<0.000000e+00> : vector<1xf16>
         %c250 = arith.constant 250 : index
         %c8 = arith.constant 8 : index
+        %c4 = arith.constant 4 : index
+        %c2 = arith.constant 2 : index
         %c0 = arith.constant 0 : index
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xf16>
         memref.assume_alignment %1, 64 : memref<2xf16>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %subview = memref.subview %1[%workgroup_id_x] [1] [1] : memref<2xf16> to memref<1xf16, strided<[1], offset: ?>>
-// CHECK: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG: %[[C250:.+]] = arith.constant 250 : index
+
 // CHECK: %[[TX:.+]] = gpu.thread_id  x
-// CHECK: %[[COND:.*]] = arith.cmpi ult
+// CHECK: %[[COND:.*]] = arith.cmpi ult, %[[TX]], %[[C250]] : index
 // CHECK: scf.if %[[COND]] {
-// CHECK:   vector.transfer_write %{{.*}}, %{{.*}}[%[[TX]]] {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
+// CHECK:   vector.transfer_write %{{.*}}, %{{.*}}[%[[TX]]]
         scf.forall (%arg0) in (%c250) {
           vector.transfer_write %cst_0, %subview[%arg0]
           {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
         } {mapping = [#gpu.thread<x>]}
-// CHECK: %[[WX:.+]] = arith.divui %[[TX]], %[[C32]] : index
-// CHECK: vector.transfer_write %{{.*}}, %{{.*}}[%[[WX]]] {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
-        scf.forall (%arg0) in (%c8) {
+
+// CHECK: %[[WX:.+]] = affine.apply #[[$MAP]]()[%[[TX]]]
+// CHECK: %[[CONDWX:.*]] = arith.cmpi ult, %[[WX]], %[[C4]] : index
+// CHECK: scf.if %[[CONDWX]] {
+// CHECK:   vector.transfer_write %{{.*}}, %{{.*}}[%[[WX]]]
+        scf.forall (%arg0) in (%c4) {
           vector.transfer_write %cst_0, %subview[%arg0]
           {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
-        } {mapping = [#gpu.warp<x>]}        
+        } {mapping = [#gpu.warp<x>]}
         return
       }
       module {
@@ -45,7 +54,8 @@ hal.executable private @distribute {
         ^bb0(%variant_op: !pdl.operation):
         %17 = transform.structured.match ops{["func.func"]} in %variant_op 
           : (!pdl.operation) -> !pdl.operation
-        %18 = transform.iree.map_nested_forall_to_gpu_threads %17 {workgroup_size = [256, 1, 1]}
+        %18 = transform.iree.map_nested_forall_to_gpu_threads %17 
+          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1]
 
         // Late canonicalizations to cleanup and pass the checks.
         // Needs to occur on the whole variant to perform cse on the workgroup_count region.
