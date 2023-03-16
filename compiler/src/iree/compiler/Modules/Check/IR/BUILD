@@ -4,10 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("@llvm-project//mlir:tblgen.bzl", "td_library")
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//build_tools/bazel:iree_tablegen.bzl", "iree_gentbl_cc_library", "iree_tablegen_doc")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,7 +13,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-td_library(
+iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
         ["CheckOps.td"],
