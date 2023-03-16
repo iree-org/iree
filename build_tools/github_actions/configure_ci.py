@@ -103,13 +103,16 @@ def check_description_and_show_diff(original_description: str,
                                     original_labels: Sequence[str],
                                     current_description: str,
                                     current_labels: Sequence[str]):
-  original_description += "\n\nLabels:\n" + "\n".join(original_labels)
-  current_description += "\n\nLabels:\n" + "\n".join(current_labels)
-  if original_description == current_description:
+  original_labels = sorted(original_labels)
+  current_labels = sorted(current_labels)
+  if (original_description == current_description and
+      original_labels == current_labels):
     return
 
-  diffs = difflib.unified_diff(original_description.splitlines(keepends=True),
-                               current_description.splitlines(keepends=True))
+  description_diffs = difflib.unified_diff(
+      original_description.splitlines(keepends=True),
+      current_description.splitlines(keepends=True))
+  description_diffs = "".join(description_diffs)
 
   write_job_summary(
       textwrap.dedent("""\
@@ -119,9 +122,14 @@ def check_description_and_show_diff(original_description: str,
   <summary>Click to show diff (original vs. current)</summary>
 
   ```diff
-  {}
+  {description_diffs}
   ```
-  </details>""").format("".join(diffs)))
+
+  Original labels: {original_labels}
+  Current labels: {current_labels}
+  </details>""").format(description_diffs=description_diffs,
+                        original_labels=original_labels,
+                        current_labels=current_labels))
 
 
 def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
