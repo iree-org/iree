@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <algorithm>
 #include <optional>
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
@@ -182,10 +183,16 @@ static SmallVector<int64_t> getVectorSizes(
   assert(canonicalVectorShape.size() >= linalgOp.getNumLoops() &&
          "Unexpected canonical vector shape or number of loops");
 
-  // Return the canonical vector shape subset based on the number of loops of
-  // the linalg op.
-  return {canonicalVectorShape.begin(),
-          std::next(canonicalVectorShape.begin(), linalgOp.getNumLoops())};
+  // Return the valid canonical vector shape subset based on the number of loops
+  // of the linalg op.
+  SmallVector<int64_t> vecSize(
+      canonicalVectorShape.take_front(linalgOp.getNumLoops()));
+  for (auto [idx, val] : llvm::enumerate(linalgOp.getStaticLoopRanges())) {
+    if (ShapedType::isDynamic(val)) continue;
+    vecSize[idx] = std::max(vecSize[idx], val);
+  }
+
+  return vecSize;
 }
 
 /// Constructs padding attributes for given anchor op. Returns failure if there
