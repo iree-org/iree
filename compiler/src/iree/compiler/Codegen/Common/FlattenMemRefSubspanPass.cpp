@@ -604,6 +604,23 @@ struct LinearizeTransferWriteIndices final
   }
 };
 
+/// Updates deallocations to the flattened allocation.
+struct FlattenDealloc final : public OpConversionPattern<memref::DeallocOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      memref::DeallocOp deallocOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!isRankZeroOrOneMemRef(adaptor.getMemref().getType())) {
+      return rewriter.notifyMatchFailure(
+          deallocOp, "expected converted memref of rank <= 1");
+    }
+    rewriter.replaceOpWithNewOp<memref::DeallocOp>(deallocOp,
+                                                   adaptor.getMemref());
+    return success();
+  }
+};
+
 /// Adjusts unrealized_conversion_cast ops' inputs to flattened memref values.
 struct AdjustConversionCast final
     : public OpConversionPattern<UnrealizedConversionCastOp> {
@@ -777,8 +794,8 @@ struct FlattenMemRefSubspanPass
         FlattenGlobal, FlattenGetGlobal, FlattenReinterpretCast,
         LinearizeLoadIndices, LinearizeMMALoadIndices, LinearizeStoreIndices,
         LinearizeMMAStoreIndices, LinearizeTransferReadIndices,
-        LinearizeTransferWriteIndices, AdjustConversionCast, FlattenSubView,
-        FoldMemRefReshape<memref::CollapseShapeOp>,
+        LinearizeTransferWriteIndices, FlattenDealloc, AdjustConversionCast,
+        FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,
         FoldMemRefReshape<memref::ExpandShapeOp>>(internalTypeConverter,
                                                   context);
 
@@ -843,6 +860,9 @@ struct FlattenMemRefSubspanPass
         });
     target.addDynamicallyLegalOp<memref::SubViewOp>([](memref::SubViewOp op) {
       return isRankZeroOrOneMemRef(op.getType());
+    });
+    target.addDynamicallyLegalOp<memref::DeallocOp>([](memref::DeallocOp op) {
+      return isRankZeroOrOneMemRef(op.getMemref().getType());
     });
 
     // Use partial conversion here so that we can ignore allocations created
