@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -161,7 +162,9 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
   SPIRVVectorizePass(const SPIRVVectorizePass &pass) = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, vector::VectorDialect>();
+    // vector.gather lowering patterns target scf ops.
+    registry.insert<linalg::LinalgDialect, vector::VectorDialect,
+                    scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -391,7 +394,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    // Lower vector broadcast/transpose and contraction.
+    // Lower vector broadcast/transpose, contraction, and gather.
     {
       RewritePatternSet patterns(context);
       auto options = vector::VectorTransformsOptions()
@@ -404,6 +407,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
+      vector::populateVectorGatherLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
