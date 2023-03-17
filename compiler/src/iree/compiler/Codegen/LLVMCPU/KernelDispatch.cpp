@@ -819,14 +819,9 @@ static LogicalResult setMatmulMaskingRootConfig(
 
   parallelTileSizes.back() = 0;
 
-  // TODO(hanchung): Make logic more heuristic. Padding hurts performance a
-  // lot if the dim size is small (e.g., K=24).
+  // Do not unroll k dim.
   SmallVector<int64_t> reductionTileSizes(workgroupTileSizes.size() - 1, 0);
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
-  int64_t K = lhsShapedType.getShape().back();
-  reductionTileSizes.push_back(getMaxTileSize(
-      0, K, workgroupTileSizes.back(), vectorSize,
-      /*allowIncompleteTile=*/false, /*enforcePowerOfTwo=*/true));
+  reductionTileSizes.push_back(1);
 
   TileSizesListType newTileSizes;
   // Copy all the tile size levels except the workgroup one which will be split
@@ -836,7 +831,7 @@ static LogicalResult setMatmulMaskingRootConfig(
   newTileSizes.push_back(parallelTileSizes);
   newTileSizes.push_back(reductionTileSizes);
 
-  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for no-padding contraction: "
+  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for masking contraction: "
                        << newTileSizes << "\n");
 
   return setOpConfigAndEntryPointFnTranslation(
