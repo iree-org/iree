@@ -144,8 +144,7 @@ class DeviceSpec(object):
     tag_part = ",".join(tags)
     # Format: <device_name>[<tag>,...]
     name = f"{device_name}[{tag_part}]"
-    device_parameters = [] if device_parameters is None else list(
-        device_parameters)
+    device_parameters = device_parameters or []
     return DeviceSpec(id=id,
                       name=name,
                       tags=list(tags),
