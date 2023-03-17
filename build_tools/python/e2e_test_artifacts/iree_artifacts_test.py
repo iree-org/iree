@@ -60,7 +60,7 @@ class IreeArtifactsTest(unittest.TestCase):
         entry_function="main",
         input_types=["1xf32"])
     imported_model = iree_definitions.ImportedModel.from_model(model)
-    compile_config = iree_definitions.CompileConfig(
+    compile_config = iree_definitions.CompileConfig.build(
         id="config_a",
         tags=["defaults"],
         compile_targets=[
@@ -70,7 +70,7 @@ class IreeArtifactsTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config = iree_definitions.ModuleGenerationConfig.with_flag_generation(
+    gen_config = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model, compile_config=compile_config)
     root_path = pathlib.PurePath("root")
 
@@ -100,7 +100,7 @@ class IreeArtifactsTest(unittest.TestCase):
         input_types=["3xf32"])
     imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
     imported_model_b = iree_definitions.ImportedModel.from_model(model_b)
-    compile_config_a = iree_definitions.CompileConfig(
+    compile_config_a = iree_definitions.CompileConfig.build(
         id="config_a",
         tags=["defaults"],
         compile_targets=[
@@ -110,7 +110,7 @@ class IreeArtifactsTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    compile_config_b = iree_definitions.CompileConfig(
+    compile_config_b = iree_definitions.CompileConfig.build(
         id="config_b",
         tags=["defaults"],
         compile_targets=[
@@ -120,11 +120,11 @@ class IreeArtifactsTest(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig.with_flag_generation(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model_b, compile_config=compile_config_a)
-    gen_config_c = iree_definitions.ModuleGenerationConfig.with_flag_generation(
+    gen_config_c = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model_b, compile_config=compile_config_b)
 
     models = iree_artifacts.get_dependent_model_map(

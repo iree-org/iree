@@ -17,7 +17,7 @@ transform.sequence failures(propagate) {
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ==============================================================
   // This must be used with the custom dispatch region formation because IREE's
-  // does not fuse even with --iree-flow-enable-aggressive-fusion.
+  // does not fuse even with --iree-flow-fuse-multi-use.
   // %forall, %_ =
   // transform.iree.tile_to_forall_and_workgroup_count_region %div tile_sizes [1, 4]
   //   ( mapping = [#gpu.thread<x>, #gpu.thread<y>] )

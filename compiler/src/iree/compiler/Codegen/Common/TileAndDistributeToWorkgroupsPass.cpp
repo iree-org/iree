@@ -341,13 +341,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       patterns.insert<LowerDispatchWorkgroupCountForDagRootOp>(
           context, tileSizes, staticLoopRanges, interchange,
           partitionableLoops);
-      if (auto packRootOp = dyn_cast_or_null<tensor::PackOp>(dispatchRootOp)) {
+      auto res = funcOp.walk([&](tensor::PackOp packOp) -> WalkResult {
         FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
-            getMaterializationInfo(packRootOp);
-        if (failed(encodingInfo)) {
-          return signalPassFailure();
-        }
-        auto tensorType = packRootOp.getSourceType();
+            getMaterializationInfo(packOp);
+        if (failed(encodingInfo)) return WalkResult::interrupt();
+        auto tensorType = packOp.getSourceType();
         // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
         // call materializeEncodingValueFn, passing it a tensor type, expecting
         // that tensor type to have a TensorEncodingAttr. The problem is that
@@ -361,11 +359,17 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         // LowerDispatchWorkgroupCountFromSetEncodingOp can call
         // materializeEncodingValueFn.
         Attribute encodingAttr =
-            packRootOp->getAttr(StringAttr::get(context, "encoding"));
+            packOp->getAttr(StringAttr::get(context, "encoding"));
         auto tensorTypeWithEncoding = RankedTensorType::Builder(
             tensorType.getShape(), tensorType.getElementType(), encodingAttr);
         patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
             context, encodingInfo.value(), tensorTypeWithEncoding);
+        return WalkResult::advance();
+      });
+      if (res.wasInterrupted()) {
+        exportOp.emitOpError(
+            "failed to get encoding information from pack ops");
+        return signalPassFailure();
       }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");

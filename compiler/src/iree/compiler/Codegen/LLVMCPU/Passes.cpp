@@ -520,6 +520,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+    // TODO(hanchung): Merge two vectorization passes into a pass. All the ops
+    // should be vectorized altogether. Otherwise, there would be tensor.empty
+    // ops which becomes a stack allocation in bufferization.
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createVectorizePackUnPackOpsPass());
   }
 
   addBufferizePasses(nestedModulePM);

@@ -21,7 +21,7 @@ def generate_e2e_model_run_configs(
   """Generates the run specs from the product of compile specs and run configs.
   """
   return [
-      iree_definitions.E2EModelRunConfig.with_flag_generation(
+      iree_definitions.E2EModelRunConfig.build(
           module_generation_config=module_generation_config,
           module_execution_config=module_execution_config,
           target_device_spec=device_spec,

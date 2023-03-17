@@ -140,7 +140,7 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 // is created for each tiled loop nest. This pass only moves the root compute op
 // into the dispatch region, allowing producers to be outside.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchRegionsPass(bool aggressiveFusion = false,
+createFormDispatchRegionsPass(bool fuseMultiUse = false,
                               bool generateWorkloadRegion = true);
 
 // Pass to collapse dimensions of Linalg Ops on tensor ops.

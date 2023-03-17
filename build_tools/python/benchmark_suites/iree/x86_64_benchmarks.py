@@ -23,11 +23,11 @@ class Linux_x86_64_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.LLVM_CPU,
       target_abi=iree_definitions.TargetABI.LINUX_GNU)
 
-  CASCADELAKE_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  CASCADELAKE_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE,
       tags=["default-flags"],
       compile_targets=[CASCADELAKE_CPU_TARGET])
-  CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_FUSE_PADDING,
       tags=["experimental-flags", "fuse-padding"],
       compile_targets=[CASCADELAKE_CPU_TARGET],
@@ -43,7 +43,7 @@ class Linux_x86_64_Benchmarks(object):
     """Generates IREE compile and run configs."""
 
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.CASCADELAKE_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in model_groups.SMALL + model_groups.LARGE
@@ -51,7 +51,7 @@ class Linux_x86_64_Benchmarks(object):
     # TODO(#11174): Excludes ResNet50
     excluded_models_for_experiments = [tf_models.RESNET50_TF_FP32]
     gen_configs += [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in model_groups.SMALL + model_groups.LARGE
