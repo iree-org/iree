@@ -141,7 +141,7 @@ class DeviceSpec(object):
             host_environment: HostEnvironment,
             architecture: DeviceArchitecture,
             device_parameters: Optional[Sequence[str]] = None):
-    tag_part = tags = ",".join(tags)
+    tag_part = ",".join(tags)
     # Format: <device_name>[<tag>,...]
     name = f"{device_name}[{tag_part}]"
     device_parameters = [] if device_parameters is None else list(
