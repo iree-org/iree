@@ -219,40 +219,6 @@ public:
 };
 
 ///
-/// Linalg SCF tile and fuse patterns.
-///
-/// `filter` controls LinalgTransformMarker matching and update when specified.
-struct SCFTileAndFusePattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
-  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  SCFTileAndFusePattern(
-      MLIRContext *context,
-      scf::SCFTilingOptions options = scf::SCFTilingOptions(),
-      LinalgTransformationFilter filter = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1)
-      : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        options(std::move(options)), filter(std::move(filter)) {}
-
-  /// Construct a pattern specifically applied to `opName`.
-  SCFTileAndFusePattern(
-      StringRef opName, MLIRContext *context,
-      scf::SCFTilingOptions options = scf::SCFTilingOptions(),
-      LinalgTransformationFilter filter = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1)
-      : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        options(std::move(options)), filter(filter.addOpNameFilter(opName)) {}
-
-  LogicalResult matchAndRewrite(TilingInterface op,
-                                PatternRewriter &rewriter) const override;
-
-private:
-  scf::SCFTilingOptions options;
-
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-};
-
-///
 /// Linalg vectorization patterns.
 ///
 /// `filter` controls LinalgTransformMarker matching and update when specified.
@@ -436,45 +402,6 @@ struct DownscaleDepthwiseConv2DNhwcHwcOp final
 private:
   /// LinalgTransformMarker handles special attribute manipulations.
   LinalgTransformationFilter filter;
-};
-
-/// Wraps upstream Linalg pattern in a filter check + update.
-struct LinalgPaddingPattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
-  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  LinalgPaddingPattern(
-      MLIRContext *context,
-      linalg::LinalgPaddingOptions options = linalg::LinalgPaddingOptions(),
-      LinalgTransformationFilter f = LinalgTransformationFilter())
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(context,
-                                                    /*benefit=*/1),
-        filter(std::move(f)), options(options) {}
-
-  /// Construct a pattern specifically applied to `opName`.
-  LinalgPaddingPattern(
-      StringRef opName, MLIRContext *context,
-      linalg::LinalgPaddingOptions options = linalg::LinalgPaddingOptions(),
-      LinalgTransformationFilter f = LinalgTransformationFilter())
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(context, /*benefit=*/1),
-        filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
-
-  LogicalResult matchAndRewrite(linalg::LinalgOp op,
-                                PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, op)))
-      return failure();
-    linalg::LinalgPaddingPattern p(op.getContext(), options);
-    auto maybeRes = linalg::padAndHoistLinalgOp(rewriter, op, options);
-    if (failed(maybeRes))
-      return failure();
-    filter.replaceLinalgTransformationFilter(rewriter, *maybeRes);
-    return success();
-  }
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-  /// Options to control padding and hoisting.
-  linalg::LinalgPaddingOptions options;
 };
 
 FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
