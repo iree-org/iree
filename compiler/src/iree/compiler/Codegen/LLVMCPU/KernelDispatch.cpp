@@ -824,8 +824,9 @@ static LogicalResult setMatmulMaskingRootConfig(
   SmallVector<int64_t> reductionTileSizes(workgroupTileSizes.size() - 1, 0);
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  reductionTileSizes.push_back(
-      getMaxTileSize(0, K, workgroupTileSizes.back(), vectorSize));
+  reductionTileSizes.push_back(getMaxTileSize(
+      0, K, workgroupTileSizes.back(), vectorSize,
+      /*allowIncompleteTile=*/false, /*enforcePowerOfTwo=*/true));
 
   TileSizesListType newTileSizes;
   // Copy all the tile size levels except the workgroup one which will be split

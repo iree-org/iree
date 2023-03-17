@@ -1563,7 +1563,7 @@ hal.executable private @quant_model {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[256, 72, 0], [8, 32, 0], [0, 0, 12]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[256, 72, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @quant_model
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
