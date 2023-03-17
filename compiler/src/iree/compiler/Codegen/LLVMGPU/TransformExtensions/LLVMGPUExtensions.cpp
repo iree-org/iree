@@ -9,7 +9,9 @@
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -787,6 +789,65 @@ transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
                                                  cast<func::FuncOp>(target));
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// GpuDistributeSharedMemoryCopyOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
+    func::FuncOp funcOp, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(funcOp.getContext());
+  // Look for ops that move to/from workgroup memory and mark as copies for
+  // distribution.
+  funcOp.walk([&](linalg::GenericOp copyOp) {
+    if (copyOp.getDpsInputOperands().size() != 1 ||
+        copyOp.getDpsInitOperands().size() != 1)
+      return;
+    auto sourceType =
+        copyOp.getDpsInputOperand(0)->get().getType().dyn_cast<MemRefType>();
+    auto destType =
+        copyOp.getDpsInitOperand(0)->get().getType().dyn_cast<MemRefType>();
+    if (!sourceType || !destType) return;
+
+    Block &body = copyOp.getRegion().front();
+    if (!std::begin(body)->hasTrait<OpTrait::IsTerminator>()) return;
+
+    auto sourceSpace = sourceType.getMemorySpace();
+    auto destSpace = destType.getMemorySpace();
+    if ((!sourceSpace && !destSpace) || sourceSpace == destSpace) return;
+
+    auto sourceGpuSpace = sourceSpace.dyn_cast_or_null<gpu::AddressSpaceAttr>();
+    auto destGpuSpace = destSpace.dyn_cast_or_null<gpu::AddressSpaceAttr>();
+    if ((!sourceGpuSpace || sourceGpuSpace.getValue() !=
+                                gpu::GPUDialect::getWorkgroupAddressSpace()) &&
+        (!destGpuSpace || destGpuSpace.getValue() !=
+                              gpu::GPUDialect::getWorkgroupAddressSpace()))
+      return;
+
+    setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
+    // Insert barriers immediately after copies to workgroup memory.
+    if (destGpuSpace && destGpuSpace.getValue() ==
+                            gpu::GPUDialect::getWorkgroupAddressSpace()) {
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointAfter(copyOp);
+      rewriter.create<gpu::BarrierOp>(copyOp.getLoc());
+    }
+  });
+
+  if (failed(mlir::iree_compiler::gpuDistributeSharedMemoryCopy(funcOp))) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Pattern failed to apply");
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::GpuDistributeSharedMemoryCopyOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES
