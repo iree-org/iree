@@ -526,4 +526,41 @@ def TileToForallAndWorkgroupCountRegionOp :
   }];
 }
 
+def ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp : Op<Transform_Dialect,
+    "iree.convert_conv2d_to_img2col_and_adjust_workgroup_count_region",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
+  let description = [{
+    Wrapper around `structured.convert_conv2d_to_img2col` for use within IREE.
+
+    In addition to converting the conv2d to img2col, updates the
+    `workgroup_count` region of the export op corresponding to the
+    parent `func.func` of the target to match the changes to the problem
+    shape introduced by the conversion to img2col.
+    Please see the doc of `structured.convert_conv2d_to_img2col` for full
+    description of op semantics.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$img2col_tensor,
+                      TransformHandleTypeInterface:$transformed);
+
+  let assemblyFormat =
+    "$target attr-dict `:` functional-type($target, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::linalg::LinalgOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
