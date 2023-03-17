@@ -15,9 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "fusion_expert.mlir"
-    "outline_one_parent_loop.mlir"
     "single_tiling_expert.mlir"
-    "unroll_one_vector_op.mlir"
   TOOLS
     FileCheck
     iree-opt

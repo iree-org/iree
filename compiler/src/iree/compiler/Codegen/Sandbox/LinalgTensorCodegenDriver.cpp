@@ -304,18 +304,6 @@ static FailureOr<int64_t> getSplitReductionSizeFromConfig(func::FuncOp funcOp) {
 
 namespace {
 
-static void getAtMostNEnclosingLoops(
-    Operation *op, int64_t nLoops,
-    SmallVector<scf::ForOp> &reverseEnclosingLoops) {
-  scf::ForOp outermostEnclosingForOp = nullptr;
-  Operation *nextEnclosingOp = op->getParentOp();
-  while (nLoops-- > 0 &&
-         (outermostEnclosingForOp = dyn_cast<scf::ForOp>(nextEnclosingOp))) {
-    reverseEnclosingLoops.push_back(outermostEnclosingForOp);
-    nextEnclosingOp = outermostEnclosingForOp->getParentOp();
-  }
-}
-
 struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
   LinalgFusePass(int64_t tilingLevel = -1, bool vectorize = false) {
     this->tilingLevel.setValue(tilingLevel);
@@ -403,27 +391,6 @@ struct LinalgVectorLoweringPass
     this->maxTransferRank = options.maxTransferRank;
   }
 
-  void runOnOperation() override;
-};
-
-struct UnrollOneVectorOpPass
-    : public UnrollOneVectorOpBase<UnrollOneVectorOpPass> {
-  UnrollOneVectorOpPass() = default;
-  UnrollOneVectorOpPass(const UnrollOneVectorOpPass &pass) {}
-  void runOnOperation() override;
-};
-
-struct UnrollOneParentLoopPass
-    : public UnrollOneParentLoopBase<UnrollOneParentLoopPass> {
-  UnrollOneParentLoopPass() = default;
-  UnrollOneParentLoopPass(const UnrollOneParentLoopPass &pass) {}
-  void runOnOperation() override;
-};
-
-struct OutlineOneParentLoopPass
-    : public OutlineOneParentLoopBase<OutlineOneParentLoopPass> {
-  OutlineOneParentLoopPass() = default;
-  OutlineOneParentLoopPass(const OutlineOneParentLoopPass &pass) {}
   void runOnOperation() override;
 };
 }  // namespace
@@ -894,87 +861,6 @@ void LinalgVectorLoweringPass::runOnOperation() {
   }
 }
 
-void UnrollOneVectorOpPass::runOnOperation() {
-  if (getOperation().getName() != anchorFuncOpName) return;
-
-  MLIRContext *ctx = &getContext();
-  RewritePatternSet patterns(ctx);
-  vector::populateVectorUnrollPatterns(
-      patterns, vector::UnrollVectorOptions()
-                    .setNativeShape(targetShape)
-                    .setFilterConstraint([&](Operation *op) {
-                      auto unrollInterface =
-                          dyn_cast<VectorUnrollOpInterface>(op);
-                      if (!unrollInterface ||
-                          op->getName().getStringRef() != anchorOpName ||
-                          !sourceShape.hasValue()) {
-                        return failure();
-                      }
-                      auto shapeForUnroll = unrollInterface.getShapeForUnroll();
-                      if (!shapeForUnroll) return failure();
-                      ArrayRef<int64_t> sourceShapeToMatch{sourceShape};
-                      ArrayRef<int64_t> actualSourceShape{
-                          shapeForUnroll->begin(), shapeForUnroll->end()};
-                      return success(sourceShapeToMatch == actualSourceShape);
-                    }));
-  vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-  (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-}
-
-void UnrollOneParentLoopPass::runOnOperation() {
-  if (getOperation().getName() != anchorFuncOpName) return;
-
-  // Poor man's op targeting.
-  getOperation().walk([&](Operation *op) {
-    if (op->getName().getStringRef() != anchorOpName)
-      return WalkResult::advance();
-    SmallVector<scf::ForOp> reverseEnclosingLoops;
-    getAtMostNEnclosingLoops(op, parentLoopNum, reverseEnclosingLoops);
-    if (failed(loopUnrollByFactor(reverseEnclosingLoops.back(), unrollFactor)))
-      signalPassFailure();
-    return WalkResult::interrupt();
-  });
-}
-
-scf::ExecuteRegionOp outlineInExecuteRegion(RewriterBase &b, Operation *op) {
-  if (op->getNumRegions() != 1) return nullptr;
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(op);
-  scf::ExecuteRegionOp executeRegionOp =
-      b.create<scf::ExecuteRegionOp>(op->getLoc(), op->getResultTypes());
-  {
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
-    Operation *clonedOp = b.cloneWithoutRegions(*op);
-    Region &clonedRegion = clonedOp->getRegions().front();
-    assert(clonedRegion.empty() && "expected empty region");
-    b.inlineRegionBefore(op->getRegions().front(), clonedRegion,
-                         clonedRegion.end());
-    b.create<scf::YieldOp>(op->getLoc(), clonedOp->getResults());
-  }
-  b.replaceOp(op, executeRegionOp.getResults());
-  return executeRegionOp;
-}
-
-void OutlineOneParentLoopPass::runOnOperation() {
-  if (getOperation().getName() != anchorFuncOpName) return;
-
-  // Poor man's op targeting.
-  getOperation().walk([&](Operation *op) {
-    if (op->getName().getStringRef() != anchorOpName)
-      return WalkResult::advance();
-    SmallVector<scf::ForOp> reverseEnclosingLoops;
-    getAtMostNEnclosingLoops(op, parentLoopNum, reverseEnclosingLoops);
-    IRRewriter b(op->getContext());
-    scf::ExecuteRegionOp exec =
-        outlineInExecuteRegion(b, reverseEnclosingLoops.back());
-    if (failed(outlineSingleBlockRegion(b, op->getLoc(), exec.getRegion(),
-                                        resultFuncName)))
-      signalPassFailure();
-    return WalkResult::interrupt();
-  });
-}
-
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass() {
   return std::make_unique<LinalgFusePass>();
 }
@@ -1007,21 +893,6 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgVectorLoweringPass(
     const LinalgVectorLoweringPassOptions &options) {
   return std::make_unique<LinalgVectorLoweringPass>(options);
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::createUnrollOneVectorOpPass() {
-  return std::make_unique<UnrollOneVectorOpPass>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::createUnrollOneParentLoopPass() {
-  return std::make_unique<UnrollOneParentLoopPass>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::createOutlineOneParentLoopPass() {
-  return std::make_unique<OutlineOneParentLoopPass>();
 }
 
 //===----------------------------------------------------------------------===//
