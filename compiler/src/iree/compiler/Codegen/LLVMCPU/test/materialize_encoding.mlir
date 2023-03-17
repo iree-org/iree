@@ -274,7 +274,7 @@ func.func @matmul_lowering_f32f32f32_x86_64() attributes {
 // -----
 
 func.func @matmul_lowering_f32f32f32_x86_64_avx2() attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx2"}>
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx"}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load[0] : index
