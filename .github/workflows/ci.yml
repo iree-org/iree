@@ -195,7 +195,7 @@ jobs:
 
   build_test_all_windows:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
+    if: fromJson(needs.setup.outputs.should-run)
     runs-on: windows-2022-64core
     defaults:
       run:
