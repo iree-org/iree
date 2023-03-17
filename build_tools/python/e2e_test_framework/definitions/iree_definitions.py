@@ -78,8 +78,9 @@ class CompileConfig(object):
   def __str__(self):
     return self.name
 
-  @staticmethod
-  def build(id: str,
+  @classmethod
+  def build(cls,
+            id: str,
             tags: Sequence[str],
             compile_targets: Sequence[CompileTarget],
             extra_flags: Optional[Sequence[str]] = None):
@@ -87,12 +88,12 @@ class CompileConfig(object):
     tag_part = ",".join(tags)
     # Format: [<target_name>,...][<tag>,...]
     name = f"[{target_part}][{tag_part}]"
-    extra_flags = [] if extra_flags is None else list(extra_flags)
-    return CompileConfig(id=id,
-                         name=name,
-                         tags=list(tags),
-                         compile_targets=list(compile_targets),
-                         extra_flags=extra_flags)
+    extra_flags = extra_flags or []
+    return cls(id=id,
+               name=name,
+               tags=list(tags),
+               compile_targets=list(compile_targets),
+               extra_flags=list(extra_flags))
 
 
 @serialization.serializable(type_key="iree_module_execution_configs")
@@ -109,8 +110,9 @@ class ModuleExecutionConfig(object):
   def __str__(self):
     return self.name
 
-  @staticmethod
-  def build(id: str,
+  @classmethod
+  def build(cls,
+            id: str,
             tags: Sequence[str],
             loader: RuntimeLoader,
             driver: RuntimeDriver,
@@ -119,13 +121,13 @@ class ModuleExecutionConfig(object):
     tag_part = ",".join(tags)
     # Format: <driver>(<loader>)[<tag>,...]
     name = f"{runtime_part}[{tag_part}]"
-    extra_flags = [] if extra_flags is None else list(extra_flags)
-    return ModuleExecutionConfig(id=id,
-                                 name=name,
-                                 tags=list(tags),
-                                 loader=loader,
-                                 driver=driver,
-                                 extra_flags=extra_flags)
+    extra_flags = extra_flags or []
+    return cls(id=id,
+               name=name,
+               tags=list(tags),
+               loader=loader,
+               driver=driver,
+               extra_flags=list(extra_flags))
 
 
 class ImportTool(Enum):
@@ -228,8 +230,8 @@ class ImportedModel(object):
   def __str__(self):
     return self.name
 
-  @staticmethod
-  def from_model(model: common_definitions.Model):
+  @classmethod
+  def from_model(cls, model: common_definitions.Model):
     config = MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP.get(model.source_type)
     if config is None:
       raise ValueError(f"Unsupported model source type: {model.source_type}.")
@@ -237,10 +239,10 @@ class ImportedModel(object):
     composite_id = unique_ids.hash_composite_id([model.id, config.id])
     # Format: <model_name>(<import_config_name>)
     name = f"{model}({config})"
-    return ImportedModel(composite_id=composite_id,
-                         name=name,
-                         model=model,
-                         import_config=config)
+    return cls(composite_id=composite_id,
+               name=name,
+               model=model,
+               import_config=config)
 
 
 @serialization.serializable(type_key="iree_module_generation_configs",
@@ -265,19 +267,19 @@ class ModuleGenerationConfig(object):
     """Materialize flags with dependent values."""
     return self.compile_flags
 
-  @staticmethod
-  def build(imported_model: ImportedModel, compile_config: CompileConfig):
+  @classmethod
+  def build(cls, imported_model: ImportedModel, compile_config: CompileConfig):
     composite_id = unique_ids.hash_composite_id(
         [imported_model.composite_id, compile_config.id])
     # Format: <imported_model_name> <compile_config_name>
     name = f"{imported_model} {compile_config}"
-    return ModuleGenerationConfig(
-        composite_id=composite_id,
-        name=name,
-        imported_model=imported_model,
-        compile_config=compile_config,
-        compile_flags=_generate_compile_flags(
-            compile_config, imported_model.import_config.dialect_type))
+    compile_flags = _generate_compile_flags(
+        compile_config, imported_model.import_config.dialect_type)
+    return cls(composite_id=composite_id,
+               name=name,
+               imported_model=imported_model,
+               compile_config=compile_config,
+               compile_flags=compile_flags)
 
 
 # Placeholder to be replaced with gpu id when outputting the actual flag list.
@@ -317,8 +319,8 @@ class E2EModelRunConfig(object):
         for flag in self.run_flags
     ]
 
-  @staticmethod
-  def build(module_generation_config: ModuleGenerationConfig,
+  @classmethod
+  def build(cls, module_generation_config: ModuleGenerationConfig,
             module_execution_config: ModuleExecutionConfig,
             target_device_spec: common_definitions.DeviceSpec,
             input_data: common_definitions.ModelInputData,
@@ -334,14 +336,14 @@ class E2EModelRunConfig(object):
         input_data=input_data,
         module_execution_config=module_execution_config,
         gpu_id=E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER)
-    return E2EModelRunConfig(composite_id=composite_id,
-                             name=name,
-                             module_generation_config=module_generation_config,
-                             module_execution_config=module_execution_config,
-                             target_device_spec=target_device_spec,
-                             input_data=input_data,
-                             run_flags=run_flags,
-                             tool=tool)
+    return cls(composite_id=composite_id,
+               name=name,
+               module_generation_config=module_generation_config,
+               module_execution_config=module_execution_config,
+               target_device_spec=target_device_spec,
+               input_data=input_data,
+               run_flags=run_flags,
+               tool=tool)
 
 
 def generate_run_flags(imported_model: ImportedModel,

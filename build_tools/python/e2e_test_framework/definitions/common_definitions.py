@@ -134,8 +134,9 @@ class DeviceSpec(object):
   def __str__(self):
     return self.name
 
-  @staticmethod
-  def build(id: str,
+  @classmethod
+  def build(cls,
+            id: str,
             device_name: str,
             tags: Sequence[str],
             host_environment: HostEnvironment,
@@ -145,13 +146,13 @@ class DeviceSpec(object):
     # Format: <device_name>[<tag>,...]
     name = f"{device_name}[{tag_part}]"
     device_parameters = device_parameters or []
-    return DeviceSpec(id=id,
-                      name=name,
-                      tags=list(tags),
-                      device_name=device_name,
-                      host_environment=host_environment,
-                      architecture=architecture,
-                      device_parameters=device_parameters)
+    return cls(id=id,
+               name=name,
+               tags=list(tags),
+               device_name=device_name,
+               host_environment=host_environment,
+               architecture=architecture,
+               device_parameters=list(device_parameters))
 
 
 @serialization.serializable(type_key="models")
