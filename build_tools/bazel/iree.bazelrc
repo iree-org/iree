@@ -339,8 +339,6 @@ build:_msvc_base --linkopt=/IGNORE:4001 # no object files
 # Flags to make tensorflow build.
 # Some of these are also of general use and fine to enable globally for windows.
 build:_msvc_base --copt=/arch:AVX
-# Host and target are the same in windows so don't waste time building both.
-build:_msvc_base --distinct_host_configuration=false
 # TensorFlow requires the "monolithic" build mode for now on Windows.
 build:_msvc_base --define framework_shared_object=false
 
