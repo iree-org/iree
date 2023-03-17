@@ -183,48 +183,44 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
   for (int dim = 0; dim < numDims; ++dim) {
     // Map dimension `dim` to an operand dimension that we will use to
     // traverse the U-D chain to get `dim` vector size information.
-    Value operand;
-    unsigned operandDim;
-    if (failed(linalgOp.mapIterationSpaceDimToOperandDim(dim, operand,
-                                                         operandDim))) {
+    SmallVector<std::pair<Value, unsigned>> operandDimPairs;
+    linalgOp.mapIterationSpaceDimToAllOperandDims(dim, operandDimPairs);
+    if (operandDimPairs.empty()) {
       return failure();
     }
 
+    Value firstOperand = operandDimPairs[0].first;
+    unsigned firstOperandDim = operandDimPairs[0].second;
+
     // Trivial case: `dim` size is available in the operand type.
     int64_t dimSize =
-        operand.getType().cast<ShapedType>().getShape()[operandDim];
+        firstOperand.getType().cast<ShapedType>().getShape()[firstOperandDim];
     if (!ShapedType::isDynamic(dimSize)) {
       vectorSizes.push_back(dimSize);
       continue;
     }
 
     // TODO
-    AffineMap ubMap;
-    ValueDimList ubMapOperands;
-    if (failed(ValueBoundsConstraintSet::computeBound(
-            ubMap, ubMapOperands, linalgOp.getLoc(), presburger::BoundType::UB,
-            operand, operandDim, [](Value value) -> bool {
-              auto bbArg = value.dyn_cast<BlockArgument>();
-              if (!bbArg) return false;
-              return isa<FunctionOpInterface>(
-                  bbArg.getParentBlock()->getParentOp());
-            }))) {
-      return failure();
-      // llvm_unreachable("reifyBounds failed");
+    FailureOr<int64_t> dimBound;
+    for (auto operandDimPair : operandDimPairs) {
+      Value operand = operandDimPair.first;
+      unsigned operandDim = operandDimPair.second;
+      dimBound = ValueBoundsConstraintSet::computeConstantBound(
+          presburger::BoundType::UB, operand, operandDim);
+
+      if (succeeded(dimBound)) {
+        break;
+        // llvm_unreachable("reifyBounds failed");
+      }
     }
 
-    // We should have no operands.
-    if (!ubMapOperands.empty()) {
-      return failure();
-    }
-
-    if (!ubMap.isSingleConstant()) {
+    if (failed(dimBound)) {
       return failure();
     }
 
     // TODO(dcaballe): UBs are exclusive by default. Use new attribute in
     // interface.
-    dimSize = ubMap.getSingleConstantResult() - 1;
+    dimSize = dimBound.value() - 1;
     vectorSizes.push_back(dimSize);
     LDBG("Inferred vector size '" << dimSize << "' for dimension '" << dim
                                   << "'\n");
