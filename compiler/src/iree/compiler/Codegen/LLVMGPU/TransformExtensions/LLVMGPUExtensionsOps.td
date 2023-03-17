@@ -514,4 +514,33 @@ def LayoutAnalysisAndDistributionOp :
 
 }
 
+def GpuDistributeSharedMemoryCopyOp :
+  Op<Transform_Dialect, "iree.gpu_distribute_shared_memory_copy",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformOpInterface, TransformEachOpTrait]> {
+  let summary = "Distribute shared memory copies";
+  let description = [{
+    Find shared memory copies, hoist them, and distribute the copy loops based
+    on the workgroup size.
+
+    #### Return modes
+    This operation applies to the entire function and does not consume the
+    target handle. It always return success.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp funcOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
