@@ -96,7 +96,8 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
         loc, globalPtr.getType(), globalPtr, ValueRange({zero, offsetValue}));
     Value castPtr = builder.create<LLVM::BitcastOp>(
         loc,
-        LLVM::LLVMPointerType::get(globalOp.getType(), global.getAddrSpace()),
+        LLVM::LLVMPointerType::get(globalOp.getContext(),
+                                   global.getAddrSpace()),
         shiftedPtr);
     addressOfOp.replaceAllUsesWith(castPtr);
     addressOfOp.erase();
@@ -267,11 +268,9 @@ class ConvertFunc : public ConvertToLLVMPattern {
     auto argMapping = getKernelArgMapping(funcOp);
     // There may be dead symbols, we pick i32 pointer as default argument type.
     SmallVector<Type, 8> llvmInputTypes(
-        argMapping.size(), LLVM::LLVMPointerType::get(rewriter.getI32Type()));
+        argMapping.size(), LLVM::LLVMPointerType::get(rewriter.getContext()));
     funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-      auto memrefType = subspanOp.getType().cast<MemRefType>();
-      Type elType = memrefType.getElementType();
-      auto llvmType = LLVM::LLVMPointerType::get(elType);
+      auto llvmType = LLVM::LLVMPointerType::get(rewriter.getContext());
       llvmInputTypes[argMapping[SetBinding(subspanOp.getSet(),
                                            subspanOp.getBinding())]] = llvmType;
     });
@@ -382,7 +381,7 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     // Add the byte offset.
     Value llvmBufferBasei8Ptr = rewriter.create<LLVM::BitcastOp>(
         loc,
-        LLVM::LLVMPointerType::get(rewriter.getIntegerType(8),
+        LLVM::LLVMPointerType::get(rewriter.getContext(),
                                    llvmBufferArg.getType()
                                        .cast<LLVM::LLVMPointerType>()
                                        .getAddressSpace()),
@@ -392,7 +391,7 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
           loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
           adaptor.getByteOffset());
     }
-    auto llvmPtrType = LLVM::LLVMPointerType::get(memrefType.getElementType());
+    auto llvmPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
     Value llvmBufferBasePtr =
         rewriter.create<LLVM::BitcastOp>(loc, llvmPtrType, llvmBufferBasei8Ptr);
     if (memrefType.hasStaticShape()) {

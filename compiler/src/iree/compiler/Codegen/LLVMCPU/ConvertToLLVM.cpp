@@ -338,7 +338,7 @@ static InstrumentationEntry acquireInstrumentationEntry(Location loc,
       builder.create<LLVM::GEPOp>(loc, basePtr.getType(), basePtr, offsetIndex,
                                   /*inbounds=*/true);
   Value offsetPtrI64 = builder.create<LLVM::BitcastOp>(
-      loc, LLVM::LLVMPointerType::get(i64Type), offsetPtr);
+      loc, LLVM::LLVMPointerType::get(builder.getContext()), offsetPtr);
   Value rawOffset = builder.create<LLVM::AtomicRMWOp>(
       loc, LLVM::AtomicBinOp::add, offsetPtrI64, entrySize,
       LLVM::AtomicOrdering::monotonic);
@@ -371,7 +371,8 @@ static InstrumentationEntry appendInstrumentationEntry(
   builder.create<LLVM::StoreOp>(
       loc, entryStruct,
       builder.create<LLVM::BitcastOp>(
-          loc, LLVM::LLVMPointerType::get(entryType), entry.entryPtr),
+          loc, LLVM::LLVMPointerType::get(builder.getContext()),
+          entry.entryPtr),
       /*alignment=*/16);
 
   return entry;
