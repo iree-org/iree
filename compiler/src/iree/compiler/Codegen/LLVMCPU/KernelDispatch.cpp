@@ -1859,10 +1859,13 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
   TileSizesListType tileSizesList =
       getLoweringConfig(linalgOp).getTileSizeVals();
 
+  bool foundUnPackOp = false;
   SmallVector<int64_t> alignedSizes(linalgOp.getNumLoops(), 1);
   for (OpOperand *opOperand : linalgOp.getDpsInputOperands()) {
     auto unpackOp = opOperand->get().getDefiningOp<tensor::UnPackOp>();
     if (!unpackOp) continue;
+
+    foundUnPackOp = true;
     auto idxMap = linalgOp.getMatchingIndexingMap(opOperand);
     LLVM_DEBUG(KD_DBGS() << "Find unpack op candidate: " << unpackOp << "\n"
                          << "The corresponding indexing map is: " << idxMap
@@ -1879,6 +1882,8 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
     }
   }
 
+  if (!foundUnPackOp) return success();
+
   LLVM_DEBUG(
       KD_DBGS() << "The tile sizes for each dimension should be aligned to "
                 << alignedSizes);
@@ -1889,6 +1894,12 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
       if (tileSizes[idx] == 0) continue;
       tileSizes[idx] = llvm::alignTo(tileSizes[idx], alignedSizes[idx]);
     }
+  }
+
+  if (pipeline == DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert) {
+    LLVM_DEBUG(KD_DBGS() << "unpack fusion does not work with peeling, falling "
+                            "back to non-peeling path");
+    pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   }
 
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
