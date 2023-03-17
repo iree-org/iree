@@ -11,6 +11,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/Matchers.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-layout-analysis-and-distribution"
 
@@ -67,6 +68,7 @@ struct Layout {
   Layout(const DimOrderArray &orders,
          const std::array<int, maxTensorDims> &canonicalShape);
   // Reduces the layout along the tensor dim i
+  void reduceDim(int i);
   // Updates the batch dims of the layout given the tensor dims
   void updateBatchDims(int dim0, int dim1);
   // Computes the ith dimension expression for a given state
@@ -169,6 +171,15 @@ Layout::Layout(const DimOrderArray &dimOrder,
   rank = dimOrder.size();
 }
 
+void Layout::reduceDim(int i) {
+  assert(rank > 0);
+  assert(order.size() > i);
+  for (auto dim : order[i]) {
+    shape[dim] = 1;
+  }
+  rank--;
+}
+
 void Layout::updateBatchDims(int dim0, int dim1) {
   shape[DimType::Batch0] = dim0 / canonicalShape[0];
   shape[DimType::Batch1] = dim1 / canonicalShape[1];
@@ -262,8 +273,74 @@ void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
   setLayout(cMatrix, MMAMatrixType::CMatrix, "cMatrix");
 }
 
+void propagateLayoutToReductions(vector::MultiDimReductionOp reductionOp,
+                                 DenseMap<Value, Layout> &layoutMap) {
+  Value src = reductionOp.getSource();
+  if (!layoutMap.count(src)) return;
+  // Determine layout of result (after reduction)
+  Value result = reductionOp.getResult();
+  Layout resultLayout(layoutMap.at(src));
+  auto reductionDims = reductionOp.getReductionDims().getAsRange<IntegerAttr>();
+  for (auto ia : reductionDims) {
+    resultLayout.reduceDim(ia.getInt());
+  }
+  layoutMap.try_emplace(result, resultLayout);
+  // Propagate result layout to accumulator
+  Value acc = reductionOp.getAcc();
+  layoutMap.try_emplace(acc, resultLayout);
+  layoutMap.at(result).debugPrint("reduced");
+}
+
+void propagateLayoutToBroadcasts(vector::BroadcastOp broadcastOp,
+                                 DenseMap<Value, Layout> &layoutMap) {
+  Value src = broadcastOp.getSource();
+  if (!layoutMap.count(src)) return;
+  // For now, only compute for broadcasts after reductions
+  auto reductionOp = src.getDefiningOp<vector::MultiDimReductionOp>();
+  if (!reductionOp) return;
+  Value reductionSrc = reductionOp.getSource();
+  if (!layoutMap.count(reductionSrc)) return;
+  // For now, require that result shape and source shape are the same
+  // Unless there is a transpose that changes the result shape to the source
+  // shape
+  Value result = broadcastOp.getResult();
+  ArrayRef<int64_t> resultShape =
+      result.getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> srcShape =
+      reductionSrc.getType().cast<ShapedType>().getShape();
+  bool success = srcShape == resultShape;
+  if (!success) {
+    for (Operation *user : result.getUsers()) {
+      if (auto transposeOp = dyn_cast<vector::TransposeOp>(user)) {
+        Value transposedResult = transposeOp.getResult();
+        ArrayRef<int64_t> transposedShape =
+            transposedResult.getType().cast<ShapedType>().getShape();
+        if (transposedShape == srcShape) {
+          // We will lower reduction + broadcast + transpose at once
+          // So assign all their results the same layout
+          layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
+          layoutMap.at(transposedResult).debugPrint("transposed");
+          success = true;
+          break;
+        }
+      }
+    }
+  }
+  if (success) {
+    // Sets layout for either reduction + broadcast (if right shape)
+    // or reduction + broadcast + transpose
+    layoutMap.try_emplace(result, layoutMap.at(reductionSrc));
+    layoutMap.at(result).debugPrint("broadcasted");
+  }
+}
+
 void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
-  // TODO: Not Implemented
+  if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
+    propagateLayoutToReductions(reductionOp, layoutMap);
+  }
+  if (auto broadcastOp = dyn_cast<vector::BroadcastOp>(op)) {
+    propagateLayoutToBroadcasts(broadcastOp, layoutMap);
+  }
 }
 
 void distributeTransferReads(vector::TransferReadOp readOp,
@@ -438,12 +515,208 @@ void distributeTransferWrites(vector::TransferWriteOp writeOp,
   }
 }
 
+static bool isLaneId(int dimType) {
+  return ((dimType == DimType::LaneIdX) || (dimType == DimType::LaneIdY) ||
+          (dimType == DimType::LaneIdZ));
+}
+
+static int getLaneIdIndex(std::array<int, 4> &order) {
+  for (int i = 0; i < 4; i++) {
+    if (isLaneId(order[i])) return i;
+  }
+  return -1;
+}
+
+static int isSingleLaneIdReduced(std::array<int, 4> &order) {
+  int count{0};
+  for (int i = 0; i < 4; i++) {
+    if (isLaneId(order[i])) count++;
+  }
+  return count == 1;
+}
+
+static Value createReductionOp(vector::CombiningKind combiningKind, Value lhs,
+                               Value rhs, Location loc, OpBuilder &rewriter) {
+  switch (combiningKind) {
+    case vector::CombiningKind::ADD:
+      return rewriter.create<arith::AddFOp>(loc, lhs, rhs);
+    case vector::CombiningKind::MAXF:
+      return rewriter.create<arith::MaxFOp>(loc, lhs, rhs);
+    default:
+      assert("Unsupported vector combining kind!");
+      break;
+  }
+  return Value{};
+}
+
+using Triplet = std::tuple<vector::MultiDimReductionOp, vector::BroadcastOp,
+                           vector::TransposeOp>;
+
+void distributeReductionBroadcastTranspose(
+    vector::MultiDimReductionOp reductionOp, DenseMap<Value, Layout> &layoutMap,
+    DenseMap<Value, Value> &simdToSimtMap, OpBuilder &rewriter,
+    SmallVectorImpl<Triplet> &triplets) {
+  vector::BroadcastOp broadcastOp{nullptr};
+  vector::TransposeOp transposeOp{nullptr};
+  for (Operation *user : reductionOp.getResult().getUsers()) {
+    if (auto broadcast = dyn_cast<vector::BroadcastOp>(user)) {
+      for (Operation *bUser : broadcast.getResult().getUsers()) {
+        if (auto transpose = dyn_cast<vector::TransposeOp>(bUser)) {
+          transposeOp = transpose;
+          break;
+        }
+      }
+      broadcastOp = broadcast;
+      break;
+    }
+  }
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(reductionOp);
+  Value source = reductionOp.getSource();
+  Type elementType = source.getType().cast<ShapedType>().getElementType();
+  if (!layoutMap.count(source)) return;
+  if (!simdToSimtMap.count(source)) return;
+  if (!broadcastOp) return;
+  Location loc = reductionOp.getLoc();
+  Layout layout = layoutMap.at(source);
+  auto reductionDims = llvm::to_vector<4>(
+      reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  // Only support reduction on one dimension
+  if (reductionDims.size() > 1) return;
+  int reductionDim = reductionDims[0].getInt();
+  std::array<int, 4> reductionOrder = layout.order[reductionDim];
+  std::array<int, 4> parallelOrder = layout.order[!reductionDim];
+  Value acc = reductionOp.getAcc();
+  APFloat floatValue(0.0);
+  if (!matchPattern(acc, m_ConstantFloat(&floatValue))) return;
+  SmallVector<int64_t> vecShape{
+      layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
+      layout.shape[DimType::VecIdZ] * layout.shape[DimType::VecIdY],
+      layout.shape[DimType::VecIdX]};
+  auto vecType = VectorType::get(vecShape, elementType);
+  Value output = rewriter.create<arith::ConstantOp>(
+      loc, vecType, rewriter.getZeroAttr(vecType));
+
+  std::function<void(int, std::array<int, 4> &,
+                     std::array<int, DimType::NumDims> &,
+                     std::function<void(std::array<int, DimType::NumDims> &)>)>
+      iterate =
+          [&](int dimType, std::array<int, 4> &order,
+              std::array<int, DimType::NumDims> &state,
+              std::function<void(std::array<int, DimType::NumDims> &)> body) {
+            if (dimType == DimType::NumDims) {
+              body(state);
+              return;
+            }
+            if ((std::find(order.begin(), order.end(), dimType) !=
+                 order.end()) &&
+                (!isLaneId(dimType))) {
+              for (int i = 0; i < layout.shape[dimType]; i++) {
+                state[dimType] = i;
+                iterate(dimType + 1, order, state, body);
+              }
+            } else {
+              iterate(dimType + 1, order, state, body);
+            }
+          };
+
+  std::function<void(std::array<int, DimType::NumDims> &)> loopBody =
+      [&](std::array<int, DimType::NumDims> &state) {
+        Value result = rewriter.create<arith::ConstantOp>(
+            loc, rewriter.getFloatAttr(elementType, floatValue));
+        vector::CombiningKind combiningKind = reductionOp.getKind();
+        // First do reduction on values local to thread
+        auto threadLocalReduce = [&](std::array<int, DimType::NumDims> &state) {
+          Value v = rewriter.create<vector::ExtractOp>(
+              loc, simdToSimtMap.at(source),
+              SmallVector<int64_t>{
+                  state[DimType::Batch0], state[DimType::Batch1],
+                  state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
+                      state[DimType::VecIdZ],
+                  state[DimType::VecIdX]});
+          result = createReductionOp(combiningKind, v, result, loc, rewriter);
+        };
+        iterate(0, reductionOrder, state, threadLocalReduce);
+
+        // Next reduce across threads
+        // Restrict to reductions that only reduce a single lane id dim at a
+        // time
+        if (!isSingleLaneIdReduced(reductionOrder)) return;
+        int dimIndex = getLaneIdIndex(reductionOrder);
+        int dimType = reductionOrder[dimIndex];
+        int offset{0};
+        switch (dimType) {
+          case DimType::LaneIdX:
+            offset = 1;
+            break;
+          case DimType::LaneIdY:
+            offset = layout.shape[DimType::LaneIdX];
+            break;
+          case DimType::LaneIdZ:
+            offset =
+                layout.shape[DimType::LaneIdX] * layout.shape[DimType::LaneIdY];
+            break;
+        }
+        uint32_t size{32};
+        result =
+            rewriter.create<arith::ExtFOp>(loc, rewriter.getF32Type(), result);
+        for (uint64_t i = offset; i < layout.shape[dimType]; i <<= 1) {
+          Value newResult = rewriter
+                                .create<gpu::ShuffleOp>(loc, result, i, size,
+                                                        gpu::ShuffleMode::XOR)
+                                .getShuffleResult();
+          result = createReductionOp(combiningKind, newResult, result, loc,
+                                     rewriter);
+        }
+        result = rewriter.create<arith::TruncFOp>(loc, rewriter.getF16Type(),
+                                                  result);
+
+        auto broadcastResult = [&](std::array<int, DimType::NumDims> &state) {
+          output = rewriter.create<vector::InsertOp>(
+              loc, result, output,
+              SmallVector<int64_t>{
+                  state[DimType::Batch0], state[DimType::Batch1],
+                  state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
+                      state[DimType::VecIdZ],
+                  state[DimType::VecIdX]});
+        };
+        // Broadcast result to same shape as original
+        iterate(0, reductionOrder, state, broadcastResult);
+      };
+
+  std::array<int, DimType::NumDims> state;
+  iterate(0, parallelOrder, state, loopBody);
+
+  if (transposeOp)
+    simdToSimtMap.try_emplace(transposeOp.getResult(), output);
+  else
+    simdToSimtMap.try_emplace(broadcastOp.getResult(), output);
+
+  triplets.push_back(std::make_tuple(reductionOp, broadcastOp, transposeOp));
+}
+
 template <typename T>
 static void eraseOps(func::FuncOp funcOp, IRRewriter &rewriter) {
   funcOp.walk([&](T op) {
-    rewriter.eraseOp(op);
+    if (op->getUses().empty()) rewriter.eraseOp(op);
     return WalkResult::advance();
   });
+}
+
+static void eraseTriplets(SmallVectorImpl<Triplet> &triplets,
+                          func::FuncOp funcOp, IRRewriter &rewriter) {
+  for (int i = 0; i < triplets.size(); i++) {
+    auto [reductionOp, broadcastOp, transposeOp] = triplets[i];
+    if (transposeOp) {
+      if (transposeOp->getUses().empty()) rewriter.eraseOp(transposeOp);
+    }
+    if (broadcastOp) {
+      if (broadcastOp->getUses().empty()) rewriter.eraseOp(broadcastOp);
+    }
+    if (reductionOp) {
+      if (reductionOp->getUses().empty()) rewriter.eraseOp(reductionOp);
+    }
+  }
 }
 
 }  // namespace
@@ -466,6 +739,7 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
 
   // Apply SIMD to SIMT conversion
   DenseMap<Value, Value> simdToSimtMap;
+  SmallVector<Triplet> triplets;
   funcOp.walk([&](Operation *op) {
     if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
       distributeTransferReads(readOp, layoutMap, simdToSimtMap, rewriter);
@@ -476,11 +750,16 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
     if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
       distributeTransferWrites(writeOp, layoutMap, simdToSimtMap, rewriter);
     }
+    if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
+      distributeReductionBroadcastTranspose(reductionOp, layoutMap,
+                                            simdToSimtMap, rewriter, triplets);
+    }
     return WalkResult::advance();
   });
 
   // Erase old ops
   eraseOps<vector::TransferWriteOp>(funcOp, rewriter);
+  eraseTriplets(triplets, funcOp, rewriter);
   eraseOps<vector::ContractionOp>(funcOp, rewriter);
   eraseOps<vector::TransferReadOp>(funcOp, rewriter);
 }
