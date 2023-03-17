@@ -81,12 +81,14 @@ static iree_status_t iree_hal_metal_kernel_library_flatbuffer_verify(
                             entry_point_count, threadgroup_size_count);
   }
 
-  flatbuffers_uint8_vec_t shader_library_vec =
-      iree_MetalExecutableDef_shader_library_get(executable_def);
-  size_t shader_library_size = flatbuffers_uint8_vec_len(shader_library_vec);
-  if (shader_library_size) {
-    // TODO(antiagainst): verify kernel library.
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplemented metal kernel library");
+  flatbuffers_string_vec_t shader_libraries_vec =
+      iree_hal_metal_ExecutableDef_shader_libraries_get(executable_def);
+  size_t shader_library_count = flatbuffers_string_vec_len(shader_libraries_vec);
+  for (size_t i = 0; i < shader_library_count; ++i) {
+    if (!flatbuffers_string_len(flatbuffers_string_vec_at(shader_libraries_vec, i))) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "executable shader library %zu is empty", i);
+    }
   }
   if (shader_library_count != 0 && entry_point_count != shader_library_count) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -110,7 +112,7 @@ static iree_status_t iree_hal_metal_kernel_library_flatbuffer_verify(
                             entry_point_count, shader_source_count);
   }
 
-  if (!shader_library_size && !shader_source_count) {
+  if (!shader_library_count && !shader_source_count) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "missing shader library or source strings");
   }
@@ -168,6 +170,53 @@ iree_status_t iree_hal_metal_compile_msl(const char* source_code, const char* en
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_metal_load_mtllib(const char* source_lib, size_t length,
+                                         const char* entry_point, id<MTLDevice> device,
+                                         id<MTLLibrary>* out_library, id<MTLFunction>* out_function,
+                                         id<MTLComputePipelineState>* out_pso) {
+  @autoreleasepool {
+    NSError* error = nil;
+
+    dispatch_data_t data =
+        dispatch_data_create(source_lib, length, /*queue=*/NULL, DISPATCH_DATA_DESTRUCTOR_DEFAULT);
+    *library = [device newLibraryWithData:data error:&error];  // +1
+    if (*library == nil) {
+#ifndef NDEBUG
+      NSLog(@"Failed to create MTLLibrary: %@", error);
+      NSLog(@"For entry point '%s' in Metal library\n", entry_point);
+#endif
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "failed to create MTLLibrary from shader source");
+    }
+
+    NSString* function_name =
+        [NSString stringWithCString:entry_point
+                           encoding:[NSString defaultCStringEncoding]];  // autoreleased
+    *function = [*library newFunctionWithName:function_name];            // +1
+    if (*function == nil) {
+#ifndef NDEBUG
+      NSLog(@"Failed to create MTLFunction '%@': %@", function_name, error);
+      NSLog(@"For entry point '%s' in Metal library\n", entry_point);
+#endif
+      [*library release];
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "cannot find entry point '%s' in shader source", entry_point);
+    }
+
+    *pso = [device newComputePipelineStateWithFunction:*function error:&error];  // +1
+    if (*pso == nil) {
+#ifndef NDEBUG
+      NSLog(@"Failed to create MTLComputePipelineState: %@", error);
+      NSLog(@"For entry point '%s' in Metal library\n", entry_point);
+#endif
+      [*function release];
+      [*library release];
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid MSL source");
+    }
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_metal_kernel_library_create(
     iree_allocator_t host_allocator, id<MTLDevice> device,
     const iree_hal_executable_params_t* executable_params, iree_hal_executable_t** out_executable) {
@@ -185,9 +234,11 @@ iree_status_t iree_hal_metal_kernel_library_create(
       iree_hal_metal_ExecutableDef_as_root(executable_params->executable_data.data);
 
   flatbuffers_string_vec_t entry_points_vec =
-      iree_MetalExecutableDef_entry_points_get(executable_def);
-  iree_MetalThreadgroupSize_vec_t threadgroup_sizes_vec =
-      iree_MetalExecutableDef_threadgroup_sizes(executable_def);
+      iree_hal_metal_ExecutableDef_entry_points_get(executable_def);
+  iree_hal_metal_ThreadgroupSize_vec_t threadgroup_sizes_vec =
+      iree_hal_metal_ExecutableDef_threadgroup_sizes(executable_def);
+  flatbuffers_string_vec_t shader_libraries_vec =
+      iree_hal_metal_ExecutableDef_shader_libraries_get(executable_def);
   flatbuffers_string_vec_t shader_sources_vec =
       iree_hal_metal_ExecutableDef_shader_sources_get(executable_def);
   iree_host_size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
@@ -216,24 +267,35 @@ iree_status_t iree_hal_metal_kernel_library_create(
     executable->host_allocator = host_allocator;
     executable->entry_point_count = entry_point_count;
 
-    // Compile each MSL source string into a MTLLibrary and get the MTLFunction for the entry point
-    // to build the pipeline state object.
-    // TODO(antiagainst): We are performing synchronous compilation at runtime here. This is good
-    // for debugging purposes but bad for performance. Enable offline compilation and make that as
-    // the default.
+    size_t shader_library_count = flatbuffers_string_vec_len(shader_libraries_vec);
+    size_t shader_source_count = flatbuffers_string_vec_len(shader_sources_vec);
+
+    // Try to load as Metal library first. Otherwise, compile each MSL source string into a
+    // MTLLibrary and get the MTLFunction for the entry point to build the pipeline state object.
+    // TODO(#14047): Enable async MSL compilation at runtime.
 
     MTLCompileOptions* compile_options = [MTLCompileOptions new];  // +1
     compile_options.languageVersion = MTLLanguageVersion3_0;
 
-    for (size_t i = 0, e = flatbuffers_string_vec_len(shader_sources_vec); i < e; ++i) {
-      flatbuffers_string_t source_code = flatbuffers_string_vec_at(shader_sources_vec, i);
-      flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, i);
-
+    for (size_t i = 0, e = iree_max(shader_library_count, shader_source_count); i < e; ++i) {
       id<MTLLibrary> library = nil;
       id<MTLFunction> function = nil;
       id<MTLComputePipelineState> pso = nil;
-      status = iree_hal_metal_compile_msl(source_code, entry_point, device, compile_options,
-                                          &library, &function, &pso);
+
+      flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, i);
+      if (shader_library_count != 0) {
+        flatbuffers_string_t source_library = flatbuffers_string_vec_at(shader_libraries_vec, i);
+        flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, i);
+
+        status = iree_hal_metal_load_mtllib(source_library, flatbuffers_string_len(source_library),
+                                            entry_point, device, &library, &function, &pso);
+      } else {
+        flatbuffers_string_t source_code = flatbuffers_string_vec_at(shader_sources_vec, i);
+        flatbuffers_string_t entry_point = flatbuffers_string_vec_at(entry_points_vec, i);
+
+        status = iree_hal_metal_compile_msl(source_code, entry_point, device, compile_options,
+                                            &library, &function, &pso);
+      }
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.

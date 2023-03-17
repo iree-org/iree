@@ -22,7 +22,10 @@ iree_cc_library(
   SRCS
     "MetalSPIRVTarget.cpp"
   DEPS
+    ::MSLToMetalLib
     ::SPIRVToMSL
+    LLVMSupport
+    LLVMTargetParser
     MLIRAffineDialect
     MLIRGPUDialect
     MLIRLinalgDialect
@@ -50,6 +53,19 @@ iree_cc_library(
     LLVMSupport
     MLIRSupport
     spirv-cross-msl
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    MSLToMetalLib
+  HDRS
+    "MSLToMetalLib.h"
+  SRCS
+    "MSLToMetalLib.cpp"
+  DEPS
+    LLVMSupport
+    MLIRSupport
   PUBLIC
 )
 
