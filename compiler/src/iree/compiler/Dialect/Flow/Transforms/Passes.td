@@ -67,8 +67,8 @@ def FormDispatchRegions :
   let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions";
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormDispatchRegionsPass()";
   let options = [
-    Option<"aggressiveFusion", "aggressive-fusion", "bool",
-           /*default=*/"false", "Fuse with aggressive heuristics">,
+    Option<"fuseMultiUse", "fuse-multi-use", "bool",
+           /*default=*/"false", "Fuse multi-use ops">,
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
   ];

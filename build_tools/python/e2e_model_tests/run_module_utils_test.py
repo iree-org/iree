@@ -14,12 +14,13 @@ from e2e_test_framework.device_specs import device_parameters
 class RunModuleUtilsTest(unittest.TestCase):
 
   def test_build_linux_wrapper_cmds_for_device_spec(self):
-    device_spec = common_definitions.DeviceSpec(
+    device_spec = common_definitions.DeviceSpec.build(
         id="abc",
         device_name="test-device",
         architecture=common_definitions.DeviceArchitecture.VMVX_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
-        device_parameters=[device_parameters.OCTA_CORES])
+        device_parameters=[device_parameters.OCTA_CORES],
+        tags=[])
 
     flags = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
         device_spec)

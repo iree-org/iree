@@ -65,8 +65,10 @@ static MatmulTileParams chooseMatmulTileParamsX86_64(
       return {8, 1, 4};
     case MatmulType::I8I8I32:
       if (hasFeature(target, "+avx512vnni")) {
-        // Aim to use VPDPWSSD.
-        return {16, 4, 16};
+        // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
+        // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
+        // call for {16, 4, 16} but we can't use it because of its unsigned LHS.
+        return {16, 2, 16};
       }
       if (hasFeature(target, "+avx512bw")) {
         // Aim to use VPMADDWD (zmm).

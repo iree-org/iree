@@ -89,11 +89,6 @@ static llvm::cl::opt<bool> enableVectorPeeling(
     "iree-codegen-enable-vector-peeling",
     llvm::cl::desc("Enable peeling for vectorization"), llvm::cl::init(true));
 
-static llvm::cl::opt<bool> enableTripleTilingPipeline(
-    "iree-llvmcpu-enable-triple-tiling-pipeline",
-    llvm::cl::desc("enable triple tiling expert for matmul kernels"),
-    llvm::cl::init(false));
-
 // Non-static options are used in other places.
 llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
     "iree-codegen-llvmcpu-use-transform-dialect",
@@ -192,12 +187,6 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
   // Generic strategies.
 
   if (linalgOp.hasBufferSemantics()) {
-    return VectorPreProcStrategy::None;
-  }
-
-  // TripleTilingPipeline is only for experimental for now. It's not mature
-  // enough to work well with other strategies.
-  if (enableTripleTilingPipeline) {
     return VectorPreProcStrategy::None;
   }
 
@@ -740,59 +729,18 @@ static LogicalResult setMatmulPadRootConfig(
       DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
 }
 
-// Returns true if all the tiling sizes are divisible by the next level of
-// tile sizes.
-static bool isNoPadMultiTilingBeneficial(linalg::ContractionOpInterface op,
-                                         TileSizesListType tileSizes) {
-  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  int numLoops = linalgOp.getNumLoops();
-  if (numLoops != 3) return false;
-
-  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  if (llvm::any_of(shape,
-                   [](int64_t v) { return v == ShapedType::kDynamic; })) {
-    return false;
-  }
-
-  auto tryToFullyTile = [&](SmallVectorImpl<int64_t> &arr,
-                            ArrayRef<int64_t> tiles) -> bool {
-    for (int i = 0; i < numLoops; ++i) {
-      if (tiles[i] == 0) continue;
-      if (arr[i] % tiles[i] != 0) return false;
-      arr[i] = tiles[i];
-    }
-    return true;
-  };
-
-  for (auto sizes : tileSizes) {
-    if (!tryToFullyTile(shape, sizes)) return false;
-  }
-
-  return true;
-}
-
-static DispatchLoweringPassPipeline getNoPadMultiTilingExpert(
-    VectorPreProcStrategy strategy, int numLevels) {
+static DispatchLoweringPassPipeline getNoPadTilingExpert(
+    VectorPreProcStrategy strategy) {
   if (strategy == VectorPreProcStrategy::Peeling) {
     return DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
   }
-  switch (numLevels) {
-    case (2):
-      return DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-    case (3):
-      return DispatchLoweringPassPipeline::CPUTripleTilingExpert;
-    default:
-      llvm_unreachable("Unexpected number of levels");
-  }
+  return DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
 }
 
 static LogicalResult setMatmulNoPadRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     const TileSizesListTypeRef inputTileSizes, int vectorSize,
     VectorPreProcStrategy vecPreProcStrategy) {
-  size_t numTuples = inputTileSizes.size();
-  assert(numTuples >= 2 && "Expected two or more tile size tuples");
-
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
   // TODO(dcaballe): This is no longer true but we can't remove the loop
@@ -847,8 +795,7 @@ static LogicalResult setMatmulNoPadRootConfig(
                        << newTileSizes << "\n");
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, newTileSizes,
-      getNoPadMultiTilingExpert(vecPreProcStrategy, numTuples));
+      entryPointFn, op, newTileSizes, getNoPadTilingExpert(vecPreProcStrategy));
 }
 
 // TODO (dcaballe): Remove
@@ -888,8 +835,7 @@ static LogicalResult setMatmulMaskingRootConfig(
                        << newTileSizes << "\n");
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, newTileSizes,
-      getNoPadMultiTilingExpert(vecPreProcStrategy, numTuples));
+      entryPointFn, op, newTileSizes, getNoPadTilingExpert(vecPreProcStrategy));
 }
 
 static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
@@ -1083,18 +1029,6 @@ static LogicalResult setRootConfig(
   if (usePadding) {
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   workgroupTileSizes, vectorSize);
-  }
-  // TODO(hanchung): We should make the tile sizes be related to memory
-  // hierarchy. They are derived from experiments for now.
-  if (enableTripleTilingPipeline) {
-    SmallVector<int64_t> l1TileSizes = {0, 0, 384};
-    TileSizesListType tripleTileSizes = {flowTileSizes, l1TileSizes,
-                                         workgroupTileSizes};
-    if (isNoPadMultiTilingBeneficial(contractionOp, tripleTileSizes)) {
-      return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
-                                      tripleTileSizes, vectorSize,
-                                      vecPreProcStrategy);
-    }  // else fall back to the default configuration.
   }
 
   if (isX86(targetAttr) &&
@@ -1899,7 +1833,7 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 }
 
 /// Find the root operation for the dispatch region. The priority is:
-///   1. A tensor.pack op or a tensor.unpack op/
+///   1. A tensor.unpack op.
 ///   2. A Linalg operation that has reduction loops.
 ///   3. Any other Lainlg op or LinalgExt op.
 ///   4. An operation that implements TilingInterface.
@@ -1907,10 +1841,10 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 /// to the end of the function is the root op.
 static FailureOr<Operation *> getRootOperation(
     ArrayRef<Operation *> computeOps) {
-  // TODO(hanchung): The pack ops and unpack ops are unconditionally treated as
-  // root ops. This should be fixed if there are fusion cases.
+  // TODO(hanchung): The unpack ops are unconditionally treated as root ops.
+  // This should be fixed if there are fusion cases.
   for (auto op : computeOps) {
-    if (isa<tensor::PackOp, tensor::UnPackOp>(op)) return op;
+    if (isa<tensor::UnPackOp>(op)) return op;
   }
 
   for (auto op : llvm::reverse(computeOps)) {
@@ -1928,6 +1862,60 @@ static FailureOr<Operation *> getRootOperation(
   }
 
   return nullptr;
+}
+
+static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
+                                              Operation *rootOp) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
+  if (!linalgOp) return success();
+
+  // The transform dialect codegen has differnet logics and codegen flow. Ignore
+  // the adjustment for it.
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+  if (pipeline == DispatchLoweringPassPipeline::TransformDialectCodegen) {
+    return success();
+  }
+  TileSizesListType tileSizesList =
+      getLoweringConfig(linalgOp).getTileSizeVals();
+
+  bool hasChanged = false;
+  auto res = entryPointFn.walk([&](tensor::PackOp packOp) -> WalkResult {
+    // Multiple pack ops case is not supported.
+    if (hasChanged) return WalkResult::interrupt();
+
+    // TODO(hanchung): Support chain cases. It needs following use-def chain
+    // until rootOp.
+    if (packOp.getSource().getDefiningOp() != rootOp) {
+      return WalkResult::advance();
+    }
+    hasChanged = true;
+    OpResult result = packOp.getSource().cast<OpResult>();
+    auto idxMap = linalgOp.getMatchingIndexingMap(
+        linalgOp.getDpsInitOperand(result.getResultNumber()));
+    (void)idxMap;
+    LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n"
+                         << "The corresponding indexing map is: " << idxMap
+                         << "\n");
+    assert(idxMap.isIdentity() && "unexpected codegen input");
+
+    for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
+      SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
+      ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+      for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+        if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+        tileSizes[pos] = tileSizes[pos] / size;
+        tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+        LLVM_DEBUG(KD_DBGS() << "Scale # " << pos << " tile size to "
+                             << tileSizes[pos] << "\n");
+      }
+    }
+
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted()) return failure();
+
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
+                                               tileSizesList, pipeline);
 }
 
 /// Sets the translation information to use for a dispatch region.
@@ -1979,6 +1967,10 @@ static LogicalResult setTranslationInfoAndRootConfig(
     if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
       return failure();
     }
+  }
+
+  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
+    return failure();
   }
 
   return success();

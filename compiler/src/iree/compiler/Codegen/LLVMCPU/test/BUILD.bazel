@@ -49,7 +49,6 @@ iree_lit_test_suite(
             "transform_dialect_bufferize.mlir",
             "transform_dialect_iree_tile_to_forall.mlir",
             "transpose_avx2_lowering.mlir",
-            "triple_tiling_expert_pipeline.mlir",
             "unfused_fma.mlir",
             "vector_contract_to_arm_asm.mlir",
             "vector_contract_to_arm_intrinsics.mlir",

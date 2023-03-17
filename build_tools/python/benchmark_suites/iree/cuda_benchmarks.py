@@ -21,7 +21,7 @@ class Linux_CUDA_Benchmarks(object):
       target_architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
       target_backend=iree_definitions.TargetBackend.CUDA,
       target_abi=iree_definitions.TargetABI.LINUX_GNU)
-  SM_80_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  SM_80_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CUDA_SM80_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[SM_80_GPU_TARGET])
@@ -33,7 +33,7 @@ class Linux_CUDA_Benchmarks(object):
     """Generates IREE compile and run configs."""
 
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.SM_80_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in model_groups.LARGE
