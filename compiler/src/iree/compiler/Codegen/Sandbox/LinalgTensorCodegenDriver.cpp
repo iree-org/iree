@@ -19,9 +19,9 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Transforms/ValueBoundsOpInterface.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/X86Vector/Transforms.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -199,35 +199,32 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
     }
 
     // TODO
-    OpBuilder fakeBuilder(linalgOp.getContext());
-    FailureOr<OpFoldResult> dimBound =
-        linalg::ValueBoundsConstraintSet::reifyBound(
-            fakeBuilder, linalgOp.getLoc(),
-            presburger::IntegerPolyhedron::BoundType::UB, operand, operandDim,
-            [](Value value) -> bool {
-              Operation *defOp = isa<BlockArgument>(value)
-                                     ? value.getParentRegion()->getParentOp()
-                                     : value.getDefiningOp();
-              if (!defOp || isa<func::FuncOp>(defOp)) {
-                return true;
-              }
-
-              return false;
-            });
-    if (failed(dimBound)) {
+    AffineMap ubMap;
+    ValueDimList ubMapOperands;
+    if (failed(ValueBoundsConstraintSet::computeBound(
+            ubMap, ubMapOperands, linalgOp.getLoc(), presburger::BoundType::UB,
+            operand, operandDim, [](Value value) -> bool {
+              auto bbArg = value.dyn_cast<BlockArgument>();
+              if (!bbArg) return false;
+              return isa<FunctionOpInterface>(
+                  bbArg.getParentBlock()->getParentOp());
+            }))) {
       return failure();
       // llvm_unreachable("reifyBounds failed");
     }
 
-    if (auto val = dimBound->dyn_cast<Value>()) {
+    // We should have no operands.
+    if (!ubMapOperands.empty()) {
       return failure();
-      // val.dump();
-      // llvm_unreachable("bound is a Value");
+    }
+
+    if (!ubMap.isSingleConstant()) {
+      return failure();
     }
 
     // TODO(dcaballe): UBs are exclusive by default. Use new attribute in
     // interface.
-    dimSize = dimBound->get<Attribute>().cast<IntegerAttr>().getInt() - 1;
+    dimSize = ubMap.getSingleConstantResult() - 1;
     vectorSizes.push_back(dimSize);
     LDBG("Inferred vector size '" << dimSize << "' for dimension '" << dim
                                   << "'\n");
