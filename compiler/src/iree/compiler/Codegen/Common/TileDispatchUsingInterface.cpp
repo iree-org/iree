@@ -518,6 +518,7 @@ FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
         fusableProducer.getIterationDomain(rewriter);
     for (auto [index, range] : llvm::enumerate(producerIterationDomain)) {
       if (index < tilingResult->tiledLoops.size() &&
+          index < sliceOp.getMixedOffsets().size() &&
           tilingResult->tiledLoops.test(index)) {
         // It is not true that the tiling sizes for produces are always as same
         // as the tiling sizes for consumers. The tensor.extract_slice op

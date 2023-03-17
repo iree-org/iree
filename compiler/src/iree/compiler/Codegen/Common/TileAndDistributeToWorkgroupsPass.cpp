@@ -209,6 +209,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     // slowest varying.
     SmallVector<Value> numWorkgroups;
     for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
+      if (partitionedLoop >= tileSizes.size()) continue;
       if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
       Value numTileAlongDim = getValueOrCreateConstantIndexOp(
           rewriter, loc, numTiles[partitionedLoop]);
