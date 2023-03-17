@@ -21,7 +21,7 @@ class IreeDefinitionsTest(unittest.TestCase):
             source_url="https://example.com/xyz.tflite",
             entry_function="main",
             input_types=["1xf32", "2x2xf32"]))
-    execution_config = iree_definitions.ModuleExecutionConfig(
+    execution_config = iree_definitions.ModuleExecutionConfig.build(
         id="123",
         tags=["test"],
         loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
@@ -48,7 +48,7 @@ class IreeDefinitionsTest(unittest.TestCase):
             source_url="https://example.com/xyz.tflite",
             entry_function="main",
             input_types=["1xf32"]))
-    execution_config = iree_definitions.ModuleExecutionConfig(
+    execution_config = iree_definitions.ModuleExecutionConfig.build(
         id="123",
         tags=["test"],
         loader=iree_definitions.RuntimeLoader.NONE,
@@ -74,7 +74,7 @@ class IreeDefinitionsTest(unittest.TestCase):
             source_url="https://example.com/xyz.tflite",
             entry_function="main",
             input_types=["1xf32"]))
-    execution_config = iree_definitions.ModuleExecutionConfig(
+    execution_config = iree_definitions.ModuleExecutionConfig.build(
         id="123",
         tags=["test"],
         loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,

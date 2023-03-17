@@ -32,11 +32,11 @@ class Android_ARMv8_A_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.LLVM_CPU,
       target_abi=iree_definitions.TargetABI.LINUX_ANDROID29)
 
-  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[ARMV8_A_CPU_TARGET])
-  MMT4D_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  MMT4D_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D,
       tags=["experimental-flags", "mmt4d"],
       compile_targets=[ARMV8_A_CPU_TARGET],
@@ -45,7 +45,7 @@ class Android_ARMv8_A_Benchmarks(object):
           "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
           "--iree-llvmcpu-enable-pad-consumer-fusion"
       ])
-  MMT4D_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  MMT4D_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D_DOTPROD,
       tags=["experimental-flags", "mmt4d", "dotprod"],
       compile_targets=[ARMV8_A_CPU_TARGET],
@@ -71,18 +71,18 @@ class Android_ARMv8_A_Benchmarks(object):
     ]
 
     default_gen_confings = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.NONQUANT_MODELS + self.QUANT_MODELS
     ]
     experimental_gen_confings = [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.MMT4D_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.NONQUANT_MODELS
     ] + [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.MMT4D_AND_DOTPROD_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.QUANT_MODELS
