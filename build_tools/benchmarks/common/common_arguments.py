@@ -137,14 +137,11 @@ class Parser(argparse.ArgumentParser):
         help="Base directory in which to store temporary files. A subdirectory"
         " with a name matching the git commit hash will be created.")
     self.add_argument(
-        "--continue_from_directory",
-        "--continue-from-directory",
-        default=None,
-        type=_check_dir_path,
-        help="Path to directory with previous benchmark temporary files. This"
-        " should be for the specific commit (not the general tmp-dir). Previous"
-        " benchmark and capture results from here will not be rerun and will be"
-        " combined with the new runs.")
+        "--continue_from_previous",
+        "--continue-from-previous",
+        action="store_true",
+        help="Previous benchmark and capture results will be used and not "
+        "rerun if they are found in the benchmark results directory.")
     self.add_argument(
         "--benchmark_min_time",
         "--benchmark-min-time",
