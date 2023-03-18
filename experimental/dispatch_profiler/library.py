@@ -283,13 +283,8 @@ def get_np_array(tensor_description, shape, dist):
 # Helper function to substitute values into a template string.
 def SubstituteTemplate(template, values):
   text = template
-  changed = True
-  while changed:
-    changed = False
-    for key, value in values.items():
-      regex = "\\$\\{%s\\}" % key
-      newtext = re.sub(regex, value, text)
-      if newtext != text:
-        changed = True
-      text = newtext
+  for key, value in values.items():
+    regex = "\\$\\{%s\\}" % key
+    newtext = re.sub(regex, value, text)
+    text = newtext
   return text

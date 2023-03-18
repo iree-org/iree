@@ -375,28 +375,27 @@ class MatmulOperationLauncher:
     benchmark_dispatch_repeat_count = self.benchmark_dispatch_repeat_count if compilation_mode == CompilationMode.Profile else 1
     vmfb_file = self.vmfb_benchmark_file if compilation_mode == CompilationMode.Profile else self.vmfb_verify_file
 
-    cmd = \
-    "{iree_compile_path} {source_mlir_file} "\
-    "--iree-hal-target-backends={device} "\
-    "--iree-hal-cuda-llvm-target-arch=sm_80 "\
-    "--iree-hal-benchmark-dispatch-repeat-count={benchmark_dispatch_repeat_count} "\
-    "-o {vmfb_file}".format(
-        iree_compile_path=self.iree_compile_path,
-        source_mlir_file=self.source_mlir_file,
-        device=self.device,
-        benchmark_dispatch_repeat_count=benchmark_dispatch_repeat_count,
-        vmfb_file=vmfb_file
-    )
+    # Base iree-compile commandline
+    cmd = [self.iree_compile_path, self.source_mlir_file, "-o", f"{vmfb_file}"]
+
+    # Device specific flags.
+    cmd += [f"--iree-hal-target-backends={self.device}"]
+    cmd += [f"--iree-hal-cuda-llvm-target-arch=sm_80"]
+
+    # Misc flags.
+    cmd += [
+        f"--iree-hal-benchmark-dispatch-repeat-count={benchmark_dispatch_repeat_count}"
+    ]
 
     if not os.path.exists(vmfb_file) or self.force_compile:
-      print(">> Compilation command for " +
-            CompilationModeNames[compilation_mode] + " : " + cmd)
-      subprocess.getoutput(cmd)
+      print(
+          f">> Compilation command for {CompilationModeNames[compilation_mode]} : {' '.join(cmd)}"
+      )
+      subprocess.check_output(cmd)
 
-    else:
-      if self.verbose:
-        print("Skipping compilation of matmul operation: " + vmfb_file +
-              " since it already exists.")
+    elif self.verbose:
+      print("Skipping compilation of matmul operation: " + vmfb_file +
+            " since it already exists.")
 
   def verify(self, configuration):
     """Verifies the matmul operation with a given configuration."""
@@ -419,26 +418,25 @@ class MatmulOperationLauncher:
     # Run the reference implementation and generate npy files
     reference_op.run_and_save(self.operation_path)
 
-    # Command-line for using iree-run-module as the verification tool.
-    cmd = \
-    "{iree_run_module_path} --module={vmfb_file} --device={device} --function={function_name} "\
-    "--input=@{lhs_npy_file} --input=@{rhs_npy_file} "\
-    "--expected_output=@{expected_result_npy_file}".format(
-        iree_run_module_path = self.iree_run_module_path,
-        vmfb_file = self.vmfb_verify_file,
-        device = self.device,
-        function_name = self.operation.name() + "_" + configuration.name(),
-        lhs_npy_file = os.path.join(self.operation_path, reference_op.filename_lhs),
-        rhs_npy_file = os.path.join(self.operation_path, reference_op.filename_rhs),
-        expected_result_npy_file = os.path.join(self.operation_path, reference_op.reference_filename_result)
-    )
+    # Commandline `iree-run-module` for verification.
+    cmd = [
+        self.iree_run_module_path, f'--module={self.vmfb_verify_file}',
+        f'--device={self.device}'
+    ]
+
+    # Operation-specific verification command-line.
+    # TODO: abstract the operation-specific verification command-line out of verification.
+    cmd.append(f'--function={self.operation.name()}_{configuration.name()}')
+    cmd.append(f'--input=@{lhs_npy_file}')
+    cmd.append(f'--input=@{rhs_npy_file}')
+    cmd.append(f'--expected_output=@{expected_result_npy_file}')
 
     # Print the command if verbose.
     if self.verbose:
-      print(">> Verification command: " + cmd)
+      print(">> Verification command: " + ' '.join(cmd))
 
     # Launch verification.
-    cmd_output = subprocess.getoutput(cmd)
+    cmd_output = subprocess.check_output(cmd, text=True)
 
     # Parse the verification output.
     m = re.search(r"\[(?P<verification_result>[a-zA-Z]+)\]", cmd_output)
@@ -458,27 +456,29 @@ class MatmulOperationLauncher:
     # First compile the operation to a vmfb file.
     self.compile(CompilationMode.Profile)
 
-    # Command-line for using iree-benchmark-module as the profiling tool.
-    cmd = \
-      "{iree_benchmark_module_path} --module={vmfb_file} --device={device} "\
-      "--benchmark_repetitions={benchmark_repetitions} --batch_size={batch_size} --function={function_name} "\
-      "--input={lhs_npy_shape} --input={rhs_npy_shape}".format(
-        iree_benchmark_module_path = self.iree_benchmark_module_path,
-        vmfb_file = self.vmfb_benchmark_file,
-        device = self.device,
-        benchmark_repetitions = self.benchmark_repetitions,
-        batch_size = self.batch_size,
-        function_name = self.operation.name() + "_" + configuration.name(),
-        lhs_npy_shape = self.operation.lhs_npy_shape(),
-        rhs_npy_shape = self.operation.rhs_npy_shape()
-      )
+    # Commandline `iree-benchmark-module` for profiling.
+    cmd = [
+        self.iree_benchmark_module_path, f'--module={self.vmfb_benchmark_file}',
+        f'--device={self.device}'
+    ]
+
+    # Profiling specific flags.
+    cmd += [f'--benchmark_repetitions={self.benchmark_repetitions}']
+    cmd += [f'--batch_size={self.batch_size}']
+
+    # Operation-specific profiling command-line.
+    cmd += [f'--function={self.operation.name()}_{configuration.name()}']
+    cmd += [f'--input={self.operation.lhs_npy_shape()}']
+    cmd += [f'--input={self.operation.rhs_npy_shape()}']
 
     # Print the command if verbose.
     if self.verbose:
-      print(">> Profiling command: " + cmd)
+      print(">> Profiling command: " + ' '.join(cmd))
 
     # Launch profiling.
-    cmd_output = subprocess.getoutput(cmd)
+    cmd_output = subprocess.check_output(cmd,
+                                         text=True,
+                                         stderr=subprocess.STDOUT)
 
     # Parse the profiling output.
     m = re.search(r"real_time_median\s+(?P<runtime>\d+.\d+)\s+ms", cmd_output)
@@ -508,26 +508,30 @@ def gpu_matmul_tensor_cores_f16(manifest):
       TileDescription([128, 256, 32], 3, [128, 2, 1]),
       TileDescription([128, 128, 64], 4, [64, 2, 1]),
       TileDescription([128, 128, 32], 5, [64, 2, 1]),
-      TileDescription([128, 64, 32], 5, [64, 2, 1]),
-      TileDescription([64, 64, 64], 5, [64, 2, 1]),
-      TileDescription([64, 64, 32], 10, [64, 2, 1]),
+      #TileDescription([128, 64, 32], 5, [64, 2, 1]),
+      #TileDescription([64, 64, 64], 5, [64, 2, 1]),
+      #TileDescription([64, 64, 32], 10, [64, 2, 1]),
+  ]
+
+  translation_infos = [  #TranslationInfo.LLVMGPUMatmulTensorCore, 
+      TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync
   ]
 
   # compilation info configuration list.
   configuration_list = []
-  #translation_info = TranslationInfo.LLVMGPUMatmulTensorCore
-  translation_info = TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync
+
   for tile_description in tile_descriptions:
-    configuration_list.append(
-        MatmulCompilationInfo(tile_description, translation_info))
+    for translation_info in translation_infos:
+      configuration_list.append(
+          MatmulCompilationInfo(tile_description, translation_info))
 
   # Matmul problems.
   problem_shapes = [
       #[128, 128, 256],
-      #[256, 256, 256],
+      [256, 512, 128],
+      #[1024, 512, 2048],
       #[2560, 2560, 2560],
-      [1024, 512, 2048],
-      [3456, 1024, 2048]
+      #[3456, 1024, 2048]
   ]
 
   for problem_shape in problem_shapes:
@@ -550,25 +554,29 @@ def gpu_matmul_tensor_cores_f32(mainfest):
       #TileDescription([256, 128, 16], 3, [64, 4, 1]), # This tile does not iree-compile.
       TileDescription([128, 128, 16], 5, [64, 2, 1]),
       TileDescription([128, 128, 32], 3, [64, 2, 1]),
-      TileDescription([128, 128, 32], 4, [64, 2, 1]),
-      TileDescription([64, 64, 64], 3, [64, 2, 1]),
+      #TileDescription([128, 128, 32], 4, [64, 2, 1]),
+      #TileDescription([64, 64, 64], 3, [64, 2, 1]),
+  ]
+
+  translation_infos = [  #TranslationInfo.LLVMGPUMatmulTensorCore, 
+      TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync
   ]
 
   # compilation info configuration list.
   configuration_list = []
-  #translation_info = TranslationInfo.LLVMGPUMatmulTensorCore
-  translation_info = TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync
+
   for tile_description in tile_descriptions:
-    configuration_list.append(
-        MatmulCompilationInfo(tile_description, translation_info))
+    for translation_info in translation_infos:
+      configuration_list.append(
+          MatmulCompilationInfo(tile_description, translation_info))
 
   # Matmul problems.
   problem_shapes = [
       #[128, 128, 256],
-      #[256, 256, 256],
+      [256, 512, 128],
       #[1024, 512, 2048],
-      [2560, 2560, 2560]
-      [3456, 1024, 2048]
+      #[2560, 2560, 2560],
+      #[3456, 1024, 2048]
   ]
 
   for problem_shape in problem_shapes:

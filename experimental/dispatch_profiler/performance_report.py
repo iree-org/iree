@@ -18,9 +18,9 @@ class PerformanceResult:
 
   def print(self):
     """Prints the performance result to the console."""
-    runtime = (str(self.runtime) if self.runtime != -1.0 else 'Not run')
+    runtime = (str(self.runtime) if self.runtime != -1.0 else 'Not profiled')
     gflops = (str(float(round(self.gflops, 2)))
-              if self.runtime != -1.0 else 'Not run')
+              if self.runtime != -1.0 else 'Not profiled')
 
     print('---------------------------------------------------------------- ')
     print('Dispatch      : %s' %

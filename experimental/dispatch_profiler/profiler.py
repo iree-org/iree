@@ -144,7 +144,7 @@ if __name__ == "__main__":
 
         else:
           # Initialize verification and profiling results.
-          verification_result = 'Not run' if not verification_enabled else 'Failed'
+          verification_result = 'Not verified' if not verification_enabled else 'Failed'
           runtime = -1.0
 
           # Launch the operation dispatches for verification and profiling.
