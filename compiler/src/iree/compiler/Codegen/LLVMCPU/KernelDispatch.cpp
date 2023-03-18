@@ -451,7 +451,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
 
 /// Returns the nearest power of two of `size` if `predicate` is true.
 /// Otherwise, returns `size`.
-static int64_t roundUpToPow2(int64_t size, bool predicate) {
+static int64_t roundUpToPow2(int64_t size, bool predicate = true) {
   if (!predicate) {
     return size;
   }
@@ -804,25 +804,15 @@ static LogicalResult setMatmulMaskingRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     const TileSizesListTypeRef inputTileSizes, int vectorSize,
     VectorPreProcStrategy vecPreProcStrategy) {
-  size_t numTuples = inputTileSizes.size();
-  assert(numTuples >= 2 && "Expected two or more tile size tuples");
+  assert(inputTileSizes.size() >= 2 && "Expected two or more tile size tuples");
 
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
-  // TODO(dcaballe): Tile size configuration copied from MatmulPadRootConfig.
-  const SmallVectorImpl<int64_t> &workgroupTileSizes = inputTileSizes.back();
-  SmallVector<int64_t> parallelTileSizes;
-  for (int64_t workgroupSize : workgroupTileSizes) {
-    parallelTileSizes.push_back(
-        roundUpToPow2(workgroupSize, /*predicate =*/true));
-  }
-
-  parallelTileSizes.back() = 0;
-
-  // Do not unroll k dim.
-  SmallVector<int64_t> reductionTileSizes(workgroupTileSizes.size() - 1, 0);
-  reductionTileSizes.push_back(1);
+  SmallVector<int64_t> parallelTileSizes = inputTileSizes.back();
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(linalgOp, parallelTileSizes,
+                                 reductionTileSizes);
 
   TileSizesListType newTileSizes;
   // Copy all the tile size levels except the workgroup one which will be split
@@ -874,11 +864,16 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
 
 /// Returns default hard-coded workgroup sizes for a give target. No smartness
 /// should be introduced in this utility.
-static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
-                                           SmallVectorImpl<int64_t> &sizes,
-                                           int64_t vectorSize) {
+static void getDefaultMatmulWorkgroupSizes(
+    linalg::LinalgOp op, SmallVectorImpl<int64_t> &sizes, int64_t vectorSize,
+    VectorPreProcStrategy vecPreProcStrategy) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
+    if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
+      sizes.append({8, 16, 1});
+      return;
+    }
+
     sizes.append({8, 32, 16});
     return;
   }
@@ -899,15 +894,36 @@ static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
 }
 
 /// Main utility to compute the workgroup (vectorization/unrolling) tile sizes.
-static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
-                                                    linalg::LinalgOp op,
-                                                    int64_t vectorSize,
-                                                    bool isQuantized) {
+static SmallVector<int64_t> getMatmulWorkgroupSizes(
+    func::FuncOp entryPointFn, linalg::LinalgOp matmulOp, int64_t vectorSize,
+    bool isQuantized, VectorPreProcStrategy vecPreProcStrategy) {
   SmallVector<int64_t> matmulTileSizes;
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  SmallVector<int64_t> defaultTileSizes;
+  getDefaultMatmulWorkgroupSizes(matmulOp, defaultTileSizes, vectorSize,
+                                 vecPreProcStrategy);
 
   // Compute workgroup tile sizes using heuristics.
-  // TODO: if (isX86(targetAttr) || isRISCV(targetAttr)) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (isX86(targetAttr) &&
+      vecPreProcStrategy == VectorPreProcStrategy::Masking) {
+    auto matmulShape = matmulOp.getStaticLoopRanges();
+    // Set tile sizes to their default values or to the static dimension if the
+    // latter is lower.
+    for (auto [matmulSize, defTileSize] :
+         llvm::zip(matmulShape, defaultTileSizes)) {
+      int64_t tileSize = ShapedType::isDynamic(matmulSize)
+                             ? defTileSize
+                             : std::min(matmulSize, defTileSize);
+      matmulTileSizes.push_back(tileSize);
+    }
+
+    // Round-up main vectorization dimension for masking.
+    int64_t vectorDimIdx = std::max(0L, ((int64_t)matmulTileSizes.size()) - 2);
+    matmulTileSizes[vectorDimIdx] =
+        roundUpToPow2(matmulTileSizes[vectorDimIdx]);
+  }
+
+  // TODO(dcaballe): isRISCV(targetAttr)
 
   if (isAArch64(targetAttr)) {
     if (isQuantized) {
@@ -917,18 +933,23 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
     }
   }
 
-  // Get default hard-coded tile sizes if we couldn't compute anything better.
+  // Get default hard-coded tile sizes if we couldn't compute anything better
+  // with heuristics.
   if (matmulTileSizes.empty())
-    getDefaultMatmulWorkgroupSizes(op, matmulTileSizes, vectorSize);
+    matmulTileSizes.append(defaultTileSizes.begin(), defaultTileSizes.end());
 
+  // TODO(dcaballe): This whole adjustment is error-prone. We should make sure
+  // that we end up with the right number of tile sizes in first place.
   SmallVector<int64_t> tileSizes;
-  unsigned numLoops = op.getNumLoops();
+  unsigned numLoops = matmulOp.getNumLoops();
   if (numLoops > 3) {
     tileSizes.append(numLoops - 3, 1);
     tileSizes.append(matmulTileSizes.begin(), matmulTileSizes.end());
-  } else {
+  } else if (numLoops < matmulTileSizes.size()) {
     tileSizes.append(matmulTileSizes.begin() + (3 - numLoops),
                      matmulTileSizes.end());
+  } else {
+    tileSizes.append(matmulTileSizes.begin(), matmulTileSizes.end());
   }
 
   LLVM_DEBUG(KD_DBGS() << "Matmul workgroup sizes: " << tileSizes << "\n");
@@ -942,7 +963,17 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp) {
   assert(!getLoweringConfig(contractionOp) &&
          "expected lowering_config is not set");
+
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
+  LLVM_DEBUG(KD_DBGS() << "Contraction shape: "
+                       << linalgOp.getStaticLoopRanges() << "\n");
+
+  auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
+  bool usePadding = vecPreProcStrategy == VectorPreProcStrategy::Padding;
+  // bool useMasking = vecPreProcStrategy == VectorPreProcStrategy::Masking;
+  LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
+                       << vecPreProcStrategy << "\n");
+
   unsigned numLoops = linalgOp.getNumLoops();
   {
     SmallVector<unsigned> dims;
@@ -966,8 +997,8 @@ static LogicalResult setRootConfig(
   bool isQuantized =
       lhsShapedType.getElementType() != resShapedType.getElementType();
 
-  SmallVector<int64_t> workgroupTileSizes =
-      getMatmulWorkgroupSizes(entryPointFn, linalgOp, vectorSize, isQuantized);
+  SmallVector<int64_t> workgroupTileSizes = getMatmulWorkgroupSizes(
+      entryPointFn, linalgOp, vectorSize, isQuantized, vecPreProcStrategy);
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
@@ -987,17 +1018,10 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
-  bool usePadding = vecPreProcStrategy == VectorPreProcStrategy::Padding;
-  bool useMasking = vecPreProcStrategy == VectorPreProcStrategy::Masking;
-
-  LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
-                       << vecPreProcStrategy << "\n");
-
   // TODO(dcaballe): Try to use the same tile size configuration for padding and
   // masking. Note that there is a tile size tweak in `setMatmulPadRootConfig`
   // that is not done for masking (yet).
-  if (usePadding || useMasking) {
+  if (usePadding) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
     // 288/12*8=192
