@@ -1065,7 +1065,8 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp, DispatchStateField field,
   auto statePtrValue = buildArgDI(
       forOp, /*argNum=*/1, getLocalArgument(forOp, 1), "dispatch_state",
       di.getPtrOf(di.getConstOf(di.getDispatchStateV0T())), builder);
-  Value stateValue = builder.create<LLVM::LoadOp>(loc, statePtrValue);
+  Value stateValue =
+      builder.create<LLVM::LoadOp>(loc, dispatchStateType, statePtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
   return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
 }
@@ -1077,7 +1078,8 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp,
   auto statePtrValue = buildArgDI(
       forOp, /*argNum=*/2, getLocalArgument(forOp, 2), "workgroup_state",
       di.getPtrOf(di.getConstOf(di.getWorkgroupStateV0T())), builder);
-  Value stateValue = builder.create<LLVM::LoadOp>(loc, statePtrValue);
+  Value stateValue =
+      builder.create<LLVM::LoadOp>(loc, workgroupStateType, statePtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
   return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
 }
