@@ -415,8 +415,12 @@ class MatmulOperationLauncher:
     expected_result_npy_file = os.path.join(
         self.operation_path, reference_op.reference_filename_result)
 
-    # Run the reference implementation and generate npy files
-    reference_op.run_and_save(self.operation_path)
+    # If the reference numpy do not exists, run the reference implementation
+    # and generate npy files.
+    if not os.path.exists(lhs_npy_file) or \
+       not os.path.exists(rhs_npy_file) or \
+       not os.path.exists(expected_result_npy_file):
+      reference_op.run_and_save(self.operation_path)
 
     # Commandline `iree-run-module` for verification.
     cmd = [
@@ -505,12 +509,13 @@ def gpu_matmul_tensor_cores_f16(manifest):
       #TileDescription([128, 128, 32], 3, [64, 2, 1]),
 
       # Tiles for performance profiling `mma.sync.[f16/f32].f16.f16.[f16/f32]``
+      #TileDescription([256, 128, 32], 3, [128, 2, 1]), # What should be the workgroup size?
       TileDescription([128, 256, 32], 3, [128, 2, 1]),
       TileDescription([128, 128, 64], 4, [64, 2, 1]),
       TileDescription([128, 128, 32], 5, [64, 2, 1]),
-      #TileDescription([128, 64, 32], 5, [64, 2, 1]),
-      #TileDescription([64, 64, 64], 5, [64, 2, 1]),
-      #TileDescription([64, 64, 32], 10, [64, 2, 1]),
+      TileDescription([128, 64, 32], 5, [64, 2, 1]),
+      TileDescription([64, 64, 64], 5, [64, 2, 1]),
+      TileDescription([64, 64, 32], 10, [64, 2, 1]),
   ]
 
   translation_infos = [  #TranslationInfo.LLVMGPUMatmulTensorCore, 
@@ -528,10 +533,10 @@ def gpu_matmul_tensor_cores_f16(manifest):
   # Matmul problems.
   problem_shapes = [
       #[128, 128, 256],
-      [256, 512, 128],
+      #[256, 512, 128],
       #[1024, 512, 2048],
-      #[2560, 2560, 2560],
-      #[3456, 1024, 2048]
+      [2560, 2560, 2560],
+      [3456, 1024, 2048]
   ]
 
   for problem_shape in problem_shapes:

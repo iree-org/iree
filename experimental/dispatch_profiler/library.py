@@ -255,8 +255,12 @@ class TileDescription:
 # These function may be moved as the need for create a proper structure for the
 # functionality they provide becomes apparent and necessary as we move forward.
 ###################################################################################################
-# Helper function to generate a npy file name from a distribution and shape.
 def get_np_array(tensor_description, shape, dist):
+  """Returns a numpy array based on the distribution and shape."""
+  # Fix the seed for reproducibility.
+  np.random.seed(42)
+
+  # Generate the numpy array based on the distribution.
   if dist == Distribution.Empty:
     return np.empty(shape)
   elif dist == Distribution.Zeros:
@@ -269,19 +273,19 @@ def get_np_array(tensor_description, shape, dist):
     return np.eye(shape[0], shape[1])
   elif dist == Distribution.Random:
     if tensor_description.datatype == DataType.s8:
-      return np.random.randint(-2, 2, shape)
+      return np.random.randint(-2, 3, shape)
     elif tensor_description.datatype == DataType.u8:
       return np.random.randint(0, 4, shape)
     elif tensor_description.datatype == DataType.f16 or \
          tensor_description.datatype == DataType.bf16:
-      return np.random.randint(-4, 4, shape)
+      return np.random.randint(-3, 4, shape)
     elif tensor_description.datatype == DataType.f32:
-      return np.random.randint(-8, 8, shape)
+      return np.random.randint(-7, 8, shape)
 
 
 ###################################################################################################
-# Helper function to substitute values into a template string.
 def SubstituteTemplate(template, values):
+  """Substitutes values into a template string."""
   text = template
   for key, value in values.items():
     regex = "\\$\\{%s\\}" % key

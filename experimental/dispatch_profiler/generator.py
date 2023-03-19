@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
   # Collect all the pre-defined dispatches in a manifest for various operations.
   gpu_matmul_tensor_cores_f16(manifest)
-  gpu_matmul_tensor_cores_f32(manifest)
+  #gpu_matmul_tensor_cores_f32(manifest)
 
   # Emit the dispatches in MLIR source files.
   manifest.emit(MlirDialect.Linalg)
