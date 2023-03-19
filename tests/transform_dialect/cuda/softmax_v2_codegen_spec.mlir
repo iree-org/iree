@@ -33,7 +33,7 @@ transform.sequence failures(propagate) {
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
   
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
@@ -66,13 +66,13 @@ transform.sequence failures(propagate) {
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 
   // Step 3. Rank-reduce and vectorize.
   // ==================================
   %funcx_2 = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %funcx_3 = transform.iree.apply_patterns %funcx_2 {  rank_reducing_linalg, rank_reducing_vector }
-  transform.structured.vectorize %funcx_3
+  transform.iree.apply_patterns %funcx_2 {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
+  transform.structured.vectorize %funcx_2
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
@@ -92,15 +92,15 @@ transform.sequence failures(propagate) {
   // ===================================================================
   %end_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
-  %end_func_2 = transform.iree.apply_patterns %end_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
+  transform.iree.apply_patterns %end_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!pdl.operation) -> ()
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
-  transform.iree.vector.warp_distribute %end_func_2
+  transform.iree.vector.warp_distribute %end_func
     : (!pdl.operation) -> !pdl.operation
 
 
   // Late canonicalizations.
   transform.iree.apply_patterns %variant_op_3
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 }

@@ -172,8 +172,18 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     return emitDefaultDefiniteFailure(target);
   }
 
-  results.push_back(target);
+  auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
+  // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
+  rewriter.startRootUpdate(exportOp);
+  exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
+  rewriter.finalizeRootUpdate(exportOp);
   return diag;
+}
+
+void transform_dialect::MapNestedForallToGpuThreadsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//
@@ -404,8 +414,13 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
 void transform_dialect::VectorWarpDistributionOp::build(OpBuilder &builder,
                                                         OperationState &result,
                                                         Value target) {
-  result.addTypes(pdl::OperationType::get(builder.getContext()));
   result.addOperands(target);
+}
+
+void transform_dialect::VectorWarpDistributionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 /// Emit shared local memory allocation in case it is needed when lowering the
@@ -672,15 +687,13 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
         target, "warp execute on lane 0 to scf patterns failed to apply");
   }
 
-  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::VectorToMMAConversionOp::build(OpBuilder &builder,
-                                                       OperationState &result,
-                                                       Value target) {
-  result.addOperands(target);
-  result.addTypes({pdl::OperationType::get(builder.getContext())});
+void transform_dialect::VectorToMMAConversionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 DiagnosedSilenceableFailure
@@ -725,7 +738,6 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
       target->emitOpError("vector to wmma patterns failed to apply");
       return emitDefaultDefiniteFailure(target);
     }
-    results.push_back(target);
     return DiagnosedSilenceableFailure::success();
   }
 
@@ -742,7 +754,6 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
     target->emitOpError("vector to mma F32ToTF32 patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
-  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -800,11 +811,17 @@ transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
 //===---------------------------------------------------------------------===//
 // CreateAsyncGroupsOp.
 //===---------------------------------------------------------------------===//
+
+void transform_dialect::CreateAsyncGroupsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
 DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
     func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   iree_compiler::createAsyncGroups(cast<func::FuncOp>(target), getUseMmaSync());
-  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 

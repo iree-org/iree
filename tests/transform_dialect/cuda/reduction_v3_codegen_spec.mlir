@@ -16,7 +16,7 @@ transform.sequence failures(propagate) {
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 
   // Step 2. Split the reduction to get meatier parallelism.
   // This also parallelizes to threads.
@@ -37,7 +37,7 @@ transform.sequence failures(propagate) {
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 
   // Step 3. Rank-reduce and vectorize.
   // ===========================================================================
@@ -45,14 +45,14 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
   // TODO: masked vectorization on block_more_parallel_op_2 if we want 
   // vector<4> to work as intended.
-  %func_2 = transform.iree.apply_patterns %func 
-    { rank_reducing_linalg, rank_reducing_vector }
-  %func_3 = transform.structured.vectorize %func_2
+  transform.iree.apply_patterns %func 
+    { rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
+  %func_3 = transform.structured.vectorize %func
 
   // Canonicalizations is necessary to get rid of some tensor.cast that block
   // hoisting.
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
   %func_4 = transform.structured.hoist_redundant_tensor_subsets %func_3
     : (!pdl.operation) -> !pdl.operation
 
@@ -61,12 +61,12 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   // Canonicalizations required before bufferization to avoid unnecessary allocs.
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }
-  %func_5 = transform.iree.apply_patterns %func_4 { fold_reassociative_reshapes }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
+  transform.iree.apply_patterns %func_4 { fold_reassociative_reshapes } : (!pdl.operation) -> ()
   %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
   %func_6 = transform.structured.match ops{["func.func"]} in %variant_op_2 
     : (!pdl.operation) -> !pdl.operation
-  %func_7 = transform.iree.apply_patterns %func_6 { erase_unnecessary_tensor_operands }
+  transform.iree.apply_patterns %func_6 { erase_unnecessary_tensor_operands } : (!pdl.operation) -> ()
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
@@ -82,15 +82,15 @@ transform.sequence failures(propagate) {
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
-  %func_m_4 = transform.iree.apply_patterns %func_m_3 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
+  transform.iree.apply_patterns %func_m_3 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!pdl.operation) -> ()
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
-  transform.iree.vector.warp_distribute %func_m_4
+  transform.iree.vector.warp_distribute %func_m_3
     : (!pdl.operation) -> !pdl.operation
 
 
   // Late canonicalizations.
   transform.iree.apply_patterns %variant_op_3
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 }

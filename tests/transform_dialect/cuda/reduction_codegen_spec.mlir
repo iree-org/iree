@@ -30,7 +30,7 @@ transform.sequence failures(propagate) {
 
   // Canonicalizations.
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op 
     : (!pdl.operation) -> !pdl.operation
@@ -46,14 +46,14 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op 
     : (!pdl.operation) -> !pdl.operation
-  %func_2 = transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector }
-  %func_3 = transform.structured.vectorize %func_2
+  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
+  %func_3 = transform.structured.vectorize %func
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================
-  %func_4 = transform.iree.apply_patterns %func_3 { fold_reassociative_reshapes }
-  %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
-  %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
+  transform.iree.apply_patterns %func_3 { fold_reassociative_reshapes } : (!pdl.operation) -> ()
+  transform.iree.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
+  %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func
@@ -68,7 +68,7 @@ transform.sequence failures(propagate) {
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
-  %func_8 = transform.iree.apply_patterns %func_7 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
+  transform.iree.apply_patterns %func_7 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!pdl.operation) -> ()
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
   // Don't complain about unsupported if (threadIdx.x == 0 && threadIdx.y == 0)
@@ -77,7 +77,7 @@ transform.sequence failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
     transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   }
-  transform.iree.vector.warp_distribute %func_8
+  transform.iree.vector.warp_distribute %func_7
     : (!pdl.operation) -> !pdl.operation
 
 
