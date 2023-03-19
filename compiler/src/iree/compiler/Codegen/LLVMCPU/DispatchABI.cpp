@@ -680,10 +680,9 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
   auto constantsPtrValue =
       loadFieldValue(forOp, DispatchStateField::push_constants, builder);
   auto offsetValue = getIndexValue(loc, offset, builder);
-  Value constantPtrValue = builder.create<LLVM::GEPOp>(
-      loc, constantsPtrValue.getType(),
-      LLVM::LLVMPointerType::get(builder.getContext()), constantsPtrValue,
-      offsetValue);
+  Value constantPtrValue =
+      builder.create<LLVM::GEPOp>(loc, constantsPtrValue.getType(), resultType,
+                                  constantsPtrValue, offsetValue);
   Value constantValue =
       builder.create<LLVM::LoadOp>(loc, resultType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
@@ -711,7 +710,7 @@ Value HALDispatchABI::loadBindingPtr(Operation *forOp, int64_t ordinal,
   auto ordinalValue = getIndexValue(loc, ordinal, builder);
   auto elementPtrValue = builder.create<LLVM::GEPOp>(
       loc, ptrsPtrValue.getType(),
-      LLVM::LLVMPointerType::get(builder.getContext()), ptrsPtrValue,
+      mlir::LLVM::LLVMPointerType::get(builder.getContext()), ptrsPtrValue,
       ordinalValue);
   auto elementValue = builder.create<LLVM::LoadOp>(
       loc, mlir::LLVM::LLVMPointerType::get(builder.getContext()),
@@ -743,16 +742,15 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
                                              ValueRange dynamicDims,
                                              OpBuilder &builder) {
   auto loc = forOp->getLoc();
-  auto context = builder.getContext();
 
   // Load the base buffer pointer in the appropriate type (f32*, etc).
   Value basePtrValue = loadBindingPtr(forOp, ordinal, builder);
 
   // Adjust by baseOffset (if needed).
   if (baseOffsetValue) {
+    auto i8Type = typeConverter->convertType(builder.getI8Type());
     basePtrValue = builder.create<LLVM::GEPOp>(
-        loc, basePtrValue.getType(), LLVM::LLVMPointerType::get(context),
-        basePtrValue, baseOffsetValue);
+        loc, basePtrValue.getType(), i8Type, basePtrValue, baseOffsetValue);
   }
 
   // NOTE: if we wanted to check the range was in bounds here would be the

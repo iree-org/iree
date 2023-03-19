@@ -378,9 +378,9 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     // Add the byte offset.
     Value llvmBufferBasePtr = llvmBufferArg;
     if (adaptor.getByteOffset()) {
+      auto i8Type = typeConverter->convertType(rewriter.getI8Type());
       llvmBufferBasePtr = rewriter.create<LLVM::GEPOp>(
-          loc, llvmBufferBasePtr.getType(),
-          LLVM::LLVMPointerType::get(rewriter.getContext()), llvmBufferBasePtr,
+          loc, llvmBufferBasePtr.getType(), i8Type, llvmBufferBasePtr,
           adaptor.getByteOffset());
     }
     if (memrefType.hasStaticShape()) {
