@@ -172,6 +172,13 @@ static llvm::raw_ostream &operator<<(
   return os;
 }
 
+static bool is2DPoolingOp(linalg::LinalgOp op) {
+  return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNchwSumOp,
+             linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+             linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
+             linalg::PoolingNchwMaxOp>(op.getOperation());
+}
+
 /// Returns true if all the input and output tensor operands of 'op' are fully
 /// dynamic.
 static bool isFullyDynamicOp(linalg::LinalgOp op) {
@@ -192,10 +199,17 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
   bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
+  bool isConvolution =
+      isa<linalg::Conv1DNcwFcwOp, linalg::Conv1DNwcWcfOp, linalg::Conv1DOp,
+          linalg::Conv2DNchwFchwOp, linalg::Conv2DNgchwFgchwOp,
+          linalg::Conv2DNhwcFhwcOp, linalg::Conv2DNhwcHwcfOp,
+          linalg::Conv2DNhwcHwcfQOp, linalg::Conv2DOp,
+          linalg::Conv3DNdhwcDhwcfOp, linalg::Conv3DNdhwcDhwcfQOp,
+          linalg::Conv3DOp>(linalgOp.getOperation());
 
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
-    if (isLinalgGeneric) {
+    if (isLinalgGeneric || isConvolution) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -1463,15 +1477,6 @@ static LogicalResult setRootConfig(
   return failure();
 }
 
-namespace {
-bool is2DPoolingOp(linalg::LinalgOp op) {
-  return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNchwSumOp,
-             linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-             linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
-             linalg::PoolingNchwMaxOp>(op.getOperation());
-}
-}  // namespace
-
 /// Sets lowering configuration for conv ops. See below for supported conv ops.
 static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
                                        linalg::LinalgOp convOp,
@@ -1498,6 +1503,8 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
       convOp, minTileSizes, maxTileSizes, /*allowIncompleteTile=*/false,
       vectorSizeHints);
 
+  auto vecPreProcStrategy = getVectorPreProcStrategy(convOp);
+
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   SmallVector<int64_t, 4> shapes = convOp.getStaticLoopRanges();
   SmallVector<int64_t> parallelTileSizes(targetTileSizes.begin(),
@@ -1508,12 +1515,16 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
     // The ops will be decomposed to lower-rank named ops.
     if (parallelTileSizes[i] != 1) {
       parallelTileSizes[i] =
-          getMaxTileSize(0, tileSize, parallelTileSizes[i], vectorSize);
+          getMaxTileSize(0, tileSize, parallelTileSizes[i], vectorSize,
+                         /*allowIncompleteTile=*/false,
+                         /*enforcePowerOfTwo=*/vecPreProcStrategy ==
+                             VectorPreProcStrategy::Masking);
     }
   }
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
-  setAlwaysVectorizeSizes(convOp, parallelTileSizes, reductionTileSizes);
+  setVectorSizesForDynamicShapes(convOp, vecPreProcStrategy, parallelTileSizes,
+                                 reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
