@@ -93,13 +93,10 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
         loc, IntegerType::get(builder.getContext(), 64),
         builder.getI64IntegerAttr(offset));
     Value shiftedPtr = builder.create<LLVM::GEPOp>(
-        loc, globalPtr.getType(), globalPtr, ValueRange({zero, offsetValue}));
-    Value castPtr = builder.create<LLVM::BitcastOp>(
-        loc,
-        LLVM::LLVMPointerType::get(globalOp.getContext(),
-                                   global.getAddrSpace()),
-        shiftedPtr);
-    addressOfOp.replaceAllUsesWith(castPtr);
+        loc, globalPtr.getType(),
+        LLVM::LLVMPointerType::get(globalOp.getContext()), globalPtr,
+        ValueRange({zero, offsetValue}));
+    addressOfOp.replaceAllUsesWith(shiftedPtr);
     addressOfOp.erase();
   }
   // Add the amount of shared memory required as an attribute.
@@ -379,21 +376,13 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
                             rewriter.getUnitAttr());
     }
     // Add the byte offset.
-    Value llvmBufferBasei8Ptr = rewriter.create<LLVM::BitcastOp>(
-        loc,
-        LLVM::LLVMPointerType::get(rewriter.getContext(),
-                                   llvmBufferArg.getType()
-                                       .cast<LLVM::LLVMPointerType>()
-                                       .getAddressSpace()),
-        llvmBufferArg);
+    Value llvmBufferBasePtr = llvmBufferArg;
     if (adaptor.getByteOffset()) {
-      llvmBufferBasei8Ptr = rewriter.create<LLVM::GEPOp>(
-          loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
+      llvmBufferBasePtr = rewriter.create<LLVM::GEPOp>(
+          loc, llvmBufferBasePtr.getType(),
+          LLVM::LLVMPointerType::get(rewriter.getContext()), llvmBufferBasePtr,
           adaptor.getByteOffset());
     }
-    auto llvmPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
-    Value llvmBufferBasePtr =
-        rewriter.create<LLVM::BitcastOp>(loc, llvmPtrType, llvmBufferBasei8Ptr);
     if (memrefType.hasStaticShape()) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);

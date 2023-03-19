@@ -467,18 +467,6 @@ LLVM::LLVMStructType HALDispatchABI::getWorkgroupStateType(
 // static
 SmallVector<Type, 5> HALDispatchABI::getInputTypes(
     MLIRContext *context, LLVMTypeConverter *typeConverter) {
-  auto environmentType = LLVM::LLVMStructType::getIdentified(
-      context, "iree_hal_executable_environment_v0_t");
-  assert(environmentType &&
-         "environment type must be defined by ConvertToLLVM");
-  auto dispatchStateType = LLVM::LLVMStructType::getIdentified(
-      context, "iree_hal_executable_dispatch_state_v0_t");
-  assert(dispatchStateType &&
-         "dispatch state type must be defined by ConvertToLLVM");
-  auto workgroupStateType = LLVM::LLVMStructType::getIdentified(
-      context, "iree_hal_executable_workgroup_state_v0_t");
-  assert(workgroupStateType &&
-         "workgroup state type must be defined by ConvertToLLVM");
   return SmallVector<Type, 5>{
       // const iree_hal_executable_environment_v0_t* IREE_RESTRICT
       //   environment
@@ -693,8 +681,11 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
       loadFieldValue(forOp, DispatchStateField::push_constants, builder);
   auto offsetValue = getIndexValue(loc, offset, builder);
   Value constantPtrValue = builder.create<LLVM::GEPOp>(
-      loc, constantsPtrValue.getType(), constantsPtrValue, offsetValue);
-  Value constantValue = builder.create<LLVM::LoadOp>(loc, constantPtrValue);
+      loc, constantsPtrValue.getType(),
+      LLVM::LLVMPointerType::get(builder.getContext()), constantsPtrValue,
+      offsetValue);
+  Value constantValue =
+      builder.create<LLVM::LoadOp>(loc, resultType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
   return buildValueDI(
       forOp, resultValue,
@@ -719,8 +710,12 @@ Value HALDispatchABI::loadBindingPtr(Operation *forOp, int64_t ordinal,
       loadFieldValue(forOp, DispatchStateField::binding_ptrs, builder);
   auto ordinalValue = getIndexValue(loc, ordinal, builder);
   auto elementPtrValue = builder.create<LLVM::GEPOp>(
-      loc, ptrsPtrValue.getType(), ptrsPtrValue, ordinalValue);
-  auto elementValue = builder.create<LLVM::LoadOp>(loc, elementPtrValue);
+      loc, ptrsPtrValue.getType(),
+      LLVM::LLVMPointerType::get(builder.getContext()), ptrsPtrValue,
+      ordinalValue);
+  auto elementValue = builder.create<LLVM::LoadOp>(
+      loc, mlir::LLVM::LLVMPointerType::get(builder.getContext()),
+      elementPtrValue);
   return buildValueDI(
       forOp, elementValue,
       StringRef("binding_ptrs[") + std::to_string(ordinal) + "]",
@@ -755,23 +750,20 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
 
   // Adjust by baseOffset (if needed).
   if (baseOffsetValue) {
-    basePtrValue = builder.create<LLVM::GEPOp>(loc, basePtrValue.getType(),
-                                               basePtrValue, baseOffsetValue);
+    basePtrValue = builder.create<LLVM::GEPOp>(
+        loc, basePtrValue.getType(), LLVM::LLVMPointerType::get(context),
+        basePtrValue, baseOffsetValue);
   }
 
   // NOTE: if we wanted to check the range was in bounds here would be the
   // place to do it.
-
-  // Cast to the desired memref element type.
-  Value typedPtrValue = builder.create<LLVM::BitcastOp>(
-      loc, LLVM::LLVMPointerType::get(context), basePtrValue);
 
   // Construct the MemRefDescriptor type based on the information we have.
   // NOTE: we could use the binding length to clamp this/check that the
   // requested range is valid.
   if (memRefType.hasStaticShape()) {
     return MemRefDescriptor::fromStaticShape(builder, loc, *typeConverter,
-                                             memRefType, typedPtrValue);
+                                             memRefType, basePtrValue);
   } else {
     assert(memRefType.getNumDynamicDims() == dynamicDims.size());
     int64_t rank = memRefType.getRank();
@@ -779,8 +771,8 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
     // Build MemRef descriptor for this interface binding.
     auto desc = MemRefDescriptor::undef(builder, loc,
                                         typeConverter->convertType(memRefType));
-    desc.setAllocatedPtr(builder, loc, typedPtrValue);
-    desc.setAlignedPtr(builder, loc, typedPtrValue);
+    desc.setAllocatedPtr(builder, loc, basePtrValue);
+    desc.setAlignedPtr(builder, loc, basePtrValue);
     desc.setConstantOffset(builder, loc, 0);
 
     // Update memref descriptor shape. Dynamic dimensions can be mixed with
