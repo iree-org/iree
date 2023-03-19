@@ -92,6 +92,11 @@ Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 /// Return true if the given memref has workgroup memory space.
 bool hasSharedMemoryAddressSpace(MemRefType memrefType);
 
+/// Utilities to pack/unpack vector for shuffle instructions
+Value packVectorToSupportedWidth(Location loc, OpBuilder &builder, Value input);
+Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
+                     VectorType targetVecType);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

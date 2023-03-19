@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -520,6 +521,11 @@ static bool isLaneId(int dimType) {
           (dimType == DimType::LaneIdZ));
 }
 
+static bool isVectorId(int dimType) {
+  return ((dimType == DimType::VecIdX) || (dimType == DimType::VecIdY) ||
+          (dimType == DimType::VecIdZ));
+}
+
 static int getLaneIdIndex(std::array<int, 4> &order) {
   for (int i = 0; i < 4; i++) {
     if (isLaneId(order[i])) return i;
@@ -533,6 +539,14 @@ static int isSingleLaneIdReduced(std::array<int, 4> &order) {
     if (isLaneId(order[i])) count++;
   }
   return count == 1;
+}
+
+static int getVecSizes(std::array<int, 4> &order, const Layout &layout) {
+  int size = 1;
+  for (int i = 0; i < 4; i++) {
+    if (isVectorId(i)) size *= layout.shape[i];
+  }
+  return size;
 }
 
 static Value createReductionOp(vector::CombiningKind combiningKind, Value lhs,
@@ -551,6 +565,26 @@ static Value createReductionOp(vector::CombiningKind combiningKind, Value lhs,
 
 using Triplet = std::tuple<vector::MultiDimReductionOp, vector::BroadcastOp,
                            vector::TransposeOp>;
+using bodyType = std::function<void(std::array<int, DimType::NumDims> &)>;
+
+template <std::size_t T>
+void iterate(int dimType, std::array<int, T> &order,
+             std::array<int, DimType::NumDims> &state, const Layout &layout,
+             bodyType body) {
+  if (dimType == DimType::NumDims) {
+    body(state);
+    return;
+  }
+  if ((std::find(order.begin(), order.end(), dimType) != order.end()) &&
+      (!isLaneId(dimType))) {
+    for (int i = 0; i < layout.shape[dimType]; i++) {
+      state[dimType] = i;
+      iterate(dimType + 1, order, state, layout, body);
+    }
+  } else {
+    iterate(dimType + 1, order, state, layout, body);
+  }
+}
 
 void distributeReductionBroadcastTranspose(
     vector::MultiDimReductionOp reductionOp, DenseMap<Value, Layout> &layoutMap,
@@ -581,6 +615,7 @@ void distributeReductionBroadcastTranspose(
   Layout layout = layoutMap.at(source);
   auto reductionDims = llvm::to_vector<4>(
       reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  vector::CombiningKind combiningKind = reductionOp.getKind();
   // Only support reduction on one dimension
   if (reductionDims.size() > 1) return;
   int reductionDim = reductionDims[0].getInt();
@@ -597,95 +632,85 @@ void distributeReductionBroadcastTranspose(
   Value output = rewriter.create<arith::ConstantOp>(
       loc, vecType, rewriter.getZeroAttr(vecType));
 
-  std::function<void(int, std::array<int, 4> &,
-                     std::array<int, DimType::NumDims> &,
-                     std::function<void(std::array<int, DimType::NumDims> &)>)>
-      iterate =
-          [&](int dimType, std::array<int, 4> &order,
-              std::array<int, DimType::NumDims> &state,
-              std::function<void(std::array<int, DimType::NumDims> &)> body) {
-            if (dimType == DimType::NumDims) {
-              body(state);
-              return;
-            }
-            if ((std::find(order.begin(), order.end(), dimType) !=
-                 order.end()) &&
-                (!isLaneId(dimType))) {
-              for (int i = 0; i < layout.shape[dimType]; i++) {
-                state[dimType] = i;
-                iterate(dimType + 1, order, state, body);
-              }
-            } else {
-              iterate(dimType + 1, order, state, body);
-            }
-          };
+  if (!isSingleLaneIdReduced(reductionOrder)) return;
+  int dimIndex = getLaneIdIndex(reductionOrder);
+  int dimType = reductionOrder[dimIndex];
+  int offset{0};
+  switch (dimType) {
+    case DimType::LaneIdX:
+      offset = 1;
+      break;
+    case DimType::LaneIdY:
+      offset = layout.shape[DimType::LaneIdX];
+      break;
+    case DimType::LaneIdZ:
+      offset = layout.shape[DimType::LaneIdX] * layout.shape[DimType::LaneIdY];
+      break;
+  }
 
-  std::function<void(std::array<int, DimType::NumDims> &)> loopBody =
-      [&](std::array<int, DimType::NumDims> &state) {
-        Value result = rewriter.create<arith::ConstantOp>(
-            loc, rewriter.getFloatAttr(elementType, floatValue));
-        vector::CombiningKind combiningKind = reductionOp.getKind();
-        // First do reduction on values local to thread
-        auto threadLocalReduce = [&](std::array<int, DimType::NumDims> &state) {
-          Value v = rewriter.create<vector::ExtractOp>(
-              loc, simdToSimtMap.at(source),
-              SmallVector<int64_t>{
-                  state[DimType::Batch0], state[DimType::Batch1],
-                  state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
-                      state[DimType::VecIdZ],
-                  state[DimType::VecIdX]});
-          result = createReductionOp(combiningKind, v, result, loc, rewriter);
-        };
-        iterate(0, reductionOrder, state, threadLocalReduce);
+  bodyType loopBody = [&](std::array<int, DimType::NumDims> &state) {
+    Value result = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getFloatAttr(elementType, floatValue));
 
-        // Next reduce across threads
-        // Restrict to reductions that only reduce a single lane id dim at a
-        // time
-        if (!isSingleLaneIdReduced(reductionOrder)) return;
-        int dimIndex = getLaneIdIndex(reductionOrder);
-        int dimType = reductionOrder[dimIndex];
-        int offset{0};
-        switch (dimType) {
-          case DimType::LaneIdX:
-            offset = 1;
-            break;
-          case DimType::LaneIdY:
-            offset = layout.shape[DimType::LaneIdX];
-            break;
-          case DimType::LaneIdZ:
-            offset =
-                layout.shape[DimType::LaneIdX] * layout.shape[DimType::LaneIdY];
-            break;
-        }
-        uint32_t size{32};
-        result =
-            rewriter.create<arith::ExtFOp>(loc, rewriter.getF32Type(), result);
-        for (uint64_t i = offset; i < layout.shape[dimType]; i <<= 1) {
-          Value newResult = rewriter
-                                .create<gpu::ShuffleOp>(loc, result, i, size,
-                                                        gpu::ShuffleMode::XOR)
-                                .getShuffleResult();
-          result = createReductionOp(combiningKind, newResult, result, loc,
-                                     rewriter);
-        }
-        result = rewriter.create<arith::TruncFOp>(loc, rewriter.getF16Type(),
-                                                  result);
+    auto reduce = [&](std::array<int, DimType::NumDims> &state) {
+      Value vector = simdToSimtMap.at(source);
+      int vectorOffset =
+          state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
+          state[DimType::VecIdZ];
+      if (std::find(reductionOrder.begin(), reductionOrder.end(),
+                    DimType::VecIdX) == reductionOrder.end()) {
+        vector = rewriter.create<vector::TransposeOp>(
+            loc, vector, ArrayRef<int64_t>{0, 1, 3, 2});
+        vectorOffset = state[DimType::VecIdX];
+      }
 
-        auto broadcastResult = [&](std::array<int, DimType::NumDims> &state) {
-          output = rewriter.create<vector::InsertOp>(
-              loc, result, output,
-              SmallVector<int64_t>{
-                  state[DimType::Batch0], state[DimType::Batch1],
-                  state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
-                      state[DimType::VecIdZ],
-                  state[DimType::VecIdX]});
-        };
-        // Broadcast result to same shape as original
-        iterate(0, reductionOrder, state, broadcastResult);
-      };
+      vector = rewriter.create<vector::ExtractOp>(
+          loc, vector,
+          SmallVector<int64_t>{state[DimType::Batch0], state[DimType::Batch1],
+                               vectorOffset});
+      ArrayRef<int64_t> vShape = vector.getType().cast<VectorType>().getShape();
+      assert(vShape.size() == 1);
+
+      uint32_t size{32};
+      for (uint64_t i = offset; i < layout.shape[dimType]; i <<= 1) {
+        Value packed = packVectorToSupportedWidth(loc, rewriter, vector);
+        auto shuffleOp = rewriter.create<gpu::ShuffleOp>(loc, packed, i, size,
+                                                         gpu::ShuffleMode::XOR);
+        Value unpacked =
+            unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
+                           vector.getType().cast<VectorType>());
+        vector =
+            createReductionOp(combiningKind, unpacked, vector, loc, rewriter);
+      }
+
+      for (int i = 0; i < vShape[0]; i++) {
+        Value v = rewriter.create<vector::ExtractOp>(loc, vector,
+                                                     SmallVector<int64_t>{i});
+        result = createReductionOp(combiningKind, result, v, loc, rewriter);
+      }
+    };
+
+    // Iterate only over batch dimension
+    std::array<int, 1> batchDim = {{reductionOrder.back()}};
+    iterate(0, batchDim, state, layout, reduce);
+
+    auto broadcastResult = [&](std::array<int, DimType::NumDims> &state) {
+      output = rewriter.create<vector::InsertOp>(
+          loc, result, output,
+          SmallVector<int64_t>{
+              state[DimType::Batch0], state[DimType::Batch1],
+              state[DimType::VecIdY] * layout.shape[DimType::VecIdZ] +
+                  state[DimType::VecIdZ],
+              state[DimType::VecIdX]});
+    };
+
+    // Broadcast result to same shape as original
+    iterate(0, reductionOrder, state, layout, broadcastResult);
+  };
 
   std::array<int, DimType::NumDims> state;
-  iterate(0, parallelOrder, state, loopBody);
+  state.fill(0);
+  iterate(0, parallelOrder, state, layout, loopBody);
 
   if (transposeOp)
     simdToSimtMap.try_emplace(transposeOp.getResult(), output);
