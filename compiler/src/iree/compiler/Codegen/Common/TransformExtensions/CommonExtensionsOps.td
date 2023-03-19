@@ -329,10 +329,9 @@ def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
 
 def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformOpInterface,
-     TransformEachOpTrait]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     Target the whole hal.executable_variant op and rewrite the unique topLevel
     scf.forall to distributed workgroup_id and workgroup_count.
@@ -361,23 +360,19 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
     topLevel tile_to_forall_op.
 
     If the unique topLevel scf.forall operation contained within the
-    FuncOp referred to by the `target` PDLOperation lowers to workgroup properly,
-    the transform succeeds. Otherwise the transform definitely fails.
+    FuncOp referred to by the `target` transform handle lowers to workgroup 
+    properly, the transform succeeds.
+    
+    Otherwise the transform definitely fails.
 
-    The returned handle points to the same FuncOp operand, consuming it and
-    producing a new SSA value to satisfy chaining and linearity of the IR
-    properties.
+    This transform does not consume its input handle and produces no result.
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs TransformHandleTypeInterface:$transformed);
+  let results = (outs);
 
   let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(

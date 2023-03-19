@@ -20,5 +20,5 @@ transform.sequence failures(propagate) {
 
   // Step 3. Post-bufferization mapping workgroup.
   // =========================================================
-  %foo = transform.iree.forall_to_workgroup %memref_func : (!pdl.operation) -> (!pdl.operation)
+  transform.iree.forall_to_workgroup %memref_func : (!pdl.operation) -> ()
 }

@@ -53,17 +53,6 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // IREE-specific LLVMGPU transformations.
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::MapNestedForallToGpuThreadsOp::build(
-    OpBuilder &builder, OperationState &result, Value target,
-    ArrayRef<int64_t> workgroupSize) {
-  result.addOperands(target);
-  result.addAttribute(
-      MapNestedForallToGpuThreadsOp::getWorkgroupSizeAttrName(result.name),
-      builder.getI64ArrayAttr(workgroupSize));
-  MLIRContext *ctx = builder.getContext();
-  result.addTypes({pdl::OperationType::get(ctx)});
-}
-
 // TODO: if the number of threads was wired like the workgroup_count, we could
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
@@ -87,8 +76,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     return emitDefaultDefiniteFailure(target);
   }
 
-  SmallVector<int64_t> workgroupSize =
-      extractFromI64ArrayAttr(getWorkgroupSize());
+  SmallVector<int64_t> workgroupSize{getWorkgroupDims()};
   // TODO: no magic constant but IREE uses this extensively.
   workgroupSize.resize(/*size=*/3, /*value=*/1);
 

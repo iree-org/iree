@@ -32,7 +32,7 @@ transform.sequence failures(propagate) {
   %func = transform.structured.match ops{["func.func"]} in %module
     : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func { unroll_vectors_gpu_wmma } : (!pdl.operation) -> ()
-  transform.iree.vector.vector_to_mma_conversion %func { use_wmma }
+  transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!pdl.operation) -> ()
 
   // Apply canonicalization post-hoc to trigger DCE and pass the test 
   // (i.e. all vector.contract are dead).
@@ -72,7 +72,7 @@ transform.sequence failures(propagate) {
   %func = transform.structured.match ops{["func.func"]} in %module
     : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func { unroll_vectors_gpu_mma_sync } : (!pdl.operation) -> ()
-  transform.iree.vector.vector_to_mma_conversion %func { use_mma_sync }
+  transform.iree.vector.vector_to_mma_conversion %func { use_mma_sync } : (!pdl.operation) -> ()
 
   // Apply canonicalization post-hoc to trigger DCE and pass the test 
   // (i.e. all vector.contract are dead).

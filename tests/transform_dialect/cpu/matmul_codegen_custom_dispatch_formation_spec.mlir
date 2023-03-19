@@ -17,7 +17,7 @@ transform.sequence failures(propagate) {
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!pdl.operation) -> ()
-  %memref_func_2 = transform.iree.forall_to_workgroup %memref_func : (!pdl.operation) -> (!pdl.operation)
+  transform.iree.forall_to_workgroup %memref_func : (!pdl.operation) -> ()
 
   // CSE is needed on the workgroup_count region to pass this particular test.
   transform.iree.apply_patterns %variant_op_3 { cse } : (!pdl.operation) -> ()

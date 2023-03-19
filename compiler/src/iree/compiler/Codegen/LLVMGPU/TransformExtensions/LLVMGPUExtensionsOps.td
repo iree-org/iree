@@ -99,10 +99,6 @@ def MapNestedForallToGpuThreadsOp :
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let builders = [
-    OpBuilder<(ins "Value":$target, "ArrayRef<int64_t>":$workgroupSize)>
-  ];
-
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::func::FuncOp target,

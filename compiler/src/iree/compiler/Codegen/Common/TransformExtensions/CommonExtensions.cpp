@@ -548,14 +548,6 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
 // ForallToWorkgroupOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::ForallToWorkgroupOp::build(OpBuilder &builder,
-                                                   OperationState &result,
-                                                   Value target) {
-  result.addOperands(target);
-  MLIRContext *ctx = builder.getContext();
-  result.addTypes({pdl::OperationType::get(ctx)});
-}
-
 /// Populate the workgroup_count region of `dispatchOp`.
 /// For now, this only supports constant index ops and empty workload
 /// operands. Assumes the HAL::ExecutableExportOp is built with an empty
@@ -743,7 +735,6 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
     if (op.getSymName() == target.getName()) exportOp = op;
   });
   if (!exportOp) {
-    results.assign(1, nullptr);
     return mlir::emitSilenceableFailure(
         target, "no IREE::HAL::ExecutableExportOp found");
   }
@@ -758,7 +749,6 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
   });
 
   if (walkResult.wasInterrupted()) {
-    results.assign(1, nullptr);
     return mlir::emitSilenceableFailure(
         target, "could not find a unique topLevel scf.forall");
   }
@@ -768,8 +758,13 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
     return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
   }
 
-  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ForallToWorkgroupOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//
