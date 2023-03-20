@@ -67,17 +67,23 @@ static LogicalResult getTileAndDistributeConfig(
     SmallVectorImpl<int64_t> &interchange,
     SmallVectorImpl<unsigned> &partitionableLoops) {
   // Find the lowering configuration of the root operation.
-  FailureOr<Operation *> rootOp = getLoweringConfigCarryingOp(computeOps);
-  if (failed(rootOp)) {
+  Operation *rootOp = nullptr;
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (getLoweringConfig(op)) {
+      rootOp = op;
+      break;
+    }
+  }
+  if (!rootOp) {
     // Just return. All the in-out vectors are empty that should default
     // the number of workgroups to {1, 1, 1}
     dispatchRootOp = nullptr;
     return success();
   }
-  dispatchRootOp = rootOp.value();
+  dispatchRootOp = rootOp;
 
   auto partitionableLoopInterface =
-      dyn_cast<PartitionableLoopsInterface>(*rootOp);
+      dyn_cast<PartitionableLoopsInterface>(rootOp);
   if (!partitionableLoopInterface) {
     // Just return. All the in-out vectors are empty that should default
     // the number of workgroups to {1, 1, 1}
@@ -86,9 +92,9 @@ static LogicalResult getTileAndDistributeConfig(
 
   partitionableLoops =
       partitionableLoopInterface.getPartitionableLoops(std::nullopt);
-  IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(*rootOp);
+  IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(rootOp);
   if (!rootOpConfig) {
-    return rootOp.value()->emitOpError(
+    return rootOp->emitOpError(
         "unable to find configuration of root op to define workgroup count "
         "region");
   }
@@ -203,6 +209,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     // slowest varying.
     SmallVector<Value> numWorkgroups;
     for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
+      if (partitionedLoop >= tileSizes.size()) continue;
       if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
       Value numTileAlongDim = getValueOrCreateConstantIndexOp(
           rewriter, loc, numTiles[partitionedLoop]);

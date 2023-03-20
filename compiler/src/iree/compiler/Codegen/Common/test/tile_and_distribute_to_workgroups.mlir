@@ -2292,3 +2292,42 @@ hal.executable private @elem_pack {
 // CHECK-DAG:         flow.dispatch.tensor.store %[[PACK]], {{.*}} sizes = [8, 64, 8, 1]
 // CHECK-DAG:         flow.dispatch.tensor.store %[[ELEM]]#0, {{.*}} sizes = [64, 64]
 // CHECK-DAG:         flow.dispatch.tensor.store %[[ELEM]]#1, {{.*}} sizes = [64, 64]
+
+// -----
+
+hal.executable private @scatter {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+  hal.executable.export public @scatter ordinal(0) 
+  layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
+  attributes {translation_info = #iree_codegen.translation_info<LLVMGPUDistribute>, workgroup_size = [1 : index, 1 : index, 1 : index]} {
+  ^bb0(%arg0: !hal.device, %arg1: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @scatter() {
+      %c228075520 = arith.constant 228075520 : index
+      %c251668480 = arith.constant 251668480 : index
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c228075520) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<5898240xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c251668480) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<5898240x4xi32>>
+      %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x640x48x48xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [5898240], strides = [1] : !flow.dispatch.tensor<readonly:tensor<5898240xf32>> -> tensor<5898240xf32>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [5898240, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<5898240x4xi32>> -> tensor<5898240x4xi32>
+      %5 = tensor.empty() : tensor<1x640x48x48xf32>
+      %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[]]>} ins(%cst : f32) outs(%5 : tensor<1x640x48x48xf32>) -> tensor<1x640x48x48xf32>
+      %7 = iree_linalg_ext.scatter {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[]]>} dimension_map = [0, 1, 2, 3] unique_indices(false) ins(%3, %4 : tensor<5898240xf32>, tensor<5898240x4xi32>) outs(%6 : tensor<1x640x48x48xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32):
+        %8 = arith.addf %arg1, %arg0 : f32
+        iree_linalg_ext.yield %8 : f32
+      } -> tensor<1x640x48x48xf32>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 640, 48, 48], strides = [1, 1, 1, 1] : tensor<1x640x48x48xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x640x48x48xf32>>
+      return
+    }
+  }
+}
+}
+
+// CHECK-LABEL: func.func @scatter
+//       CHECK:   iree_linalg_ext.scatter
