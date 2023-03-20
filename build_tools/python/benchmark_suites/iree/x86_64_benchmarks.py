@@ -27,14 +27,6 @@ class Linux_x86_64_Benchmarks(object):
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE,
       tags=["default-flags"],
       compile_targets=[CASCADELAKE_CPU_TARGET])
-  CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
-      id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_FUSE_PADDING,
-      tags=["experimental-flags", "fuse-padding"],
-      compile_targets=[CASCADELAKE_CPU_TARGET],
-      extra_flags=[
-          "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-          "--iree-llvmcpu-enable-pad-consumer-fusion"
-      ])
 
   def generate(
       self
@@ -47,15 +39,6 @@ class Linux_x86_64_Benchmarks(object):
             compile_config=self.CASCADELAKE_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in model_groups.SMALL + model_groups.LARGE
-    ]
-    # TODO(#11174): Excludes ResNet50
-    excluded_models_for_experiments = [tf_models.RESNET50_TF_FP32]
-    gen_configs += [
-        iree_definitions.ModuleGenerationConfig.build(
-            compile_config=self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in model_groups.SMALL + model_groups.LARGE
-        if model not in excluded_models_for_experiments
     ]
     default_execution_configs = [
         module_execution_configs.ELF_LOCAL_SYNC_CONFIG

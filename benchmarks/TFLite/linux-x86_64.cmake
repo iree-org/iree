@@ -187,8 +187,6 @@ iree_benchmark_suite(
     "CPU-x86_64-CascadeLake"
   COMPILATION_FLAGS
     ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -221,8 +219,6 @@ iree_benchmark_suite(
     "CPU-x86_64-CascadeLake"
   COMPILATION_FLAGS
     ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -257,8 +253,6 @@ iree_benchmark_suite(
     "CPU-x86_64-CascadeLake"
   COMPILATION_FLAGS
     ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -293,8 +287,6 @@ iree_benchmark_suite(
     "CPU-x86_64-CascadeLake"
   COMPILATION_FLAGS
     ${LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
