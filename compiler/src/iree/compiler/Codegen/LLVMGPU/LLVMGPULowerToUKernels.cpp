@@ -47,9 +47,9 @@ static std::string generateMicrokernelName(ArrayRef<Operation *> combinedOps,
                                            int TILE_N, int TILE_K,
                                            int numstages, bool has_fill,
                                            bool writeback_to_global) {
-  uGPUKernel ukernel(typeName.str(), typeName.str(), {TILE_M, TILE_N, TILE_K},
-                     numstages, has_fill, writeback_to_global);
-  return ukernel.generate_ukernel_name();
+  return generate_ukernel_name(typeName.str(), typeName.str(), typeName.str(),
+                               TILE_M, TILE_N, TILE_K, numstages, has_fill,
+                               writeback_to_global);
 }
 
 static FailureOr<StringRef> returnCtype(Type type) {

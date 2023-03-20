@@ -8,11 +8,12 @@
 #define IREE_COMPILER_CODEGEN_UCUDAKERNELS_CONTRACT_H_
 
 #include <array>
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <numeric>
-#include <set>
 #include <string>
+#include <vector>
 
 #define INT int64_t
 
@@ -29,32 +30,24 @@ struct uGPUKernel {
   bool has_linalg_fill;
   bool writeback_to_global;
 
-  uGPUKernel(std::string lhs, std::string result, std::array<INT, 3> tileSize,
-             INT numstages, bool hasFill, bool writeback2Global) {
-    // todo(guray) needs to be verification here.
-    LHS = RHS = lhs;
+  uGPUKernel(std::string lhs, std::string rhs, std::string result,
+             std::array<INT, 3> tileSize, std::array<INT, 2> warpShape,
+             std::array<INT, 3> instShape, INT numStages, bool hasFill,
+             bool writeback2Global) {
+    LHS = lhs;
+    RHS = rhs;
     RESULT = result;
     ThreadblockShape[0] = tileSize[0];
     ThreadblockShape[1] = tileSize[1];
     ThreadblockShape[2] = tileSize[2];
-    WarpShape = {64, 64};
-    InstShape = {16, 8, 8};
-    stages = numstages;
+    WarpShape[0] = warpShape[0];
+    WarpShape[1] = warpShape[1];
+    InstShape[0] = instShape[0];
+    InstShape[1] = instShape[1];
+    InstShape[2] = instShape[2];
+    stages = numStages;
     has_linalg_fill = hasFill;
     writeback_to_global = writeback2Global;
-  }
-
-  bool operator<(const uGPUKernel& e) const {
-    // todo(guray) improve here
-    bool result = true;
-    if ((ThreadblockShape[0] == e.ThreadblockShape[0] &&
-         ThreadblockShape[1] == e.ThreadblockShape[1] &&
-         ThreadblockShape[2] == e.ThreadblockShape[2] &&
-         has_linalg_fill == e.has_linalg_fill &&
-         writeback_to_global == e.writeback_to_global)) {
-      result = false;
-    }
-    return result;
   }
 
   std::string generate_ukernel_name() {
@@ -88,31 +81,45 @@ struct uGPUKernel {
   }
 };
 
+static std::string generate_ukernel_name(std::string LHS, std::string RHS,
+                                         std::string RES, int TILE_M,
+                                         INT TILE_N, INT TILE_K, INT numStages,
+                                         bool hasFill, bool writeback2Global) {
+  if (LHS == RHS && LHS == "float") {
+    uGPUKernel ukernel(LHS, RHS, RES, {TILE_M, TILE_N, TILE_K}, {64, 64},
+                       {16, 8, 8}, numStages, hasFill, writeback2Global);
+    return ukernel.generate_ukernel_name();
+  }
+  // todo(guray) not supported types
+  assert(true);  
+}
+
 /// This is responsible for generating microkernels contracts. The contracts are
 /// used in two places. First uCUDAKernelGenerator.cpp (microkernel generator)
 /// uses for generatation. Second, it is used in the compiler to make sure we
 /// have precompiled microkernel.
 struct uGPUContracts {
-  std::set<uGPUKernel> ukernels;
+  std::vector<uGPUKernel> ukernels;
 
-  void generateVariant(std::string lhs, std::string result,
-                       std::array<INT, 3> tileSize, INT stages) {
-    ukernels.insert(uGPUKernel(lhs, result, tileSize, stages, false, false));
-    ukernels.insert(uGPUKernel(lhs, result, tileSize, stages, true, true));
-    ukernels.insert(uGPUKernel(lhs, result, tileSize, stages, false, true));
-    ukernels.insert(uGPUKernel(lhs, result, tileSize, stages, true, false));
+  void generateVariant(std::string lhs, std::string rhs, std::string res,
+                       std::array<INT, 3> ts, std::array<INT, 2> ws,
+                       std::array<INT, 3> is, INT s) {
+    ukernels.push_back(uGPUKernel(lhs, rhs, res, ts, ws, is, s, false, false));
+    ukernels.push_back(uGPUKernel(lhs, rhs, res, ts, ws, is, s, true, true));
+    ukernels.push_back(uGPUKernel(lhs, rhs, res, ts, ws, is, s, false, true));
+    ukernels.push_back(uGPUKernel(lhs, rhs, res, ts, ws, is, s, true, false));
   }
 
   uGPUContracts() {
     ukernels.clear();
     auto t = "float";
     // Pipeline Stages 3
-    generateVariant(t, t, {128, 128, 32}, 3);
-    generateVariant(t, t, {128, 256, 32}, 3);
-    generateVariant(t, t, {256, 128, 32}, 3);
+    generateVariant(t, t, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 3);
+    generateVariant(t, t, t, {128, 256, 32}, {64, 64}, {16, 8, 8}, 3);
+    generateVariant(t, t, t, {256, 128, 32}, {64, 64}, {16, 8, 8}, 3);
     // // Pipeline Stages 5
-    generateVariant(t, t, {128, 128, 16}, 5);
-    generateVariant(t, t, {128, 128, 32}, 5);
+    generateVariant(t, t, t, {128, 128, 16}, {64, 64}, {16, 8, 8}, 5);
+    generateVariant(t, t, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 5);
   }
 };
 
