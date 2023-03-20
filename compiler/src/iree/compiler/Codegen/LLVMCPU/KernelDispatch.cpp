@@ -197,7 +197,8 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
-    if (isLinalgGeneric || isContraction) {
+    if (isLinalgGeneric || isContraction ||
+        isa<linalg::FillOp>(linalgOp.getOperation())) {
       return VectorPreProcStrategy::Masking;
     }
 
