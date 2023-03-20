@@ -619,6 +619,48 @@ struct ScalarizeVectorTransferRead final
   }
 };
 
+struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::LoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    VectorType vectorType = loadOp.getType();
+    if (vectorType.getRank() > 1) return failure();
+
+    Location loc = loadOp.getLoc();
+    if (vectorType.getRank() == 0) {
+      Value scalar = rewriter.create<memref::LoadOp>(loc, loadOp.getBase(),
+                                                     loadOp.getIndices());
+      rewriter.replaceOpWithNewOp<vector::SplatOp>(loadOp, vectorType, scalar);
+      return success();
+    }
+
+    MLIRContext *context = rewriter.getContext();
+    AffineExpr sym0, sym1;
+    bindSymbols(context, sym0, sym1);
+    auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
+
+    // The result vector is 1-D so we just unroll the load along the last index.
+    unsigned dimPos = loadOp.getBase().getType().getRank() - 1;
+
+    auto indices = llvm::to_vector<4>(loadOp.getIndices());
+    Value oldIndex = indices[dimPos];
+
+    Value newVector = rewriter.create<arith::ConstantOp>(
+        loc, vectorType, rewriter.getZeroAttr(vectorType));
+    for (int i = 0; i < vectorType.getDimSize(0); ++i) {
+      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      indices[dimPos] = rewriter.create<AffineApplyOp>(
+          loc, addMap, ValueRange{oldIndex, iVal});
+      Value scalar =
+          rewriter.create<memref::LoadOp>(loc, loadOp.getBase(), indices);
+      newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
+    }
+    rewriter.replaceOp(loadOp, newVector);
+    return success();
+  }
+};
+
 struct ScalarizeVectorTransferWrite final
     : public OpRewritePattern<vector::TransferWriteOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -753,9 +795,8 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
 
   for (func::FuncOp func : module.getOps<func::FuncOp>()) {
     RewritePatternSet rewritingPatterns(context);
-    rewritingPatterns
-        .add<ScalarizeVectorTransferRead, ScalarizeVectorTransferWrite>(
-            context);
+    rewritingPatterns.add<ScalarizeVectorTransferRead, ScalarizeVectorLoad,
+                          ScalarizeVectorTransferWrite>(context);
 
     if (failed(
             applyPatternsAndFoldGreedily(func, std::move(rewritingPatterns)))) {

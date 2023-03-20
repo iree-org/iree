@@ -358,3 +358,30 @@ func.func @vectorize_alloc_with_mma_load_store_unaligned_case(%i0: index, %i1: i
 // CHECK-SAME:   leadDimension = 18 : index
 //      CHECK: gpu.subgroup_mma_store_matrix
 // CHECK-SAME:   leadDimension = 18 : index
+
+// -----
+
+// CHECK-LABEL: func.func @scalarize_vector_load_op
+//  CHECK-SAME: (%[[ARG0:.+]]: index)
+func.func @scalarize_vector_load_op(%i: index) -> vector<4xi32> {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<10x10xi32>
+  %1 = vector.load %0[%c0, %i] : memref<10x10xi32>, vector<4xi32>
+  return %1: vector<4xi32>
+}
+
+// CHECK: %[[INIT:.+]] = arith.constant dense<0> : vector<4xi32>
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+// CHECK: %[[LD0:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[ARG0]]] : memref<10x10xi32>
+// CHECK: %[[INSERT0:.+]] = vector.insert %[[LD0]], %[[INIT]] [0] : i32 into vector<4xi32>
+// CHECK: %[[IDX1:.+]] = affine.apply affine_map<()[s0] -> (s0 + 1)>()[%[[ARG0]]]
+// CHECK: %[[LD1:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[IDX1]]] : memref<10x10xi32>
+// CHECK: %[[INSERT1:.+]] = vector.insert %[[LD1]], %[[INSERT0]] [1] : i32 into vector<4xi32>
+// CHECK: %[[IDX2:.+]] = affine.apply affine_map<()[s0] -> (s0 + 2)>()[%[[ARG0]]]
+// CHECK: %[[LD2:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[IDX2]]] : memref<10x10xi32>
+// CHECK: %[[INSERT2:.+]] = vector.insert %[[LD2]], %[[INSERT1]] [2] : i32 into vector<4xi32>
+// CHECK: %[[IDX3:.+]] = affine.apply affine_map<()[s0] -> (s0 + 3)>()[%[[ARG0]]]
+// CHECK: %[[LD3:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[IDX3]]] : memref<10x10xi32>
+// CHECK: %[[INSERT3:.+]] = vector.insert %[[LD3]], %[[INSERT2]] [3] : i32 into vector<4xi32>
+// CHECK: return %[[INSERT3]]
