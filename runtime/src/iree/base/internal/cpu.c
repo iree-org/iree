@@ -167,7 +167,7 @@ static void iree_cpu_initialize_from_platform_x86_64(uint64_t* out_fields) {
   // Features that depend on YMM registers being enabled by the OS.
   if (iree_all_bits_set(leafD.eax, 0x7)) {
     IREE_COPY_BITS(out0, IREE_CPU_DATA0_X86_64_AVX, leaf1.ecx, 1 << 28);
-    IREE_COPY_BITS(out0, IREE_CPU_DATA0_X86_64_FMA3, leaf1.ecx, 1 << 12);
+    IREE_COPY_BITS(out0, IREE_CPU_DATA0_X86_64_FMA, leaf1.ecx, 1 << 12);
     IREE_COPY_BITS(out0, IREE_CPU_DATA0_X86_64_FMA4, leafExt1.ecx, 1 << 16);
     IREE_COPY_BITS(out0, IREE_CPU_DATA0_X86_64_XOP, leafExt1.ecx, 1 << 11);
     IREE_COPY_BITS(out0, IREE_CPU_DATA0_X86_64_F16C, leaf1.ecx, 1 << 29);
