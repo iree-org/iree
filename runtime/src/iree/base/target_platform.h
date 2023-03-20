@@ -65,18 +65,16 @@ enum iree_arch_enum_e {
   IREE_ARCH_ENUM_X86_64,
 };
 
-#if defined(__arm__) || defined(__arm64) || defined(__aarch64__) || \
-    defined(__thumb__) || defined(__TARGET_ARCH_ARM) ||             \
-    defined(__TARGET_ARCH_THUMB) || defined(_M_ARM)
-#if defined(__arm64) || defined(__aarch64__)
+#if defined(__arm64) || defined(__aarch64__) || defined(_M_ARM64) || \
+    defined(_M_ARM64EC)
 #define IREE_ARCH "arm_64"
 #define IREE_ARCH_ENUM IREE_ARCH_ENUM_ARM_64
 #define IREE_ARCH_ARM_64 1
-#else
+#elif defined(__arm__) || defined(__thumb__) || defined(__TARGET_ARCH_ARM) || \
+    defined(__TARGET_ARCH_THUMB) || defined(_M_ARM)
 #define IREE_ARCH "arm_32"
 #define IREE_ARCH_ENUM IREE_ARCH_ENUM_ARM_32
 #define IREE_ARCH_ARM_32 1
-#endif  // __arm64
 #endif  // ARM
 
 #if defined(__riscv) && (__riscv_xlen == 32)
