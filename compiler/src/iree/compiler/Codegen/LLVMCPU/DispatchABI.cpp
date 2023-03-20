@@ -351,8 +351,6 @@ LLVM::LLVMStructType HALDispatchABI::getEnvironmentType(
   // iree_hal_executable_import_thunk_v0_t import_thunk;
   // const iree_hal_executable_import_v0_t* import_funcs;
   // const void** import_contexts;
-  // auto importType = LLVM::LLVMFunctionType::get(
-  //    uint32Type, {opaquePtrType, opaquePtrType, opaquePtrType});
   auto importThunkType = LLVM::LLVMFunctionType::get(
       uint32Type, {opaquePtrType, opaquePtrType, opaquePtrType, opaquePtrType});
   fieldTypes.push_back(LLVM::LLVMPointerType::get(importThunkType));
@@ -378,8 +376,6 @@ LLVM::LLVMStructType HALDispatchABI::getDispatchStateType(
       context, "iree_hal_executable_dispatch_state_v0_t");
   if (structType.isInitialized()) return structType;
 
-  // auto indexType = typeConverter->convertType(IndexType::get(context));
-  // auto int8Type = IntegerType::get(context, 8);
   auto uint8Type = IntegerType::get(context, 8);
   auto uint16Type = IntegerType::get(context, 16);
   auto uint32Type = IntegerType::get(context, 32);
@@ -410,9 +406,9 @@ LLVM::LLVMStructType HALDispatchABI::getDispatchStateType(
   fieldTypes.push_back(uint8Type);
 
   // const uint32_t * push_constants;
-  fieldTypes.push_back(opaquePtrType);
   // void *const * binding_ptrs;
   // const size_t * binding_lengths;
+  fieldTypes.push_back(opaquePtrType);
   fieldTypes.push_back(opaquePtrType);
   fieldTypes.push_back(opaquePtrType);
 
@@ -432,7 +428,6 @@ LLVM::LLVMStructType HALDispatchABI::getWorkgroupStateType(
       context, "iree_hal_executable_workgroup_state_v0_t");
   if (structType.isInitialized()) return structType;
 
-  // auto int8Type = IntegerType::get(context, 8);
   auto uint16Type = IntegerType::get(context, 16);
   auto uint32Type = IntegerType::get(context, 32);
   auto opaquePtrType = LLVM::LLVMPointerType::get(context);
