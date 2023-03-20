@@ -308,7 +308,17 @@ _FILTER_ARCH:_TARGET_CPU_FEATURES. Got: ${_INPUT_TARGET_CPU_FEATURES}")
   # TARGET_CPU_FEATURES_VARIANT is of the form _FILTER_ARCH:_TARGET_CPU_FEATURE.
   list(GET _COMPONENTS 0 _FILTER_ARCH)
   list(GET _COMPONENTS 1 _TARGET_CPU_FEATURES)
-  if(_FILTER_ARCH STREQUAL CMAKE_SYSTEM_PROCESSOR)
+  # Canonicalize the architecture name - some architectures have multiple
+  # possible CMAKE_SYSTEM_PROCESSOR values and this has caused failure to select
+  # architecture-specific code paths. For example, if we assume that on AArch64
+  # the value of CMAKE_SYSTEM_PROCESSOR is "aarch64" then we miss Apple where it
+  # is "arm64".
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+    set(_ARCH "aarch64")
+  else()
+    set(_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+  if(_FILTER_ARCH STREQUAL _ARCH)
     set(_ENABLED "TRUE" PARENT_SCOPE)
     set(_TARGET_CPU_FEATURES "${_TARGET_CPU_FEATURES}" PARENT_SCOPE)
     # TODO: the logic to generate the suffix from the list of target CPU features
