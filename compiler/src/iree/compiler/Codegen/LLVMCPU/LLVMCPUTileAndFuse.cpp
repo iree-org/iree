@@ -201,9 +201,11 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   auto funcOp = getOperation();
 
   TilingInterface consumerOp;
-  funcOp.walk<WalkOrder::PostOrder>([&](TilingInterface op) {
-    if (op.getLoopIteratorTypes().empty()) return;
+  funcOp.walk<WalkOrder::PostOrder, ReverseIterator>([&](TilingInterface op) {
+    // Find the next consumer op if it does not have loops.
+    if (op.getLoopIteratorTypes().empty()) return WalkResult::advance();
     consumerOp = op;
+    return WalkResult::interrupt();
   });
   if (!consumerOp) {
     LLVM_DEBUG(llvm::dbgs() << "----- skip, no consumer op -----\n");
