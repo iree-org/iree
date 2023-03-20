@@ -155,12 +155,14 @@ struct LowerDispatchWorkgroupCountForDagRootOp
                                           ArrayRef<int64_t> staticLoopRanges,
                                           ArrayRef<int64_t> interchange,
                                           ArrayRef<unsigned> partitionedLoops,
+                                          int32_t maxWorkgroupParallelDims,
                                           PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
         givenTileSizes(tileSizes),
         givenStaticLoopRanges(staticLoopRanges),
         givenInterchange(interchange),
-        partitionedLoops(partitionedLoops) {}
+        partitionedLoops(partitionedLoops),
+        maxWorkgroupParallelDims(maxWorkgroupParallelDims) {}
 
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
@@ -212,7 +214,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
       if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
       Value numTileAlongDim = getValueOrCreateConstantIndexOp(
           rewriter, loc, numTiles[partitionedLoop]);
-      if (numWorkgroups.size() == kNumMaxWorkgroupParallelDims) {
+      if (numWorkgroups.size() == maxWorkgroupParallelDims) {
         // IREE runtime only has 3 ID dimensions. After all the num of tiles are
         // combined into one.
         AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
@@ -243,6 +245,8 @@ struct LowerDispatchWorkgroupCountForDagRootOp
 
   /// Loops that are partitioned.
   SmallVector<unsigned> partitionedLoops;
+
+  int32_t maxWorkgroupParallelDims;
 };
 
 /// Pattern to lower a `flow.dispatch.workgroup_count_from_set_encoding` op.
@@ -308,6 +312,8 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
+  TileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims)
+      : maxWorkgroupParallelDims(maxWorkgroupParallelDims) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, IREE::HAL::HALDialect,
@@ -315,16 +321,32 @@ struct TileAndDistributeToWorkgroupsPass
                 scf::SCFDialect, tensor::TensorDialect>();
   }
 
+  void initOptions() {
+    if (TileAndDistributeToWorkgroupsBase::maxWorkgroupParallelDims.hasValue())
+      maxWorkgroupParallelDims =
+          TileAndDistributeToWorkgroupsBase::maxWorkgroupParallelDims
+              .getValue();
+  }
+
   void runOnOperation() override;
+
+ private:
+  int32_t maxWorkgroupParallelDims;
 };
 }  // namespace
 
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
+  initOptions();
   MLIRContext *context = &getContext();
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp innerModule = variantOp.getInnerModule();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> entryPoints =
       getAllEntryPoints(innerModule);
+
+  if (maxWorkgroupParallelDims > kNumMaxParallelDims) {
+    innerModule.emitError(
+        "maxWorkgroupParallelDims set to more than allowed MaxParallelDims");
+  }
 
   for (func::FuncOp funcOp : innerModule.getOps<func::FuncOp>()) {
     auto exportOp = entryPoints.lookup(funcOp.getName());
@@ -345,8 +367,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     {
       RewritePatternSet patterns(context);
       patterns.insert<LowerDispatchWorkgroupCountForDagRootOp>(
-          context, tileSizes, staticLoopRanges, interchange,
-          partitionableLoops);
+          context, tileSizes, staticLoopRanges, interchange, partitionableLoops,
+          maxWorkgroupParallelDims);
       auto res = funcOp.walk([&](tensor::PackOp packOp) -> WalkResult {
         FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
             getMaterializationInfo(packOp);
@@ -470,8 +492,9 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createTileAndDistributeToWorkgroupsPass() {
-  return std::make_unique<TileAndDistributeToWorkgroupsPass>();
+createTileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims) {
+  return std::make_unique<TileAndDistributeToWorkgroupsPass>(
+      maxWorkgroupParallelDims);
 }
 
 }  // namespace iree_compiler

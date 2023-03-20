@@ -43,6 +43,7 @@ iree_lit_test_suite(
     "repeated_matcher_use.mlir"
     "swizzle_workgroup.mlir"
     "test_partitionable_loops_interface.mlir"
+    "tile_and_distribute_max_workgroups.mlir"
     "tile_and_distribute_to_workgroups.mlir"
     "tile_reduction.mlir"
     "transform_buffer_opt.mlir"
