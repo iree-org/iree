@@ -15,7 +15,6 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -82,9 +81,8 @@ static FailureOr<SmallVector<int64_t>> getTilingSizesFromConfig(
 /// Starting from `op` walk all operands backwards to find all
 /// potentially fusable operations, i.e. operations that implement
 /// the `TilingInterface`.
-static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
-    Operation *rootOp) {
-  llvm::SmallDenseSet<Operation *> result;
+static void collectTiledAndFusedOps(Operation *rootOp,
+                                    llvm::SmallDenseSet<Operation *> &result) {
   SmallVector<Operation *> worklist;
   worklist.push_back(rootOp);
   result.insert(rootOp);
@@ -99,9 +97,11 @@ static llvm::SmallDenseSet<Operation *> collectTiledAndFusedOps(
       result.insert(producer);
     }
   }
-  return result;
 }
 
+/// This pass starts with the last TilingInterface operation, tiles the op and
+/// fuses its producers recursively. The `tilingLevel` must be specified. It
+/// picks the `tilingLevel`-th list as tiling sizes from lowering_config.
 struct LLVMCPUTileAndFusePass : LLVMCPUTileAndFuseBase<LLVMCPUTileAndFusePass> {
   LLVMCPUTileAndFusePass(int64_t tilingLevel = -1) {
     this->tilingLevel.setValue(tilingLevel);
@@ -114,10 +114,10 @@ struct LLVMCPUTileAndFusePass : LLVMCPUTileAndFuseBase<LLVMCPUTileAndFusePass> {
   void runOnOperation() override;
 };
 
-LogicalResult applyTileAndFuse(PatternRewriter &rewriter, Operation *rootOp,
+LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
                                scf::SCFTilingOptions options) {
-  llvm::SmallDenseSet<Operation *> origTiledAndFusedOps =
-      collectTiledAndFusedOps(rootOp);
+  llvm::SmallDenseSet<Operation *> origTiledAndFusedOps;
+  collectTiledAndFusedOps(rootOp, origTiledAndFusedOps);
   auto isIgnoredUser = [&](Operation *user, scf::ForOp outerMostTiledLoop) {
     return origTiledAndFusedOps.count(user) || isa<tensor::DimOp>(user) ||
            outerMostTiledLoop->isAncestor(user);
@@ -201,7 +201,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   auto funcOp = getOperation();
 
   TilingInterface consumerOp;
-  funcOp.walk([&](TilingInterface op) {
+  funcOp.walk<WalkOrder::PostOrder>([&](TilingInterface op) {
     if (op.getLoopIteratorTypes().empty()) return;
     consumerOp = op;
   });
@@ -233,7 +233,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   }
 
   auto options = scf::SCFTilingOptions().setTileSizes(tilingSizes);
-  transform::TrivialPatternRewriter rewriter(context);
+  IRRewriter rewriter(context);
   if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
     return signalPassFailure();
