@@ -723,9 +723,11 @@ Value HALDispatchABI::loadBindingLength(Operation *forOp, int64_t ordinal,
   auto lengthsPtrValue =
       loadFieldValue(forOp, DispatchStateField::binding_lengths, builder);
   auto ordinalValue = getIndexValue(loc, ordinal, builder);
+  auto indexType = typeConverter->convertType(IndexType::get(context));
   auto elementPtrValue = builder.create<LLVM::GEPOp>(
-      loc, lengthsPtrValue.getType(), lengthsPtrValue, ordinalValue);
-  auto elementValue = builder.create<LLVM::LoadOp>(loc, elementPtrValue);
+      loc, lengthsPtrValue.getType(), indexType, lengthsPtrValue, ordinalValue);
+  auto elementValue =
+      builder.create<LLVM::LoadOp>(loc, indexType, elementPtrValue);
   return buildValueDI(
       forOp, elementValue,
       StringRef("binding_lengths[") + std::to_string(ordinal) + "]",
@@ -886,14 +888,24 @@ std::pair<Value, Value> HALDispatchABI::loadImportFunc(Operation *forOp,
   auto loc = forOp->getLoc();
   auto funcPtrsValue =
       loadFieldValue(forOp, EnvironmentField::import_funcs, builder);
-  auto funcPtrValue = builder.create<LLVM::GEPOp>(loc, funcPtrsValue.getType(),
-                                                  funcPtrsValue, importOrdinal);
+  auto int8Type = IntegerType::get(context, 8);
+  auto uint32Type = IntegerType::get(context, 32);
+  auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
+  auto importFuncsType = LLVM::LLVMFunctionType::get(
+      uint32Type, {int8PtrType, int8PtrType, int8PtrType});
+
+  auto funcPtrValue =
+      builder.create<LLVM::GEPOp>(loc, funcPtrsValue.getType(), importFuncsType,
+                                  funcPtrsValue, importOrdinal);
+
   auto contextPtrsValue =
       loadFieldValue(forOp, EnvironmentField::import_contexts, builder);
-  auto contextPtrValue = builder.create<LLVM::GEPOp>(
-      loc, contextPtrsValue.getType(), contextPtrsValue, importOrdinal);
-  return std::make_pair(builder.create<LLVM::LoadOp>(loc, funcPtrValue),
-                        builder.create<LLVM::LoadOp>(loc, contextPtrValue));
+  auto contextPtrValue =
+      builder.create<LLVM::GEPOp>(loc, contextPtrsValue.getType(), int8Type,
+                                  contextPtrsValue, importOrdinal);
+  return std::make_pair(
+      builder.create<LLVM::LoadOp>(loc, importFuncsType, funcPtrValue),
+      builder.create<LLVM::LoadOp>(loc, int8Type, contextPtrValue));
 }
 
 Value HALDispatchABI::isImportFuncAvailable(Operation *forOp,
