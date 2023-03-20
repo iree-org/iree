@@ -35,7 +35,14 @@
 //     feature's bit value.
 //   - `llvm_name` is the string name of the corresponding LLVM target attribute
 //     (without a leading +).
-
+//
+// The bit_name should consistently be just the llvm_name uppercase'd and with
+// non-alphanumeric characters dropped. Each CPU feature may have different
+// names in each compiler, in each OS, and in the ISA manual, so we can't be
+// consistent with everything. This matters particularly because we sometimes
+// have side by side a compile-time (#ifdef) and a runtime check. If names are
+// not consistent, the #ifdef may be unwittingly testing for the wrong token.
+//
 //===----------------------------------------------------------------------===//
 // IREE_ARCH_ARM_64 / aarch64
 //===----------------------------------------------------------------------===//
@@ -60,7 +67,7 @@ IREE_CPU_FEATURE_BIT(X86_64, 0, 4, SSE4A, "sse4a")
 
 // AVX features.
 IREE_CPU_FEATURE_BIT(X86_64, 0, 10, AVX, "avx")
-IREE_CPU_FEATURE_BIT(X86_64, 0, 11, FMA3, "fma")
+IREE_CPU_FEATURE_BIT(X86_64, 0, 11, FMA, "fma")
 IREE_CPU_FEATURE_BIT(X86_64, 0, 12, FMA4, "fma4")
 IREE_CPU_FEATURE_BIT(X86_64, 0, 13, XOP, "xop")
 IREE_CPU_FEATURE_BIT(X86_64, 0, 14, F16C, "f16c")
