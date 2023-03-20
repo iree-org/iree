@@ -12,6 +12,7 @@
 #include "cutlass/gemm/threadblock/default_mma.h"
 #include "cutlass/gemm/threadblock/default_mma_core_sm80.h"
 #include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
+#include "cutlass/gemm/threadblock/threadblock_swizzle.h"
 
 #ifndef DEBUG_CUTLASS
 #include "cutlass/util/debug.h"
@@ -60,6 +61,20 @@ __forceinline__ __device__ void gemm_ukernel(
 
   // Set entire matrix as the problem size
   cutlass::gemm::GemmCoord problem_size(SZ_M, SZ_N, SZ_K);
+  
+  const int split_k_slices = 1;
+
+  using ThreadblockSwizzle = cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>; 
+  ThreadblockSwizzle threadblock_swizzle;
+
+  cutlass::gemm::GemmCoord grid_tiled_shape = threadblock_swizzle.get_tiled_shape(
+      problem_size,
+      {ThreadblockShape::kM, ThreadblockShape::kN, ThreadblockShape::kK}, split_k_slices);
+
+  int swizzle_log_tile = ThreadblockSwizzle().get_log_tile(grid_tiled_shape);
+
+  // Compute threadblock location
+  cutlass::gemm::GemmCoord tb_tile_offset = threadblock_swizzle.get_tile_offset(swizzle_log_tile);
 
   // Dynamic shared memory base pointer
   extern __shared__ ElementC GemmSharedStorageBase[];
@@ -69,9 +84,6 @@ __forceinline__ __device__ void gemm_ukernel(
       reinterpret_cast<typename ThreadblockMma::SharedStorage*>(
           GemmSharedStorageBase);
 
-  // Compute threadblock location
-  cutlass::gemm::GemmCoord tb_tile_offset = {int(blockIdx.y), int(blockIdx.x),
-                                             0};
 
   cutlass::MatrixCoord tb_offset_A{
       tb_tile_offset.m() * ThreadblockMma::Shape::kM, tb_tile_offset.k()};
@@ -86,6 +98,7 @@ __forceinline__ __device__ void gemm_ukernel(
 
   typename IteratorA::Params params_A(
       cutlass::layout::RowMajor::packed({problem_size.m(), problem_size.k()}));
+
   typename IteratorB::Params params_B(
       cutlass::layout::RowMajor::packed({problem_size.k(), problem_size.n()}));
 
@@ -157,6 +170,8 @@ __forceinline__ __device__ void gemm_ukernel(
             ThreadblockShape, typename ThreadblockMma::Operator,
             ThreadblockMma::Policy::kPartitionsK, EpilogueOutputOp,
             EpilogueOutputOp::kCount>::Epilogue;
+
+    tb_tile_offset = threadblock_swizzle.get_tile_offset(swizzle_log_tile);
 
     // assume identity swizzle
     cutlass::MatrixCoord threadblock_offset{
