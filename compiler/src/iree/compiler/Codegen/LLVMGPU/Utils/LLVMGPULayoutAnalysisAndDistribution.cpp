@@ -321,7 +321,6 @@ void propagateLayoutToBroadcasts(vector::BroadcastOp broadcastOp,
           // So assign all their results the same layout
           layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
           layoutMap.at(transposedResult).debugPrint("transposed");
-          success = true;
           break;
         }
       }
@@ -347,7 +346,8 @@ void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
 void distributeTransferReads(vector::TransferReadOp readOp,
                              DenseMap<Value, Layout> &layoutMap,
                              DenseMap<Value, Value> &simdToSimtMap,
-                             OpBuilder &rewriter) {
+                             OpBuilder &rewriter,
+                             SmallVectorImpl<Operation *> &ops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(readOp);
   Value result = readOp.getResult();
@@ -408,12 +408,14 @@ void distributeTransferReads(vector::TransferReadOp readOp,
     }
   }
   simdToSimtMap.try_emplace(result, vector);
+  ops.push_back(readOp);
 }
 
 void distributeContracts(vector::ContractionOp contractOp,
                          DenseMap<Value, Layout> &layoutMap,
                          DenseMap<Value, Value> &simdToSimtMap,
-                         OpBuilder &rewriter) {
+                         OpBuilder &rewriter,
+                         SmallVectorImpl<Operation *> &ops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(contractOp);
   Value lhs = contractOp.getLhs();
@@ -459,12 +461,14 @@ void distributeContracts(vector::ContractionOp contractOp,
     }
   }
   simdToSimtMap.try_emplace(contractResult, result);
+  ops.push_back(contractOp);
 }
 
 void distributeTransferWrites(vector::TransferWriteOp writeOp,
                               DenseMap<Value, Layout> &layoutMap,
                               DenseMap<Value, Value> &simdToSimtMap,
-                              OpBuilder &rewriter) {
+                              OpBuilder &rewriter,
+                              SmallVectorImpl<Operation *> &ops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(writeOp);
   Value vector = writeOp.getVector();
@@ -514,6 +518,7 @@ void distributeTransferWrites(vector::TransferWriteOp writeOp,
       }
     }
   }
+  ops.push_back(writeOp);
 }
 
 static bool isLaneId(int dimType) {
@@ -549,26 +554,13 @@ static int getVecSizes(std::array<int, 4> &order, const Layout &layout) {
   return size;
 }
 
-static Value createReductionOp(vector::CombiningKind combiningKind, Value lhs,
-                               Value rhs, Location loc, OpBuilder &rewriter) {
-  switch (combiningKind) {
-    case vector::CombiningKind::ADD:
-      return rewriter.create<arith::AddFOp>(loc, lhs, rhs);
-    case vector::CombiningKind::MAXF:
-      return rewriter.create<arith::MaxFOp>(loc, lhs, rhs);
-    default:
-      assert("Unsupported vector combining kind!");
-      break;
-  }
-  return Value{};
-}
-
-using Triplet = std::tuple<vector::MultiDimReductionOp, vector::BroadcastOp,
-                           vector::TransposeOp>;
 using bodyType = std::function<void(std::array<int, DimType::NumDims> &)>;
 
-template <std::size_t T>
-void iterate(int dimType, std::array<int, T> &order,
+/// This function iterates over the dimensions of a given column/row order
+/// that are not LaneIdX, LaneIdY or LaneIdZ and executes the function body
+/// inside the innermost loop. It keeps track of the induction variables
+/// in the state array and passes them to the body function.
+void iterate(int dimType, ArrayRef<int> order,
              std::array<int, DimType::NumDims> &state, const Layout &layout,
              bodyType body) {
   if (dimType == DimType::NumDims) {
@@ -589,7 +581,7 @@ void iterate(int dimType, std::array<int, T> &order,
 void distributeReductionBroadcastTranspose(
     vector::MultiDimReductionOp reductionOp, DenseMap<Value, Layout> &layoutMap,
     DenseMap<Value, Value> &simdToSimtMap, OpBuilder &rewriter,
-    SmallVectorImpl<Triplet> &triplets) {
+    SmallVectorImpl<Operation *> &ops) {
   vector::BroadcastOp broadcastOp{nullptr};
   vector::TransposeOp transposeOp{nullptr};
   for (Operation *user : reductionOp.getResult().getUsers()) {
@@ -622,6 +614,8 @@ void distributeReductionBroadcastTranspose(
   std::array<int, 4> reductionOrder = layout.order[reductionDim];
   std::array<int, 4> parallelOrder = layout.order[!reductionDim];
   Value acc = reductionOp.getAcc();
+  // TODO: Should be able to handle any accumulator type here without
+  // too many problems
   APFloat floatValue(0.0);
   if (!matchPattern(acc, m_ConstantFloat(&floatValue))) return;
   SmallVector<int64_t> vecShape{
@@ -672,21 +666,23 @@ void distributeReductionBroadcastTranspose(
       assert(vShape.size() == 1);
 
       uint32_t size{32};
-      for (uint64_t i = offset; i < layout.shape[dimType]; i <<= 1) {
+      Value mask;
+      for (uint64_t i = offset; i < offset * layout.shape[dimType]; i <<= 1) {
         Value packed = packVectorToSupportedWidth(loc, rewriter, vector);
         auto shuffleOp = rewriter.create<gpu::ShuffleOp>(loc, packed, i, size,
                                                          gpu::ShuffleMode::XOR);
         Value unpacked =
             unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
                            vector.getType().cast<VectorType>());
-        vector =
-            createReductionOp(combiningKind, unpacked, vector, loc, rewriter);
+        vector = makeArithReduction(rewriter, loc, combiningKind, unpacked,
+                                    vector, mask);
       }
 
       for (int i = 0; i < vShape[0]; i++) {
         Value v = rewriter.create<vector::ExtractOp>(loc, vector,
                                                      SmallVector<int64_t>{i});
-        result = createReductionOp(combiningKind, result, v, loc, rewriter);
+        result =
+            makeArithReduction(rewriter, loc, combiningKind, result, v, mask);
       }
     };
 
@@ -717,30 +713,16 @@ void distributeReductionBroadcastTranspose(
   else
     simdToSimtMap.try_emplace(broadcastOp.getResult(), output);
 
-  triplets.push_back(std::make_tuple(reductionOp, broadcastOp, transposeOp));
+  ops.push_back(reductionOp);
+  ops.push_back(broadcastOp);
+  if (transposeOp) ops.push_back(transposeOp);
 }
 
-template <typename T>
-static void eraseOps(func::FuncOp funcOp, IRRewriter &rewriter) {
-  funcOp.walk([&](T op) {
-    if (op->getUses().empty()) rewriter.eraseOp(op);
-    return WalkResult::advance();
-  });
-}
-
-static void eraseTriplets(SmallVectorImpl<Triplet> &triplets,
-                          func::FuncOp funcOp, IRRewriter &rewriter) {
-  for (int i = 0; i < triplets.size(); i++) {
-    auto [reductionOp, broadcastOp, transposeOp] = triplets[i];
-    if (transposeOp) {
-      if (transposeOp->getUses().empty()) rewriter.eraseOp(transposeOp);
-    }
-    if (broadcastOp) {
-      if (broadcastOp->getUses().empty()) rewriter.eraseOp(broadcastOp);
-    }
-    if (reductionOp) {
-      if (reductionOp->getUses().empty()) rewriter.eraseOp(reductionOp);
-    }
+static void eraseOps(SmallVectorImpl<Operation *> &opsToErase,
+                     IRRewriter &rewriter) {
+  for (int i = opsToErase.size() - 1; i >= 0; i--) {
+    assert(opsToErase[i]->getUses().empty());
+    rewriter.eraseOp(opsToErase[i]);
   }
 }
 
@@ -764,29 +746,29 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
 
   // Apply SIMD to SIMT conversion
   DenseMap<Value, Value> simdToSimtMap;
-  SmallVector<Triplet> triplets;
+  SmallVector<Operation *> opsToErase;
   funcOp.walk([&](Operation *op) {
     if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
-      distributeTransferReads(readOp, layoutMap, simdToSimtMap, rewriter);
+      distributeTransferReads(readOp, layoutMap, simdToSimtMap, rewriter,
+                              opsToErase);
     }
     if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-      distributeContracts(contractOp, layoutMap, simdToSimtMap, rewriter);
+      distributeContracts(contractOp, layoutMap, simdToSimtMap, rewriter,
+                          opsToErase);
     }
     if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
-      distributeTransferWrites(writeOp, layoutMap, simdToSimtMap, rewriter);
+      distributeTransferWrites(writeOp, layoutMap, simdToSimtMap, rewriter,
+                               opsToErase);
     }
     if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
-      distributeReductionBroadcastTranspose(reductionOp, layoutMap,
-                                            simdToSimtMap, rewriter, triplets);
+      distributeReductionBroadcastTranspose(
+          reductionOp, layoutMap, simdToSimtMap, rewriter, opsToErase);
     }
     return WalkResult::advance();
   });
 
   // Erase old ops
-  eraseOps<vector::TransferWriteOp>(funcOp, rewriter);
-  eraseTriplets(triplets, funcOp, rewriter);
-  eraseOps<vector::ContractionOp>(funcOp, rewriter);
-  eraseOps<vector::TransferReadOp>(funcOp, rewriter);
+  eraseOps(opsToErase, rewriter);
 }
 
 }  // namespace mlir::iree_compiler

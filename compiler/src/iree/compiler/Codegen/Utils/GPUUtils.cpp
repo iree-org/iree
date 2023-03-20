@@ -307,8 +307,6 @@ static Value promoteElementToVector(Location loc, OpBuilder &builder,
   return vectorInput;
 }
 
-/// Packs vector of lower precision into a single 32-bit width element.
-/// (i.e <2xf16> -> i32 and <4xi8> -> i32)
 Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
                                  Value input) {
   LLVM_DEBUG({
@@ -327,8 +325,6 @@ Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
   return packedInput;
 }
 
-/// Unpack single scalar element into a target vector type.
-/// (i.e i32 -> vector<4xi8> or f32 -> vector<2xf16>)
 Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
                      VectorType targetVecType) {
   LLVM_DEBUG({

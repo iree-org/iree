@@ -149,15 +149,15 @@ builtin.module {
   }
 }
 
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 1)>
-// CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 8)>
-// CHECK-DAG:  #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 9)>
-// CHECK-DAG:  #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16 + 8)>
-// CHECK-DAG:  #[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 8)>
+// CHECK-DAG:#[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
+// CHECK-DAG:#[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
+// CHECK-DAG:#[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 1)>
+// CHECK-DAG:#[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 8)>
+// CHECK-DAG:#[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 9)>
+// CHECK-DAG:#[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16 + 8)>
+// CHECK-DAG:#[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 8)>
 // CHECK:      func.func @matmul_reduction() {
-// CHECK:        %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x16xf16>
@@ -167,32 +167,32 @@ builtin.module {
 // CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
 // CHECK:        memref.assume_alignment %[[D2]], 64 : memref<16x8xf16>
-// CHECK:        %[[D3:.+]] = gpu.thread_id  x
-// CHECK:        %[[D4:.+]] = gpu.thread_id  y
-// CHECK:        %[[D5:.+]] = gpu.thread_id  z
-// CHECK:        %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4x2xf16>
-// CHECK-DAG:      %[[D6:.+]] = affine.apply #[[MAP]](%[[D3]], %[[D4]], %[[D5]])
-// CHECK-DAG:      %[[D7:.+]] = affine.apply #[[MAP1]](%[[D3]], %[[D4]], %[[D5]])
+// CHECK-DAG:    %[[D3:.+]] = gpu.thread_id  x
+// CHECK-DAG:    %[[D4:.+]] = gpu.thread_id  y
+// CHECK-DAG:    %[[D5:.+]] = gpu.thread_id  z
+// CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4x2xf16>
+// CHECK-DAG:    %[[D6:.+]] = affine.apply #[[MAP]](%[[D3]], %[[D4]], %[[D5]])
+// CHECK-DAG:    %[[D7:.+]] = affine.apply #[[MAP1]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D8:.+]] = memref.load %[[D0]][%[[D6]], %[[D7]]] : memref<16x16xf16>
 // CHECK:        %[[D9:.+]] = vector.broadcast %[[D8]] : f16 to vector<1xf16>
 // CHECK:        %[[D10:.+]] = vector.insert_strided_slice %[[D9]], %[[CST]] {offsets = [0, 0, 0, 0], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
-// CHECK-DAG:      %[[D11:.+]] = affine.apply #[[MAP2]](%[[D3]], %[[D4]], %[[D5]])
+// CHECK-DAG:    %[[D11:.+]] = affine.apply #[[MAP2]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D12:.+]] = memref.load %[[D0]][%[[D6]], %[[D11]]] : memref<16x16xf16>
 // CHECK:        %[[D13:.+]] = vector.broadcast %[[D12]] : f16 to vector<1xf16>
 // CHECK:        %[[D14:.+]] = vector.insert_strided_slice %[[D13]], %[[D10]] {offsets = [0, 0, 0, 1], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
-// CHECK-DAG:      %[[D15:.+]] = affine.apply #[[MAP3]](%[[D3]], %[[D4]], %[[D5]])
+// CHECK-DAG:    %[[D15:.+]] = affine.apply #[[MAP3]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D16:.+]] = memref.load %[[D0]][%[[D6]], %[[D15]]] : memref<16x16xf16>
 // CHECK:        %[[D17:.+]] = vector.broadcast %[[D16]] : f16 to vector<1xf16>
 // CHECK:        %[[D18:.+]] = vector.insert_strided_slice %[[D17]], %[[D14]] {offsets = [0, 0, 2, 0], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
-// CHECK-DAG:      %[[D19:.+]] = affine.apply #[[MAP4]](%[[D3]], %[[D4]], %[[D5]])
+// CHECK-DAG:    %[[D19:.+]] = affine.apply #[[MAP4]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D20:.+]] = memref.load %[[D0]][%[[D6]], %[[D19]]] : memref<16x16xf16>
 // CHECK:        %[[D21:.+]] = vector.broadcast %[[D20]] : f16 to vector<1xf16>
 // CHECK:        %[[D22:.+]] = vector.insert_strided_slice %[[D21]], %[[D18]] {offsets = [0, 0, 2, 1], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
-// CHECK-DAG:      %[[D23:.+]] = affine.apply #[[MAP5]](%[[D3]], %[[D4]], %[[D5]])
+// CHECK-DAG:    %[[D23:.+]] = affine.apply #[[MAP5]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D24:.+]] = memref.load %[[D0]][%[[D23]], %[[D7]]] : memref<16x16xf16>
 // CHECK:        %[[D25:.+]] = vector.broadcast %[[D24]] : f16 to vector<1xf16>
 // CHECK:        %[[D26:.+]] = vector.insert_strided_slice %[[D25]], %[[D22]] {offsets = [0, 0, 1, 0], strides = [1]} :
@@ -209,8 +209,8 @@ builtin.module {
 // CHECK:        %[[D34:.+]] = vector.broadcast %[[D33]] : f16 to vector<1xf16>
 // CHECK:        %[[D35:.+]] = vector.insert_strided_slice %[[D34]], %[[D32]] {offsets = [0, 0, 3, 1], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
-// CHECK:        %[[CST_0:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2x2xf16>
-// CHECK-DAG:      %[[D36:.+]] = affine.apply #[[MAP6]](%[[D3]], %[[D4]], %[[D5]])
+// CHECK-DAG:    %[[CST_0:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2x2xf16>
+// CHECK-DAG:    %[[D36:.+]] = affine.apply #[[MAP6]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D37:.+]] = memref.load %[[D1]][%[[D7]], %[[D36]]] : memref<16x8xf16>
 // CHECK:        %[[D38:.+]] = vector.broadcast %[[D37]] : f16 to vector<1xf16>
 // CHECK:        %[[D39:.+]] = vector.insert_strided_slice %[[D38]], %[[CST_0]] {offsets = [0, 0, 0, 0], strides = [1]}
@@ -227,27 +227,27 @@ builtin.module {
 // CHECK:        %[[D47:.+]] = vector.broadcast %[[D46]] : f16 to vector<1xf16>
 // CHECK:        %[[D48:.+]] = vector.insert_strided_slice %[[D47]], %[[D45]] {offsets = [0, 0, 1, 1], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x2x2xf16>
-// CHECK:        %[[CST_1:.+]] = arith.constant dense<0.000000e+00> : vector<2x2xf16>
+// CHECK-DAG:    %[[CST_1:.+]] = arith.constant dense<0.000000e+00> : vector<2x2xf16>
 // CHECK:        %[[D49:.+]] = vector.extract %[[D35]][0, 0] : vector<1x1x4x2xf16>
 // CHECK:        %[[D50:.+]] = vector.extract %[[D48]][0, 0] : vector<1x1x2x2xf16>
 // CHECK:        %[[D51:.+]] = nvgpu.mma.sync(%[[D49]], %[[D50]], %[[CST_1]]) {mmaShape = [16, 8, 16]} :
 // CHECK-SAME:     (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
 // CHECK:        %[[D52:.+]] = vector.insert %[[D51]], %[[CST_0]] [0, 0] : vector<2x2xf16> into vector<1x1x2x2xf16>
-// CHECK:        %[[CST_2:.+]] = arith.constant -1.000000e+04 : f16
+// CHECK-DAG:    %[[CST_2:.+]] = arith.constant -1.000000e+04 : f16
 // CHECK:        %[[D53:.+]] = vector.extract %[[D52]][0, 0, 0] : vector<1x1x2x2xf16>
 // CHECK:        %[[D54:.+]] = vector.bitcast %[[D53]] : vector<2xf16> to vector<1xi32>
 // CHECK:        %[[D55:.+]] = vector.extract %[[D54]][0] : vector<1xi32>
-// CHECK:        %[[C1:.+]]_i32 = arith.constant 1 : i32
-// CHECK:        %[[C32:.+]]_i32 = arith.constant 32 : i32
-// CHECK:        %[[SHUFFLE:.+]]Result, %[[VALID:.+]] = gpu.shuffle  xor %[[D55]], %[[C1]]_i32, %[[C32]]_i32 : i32
-// CHECK:        %[[D56:.+]] = vector.broadcast %[[SHUFFLE]]Result : i32 to vector<1xi32>
+// CHECK-DAG:    %[[C1_I32:.+]] = arith.constant 1 : i32
+// CHECK-DAG:    %[[C32_I32:.+]] = arith.constant 32 : i32
+// CHECK:        %[[SHUFFLERESULT:.+]], %[[VALID:.+]] = gpu.shuffle  xor %[[D55]], %[[C1_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D56:.+]] = vector.broadcast %[[SHUFFLERESULT]] : i32 to vector<1xi32>
 // CHECK:        %[[D57:.+]] = vector.bitcast %[[D56]] : vector<1xi32> to vector<2xf16>
 // CHECK:        %[[D58:.+]] = arith.maxf %[[D57]], %[[D53]] : vector<2xf16>
 // CHECK:        %[[D59:.+]] = vector.bitcast %[[D58]] : vector<2xf16> to vector<1xi32>
 // CHECK:        %[[D60:.+]] = vector.extract %[[D59]][0] : vector<1xi32>
-// CHECK:        %[[C2:.+]]_i32 = arith.constant 2 : i32
-// CHECK:        %[[SHUFFLE]]Result_3, %[[VALID_4:.+]] = gpu.shuffle  xor %[[D60]], %[[C2]]_i32, %[[C32]]_i32 : i32
-// CHECK:        %[[D61:.+]] = vector.broadcast %[[SHUFFLE]]Result_3 : i32 to vector<1xi32>
+// CHECK-DAG:    %[[C2_I32:.+]] = arith.constant 2 : i32
+// CHECK:        %[[SHUFFLERESULT_3:.+]], %[[VALID_4:.+]] = gpu.shuffle  xor %[[D60]], %[[C2_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D61:.+]] = vector.broadcast %[[SHUFFLERESULT_3]] : i32 to vector<1xi32>
 // CHECK:        %[[D62:.+]] = vector.bitcast %[[D61]] : vector<1xi32> to vector<2xf16>
 // CHECK:        %[[D63:.+]] = arith.maxf %[[D62]], %[[D58]] : vector<2xf16>
 // CHECK:        %[[D64:.+]] = vector.extract %[[D63]][0] : vector<2xf16>
@@ -259,14 +259,14 @@ builtin.module {
 // CHECK:        %[[D70:.+]] = vector.extract %[[D52]][0, 0, 1] : vector<1x1x2x2xf16>
 // CHECK:        %[[D71:.+]] = vector.bitcast %[[D70]] : vector<2xf16> to vector<1xi32>
 // CHECK:        %[[D72:.+]] = vector.extract %[[D71]][0] : vector<1xi32>
-// CHECK:        %[[SHUFFLE]]Result_5, %[[VALID_6:.+]] = gpu.shuffle  xor %[[D72]], %[[C1]]_i32, %[[C32]]_i32 : i32
-// CHECK:        %[[D73:.+]] = vector.broadcast %[[SHUFFLE]]Result_5 : i32 to vector<1xi32>
+// CHECK:        %[[SHUFFLERESULT_5:.+]], %[[VALID_6:.+]] = gpu.shuffle  xor %[[D72]], %[[C1_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D73:.+]] = vector.broadcast %[[SHUFFLERESULT_5]] : i32 to vector<1xi32>
 // CHECK:        %[[D74:.+]] = vector.bitcast %[[D73]] : vector<1xi32> to vector<2xf16>
 // CHECK:        %[[D75:.+]] = arith.maxf %[[D74]], %[[D70]] : vector<2xf16>
 // CHECK:        %[[D76:.+]] = vector.bitcast %[[D75]] : vector<2xf16> to vector<1xi32>
 // CHECK:        %[[D77:.+]] = vector.extract %[[D76]][0] : vector<1xi32>
-// CHECK:        %[[SHUFFLE]]Result_7, %[[VALID_8:.+]] = gpu.shuffle  xor %[[D77]], %[[C2]]_i32, %[[C32]]_i32 : i32
-// CHECK:        %[[D78:.+]] = vector.broadcast %[[SHUFFLE]]Result_7 : i32 to vector<1xi32>
+// CHECK:        %[[SHUFFLERESULT_7:.+]], %[[VALID_8:.+]] = gpu.shuffle  xor %[[D77]], %[[C2_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D78:.+]] = vector.broadcast %[[SHUFFLERESULT_7]] : i32 to vector<1xi32>
 // CHECK:        %[[D79:.+]] = vector.bitcast %[[D78]] : vector<1xi32> to vector<2xf16>
 // CHECK:        %[[D80:.+]] = arith.maxf %[[D79]], %[[D75]] : vector<2xf16>
 // CHECK:        %[[D81:.+]] = vector.extract %[[D80]][0] : vector<2xf16>
