@@ -138,8 +138,9 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
 /// func.func.
 Value mlir::iree_compiler::gpu::buildMapToBlockAndThreads(
     ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize) {
-  funcH = b.create<ForallToWorkgroupOp>(funcH);
-  return b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize);
+  b.create<ForallToWorkgroupOp>(funcH);
+  b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize);
+  return funcH;
 }
 
 /// Post-bufferization vector distribution with rank-reduction.
@@ -152,7 +153,7 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
   ApplyPatternsOpPatterns patterns;
   patterns.foldMemrefAliases = true;
   patterns.rankReducingVector = true;
-  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  b.create<ApplyPatternsOp>(funcH, patterns);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
   // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.

@@ -78,11 +78,11 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = b.create<ForallToWorkgroupOp>(funcH);
-  auto pdlOperation = pdl::OperationType::get(b.getContext());
+  b.create<ForallToWorkgroupOp>(funcH);
 
   // Step N. Lower vectors.
   // TODO: Control the lowering to vectors.
+  auto pdlOperation = pdl::OperationType::get(b.getContext());
   funcH = b.create<LowerVectorsOp>(pdlOperation, funcH, lowerVectorsOpts);
   return std::make_pair(variantH, funcH);
 }

@@ -16,8 +16,7 @@ include "mlir/IR/OpBase.td"
 
 def MapNestedForallToGpuThreadsOp :
   Op<Transform_Dialect, "iree.map_nested_forall_to_gpu_threads",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
@@ -88,16 +87,17 @@ def MapNestedForallToGpuThreadsOp :
     ```
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$workgroup_size);
-  let results = (outs PDL_Operation:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = [{
+    $target
+    `workgroup_dims` `=` $workgroup_dims
+    attr-dict
+    `:` functional-type($target, results)
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target, "ArrayRef<int64_t>":$workgroupSize)>
-  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -213,8 +213,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
 }
 
 def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribute",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
@@ -304,9 +303,13 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs TransformHandleTypeInterface:$result);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
+  let assemblyFormat = [{
+    $target 
+    attr-dict 
+    `:` functional-type($target, results)
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let skipDefaultBuilders = 1;
@@ -322,8 +325,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
 }
 
 def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_conversion",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
@@ -339,18 +341,18 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
     This transform consumes the target handle and produces a result handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                        UnitAttr:$use_mma_sync,
                        UnitAttr:$use_wmma);
-  let results = (outs PDL_Operation:$result);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = [{
+    $target
+    attr-dict
+    `:` functional-type($target, results)
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
@@ -382,10 +384,6 @@ def PromoteOperandsOp :
 
   let assemblyFormat = [{ $target $indices attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target, "ArrayRef<int64_t>":$indices)>
-  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -419,14 +417,17 @@ def PipelineSharedMemoryCopiesOp : Op<
   }];
 
   let arguments = (
-      ins Transform_ConcreteOpType<"scf.for">:$for_op,
+      ins TransformHandleTypeInterface:$for_op,
           I64Attr:$depth,
           UnitAttr:$peel_epilogue);
-  let results = (outs Transform_ConcreteOpType<"scf.for">:$result);
+  let results = (outs TransformHandleTypeInterface:$result);
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let assemblyFormat = [{ $for_op attr-dict `:` functional-type(operands, results)}];
+  let assemblyFormat = [{ 
+    $for_op 
+    attr-dict 
+    `:` functional-type(operands, results)}];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -438,8 +439,7 @@ def PipelineSharedMemoryCopiesOp : Op<
 
 def CreateAsyncGroupsOp :
   Op<Transform_Dialect, "iree.create_async_groups",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
@@ -455,16 +455,15 @@ def CreateAsyncGroupsOp :
     changed.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                    BoolAttr:$use_mma_sync);
-  let results = (outs Variadic<PDL_Operation>:$result);
+  let results = (outs);
 
-  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
+  let assemblyFormat = [{ 
+    $target 
+    attr-dict 
+    `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target, "bool":$use_mma_sync)>
-  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(

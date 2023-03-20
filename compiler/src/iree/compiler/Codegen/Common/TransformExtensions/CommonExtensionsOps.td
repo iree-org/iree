@@ -31,14 +31,13 @@ def ApplyBufferOptimizationsOp :
     This operation applies a set of memory optimization on the whole region of
     the operand.
 
-    If the transformation is successful it returns the handle to the
-    same payload as its operand to allow for simpler composition.
+    The transformation does not consume the target handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let skipDefaultBuilders = 1;
@@ -140,11 +139,13 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     If the pattern application fails, or if the underlying listener fails to
     capture op handles, the transformation definitely fails.
 
-    Otherwise the transformation is successful and returns the handle to the
-    same payload as its operand to allow for simpler composition.
+    Otherwise the transformation is successful.
+    
+    This operation does not consume the target handle and does not produce any
+    handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                        UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse,
                        UnitAttr:$bubble_expand,
@@ -168,9 +169,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$tiling_canonicalization,
                        UnitAttr:$unroll_vectors_gpu_mma_sync,
                        UnitAttr:$unroll_vectors_gpu_wmma);
-  let results = (outs PDL_Operation:$result);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
@@ -188,19 +189,21 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 }
 
 def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
-    [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-     TransformOpInterface, TransformEachOpTrait]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let summary = "Hoist static allocations";
   let description = [{
     Find static allocations and hoist them to the top level.
 
     #### Return modes
-    This operation applies static alloc hoisting the whole region of the operand.
-    It always return success.
+    This transform applies static alloc hoisting the whole region of the operand.
+
+    It does not consume the target handle and always return success.
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs TransformHandleTypeInterface:$result);
+  let results = (outs);
 
   let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -240,14 +243,14 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   }];
 
   let arguments = (
-      ins PDL_Operation:$target,
+      ins TransformHandleTypeInterface:$target,
           UnitAttr:$target_gpu,
           UnitAttr:$test_analysis_only,
           UnitAttr:$print_conflicts
   );
-  let results = (outs PDL_Operation:$result);
+  let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat = "attr-dict $target";
+  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
@@ -260,12 +263,12 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
 
 def IREEEliminateEmptyTensorsOp : Op<
     Transform_Dialect, "iree.eliminate_empty_tensors",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     This is a pre-processing pass for iree.bufferize. It tries to remove
-    tensor.empty ops by replacing them with a suitable destination tensors,
+    tensor.empty ops by replacing them with suitable destination tensors,
     which can reduce the number of allocations when bufferizing.
 
     This transform is not part of iree.bufferize because additional
@@ -274,24 +277,26 @@ def IREEEliminateEmptyTensorsOp : Op<
 
     #### Return modes
 
-    This transform consumes the target handle and produces a result handle.
+    This transform does not consume the target handle and always return success.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$result);
-  let assemblyFormat = "attr-dict $target";
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
+  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
 }
 
 def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
     "iree.erase_hal_descriptor_type_from_memref",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     Erase #hal.descriptor_type from MemRef memory space to ignore all IREE
     memory space planning. This is meant to ease transitioning given that
@@ -305,23 +310,28 @@ def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
 
     If any of the pass on any of the FuncOp fails, the transformation
     definitely fails. Otherwise the transformation succeeds.
+
+    This transform does not consume the target handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
 
-  let assemblyFormat = "attr-dict $target";
+  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [OpBuilder<(ins "Value":$target)>];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
 }
 
 def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformOpInterface,
-     TransformEachOpTrait]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     Target the whole hal.executable_variant op and rewrite the unique topLevel
     scf.forall to distributed workgroup_id and workgroup_count.
@@ -350,23 +360,19 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
     topLevel tile_to_forall_op.
 
     If the unique topLevel scf.forall operation contained within the
-    FuncOp referred to by the `target` PDLOperation lowers to workgroup properly,
-    the transform succeeds. Otherwise the transform definitely fails.
+    FuncOp referred to by the `target` transform handle lowers to workgroup 
+    properly, the transform succeeds.
+    
+    Otherwise the transform definitely fails.
 
-    The returned handle points to the same FuncOp operand, consuming it and
-    producing a new SSA value to satisfy chaining and linearity of the IR
-    properties.
+    This transform does not consume its input handle and produces no result.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(

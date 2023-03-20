@@ -25,7 +25,7 @@ builtin.module {
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.create_async_groups %top_level_func {use_mma_sync = true} : (!pdl.operation) -> (!pdl.operation)
+    transform.iree.create_async_groups %top_level_func {use_mma_sync = true} : (!pdl.operation) -> ()
   }
 }
 
@@ -57,7 +57,7 @@ builtin.module {
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %transformed_func = transform.iree.create_async_groups %top_level_func {use_mma_sync = false} : (!pdl.operation) -> (!pdl.operation)
+    transform.iree.create_async_groups %top_level_func {use_mma_sync = false} : (!pdl.operation) -> ()
   }
 }
 
@@ -87,7 +87,7 @@ builtin.module {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
     %vector_transfer = transform.structured.match ops{["memref.alloc"]} in %top_level_func : (!pdl.operation) -> !pdl.operation
     // expected-error@below {{transform applied to the wrong op kind}}
-    %transformed_func = transform.iree.create_async_groups %vector_transfer {use_mma_sync = false} : (!pdl.operation) -> (!pdl.operation)
+    transform.iree.create_async_groups %vector_transfer {use_mma_sync = false} : (!pdl.operation) -> ()
   }
 }
 

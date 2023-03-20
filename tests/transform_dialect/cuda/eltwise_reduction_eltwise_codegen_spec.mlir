@@ -27,7 +27,7 @@ transform.sequence failures(propagate) {
   // able to preserve the handles.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  transform.iree.apply_patterns %func { bubble_expand }
+  transform.iree.apply_patterns %func { bubble_expand } : (!pdl.operation) -> ()
   %fills = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %fill_2, %more_parallel_fill_2 = transform.split_handles %fills in [2]
     : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
@@ -66,7 +66,7 @@ transform.sequence failures(propagate) {
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
   %func_1 = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %func_2 = transform.iree.apply_patterns %func_1 {  rank_reducing_linalg, rank_reducing_vector }
+  %func_2 = transform.iree.apply_patterns %func_1 {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
   %func_3 = transform.structured.vectorize %func_2
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
@@ -85,7 +85,7 @@ transform.sequence failures(propagate) {
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   // ===========================================================================
-  %func_7 = transform.iree.apply_patterns %func_6 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
+  %func_7 = transform.iree.apply_patterns %func_6 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!pdl.operation) -> ()
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   // Don't complain about unsupported if (threadIdx.x == 0 && threadIdx.y == 0)
   // at this point.

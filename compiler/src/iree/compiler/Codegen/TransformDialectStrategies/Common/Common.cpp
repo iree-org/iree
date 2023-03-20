@@ -133,7 +133,8 @@ Value mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
   configuration.cse = true;
   configuration.licm = true;
   configuration.tilingCanonicalization = true;
-  return b.create<ApplyPatternsOp>(variantH, configuration);
+  b.create<ApplyPatternsOp>(variantH, configuration);
+  return variantH;
 }
 
 /// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
@@ -307,7 +308,7 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
   configuration.foldReassociativeReshapes = true;
   variantH =
       buildCanonicalizationAndEnablingTransforms(b, configuration, variantH);
-  variantH = b.create<IREEEliminateEmptyTensorsOp>(variantH);
+  b.create<IREEEliminateEmptyTensorsOp>(variantH);
   variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
   Value memrefFunc =
       b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
@@ -451,5 +452,6 @@ Value mlir::iree_compiler::buildMemoryOptimizations(ImplicitLocOpBuilder &b,
   // Apply canonicalizations and enablings twice as they enable each other.
   buildCanonicalizationAndEnablingTransforms(b, configuration, funcH);
   buildCanonicalizationAndEnablingTransforms(b, configuration, funcH);
-  return b.create<ApplyBufferOptimizationsOp>(funcH);
+  b.create<ApplyBufferOptimizationsOp>(funcH);
+  return funcH;
 }
