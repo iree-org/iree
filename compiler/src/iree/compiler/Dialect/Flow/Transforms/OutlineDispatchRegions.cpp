@@ -22,8 +22,14 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
+#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "iree-dispatch"
+
+llvm::cl::opt<bool> clAddCutlass(
+    "iree-flow-add-cutlass",
+    llvm::cl::desc("Add cutlass to the kernel name"),
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
@@ -351,14 +357,15 @@ class OutlineDispatchRegionsPass
         namePrefix =
             std::string("_function_like_") + std::to_string(it.index());
       }
-
       auto &bodyRegion = op.getFunctionBody();
       // Outline all of the dispatch regions ops in this function.
       auto dispatchWorkgroupsOps =
           llvm::to_vector<8>(bodyRegion.getOps<DispatchWorkgroupsOp>());
       for (int i = 0; i < dispatchWorkgroupsOps.size(); ++i) {
         std::string executableOpName =
-            (namePrefix + "_dispatch_" + llvm::Twine(i)).str();
+            (namePrefix + 
+            (clAddCutlass ? "_dispatch_cutlass" : "_dispatch_" )+             
+             llvm::Twine(i)).str();
         // Add a summary of the op as a suffix, if one can be generated.
         // Note: the executable names omit this suffix so their names are more
         // predictable.
