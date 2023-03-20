@@ -290,16 +290,17 @@ static void addTilingCanonicalizationPatterns(RewritePatternSet &patterns) {
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeMmaSyncVectorSize(
-    Operation *op) {
-  return getMmaNativeVectorSize(op);
-}
-
-static void addUnrollVectorsGpuMmaSyncPatterns(RewritePatternSet &patterns) {
+static void addUnrollVectorsGpuMmaSyncPatterns(RewritePatternSet &patterns,
+                                               Operation *filter) {
   auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (!contract) return std::nullopt;
     return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
+  };
+  auto getGPUTensorCoreNativeMmaSyncVectorSize =
+      [filter](Operation *op) -> Optional<SmallVector<int64_t>> {
+    if (!filter->isProperAncestor(op)) return std::nullopt;
+    return getMmaNativeVectorSize(op);
   };
   vector::populateVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
@@ -307,16 +308,17 @@ static void addUnrollVectorsGpuMmaSyncPatterns(RewritePatternSet &patterns) {
                     .setUnrollTraversalOrderFn(unrollOrder));
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeWmmaVectorSize(
-    Operation *op) {
-  return getWmmaNativeVectorSize(op);
-}
-
-static void addUnrollVectorsGpuWmmaPatterns(RewritePatternSet &patterns) {
+static void addUnrollVectorsGpuWmmaPatterns(RewritePatternSet &patterns,
+                                            Operation *filter) {
   auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (!contract) return std::nullopt;
     return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
+  };
+  auto getGPUTensorCoreNativeWmmaVectorSize =
+      [filter](Operation *op) -> Optional<SmallVector<int64_t>> {
+    if (!filter->isProperAncestor(op)) return std::nullopt;
+    return getWmmaNativeVectorSize(op);
   };
   vector::populateVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
@@ -381,8 +383,9 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
   if (getTilingCanonicalization()) addTilingCanonicalizationPatterns(patterns);
   if (getUnrollVectorsGpuMmaSync())
-    addUnrollVectorsGpuMmaSyncPatterns(patterns);
-  if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
+    addUnrollVectorsGpuMmaSyncPatterns(patterns, target);
+  if (getUnrollVectorsGpuWmma())
+    addUnrollVectorsGpuWmmaPatterns(patterns, target);
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
@@ -451,6 +454,76 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
 }
 
 void transform_dialect::ApplyPatternsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyPatternsToNestedOp
+//===---------------------------------------------------------------------===//
+void transform_dialect::ApplyPatternsToNestedOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    const ApplyPatternsOpPatterns &patterns) {
+  result.addOperands(target);
+  auto unitAttr = builder.getUnitAttr();
+#define ADD_NESTED_PATTERN(NAME, ATTR) \
+  if (patterns.NAME)                   \
+    result.addAttribute(ApplyPatternsToNestedOp::ATTR(result.name), unitAttr);
+  ///
+  /// When touching something here, do not forget to update CommonExtensions.h.
+  ///
+  ADD_NESTED_PATTERN(unrollVectorsGpuMmaSync,
+                     getUnrollVectorsGpuMmaSyncAttrName)
+  ADD_NESTED_PATTERN(unrollVectorsGpuWmma, getUnrollVectorsGpuWmmaAttrName)
+#undef ADD_NESTED_PATTERN
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::ApplyPatternsToNestedOp::applyToOne(
+    Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  if (target->getNumRegions() != 1)
+    return mlir::emitDefiniteFailure(target,
+                                     "target must have exactly one region");
+
+  Operation *isolatedParent = target;
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+    isolatedParent = target->getParentWithTrait<OpTrait::IsIsolatedFromAbove>();
+    if (!isolatedParent)
+      return mlir::emitDefiniteFailure(
+          target, "Failed to find isolated from above parent op");
+  }
+  MLIRContext *ctx = target->getContext();
+  RewritePatternSet patterns(ctx);
+  if (getUnrollVectorsGpuMmaSync())
+    addUnrollVectorsGpuMmaSyncPatterns(patterns, target);
+  if (getUnrollVectorsGpuWmma())
+    addUnrollVectorsGpuWmmaPatterns(patterns, target);
+
+  TrackingListener listener(state);
+  GreedyRewriteConfig config;
+  config.listener = &listener;
+  // Manually gather list of ops because the other GreedyPatternRewriteDriver
+  // overloads only accepts ops that are isolated from above.
+  SmallVector<Operation *> ops;
+  isolatedParent->walk([&](Operation *nestedOp) {
+    if (target != nestedOp && target->isProperAncestor(nestedOp))
+      ops.push_back(nestedOp);
+  });
+  LogicalResult result =
+      applyOpPatternsAndFold(ops, std::move(patterns), config);
+  if (failed(result)) {
+    return mlir::emitDefiniteFailure(target, "greedy patterns failed");
+  }
+  LogicalResult listenerResult = listener.checkErrorState();
+  if (failed(listenerResult))
+    return mlir::emitDefiniteFailure(target, "pattern listener tracker fail");
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ApplyPatternsToNestedOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
