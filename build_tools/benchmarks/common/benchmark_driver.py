@@ -111,6 +111,12 @@ class BenchmarkDriver(object):
         try:
           self.run_benchmark_case(benchmark_case, results_path, capture_path)
         except Exception as e:
+          # Delete unfinished results if they exist.
+          if results_path is not None:
+            results_path.unlink(missing_ok=True)
+          if capture_path is not None:
+            capture_path.unlink(missing_ok=True)
+
           if not self.config.keep_going:
             raise e
 
