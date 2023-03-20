@@ -91,11 +91,19 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
     return !hasUnknownCase;
   }
 
-  Options getCompilationOptions() {
+  Options getCompilationOptions(IREE::HAL::MetalTargetPlatform platform) {
     // TODO(antiagainst): fill out the following according to the Metal GPU
     // family.
     SPIRVToMSLCompiler::Options spvCrossOptions;
-    spvCrossOptions.platform = SPIRVToMSLCompiler::Options::Platform::macOS;
+    switch (platform) {
+      case IREE::HAL::MetalTargetPlatform::macOS:
+        spvCrossOptions.platform = SPIRVToMSLCompiler::Options::Platform::macOS;
+        break;
+      case IREE::HAL::MetalTargetPlatform::iOS:
+      case IREE::HAL::MetalTargetPlatform::iOSSimulator:
+        spvCrossOptions.platform = SPIRVToMSLCompiler::Options::Platform::iOS;
+        break;
+    }
     spvCrossOptions.msl_version =
         SPIRVToMSLCompiler::Options::make_msl_version(3, 0);
     // Eanble using Metal argument buffers. It is more akin to Vulkan descriptor
@@ -107,6 +115,7 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
 }  // namespace
 
 std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
+    IREE::HAL::MetalTargetPlatform targetPlatform,
     llvm::ArrayRef<uint32_t> spvBinary, StringRef entryPoint) {
   SPIRVToMSLCompiler spvCrossCompiler(spvBinary.data(), spvBinary.size());
 
@@ -144,7 +153,7 @@ std::optional<std::pair<MetalShader, std::string>> crossCompileSPIRVToMSL(
     spvCrossCompiler.add_msl_resource_binding(binding);
   }
 
-  auto spvCrossOptions = spvCrossCompiler.getCompilationOptions();
+  auto spvCrossOptions = spvCrossCompiler.getCompilationOptions(targetPlatform);
   spvCrossCompiler.set_msl_options(spvCrossOptions);
 
   std::string mslSource = spvCrossCompiler.compile();

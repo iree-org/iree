@@ -31,6 +31,15 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+llvm::cl::opt<MetalTargetPlatform> clTargetPlatform(
+    "iree-metal-target-platform", llvm::cl::desc("Apple platform to target"),
+    llvm::cl::values(
+        clEnumValN(MetalTargetPlatform::macOS, "macos", "macOS platform"),
+        clEnumValN(MetalTargetPlatform::iOS, "ios", "iOS platform"),
+        clEnumValN(MetalTargetPlatform::iOSSimulator, "ios-simulator",
+                   "iOS simulator platform")),
+    llvm::cl::init(MetalTargetPlatform::macOS));
+
 static llvm::cl::opt<bool> clCompileToMetalLib(
     "iree-metal-compile-to-metallib",
     llvm::cl::desc(
@@ -171,7 +180,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
       // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
       ArrayRef spvData(spvBinary.data(), spvBinary.size());
       std::optional<std::pair<MetalShader, std::string>> msl =
-          crossCompileSPIRVToMSL(spvData, entryPoint);
+          crossCompileSPIRVToMSL(clTargetPlatform, spvData, entryPoint);
       if (!msl) {
         return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";
@@ -200,7 +209,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
         for (auto [shader, entryPoint] :
              llvm::zip(mslShaders, mslEntryPointNames)) {
           std::unique_ptr<llvm::MemoryBuffer> lib =
-              compileMSLToMetalLib(shader.source, entryPoint);
+              compileMSLToMetalLib(clTargetPlatform, shader.source, entryPoint);
           if (!lib) {
             return variantOp.emitError()
                    << "failed to compile to MTLLibrary from MSL:\n\n"

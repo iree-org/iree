@@ -23,11 +23,32 @@ namespace IREE {
 namespace HAL {
 
 /// Returns the command to compile the given MSL source file into Metal library.
-static std::string getMetalCompileCommand(StringRef mslFile,
+static std::string getMetalCompileCommand(MetalTargetPlatform platform,
+                                          StringRef mslFile,
                                           StringRef libFile) {
-  return llvm::Twine("xcrun -sdk macosx metal -c ")
+  const char *sdk = "";
+  switch (platform) {
+    case MetalTargetPlatform::macOS:
+      sdk = "macosx";
+      break;
+    case MetalTargetPlatform::iOS:
+      sdk = "iphoneos";
+      break;
+    case MetalTargetPlatform::iOSSimulator:
+      sdk = "iphonesimulator";
+      break;
+  }
+
+  // Metal shader offline compilation involves two steps:
+  // 1. Compile the MSL source code into an Apple IR (AIR) file,
+  // 2. Compile the AIR file into a Metal library.
+  return llvm::Twine("xcrun -sdk ")
+      .concat(sdk)
+      .concat(" metal -c ")
       .concat(mslFile)
-      .concat(" -o - | xcrun -sdk macosx metallib - -o ")
+      .concat(" -o - | xcrun -sdk ")
+      .concat(sdk)
+      .concat(" metallib - -o ")
       .concat(libFile)
       .str();
 }
@@ -42,8 +63,9 @@ static LogicalResult runSystemCommand(StringRef command) {
   return failure();
 }
 
-std::unique_ptr<llvm::MemoryBuffer> compileMSLToMetalLib(StringRef mslCode,
-                                                         StringRef entryPoint) {
+std::unique_ptr<llvm::MemoryBuffer> compileMSLToMetalLib(
+    MetalTargetPlatform targetPlatform, StringRef mslCode,
+    StringRef entryPoint) {
   SmallString<32> mslFile, airFile, libFile;
   int mslFd = 0;
   llvm::sys::fs::createTemporaryFile(entryPoint, "metal", mslFd, mslFile);
@@ -56,7 +78,8 @@ std::unique_ptr<llvm::MemoryBuffer> compileMSLToMetalLib(StringRef mslCode,
     inputStream << mslCode << "\n";
   }
 
-  std::string command = getMetalCompileCommand(mslFile, libFile);
+  std::string command =
+      getMetalCompileCommand(targetPlatform, mslFile, libFile);
   if (failed(runSystemCommand(command))) return nullptr;
 
   auto fileOrErr =

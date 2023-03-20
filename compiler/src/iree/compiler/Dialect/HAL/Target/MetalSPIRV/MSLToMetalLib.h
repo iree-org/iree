@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_MSLTOMETALLIB_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_MSLTOMETALLIB_H_
 
+#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalTargetPlatform.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -19,7 +20,8 @@ namespace HAL {
 // and returns the library binary code. |fileName| will be used as a hint for
 // creating intermediate files.
 std::unique_ptr<llvm::MemoryBuffer> compileMSLToMetalLib(
-    llvm::StringRef mslCode, llvm::StringRef fileName);
+    MetalTargetPlatform targetPlatform, llvm::StringRef mslCode,
+    llvm::StringRef fileName);
 
 }  // namespace HAL
 }  // namespace IREE

@@ -46,12 +46,18 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "MetalTargetPlatform",
+    hdrs = ["MetalTargetPlatform.h"],
+)
+
+iree_compiler_cc_library(
     name = "SPIRVToMSL",
     srcs = [
         "SPIRVToMSL.cpp",
     ],
     hdrs = ["SPIRVToMSL.h"],
     deps = [
+        ":MetalTargetPlatform",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
         "@spirv_cross//:spirv_cross_lib",
@@ -65,6 +71,7 @@ iree_compiler_cc_library(
     ],
     hdrs = ["MSLToMetalLib.h"],
     deps = [
+        ":MetalTargetPlatform",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Support",
     ],
