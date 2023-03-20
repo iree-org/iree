@@ -207,7 +207,7 @@ static void inlineClosureOperands(const ClosureOptimizationOptions &options,
 
       // Replace all of the uses inside of the closure.
       BlockArgument blockArg = entryBlock.getArgument(opArg.index());
-      blockArg.replaceAllUsesWith(newValue);
+      rewriter.replaceAllUsesWith(blockArg, newValue);
     }
   }
 }
@@ -282,8 +282,8 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
       // Dropped.
     } else {
       // Replaced.
-      entryBlock.getArgument(replacement.index())
-          .replaceAllUsesWith(*replacement.value());
+      rewriter.replaceAllUsesWith(entryBlock.getArgument(replacement.index()),
+                                  *replacement.value());
     }
   }
 
@@ -305,13 +305,13 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
   assert(oldResults.size() == newResults.size() &&
          "expected non-closure results to match");
   for (auto [oldResult, newResult] : llvm::zip_equal(oldResults, newResults)) {
-    oldResult.replaceAllUsesWith(newResult);
+    rewriter.replaceAllUsesWith(oldResult, newResult);
   }
 
   // Replace original uses of the closure results.
   for (auto [oldResult, newResult] :
        llvm::zip_equal(preservedResults, newOp.getClosureResults())) {
-    oldResult.replaceAllUsesWith(newResult);
+    rewriter.replaceAllUsesWith(oldResult, newResult);
   }
 
   // Erase the original op.

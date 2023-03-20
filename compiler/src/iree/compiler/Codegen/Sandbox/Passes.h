@@ -28,6 +28,7 @@ struct LinalgFusePassOptions {
   SmallVector<int64_t> hoistPaddings = {};
   SmallVector<std::string> transposePaddings = {};
   bool vectorize = false;
+  bool enableVectorMasking = false;
   bool vectorizePadding = false;
   int64_t tilingLevel = -1;
 };
@@ -57,6 +58,7 @@ struct LinalgSingleTilingExpertPassOptions {
   bool decomposeToLowerDimOp = false;
   bool peel = false;
   bool vectorize = false;
+  bool enableVectorMasking = false;
   bool vectorizePadding = false;
   bool vectorizeGatherAccesses = false;
   int64_t tilingLevel = -1;
@@ -86,16 +88,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgVectorLoweringPass(
     int64_t vectorLoweringStage = 0);
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgVectorLoweringPass(
     const LinalgVectorLoweringPassOptions &options);
-
-/// Create a pass to drive the unrolling of a single vector op.
-std::unique_ptr<OperationPass<func::FuncOp>> createUnrollOneVectorOpPass();
-
-/// Create a pass to drive the unrolling of a single parent loop of an op.
-std::unique_ptr<OperationPass<func::FuncOp>> createUnrollOneParentLoopPass();
-
-/// Create a pass to drive the outlining of the region of a single parent loop
-/// of an op.
-std::unique_ptr<OperationPass<func::FuncOp>> createOutlineOneParentLoopPass();
 
 //===----------------------------------------------------------------------===//
 // Transforms that tie together individual drivers.

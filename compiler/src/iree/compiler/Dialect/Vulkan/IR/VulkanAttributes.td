@@ -104,6 +104,13 @@ def VK_CapabilitiesAttr : VK_Attr<"Capabilities", "caps"> {
     OptionalParameter<"::mlir::UnitAttr">:$shaderFloat16,
     OptionalParameter<"::mlir::UnitAttr">:$shaderInt8,
 
+    // VK_KHR_shader_integer_dot_product features.
+    //
+    // This corresponds to the `VkPhysicalDeviceShaderIntegerDotProductFeatures`
+    // structure:
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR.html
+    OptionalParameter<"::mlir::UnitAttr">:$shaderIntegerDotProduct,
+
     // VK_KHR_variable_pointers features.
     // This corresponds to the `VkPhysicalDeviceVariablePointersFeatures`
     // structure:

@@ -25,7 +25,7 @@
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=local-sync" are added automatically.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvm-target-cpu-features.
+#       --iree-llvmcpu-target-cpu-features.
 #
 # Example:
 #   iree_static_linker_test(
@@ -82,7 +82,7 @@ function(iree_static_linker_test)
   set(_COMPILER_ARGS ${_RULE_COMPILER_FLAGS})
   list(APPEND _COMPILER_ARGS "--iree-hal-target-backends=llvm-cpu")
   if(_RULE_TARGET_CPU_FEATURES)
-    list(APPEND _COMPILER_ARGS "--iree-llvm-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
+    list(APPEND _COMPILER_ARGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
 
   if(_RULE_EMITC)

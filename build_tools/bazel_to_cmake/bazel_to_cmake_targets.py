@@ -32,6 +32,9 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:X86AsmParser": ["IREELLVMCPUTargetDeps"],
     "@llvm-project//llvm:X86CodeGen": ["IREELLVMCPUTargetDeps"],
 
+    # Clang
+    "@llvm-project//clang": ["${IREE_CLANG_TARGET}"],
+
     # LLD
     "@llvm-project//lld": ["${IREE_LLD_TARGET}"],
     "@llvm-project//lld:COFF": ["lldCOFF"],
@@ -45,6 +48,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:IPO": ["LLVMipo"],
     "@llvm-project//llvm:FileCheck": ["FileCheck"],
     "@llvm-project//llvm:not": ["not"],
+    "@llvm-project//llvm:llvm-link": ["${IREE_LLVM_LINK_TARGET}"],
+
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:DialectUtils": [""],
@@ -60,6 +65,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
+
     # MHLO.
     # TODO: Rework this upstream so that Bazel and CMake rules match up
     # better.

@@ -16,7 +16,7 @@ iree_microbenchmark_suite(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
-    "--iree-llvm-target-cpu-features=host"
+    "--iree-llvmcpu-target-cpu-features=host"
 )
 
 # Only target cuda benchmarks if the backend is enabled.

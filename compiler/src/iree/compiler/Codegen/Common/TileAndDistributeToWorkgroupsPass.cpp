@@ -112,9 +112,9 @@ static LogicalResult getTileAndDistributeConfig(
   return success();
 }
 
-/// Get the materialization information from a `iree_linalg_ext.pack` operation.
+/// Get the materialization information from a `tensor.pack` operation.
 static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
-getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
+getMaterializationInfo(tensor::PackOp packOp) {
   IREE::LinalgExt::MaterializeEncodingInfo encodingInfo;
   SmallVector<OpFoldResult> mixedTileSizes = packOp.getMixedTiles();
   encodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
@@ -128,7 +128,7 @@ getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
   }
   encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
   encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
-  encodingInfo.srcRank = packOp.getInputRank();
+  encodingInfo.srcRank = packOp.getSourceRank();
   return encodingInfo;
 }
 
@@ -203,6 +203,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
     // slowest varying.
     SmallVector<Value> numWorkgroups;
     for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
+      if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
       Value numTileAlongDim = getValueOrCreateConstantIndexOp(
           rewriter, loc, numTiles[partitionedLoop]);
       if (numWorkgroups.size() == kNumMaxParallelDims) {
@@ -276,11 +277,10 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
     auto innerTileSizes = getInnerTileSizesOfr(rewriter, loc, inputType,
                                                materializeEncodingInfo, {});
     if (failed(innerTileSizes)) return failure();
-    SmallVector<OpFoldResult> resultShape =
-        IREE::LinalgExt::PackOp::getResultShape(
-            rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
-            materializeEncodingInfo.innerDimsPos,
-            materializeEncodingInfo.outerDimsPerm);
+    SmallVector<OpFoldResult> resultShape = tensor::PackOp::getResultShape(
+        rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
+        materializeEncodingInfo.innerDimsPos,
+        materializeEncodingInfo.outerDimsPerm);
     resultShape.resize(materializeEncodingInfo.srcRank);
 
     rewriter
@@ -324,16 +324,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     auto exportOp = entryPoints.lookup(funcOp.getName());
     if (!exportOp) continue;
 
-    SmallVector<Operation *> computeOps;
-    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
-      funcOp.emitOpError("failed to get compute ops in dispatch");
-      return signalPassFailure();
-    }
-    if (!tiledLoops.empty()) {
-      // The entry point already has distribution to workgroups. Do nothing.
-      continue;
-    }
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     SmallVector<int64_t> tileSizes, staticLoopRanges, interchange;
     SmallVector<unsigned> partitionableLoops;
     Operation *dispatchRootOp = nullptr;
@@ -350,14 +341,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       patterns.insert<LowerDispatchWorkgroupCountForDagRootOp>(
           context, tileSizes, staticLoopRanges, interchange,
           partitionableLoops);
-      if (auto packRootOp =
-              dyn_cast_or_null<IREE::LinalgExt::PackOp>(dispatchRootOp)) {
+      auto res = funcOp.walk([&](tensor::PackOp packOp) -> WalkResult {
         FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
-            getMaterializationInfo(packRootOp);
-        if (failed(encodingInfo)) {
-          return signalPassFailure();
-        }
-        auto tensorType = packRootOp.getInputType().cast<RankedTensorType>();
+            getMaterializationInfo(packOp);
+        if (failed(encodingInfo)) return WalkResult::interrupt();
+        auto tensorType = packOp.getSourceType();
         // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
         // call materializeEncodingValueFn, passing it a tensor type, expecting
         // that tensor type to have a TensorEncodingAttr. The problem is that
@@ -371,11 +359,17 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         // LowerDispatchWorkgroupCountFromSetEncodingOp can call
         // materializeEncodingValueFn.
         Attribute encodingAttr =
-            packRootOp->getAttr(StringAttr::get(context, "encoding"));
+            packOp->getAttr(StringAttr::get(context, "encoding"));
         auto tensorTypeWithEncoding = RankedTensorType::Builder(
             tensorType.getShape(), tensorType.getElementType(), encodingAttr);
         patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
             context, encodingInfo.value(), tensorTypeWithEncoding);
+        return WalkResult::advance();
+      });
+      if (res.wasInterrupted()) {
+        exportOp.emitOpError(
+            "failed to get encoding information from pack ops");
+        return signalPassFailure();
       }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");

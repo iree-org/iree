@@ -65,6 +65,7 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::atomic_slist
+    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
     iree::base::tracing
@@ -73,6 +74,7 @@ iree_cc_binary(
     iree::testing::benchmark
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
@@ -96,8 +98,22 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::vm_util
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   TESTONLY
+)
+
+iree_cc_binary(
+  NAME
+    iree-dump-instruments
+  SRCS
+    "iree-dump-instruments-main.c"
+  DEPS
+    flatcc::runtime
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flatcc::parsing
+    iree::schemas::instruments
+    iree::schemas::instruments::dispatch_def_c_fbs
 )
 
 iree_cc_binary(
@@ -111,7 +127,7 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::internal::flatcc::debugging
     iree::schemas::bytecode_module_def_c_fbs
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
 
 iree_cc_binary(
@@ -128,6 +144,7 @@ iree_cc_binary(
     iree::tooling::comparison
     iree::tooling::context_util
     iree::tooling::device_util
+    iree::tooling::instrument_util
     iree::tooling::vm_util
     iree::vm
 )
@@ -146,6 +163,7 @@ iree_cc_binary(
     iree::modules::hal
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
@@ -169,6 +187,17 @@ iree_cc_binary(
     iree::tooling::yaml_util
     iree::vm
     yaml
+)
+
+iree_cc_binary(
+  NAME
+    iree-cpuinfo
+  SRCS
+    "iree-cpuinfo.c"
+  DEPS
+    iree::base
+    iree::base::internal::cpu
+    iree::schemas::cpu_data
 )
 
 if(IREE_BUILD_COMPILER)
@@ -205,8 +234,8 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-compile-main.cc"
     DEPS
-      iree::compiler::API2::Headers
-      iree::compiler::API2::Impl
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -219,8 +248,8 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-opt-main.cc"
     DEPS
-      iree::compiler::API2::Headers
-      iree::compiler::API2::Impl
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -233,8 +262,8 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-mlir-lsp-server.cc"
     DEPS
-      iree::compiler::API2::Headers
-      iree::compiler::API2::Impl
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
     SETUP_INSTALL_RPATH
   )
 
@@ -266,7 +295,7 @@ if(IREE_BUILD_COMPILER)
       iree::tooling::device_util
       iree::tooling::vm_util
       iree::vm
-      iree::vm::bytecode_module
+      iree::vm::bytecode::module
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY

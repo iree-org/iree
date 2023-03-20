@@ -45,6 +45,11 @@ static llvm::cl::opt<bool> clDemoteF32ToF16(
     llvm::cl::desc("Converts all f32 ops and values into f16 counterparts "
                    "unconditionally before main flow conversions."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clPromoteBF16ToF32(
+    "iree-flow-promote-bf16-to-f32",
+    llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts "
+                   "unconditionally before main flow conversions."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clPromoteF16ToF32(
     "iree-flow-promote-f16-to-f32",
     llvm::cl::desc("Converts all f16 ops and values into f32 counterparts "
@@ -61,11 +66,8 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableAggressiveFusion(
-    "iree-flow-enable-aggressive-fusion",
-    llvm::cl::desc(
-        "Enable the aggressive fusion heuristic to fuse multiuse ops and ops "
-        "with reduction loops"),
+static llvm::cl::opt<bool> clEnableFuseMultiUse(
+    "iree-flow-fuse-multi-use", llvm::cl::desc("Fuse multi-use ops"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
@@ -174,6 +176,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   if (clDemoteI64ToI32) {
     passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
   }
+  if (clPromoteBF16ToF32) {
+    passManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
+  }
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(passManager)
@@ -207,9 +212,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Elementwise fusion.
-      .addPass([]() {
-        return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
-      })
+      .addPass(
+          []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse); })
       .addPass(mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
@@ -234,13 +238,22 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
       // Only want use the transform dialect for some dispatch regions and let
-      // the FormDispatchRegions handle the rest.
+      // the FormDispatchRegions handle the rest. This only moves the root
+      // compute op into the dispatch region, so that we can run additional
+      // transformations afterwards with a simple region and without bothering
+      // producers.
       .addPass([&]() {
-        return createFormDispatchRegionsPass(clEnableAggressiveFusion,
+        return createFormDispatchRegionsPass(clEnableFuseMultiUse,
                                              clDispatchGenerateWorkloadRegion);
       })
       // Collapse dimensions of linalg Ops.
       .addPass(createCollapseDimensionsPass)
+      // Clone all producers into the dispatch region to perpare for being
+      // isolated from above. This enables running additional transformations
+      // afterwards that would need the full dispatch content but don't want to
+      // handle explicit captures as materialized as dispatch workgroup operands
+      // and block arguments.
+      .addPass(createCloneProducersIntoDispatchRegionsPass)
       // Form dispatch region into dispatch workgroups
       .addPass([&]() {
         return createFormDispatchWorkgroupsPass(
@@ -249,10 +262,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(createCSEPass);
+      .addPass(createCSEPass)
 
-  // Initialize any empty tensors to zero.
-  passManager.addPass(createInitializeEmptyTensorsPass(clZeroFillEmptyTensors));
+      // Initialize any empty tensors to zero.
+      .addPass([&]() {
+        return createInitializeEmptyTensorsPass(clZeroFillEmptyTensors);
+      });
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

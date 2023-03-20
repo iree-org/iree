@@ -47,6 +47,18 @@ def DecomposeLinalgGeneric :
   let constructor = "mlir::iree_compiler::createDecomposeLinalgGenericPass()";
 }
 
+def FixupSubspanWithOffsets :
+    Pass<"iree-codegen-fixup-subspan-with-offsets", "func::FuncOp"> {
+  let summary = "Fixes up `hal.interface.binding.subspan` ops with offsets";
+  let constructor =
+      "mlir::iree_compiler::createFixupSubspanWithOffsetsPass()";
+  let options = [
+    Option<"keepDeadSubspanOps", "keep-dead-subspan-ops",
+            "bool", /*default=*/"false",
+            "Flag to not remove dead subspan ops (used for testing only)">
+  ];
+}
+
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
@@ -141,6 +153,12 @@ def SplitFullPartialTransfer :
   ];
 }
 
+def TestExecutablePreprocessing :
+    Pass<"iree-codegen-test-executable-preprocessing", ""> {
+  let summary = "Tests iree-hal-preprocess-executables-with behavior.";
+  let constructor = "mlir::iree_compiler::createTestExecutablePreprocessingPass()";
+}
+
 def TestPartitionableLoopsInterface :
     Pass<"iree-codegen-test-partitionable-loops-interface", ""> {
   let summary = "Test the PartitionableLoopsInterface";
@@ -226,6 +244,17 @@ def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
     Option<"epiloguePeeling", "epilogue-peeling", "bool",
             /*default=*/"true",
            "Try to use un-peeling epilogue when false, peeled epilouge o.w.">,
+    Option<"depth", "pipeline-depth", "int64_t",
+            /*default=*/"2",
+           "Number of stages ">,
+    Option<"scheduleIndex", "schedule-index", "int64_t",
+            /*default=*/"0",
+           "Allows picking different schedule for the pipelining transformation.">,
+    Option<"transformFileName", "transform-file-name", "std::string",
+            /*default=*/"\"\"",
+            "Optional filename containing a transform dialect specification to "
+            "apply. If left empty, the IR is assumed to contain one top-level "
+            "transform dialect operation somewhere in the module.">,
   ];
 }
 
@@ -328,6 +357,12 @@ def RematerializeParallelOps :
     Pass<"iree-codegen-rematerialize-parallel-ops", "func::FuncOp"> {
   let summary = "Pass to rematerialize and merge parallel ops to avoid creating temporary allocs.";
   let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
+}
+
+def InstrumentMemoryAccesses :
+    Pass<"iree-codegen-instrument-memory-accesses", "func::FuncOp"> {
+  let summary = "Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.";
+  let constructor = "mlir::iree_compiler::createInstrumentMemoryAccessesPass()";
 }
 
 //------------------------------------------------------------------------------
@@ -482,6 +517,12 @@ def LLVMGPUTensorAlloc :
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorAlloc()";
 }
 
+def LLVMGPUPackSharedMemoryAlloc :
+    Pass<"iree-llvmgpu-pack-shared-memory-alloc", "func::FuncOp"> {
+  let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
+}
+
 def LLVMGPUTensorCoreVectorization :
     Pass<"iree-llvmgpu-tensorcore-vectorization", "func::FuncOp"> {
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
@@ -610,6 +651,12 @@ def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
   let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
+}
+
+def SPIRVEraseStorageBufferStaticShape :
+    Pass<"iree-spirv-erase-storage-buffer-static-shape", "func::FuncOp"> {
+  let summary = "Turn static shaped storage buffer subspan ops into dynamic shaped ones";
+  let constructor = "mlir::iree_compiler::createSPIRVEraseStorageBufferStaticShapePass()";
 }
 
 def SPIRVMapMemRefStorageClass :

@@ -7,7 +7,9 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
@@ -17,6 +19,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#define DEBUG_TYPE "iree-gpu-pipelining"
 
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
@@ -42,21 +45,12 @@ static bool hasDefaultOrHALAddressSpace(MemRefType memrefType) {
   return addrSpace.isa<IREE::HAL::DescriptorTypeAttr>();
 }
 
-/// Returns true if the given `memrefType` has the numeric address space for
-/// GPU shared memory.
-static bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
-  auto addrSpace =
-      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
-  return addrSpace &&
-         addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
-}
-
-// Returns a new predicated operation to support unpeeled epilogue. Unpeeled
-// epilogue needs to handle the last iterations within the mainloop which
-// requires predicating operations, for e.g., OOB global memory access. This
-// helper function predicates operations (where predication is avialable),
-// checks if unpredicated operations are side-effect free and acceptable to
-// execute speculatively.
+/// Returns a new predicated operation to support unpeeled epilogue. Unpeeled
+/// epilogue needs to handle the last iterations within the mainloop which
+/// requires predicating operations, for e.g., OOB global memory access. This
+/// helper function predicates operations (where predication is avialable),
+/// checks if unpredicated operations are side-effect free and acceptable to
+/// execute speculatively.
 static Operation* replaceOpWithPredicatedOp(Operation* op, Value pred,
                                             PatternRewriter& rewriter) {
   // Predication is only supported for AsyncCopyOp. Thus, for operations which
@@ -66,12 +60,16 @@ static Operation* replaceOpWithPredicatedOp(Operation* op, Value pred,
     // Return/execute the op if it is a side effect free.
     if (mlir::isMemoryEffectFree(op)) return op;
     // Return/execute the op if it is barrier, commit group, or ldmatrix op.
-    if (isa<gpu::BarrierOp, nvgpu::DeviceAsyncCreateGroupOp, nvgpu::LdMatrixOp>(
-            op))
+    if (isa<gpu::BarrierOp, nvgpu::DeviceAsyncCreateGroupOp, nvgpu::LdMatrixOp,
+            nvgpu::DeviceAsyncWaitOp>(op))
       return op;
     // Return/execute the op if it is a shared memory load.
     if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
       auto loadBaseType = loadOp.getBase().getType().cast<MemRefType>();
+      if (hasSharedMemoryAddressSpace(loadBaseType)) return op;
+    }
+    if (auto loadOp = dyn_cast<memref::LoadOp>(op)) {
+      auto loadBaseType = loadOp.getMemRefType();
       if (hasSharedMemoryAddressSpace(loadBaseType)) return op;
     }
     // If we are here that means the operation does not have predication support
@@ -148,12 +146,17 @@ static void getPipelineStages(scf::ForOp forOp,
 static void setAsyncAnnotations(Operation* op,
                                 scf::PipeliningOption::PipelinerPart part,
                                 unsigned iteration, unsigned depth,
-                                unsigned store_stage) {
+                                PipeliningSchedulingStrategy schedule) {
   if (auto waitOp = dyn_cast<nvgpu::DeviceAsyncWaitOp>(op)) {
+    // Based on the order copies within the loop we need to adjust the number of
+    // copies in flight.
+    bool copyBeforeLoad =
+        schedule == PipeliningSchedulingStrategy::nvidiaTensorCore;
     if (waitOp.getNumGroups()) return;
     int numGroupInFlight = 0;
-    if (part == scf::PipeliningOption::PipelinerPart::Kernel) {
-      numGroupInFlight = depth - 1;
+    if (part == scf::PipeliningOption::PipelinerPart::Kernel ||
+        part == scf::PipeliningOption::PipelinerPart::Prologue) {
+      numGroupInFlight = copyBeforeLoad ? depth - 2 : depth - 1;
     } else {
       // By construction there should be no wait op in the prologue as all the
       // wait should be in the last stage.
@@ -166,7 +169,9 @@ static void setAsyncAnnotations(Operation* op,
     waitOp->setAttr(waitOp.getNumGroupsAttrName(),
                     b.getI32IntegerAttr(numGroupInFlight));
   } else if (auto barrierOp = dyn_cast<gpu::BarrierOp>(op)) {
-    if (store_stage != 0 ||
+    unsigned pipelineStoreStage =
+        schedule == PipeliningSchedulingStrategy::loadStoreStage0 ? 0 : 1;
+    if (pipelineStoreStage != 0 ||
         part != mlir::scf::PipeliningOption::PipelinerPart::Prologue ||
         iteration >= depth - 1)
       return;
@@ -222,25 +227,370 @@ static bool setPipeliningMarkers(scf::ForOp forOp, bool pipelineStoreStage) {
   return copyToWorkgroupMemory;
 }
 
-/// Apply pipeline rewrite pattern assuming the operations were already
-/// annotated with stage information.
+/// Warp-level TensorOp.
+/// The data structures holds the operations and their dependencies for the
+/// Shared Memory and Tensor Core (mma.sync) for a kgroup.
+struct WarpMmaOp {
+  // Load matrixA from Shared Memory to Registers.
+  llvm::SetVector<Operation*> loadOperationsA;
+  // Load matrixB from Shared Memory to Registers.
+  llvm::SetVector<Operation*> loadOperationsB;
+  // Warp-level Tensor Core operations on Registers.
+  llvm::SetVector<Operation*> mmaOperations;
+};
+
+/// Structure to hold the matmul's mainloop information:
+/// Seperates the mma operations into kgroups and collects the Shared Memory
+/// loads for each kgroup. This information is used to pipeline the mainloop and
+/// to generate an optimal schedule interleaving Global Memory loads, Shared
+/// Memory loads, and math operations.
+struct MainLoopInfo {
+  // Mainloop asyncronous copy operations:
+  // `cp.async` GlobalMemory -> SharedMemory
+  llvm::SetVector<Operation*> copyGlobalToSharedOps;
+  llvm::SetVector<Operation*> asyncCreateGroupOp;
+  llvm::SetVector<Operation*> barrierOps;
+  llvm::SetVector<Operation*> asyncWaitOps;
+
+  // Mainloop asyncronous copy operations dependencies
+  llvm::SetVector<Operation*> copyGlobalToSharedOpDeps;
+
+  // Warp-level syncronous operations:
+  // `ldmatrix, ld.shared` SharedMemory -> Registers
+  // `mma.sync` Registers -> Tensor Cores.
+  llvm::SmallVector<WarpMmaOp, 4> warpOperations;
+
+  // Set to track the dependencies already seen to a backward slice.
+  llvm::SetVector<Operation*> seenDepOps;
+
+  // Set to track the mma operations in forward slice to count kgroups and
+  // populate the warp-level warpOperations
+  llvm::SetVector<Operation*> seenMmaOps;
+
+  // Boolen to store if the mainloop can be pipelined (coarse-grained
+  // scheduling) and the instructions can be interleaved (fine-grained
+  // scheduling).
+  bool isSchedulable = false;
+
+  // Populates the dependent operations in ``dependentOps`` for the given a op
+  // recursively that are in the same block and not added to the backward slice
+  // of some other op.
+  void backwardSliceOfDependentOps(llvm::SetVector<Operation*>& dependentOps,
+                                   Operation* op, Block* block) {
+    if (!seenDepOps.insert(op)) return;
+    // Add the unseen op to the dependentOps and recurse on its operands.
+    dependentOps.insert(op);
+    for (Value operand : op->getOperands()) {
+      Operation* defOp = operand.getDefiningOp();
+      if (defOp && defOp->getBlock() == block)
+        backwardSliceOfDependentOps(dependentOps, defOp, block);
+    }
+  }
+
+  // Backtrack from the MmaSyncOp operand (mlir::OpOperand) to its defining
+  // mlir::Operation to find the ldmatrix or ld.shared operations that load
+  // MmaSyncOp operands.
+  void backtrackToFindSmemLoad(Operation* op,
+                               llvm::SetVector<Operation*>& loadOperations,
+                               Block* block) {
+    if (!op) return;
+
+    // If the operation is a ldmatrix or ld.shared, then add it to the set of
+    // the current kgroup load operations.
+    if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(op)) {
+      if (op->getBlock() == block) {
+        loadOperations.insert(op);
+      }
+      return;
+    }
+
+    // If the operation is not a ldmatrix or ld.shared, then it has to be a
+    // vector.extract_strided_slice or vector.insert operation  to recurse up
+    // the chain to find the ldmatrix or ld.shared Shared Memory load operation.
+    if (!isa<vector::ExtractStridedSliceOp, vector::InsertOp>(op)) {
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "Unable to find Shared Memory load for MmaSyncOp. Thus, the "
+               "Shared Memory load into the register operand will not be "
+               "pipelined."
+            << "\n";
+      });
+      return;
+    }
+
+    // Recurse upwards towards the definition until a Shared Memory load is
+    // found. Only vector.extract_strided_slice or vector.insert operations
+    // leading up to a Shared Memory loads are considered.
+    Operation* defOp = op->getOperand(0).getDefiningOp();
+
+    backtrackToFindSmemLoad(defOp, loadOperations, block);
+  }
+
+  // Recursively traverse the chain of mma operations for all kgroups from 0
+  // (start) to numKgroups (ends scf.yield).
+  // Assumption: The mma operations are in a chain in monotonic increasing
+  // kgroup order.
+  void vistMmaSyncOp(Operation* op, int kgroup) {
+    // if the operation in an `scf.yield`, we reached the end of MmaSyncOp chain
+    // return.
+    if (seenMmaOps.count(op) || isa<scf::YieldOp>(op)) return;
+
+    seenMmaOps.insert(op);
+
+    // If the kgroup is not in the vector, create a new WarpMmaOp.
+    if (warpOperations.size() < kgroup + 1)
+      warpOperations.push_back(WarpMmaOp());
+
+    backtrackToFindSmemLoad(op->getOperand(0).getDefiningOp(),
+                            warpOperations[kgroup].loadOperationsA,
+                            op->getBlock());
+
+    backtrackToFindSmemLoad(op->getOperand(1).getDefiningOp(),
+                            warpOperations[kgroup].loadOperationsB,
+                            op->getBlock());
+
+    warpOperations[kgroup].mmaOperations.insert(op);
+
+    vistMmaSyncOp((op->getUses().begin())->getOwner(), ++kgroup);
+  }
+
+  MainLoopInfo(scf::ForOp forOp) : isSchedulable(true) { analyze(forOp); }
+
+  // Iterate through the mainloop and collect `cp.async`, `cp.commit_group`,
+  // `cp.wait_group`, and `barrier` operations. These operations are used to
+  // pipeline the mainloop and cheorograph asyncroncy for a *coarse-grained*
+  // schedule. Additionally, collect the `mma.sync` and `ldmatrix`/`ld.shared`
+  // operations and separate them into kgroups. The information is helpful in
+  // generating an optimal *finer-grained* instruction interleaving of global
+  // memory loads, shared memory loads, and math operations.
+  void analyze(scf::ForOp forOp) {
+    for (Operation& op : forOp.getBody()->getOperations()) {
+      if (op.getNumRegions() > 0) {
+        // Pipeline and schedule the most inner for op ,i.e., the mainloop that
+        // should be a flat region.
+        isSchedulable = false;
+        return;
+      }
+      if (isa<nvgpu::DeviceAsyncCopyOp>(op)) {
+        copyGlobalToSharedOps.insert(&op);
+      }
+      if (isa<nvgpu::DeviceAsyncCreateGroupOp>(op)) {
+        asyncCreateGroupOp.insert(&op);
+      }
+      if (isa<gpu::BarrierOp>(op)) {
+        barrierOps.insert(&op);
+      }
+      if (isa<nvgpu::DeviceAsyncWaitOp>(op)) {
+        asyncWaitOps.insert(&op);
+      }
+      if (isa<nvgpu::MmaSyncOp>(op)) {
+        // MmaSyncOp visitor traverses the chain of mma operations and separates
+        // them into kgroups.
+        vistMmaSyncOp(&op, 0 /*kgroup=0*/);
+      }
+    }
+
+    // If one of the ingredients (`cp.async`, `cp.commit_group`,
+    // `cp.wait_group`, `bar.sync`, `mma.sync`, `ldmatrix` or `ld.shared`) for
+    // scheduling is missing, the mainloop cannot be scheduled.
+    if (copyGlobalToSharedOps.empty() || asyncCreateGroupOp.empty() ||
+        asyncWaitOps.empty() || barrierOps.empty() || warpOperations.empty()) {
+      isSchedulable = false;
+      return;
+    }
+
+    // Collect the dependent operations for `cp.async` in the mainloop order for
+    // coarse-grained software pipeling. The deps are collected in stage order,
+    // i.e., `cp.async`'s deps in stage 0 are collected first.
+    for (Operation& op : forOp.getBody()->getOperations()) {
+      if (isa<nvgpu::DeviceAsyncCopyOp>(&op)) {
+        backwardSliceOfDependentOps(copyGlobalToSharedOpDeps, &op,
+                                    forOp.getBody());
+      }
+    }
+
+    // Collect the dependent operations for `mma.sync` and `ldmatrix/ld.shared`
+    // operations seperated by kgroups for fine-grained instruction scheduling.
+    for (int kgroup = 0; kgroup < getNumberOfKgroups(); ++kgroup) {
+      for (Operation& op : forOp.getBody()->getOperations()) {
+        if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(&op)) {
+          if (warpOperations[kgroup].loadOperationsA.count(&op)) {
+            backwardSliceOfDependentOps(warpOperations[kgroup].loadOperationsA,
+                                        &op, forOp.getBody());
+          }
+          if (warpOperations[kgroup].loadOperationsB.count(&op)) {
+            backwardSliceOfDependentOps(warpOperations[kgroup].loadOperationsB,
+                                        &op, forOp.getBody());
+          }
+        }
+      }
+      for (Operation& op : forOp.getBody()->getOperations()) {
+        if (isa<nvgpu::MmaSyncOp>(&op)) {
+          if (warpOperations[kgroup].mmaOperations.count(&op)) {
+            backwardSliceOfDependentOps(warpOperations[kgroup].mmaOperations,
+                                        &op, forOp.getBody());
+          }
+        }
+      }
+    }
+  }
+
+  // Returns the number of kgroups in the Warp-level MMA operations.
+  int getNumberOfKgroups() { return warpOperations.size(); }
+};
+
+/// Prints the given `funcOp` after a leading `step` comment header.
+static void debugMainloopSchedule(
+    MainLoopInfo& mainloop, int numStages,
+    std::vector<std::pair<Operation*, unsigned>>& ops) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- Mainloop schedule generated for Nvidia Ampere "
+                    "mma.sync TensorCore Pipeline. ---//\n";
+    llvm::dbgs() << " Number of stages: " << numStages << "\n";
+    llvm::dbgs() << " Number of kgroups: " << mainloop.getNumberOfKgroups()
+                 << "\n";
+    llvm::dbgs() << " Number of mainloop instructions " << ops.size() << "\n";
+    llvm::dbgs() << " Mainloop instructions schedule and stage assignment: ";
+    for (auto& stage_op_pair : ops) {
+      llvm::dbgs() << " Stage (" << stage_op_pair.second << ") , Operation: ";
+      stage_op_pair.first->dump();
+    }
+    llvm::dbgs() << "\n\n";
+  });
+}
+
+/// This function returns an *coarse-grained* stage assignment for software
+/// pipelining of the mainloop and a *fine-grained* instruction interleaving.
+/// The schedule provides good performance on Nvidia Ampere architecture using
+/// Ampere-style multi-staged pipeline.
+///
+/// @param forOp the mainloop to pipeline and schedule.
+/// @param ops a vector of pairs: [(operations, pipeline_stage)].
+/// @param numStages the total number of pipeline stages used for multi-buffer.
+static void getNvidiaAmpereTensorCorePipeline(
+    scf::ForOp forOp, std::vector<std::pair<Operation*, unsigned>>& ops,
+    unsigned numStages) {
+  // Analyze the main loop and obtain information for coarse-grained pipelining
+  // and fine-grained instruction scheduling.
+  MainLoopInfo mainloop(forOp);
+
+  // If the mainloop is not schedulable, return an empty schedule.
+  if (!mainloop.isSchedulable) return;
+
+  // NVIDIA Ampere Tensor Core multi-staged pipeline requires at least 2 kgroups
+  // and 3 software pipeline stages. If the conditions are not met, return an
+  // empty schedule.
+  int numKgroups = mainloop.getNumberOfKgroups();
+  if (numKgroups < 2 || numStages < 3) {
+    return;
+  }
+
+  // Un-pipelined mainloop should have only one occurance of
+  // cp.async.commit_group and cp.async.wait_group. Additionally, two barrier
+  // ops are inserted around each staged copy. The barrier op before the copy is
+  // un-necessary and will be removed. If the conditions are not met, return an
+  // empty schedule.
+  if (!(mainloop.asyncCreateGroupOp.size() == 1) ||
+      !(mainloop.asyncWaitOps.size() == 1) ||
+      !(mainloop.barrierOps.size() == 2)) {
+    return;
+  }
+
+  // Start pipelining and scheduling the main loop, all kgroups but the last
+  // one.
+  for (int kgroup = 0; kgroup < numKgroups - 1; kgroup++) {
+    // Fine-grained instruction scheduling: interleave Shared Memory loads
+    // into and mma.sync operations to hide load latencies.
+
+    // Load the next kgroup into registers.
+    for (Operation& op : forOp.getBody()->getOperations()) {
+      if (mainloop.warpOperations[kgroup + 1].loadOperationsA.count(&op) ||
+          mainloop.warpOperations[kgroup + 1].loadOperationsB.count(&op)) {
+        ops.push_back(std::make_pair(&op, numStages - 1));
+      }
+    }
+
+    // Issue mma.sync on previous loaded kgroup.
+    for (Operation& op : forOp.getBody()->getOperations()) {
+      if (mainloop.warpOperations[kgroup].mmaOperations.count(&op))
+        ops.push_back(std::make_pair(&op, numStages - 1));
+    }
+  }
+
+  // Coarse-grained instruction pipelining: pipeline Global Memory
+  // transfer (GMEM -> SMEM) several stages in advance.
+
+  // Schedule all cp.async and one cp.async.commit_group.
+  // TODO: Distribute cp.async throughout the main loop and do not concentrate
+  // it at one place.
+  // Schedule all cp.async and one cp.async.commit_group.
+  for (Operation& op : forOp.getBody()->getOperations()) {
+    if (mainloop.copyGlobalToSharedOpDeps.count(&op))
+      ops.push_back(std::make_pair(&op, 0 /*pipelineStage*/));
+  }
+  ops.push_back(
+      std::make_pair(mainloop.asyncCreateGroupOp[0], 0 /*pipelineStage*/));
+
+  // Schedule and pipeline all async.wait and barrier
+  ops.push_back(std::make_pair(mainloop.asyncWaitOps[0], numStages - 2));
+  mainloop.barrierOps[0]->erase();
+  ops.push_back(std::make_pair(mainloop.barrierOps[1], numStages - 2));
+  //////////////////////////////////////////////////////////////////////////////
+
+  // Coarse-grained instruction pipelining: pipeline Shared Memory loads
+  // (SMEM -> Registers) for the first kgroup (kgroup = 0) one stage in
+  // advance.
+
+  // Schedule the Shared Memory loads for the first kgroup and pipeline them
+  // into one stage ahead.
+  for (Operation& op : forOp.getBody()->getOperations()) {
+    if (mainloop.warpOperations[0].loadOperationsA.count(&op) ||
+        mainloop.warpOperations[0].loadOperationsB.count(&op))
+      ops.push_back(std::make_pair(&op, numStages - 2));
+  }
+
+  // Issue mma.sync on for the last kgroup at the end of the mainloop.
+  for (Operation& op : forOp.getBody()->getOperations()) {
+    if (mainloop.warpOperations[numKgroups - 1].mmaOperations.count(&op))
+      ops.push_back(std::make_pair(&op, numStages - 1));
+  }
+
+  // Prints the mainloop schedule generated for NVIDIA Ampere through native
+  // Tensor Core operations (asyncronous copy, load matrix, and mma.sync).
+  debugMainloopSchedule(mainloop, numStages, ops);
+}
+
+// Apply pipeline rewrite pattern assuming the operations were already
+// annotated with stage information.
 // TODO: move away from using attribute annotations.
-static FailureOr<scf::ForOp> applyPipelining(scf::ForOp forOp, int64_t depth,
-                                             bool epiloguePeeling,
-                                             bool pipelineStoreStage) {
+static FailureOr<scf::ForOp> applyPipelining(
+    scf::ForOp forOp, int64_t depth, bool epiloguePeeling,
+    PipeliningSchedulingStrategy schedule) {
+  // TODO: Refactor schedules to not rely on markers.
+  if (schedule == PipeliningSchedulingStrategy::loadGlobalStage0 ||
+      schedule == PipeliningSchedulingStrategy::loadStoreStage0) {
+    unsigned pipelineStoreStage =
+        schedule == PipeliningSchedulingStrategy::loadGlobalStage0;
+    if (!setPipeliningMarkers(forOp, pipelineStoreStage)) {
+      return failure();
+    }
+  }
+
   scf::PipeliningOption options;
   unsigned maxDepth = depth;
-  auto getSchedule = [maxDepth](
+  auto getSchedule = [maxDepth, schedule](
                          scf::ForOp forOp,
                          std::vector<std::pair<Operation*, unsigned>>& ops) {
+    if (schedule == PipeliningSchedulingStrategy::nvidiaTensorCore) {
+      return getNvidiaAmpereTensorCorePipeline(forOp, ops, maxDepth);
+    }
     return getPipelineStages(forOp, ops, maxDepth);
   };
-  auto setAnnotation = [maxDepth, pipelineStoreStage](
+  auto setAnnotation = [maxDepth, schedule](
                            Operation* op,
                            scf::PipeliningOption::PipelinerPart part,
                            unsigned iteration) {
-    return setAsyncAnnotations(op, part, iteration, maxDepth,
-                               pipelineStoreStage);
+    return setAsyncAnnotations(op, part, iteration, maxDepth, schedule);
   };
   options.getScheduleFn = getSchedule;
   options.annotateFn = setAnnotation;
@@ -261,22 +611,27 @@ static FailureOr<scf::ForOp> applyPipelining(scf::ForOp forOp, int64_t depth,
 }
 namespace {
 struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
-  GPUPipeliningPass(bool epiloguePeeling, unsigned depth, unsigned storeStage)
-      : depth(depth), storeStage(storeStage) {
-    this->epiloguePeeling = epiloguePeeling;
+  GPUPipeliningPass(bool epiloguePeeling, int64_t depth,
+                    PipeliningSchedulingStrategy schedule)
+      : depth(depth), schedule(schedule), epiloguePeeling(epiloguePeeling) {}
+  void initOptions() {
+    if (GPUPipeliningBase::depth.hasValue())
+      depth = GPUPipeliningBase::depth.getValue();
+    if (GPUPipeliningBase::epiloguePeeling.hasValue())
+      epiloguePeeling = GPUPipeliningBase::epiloguePeeling.getValue();
+    if (GPUPipeliningBase::scheduleIndex.hasValue())
+      schedule = (PipeliningSchedulingStrategy)
+                     GPUPipeliningBase::scheduleIndex.getValue();
   }
-  void runOnOperation() override {
-    auto funcOp = getOperation();
 
-    unsigned pipelineStoreStage = storeStage;
+  void runOnOperation() override {
+    initOptions();
+    auto funcOp = getOperation();
     SmallVector<scf::ForOp> forOps;
     // Mark the loop with shared memory copy for pipelining.
     funcOp.walk([&forOps](scf::ForOp forOp) { forOps.push_back(forOp); });
     for (scf::ForOp forOp : forOps) {
-      if (setPipeliningMarkers(forOp, pipelineStoreStage)) {
-        (void)applyPipelining(forOp, depth, epiloguePeeling,
-                              pipelineStoreStage);
-      }
+      (void)applyPipelining(forOp, depth, epiloguePeeling, schedule);
     }
     // Remove extra barriers from the prologue assuming appropriate
     // multi-buffering.
@@ -286,31 +641,27 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
   }
 
  private:
-  unsigned depth;
-  unsigned storeStage;
+  int64_t depth;
+  PipeliningSchedulingStrategy schedule;
+  bool epiloguePeeling;
 };
 }  // namespace
 
 FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
     scf::ForOp forOp, PipeliningSchedulingStrategy startegy, bool peelEpilogue,
     int64_t depth, PatternRewriter& rewriter) {
-  bool pipelineStoreStage =
-      startegy == PipeliningSchedulingStrategy::loadStoreStage0;
-  if (setPipeliningMarkers(forOp, pipelineStoreStage)) {
-    return applyPipelining(forOp, depth, peelEpilogue, pipelineStoreStage);
-  }
-  return failure();
+  return applyPipelining(forOp, depth, peelEpilogue, startegy);
 }
 
 /// Pass options
 /// epiloguePeeling - try enable/disable epilogue peeling.
 /// true  : Peel epilogue (no additional checks required)
-/// false : Try and use unpeeled epilogue (check if predication is supported is
-/// avialable)
+/// false : Try and use unpeeled epilogue (check if predication is supported
+/// is avialable)
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    bool epiloguePeeling, unsigned depth, unsigned storeStage) {
-  return std::make_unique<GPUPipeliningPass>(epiloguePeeling, depth,
-                                             storeStage);
+    bool epiloguePeeling, unsigned depth,
+    PipeliningSchedulingStrategy schedule) {
+  return std::make_unique<GPUPipeliningPass>(epiloguePeeling, depth, schedule);
 }
 
 }  // namespace iree_compiler

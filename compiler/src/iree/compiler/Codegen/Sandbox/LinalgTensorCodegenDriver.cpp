@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <algorithm>
 #include <optional>
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
@@ -18,10 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
-#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Dialect/X86Vector/Transforms.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -43,19 +41,46 @@ using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 // IREE specific functions
 //===----------------------------------------------------------------------===//
 
-/// Returns the op that contains lowering config. Returns failure if there are
-/// multiple op having lowering config.
-static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
+/// Returns the op that contains lowering config. Checks whether the provided op
+/// contains the lowering config and returns it. Otherwise, tries to find the
+/// lowering config across the function. If there are multiple ops with the same
+/// lowering configs, returns the first one found. Returns failure if there are
+/// multiple op with different lowering config.
+static FailureOr<Operation *> getRootOp(Operation *op) {
+  // Check for self first.
+  if (iree_compiler::getLoweringConfig(op)) {
+    return op;
+  }
+
+  // Get the function op.
+  auto funcOp = dyn_cast<func::FuncOp>(op);
+  if (!funcOp) {
+    funcOp = op->getParentOfType<func::FuncOp>();
+  }
+
+  assert(funcOp && "Missing funcOp");
+
   Operation *rootOp = nullptr;
+  mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr rootLoweringConfig;
   auto result = funcOp.walk([&](Operation *op) -> WalkResult {
-    if (!iree_compiler::getLoweringConfig(op)) return WalkResult::advance();
-    if (rootOp) {
-      return WalkResult::interrupt();
+    auto loweringConfig = iree_compiler::getLoweringConfig(op);
+    if (!loweringConfig) {
+      return WalkResult::advance();
     }
-    rootOp = op;
+    if (rootLoweringConfig) {
+      if (rootLoweringConfig != loweringConfig) {
+        return WalkResult::interrupt();
+      }
+    } else {
+      rootOp = op;
+      rootLoweringConfig = loweringConfig;
+    }
     return WalkResult::advance();
   });
-  if (!rootOp || result.wasInterrupted()) return failure();
+
+  if (!rootOp || result.wasInterrupted()) {
+    return failure();
+  }
   return rootOp;
 }
 
@@ -141,29 +166,13 @@ static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
 // particular linalg op within that dispatch.
 static SmallVector<int64_t> getVectorSizes(
     linalg::LinalgOp linalgOp, ArrayRef<int64_t> canonicalVectorShape) {
-  FailureOr<Operation *> rootOp =
-      getRootOp(linalgOp->getParentOfType<func::FuncOp>());
+  FailureOr<Operation *> rootOp = getRootOp(linalgOp);
   if (failed(rootOp)) {
     return {};
   }
 
   // TODO: Infer the tiles sizes for an op that is not the root op.
   if (*rootOp != linalgOp.getOperation()) {
-    return {};
-  }
-
-  // TODO: Support masking for static shapes.
-  if (llvm::any_of(linalgOp.getStaticLoopRanges(), [](int64_t dimSize) {
-        return !ShapedType::isDynamicShape(dimSize) && dimSize != 1;
-      })) {
-    return {};
-  }
-
-  // TODO: Support masking for reduction.
-  if (llvm::any_of(linalgOp.getIteratorTypesArray(),
-                   [](utils::IteratorType iter) {
-                     return !linalg::isParallelIterator(iter);
-                   })) {
     return {};
   }
 
@@ -174,10 +183,16 @@ static SmallVector<int64_t> getVectorSizes(
   assert(canonicalVectorShape.size() >= linalgOp.getNumLoops() &&
          "Unexpected canonical vector shape or number of loops");
 
-  // Return the canonical vector shape subset based on the number of loops of
-  // the linalg op.
-  return {canonicalVectorShape.begin(),
-          std::next(canonicalVectorShape.begin(), linalgOp.getNumLoops())};
+  // Return the valid canonical vector shape subset based on the number of loops
+  // of the linalg op.
+  SmallVector<int64_t> vecSize(
+      canonicalVectorShape.take_front(linalgOp.getNumLoops()));
+  for (auto [idx, val] : llvm::enumerate(linalgOp.getStaticLoopRanges())) {
+    if (ShapedType::isDynamic(val)) continue;
+    vecSize[idx] = std::max(vecSize[idx], val);
+  }
+
+  return vecSize;
 }
 
 /// Constructs padding attributes for given anchor op. Returns failure if there
@@ -289,18 +304,6 @@ static FailureOr<int64_t> getSplitReductionSizeFromConfig(func::FuncOp funcOp) {
 
 namespace {
 
-static void getAtMostNEnclosingLoops(
-    Operation *op, int64_t nLoops,
-    SmallVector<scf::ForOp> &reverseEnclosingLoops) {
-  scf::ForOp outermostEnclosingForOp = nullptr;
-  Operation *nextEnclosingOp = op->getParentOp();
-  while (nLoops-- > 0 &&
-         (outermostEnclosingForOp = dyn_cast<scf::ForOp>(nextEnclosingOp))) {
-    reverseEnclosingLoops.push_back(outermostEnclosingForOp);
-    nextEnclosingOp = outermostEnclosingForOp->getParentOp();
-  }
-}
-
 struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
   LinalgFusePass(int64_t tilingLevel = -1, bool vectorize = false) {
     this->tilingLevel.setValue(tilingLevel);
@@ -322,6 +325,7 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
     this->hoistPaddings = options.hoistPaddings;
     this->transposePaddings = options.transposePaddings;
     this->vectorize = options.vectorize;
+    this->enableVectorMasking = options.enableVectorMasking;
     this->vectorizePadding = options.vectorizePadding;
     this->tilingLevel = options.tilingLevel;
   }
@@ -360,6 +364,7 @@ struct LinalgSingleTilingExpertPass
     this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
     this->peel = options.peel;
     this->vectorize = options.vectorize;
+    this->enableVectorMasking = options.enableVectorMasking;
     this->vectorizePadding = options.vectorizePadding;
     this->vectorizeGatherAccesses = options.vectorizeGatherAccesses;
     this->tilingLevel = options.tilingLevel;
@@ -387,27 +392,6 @@ struct LinalgVectorLoweringPass
     this->maxTransferRank = options.maxTransferRank;
   }
 
-  void runOnOperation() override;
-};
-
-struct UnrollOneVectorOpPass
-    : public UnrollOneVectorOpBase<UnrollOneVectorOpPass> {
-  UnrollOneVectorOpPass() = default;
-  UnrollOneVectorOpPass(const UnrollOneVectorOpPass &pass) {}
-  void runOnOperation() override;
-};
-
-struct UnrollOneParentLoopPass
-    : public UnrollOneParentLoopBase<UnrollOneParentLoopPass> {
-  UnrollOneParentLoopPass() = default;
-  UnrollOneParentLoopPass(const UnrollOneParentLoopPass &pass) {}
-  void runOnOperation() override;
-};
-
-struct OutlineOneParentLoopPass
-    : public OutlineOneParentLoopBase<OutlineOneParentLoopPass> {
-  OutlineOneParentLoopPass() = default;
-  OutlineOneParentLoopPass(const OutlineOneParentLoopPass &pass) {}
   void runOnOperation() override;
 };
 }  // namespace
@@ -770,8 +754,12 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   LinalgVectorizationOptions vectorizationOptions;
   vectorizationOptions.setVectorizePadding(vectorizePadding);
   vectorizationOptions.setVectorizeGatherAccesses(vectorizeGatherAccesses);
-  vectorizationOptions.setCanonicalVectorSizes(getCanonicalVectorShape(funcOp));
-  vectorizationOptions.setVectorSizeComputationFunction(getVectorSizes);
+  vectorizationOptions.setEnableVectorMasking(enableVectorMasking);
+  if (enableVectorMasking) {
+    vectorizationOptions.setCanonicalVectorSizes(
+        getCanonicalVectorShape(funcOp));
+    vectorizationOptions.setVectorSizeComputationFunction(getVectorSizes);
+  }
 
   CodegenStrategy strategy;
   StringRef genericOpName = linalg::GenericOp::getOperationName();
@@ -875,87 +863,6 @@ void LinalgVectorLoweringPass::runOnOperation() {
   }
 }
 
-void UnrollOneVectorOpPass::runOnOperation() {
-  if (getOperation().getName() != anchorFuncOpName) return;
-
-  MLIRContext *ctx = &getContext();
-  RewritePatternSet patterns(ctx);
-  vector::populateVectorUnrollPatterns(
-      patterns, vector::UnrollVectorOptions()
-                    .setNativeShape(targetShape)
-                    .setFilterConstraint([&](Operation *op) {
-                      auto unrollInterface =
-                          dyn_cast<VectorUnrollOpInterface>(op);
-                      if (!unrollInterface ||
-                          op->getName().getStringRef() != anchorOpName ||
-                          !sourceShape.hasValue()) {
-                        return failure();
-                      }
-                      auto shapeForUnroll = unrollInterface.getShapeForUnroll();
-                      if (!shapeForUnroll) return failure();
-                      ArrayRef<int64_t> sourceShapeToMatch{sourceShape};
-                      ArrayRef<int64_t> actualSourceShape{
-                          shapeForUnroll->begin(), shapeForUnroll->end()};
-                      return success(sourceShapeToMatch == actualSourceShape);
-                    }));
-  vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-  (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-}
-
-void UnrollOneParentLoopPass::runOnOperation() {
-  if (getOperation().getName() != anchorFuncOpName) return;
-
-  // Poor man's op targeting.
-  getOperation().walk([&](Operation *op) {
-    if (op->getName().getStringRef() != anchorOpName)
-      return WalkResult::advance();
-    SmallVector<scf::ForOp> reverseEnclosingLoops;
-    getAtMostNEnclosingLoops(op, parentLoopNum, reverseEnclosingLoops);
-    if (failed(loopUnrollByFactor(reverseEnclosingLoops.back(), unrollFactor)))
-      signalPassFailure();
-    return WalkResult::interrupt();
-  });
-}
-
-scf::ExecuteRegionOp outlineInExecuteRegion(RewriterBase &b, Operation *op) {
-  if (op->getNumRegions() != 1) return nullptr;
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(op);
-  scf::ExecuteRegionOp executeRegionOp =
-      b.create<scf::ExecuteRegionOp>(op->getLoc(), op->getResultTypes());
-  {
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
-    Operation *clonedOp = b.cloneWithoutRegions(*op);
-    Region &clonedRegion = clonedOp->getRegions().front();
-    assert(clonedRegion.empty() && "expected empty region");
-    b.inlineRegionBefore(op->getRegions().front(), clonedRegion,
-                         clonedRegion.end());
-    b.create<scf::YieldOp>(op->getLoc(), clonedOp->getResults());
-  }
-  b.replaceOp(op, executeRegionOp.getResults());
-  return executeRegionOp;
-}
-
-void OutlineOneParentLoopPass::runOnOperation() {
-  if (getOperation().getName() != anchorFuncOpName) return;
-
-  // Poor man's op targeting.
-  getOperation().walk([&](Operation *op) {
-    if (op->getName().getStringRef() != anchorOpName)
-      return WalkResult::advance();
-    SmallVector<scf::ForOp> reverseEnclosingLoops;
-    getAtMostNEnclosingLoops(op, parentLoopNum, reverseEnclosingLoops);
-    IRRewriter b(op->getContext());
-    scf::ExecuteRegionOp exec =
-        outlineInExecuteRegion(b, reverseEnclosingLoops.back());
-    if (failed(outlineSingleBlockRegion(b, op->getLoc(), exec.getRegion(),
-                                        resultFuncName)))
-      signalPassFailure();
-    return WalkResult::interrupt();
-  });
-}
-
 std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass() {
   return std::make_unique<LinalgFusePass>();
 }
@@ -988,21 +895,6 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgVectorLoweringPass(
     const LinalgVectorLoweringPassOptions &options) {
   return std::make_unique<LinalgVectorLoweringPass>(options);
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::createUnrollOneVectorOpPass() {
-  return std::make_unique<UnrollOneVectorOpPass>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::createUnrollOneParentLoopPass() {
-  return std::make_unique<UnrollOneParentLoopPass>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::createOutlineOneParentLoopPass() {
-  return std::make_unique<OutlineOneParentLoopPass>();
 }
 
 //===----------------------------------------------------------------------===//

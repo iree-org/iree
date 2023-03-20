@@ -93,6 +93,8 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
                                            int64_t vectorSize) {
   // Verify that each dimension of the shape can be distributed on the
   // threads
+  // For zero dim tensor, consider it's too small to access using all threads.
+  if (shape.size() == 0) return false;
   int64_t threadsAvailable = threadCount;
   for (auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
     int64_t numElementPerThread = index == 0 ? vectorSize : 1;
@@ -583,7 +585,7 @@ Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
       if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }
-    return llvm::to_vector<>(sliceType.getShape());
+    return llvm::to_vector(sliceType.getShape());
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
@@ -736,11 +738,18 @@ Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
           if (sliceType && sliceType != vecType) return std::nullopt;
           sliceType = vecType;
         }
-        return llvm::to_vector<>(sliceType.getShape());
+        return llvm::to_vector(sliceType.getShape());
       }
     }
   }
   return std::nullopt;
+}
+
+bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
+  auto addrSpace =
+      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+  return addrSpace &&
+         addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
 }
 
 }  // namespace iree_compiler

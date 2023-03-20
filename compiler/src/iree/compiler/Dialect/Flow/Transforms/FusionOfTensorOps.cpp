@@ -130,7 +130,7 @@ struct FuseElementwiseOpsWithMultipleUses
                                          "failed to fuse with producer");
     }
     for (auto replacement : fusionResult->replacements) {
-      rewriter.replaceUseIf(
+      rewriter.replaceUsesWithIf(
           replacement.first, replacement.second,
           [&](OpOperand &use) { return use.getOwner() != consumerOp; });
     }

@@ -102,10 +102,10 @@ EXEC @add
 4xf32=3 4 5 6
 ```
 
-[iree-cuda]: https://github.com/iree-org/iree/tree/main/iree/hal/drivers/cuda/
-[cuda-symbols]: https://github.com/iree-org/iree/blob/main/iree/hal/drivers/cuda/dynamic_symbols_tables.h
+[iree-cuda]: https://github.com/openxla/iree/tree/main/iree/hal/drivers/cuda/
+[cuda-symbols]: https://github.com/openxla/iree/blob/main/iree/hal/drivers/cuda/dynamic_symbols_tables.h
 [cuda-driver]: https://docs.nvidia.com/cuda/cuda-driver-api/index.html
 [cuda-graph]: https://developer.nvidia.com/blog/cuda-graphs/
 [vulkan-semaphore]: https://www.khronos.org/blog/vulkan-timeline-semaphores
-[semaphore-issue]: https://github.com/iree-org/iree/issues/4727
-[codegen-passes]: https://github.com/iree-org/iree/blob/main/docs/design_docs/codegen_passes.md
+[semaphore-issue]: https://github.com/openxla/iree/issues/4727
+[codegen-passes]: https://github.com/openxla/iree/blob/main/docs/design_docs/codegen_passes.md

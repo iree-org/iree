@@ -440,6 +440,45 @@ class TransposeReshapeGenericDotGeneral
   }
 };
 
+struct ScatterInt64Indices : public OpRewritePattern<mhlo::ScatterOp> {
+  using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::ScatterOp op,
+                                PatternRewriter &rewriter) const final {
+    auto indices = op.getScatterIndices();
+    auto indicesTy = indices.getType();
+    auto indicesETy = indicesTy.getElementType();
+    if (indicesETy.isInteger(32))
+      return rewriter.notifyMatchFailure(op, "already has i32 index type");
+
+    if (!indicesTy.hasStaticShape())
+      return rewriter.notifyMatchFailure(op, "cannot validate legal size");
+
+    uint64_t maxSize = std::numeric_limits<int32_t>::max();
+    if (indicesETy.getIntOrFloatBitWidth() > 32) {
+      for (int i = 0, s = indicesTy.getRank(); i < s; ++i) {
+        if (indicesTy.getDimSize(i) > maxSize) {
+          return rewriter.notifyMatchFailure(op, "index may exceed i32 max");
+        }
+      }
+    }
+
+    indices = rewriter.create<mhlo::ConvertOp>(
+        op.getLoc(), indicesTy.clone(rewriter.getI32Type()), indices);
+
+    auto newScatter = rewriter.create<mhlo::ScatterOp>(
+        op.getLoc(), op.getResultTypes(), op.getInputs(), indices,
+        op.getUpdates(), op.getScatterDimensionNumbers(),
+        op.getIndicesAreSorted(), op.getUniqueIndices());
+
+    Region &region = newScatter.getUpdateComputation();
+    rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
+    rewriter.replaceOp(op, newScatter.getResults());
+
+    return success();
+  }
+};
+
 // If the indices tensor has an implicit index vector dim we expand and make it
 // an explicit dim.
 struct ScatterImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
@@ -1407,9 +1446,9 @@ struct MHLOToMHLOPreprocessingPass
     patterns.insert<ExpandRngNormal, MulCastOfBool>(context);
 
     // scatter canonicalization patterns
-    patterns.insert<ScatterImplicitIndex, ScatterImplicitBatch,
-                    ScatterMaterializeInsertedDim, ScatterCollapseBatch,
-                    ScatterBatchFirst>(context);
+    patterns.insert<ScatterInt64Indices, ScatterImplicitIndex,
+                    ScatterImplicitBatch, ScatterMaterializeInsertedDim,
+                    ScatterCollapseBatch, ScatterBatchFirst>(context);
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);

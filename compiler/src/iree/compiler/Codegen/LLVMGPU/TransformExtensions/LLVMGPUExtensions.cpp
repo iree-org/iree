@@ -149,7 +149,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
                                      workgroupSize[1], workgroupSize[2]};
     diag = mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-        rewriter, target, workgroupSize, warpIdGenerator, true, transformOp,
+        rewriter, target, numWarps, warpIdGenerator, true, transformOp,
         warpMappingAttributes);
   }
 
@@ -404,6 +404,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
 void transform_dialect::VectorWarpDistributionOp::build(OpBuilder &builder,
                                                         OperationState &result,
                                                         Value target) {
+  result.addTypes(pdl::OperationType::get(builder.getContext()));
   result.addOperands(target);
 }
 
@@ -671,13 +672,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
         target, "warp execute on lane 0 to scf patterns failed to apply");
   }
 
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::VectorWarpDistributionOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
 }
 
 void transform_dialect::VectorToMMAConversionOp::build(OpBuilder &builder,
@@ -808,6 +804,20 @@ DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
     func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   iree_compiler::createAsyncGroups(cast<func::FuncOp>(target), getUseMmaSync());
+  results.push_back(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// LayoutAnalysisAndDistributionOp.
+//===---------------------------------------------------------------------===//
+DiagnosedSilenceableFailure
+transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
+    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  iree_compiler::doLayoutAnalysisAndDistribution(rewriter,
+                                                 cast<func::FuncOp>(target));
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }

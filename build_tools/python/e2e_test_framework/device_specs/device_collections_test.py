@@ -12,28 +12,32 @@ from e2e_test_framework.device_specs import device_collections
 class DeviceCollectionTest(unittest.TestCase):
 
   def test_query_device_specs(self):
-    linux_x86_device_spec = common_definitions.DeviceSpec(
+    linux_x86_device_spec = common_definitions.DeviceSpec.build(
         id="linux_x86",
         device_name="a",
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
-        host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
-    android_x86_device_spec = common_definitions.DeviceSpec(
+        host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
+        tags=[])
+    android_x86_device_spec = common_definitions.DeviceSpec.build(
         id="android_x86",
         device_name="b",
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
-        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
-    little_cores_device_spec = common_definitions.DeviceSpec(
+        host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
+        tags=[])
+    little_cores_device_spec = common_definitions.DeviceSpec.build(
         id="android_little",
         device_name="c",
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-        device_parameters=["little-cores"])
-    big_cores_device_spec = common_definitions.DeviceSpec(
+        device_parameters=["little-cores"],
+        tags=[])
+    big_cores_device_spec = common_definitions.DeviceSpec.build(
         id="android_big",
         device_name="d",
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-        device_parameters=["big-cores"])
+        device_parameters=["big-cores"],
+        tags=[])
     devices = device_collections.DeviceCollection(device_specs=[
         linux_x86_device_spec, android_x86_device_spec,
         little_cores_device_spec, big_cores_device_spec

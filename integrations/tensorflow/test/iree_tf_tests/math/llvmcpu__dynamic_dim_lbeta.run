@@ -1,5 +1,4 @@
-# TODO(#11923): Enable after fixing.
-# XFAIL: *
+# TODO(#11923): If this test fails again, check #11923.
 
 # REQUIRES: llvmcpu
 # RUN: %PYTHON -m iree_tf_tests.math.math_test --target_backends=iree_llvmcpu --dynamic_dims=true --functions=lbeta --artifacts_dir=%t

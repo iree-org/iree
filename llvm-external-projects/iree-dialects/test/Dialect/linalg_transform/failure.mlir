@@ -15,7 +15,7 @@ module {
       rewrite %0 with "transform.dialect"
     }
 
-    transform.structured.canonicalized_sequence %arg0 failures(propagate) {
+    transform.sequence %arg0: !pdl.operation failures(propagate) {
     ^bb1(%arg1: !pdl.operation):
       %0 = pdl_match @some_operation in %arg1 : (!pdl.operation) -> !pdl.operation
       // Make sure we don't crash on wrong operation type.

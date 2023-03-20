@@ -50,6 +50,10 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
     rewriter.setInsertionPointToStart(&moduleOp->getRegion(0).front());
     fnDecl = rewriter.create<func::FuncOp>(loc, fnName, functionType);
     SymbolTable::setSymbolVisibility(fnDecl, SymbolTable::Visibility::Private);
+    // TODO(#12327): Based on description in the issue, add an attribute
+    // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
+    // backend (obviously), but is enough to unblock while the proper fix lands.
+    fnDecl->setAttr("vm.import.module", rewriter.getStringAttr("vmvx"));
   } else if (fnDecl.getFunctionType() != functionType) {
     return rewriter.notifyMatchFailure(
         op, llvm::formatv("mismatch in function type computed during lowering "
@@ -288,10 +292,10 @@ FailureOr<func::CallOp> UKernelMmt4DOp::lowerToFunctionCall(
   std::string fnName = "vmvx.mmt4d.";
   switch (matmulType.value()) {
     case MatmulType::I8I8I32:
-      fnName.append("i8.i8.i32");
+      fnName.append("i8i8i32");
       break;
     case MatmulType::F32F32F32:
-      fnName.append("f32.f32.f32");
+      fnName.append("f32f32f32");
       break;
   }
 

@@ -9,13 +9,12 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
-#include "iree-dialects/Transforms/Listener.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
-#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
+#include "mlir/Conversion/IndexToLLVM/IndexToLLVM.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToStandard/LinalgToStandard.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
@@ -23,44 +22,28 @@
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Async/Passes.h"
-#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
-#include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
-#include "mlir/Dialect/Bufferization/Transforms/OneShotModuleBufferize.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/PDL/IR/PDLTypes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/SymbolTable.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Interfaces/TilingInterface.h"
-#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 #include "mlir/Transforms/Passes.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/FormatVariadic.h"
 
 #define DEBUG_TYPE "transform-ops-ext"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -344,7 +327,9 @@ mlir::transform_ext::StructuredTransformOpsExtension::
 
 /// Find the linalg op that defines all values in range, potentially
 /// transitively through tensor casts.
-static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
+static FailureOr<linalg::LinalgOp>
+findSingleLinalgOpDefiningAll(ValueRange range) {
+  LLVM_DEBUG(DBGS() << "Start findSingleLinalgOpDefiningAll\n");
   linalg::LinalgOp sourceOp = nullptr;
   for (Value value : range) {
     // See through tensor casts and reshape ops.
@@ -374,96 +359,124 @@ static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
       }
 
       LLVM_DEBUG(
-          DBGS() << "different source linalg ops for replacing one op: \n"
+          DBGS() << "--different source linalg ops for replacing one op: \n"
                  << sourceOp << "\n"
                  << currentSourceOp << "\n");
-      return nullptr;
+      return failure();
     }
-    LLVM_DEBUG(DBGS() << "replacing linalg op with unknown non-linalg op:\n"
+    LLVM_DEBUG(DBGS() << "--replacing linalg op with unknown non-linalg op:\n"
                       << *value.getDefiningOp() << "\n");
-    return nullptr;
+    return failure();
   }
   return sourceOp;
 }
 
 /// Find the scf "for" op that defines all values in the range.
-static scf::ForOp findSingleForOpDefiningAll(ValueRange range) {
-  scf::ForOp forOp = nullptr;
+/// Take into account the the op may just disappear when it is replaced by its
+/// body, in the case od a single iteration loop.
+// It is unclear atm how to account for this properly.
+static FailureOr<Operation *> findSingleForOpDefiningAll(ValueRange range) {
+  LLVM_DEBUG(DBGS() << "Start findSingleForOpDefiningAll\n");
+  Operation *forOp = nullptr;
   for (Value value : range) {
-    if (auto currentSourceOp = value.getDefiningOp<scf::ForOp>()) {
-      if (!forOp || forOp == currentSourceOp) {
-        forOp = currentSourceOp;
-        continue;
-      }
-      LLVM_DEBUG(
-          DBGS() << "different source scf.for ops when replacing one op\n");
-      return nullptr;
+    LLVM_DEBUG(DBGS() << "--find for: " << value << "\n");
+    // Block arguments are just dropped.
+    auto currentSourceOp = value.getDefiningOp();
+    if (!currentSourceOp) {
+      LLVM_DEBUG(DBGS() << "--replacing tracked op with bbarg -> SKIP\n");
+      continue;
     }
-
+    auto currentForOp = dyn_cast<scf::ForOp>(currentSourceOp);
+    if (!forOp || (currentForOp && forOp == currentForOp)) {
+      forOp = currentSourceOp;
+      continue;
+    }
+    LLVM_DEBUG(DBGS() << "---no single scf.for replacement found -> SKIP\n");
     LLVM_DEBUG(
-        DBGS()
-        << "could not find a source scf.for when replacing another scf.for\n");
+        DBGS() << "---WARNING: this will drop tracking of the scf.for\n");
     return nullptr;
   }
   return forOp;
 }
 
 /// Find the op that defines all values in the range.
-static Operation *findSingleOpDefiningAll(ValueRange range) {
+static FailureOr<Operation *> findSingleOpDefiningAll(ValueRange range) {
   Operation *op = nullptr;
   for (Value value : range) {
-    if (auto currentSourceOp = value.getDefiningOp()) {
-      if (!op || op == currentSourceOp) {
-        op = currentSourceOp;
-        continue;
-      }
-      LLVM_DEBUG(DBGS() << "different source op when replacing one op\n");
-      return nullptr;
+    // Block arguments are just dropped.
+    auto currentSourceOp = value.getDefiningOp();
+    if (!currentSourceOp) {
+      LLVM_DEBUG(DBGS() << "replacing tracked op with bbarg\n");
+      continue;
     }
 
-    LLVM_DEBUG(
-        DBGS() << "could not find a source op when replacing another op\n");
-    return nullptr;
+    if (!op || op == currentSourceOp) {
+      op = currentSourceOp;
+      continue;
+    }
+
+    LLVM_DEBUG(DBGS() << "different source op when replacing one op\n");
+    return failure();
   }
   return op;
 }
 
 // Find a single op that defines all values in the range, optionally
 // transitively through other operations in an op-specific way.
-static Operation *findSingleDefiningOp(Operation *replacedOp,
-                                       ValueRange range) {
-  return llvm::TypeSwitch<Operation *, Operation *>(replacedOp)
-      .Case<linalg::LinalgOp>([&](linalg::LinalgOp) -> Operation * {
-        return findSingleLinalgOpDefiningAll(range);
+static FailureOr<Operation *> findSingleDefiningOp(Operation *replacedOp,
+                                                   ValueRange range) {
+  return llvm::TypeSwitch<Operation *, FailureOr<Operation *>>(replacedOp)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp) -> FailureOr<Operation *> {
+        auto op = findSingleLinalgOpDefiningAll(range);
+        if (failed(op))
+          return failure();
+        return op->getOperation();
       })
-      .Case<scf::ForOp>([&](scf::ForOp) -> Operation * {
+      .Case<scf::ForOp>([&](scf::ForOp) -> FailureOr<Operation *> {
         return findSingleForOpDefiningAll(range);
       })
-      .Default([&](Operation *) -> Operation * {
+      .Default([&](Operation *) -> FailureOr<Operation *> {
         return findSingleOpDefiningAll(range);
       });
 }
 
-void mlir::TrackingListener::notifyRootReplaced(Operation *op,
-                                                ValueRange newValues) {
+void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
+                                                     ValueRange newValues) {
   // Bail out if in error state.
   if (hadErrors)
     return;
 
   // Exit early if the op is not tracked.
   SmallVector<Value> handles;
-  if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
+  if (failed(getTransformState().getHandlesForPayloadOp(op, handles))) {
+    LLVM_DEBUG(DBGS() << "no tracking handle to remove\n");
     return;
+  }
 
-  Operation *replacement = findSingleDefiningOp(op, newValues);
-  if (!replacement) {
+  FailureOr<Operation *> replacement = findSingleDefiningOp(op, newValues);
+  if (failed(replacement)) {
+    LLVM_DEBUG(DBGS() << "could not find replacement for tracked op\n");
     emitError(op) << "could not find replacement for tracked op";
     return;
   }
 
-  LLVM_DEBUG(DBGS() << "replacing tracked @" << op << " : " << *op << " with "
-                    << *replacement << "\n");
-  mayFail(replacePayloadOp(op, replacement));
+  // If this would cause an error with replacement, drop instead.
+  if (*replacement && (*replacement)->getNumResults() != op->getNumResults()) {
+    LLVM_DEBUG(DBGS() << "failsafe error tracking activated due to mismatched "
+                         "number of results for op: "
+                      << op << " and replacement " << *replacement << "\n");
+    replacement = nullptr;
+  }
+
+  if (*replacement == nullptr) {
+    // TODO: Check if the handle is dead. Otherwise, the op should not be
+    // dropped. This needs a change in the transform dialect interpreter.
+    LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
+  } else {
+    LLVM_DEBUG(DBGS() << "replacing tracked @" << op << " : " << *op << " with "
+                      << **replacement << "\n");
+  }
+  mayFail(replacePayloadOp(op, *replacement));
 }
 
 void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
@@ -471,17 +484,21 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
   if (hadErrors)
     return;
 
-  // Exit early if the op is not tracked.
-  SmallVector<Value> handles;
-  if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
-    return;
-
-  LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
-  mayFail(replacePayloadOp(op, nullptr));
+  // TODO: Walk can be removed when D144193 has landed.
+  op->walk([&](Operation *op) {
+    // Exit early if the op is not tracked.
+    SmallVector<Value> handles;
+    if (failed(getTransformState().getHandlesForPayloadOp(op, handles))) {
+      LLVM_DEBUG(DBGS() << "no tracking handle to remove\n");
+      return;
+    }
+    LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
+    mayFail(replacePayloadOp(op, nullptr));
+  });
 }
 
 void mlir::TrackingListener::removeMappings(Operation *op) {
-  // Bail if in error state.
+  // Bail out if in error state.
   if (hadErrors)
     return;
 
@@ -491,472 +508,10 @@ void mlir::TrackingListener::removeMappings(Operation *op) {
 }
 
 //===----------------------------------------------------------------------===//
-// CanonicalizedSequenceOp
-//===----------------------------------------------------------------------===//
-
-void ::transform_ext::CanonicalizedSequenceOp::build(
-    OpBuilder &builder, OperationState &state,
-    transform::FailurePropagationMode failurePropagationMode,
-    ::transform_ext::CanonicalizedSequenceOp::BodyBuilderFn bodyBuilder) {
-  assert(state.name.isRegistered() && "not registered!");
-  assert(bodyBuilder && "requires a body builder");
-  MLIRContext *ctx = builder.getContext();
-  state.addAttribute(
-      CanonicalizedSequenceOp::getFailurePropagationModeAttrName(state.name),
-      transform::FailurePropagationModeAttr::get(ctx, failurePropagationMode));
-  Region *bodyRegion = state.addRegion();
-  bodyRegion->push_back(new Block);
-  Block &bodyBlock = bodyRegion->front();
-  bodyBlock.addArgument(pdl::OperationType::get(ctx), state.location);
-  OpBuilder::InsertionGuard guard(builder);
-  builder.setInsertionPointToStart(&bodyBlock);
-  bodyBuilder(builder, state.location, bodyBlock.getArgument(0));
-}
-
-/// Run enabling transformations (LICM and its variants, single-iteration loop
-/// removal, CSE) on the given function.
-static LogicalResult performEnablerTransformations(
-    func::FuncOp func, RewriteListener &listener,
-    LinalgEnablingOptions options = LinalgEnablingOptions()) {
-  MLIRContext *ctx = func->getContext();
-  RewritePatternSet patterns(ctx);
-  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
-  scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  if (failed(applyPatternsTrackAndFoldGreedily(func, listener,
-                                               std::move(patterns))))
-    return failure();
-
-  // This assumes LICM never removes operations so we don't need tracking.
-  if (options.licm) {
-    func->walk(
-        [](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
-  }
-
-  func.walk([](Operation *op) {
-    (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<AffineForOp, scf::ForOp>(
-            [](auto loop) { return promoteIfSingleIteration(loop); })
-        .Default([](Operation *) { return success(); });
-  });
-
-  if (options.hoistRedundantVectorTransfers)
-    linalg::hoistRedundantVectorTransfers(func);
-  if (options.hoistRedundantVectorTransfersOnTensor)
-    linalg::hoistRedundantVectorTransfersOnTensor(func);
-
-  return eliminateCommonSubexpressions(func, /*domInfo=*/nullptr, &listener);
-}
-
-/// Run enabling transformations on the given `containerOp` while preserving the
-/// operation tracking information.
-static LogicalResult performEnablerTransformations(
-    Operation *containerOp, RewriteListener &listener,
-    LinalgEnablingOptions options = LinalgEnablingOptions()) {
-  auto res = containerOp->walk([&](func::FuncOp func) {
-    if (failed(performEnablerTransformations(func, listener, options)))
-      return WalkResult::interrupt();
-    return WalkResult::advance();
-  });
-  return failure(res.wasInterrupted());
-}
-
-/// Drop the association between payload operations and transform dialect
-/// handles when it is no longer necessary in a canonicalized sequence.
-/// Specifically, drop the association between payload operations and the
-/// operand handles if all handles to them will not be used after the current
-/// `transform`. Also drop the association between payload operations and result
-/// handles if results are never read. Note that the operand part is specific to
-/// sequence-like execution that is not guaranteed in the transform dialect in
-/// general.
-static void
-forgetUnnecessaryHandles(transform::TransformState &state,
-                         transform_ext::CanonicalizedSequenceOp sequence,
-                         transform::TransformOpInterface transform) {
-  auto *listener = state.getExtension<TrackingListener>();
-  assert(transform->getParentOp() == sequence &&
-         "only works for transform ops immediately nested in a canonicalized "
-         "sequence");
-  assert(listener && "expected tracking listener to be present");
-
-  // Checks if the operation or its ancestor is before `transform` in its block
-  // or is `transform` itself.
-  auto userIsBefore = [&](Operation *user) {
-    while (user && user->getParentOp() != sequence)
-      user = user->getParentOp();
-    if (!user)
-      return false;
-    return user->isBeforeInBlock(transform) || user == transform;
-  };
-
-  // Drop associations for operands that will not be read again. Ignore consumed
-  // operands that have been deassociated already. Consider all handles to each
-  // payload operation and only drop the association if all handles pointing to
-  // the same operation will are not used after the current transform op. The
-  // handle will be erased automatically after the last payload operation is
-  // deassociated from it.
-  llvm::SmallDenseSet<Operation *> seen;
-  llvm::SmallDenseMap<Value, bool> handlesUsedAfterTransform;
-  for (Value operand : transform->getOperands()) {
-    if (transform::isHandleConsumed(operand, transform))
-      continue;
-    if (!operand.getType().isa<transform::TransformHandleTypeInterface>())
-      continue;
-    for (Operation *payload : state.getPayloadOps(operand)) {
-      if (!payload || seen.contains(payload))
-        continue;
-      SmallVector<Value> allHandles;
-      (void)state.getHandlesForPayloadOp(payload, allHandles);
-      bool allHandlesUnused = llvm::all_of(allHandles, [&](Value handle) {
-        if (!handlesUsedAfterTransform.count(handle)) {
-          handlesUsedAfterTransform[handle] =
-              !llvm::all_of(handle.getUsers(), userIsBefore);
-        }
-        return !handlesUsedAfterTransform[handle];
-      });
-      if (allHandlesUnused) {
-        // Store for mapping removal, but not remove immediately because it
-        // could invalidate other handles.
-        seen.insert(payload);
-      }
-    }
-  }
-
-  // Drop associations for results that will never be read.
-  for (Value result : transform->getResults()) {
-    if (!result.getUses().empty())
-      continue;
-    if (!result.getType().isa<transform::TransformHandleTypeInterface>())
-      continue;
-    for (Operation *payload : state.getPayloadOps(result)) {
-      if (!payload || seen.contains(payload))
-        continue;
-      // Store for mapping removal, but not remove immediately because it could
-      // invalidate other handles.
-      seen.insert(payload);
-    }
-  }
-
-  // Remove everything in one bunch.
-  for (Operation *payload : seen)
-    listener->removeMappings(payload);
-}
-
-DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
-    transform::TransformResults &results, transform::TransformState &state) {
-
-  MLIRContext *ctx = getContext();
-  RewritePatternSet patternList(ctx);
-  for (Dialect *dialect : ctx->getLoadedDialects())
-    dialect->getCanonicalizationPatterns(patternList);
-  for (RegisteredOperationName op : ctx->getRegisteredOperations())
-    op.getCanonicalizationPatterns(patternList, ctx);
-  FrozenRewritePatternSet patterns(std::move(patternList));
-
-  transform::TransformState::RegionScope regionScope =
-      state.make_region_scope(getBodyRegion());
-  auto &listener = state.addExtension<::mlir::TrackingListener>();
-  auto detachListener = llvm::make_scope_exit(
-      [&] { state.removeExtension<::mlir::TrackingListener>(); });
-  if (failed(mapBlockArguments(state)))
-    return DiagnosedSilenceableFailure::definiteFailure();
-
-  auto checkedListenerTransform =
-      [&](function_ref<LogicalResult(Operation *, RewriteListener &)>
-              transform) {
-        SmallVector<Operation *> roots;
-        if (Value root = getRoot())
-          llvm::append_range(roots, state.getPayloadOps(root));
-        else
-          roots.push_back(state.getTopLevel());
-
-        for (Operation *target : roots) {
-          // Make sure we always check the error state, no boolean
-          // short-circuting.
-          if (failed(transform(target, listener))) {
-            target->emitOpError("Transform application failed.");
-            return failure();
-          }
-          if (failed(listener.checkErrorState())) {
-            target->emitOpError("Listener failed.");
-            return failure();
-          }
-        }
-        return success();
-      };
-
-  auto performCSE = [](Operation *root, RewriteListener &listener) {
-    LogicalResult result =
-        eliminateCommonSubexpressions(root, /*domInfo=*/nullptr, &listener);
-    LLVM_DEBUG(
-        DBGS() << (succeeded(result) ? "successfully performed" : "failed")
-               << " CSE\n");
-    return result;
-  };
-  auto performEnabler = [](Operation *root, RewriteListener &listener) {
-    LogicalResult result = performEnablerTransformations(root, listener);
-    LLVM_DEBUG(
-        DBGS() << (succeeded(result) ? "successfully performed" : "failed")
-               << " enabling transformations\n");
-    return result;
-  };
-  auto performCanonicalization = [&patterns](Operation *root,
-                                             RewriteListener &listener) {
-    LogicalResult result =
-        applyPatternsTrackAndFoldGreedily(root, listener, patterns);
-    LLVM_DEBUG(
-        DBGS() << (succeeded(result) ? "successfully performed" : "failed")
-               << " canonicalization\n");
-    return result;
-  };
-
-  LLVM_DEBUG(DBGS() << "begin canonicalizing sequence\n");
-  if (failed(checkedListenerTransform(performCSE))) {
-    return mlir::emitDefiniteFailure(
-        *this, "Failed to performCSE beform transform sequence");
-  }
-  if (failed(checkedListenerTransform(performCanonicalization))) {
-    return mlir::emitDefiniteFailure(
-        *this, "Failed to performCanonicalization beform transform sequence");
-  }
-
-  // Apply the sequenced ops one by one.
-  for (Operation &transform : getBodyBlock()->without_terminator()) {
-    auto transformOp = cast<transform::TransformOpInterface>(transform);
-    DiagnosedSilenceableFailure result = state.applyTransform(transformOp);
-    if (result.isDefiniteFailure()) {
-      LLVM_DEBUG(DBGS() << "failed: " << transform << "\n");
-      return result;
-    }
-    if (result.isSilenceableFailure()) {
-      LLVM_DEBUG(DBGS() << "failed silently: " << transform << "\n");
-      if (getFailurePropagationMode() ==
-          transform::FailurePropagationMode::Propagate)
-        return result;
-      (void)result.silence();
-    }
-    LLVM_DEBUG(DBGS() << "successfully performed: " << transform << "\n");
-
-    // Canonicalization may replace payload operations associated with the
-    // transform dialect handles. Post-canonicalize reassociation is fragile and
-    // may fail. To make this less likely, drop any association that are no
-    // longer necessary, i.e., if the operand is no longer used in the sequence
-    // or elsewhere or if the result is never read.
-    forgetUnnecessaryHandles(state, *this, transformOp);
-
-    if (failed(checkedListenerTransform(performCSE))) {
-      return mlir::emitDefiniteFailure(&transform,
-                                       "Failed to performCSE after transform");
-    }
-    if (failed(checkedListenerTransform(performEnabler))) {
-      return mlir::emitDefiniteFailure(
-          &transform, "Failed to performEnabler after transform");
-    }
-    if (failed(checkedListenerTransform(performCanonicalization))) {
-      return mlir::emitDefiniteFailure(
-          &transform, "Failed to performCanonicalization after transform");
-    }
-  }
-
-  // Forward the operation mapping for values yielded from the sequence to the
-  // values produced by the sequence op.
-  for (const auto &pair :
-       llvm::zip(getBodyBlock()->getTerminator()->getOperands(),
-                 getOperation()->getOpResults())) {
-    Value terminatorOperand = std::get<0>(pair);
-    OpResult result = std::get<1>(pair);
-    results.set(result, state.getPayloadOps(terminatorOperand));
-  }
-
-  LLVM_DEBUG(DBGS() << "end canonicalizing sequence\n");
-  return DiagnosedSilenceableFailure::success();
-}
-
-/// Returns `true` if the given op operand may be consuming the handle value in
-/// the Transform IR. That is, if it may have a Free effect on it.
-static bool isValueUsePotentialConsumer(OpOperand &use) {
-  // Conservatively assume the effect being present in absence of the interface.
-  auto memEffectInterface = dyn_cast<MemoryEffectOpInterface>(use.getOwner());
-  if (!memEffectInterface)
-    return true;
-
-  SmallVector<MemoryEffects::EffectInstance, 2> effects;
-  memEffectInterface.getEffectsOnValue(use.get(), effects);
-  return llvm::any_of(effects, [](const MemoryEffects::EffectInstance &effect) {
-    return isa<transform::TransformMappingResource>(effect.getResource()) &&
-           isa<MemoryEffects::Free>(effect.getEffect());
-  });
-}
-
-// TODO: Add declaration to TransformOps.h, then we do not have to duplicate
-// this function.
-static LogicalResult
-checkDoubleConsume(Value value,
-                   function_ref<InFlightDiagnostic()> reportError) {
-  OpOperand *potentialConsumer = nullptr;
-  for (OpOperand &use : value.getUses()) {
-    if (!isValueUsePotentialConsumer(use))
-      continue;
-
-    if (!potentialConsumer) {
-      potentialConsumer = &use;
-      continue;
-    }
-
-    InFlightDiagnostic diag = reportError()
-                              << " has more than one potential consumer";
-    diag.attachNote(potentialConsumer->getOwner()->getLoc())
-        << "used here as operand #" << potentialConsumer->getOperandNumber();
-    diag.attachNote(use.getOwner()->getLoc())
-        << "used here as operand #" << use.getOperandNumber();
-    return diag;
-  }
-
-  return success();
-}
-
-LogicalResult transform_ext::CanonicalizedSequenceOp::verify() {
-  // Check if the block argument has more than one consuming use.
-  for (BlockArgument argument : getBodyBlock()->getArguments()) {
-    auto report = [&]() {
-      return (emitOpError() << "block argument #" << argument.getArgNumber());
-    };
-    if (failed(checkDoubleConsume(argument, report)))
-      return failure();
-  }
-
-  // Check properties of the nested operations they cannot check themselves.
-  for (Operation &child : *getBodyBlock()) {
-    if (!isa<transform::TransformOpInterface>(child) &&
-        &child != &getBodyBlock()->back()) {
-      InFlightDiagnostic diag =
-          emitOpError()
-          << "expected children ops to implement TransformOpInterface";
-      diag.attachNote(child.getLoc()) << "op without interface";
-      return diag;
-    }
-
-    for (OpResult result : child.getResults()) {
-      auto report = [&]() {
-        return (child.emitError() << "result #" << result.getResultNumber());
-      };
-      if (failed(checkDoubleConsume(result, report)))
-        return failure();
-    }
-  }
-
-  if (getBodyBlock()->getTerminator()->getOperandTypes() !=
-      getOperation()->getResultTypes()) {
-    InFlightDiagnostic diag = emitOpError()
-                              << "expects the types of the terminator operands "
-                                 "to match the types of the result";
-    diag.attachNote(getBodyBlock()->getTerminator()->getLoc()) << "terminator";
-    return diag;
-  }
-  return success();
-}
-
-void transform_ext::CanonicalizedSequenceOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  auto *mappingResource = transform::TransformMappingResource::get();
-  // Effects on root if present.
-  if (getRoot())
-    effects.emplace_back(MemoryEffects::Read::get(), getRoot(),
-                         mappingResource);
-  // Effects on results.
-  for (Value result : getResults()) {
-    effects.emplace_back(MemoryEffects::Allocate::get(), result,
-                         mappingResource);
-    effects.emplace_back(MemoryEffects::Write::get(), result, mappingResource);
-  }
-
-  for (Operation &op : *getBodyBlock()) {
-    auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
-    if (!iface) {
-      // TODO: fill all possible effects; or require ops to actually implement
-      // the memory effect interface always
-      assert(false);
-    }
-    if (getRoot()) {
-      // Carry over all effects on the argument of the entry block as those on
-      // the operand, this is the same value just remapped.
-      SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
-      iface.getEffectsOnValue(getBodyBlock()->getArgument(0), nestedEffects);
-      for (const auto &effect : nestedEffects)
-        effects.emplace_back(effect.getEffect(), getRoot(),
-                             effect.getResource());
-    } else {
-      // Otherwise, get all the effects.
-      iface.getEffects(effects);
-    }
-  }
-}
-
-OperandRange transform_ext::CanonicalizedSequenceOp::getSuccessorEntryOperands(
-    Optional<unsigned> index) {
-  assert(index && index.value() == 0 && "unexpected region index");
-  if (getOperation()->getNumOperands() == 1)
-    return getOperation()->getOperands();
-  return OperandRange(getOperation()->operand_end(),
-                      getOperation()->operand_end());
-}
-
-void transform_ext::CanonicalizedSequenceOp::getSuccessorRegions(
-    Optional<unsigned> index, ArrayRef<Attribute> operands,
-    SmallVectorImpl<RegionSuccessor> &regions) {
-  if (!index.has_value()) {
-    Region *bodyRegion = &getBody();
-    regions.emplace_back(bodyRegion, !operands.empty()
-                                         ? bodyRegion->getArguments()
-                                         : Block::BlockArgListType());
-    return;
-  }
-
-  assert(*index == 0 && "unexpected region index");
-  regions.emplace_back(getOperation()->getResults());
-}
-
-void transform_ext::CanonicalizedSequenceOp::getRegionInvocationBounds(
-    ArrayRef<Attribute> operands, SmallVectorImpl<InvocationBounds> &bounds) {
-  (void)operands;
-  bounds.emplace_back(1, 1);
-}
-
-//===----------------------------------------------------------------------===//
 // TODO: WILL MIGRATE
 //===----------------------------------------------------------------------===//
 
 using namespace mlir::linalg;
-
-//===---------------------------------------------------------------------===//
-// BufferizeOp
-//===---------------------------------------------------------------------===//
-
-static void applyBufferizationEnablingTransformations(ModuleOp moduleOp) {
-  RewritePatternSet patterns(moduleOp.getContext());
-  patterns.add<GeneralizePadOpPattern>(moduleOp.getContext());
-  (void)applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
-}
-
-DiagnosedSilenceableFailure
-transform_ext::BufferizeOp::apply(mlir::transform::TransformResults &result,
-                                  mlir::transform::TransformState &state) {
-  bufferization::OneShotBufferizationOptions options;
-  options.bufferizeFunctionBoundaries = true;
-  options.memCpyFn = [](OpBuilder &builder, Location loc, Value from,
-                        Value to) {
-    return success(linalg::makeMemRefCopyOp(builder, loc, from, to));
-  };
-
-  auto moduleOp = cast<ModuleOp>(state.getTopLevel());
-  applyBufferizationEnablingTransformations(moduleOp);
-  if (failed(runOneShotModuleBufferize(moduleOp, options)))
-    return DiagnosedSilenceableFailure::definiteFailure();
-
-  // Perform buffer-level hoistings.
-  state.getTopLevel()->walk(
-      [&](func::FuncOp funcOp) { hoistRedundantVectorTransfers(funcOp); });
-  return DiagnosedSilenceableFailure::success();
-}
 
 //===---------------------------------------------------------------------===//
 // LowerToLLVMOp
@@ -965,12 +520,25 @@ transform_ext::BufferizeOp::apply(mlir::transform::TransformResults &result,
 DiagnosedSilenceableFailure
 transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
                                     mlir::transform::TransformState &state) {
+
+  //===------------------------------------------------------------------===//
+  // BEGIN: Copied from upstream, this needs to be retired once we have a
+  // proper upstream transform op.
+  //===------------------------------------------------------------------===//
+
   // TODO: it is feasible to scope lowering at arbitrary level and introduce
   // unrealized casts, but there needs to be the final module-wise cleanup in
   // the end. Keep module-level for now.
   PassManager pm(getContext());
 
+  auto enableOpaquePointers = [](auto options) {
+    options.useOpaquePointers = true;
+    return options;
+  };
+
+  // Blanket-convert any remaining high-level vector ops to loops if any remain.
   pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
+  // Blanket-convert any remaining linalg ops to loops if any remain.
   pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   if (getEnableAsync()) {
     pm.addPass(createAsyncToAsyncRuntimePass());
@@ -978,8 +546,14 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
     pm.addPass(createAsyncRuntimeRefCountingOptPass());
   }
   pm.addPass(createCanonicalizerPass());
+  // Blanket-convert any remaining affine ops if any remain.
   pm.addPass(createLowerAffinePass());
+  // Convert SCF to CF (always needed).
   pm.addPass(createConvertSCFToCFPass());
+  // Sprinkle some cleanups.
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+  // Blanket-convert any remaining linalg ops to LLVM if any remain.
   pm.addPass(createConvertLinalgToLLVMPass());
   {
     auto options = ConvertVectorToLLVMPassOptions();
@@ -989,16 +563,35 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
     options.armSVE = getEnableArmSve();
     options.amx = getEnableAmx();
     options.x86Vector = getEnableX86vector();
+    options.useOpaquePointers = true;
     pm.addPass(createConvertVectorToLLVMPass(options));
   }
+  // Convert Math to LLVM (always needed).
   pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
-  pm.addPass(createFinalizeMemRefToLLVMConversionPass());
+  // Expand complicated MemRef operations before lowering them.
+  pm.addPass(memref::createExpandStridedMetadataPass());
+  // The expansion may create affine expressions. Get rid of them.
+  pm.addPass(createLowerAffinePass());
+  // Convert MemRef to LLVM (always needed).
+  pm.addPass(createFinalizeMemRefToLLVMConversionPass(
+      enableOpaquePointers(FinalizeMemRefToLLVMConversionPassOptions{})));
   if (getEnableAsync())
     pm.addPass(createConvertAsyncToLLVMPass());
-  pm.addPass(createConvertFuncToLLVMPass());
+  // Convert Func to LLVM (always needed).
+  pm.addPass(createConvertFuncToLLVMPass(
+      enableOpaquePointers(ConvertFuncToLLVMPassOptions{})));
+  // Convert Index to LLVM (always needed).
+  pm.addPass(createConvertIndexToLLVMPass());
+  // Convert remaining unrealized_casts (always needed).
   pm.addPass(createReconcileUnrealizedCastsPass());
+
   if (failed(pm.run(state.getTopLevel())))
     return DiagnosedSilenceableFailure::definiteFailure();
+
+  //===------------------------------------------------------------------===//
+  // END: Copied from upstream, this needs to be retired once we have a
+  // proper upstream transform op.
+  //===------------------------------------------------------------------===//
 
   // Make all arguments noalias for now.
   // FIXME: this is a terrible hack!

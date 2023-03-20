@@ -66,10 +66,10 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   std::string fnName = "";
   switch (matmulType.value()) {
     case MatmulType::I8I8I32:
-      fnName = "vmvx.matmul.i8.i8.i32";
+      fnName = "vmvx.matmul.i8i8i32";
       break;
     case MatmulType::F32F32F32:
-      fnName = "vmvx.matmul.f32.f32.f32";
+      fnName = "vmvx.matmul.f32f32f32";
       break;
   }
 
@@ -108,10 +108,10 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Type outElemType = outType.getElementType();
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.matmul.i8.i8.i32";
+    fnName = "vmvx.matmul.i8i8i32";
   } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
              outElemType.isF32()) {
-    fnName = "vmvx.matmul.f32.f32.f32";
+    fnName = "vmvx.matmul.f32f32f32";
   }
   if (fnName.empty()) {
     return rewriter.notifyMatchFailure(op,
@@ -130,7 +130,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Location loc = op.getLoc();
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 1);
-  Value k = rewriter.create<tensor::DimOp>(loc, out, 1);
+  Value k = rewriter.create<tensor::DimOp>(loc, lhs, 1);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(

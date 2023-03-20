@@ -19,7 +19,7 @@
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 namespace iree {
 namespace {
@@ -157,10 +157,10 @@ Status RunModule(const IreeModuleInvocation& invocation) {
 
   iree_string_builder_t result_str;
   iree_string_builder_initialize(iree_allocator_system(), &result_str);
-  IREE_RETURN_IF_ERROR(
-      iree_tooling_append_variant_list_lines(
-          outputs.get(), /*max_element_count=*/1024, &result_str),
-      "printing results");
+  IREE_RETURN_IF_ERROR(iree_tooling_append_variant_list_lines(
+                           IREE_SV("result"), outputs.get(),
+                           /*max_element_count=*/1024, &result_str),
+                       "printing results");
   LOGI("Execution Result:");
   LOGI("%.*s", (int)iree_string_builder_size(&result_str),
        iree_string_builder_buffer(&result_str));

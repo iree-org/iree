@@ -473,16 +473,16 @@ class opaque_ref {
 // dynamic type registration mechanism and that can be wrapped in an
 // iree_vm_ref_t.
 
-#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)         \
-  namespace iree {                                      \
-  namespace vm {                                        \
-  template <>                                           \
-  struct ref_type_descriptor<T> {                       \
-    static const iree_vm_ref_type_descriptor_t* get() { \
-      return name##_get_descriptor();                   \
-    }                                                   \
-  };                                                    \
-  }                                                     \
+#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)                \
+  namespace iree {                                             \
+  namespace vm {                                               \
+  template <>                                                  \
+  struct ref_type_descriptor<T> {                              \
+    static inline const iree_vm_ref_type_descriptor_t* get() { \
+      return &name##_descriptor;                               \
+    }                                                          \
+  };                                                           \
+  }                                                            \
   }
 
 #define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)  \

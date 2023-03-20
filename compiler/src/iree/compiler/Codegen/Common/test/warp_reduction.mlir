@@ -75,3 +75,141 @@ hal.executable private @simple_reduce  {
 //       CHECK:     vector.transfer_write %[[DIV]], {{.*}} : vector<1xf32>, memref<128xf32>
 //       CHECK:   }
 //       CHECK:   return
+
+// -----
+
+// Make sure memref.load from uniform buffers are hoisted out as uniform code.
+
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, uniform_buffer>
+  ]>
+]>
+hal.executable private @reduce_uniform_buffer_offset  {
+  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.export @reduce_uniform_buffer_offset layout(#pipeline_layout) attributes {
+      workgroup_size = [32 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+    func.func @reduce_uniform_buffer_offset() {
+      %c0 = arith.constant 0 : index
+      %c1 = arith.constant 1 : index
+      %cv = arith.constant dense<0.000000e+00> : vector<1xf32>
+      %f0 = arith.constant 0.000000e+00 : f32
+      %fv = arith.constant dense<3.840000e+02> : vector<1xf32>
+      %c32 = arith.constant 32 : index
+      %c384 = arith.constant 384 : index
+
+      %ub = hal.interface.binding.subspan set(0) binding(2) type(uniform_buffer) offset(%c0) : memref<1xvector<4xi32>, #hal.descriptor_type<uniform_buffer>>
+      %offsets = memref.load %ub[%c0] : memref<1xvector<4xi32>, #hal.descriptor_type<uniform_buffer>>
+      %o0 = vector.extractelement %offsets[%c0 : index] : vector<4xi32>
+      %o1 = vector.extractelement %offsets[%c1 : index] : vector<4xi32>
+      %offset0 = arith.index_castui %o0 : i32 to index
+      %offset1 = arith.index_castui %o1 : i32 to index
+
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%offset0) : memref<128x384xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%offset1) : memref<128xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %2 = gpu.thread_id  x
+      %3 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>()[%2, %workgroup_id_x]
+      %4 = scf.for %arg0 = %c0 to %c384 step %c32 iter_args(%arg1 = %cv) -> (vector<1xf32>) {
+        %6 = vector.transfer_read %0[%3, %arg0], %f0 {in_bounds = [true]} : memref<128x384xf32>, vector<32xf32>
+        %7 = vector.broadcast %6 : vector<32xf32> to vector<1x32xf32>
+        %8 = vector.multi_reduction <add>, %7, %arg1 [1] : vector<1x32xf32> to vector<1xf32>
+        scf.yield %8 : vector<1xf32>
+      }
+      %5 = arith.divf %4, %fv : vector<1xf32>
+      vector.transfer_write %5, %1[%3] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+      return
+    }
+    }
+  }
+}
+
+//   CHECK-LABEL: func.func @reduce_uniform_buffer_offset()
+//         CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//         CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//         CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(uniform_buffer)
+//         CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[C0]]]
+//         CHECK:   %[[EXT0:.+]] = vector.extractelement %[[LOAD]][%[[C0]] : index] : vector<4xi32>
+//         CHECK:   %[[EXT1:.+]] = vector.extractelement %[[LOAD]][%[[C1]] : index] : vector<4xi32>
+//         CHECK:   %[[OFFSET0:.+]] = arith.index_castui %[[EXT0]] : i32 to index
+//         CHECK:   %[[OFFSET1:.+]] = arith.index_castui %[[EXT1]] : i32 to index
+//         CHECK:   hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[OFFSET0]])
+//         CHECK:   hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[OFFSET1]])
+//         CHECK:   scf.for
+//         CHECK:     vector.reduction
+// CHECK-COUNT-5:     gpu.shuffle
+//         CHECK:     scf.yield
+
+// -----
+
+// Make sure memref.load from readonly storage buffers are hoisted out as uniform code.
+
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @reduce_storage_buffer_offset  {
+  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.export @reduce_storage_buffer_offset layout(#pipeline_layout) attributes {
+      workgroup_size = [32 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+    func.func @reduce_storage_buffer_offset() {
+      %c0 = arith.constant 0 : index
+      %c1 = arith.constant 1 : index
+      %cv = arith.constant dense<0.000000e+00> : vector<1xf32>
+      %f0 = arith.constant 0.000000e+00 : f32
+      %fv = arith.constant dense<3.840000e+02> : vector<1xf32>
+      %c32 = arith.constant 32 : index
+      %c384 = arith.constant 384 : index
+
+      %ub = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<1xvector<4xi32>, #hal.descriptor_type<storage_buffer>>
+      %offsets = memref.load %ub[%c0] : memref<1xvector<4xi32>, #hal.descriptor_type<storage_buffer>>
+      %o0 = vector.extractelement %offsets[%c0 : index] : vector<4xi32>
+      %o1 = vector.extractelement %offsets[%c1 : index] : vector<4xi32>
+      %offset0 = arith.index_castui %o0 : i32 to index
+      %offset1 = arith.index_castui %o1 : i32 to index
+
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%offset0) : memref<128x384xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%offset1) : memref<128xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %2 = gpu.thread_id  x
+      %3 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>()[%2, %workgroup_id_x]
+      %4 = scf.for %arg0 = %c0 to %c384 step %c32 iter_args(%arg1 = %cv) -> (vector<1xf32>) {
+        %6 = vector.transfer_read %0[%3, %arg0], %f0 {in_bounds = [true]} : memref<128x384xf32>, vector<32xf32>
+        %7 = vector.broadcast %6 : vector<32xf32> to vector<1x32xf32>
+        %8 = vector.multi_reduction <add>, %7, %arg1 [1] : vector<1x32xf32> to vector<1xf32>
+        scf.yield %8 : vector<1xf32>
+      }
+      %5 = arith.divf %4, %fv : vector<1xf32>
+      vector.transfer_write %5, %1[%3] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+      return
+    }
+    }
+  }
+}
+
+//   CHECK-LABEL: func.func @reduce_storage_buffer_offset()
+//         CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//         CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//         CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//         CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[C0]]]
+//         CHECK:   %[[EXT0:.+]] = vector.extractelement %[[LOAD]][%[[C0]] : index] : vector<4xi32>
+//         CHECK:   %[[EXT1:.+]] = vector.extractelement %[[LOAD]][%[[C1]] : index] : vector<4xi32>
+//         CHECK:   %[[OFFSET0:.+]] = arith.index_castui %[[EXT0]] : i32 to index
+//         CHECK:   %[[OFFSET1:.+]] = arith.index_castui %[[EXT1]] : i32 to index
+//         CHECK:   hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[OFFSET0]])
+//         CHECK:   hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[OFFSET1]])
+//         CHECK:   scf.for
+//         CHECK:     vector.reduction
+// CHECK-COUNT-5:     gpu.shuffle
+//         CHECK:     scf.yield

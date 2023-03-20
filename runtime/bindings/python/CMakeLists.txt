@@ -52,9 +52,10 @@ iree_pyext_module(
     iree::base::tracing
     iree::hal
     iree::hal::drivers
+    iree::hal::utils::allocators
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
 
 iree_py_library(
@@ -179,7 +180,7 @@ iree_py_test(
 )
 
 # TODO: Enable this once the CI bots are updated to install the python3-venv
-# apt package. https://github.com/iree-org/iree/issues/9080
+# apt package. https://github.com/openxla/iree/issues/9080
 # iree_py_test(
 #   NAME
 #     package_test

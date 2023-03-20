@@ -37,7 +37,6 @@ def IREECodegen_Dialect : Dialect {
     void initializeCodegenAttrs();
   }];
   let useDefaultAttributePrinterParser = 1;
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;

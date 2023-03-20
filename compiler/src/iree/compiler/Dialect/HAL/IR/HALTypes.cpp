@@ -472,6 +472,21 @@ void ExecutableObjectAttr::print(AsmPrinter &p) const {
   os << "}>";
 }
 
+// static
+void ExecutableObjectAttr::filterObjects(
+    ArrayAttr objectAttrs, ArrayRef<StringRef> extensions,
+    SmallVectorImpl<ExecutableObjectAttr> &filteredAttrs) {
+  if (!objectAttrs) return;
+  for (auto objectAttr :
+       objectAttrs.getAsRange<IREE::HAL::ExecutableObjectAttr>()) {
+    auto path = objectAttr.getPath();
+    auto ext = llvm::sys::path::extension(path);
+    if (llvm::is_contained(extensions, ext)) {
+      filteredAttrs.push_back(objectAttr);
+    }
+  }
+}
+
 // Tries to find |filePath| on disk either at its absolute path or joined with
 // any of the specified |searchPaths| in order.
 // Returns the absolute file path when found or a failure if there are no hits.

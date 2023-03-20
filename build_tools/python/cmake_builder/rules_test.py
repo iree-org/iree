@@ -147,14 +147,16 @@ class RulesTest(unittest.TestCase):
   def test_build_iree_benchmark_suite_module_test(self):
     rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name="model_test",
-        model="123_abc",
         driver="LOCAL_TASK",
         expected_output="xyz",
+        platform_module_map={
+            "x86_64": "a.vmfb",
+            "arm": "b.vmfb"
+        },
         runner_args=["--x=0", "--y=1"],
         timeout_secs=10,
         labels=["defaults", "e2e"],
-        xfail_platforms=["arm", "ppc"],
-        unsupported_platforms=["riscv", "z80"])
+        xfail_platforms=["arm", "ppc"])
 
     self.assertEqual(
         rule,
@@ -162,14 +164,15 @@ class RulesTest(unittest.TestCase):
         iree_benchmark_suite_module_test(
           NAME
             "model_test"
-          MODEL
-            "123_abc"
           DRIVER
             "LOCAL_TASK"
           EXPECTED_OUTPUT
             "xyz"
           TIMEOUT
             "10"
+          MODULES
+            "x86_64=a.vmfb"
+            "arm=b.vmfb"
           RUNNER_ARGS
             "--x=0"
             "--y=1"
@@ -179,9 +182,6 @@ class RulesTest(unittest.TestCase):
           XFAIL_PLATFORMS
             "arm"
             "ppc"
-          UNSUPPORTED_PLATFORMS
-            "riscv"
-            "z80"
         )
         """))
 

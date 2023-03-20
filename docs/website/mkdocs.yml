@@ -1,7 +1,7 @@
 site_name: IREE
-site_url: https://iree-org.github.io/iree/
-repo_url: https://github.com/iree-org/iree
-repo_name: iree-org/iree
+site_url: https://openxla.github.io/iree/
+repo_url: https://github.com/openxla/iree
+repo_name: openxla/iree
 
 theme:
   name: material
@@ -60,7 +60,7 @@ extra:
 
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/iree-org/iree
+      link: https://github.com/openxla/iree
       name: IREE on GitHub
     - icon: fontawesome/brands/discord
       link: https://discord.gg/26P4xW4

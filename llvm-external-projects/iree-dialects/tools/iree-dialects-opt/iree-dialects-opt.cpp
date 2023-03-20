@@ -33,6 +33,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
+#include <mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h>
 
 using namespace mlir;
 namespace IREE = mlir::iree_compiler::IREE;
@@ -91,6 +92,7 @@ int main(int argc, char **argv) {
 
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();
+  mlir::bufferization::registerTransformDialectExtension(registry);
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::scf::registerTransformDialectExtension(registry);
   mlir::vector::registerTransformDialectExtension(registry);

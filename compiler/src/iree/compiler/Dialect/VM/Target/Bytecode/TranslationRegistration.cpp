@@ -20,7 +20,8 @@ void registerToVMBytecodeTranslation() {
       "Translates a vm.module to a bytecode module",
       [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
         return translateModuleToBytecode(
-            moduleOp, BytecodeTargetOptions::FromFlags::get(), output);
+            moduleOp, TargetOptions::FromFlags::get(),
+            BytecodeTargetOptions::FromFlags::get(), output);
       });
 }
 

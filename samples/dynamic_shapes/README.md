@@ -13,7 +13,7 @@ Steps 1-2 are performed in Python via the
 [`dynamic_shapes.ipynb`](./dynamic_shapes.ipynb)
 [Colab](https://research.google.com/colaboratory/) notebook:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/dynamic_shapes/dynamic_shapes.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/dynamic_shapes.ipynb)
 
 Step 3 should be performed on your development host machine
 
@@ -68,7 +68,7 @@ them.
     generates
 
 2. Build the `iree-compile` tool (see
-    [here](https://iree-org.github.io/iree/building-from-source/getting-started/)
+    [here](https://openxla.github.io/iree/building-from-source/getting-started/)
     for general instructions on building using CMake)
 
     ```
@@ -77,7 +77,7 @@ them.
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The
-    [CPU configuration](https://iree-org.github.io/iree/deployment-configurations/cpu/)
+    [CPU configuration](https://openxla.github.io/iree/deployment-configurations/cpu/)
     has the best support for dynamic shapes:
 
     ```

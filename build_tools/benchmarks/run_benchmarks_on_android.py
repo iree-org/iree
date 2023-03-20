@@ -339,7 +339,7 @@ def main(args):
   if args.verbose:
     print(device_info)
 
-  if args.run_config is not None:
+  if args.execution_benchmark_config is not None:
     raise ValueError("Run config option isn't supported yet.")
 
   commit = get_git_commit_hash("HEAD")

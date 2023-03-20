@@ -28,6 +28,8 @@ class PolynomialApproximationPass
     : public PolynomialApproximationPassBase<PolynomialApproximationPass> {
   void runOnOperation() override {
     RewritePatternSet mathPatterns(&getContext());
+    populateExpandTanPattern(mathPatterns);
+
     if (clNativeMathPrecision) {
       mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
     } else {

@@ -202,7 +202,7 @@ APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
 !!! Caution
 
     This section is under construction. Refer to the
-    [source documentation](https://github.com/iree-org/iree/tree/main/integrations/tensorflow#readme)
+    [source documentation](https://github.com/openxla/iree/tree/main/integrations/tensorflow#readme)
     for the latest building from source instructions.
 
 ???+ Note

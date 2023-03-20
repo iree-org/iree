@@ -74,7 +74,7 @@ static Value getByteLength(OpBuilder &builder, Location loc,
                            Value memrefValue) {
   auto memrefType = memrefValue.getType().cast<MemRefType>();
   if (memrefType.getRank() == 0) {
-    return builder.createOrFold<arith::ConstantIndexOp>(loc, 0);
+    return getElementTypeByteSize(builder, loc, memrefValue);
   }
   if (memrefType.getRank() != 1) {
     emitError(loc, "memrefs should have been flattened");
@@ -178,8 +178,10 @@ struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
       ConversionPatternRewriter &rewriter) const override {
     Location loc = allocaOp.getLoc();
     auto allocationSize = getByteLength(rewriter, loc, allocaOp.getMemref());
+    uint64_t alignment = allocaOp.getAlignment().value_or(0);
     rewriter.replaceOpWithNewOp<IREE::Util::BufferAllocOp>(
-        allocaOp, rewriter.getType<IREE::Util::BufferType>(), allocationSize);
+        allocaOp, rewriter.getType<IREE::Util::BufferType>(), allocationSize,
+        alignment ? rewriter.getIndexAttr(alignment) : IntegerAttr{});
     return success();
   }
 };

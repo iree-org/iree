@@ -145,7 +145,8 @@ Attribute CompiledBinary::invokeNullaryAsAttribute(Location loc,
                                     << " got " << iree_vm_list_size(outputs);
             }
             iree_vm_variant_t variant = iree_vm_variant_empty();
-            IREE_CHECK_OK(iree_vm_list_get_variant(outputs, 0, &variant));
+            IREE_CHECK_OK(
+                iree_vm_list_get_variant_assign(outputs, 0, &variant));
             result = convertVariantToAttribute(loc, variant);
             return success(result != nullptr);
           }))) {
@@ -295,9 +296,10 @@ InMemoryCompiledBinary::~InMemoryCompiledBinary() { deinitialize(); }
 LogicalResult InMemoryCompiledBinary::translateFromModule(
     mlir::ModuleOp moduleOp) {
   llvm::raw_string_ostream os(binary);
-  iree_compiler::IREE::VM::BytecodeTargetOptions targetOptions;
+  iree_compiler::IREE::VM::TargetOptions vmOptions;
+  iree_compiler::IREE::VM::BytecodeTargetOptions bytecodeOptions;
   if (failed(iree_compiler::IREE::VM::translateModuleToBytecode(
-          moduleOp, targetOptions, os))) {
+          moduleOp, vmOptions, bytecodeOptions, os))) {
     return failure();
   }
   os.flush();

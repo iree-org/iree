@@ -309,7 +309,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 # compatible solution.
 #
 # See also:
-#   https://github.com/iree-org/iree/issues/4665.
+#   https://github.com/openxla/iree/issues/4665.
 #   https://discourse.cmake.org/t/how-to-fix-build-warning-d9025-overriding-gr-with-gr/878
 #   https://gitlab.kitware.com/cmake/cmake/-/issues/20610
 if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -402,6 +402,7 @@ if(IREE_SIZE_OPTIMIZED)
       "-DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
       "-DIREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=0"
       "-DIREE_VM_BACKTRACE_ENABLE=0"
+      "-DIREE_VM_BYTECODE_VERIFICATION_ENABLE=0"
       "-DIREE_VM_EXT_F32_ENABLE=0"
       "-DIREE_VM_EXT_F64_ENABLE=0"
   )

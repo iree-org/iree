@@ -13,7 +13,7 @@ Steps 1-3 are performed in Python via the
 [`variables_and_state.ipynb`](./variables_and_state.ipynb)
 [Colab](https://research.google.com/colaboratory/) notebook:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/variables_and_state/variables_and_state.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/variables_and_state/variables_and_state.ipynb)
 
 Steps 4-5 are in [`main.c`](./main.c)
 
@@ -62,7 +62,7 @@ functions in the compiled programs.
    `counter_vmvx.vmfb` files it generates
 
 2. Build the `iree_samples_variables_and_state` CMake target (see
-    [here](https://iree-org.github.io/iree/building-from-source/getting-started/)
+    [here](https://openxla.github.io/iree/building-from-source/getting-started/)
     for general instructions on building using CMake)
 
     ```
@@ -87,7 +87,7 @@ compile the imported MLIR file using IREE's tools on your own machine.
 
 For example, to use IREE's `cpu` target, which is optimized for CPU execution
 using LLVM, refer to the
-[documentation](https://iree-org.github.io/iree/deployment-configurations/cpu/)
+[documentation](https://openxla.github.io/iree/deployment-configurations/cpu/)
 and compile the imported `counter.mlir` file using `iree-compile`:
 
 ```

@@ -92,7 +92,7 @@ class CollectCompilationStatistics(unittest.TestCase):
 
     self.assertEqual(moduel_path, "/abcd-compile-stats.vmfb")
 
-  def test_get_module_map_from_generation_config(self):
+  def test_get_module_map_from_compilation_benchmark_config(self):
     model_a = common_definitions.Model(
         id="1234",
         name="tflite_m",
@@ -102,7 +102,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         entry_function="main",
         input_types=["1xf32"])
     imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
-    compile_config_a = iree_definitions.CompileConfig(
+    compile_config_a = iree_definitions.CompileConfig.build(
         id="config_a",
         tags=["defaults"],
         compile_targets=[
@@ -112,7 +112,7 @@ class CollectCompilationStatistics(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    compile_config_b = iree_definitions.CompileConfig(
+    compile_config_b = iree_definitions.CompileConfig.build(
         id="config_b",
         tags=["defaults"],
         compile_targets=[
@@ -120,23 +120,20 @@ class CollectCompilationStatistics(unittest.TestCase):
                 target_architecture=common_definitions.DeviceArchitecture.
                 RV64_GENERIC,
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
-                target_abi=iree_definitions.TargetABI.LINUX_GNU),
-            iree_definitions.CompileTarget(
-                target_architecture=common_definitions.DeviceArchitecture.
-                RV32_GENERIC,
-                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model_a, compile_config=compile_config_b)
-    serialized_gen_config = json.dumps(
-        serialization.serialize_and_pack([gen_config_a, gen_config_b]))
+    benchmark_config = dict(generation_configs=serialization.serialize_and_pack(
+        [gen_config_a, gen_config_b]),
+                            module_dir_paths=["a", "b"])
     root_dir = pathlib.PurePath("artifacts_dir")
 
-    module_map = collect_compilation_statistics.get_module_map_from_generation_config(
-        serialized_gen_config=StringIO(serialized_gen_config),
+    module_map = collect_compilation_statistics.get_module_map_from_compilation_benchmark_config(
+        compilation_benchmark_config_data=StringIO(
+            json.dumps(benchmark_config)),
         e2e_test_artifacts_dir=root_dir)
 
     compile_info_a = common.benchmark_definition.CompilationInfo(
@@ -145,17 +142,16 @@ class CollectCompilationStatistics(unittest.TestCase):
         model_source=model_a.source_type.value,
         target_arch=f"[cpu-x86_64-cascadelake-linux-gnu]",
         compile_tags=tuple(gen_config_a.compile_config.tags),
-        gen_config_id=gen_config_a.composite_id())
+        gen_config_id=gen_config_a.composite_id)
     module_a_path = iree_artifacts.get_module_dir_path(
         gen_config_a, root_dir) / iree_artifacts.MODULE_FILENAME
     compile_info_b = common.benchmark_definition.CompilationInfo(
         model_name=model_a.name,
         model_tags=tuple(model_a.tags),
         model_source=model_a.source_type.value,
-        target_arch=
-        f"[cpu-riscv_64-generic-linux-gnu,cpu-riscv_32-generic-linux-gnu]",
+        target_arch=f"[cpu-riscv_64-generic-linux-gnu]",
         compile_tags=tuple(gen_config_a.compile_config.tags),
-        gen_config_id=gen_config_b.composite_id())
+        gen_config_id=gen_config_b.composite_id)
     module_b_path = iree_artifacts.get_module_dir_path(
         gen_config_b, root_dir) / iree_artifacts.MODULE_FILENAME
     self.assertEqual(module_map, {

@@ -7,7 +7,7 @@ body:
       value: |
         :star2: Thanks for taking the time to report this issue! :star2:
 
-        Please search through [other recent issues](https://github.com/iree-org/iree/issues) to see if your report overlaps with an existing issue.
+        Please search through [other recent issues](https://github.com/openxla/iree/issues) to see if your report overlaps with an existing issue.
   - type: textarea
     id: what-happened
     attributes:

@@ -33,6 +33,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -67,10 +68,18 @@ namespace {
 // Type Conversion
 //===----------------------------------------------------------------------===//
 
-/// Returns true if the given `type` is a MemRef of rank 1.
-static bool isRankOneMemRef(Type type) {
+/// Returns true if the given `type` is a 0-D MemRef.
+static bool isRankZeroMemRef(Type type) {
   if (auto memrefType = type.dyn_cast<MemRefType>()) {
-    return memrefType.hasRank() && memrefType.getRank() == 1;
+    return memrefType.hasRank() && memrefType.getRank() == 0;
+  }
+  return false;
+}
+
+/// Returns true if the given `type` is a 0-D or 1-D MemRef.
+static bool isRankZeroOrOneMemRef(Type type) {
+  if (auto memrefType = type.dyn_cast<MemRefType>()) {
+    return memrefType.hasRank() && memrefType.getRank() <= 1;
   }
   return false;
 }
@@ -83,26 +92,20 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
 
     // Convert n-D MemRef to 1-D MemRef.
     addConversion([](MemRefType type) -> Optional<Type> {
-      if (Attribute storage = type.getMemorySpace()) {
-        if (auto dtAttr = storage.dyn_cast<IREE::HAL::DescriptorTypeAttr>()) {
-          // Uniform buffers are faster but generally have a much smaller
-          // capacity limits. GPUs would expect such buffers to have a bound
-          // size when declaring resource ops in the kernel, so converting them
-          // to a static shaped 1-D memref.
-          if (dtAttr.getValue() == IREE::HAL::DescriptorType::UniformBuffer &&
-              type.hasStaticShape()) {
-            return MemRefType::get(type.getNumElements(), type.getElementType(),
-                                   AffineMap(), type.getMemorySpace());
-          }
-        }
+      int64_t offset;
+      SmallVector<int64_t> strides;
+      if (failed(getStridesAndOffset(type, strides, offset))) {
+        return nullptr;
       }
-      // By default convert others to a MemRef with unknown dimension. This is
-      // actually more akin to how IREE uses memref types for storage buffers:
-      // they are representing a view from a byte buffer with potentially
-      // unknown total size, as transformation passes can concatenate buffers,
-      // etc.
-      return MemRefType::get(ShapedType::kDynamic, type.getElementType(),
-                             AffineMap(), type.getMemorySpace());
+      // Since the memref gets linearized, use a stride 1, offset 0.
+      StridedLayoutAttr layoutAttr;
+      if (offset != 0) {
+        layoutAttr = StridedLayoutAttr::get(type.getContext(), offset, {1});
+      }
+      int64_t staticShape =
+          type.hasStaticShape() ? type.getNumElements() : ShapedType::kDynamic;
+      return MemRefType::get(staticShape, type.getElementType(), layoutAttr,
+                             type.getMemorySpace());
     });
   }
 };
@@ -230,24 +233,61 @@ struct FlattenBindingSubspan final
     auto oldType = subspanOp.getType().dyn_cast<MemRefType>();
     // IREE subspan ops only use memref types with the default identity
     // layout maps.
-    if (!oldType || !oldType.getLayout().isIdentity()) return failure();
+    if (!oldType) return failure();
 
-    auto newType = getTypeConverter()->convertType(oldType).cast<MemRefType>();
-    SmallVector<Value, 1> dynamicDims;
-    if (!newType.hasStaticShape()) {
-      dynamicDims.push_back(createTotalElementCountValue(
-          oldType, subspanOp.getDynamicDims(), subspanOp.getLoc(), rewriter));
+    OpFoldResult linearShape;
+    if (oldType.hasStaticShape()) {
+      linearShape = rewriter.getIndexAttr(oldType.getNumElements());
+    } else {
+      linearShape = createTotalElementCountValue(
+          oldType, subspanOp.getDynamicDims(), subspanOp.getLoc(), rewriter);
+    }
+    OpFoldResult linearShapeWithoutOffset = linearShape;
+
+    // Check if the subspan has offset. Convert the subspan into a new subpan
+    // of zero offset with size = linearize(original shape) + byteOffset /
+    // element-width.
+    auto byteOffset = subspanOp.getByteOffset();
+    Location loc = subspanOp.getLoc();
+    OpFoldResult elementOffset = rewriter.getIndexAttr(0);
+    if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
+      elementOffset = convertByteOffsetToElementOffset(
+          rewriter, loc, byteOffset, oldType.getElementType());
+      AffineExpr s0, s1;
+      bindSymbols(rewriter.getContext(), s0, s1);
+      linearShape = makeComposedFoldedAffineApply(rewriter, loc, s0 + s1,
+                                                  {linearShape, elementOffset});
     }
 
+    SmallVector<int64_t, 1> staticShape;
+    SmallVector<Value, 1> dynamicShape;
+    dispatchIndexOpFoldResult(linearShape, dynamicShape, staticShape);
+    auto newType =
+        MemRefType::get(staticShape, oldType.getElementType(),
+                        MemRefLayoutAttrInterface(), oldType.getMemorySpace());
+
+    auto newOffset = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp.getLoc(), newType, subspanOp.getSet(), subspanOp.getBinding(),
-        subspanOp.getDescriptorType(), subspanOp.getByteOffset(), dynamicDims,
+        subspanOp.getDescriptorType(), newOffset, dynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-    if (isRankOneMemRef(oldType)) {
-      rewriter.replaceOpWithNewOp<memref::CastOp>(subspanOp, oldType, newOp);
-    } else {
-      rewriter.replaceOp(subspanOp, newOp.getResult());
+
+    Value replacement = newOp;
+    if (!isConstantIntValue(elementOffset, 0)) {
+      OpFoldResult stride = rewriter.getIndexAttr(1);
+      MemRefType returnType =
+          oldType.getRank() == 0
+              ? memref::SubViewOp::inferRankReducedResultType(
+                    {}, newType, elementOffset, linearShapeWithoutOffset,
+                    stride)
+                    .cast<MemRefType>()
+              : nullptr;
+      replacement = rewriter.create<memref::SubViewOp>(
+          loc, returnType, newOp, elementOffset, linearShapeWithoutOffset,
+          OpFoldResult(rewriter.getIndexAttr(1)));
     }
+
+    rewriter.replaceOp(subspanOp, replacement);
     return success();
   }
 };
@@ -264,12 +304,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   assert(sourceType.hasRank());
 
   int64_t rank = sourceType.getRank();
-  if (rank == 0) {
-    // For source 0-D MemRef, we convert them into 1-D MemRef with unknown
-    // dimension size. To convert its consumer load/store ops, we also need to
-    // create an index for it.
-    return builder.create<arith::ConstantIndexOp>(loc, 0);
-  }
+  assert(rank > 0);
 
   // First try to get the strides from the MemRef type itself. This applies to
   // cases where we have static shapes and only the leading dimension is
@@ -277,8 +312,15 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   SmallVector<int64_t> strides;
   int64_t offset;
   if (succeeded(getStridesAndOffset(sourceType, strides, offset))) {
+    // The memref itself might have an offset, but we should not account for it
+    // when computing the linearization. The original memref might be
+    // `memref<?x?xf32, strided<[?, ?], offset: ?>`
+    // where shape is `{%d0, %d1}`, strides are `{%s0, %s1}` and offset is
+    // `%offset`. The interpretation of that is the actual memref starts at
+    // `%offset` from the base pointer. After linearization, the offset remains,
+    // but the shape is 1D. So build a map with the same strides, but 0 offset.
     AffineMap linearLayoutMap =
-        makeStridedLinearLayoutMap(strides, offset, builder.getContext());
+        makeStridedLinearLayoutMap(strides, 0, builder.getContext());
     // Dynamic strides/offset will create symbols. There should be none for the
     // static case.
     if (linearLayoutMap.getNumSymbols() == 0) {
@@ -342,13 +384,13 @@ struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
   LogicalResult matchAndRewrite(
       memref::SubViewOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneMemRef(adaptor.getSource().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
-          op, "expected converted memref of rank == 1");
+          op, "expected converted memref of rank <= 1");
     }
     Type neededResultType =
         getTypeConverter()->convertType(op.getResult().getType());
-    if (!neededResultType || !isRankOneMemRef(neededResultType))
+    if (!neededResultType || !isRankZeroOrOneMemRef(neededResultType))
       return failure();
     Value size = createTotalElementCountValue(op.getType(), op.sizes(),
                                               op.getLoc(), rewriter);
@@ -373,9 +415,9 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
   LogicalResult matchAndRewrite(
       memref::LoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneMemRef(adaptor.getMemref().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getMemref().getType())) {
       return rewriter.notifyMatchFailure(
-          loadOp, "expected converted memref of rank == 1");
+          loadOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex = linearizeIndices(
@@ -398,9 +440,9 @@ struct LinearizeMMALoadIndices final
   LogicalResult matchAndRewrite(
       gpu::SubgroupMmaLoadMatrixOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneMemRef(adaptor.getSrcMemref().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSrcMemref().getType())) {
       return rewriter.notifyMatchFailure(
-          loadOp, "expected converted memref of rank == 1");
+          loadOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex = linearizeIndices(
@@ -424,9 +466,9 @@ struct LinearizeStoreIndices final
   LogicalResult matchAndRewrite(
       memref::StoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneMemRef(adaptor.getMemref().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getMemref().getType())) {
       return rewriter.notifyMatchFailure(
-          storeOp, "expected converted memref of rank == 1");
+          storeOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex = linearizeIndices(
@@ -449,9 +491,9 @@ struct LinearizeMMAStoreIndices final
   LogicalResult matchAndRewrite(
       gpu::SubgroupMmaStoreMatrixOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankOneMemRef(adaptor.getDstMemref().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getDstMemref().getType())) {
       return rewriter.notifyMatchFailure(
-          storeOp, "expected converted memref of rank == 1");
+          storeOp, "expected converted memref of rank <= 1");
     }
 
     Value linearIndex =
@@ -478,11 +520,13 @@ struct LinearizeTransferReadIndices final
       ConversionPatternRewriter &rewriter) const override {
     if (!transferReadOp.getPermutationMap().isMinorIdentity()) {
       return rewriter.notifyMatchFailure(
-          transferReadOp, "cannot convert op with non-minor identity map");
+          transferReadOp,
+          "cannot convert op with non-minor identity "
+          "map");
     }
-    if (!isRankOneMemRef(adaptor.getSource().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
-          transferReadOp, "expected converted memref of rank == 1");
+          transferReadOp, "expected converted memref of rank <= 1");
     }
     Value linearIndex = linearizeIndices(transferReadOp.getSource(),
                                          transferReadOp.getIndices(),
@@ -510,11 +554,13 @@ struct LinearizeTransferWriteIndices final
       ConversionPatternRewriter &rewriter) const override {
     if (!transferWriteOp.getPermutationMap().isMinorIdentity()) {
       return rewriter.notifyMatchFailure(
-          transferWriteOp, "cannot convert op with non-minor identity map");
+          transferWriteOp,
+          "cannot convert op with non-minor identity "
+          "map");
     }
-    if (!isRankOneMemRef(adaptor.getSource().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSource().getType())) {
       return rewriter.notifyMatchFailure(
-          transferWriteOp, "expected converted memref of rank == 1");
+          transferWriteOp, "expected converted memref of rank <= 1");
     }
     Value linearIndex = linearizeIndices(transferWriteOp.getSource(),
                                          transferWriteOp.getIndices(),
@@ -545,12 +591,27 @@ struct AdjustConversionCast final
     // We only want to handle cases where the cast op handles memref types.
     if (!input.getType().isa<BaseMemRefType>()) return failure();
 
-    if (!isRankOneMemRef(input.getType())) {
+    if (!isRankZeroOrOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
-          castOp, "expected converted memref of rank == 1");
+          castOp, "expected converted memref of rank <= 1");
     }
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         castOp, castOp.getResultTypes(), input);
+    return success();
+  }
+};
+
+/// Update the source operand to use the converted source.
+struct AdjustGetBasePointer final
+    : public OpConversionPattern<IREE::Codegen::GetBasePointerOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::Codegen::GetBasePointerOp getBasePointerOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.updateRootInPlace(getBasePointerOp, [&] {
+      getBasePointerOp->setOperand(0, adaptor.getSource());
+    });
     return success();
   }
 };
@@ -569,9 +630,9 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
       ReshapeOpTy op, typename ReshapeOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto typeConverter = OpConversionPattern<ReshapeOpTy>::typeConverter;
-    if (!isRankOneMemRef(adaptor.getSrc().getType())) {
+    if (!isRankZeroOrOneMemRef(adaptor.getSrc().getType())) {
       return rewriter.notifyMatchFailure(
-          op, "expected converted memref of rank == 1");
+          op, "expected converted memref of rank <= 1");
     }
 
     // If the types are the same, just elide. Otherwise, introduce a cast
@@ -585,7 +646,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
     if (newSourceType == neededResultType) {
       rewriter.replaceOp(op, adaptor.getSrc());
       return success();
-    } else if (isRankOneMemRef(neededResultType)) {
+    } else if (isRankZeroOrOneMemRef(neededResultType)) {
       rewriter.replaceOpWithNewOp<memref::CastOp>(op, neededResultType,
                                                   adaptor.getSrc());
       return success();
@@ -611,94 +672,6 @@ Optional<int64_t> getNumBytes(Type type) {
   }
   return std::nullopt;
 }
-
-/// Folds the byte offset on subspan ops into the consumer load/store ops.
-template <typename OpType>
-struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
-  using OpRewritePattern<OpType>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(OpType op,
-                                PatternRewriter &rewriter) const override {
-    Value memref;
-    if constexpr (std::is_same<OpType, gpu::SubgroupMmaLoadMatrixOp>::value) {
-      memref = op.getSrcMemref();
-    } else if constexpr (std::is_same<OpType,
-                                      gpu::SubgroupMmaStoreMatrixOp>::value) {
-      memref = op.getDstMemref();
-    } else {
-      memref = op.getMemref();
-    }
-    // Look through memref cast ops. They can be generated during conversions.
-    while (auto castOp = memref.getDefiningOp<memref::CastOp>()) {
-      memref = castOp.getSource();
-    }
-    auto memrefType = memref.getType().template cast<MemRefType>();
-    if (!isRankOneMemRef(memrefType)) {
-      return rewriter.notifyMatchFailure(op, "expected 1-D memref");
-    }
-
-    auto subspanOp =
-        memref.template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp) return failure();
-
-    // If the subspan op has a zero byte offset then we are done.
-    if (!subspanOp.getByteOffset() ||
-        matchPattern(subspanOp.getByteOffset(), m_Zero())) {
-      return failure();
-    }
-
-    // Calculate the offset we need to add to the load/store op, in terms of how
-    // many elements.
-    Optional<int64_t> numBytes = getNumBytes(memrefType.getElementType());
-    if (!numBytes) {
-      return rewriter.notifyMatchFailure(op,
-                                         "cannot deduce element byte count");
-    }
-    // Create a new subspan op with zero byte offset at the original location.
-    auto ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointAfter(subspanOp);
-    Value zero = rewriter.create<arith::ConstantIndexOp>(memref.getLoc(), 0);
-    Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        memref.getLoc(), subspanOp.getType(), subspanOp.getSet(),
-        subspanOp.getBinding(), subspanOp.getDescriptorType(), zero,
-        subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(), nullptr);
-    rewriter.restoreInsertionPoint(ip);
-
-    MLIRContext *context = rewriter.getContext();
-    AffineExpr sym0, sym1;
-    bindSymbols(context, sym0, sym1);
-    auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
-    auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
-
-    Value byteValue = rewriter.create<arith::ConstantIndexOp>(memref.getLoc(),
-                                                              numBytes.value());
-    // We assume that upper layers guarantee the byte offset is perfectly
-    // divisible by the element byte count so the content is well aligned.
-    Value offset = rewriter.create<AffineApplyOp>(
-        op.getLoc(), divMap, ValueRange{subspanOp.getByteOffset(), byteValue});
-
-    // Get the new index by adding the old index with the offset.
-    Value newIndex = rewriter.create<AffineApplyOp>(
-        op.getLoc(), addMap, ValueRange{op.getIndices().front(), offset});
-    if constexpr (std::is_same<OpType, gpu::SubgroupMmaLoadMatrixOp>::value) {
-      rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
-          op, op.getType(), newSubspan, newIndex, op.getLeadDimension(),
-          op.getTransposeAttr());
-    } else if constexpr (std::is_same<OpType,
-                                      gpu::SubgroupMmaStoreMatrixOp>::value) {
-      rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
-          op, op.getSrc(), newSubspan, newIndex, op.getLeadDimension(),
-          op.getTransposeAttr());
-    } else if constexpr (std::is_same<OpType, memref::LoadOp>::value) {
-      rewriter.replaceOpWithNewOp<memref::LoadOp>(
-          op, memrefType.getElementType(), ValueRange{newSubspan, newIndex});
-    } else {
-      rewriter.replaceOpWithNewOp<memref::StoreOp>(
-          op, TypeRange{}, ValueRange{op.getOperand(0), newSubspan, newIndex});
-    }
-    return success();
-  }
-};
 
 /// Erase alignment hints.
 struct RemoveAssumeAlignOp
@@ -763,6 +736,14 @@ struct FlattenMemRefSubspanPass
     // uniform buffers and dynamic for storage buffers. This matches how IREE
     // models runtime buffers nicely.
     FlattenMemRefTypeConverter interfaceTypeConverter;
+    interfaceTypeConverter.addConversion([](MemRefType type) -> Optional<Type> {
+      // 0-D MemRef types can be used to represent raw pointers for micro-kernel
+      // ABI purposes. Specially allow it.
+      if (isRankZeroMemRef(type)) return type;
+
+      // Fall back to the default conversion flow.
+      return std::nullopt;
+    });
     flattenPatterns.add<FlattenBindingSubspan>(interfaceTypeConverter, context);
 
     // Other ops generate MemRef values representing internal allocations (e.g.,
@@ -771,8 +752,8 @@ struct FlattenMemRefSubspanPass
     // Still convert everything to 1-D though.
     FlattenMemRefTypeConverter internalTypeConverter;
     internalTypeConverter.addConversion([](MemRefType type) -> Optional<Type> {
-      // 1-D MemRef types are okay.
-      if (isRankOneMemRef(type)) return type;
+      // 0-D or 1-D MemRef types are okay.
+      if (isRankZeroOrOneMemRef(type)) return type;
 
       // Fall back to the default conversion flow.
       return std::nullopt;
@@ -783,7 +764,8 @@ struct FlattenMemRefSubspanPass
              LinearizeMMALoadIndices, LinearizeStoreIndices,
              LinearizeMMAStoreIndices, LinearizeTransferReadIndices,
              LinearizeTransferWriteIndices, AdjustConversionCast,
-             FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,
+             AdjustGetBasePointer, FlattenSubView,
+             FoldMemRefReshape<memref::CollapseShapeOp>,
              FoldMemRefReshape<memref::ExpandShapeOp>>(internalTypeConverter,
                                                        context);
 
@@ -791,42 +773,47 @@ struct FlattenMemRefSubspanPass
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addDynamicallyLegalOp<memref::AllocaOp, memref::AllocOp,
                                  memref::GetGlobalOp>([](Operation *op) {
-      return isRankOneMemRef(op->getResultTypes().front());
+      return isRankZeroOrOneMemRef(op->getResultTypes().front());
     });
     target
         .addDynamicallyLegalOp<memref::CollapseShapeOp, memref::ExpandShapeOp>(
             [](Operation *op) {
-              return isRankOneMemRef(op->getResultTypes().front()) &&
-                     isRankOneMemRef(op->getOperandTypes().front());
+              return isRankZeroOrOneMemRef(op->getResultTypes().front()) &&
+                     isRankZeroOrOneMemRef(op->getOperandTypes().front());
             });
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
         [&](IREE::HAL::InterfaceBindingSubspanOp op) {
-          return interfaceTypeConverter.isLegal(op.getType());
+          if (!isRankZeroOrOneMemRef(op.getType())) {
+            return false;
+          }
+          auto byteOffset = op.getByteOffset();
+          return !byteOffset || matchPattern(byteOffset, m_Zero());
         });
-    target.addDynamicallyLegalOp<memref::GlobalOp>(
-        [](memref::GlobalOp op) { return isRankOneMemRef(op.getType()); });
+    target.addDynamicallyLegalOp<memref::GlobalOp>([](memref::GlobalOp op) {
+      return isRankZeroOrOneMemRef(op.getType());
+    });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
-      return isRankOneMemRef(loadOp.getMemRefType());
+      return isRankZeroOrOneMemRef(loadOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<gpu::SubgroupMmaLoadMatrixOp>(
         [](gpu::SubgroupMmaLoadMatrixOp loadOp) {
-          return isRankOneMemRef(loadOp.getSrcMemref().getType());
+          return isRankZeroOrOneMemRef(loadOp.getSrcMemref().getType());
         });
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
-      return isRankOneMemRef(storeOp.getMemRefType());
+      return isRankZeroOrOneMemRef(storeOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<gpu::SubgroupMmaStoreMatrixOp>(
         [](gpu::SubgroupMmaStoreMatrixOp storeOp) {
-          return isRankOneMemRef(storeOp.getDstMemref().getType());
+          return isRankZeroOrOneMemRef(storeOp.getDstMemref().getType());
         });
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
         [](vector::TransferReadOp readOp) {
-          return isRankOneMemRef(
+          return isRankZeroOrOneMemRef(
               readOp.getSource().getType().cast<MemRefType>());
         });
     target.addDynamicallyLegalOp<vector::TransferWriteOp>(
         [](vector::TransferWriteOp writeOp) {
-          return isRankOneMemRef(
+          return isRankZeroOrOneMemRef(
               writeOp.getSource().getType().cast<MemRefType>());
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
@@ -834,13 +821,20 @@ struct FlattenMemRefSubspanPass
           if (castOp->getNumOperands() != 1) return false;
 
           Type inputType = castOp->getOperandTypes().front();
-          return !inputType.isa<BaseMemRefType>() || isRankOneMemRef(inputType);
+          return !inputType.isa<BaseMemRefType>() ||
+                 isRankZeroOrOneMemRef(inputType);
         });
-    target.addDynamicallyLegalOp<memref::SubViewOp>(
-        [](memref::SubViewOp op) { return isRankOneMemRef(op.getType()); });
+    target.addDynamicallyLegalOp<memref::SubViewOp>([](memref::SubViewOp op) {
+      return isRankZeroOrOneMemRef(op.getType());
+    });
+    target.addDynamicallyLegalOp<IREE::Codegen::GetBasePointerOp>(
+        [](IREE::Codegen::GetBasePointerOp op) {
+          return isRankZeroOrOneMemRef(
+              op.getSource().getType().cast<MemRefType>());
+        });
 
-    // Use partial conversion here so that we can ignore allocations created by
-    // promotion and their load/store ops.
+    // Use partial conversion here so that we can ignore allocations created
+    // by promotion and their load/store ops.
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(flattenPatterns)))) {
       return signalPassFailure();
@@ -851,20 +845,6 @@ struct FlattenMemRefSubspanPass
     memref::populateFoldMemRefAliasOpPatterns(foldSubviewPatterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(foldSubviewPatterns)))) {
-      return signalPassFailure();
-    }
-
-    // Then fold byte offset on subspan ops into consumer load/store ops.
-    RewritePatternSet foldPatterns(context);
-    foldPatterns
-        .add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
-             FoldSubspanOffsetIntoLoadStore<memref::StoreOp>,
-             FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaLoadMatrixOp>,
-             FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaStoreMatrixOp>>(
-            context);
-
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(foldPatterns)))) {
       return signalPassFailure();
     }
 

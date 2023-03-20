@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -88,11 +89,6 @@ static llvm::cl::opt<bool> enableVectorPeeling(
     "iree-codegen-enable-vector-peeling",
     llvm::cl::desc("Enable peeling for vectorization"), llvm::cl::init(true));
 
-static llvm::cl::opt<bool> enableTripleTilingPipeline(
-    "iree-llvmcpu-enable-triple-tiling-pipeline",
-    llvm::cl::desc("enable triple tiling expert for matmul kernels"),
-    llvm::cl::init(false));
-
 // Non-static options are used in other places.
 llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
     "iree-codegen-llvmcpu-use-transform-dialect",
@@ -126,6 +122,10 @@ enum class VectorPreProcStrategy {
   // Peel iterations from the vector dimensions so that they become multiple of
   // the vector length.
   Peeling,
+  // Compute vector dimensions assuming vector masking support. Vector sizes may
+  // be rounded up to the nearest power of two and out-of-bounds elements would
+  // be masked-out.
+  Masking,
   // Do not apply any vectorization pre-processing transformation.
   None
 };
@@ -139,6 +139,9 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
       break;
     case VectorPreProcStrategy::Peeling:
       os << "Peeling";
+      break;
+    case VectorPreProcStrategy::Masking:
+      os << "Masking";
       break;
     case VectorPreProcStrategy::None:
       os << "None";
@@ -187,29 +190,43 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
     return VectorPreProcStrategy::None;
   }
 
-  // TripleTilingPipeline is only for experimental for now. It's not mature
-  // enough to work well with other strategies.
-  if (enableTripleTilingPipeline) {
-    return VectorPreProcStrategy::None;
-  }
-
-  if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
-    // Peeling is only enabled on fully dynamic shape ops for now.
-    return VectorPreProcStrategy::Peeling;
-  }
-
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
+  bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
 
   // Default X86 specific strategy.
-  if (isX86(targetAttr) && enableVectorPadding) {
-    // Padding is only enabled on x86. It leads to too much overhead on RISC-V
-    // and ARM.
-    return VectorPreProcStrategy::Padding;
+  if (isX86(targetAttr)) {
+    if (isLinalgGeneric) {
+      return VectorPreProcStrategy::Masking;
+    }
+
+    if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
+      return VectorPreProcStrategy::Peeling;
+    }
+
+    if (enableVectorPadding) {
+      // Padding is only enabled on x86. It leads to too much overhead on
+      // RISC-V and ARM.
+      return VectorPreProcStrategy::Padding;
+    }
   }
 
   // Default RISC-V specific strategies.
-  if (isRISCV(targetAttr) && enableVectorPeeling) {
-    return VectorPreProcStrategy::Peeling;
+  if (isRISCV(targetAttr)) {
+    if (isLinalgGeneric) {
+      return VectorPreProcStrategy::Masking;
+    }
+
+    if (enableVectorPeeling) {
+      return VectorPreProcStrategy::Peeling;
+    }
+  }
+
+  // Default AArch64 specific strategies.
+  if (isAArch64(targetAttr)) {
+    if ((linalg::isElementwise(linalgOp) || isFullyDynamicOp(linalgOp)) &&
+        enableVectorPeeling) {
+      return VectorPreProcStrategy::Peeling;
+    }
   }
 
   return VectorPreProcStrategy::None;
@@ -429,17 +446,33 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   return distributedTileSizes;
 }
 
+/// Returns the nearest power of two of `size` if `predicate` is true.
+/// Otherwise, returns `size`.
+static int64_t roundUpToPow2(int64_t size, bool predicate) {
+  if (!predicate) {
+    return size;
+  }
+  assert(size > 0 && "Negative size");
+  return llvm::PowerOf2Ceil(size);
+}
+
 /// Adjusts the workload per workgroup to be a multiple of vector size to ensure
 /// that the op vectorizes.
 static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
                               int64_t vectorSize,
-                              bool allowIncompleteTile = false) {
+                              bool allowIncompleteTile = false,
+                              bool enforcePowerOfTwo = false) {
   if (ub == ShapedType::kDynamic || lb == ShapedType::kDynamic) {
-    return maxSize;
+    return roundUpToPow2(maxSize, enforcePowerOfTwo);
   }
   int64_t numIters = ub - lb;
   if (numIters <= maxSize && numIters < vectorSize) {
-    return numIters;
+    return roundUpToPow2(numIters, enforcePowerOfTwo);
+  }
+
+  // Return the largest suitable power of two if power of two is enforced.
+  if (enforcePowerOfTwo) {
+    return roundUpToPow2(std::min(maxSize, numIters), enforcePowerOfTwo);
   }
 
   int64_t scaledUB = std::min(maxSize, numIters) / vectorSize * vectorSize;
@@ -576,6 +609,11 @@ static void setVectorSizesForDynamicShapes(
     linalg::LinalgOp op, VectorPreProcStrategy vecPreProcStrategy,
     SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes) {
+  // Masking doesn't need any dim set to 1.
+  if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
+    return;
+  }
+
   SmallVector<int64_t> origParallelSizes(parallelSizes.begin(),
                                          parallelSizes.end());
   SmallVector<int64_t> origReductionSizes(reductionSizes.begin(),
@@ -630,8 +668,8 @@ static LogicalResult setDefaultRootConfig(
     func::FuncOp entryPointFn,
     PartitionableLoopsInterface partitionableLoopsInterfaceOp,
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
-  if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
-
+  assert(!getLoweringConfig(partitionableLoopsInterfaceOp) &&
+         "expected lowering_config is not set");
   SmallVector<unsigned> partitionableLoops =
       partitionableLoopsInterfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
@@ -689,59 +727,18 @@ static LogicalResult setMatmulPadRootConfig(
       DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
 }
 
-// Returns true if all the tiling sizes are divisible by the next level of
-// tile sizes.
-static bool isNoPadMultiTilingBeneficial(linalg::ContractionOpInterface op,
-                                         TileSizesListType tileSizes) {
-  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  int numLoops = linalgOp.getNumLoops();
-  if (numLoops != 3) return false;
-
-  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  if (llvm::any_of(shape,
-                   [](int64_t v) { return v == ShapedType::kDynamic; })) {
-    return false;
-  }
-
-  auto tryToFullyTile = [&](SmallVectorImpl<int64_t> &arr,
-                            ArrayRef<int64_t> tiles) -> bool {
-    for (int i = 0; i < numLoops; ++i) {
-      if (tiles[i] == 0) continue;
-      if (arr[i] % tiles[i] != 0) return false;
-      arr[i] = tiles[i];
-    }
-    return true;
-  };
-
-  for (auto sizes : tileSizes) {
-    if (!tryToFullyTile(shape, sizes)) return false;
-  }
-
-  return true;
-}
-
-static DispatchLoweringPassPipeline getNoPadMultiTilingExpert(
-    VectorPreProcStrategy strategy, int numLevels) {
+static DispatchLoweringPassPipeline getNoPadTilingExpert(
+    VectorPreProcStrategy strategy) {
   if (strategy == VectorPreProcStrategy::Peeling) {
     return DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
   }
-  switch (numLevels) {
-    case (2):
-      return DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-    case (3):
-      return DispatchLoweringPassPipeline::CPUTripleTilingExpert;
-    default:
-      llvm_unreachable("Unexpected number of levels");
-  }
+  return DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
 }
 
 static LogicalResult setMatmulNoPadRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     const TileSizesListTypeRef inputTileSizes, int vectorSize,
     VectorPreProcStrategy vecPreProcStrategy) {
-  size_t numTuples = inputTileSizes.size();
-  assert(numTuples >= 2 && "Expected two or more tile size tuples");
-
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
   // Iterate over the inner tile size tuples to check that their sizes divides
@@ -763,11 +760,14 @@ static LogicalResult setMatmulNoPadRootConfig(
   SmallVector<int64_t> parallelTileSizes;
   for (auto [index, tileSize] : llvm::enumerate(workgroupTileSizes)) {
     int64_t sz = tileSize;
+    bool allowIncompleteTile =
+        vecPreProcStrategy == VectorPreProcStrategy::Peeling ||
+        vecPreProcStrategy == VectorPreProcStrategy::Masking;
+
     if (sz != 0) {
-      sz = getMaxTileSize(/*lb=*/0, /*ub=*/shape[index],
-                          /*maxTileSize=*/sz, vectorSize,
-                          /*allowIncompleteTile=*/vecPreProcStrategy ==
-                              VectorPreProcStrategy::Peeling);
+      sz = getMaxTileSize(
+          /*lb=*/0, /*ub=*/shape[index],
+          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile);
     }
     parallelTileSizes.push_back(sz);
   }
@@ -790,8 +790,7 @@ static LogicalResult setMatmulNoPadRootConfig(
                        << newTileSizes << "\n");
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, newTileSizes,
-      getNoPadMultiTilingExpert(vecPreProcStrategy, numTuples));
+      entryPointFn, op, newTileSizes, getNoPadTilingExpert(vecPreProcStrategy));
 }
 
 static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
@@ -895,6 +894,8 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
 /// implements the contraction operation interface.
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp) {
+  assert(!getLoweringConfig(contractionOp) &&
+         "expected lowering_config is not set");
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
   unsigned numLoops = linalgOp.getNumLoops();
   {
@@ -940,11 +941,12 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  auto preProcStrategy = getVectorPreProcStrategy(linalgOp);
-  bool usePaddingPipeline = preProcStrategy == VectorPreProcStrategy::Padding;
+  auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
+  bool usePaddingPipeline =
+      vecPreProcStrategy == VectorPreProcStrategy::Padding;
 
-  LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: " << preProcStrategy
-                       << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
+                       << vecPreProcStrategy << "\n");
 
   if (usePaddingPipeline) {
     // It's inspired from Sandbox configuration. Sandbox has
@@ -980,26 +982,15 @@ static LogicalResult setRootConfig(
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                   workgroupTileSizes, vectorSize);
   }
-  // TODO(hanchung): We should make the tile sizes be related to memory
-  // hierarchy. They are derived from experiments for now.
-  if (enableTripleTilingPipeline) {
-    SmallVector<int64_t> l1TileSizes = {0, 0, 384};
-    TileSizesListType tripleTileSizes = {flowTileSizes, l1TileSizes,
-                                         workgroupTileSizes};
-    if (isNoPadMultiTilingBeneficial(contractionOp, tripleTileSizes)) {
-      return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
-                                      tripleTileSizes, vectorSize,
-                                      preProcStrategy);
-    }  // else fall back to the default configuration.
-  }
   return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
-                                  vectorSize, preProcStrategy);
+                                  vectorSize, vecPreProcStrategy);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root
 /// op
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::Mmt4DOp mmt4dOp) {
+  assert(!getLoweringConfig(mmt4dOp) && "expected lowering_config is not set");
   auto getWorkgroupTileSizes = [&]() -> SmallVector<int64_t> {
     if (!mmt4dWorkgroupTileSizes.empty()) {
       return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
@@ -1062,12 +1053,9 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
   return workgroupTileSizes;
 }
 
-template <typename OpTy>
-static LogicalResult setPackOpRootConfig(func::FuncOp entryPointFn, OpTy op) {
-  // TODO(hanchung): Retire IREE::LinalgExt::PackOp. This is for having
-  // consistent configurations for pack ops.
-  static_assert(
-      llvm::is_one_of<OpTy, IREE::LinalgExt::PackOp, tensor::PackOp>::value);
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   tensor::PackOp op) {
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
 
@@ -1088,16 +1076,11 @@ static LogicalResult setPackOpRootConfig(func::FuncOp entryPointFn, OpTy op) {
       DispatchLoweringPassPipeline::CPUDataTiling);
 }
 
-template <typename OpTy>
 static LogicalResult setUnPackOpRootConfig(
-    func::FuncOp entryPointFn, OpTy op,
+    func::FuncOp entryPointFn, tensor::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
-  // TODO(hanchung): Retire IREE::LinalgExt::UnPackOp. This is for having
-  // consistent configurations for unpack ops.
-  static_assert(llvm::is_one_of<OpTy, IREE::LinalgExt::UnPackOp,
-                                tensor::UnPackOp>::value);
-
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   // TODO(#11505): Consider multi-level tiling for handling unpack + generic
   // cases.
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
@@ -1123,6 +1106,7 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
+  assert(!getLoweringConfig(fftOp) && "expected lowering_config is not set");
   SmallVector<int64_t> workgroupTileSizes =
       getLinalgExtDefaultWorkgroupTileSizes(fftOp, defaultWorkgroupTileSize);
   auto rank = fftOp.getOperandRank();
@@ -1145,7 +1129,7 @@ static LogicalResult setRootConfig(
 static void setX86WorkgroupTileSizes(
     linalg::GenericOp genericOp, unsigned numLoops,
     ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> minTileSizes,
-    ArrayRef<int64_t> maxTileSizes,
+    ArrayRef<int64_t> maxTileSizes, VectorPreProcStrategy vecPreProcStrategy,
     SmallVectorImpl<int64_t> &workgroupTileSizes) {
   workgroupTileSizes.append(numLoops, 0);
   SmallVector<int64_t, 4> staticLoopRanges = genericOp.getStaticLoopRanges();
@@ -1153,7 +1137,9 @@ static void setX86WorkgroupTileSizes(
     if (flowTileSizes[loopNum]) {
       workgroupTileSizes[loopNum] =
           getMaxTileSize(0, flowTileSizes[loopNum], minTileSizes[loopNum],
-                         minTileSizes[loopNum]);
+                         minTileSizes[loopNum], /*allowIncompleteTile=*/false,
+                         /*enforcePowerOfTwo=*/vecPreProcStrategy ==
+                             VectorPreProcStrategy::Masking);
     } else {
       // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
@@ -1197,9 +1183,9 @@ static LogicalResult setDefaultGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (getLoweringConfig(genericOp)) {
-    return success();
-  }
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
+  LLVM_DEBUG(KD_DBGS() << "Setting default generic op root configuration\n");
 
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
@@ -1215,21 +1201,36 @@ static LogicalResult setDefaultGenericOpRootConfig(
   // allocation limit See #9469 for example.
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize / 2);
 
+  LLVM_DEBUG(KD_DBGS() << "Min tile sizes for distribution: " << minTileSizes
+                       << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Max tile sizes for distribution: " << maxTileSizes
+                       << "\n");
+
   // Set the flow level tiling to the default.
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       genericOp, minTileSizes, maxTileSizes);
+
+  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for distribution: " << flowTileSizes
+                       << "\n");
+
+  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+  LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
+                       << vecPreProcStrategy << "\n");
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   setX86WorkgroupTileSizes(genericOp, numLoops, flowTileSizes, minTileSizes,
-                           maxTileSizes, parallelTileSizes);
+                           maxTileSizes, vecPreProcStrategy, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
-
-  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
   setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
                                  parallelTileSizes, reductionTileSizes);
+
+  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (parallel): "
+                       << parallelTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (reduction): "
+                       << reductionTileSizes << "\n");
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -1256,8 +1257,9 @@ static LogicalResult setTransformStrategyRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   if (!clCPUEnableTransformDialectJit) return failure();
-  if (getLoweringConfig(genericOp)) return failure();
   cpu::CPUModel cpuModel;
   if (failed(
           cpu::matchAndSetReductionStrategy(entryPointFn, genericOp, cpuModel)))
@@ -1276,13 +1278,11 @@ static LogicalResult setTransposeLikeOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (getLoweringConfig(genericOp)) {
-    return success();
-  }
-
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (!hasAVX2Feature(targetAttr) || !isSupportedTransposeOp(genericOp)) {
-    return success();
+    return failure();
   }
 
   unsigned numLoops = genericOp.getNumLoops();
@@ -1291,14 +1291,14 @@ static LogicalResult setTransposeLikeOpRootConfig(
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
     // Nothing to vectorize just lower to loops.
-    return success();
+    return failure();
   }
 
   if (llvm::count_if(minTileSizes,
                      [](int64_t tileSize) { return tileSize > 1; }) != 2) {
     // Transpose patterns are not applicable if vectorizing more or less than
     // two dims.
-    return success();
+    return failure();
   }
 
   // Make sure that the original tile sizes are multiple of the tile sizes
@@ -1307,7 +1307,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
   if (llvm::any_of(minTileSizes, [](int64_t tileSize) {
         return tileSize > 1 && (tileSize % 8) != 0;
       })) {
-    return success();
+    return failure();
   }
 
   // Replace dims to be vectorized with the new 8x8 tile sizes.
@@ -1319,10 +1319,14 @@ static LogicalResult setTransposeLikeOpRootConfig(
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       genericOp, minTileSizes, maxTileSizes);
 
+  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+  LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
+                       << vecPreProcStrategy << "\n");
+
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
   setX86WorkgroupTileSizes(genericOp, numLoops, flowTileSizes, minTileSizes,
-                           maxTileSizes, parallelTileSizes);
+                           maxTileSizes, vecPreProcStrategy, parallelTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -1345,13 +1349,11 @@ static LogicalResult setElementwiseGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  if (getLoweringConfig(genericOp)) {
-    return success();
-  }
-
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   unsigned numLoops = genericOp.getNumLoops();
-  if (numLoops == 0) return success();
-  if (!linalg::isElementwise(genericOp)) return success();
+  if (numLoops == 0) return failure();
+  if (!linalg::isElementwise(genericOp)) return failure();
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
@@ -1361,6 +1363,9 @@ static LogicalResult setElementwiseGenericOpRootConfig(
       getDefaultDistributedLevelTileSizes(genericOp, minTileSizes, maxTileSizes,
                                           /*allowIncompleteTile=*/true);
 
+  // TODO(dcaballe): The logic below is disconnected from the main tile size
+  // selection logic in getMaxTileSize. We should either port it there or remove
+  // it.
   // Adjust the number of workload per workgroup to at least 4096. This
   // prevents the runtime overheads domiating the execution time. The number is
   // derived from experimients. We should be able to make it related to target.
@@ -1388,6 +1393,10 @@ static LogicalResult setElementwiseGenericOpRootConfig(
     flowTileSizes[currDim] = newSize;
   }
 
+  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+  LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
+                       << vecPreProcStrategy << "\n");
+
   // Adjust tiling sizes of vector levels to avoid large unroll factors. Most of
   // the cases are f32 and i32, so we divide it by 4.
   auto nativeVecSize = getNativeVectorSizeInBytes(entryPointFn);
@@ -1395,7 +1404,10 @@ static LogicalResult setElementwiseGenericOpRootConfig(
       nativeVecSize ? nativeVecSize.value() : clNativeVectorSizeInBytes;
   vecSize /= 4;
   SmallVector<int64_t> vecTileSizes(minTileSizes.begin(), minTileSizes.end());
-  for (auto &i : vecTileSizes) i = std::min(i, vecSize);
+  for (auto &i : vecTileSizes) {
+    i = roundUpToPow2(std::min(i, vecSize),
+                      vecPreProcStrategy == VectorPreProcStrategy::Masking);
+  }
 
   // Setting reduction tile sizes is a workaround to kick in peeling transform.
   // The tiling won't happen because the sizes are zeros.
@@ -1406,10 +1418,18 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   tileSizes.push_back(vecTileSizes);
   tileSizes.push_back(zeros);
 
-  auto passPipeline =
-      genericOp.hasTensorSemantics()
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
-          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for element-wise op: " << tileSizes
+                       << "\n");
+
+  DispatchLoweringPassPipeline passPipeline;
+  if (genericOp.hasBufferSemantics()) {
+    passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  } else if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
+    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
+  } else {
+    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+  }
+
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
                                                tileSizes, passPipeline);
 }
@@ -1420,19 +1440,27 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
+  assert(!getLoweringConfig(genericOp) &&
+         "expected lowering_config is not set");
   // First, try to apply the transform dialect strategy, if defined.
   if (succeeded(setTransformStrategyRootConfig(
-          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)))
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
     return success();
-  if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
-                                          targetMLTransInfo)) ||
-      failed(setElementwiseGenericOpRootConfig(
-          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)) ||
-      failed(setDefaultGenericOpRootConfig(entryPointFn, genericOp,
-                                           linalgOpInfo, targetMLTransInfo))) {
-    return failure();
   }
-  return success();
+
+  if (succeeded(setTransposeLikeOpRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
+    return success();
+  }
+  if (succeeded(setElementwiseGenericOpRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
+    return success();
+  }
+  if (succeeded(setDefaultGenericOpRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
+    return success();
+  }
+  return failure();
 }
 
 namespace {
@@ -1454,6 +1482,7 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
       !is2DPoolingOp(convOp)) {
     return failure();
   }
+  assert(!getLoweringConfig(convOp) && "expected lowering_config is not set");
 
   // Use the default distribution for the conv loops.
   unsigned numLoops = convOp.getNumLoops();
@@ -1645,8 +1674,6 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::LinalgOp linalgOp,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
-  if (getLoweringConfig(linalgOp)) return success();
-
   auto partitionableLoopOp =
       cast<PartitionableLoopsInterface>(linalgOp.getOperation());
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
@@ -1666,8 +1693,8 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, TilingInterface tilingInterfaceOp,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
-  if (getLoweringConfig(tilingInterfaceOp)) return success();
-
+  assert(!getLoweringConfig(tilingInterfaceOp) &&
+         "expected lowering_config is not set");
   auto partitionableLoopOp =
       cast<PartitionableLoopsInterface>(tilingInterfaceOp.getOperation());
 
@@ -1697,26 +1724,20 @@ static LogicalResult setRootConfig(
 static LogicalResult setRootConfigImpl(
     func::FuncOp entryPointFn, Operation *op,
     const TargetMLTransformInfo &targetMLTransInfo) {
-  // Do not overwrite default configuration.
-  if (getLoweringConfig(op)) return success();
-
-  // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<linalg::GenericOp>([&](auto op) {
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
-        .Case<IREE::LinalgExt::FftOp, linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
-              linalg::Conv2DNchwFchwOp, linalg::PoolingNhwcSumOp,
-              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
-              linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp,
-              linalg::DepthwiseConv2DNhwcHwcOp>(
+        .Case<IREE::LinalgExt::FftOp, tensor::PackOp, linalg::Mmt4DOp,
+              linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Case<IREE::LinalgExt::PackOp, tensor::PackOp>(
-            [&](auto op) { return setPackOpRootConfig(entryPointFn, op); })
-        .Case<IREE::LinalgExt::UnPackOp, tensor::UnPackOp>(
+        .Case<tensor::UnPackOp>(
             [&](auto op) { return setUnPackOpRootConfig(entryPointFn, op); })
         .Case<linalg::ContractionOpInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
@@ -1733,9 +1754,6 @@ static LogicalResult setRootConfigImpl(
 /// VMVX backend.
 static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
                                            Operation *op) {
-  if (getLoweringConfig(op)) return success();
-
-  // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<IREE::LinalgExt::FftOp>([&](auto op) {
@@ -1746,7 +1764,7 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
           return setRootConfig(entryPointFn, op,
                                DispatchLoweringPassPipeline::VMVXDefault);
         })
-        .Case<IREE::LinalgExt::UnPackOp, tensor::UnPackOp>([&](auto op) {
+        .Case<tensor::UnPackOp>([&](auto op) {
           return setUnPackOpRootConfig(
               entryPointFn, op, DispatchLoweringPassPipeline::VMVXDefault);
         })
@@ -1759,47 +1777,116 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
   return setRootConfigFn(op);
 }
 
-/// Find the root operation for the dispatch region.
+/// Find the root operation for the dispatch region. The priority is:
+///   1. A tensor.unpack op.
+///   2. A Linalg operation that has reduction loops.
+///   3. Any other Lainlg op or LinalgExt op.
+///   4. An operation that implements TilingInterface.
+/// If there are multiple operations meeting the same priority, the one closer
+/// to the end of the function is the root op.
 static FailureOr<Operation *> getRootOperation(
     ArrayRef<Operation *> computeOps) {
-  Operation *rootOperation = nullptr;
-  for (auto op : llvm::reverse(computeOps)) {
-    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-      // Do not not treat linalg ops that are all parallel as root operations in
-      // this sweep.
-      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops()) continue;
-
-      // All other linalg ops are root ops.
-      rootOperation = op;
-      break;
-    }
-
-    if (isa<TilingInterface>(op)) {
-      // All other operations that implement this interface are root ops.
-      rootOperation = op;
-      break;
-    }
+  // TODO(hanchung): The unpack ops are unconditionally treated as root ops.
+  // This should be fixed if there are fusion cases.
+  for (auto op : computeOps) {
+    if (isa<tensor::UnPackOp>(op)) return op;
   }
-  if (rootOperation) return rootOperation;
 
-  // If no root operation is found yet. Look for linalg generic ops.
   for (auto op : llvm::reverse(computeOps)) {
-    if (isa<linalg::LinalgOp>(op)) {
-      rootOperation = op;
-      break;
-    }
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp) continue;
+    if (linalgOp.getNumReductionLoops()) return op;
   }
-  return rootOperation;
+
+  for (auto op : llvm::reverse(computeOps)) {
+    if (isa<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>(op)) return op;
+  }
+
+  for (auto op : llvm::reverse(computeOps)) {
+    if (isa<TilingInterface>(op)) return op;
+  }
+
+  return nullptr;
 }
 
-/// Finds the root operation in the given list of Linalg operations and sets
-/// its configuration. Returns error for multiple root operations.
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   ArrayRef<Operation *> computeOps) {
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp)) {
-    return failure();
+static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
+                                              Operation *rootOp) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
+  if (!linalgOp) return success();
+
+  // The transform dialect codegen has differnet logics and codegen flow. Ignore
+  // the adjustment for it.
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+  if (pipeline == DispatchLoweringPassPipeline::TransformDialectCodegen) {
+    return success();
   }
+  TileSizesListType tileSizesList =
+      getLoweringConfig(linalgOp).getTileSizeVals();
+
+  bool hasChanged = false;
+  auto res = entryPointFn.walk([&](tensor::PackOp packOp) -> WalkResult {
+    // Multiple pack ops case is not supported.
+    if (hasChanged) return WalkResult::interrupt();
+
+    // TODO(hanchung): Support chain cases. It needs following use-def chain
+    // until rootOp.
+    if (packOp.getSource().getDefiningOp() != rootOp) {
+      return WalkResult::advance();
+    }
+    hasChanged = true;
+    OpResult result = packOp.getSource().cast<OpResult>();
+    auto idxMap = linalgOp.getMatchingIndexingMap(
+        linalgOp.getDpsInitOperand(result.getResultNumber()));
+    (void)idxMap;
+    LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n"
+                         << "The corresponding indexing map is: " << idxMap
+                         << "\n");
+    assert(idxMap.isIdentity() && "unexpected codegen input");
+
+    for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
+      SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
+      ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+      for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+        if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+        tileSizes[pos] = tileSizes[pos] / size;
+        tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+        LLVM_DEBUG(KD_DBGS() << "Scale # " << pos << " tile size to "
+                             << tileSizes[pos] << "\n");
+      }
+    }
+
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted()) return failure();
+
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
+                                               tileSizesList, pipeline);
+}
+
+/// Sets the translation information to use for a dispatch region.
+static LogicalResult setTranslationInfoAndRootConfig(
+    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
+  if (computeOps.empty()) {
+    // No compute operations found. Allow to pass through without a config.
+    return success();
+  }
+
+  // First check if the operations have a preset pipeline. If the config is
+  // preset, do not overwrite it.
+  for (auto computeOp : computeOps) {
+    if (IREE::Codegen::CompilationInfoAttr compilationInfo =
+            getCompilationInfo(computeOp)) {
+      return setUserConfig(entryPointFn, computeOp, compilationInfo);
+    }
+  }
+
+  // Make sure that lowering_config is not preset on any compute ops.
+  for (auto computeOp : computeOps) {
+    if (getLoweringConfig(computeOp)) return failure();
+  }
+
+  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+  if (failed(rootOp)) return failure();
   Operation *rootOperation = rootOp.value();
 
   if (rootOperation) {
@@ -1827,23 +1914,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     }
   }
 
-  return success();
-}
-
-/// Sets the translation information to use for a dispatch region.
-static LogicalResult setTranslationInfoAndRootConfig(
-    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
-  // First check if the operations have a preset pipeline.
-  for (auto computeOp : computeOps) {
-    if (IREE::Codegen::CompilationInfoAttr compilationInfo =
-            getCompilationInfo(computeOp)) {
-      if (failed(setUserConfig(entryPointFn, computeOp, compilationInfo)))
-        return failure();
-    }
+  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
+    return failure();
   }
 
-  // Next set the configuration of the operations.
-  return setRootConfig(entryPointFn, computeOps);
+  return success();
 }
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
@@ -1865,13 +1940,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       continue;
     }
 
-    SmallVector<Operation *> computeOps;
-
-    // If there are no linalg ops, not using Linalg based lowering.
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return failure();
-    }
-
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
       return failure();
     }

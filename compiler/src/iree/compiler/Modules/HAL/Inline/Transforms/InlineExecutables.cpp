@@ -61,14 +61,25 @@ class InlineExecutablesPass
 
     // Annotate all dispatches with the target function.
     for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-      funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
+      auto result = funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
         // Specify new target function that conversion can use to make the call.
+        // We only support single variant dispatches when inline.
+        auto entryPointAttrs = dispatchOp.getEntryPoints().getValue();
+        if (entryPointAttrs.size() != 1) {
+          dispatchOp.emitOpError()
+              << "multiple variant targets not supported with the inline HAL";
+          return WalkResult::interrupt();
+        }
         auto targetFuncName =
-            exportToFuncMap[dispatchOp.getEntryPoint()].cast<StringAttr>();
+            exportToFuncMap[entryPointAttrs.front()].cast<StringAttr>();
         assert(targetFuncName && "missing mapping");
         dispatchOp->setAttr("hal_inline.target",
                             FlatSymbolRefAttr::get(targetFuncName));
+        return WalkResult::advance();
       });
+      if (result.wasInterrupted()) {
+        return signalPassFailure();
+      }
     }
   }
 

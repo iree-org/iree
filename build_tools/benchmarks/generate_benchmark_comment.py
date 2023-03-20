@@ -26,7 +26,7 @@ import requests
 from common import benchmark_definition, benchmark_presentation, common_arguments
 from reporting import benchmark_comment
 
-GITHUB_IREE_REPO_PREFIX = "https://github.com/iree-org/iree"
+GITHUB_IREE_REPO_PREFIX = "https://github.com/openxla/iree"
 IREE_DASHBOARD_URL = "https://perf.iree.dev/apis/v2"
 IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.

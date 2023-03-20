@@ -15,8 +15,16 @@ set -euo pipefail
 
 BUILD_DIR="$1"
 
+get_default_parallel_level() {
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "$(sysctl -n hw.logicalcpu)"
+  else
+    echo "$(nproc)"
+  fi
+}
+
 # Respect the user setting, but default to as many jobs as we have cores.
-export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(get_default_parallel_level)}
 
 # Respect the user setting, but default to turning on Vulkan.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
@@ -78,19 +86,29 @@ if [[ "$OSTYPE" =~ ^msys ]]; then
     "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_mmt4d_f32_small_ukernel_vmvx_local-task"
-    # TODO: fix segfault
-    "iree/tests/e2e/models/check_llvm-cpu_local-task_mobilenetv3_fake_weights.mlir"
-    # TODO(#11068): Fix compilation segfault
-    "iree/tests/e2e/regression/check_regression_llvm-cpu_lowering_config.mlir"
     # TODO: Fix equality mismatch
-    "iree/tests/e2e/linalg_ext_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
     # TODO(#11080): Fix arrays not matching in test_variant_list_buffers
     "iree/runtime/bindings/python/vm_types_test"
   )
+elif [[ "$OSTYPE" =~ ^darwin ]]; then
+  excluded_tests+=(
+    #TODO(#12496): Remove after fixing the test on macOS
+    "iree/compiler/bindings/c/loader_test"
+    #TODO(#12496): Remove after fixing the test on macOS
+    "iree/compiler/bindings/python/test/transforms/ireec/compile_sample_module"
+  )
 fi
+
+# TODO(#12305): figure out how to run samples with custom binary outputs
+# on the CI. $IREE_BINARY_DIR may not be setup right or the object files may
+# not be getting deployed to the test_all/test_gpu bots.
+excluded_tests+=(
+  "iree/samples/custom_dispatch/cpu/embedded/example_hal.mlir.test"
+  "iree/samples/custom_dispatch/cpu/embedded/example_stream.mlir.test"
+)
 
 ctest_args=(
   "--test-dir ${BUILD_DIR}"

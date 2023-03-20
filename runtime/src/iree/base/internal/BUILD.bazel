@@ -1,0 +1,408 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Implementations for iree/base/.
+# These are not part of the IREE API. Though they may be used by external
+# projects their API may change at any time.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Core headers (internal)
+#===------------------------------------------------------------------------===#
+# Put files here that large percentages of the code include only; adding
+# infrequently used files here will cause extraneous large rebuilds.
+
+iree_runtime_cc_library(
+    name = "internal",
+    srcs = [
+        "atomics_clang.h",
+        "atomics_disabled.h",
+        "atomics_gcc.h",
+        "atomics_msvc.h",
+    ],
+    hdrs = [
+        "atomics.h",
+        "debugging.h",
+        "inline_array.h",
+        "math.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "atomics_test",
+    srcs = ["atomics_test.cc"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "math_test",
+    srcs = ["math_test.cc"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Utilities
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "arena",
+    srcs = ["arena.c"],
+    hdrs = ["arena.h"],
+    deps = [
+        ":atomic_slist",
+        ":synchronization",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "atomic_slist",
+    srcs = ["atomic_slist.c"],
+    hdrs = ["atomic_slist.h"],
+    deps = [
+        ":internal",
+        ":synchronization",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "atomic_slist_test",
+    srcs = ["atomic_slist_test.cc"],
+    deps = [
+        ":atomic_slist",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "cpu",
+    srcs = ["cpu.c"],
+    hdrs = ["cpu.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/schemas:cpu_data",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "dynamic_library",
+    srcs = [
+        "dynamic_library_posix.c",
+        "dynamic_library_win32.c",
+    ],
+    hdrs = ["dynamic_library.h"],
+    deps = [
+        ":internal",
+        ":path",
+        ":synchronization",
+        "//build_tools:default_linkopts",
+        "//build_tools:dl",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "file_io",
+    srcs = ["file_io.c"],
+    hdrs = ["file_io.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "file_io_test",
+    srcs = ["file_io_test.cc"],
+    tags = ["requires-filesystem"],
+    deps = [
+        ":file_io",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "flags",
+    srcs = ["flags.c"],
+    hdrs = ["flags.h"],
+    deps = [
+        ":file_io",
+        ":internal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:target_platform",
+        "//runtime/src/iree/base:tracing",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "flags_demo",
+    srcs = ["flags_demo.c"],
+    deps = [
+        ":flags",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_lit_test_suite(
+    name = "flags_test",
+    srcs = ["flags_test.txt"],
+    cfg = "//runtime:lit.cfg.py",
+    tags = ["hostonly"],
+    tools = [
+        ":flags_demo",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "fpu_state",
+    srcs = ["fpu_state.c"],
+    hdrs = ["fpu_state.h"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "fpu_state_benchmark",
+    srcs = ["fpu_state_benchmark.cc"],
+    deps = [
+        ":fpu_state",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "fpu_state_test",
+    srcs = ["fpu_state_test.cc"],
+    tags = ["requires-dtz"],
+    deps = [
+        ":fpu_state",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "path",
+    srcs = ["path.c"],
+    hdrs = ["path.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "path_test",
+    srcs = [
+        "path_test.cc",
+    ],
+    deps = [
+        ":path",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "prng",
+    hdrs = ["prng.h"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "prng_test",
+    srcs = ["prng_test.cc"],
+    deps = [
+        ":prng",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "span",
+    hdrs = ["span.h"],
+)
+
+iree_runtime_cc_library(
+    name = "synchronization",
+    srcs = [
+        "synchronization.c",
+    ],
+    hdrs = [
+        "call_once.h",
+        "synchronization.h",
+    ],
+    deps = [
+        ":internal",
+        "//build_tools:default_linkopts",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "synchronization_benchmark",
+    testonly = True,
+    srcs = ["synchronization_benchmark.cc"],
+    deps = [
+        ":synchronization",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "synchronization_test",
+    srcs = ["synchronization_test.cc"],
+    deps = [
+        ":synchronization",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "wait_handle",
+    srcs = [
+        "wait_handle.c",
+        "wait_handle_epoll.c",
+        "wait_handle_impl.h",
+        "wait_handle_inproc.c",
+        "wait_handle_kqueue.c",
+        "wait_handle_null.c",
+        "wait_handle_poll.c",
+        "wait_handle_posix.c",
+        "wait_handle_posix.h",
+        "wait_handle_win32.c",
+    ],
+    hdrs = ["wait_handle.h"],
+    deps = [
+        ":synchronization",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "wait_handle_test",
+    srcs = ["wait_handle_test.cc"],
+    deps = [
+        ":wait_handle",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Utilities with thread dependencies
+#===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+if(NOT IREE_ENABLE_THREADING)
+  return()
+endif()
+""",
+    inline = True,
+)
+
+iree_runtime_cc_library(
+    name = "event_pool",
+    srcs = ["event_pool.c"],
+    hdrs = ["event_pool.h"],
+    deps = [
+        ":internal",
+        ":synchronization",
+        ":wait_handle",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "threading",
+    srcs = [
+        "threading.c",
+        "threading_darwin.c",
+        "threading_impl.h",
+        "threading_pthreads.c",
+        "threading_win32.c",
+    ],
+    hdrs = ["threading.h"],
+    deps = [
+        ":internal",
+        ":synchronization",
+        "//build_tools:default_linkopts",
+        "//build_tools:dl",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "threading_test",
+    srcs = [
+        "threading_impl.h",
+        "threading_test.cc",
+    ],
+    deps = [
+        ":internal",
+        ":synchronization",
+        ":threading",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:target_platform",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

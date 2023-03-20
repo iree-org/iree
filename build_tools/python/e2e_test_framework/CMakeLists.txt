@@ -18,4 +18,4 @@ iree_build_tools_py_test(
     "unique_ids_test.py"
 )
 
-add_subdirectory(device_specs)
+iree_add_all_subdirs()

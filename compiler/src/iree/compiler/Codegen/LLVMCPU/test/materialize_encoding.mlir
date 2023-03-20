@@ -41,7 +41,7 @@ func.func @set_encoding_op() {
 //  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?x?x8x4xf32>>{%[[TILED_OUTD0]], %[[TILED_OUTD1]]}
 //       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[TILED_OUTD0]], %[[TILED_OUTD1]])
-//       CHECK:   %[[PACK:.+]] = iree_linalg_ext.pack
+//       CHECK:   %[[PACK:.+]] = tensor.pack
 //  CHECK-SAME:       %[[INPUT]] padding_value(%[[CST]] : f32)
 //  CHECK-SAME:       inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %[[EMPTY]]
 //       CHECK:   flow.dispatch.tensor.store %[[PACK]], %[[OUTPUT_BINDING]]
@@ -86,7 +86,7 @@ func.func @unset_encoding_op() {
 //       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_D0]], %[[TILED_D1]], 8, 4], strides = [1, 1, 1, 1]
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[OUTD0]], %[[OUTD1]])
-//       CHECK:   %[[UNPACK:.+]] = iree_linalg_ext.unpack %[[INPUT]]
+//       CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[INPUT]]
 //  CHECK-SAME:       inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %[[EMPTY]]
 //   CHECK-DAG:   flow.dispatch.tensor.store %[[UNPACK]], %[[OUTPUT_BINDING]]
 
@@ -100,21 +100,21 @@ func.func @matmul_lowering_f32f32f32_generic() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>)
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>)
       outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>)
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -162,21 +162,21 @@ func.func @matmul_lowering_f32f32f32_aarch64() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>)
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>)
       outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>)
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -222,21 +222,21 @@ func.func @matmul_lowering_f32f32f32_x86_64() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>)
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>)
       outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>)
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -274,7 +274,7 @@ func.func @matmul_lowering_f32f32f32_x86_64() attributes {
 // -----
 
 func.func @matmul_lowering_f32f32f32_x86_64_avx2() attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx2"}>
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx"}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load[0] : index
@@ -283,21 +283,21 @@ func.func @matmul_lowering_f32f32f32_x86_64_avx2() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>)
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>)
       outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>)
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -343,21 +343,21 @@ func.func @matmul_lowering_f32f32f32_x86_64_avx512f() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%M, %K}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>>{%M, %N}
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS_TRANSPOSE>>)
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RHS>>)
       outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>)
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -403,21 +403,21 @@ func.func @matmul_lowering_i8i8i32_aarch64() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
       -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>)
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>)
       outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>)
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -463,21 +463,21 @@ func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
       -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>)
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>)
       outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>)
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -525,21 +525,21 @@ func.func @matmul_lowering_i8i8i32_aarch64_i8mm() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
       -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>)
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>)
       outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>)
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -586,21 +586,21 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx2() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
       -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>)
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>)
       outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>)
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -648,21 +648,21 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512bw() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
       -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>)
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>)
       outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>)
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -710,21 +710,21 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512vnni() attributes {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
       : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>>{%M, %K}
       -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
       : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>>{%M, %N}
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   %6 = linalg.matmul
       ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_LHS>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS_TRANSPOSE>>)
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RHS>>)
       outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>)
       -> tensor<?x?xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
@@ -733,7 +733,7 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512vnni() attributes {
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //      CHECK: func @matmul_lowering_i8i8i32_x86_64_avx512vnni()
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
@@ -742,16 +742,16 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512vnni() attributes {
 //  CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[MAP0]]()[%[[M]]]
 //  CHECK-DAG:   %[[TILED_K:.+]] = affine.apply #[[MAP1]]()[%[[K]]]
 //      CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
-// CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x16x4xi8>>{%[[TILED_M]], %[[TILED_K]]}
+// CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x16x2xi8>>{%[[TILED_M]], %[[TILED_K]]}
 //      CHECK:   %[[TILED_N:.+]] = affine.apply #[[MAP0]]()[%[[N]]]
 //      CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
-// CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x16x4xi8>>{%[[TILED_N]], %[[TILED_K]]}
+// CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x16x2xi8>>{%[[TILED_N]], %[[TILED_K]]}
 //      CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2)
 // CHECK-SAME:       !flow.dispatch.tensor<readwrite:tensor<?x?x16x16xi32>>{%[[TILED_M]], %[[TILED_N]]}
 //      CHECK:   %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]
-// CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 16, 4], strides = [1, 1, 1, 1]
+// CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 16, 2], strides = [1, 1, 1, 1]
 //      CHECK:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]
-// CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 16, 4], strides = [1, 1, 1, 1]
+// CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 16, 2], strides = [1, 1, 1, 1]
 //      CHECK:   %[[OUTS:.+]] = flow.dispatch.tensor.load %[[OUTS_BINDING]]
 // CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 16, 16], strides = [1, 1, 1, 1]
 //      CHECK:   %[[MMT4D:.+]] = linalg.mmt4d

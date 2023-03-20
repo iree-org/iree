@@ -1,12 +1,18 @@
-# IREE Benchmarks
+# IREE Benchmarks (Legacy)
 
-This directory contains configuration definition for IREE's continuous
-benchmarks suite. Benchmark results are posted to https://perf.iree.dev.
+**We are migrating to the new benchmark suites. Currently IREE benchmark CI
+(https://perf.iree.dev) is using the new one for x86_64, CUDA, and all
+compilation statistics targets. To reproduce those results, please see the
+[docs for IREE new benchmark suites](/docs/developers/developing_iree/benchmark_suites.md)**.
 
-The https://buildkite.com/iree/iree-benchmark Buildkite pipeline runs on each
-commit to the `main` branch and posts those results to the dashboard. The
-pipeline also runs on pull requests with the `buildkite:benchmark-*` label,
-posting results compared against their base commit as comments.
+This directory contains configuration definition for IREE's legacy benchmarks
+suite.
+
+The https://buildkite.com/iree/iree-benchmark-android Buildkite pipeline has not yet been migrated and runs
+Android benchmarks defined here on each commit to the `main` branch and posts
+results to the dashboard https://perf.iree.dev. The pipeline also runs on pull
+requests with the `buildkite:benchmark-android` label, posting results compared
+against their base commit as comments.
 
 ## Types of benchmarks
 
@@ -63,7 +69,7 @@ These steps help reproduce the failures in TFLite models.
 
 1. Install `iree-import-tflite`.
    ```
-   $ python -m pip install iree-tools-tflite -f https://iree-org.github.io/iree/pip-release-links.html
+   $ python -m pip install iree-tools-tflite -f https://openxla.github.io/iree/pip-release-links.html
    ```
 
 2. Expose and confirm the binary `iree-import-tflite` is in your path by running
@@ -85,8 +91,8 @@ These steps help reproduce the failures in TFLite models.
 
 ### <a name="run-benchmark-locally"></a> Running benchmark suites locally
 
-First you need to have [`iree-import-tflite`](https://iree-org.github.io/iree/getting-started/tflite/),
-[`iree-import-tf`](https://iree-org.github.io/iree/getting-started/tensorflow/),
+First you need to have [`iree-import-tflite`](https://openxla.github.io/iree/getting-started/tflite/),
+[`iree-import-tf`](https://openxla.github.io/iree/getting-started/tensorflow/),
 and `requests` in your python environment. Then you can build the target
 `iree-benchmark-suites` to generate the required files. Note that this target
 requires the `IREE_BUILD_BENCHMARKS` CMake option.

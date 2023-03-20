@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 #include "iree/runtime/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 #include "mnist_bytecode.h"
 
 //===----------------------------------------------------------------------===//

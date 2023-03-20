@@ -6,6 +6,13 @@
 
 #include "iree/compiler/Pipelines/Options.h"
 
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::BindingOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::InputDialectOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::HighLevelOptimizationOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::SchedulingOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PreprocessingOptions);
+
 namespace mlir {
 namespace iree_compiler {
 

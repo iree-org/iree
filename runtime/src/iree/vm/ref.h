@@ -239,23 +239,27 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
 
 // TODO(benvanik): make these macros standard/document them.
 #define IREE_VM_DECLARE_TYPE_ADAPTERS(name, T)                              \
+  IREE_API_EXPORT_VARIABLE iree_vm_ref_type_descriptor_t name##_descriptor; \
+  static inline iree_vm_ref_type_t name##_type_id() {                       \
+    return name##_descriptor.type;                                          \
+  }                                                                         \
+  static inline bool name##_isa(const iree_vm_ref_t ref) {                  \
+    return name##_descriptor.type == ref.type;                              \
+  }                                                                         \
   IREE_API_EXPORT iree_vm_ref_t name##_retain_ref(T* value);                \
   IREE_API_EXPORT iree_vm_ref_t name##_move_ref(T* value);                  \
-  IREE_API_EXPORT T* name##_deref(const iree_vm_ref_t ref);                 \
+  static inline T* name##_deref(const iree_vm_ref_t ref) {                  \
+    return IREE_LIKELY(name##_isa(ref)) ? (T*)ref.ptr : NULL;               \
+  }                                                                         \
   IREE_API_EXPORT iree_status_t name##_check_deref(const iree_vm_ref_t ref, \
                                                    T** out_ptr);            \
   IREE_API_EXPORT iree_status_t name##_check_deref_or_null(                 \
       const iree_vm_ref_t ref, T** out_ptr);                                \
-  IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*                      \
-      name##_get_descriptor();                                              \
-  static inline bool name##_isa(const iree_vm_ref_t ref) {                  \
-    return name##_get_descriptor()->type == ref.type;                       \
-  }                                                                         \
-  IREE_API_EXPORT iree_vm_ref_type_t name##_type_id();                      \
   IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
 
 // TODO(benvanik): make these macros standard/document them.
 #define IREE_VM_DEFINE_TYPE_ADAPTERS(name, T)                               \
+  iree_vm_ref_type_descriptor_t name##_descriptor = {0};                    \
   IREE_API_EXPORT iree_vm_ref_t name##_retain_ref(T* value) {               \
     iree_vm_ref_t ref = {0};                                                \
     iree_vm_ref_wrap_retain(value, name##_descriptor.type, &ref);           \
@@ -265,13 +269,6 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
     iree_vm_ref_t ref = {0};                                                \
     iree_vm_ref_wrap_assign(value, name##_descriptor.type, &ref);           \
     return ref;                                                             \
-  }                                                                         \
-  IREE_API_EXPORT T* name##_deref(const iree_vm_ref_t ref) {                \
-    if (IREE_UNLIKELY(ref.type != ref.type) ||                              \
-        IREE_UNLIKELY(ref.type == IREE_VM_REF_TYPE_NULL)) {                 \
-      return NULL;                                                          \
-    }                                                                       \
-    return (T*)ref.ptr;                                                     \
   }                                                                         \
   IREE_API_EXPORT iree_status_t name##_check_deref(const iree_vm_ref_t ref, \
                                                    T** out_ptr) {           \
@@ -288,13 +285,6 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
       *out_ptr = NULL;                                                      \
     }                                                                       \
     return iree_ok_status();                                                \
-  }                                                                         \
-  IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*                      \
-      name##_get_descriptor() {                                             \
-    return &name##_descriptor;                                              \
-  }                                                                         \
-  IREE_API_EXPORT iree_vm_ref_type_t name##_type_id() {                     \
-    return name##_descriptor.type;                                          \
   }
 
 // Optional C++ iree::vm::ref<T> wrapper.

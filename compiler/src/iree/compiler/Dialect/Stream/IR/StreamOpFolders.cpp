@@ -259,7 +259,9 @@ struct TieRegionResults : public OpRewritePattern<Op> {
             IREE::Util::TiedOpInterface::findTiedBaseValue(result.value());
         if (auto blockArg = baseValue.template dyn_cast<BlockArgument>()) {
           unsigned operandIndex = blockArg.getArgNumber();
-          op.setTiedResultOperandIndex(result.index(), operandIndex);
+          rewriter.updateRootInPlace(op, [&]() {
+            op.setTiedResultOperandIndex(result.index(), operandIndex);
+          });
           didModify = true;
         }
       }
@@ -603,9 +605,7 @@ struct PropagateResourcePackBaseOffset
     for (auto sliceOffset : op.getPackedOffsets()) {
       auto addOp =
           rewriter.create<arith::AddIOp>(op.getLoc(), baseOffset, sliceOffset);
-      SmallPtrSet<Operation *, 1> exclusions;
-      exclusions.insert(addOp);
-      sliceOffset.replaceAllUsesExcept(addOp.getResult(), exclusions);
+      rewriter.replaceAllUsesExcept(sliceOffset, addOp.getResult(), addOp);
     }
 
     return success();
@@ -665,9 +665,10 @@ struct CanonicalizeResourcePackIntervals
         dynamicSliceSizes, op.getAffinityAttr());
 
     // Remap existing values to the new values.
-    op.getTotalLength().replaceAllUsesWith(newOp.getTotalLength());
+    rewriter.replaceAllUsesWith(op.getTotalLength(), newOp.getTotalLength());
     for (size_t i = 0; i < newOp.getPackedOffsets().size(); ++i) {
-      slices[i].packedOffset.replaceAllUsesWith(newOp.getPackedOffsets()[i]);
+      rewriter.replaceAllUsesWith(slices[i].packedOffset,
+                                  newOp.getPackedOffsets()[i]);
     }
 
     rewriter.eraseOp(op);
@@ -1630,8 +1631,7 @@ struct FoldAsyncLoadBitcast : public OpRewritePattern<AsyncLoadOp> {
     if (!bitcastOp) return failure();
     rewriter.updateRootInPlace(
         loadOp, [&]() { loadedValue.setType(bitcastOp.getType()); });
-    bitcastOp.getResult().replaceAllUsesWith(loadedValue);
-    rewriter.eraseOp(bitcastOp);
+    rewriter.replaceOp(bitcastOp, loadedValue);
     return success();
   }
 };
@@ -1737,7 +1737,7 @@ struct CloneCapturedAsyncExecuteSubviewOps
           capture.subviewOp.getLoc(), arg, capture.subviewOp.getSourceSize(),
           capture.subviewOp.getSourceOffset(),
           capture.subviewOp.getResultSize());
-      arg.replaceAllUsesExcept(newOp.getResult(), newOp);
+      rewriter.replaceAllUsesExcept(arg, newOp.getResult(), newOp);
     }
 
     rewriter.finalizeRootUpdate(op);
@@ -2151,7 +2151,7 @@ struct CloneCapturedCmdExecuteSubviewOps
           capture.subviewOp.getLoc(), arg, capture.subviewOp.getSourceSize(),
           capture.subviewOp.getSourceOffset(),
           capture.subviewOp.getResultSize());
-      arg.replaceAllUsesExcept(newOp.getResult(), newOp);
+      rewriter.replaceAllUsesExcept(arg, newOp.getResult(), newOp);
     }
 
     rewriter.finalizeRootUpdate(op);
@@ -2530,7 +2530,7 @@ struct SinkSubviewsAcrossAwaits : public OpRewritePattern<TimepointAwaitOp> {
       auto newOp = rewriter.create<IREE::Stream::ResourceSubviewOp>(
           subviewOp.getLoc(), result, subviewOp.getSourceSize(),
           subviewOp.getSourceOffset(), subviewOp.getResultSize());
-      result.replaceAllUsesExcept(newOp.getResult(), newOp);
+      rewriter.replaceAllUsesExcept(result, newOp.getResult(), newOp);
 
       // Update our bound size to the subview source size (not the subrange).
       op.getResourceOperandSizesMutable()
@@ -2631,7 +2631,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
     unsigned resultIdx = 0;
     for (auto coveredOp : coveredOps) {
       for (auto result : coveredOp.getResults()) {
-        result.replaceAllUsesWith(newOp.getResults()[resultIdx++]);
+        rewriter.replaceAllUsesWith(result, newOp.getResults()[resultIdx++]);
       }
       rewriter.eraseOp(coveredOp);
     }
@@ -2681,7 +2681,7 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
     for (auto &replacement : replacements) {
       auto oldResult = replacement.first;
       auto newResult = newOp.getResults()[replacement.second];
-      oldResult.replaceAllUsesWith(newResult);
+      rewriter.replaceAllUsesWith(oldResult, newResult);
     }
     rewriter.eraseOp(op);
     return success();

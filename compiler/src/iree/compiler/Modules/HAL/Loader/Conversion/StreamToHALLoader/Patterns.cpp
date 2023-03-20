@@ -46,10 +46,22 @@ struct CmdDispatchOpPattern
       ConversionPatternRewriter &rewriter) const override {
     auto loc = dispatchOp.getLoc();
 
+    // TODO(benvanik): support a lightweight switch builder for picking variants
+    // that doesn't pull in the full HAL dialect - today the
+    // DeviceSwitchRewriter needs a !hal.device and its query methods.
+    // For now we bail if there's multiple.
+    auto entryPointAttrs = dispatchOp.getEntryPoints().getValue();
+    if (entryPointAttrs.size() != 1) {
+      return rewriter.notifyMatchFailure(dispatchOp,
+                                         "multiple variant targets not yet "
+                                         "supported in the inline HAL loader");
+    }
+    auto entryPointAttr = entryPointAttrs.front().cast<SymbolRefAttr>();
+
     // Get the handle to the executable that is compatible with our device.
     auto executableOp =
         cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
-            dispatchOp, dispatchOp.getEntryPoint().getRootReference()));
+            dispatchOp, entryPointAttr.getRootReference()));
     assert(executableOp && "dispatch target executable op not found");
 
     // For now we aren't doing loader support checks. We should, though.
@@ -70,13 +82,12 @@ struct CmdDispatchOpPattern
       auto exportOps = variantOp.getOps<IREE::HAL::ExecutableExportOp>();
       auto exportIt =
           llvm::find_if(exportOps, [&](IREE::HAL::ExecutableExportOp op) {
-            return op.getNameAttr() ==
-                   dispatchOp.getEntryPoint().getLeafReference();
+            return op.getNameAttr() == entryPointAttr.getLeafReference();
           });
       if (exportIt == exportOps.end()) {
         return variantOp.emitError()
                << "hal.executable.variant is missing the entry point for "
-               << dispatchOp.getEntryPoint();
+               << entryPointAttr;
       }
       auto exportOp = *exportIt;
 

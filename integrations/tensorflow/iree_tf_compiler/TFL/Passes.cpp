@@ -55,7 +55,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createLowerGlobalTensorsPass());
 
   mlir::tosa::TOSATFTFLLegalizationPipelineOptions tosaOptions;
-  // Temporary work-around for https://github.com/iree-org/iree/issues/8974
+  // Temporary work-around for https://github.com/openxla/iree/issues/8974
   tosaOptions.dequantize_tfl_softmax = true;
   mlir::tosa::createTFTFLtoTOSALegalizationPipeline(pm, tosaOptions);
 

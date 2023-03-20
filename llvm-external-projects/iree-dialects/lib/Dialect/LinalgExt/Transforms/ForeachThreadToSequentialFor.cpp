@@ -64,8 +64,8 @@ FailureOr<scf::ForOp> ForallOpToScfForRewriter::returningMatchAndRewrite(
   bool hasTerminator =
       !body->empty() && body->back().hasTrait<OpTrait::IsTerminator>();
   if (hasTerminator) {
-    rewriter.mergeBlockBefore(&forallOp.getRegion().front(),
-                              body->getTerminator(), bbArgsTranslated);
+    rewriter.inlineBlockBefore(&forallOp.getRegion().front(),
+                               body->getTerminator(), bbArgsTranslated);
   } else {
     rewriter.mergeBlocks(&forallOp.getRegion().front(), body, bbArgsTranslated);
   }

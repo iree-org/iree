@@ -519,10 +519,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
-     "getLoopIteratorTypes",
-     "generateScalarImplementation",
-     "getResultTilePosition",
-     "getTiledImplementation"]>,
+     "generateScalarImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
   let summary = "pack operation";
@@ -689,11 +686,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
-     "getLoopIteratorTypes",
-     "generateScalarImplementation",
-     "getResultTilePosition",
-     "getTiledImplementation",
-     "generateResultTileValue"]>,
+     "generateScalarImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
   let summary = "unpack operation";

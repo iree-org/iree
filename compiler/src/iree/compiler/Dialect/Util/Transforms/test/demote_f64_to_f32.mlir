@@ -72,3 +72,13 @@ func.func @arith.extf(%arg0: f32) -> f64 {
   %0 = arith.extf %arg0 : f32 to f64
   return %0 : f64
 }
+
+// -----
+
+// CHECK-LABEL: func.func @complexTypesF64
+// CHECK-SAME: (%arg0: complex<f32>) -> complex<f32>
+func.func @complexTypesF64(%arg0 : complex<f64>) -> complex<f64> {
+  // CHECK-NEXT: return %arg0 : complex<f32>
+  return %arg0 : complex<f64>
+}
+

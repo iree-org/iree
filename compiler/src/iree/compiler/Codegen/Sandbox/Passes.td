@@ -50,6 +50,8 @@ def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,
+    Option<"enableVectorMasking", "enableVectorMasking", "bool", /*default=*/"false",
+      "Enable vector masking during vectorization.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
       "Rewrite all tensor.pad ops in the function to vector form.">,
 
@@ -136,6 +138,8 @@ def LinalgSingleTilingExpert
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,
+    Option<"enableVectorMasking", "enableVectorMasking", "bool", /*default=*/"false",
+      "Enable vector masking during vectorization.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
       "Rewrite all tensor.pad ops in the function to vector form.">,
     Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
@@ -204,75 +208,6 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "func::FuncOp"> {
     "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::memref::MemRefDialect",
     "::mlir::scf::SCFDialect", "::mlir::cf::ControlFlowDialect",
-    "::mlir::vector::VectorDialect"
-  ];
-}
-
-def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "func::FuncOp"> {
-  let summary = "Pass to unroll a vector op to a target size.";
-  let constructor = "mlir::createUnrollOneVectorOpPass()";
-  let options = [
-    Option<"anchorFuncOpName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which unique op within the func is the anchor to latch on.">,
-
-    // UnrollOneVectorOp options.
-    ListOption<"sourceShape", "source-shape", "int64_t", "Source vector shape",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"targetShape", "target-shape", "int64_t", "Target vector shape",
-               "llvm::cl::ZeroOrMore">,
-  ];
-  let dependentDialects = [
-    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
-    "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
-    "::mlir::vector::VectorDialect"
-  ];
-}
-
-def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "func::FuncOp"> {
-  let summary = "Pass to unroll the k^th parent loop of an op by some amount.";
-  let constructor = "mlir::createUnrollOneParentLoopPass()";
-  let options = [
-    Option<"anchorFuncOpName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which unique op within the func is the anchor to latch on.">,
-
-    // UnrollOneParentLoop options.
-    Option<"parentLoopNum", "parent-loop-num", "unsigned", /*default=*/"1",
-      "Number of the parent loop to latch on.">,
-    Option<"unrollFactor", "unroll-factor", "unsigned", /*default=*/"1",
-      "Unroll factor.">,
-  ];
-  let dependentDialects = [
-    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
-    "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
-    "::mlir::vector::VectorDialect"
-  ];
-}
-
-def OutlineOneParentLoop : Pass<"outline-one-parent-loop", "func::FuncOp"> {
-  let summary = "Pass to outline the k^th parent loop of an op.";
-  let constructor = "mlir::createOutlineOneParentLoopPass()";
-  let options = [
-    Option<"anchorFuncOpName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which unique op within the func is the anchor to latch on.">,
-
-    // OutlineOneParentLoop options.
-    Option<"parentLoopNum", "parent-loop-num", "unsigned", /*default=*/"1",
-      "Number of the parent loop to latch on.">,
-    Option<"resultFuncName", "result-func-name", "std::string", /*default=*/"",
-      "Name of the func op produced by outlining.">,
-  ];
-  let dependentDialects = [
-    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
-    "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
   ];
 }

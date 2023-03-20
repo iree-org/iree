@@ -64,3 +64,58 @@ func.func @transpose_no_align_dispatch_0_generic_48x32() {
 //       CHECK:      } -> tensor<32x32xf32>
 //       CHECK:      %[[D13:.*]] = tensor.extract_slice %[[D12:.*]][0, 0] {{\[}}%[[D4]], 32] [1, 1] : tensor<32x32xf32> to tensor<?x32xf32>
 //       CHECK:      flow.dispatch.tensor.store %[[D13]], %[[D1]], offsets = {{\[}}%[[ARG0]], %[[ARG1]]], sizes = {{\[}}%[[D4]], 32], strides = [1, 1] : tensor<?x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<48x32xf32>>
+
+// -----
+
+#map = affine_map<()[s0] -> (s0 * 16)>
+#map1 = affine_map<(d0)[s0] -> (-d0 + s0, 16)>
+#map2 = affine_map<(d0) -> (d0 ceildiv 2)>
+#map3 = affine_map<(d0) -> (d0 floordiv 2)>
+func.func @unpack_dynamic() {
+  %c0 = arith.constant 0 : index
+  %c64 = arith.constant 64 : index
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = hal.interface.constant.load[1] : i32
+  %2 = hal.interface.constant.load[2] : i32
+  %3 = hal.interface.constant.load[3] : i32
+  %4 = arith.index_castui %0 : i32 to index
+  %5 = arith.index_castui %1 : i32 to index
+  %6 = arith.index_castui %2 : i32 to index
+  %7 = arith.index_castui %3 : i32 to index
+  %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c64) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x2x2xi32>>{%4, %5}
+  %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %10 = affine.apply #map()[%workgroup_id_y]
+  %11 = affine.apply #map()[%workgroup_count_y]
+  scf.for %arg0 = %10 to %6 step %11 {
+    %12 = affine.min #map1(%arg0)[%6]
+    %13 = affine.apply #map()[%workgroup_id_x]
+    %14 = affine.apply #map()[%workgroup_count_x]
+    scf.for %arg1 = %13 to %7 step %14 {
+      %15 = affine.min #map1(%arg1)[%7]
+      %16 = flow.dispatch.tensor.load %9, offsets = [%arg0, %arg1], sizes = [%12, %15], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7} -> tensor<?x?xi32>
+      %17 = affine.apply #map2(%12)
+      %18 = affine.apply #map2(%15)
+      %19 = affine.apply #map3(%arg0)
+      %20 = affine.apply #map3(%arg1)
+      %21 = flow.dispatch.tensor.load %8, offsets = [%19, %20, 0, 0], sizes = [%17, %18, 2, 2], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x2x2xi32>>{%4, %5} -> tensor<?x?x2x2xi32>
+      %c16 = arith.constant 16 : index
+      %c0_i32 = arith.constant 0 : i32
+      %22 = arith.subi %c16, %12 : index
+      %23 = arith.subi %c16, %15 : index
+      %unpack = tensor.unpack %21 inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %16 : tensor<?x?x2x2xi32> -> tensor<?x?xi32>
+      flow.dispatch.tensor.store %unpack, %9, offsets = [%arg0, %arg1], sizes = [%12, %15], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
+    }
+  }
+  return
+}
+// CHECK-LABEL: func.func @unpack_dynamic
+// CHECK:         %[[DEST_BUF:.+]] = hal.interface.binding.subspan set(0) binding(1)
+// CHECK:           %[[LOAD:.+]] = flow.dispatch.tensor.load %[[DEST_BUF]]
+// CHECK:           %[[PAD:.+]] = tensor.pad %[[LOAD]]
+// CHECK:           %[[UNPACK:.+]] = tensor.unpack {{.+}} into %[[PAD]]
+// CHECK:           %[[SLICE:.+]] = tensor.extract_slice %[[UNPACK]]
+// CHECK:           flow.dispatch.tensor.store %[[SLICE]], %[[DEST_BUF]]

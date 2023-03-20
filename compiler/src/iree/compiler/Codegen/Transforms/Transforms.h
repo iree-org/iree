@@ -9,8 +9,8 @@
 // Defines transformations that are common to backends
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
-#define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
+#ifndef IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
+#define IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -88,7 +88,34 @@ using GetMinMaxExprFn =
 /// |getMinMaxFn| for some know values.
 void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
                                               GetMinMaxExprFn getMinMaxFn);
+
+/// Populate patterns that fold tensor.expand/collapse_shape into the source
+/// hal.interface.binding.subspan.
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
+
+/// Populate patterns that remove dead allocations
+void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns);
+
+// Group of Alloc operations that have overlapping liveranges.
+using AliasGroup = SmallVector<Operation *>;
+
+/// Analyze the liverange of the given allocs and set them in individual groups
+/// if they don't overlap.
+/// The algorithm is a simplistic memory allocation solution. It sorts
+/// allocations into alias groups. Everytime two alloc's liverange interfers
+/// they are merge into the same group. If a new alloc is part of multiple alias
+/// groups all those are merged into one. At the end we are left with groups of
+/// allocations that are disjoint and can use the same memory.
+void analyseAllocsForPacking(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
+                             SmallVector<AliasGroup> &aliasGroups);
+
+/// Pack groups of allocations into a unique large i8 allocation and use
+/// memref.view to separate the indivudual allocations. This allows re-using
+/// memory across alias groups.
+void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
+                ArrayRef<AliasGroup> aliasGroups);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
+#endif  // IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_

@@ -199,7 +199,10 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
 
   // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
   // because we don't use upstream memref descriptors.
+  pm.addNestedPass<func::FuncOp>(createFixupSubspanWithOffsetsPass());
   pm.addPass(createFlattenMemRefSubspanPass());
+  pm.addNestedPass<func::FuncOp>(
+      createSPIRVEraseStorageBufferStaticShapePass());
 }
 
 /// Adds passes to perform the final SPIR-V conversion.
@@ -347,9 +350,13 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 
-  if (pipelineDepth > 0)
+  if (pipelineDepth > 0) {
+    PipeliningSchedulingStrategy schedule =
+        storeStage == 0 ? PipeliningSchedulingStrategy::loadStoreStage0
+                        : PipeliningSchedulingStrategy::loadGlobalStage0;
     nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
-        /*epiloguePeeling=*/true, pipelineDepth, storeStage));
+        /*epiloguePeeling=*/true, pipelineDepth, schedule));
+  }
 }
 
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
@@ -394,8 +401,11 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
+  PipeliningSchedulingStrategy schedule =
+      storeStage == 0 ? PipeliningSchedulingStrategy::loadStoreStage0
+                      : PipeliningSchedulingStrategy::loadGlobalStage0;
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
-      /*epiloguePeeling=*/true, pipelineDepth, storeStage));
+      /*epiloguePeeling=*/true, pipelineDepth, schedule));
 
   addLoopMaterializationPasses(nestedModulePM);
 }
@@ -424,6 +434,9 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
       pm, /*useFuseTensorPadWithConsumerPass=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());

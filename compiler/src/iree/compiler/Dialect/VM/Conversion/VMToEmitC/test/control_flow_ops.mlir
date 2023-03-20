@@ -61,7 +61,7 @@ vm.module @my_module {
 // Test vm.call conversion on an imported function.
 vm.module @my_module {
   // CHECK: func.func @my_module_call_[[IMPORTFN:[^\(]+]]
-  vm.import @imported_fn(%arg0 : i32) -> i32
+  vm.import private @imported_fn(%arg0 : i32) -> i32
 
   // CHECK: func.func @my_module_call_imported_fn
   vm.func @call_imported_fn(%arg0 : i32) -> i32 {
@@ -111,7 +111,7 @@ vm.module @my_module {
   }
 
   // CHECK: func.func @my_module_call_[[IMPORTFN]]
-  vm.import @imported_fn(%arg0 : i32) -> i32
+  vm.import private @imported_fn(%arg0 : i32) -> i32
 }
 
 // -----
@@ -144,7 +144,7 @@ vm.module @my_module {
 // Test vm.call.variadic conversion on an imported function.
 vm.module @my_module {
   // CHECK: func.func @my_module_call_[[VARIADICFN:[^\(]+]]
-  vm.import @variadic_fn(%arg0 : i32 ...) -> i32
+  vm.import private @variadic_fn(%arg0 : i32 ...) -> i32
 
   // CHECK: func.func @my_module_call_variadic
   vm.func @call_variadic(%arg0 : i32, %arg1 : i32) -> i32 {
@@ -177,7 +177,7 @@ vm.module @my_module {
 // Test vm.call.variadic with zero arguments.
 vm.module @my_module {
   // CHECK: func.func @my_module_call_[[VARIADICFN:[^\(]+]]
-  vm.import @variadic_fn(%arg0 : i32 ...) -> i32
+  vm.import private @variadic_fn(%arg0 : i32 ...) -> i32
 
   // CHECK: func.func @my_module_call_variadic
   vm.func @call_variadic() -> i32 {
@@ -211,7 +211,7 @@ vm.module @my_module {
 // Test vm.call.variadic with multiple variadic packs.
 vm.module @my_module {
   // CHECK: func.func @my_module_call_[[VARIADICFN:[^\(]+]]
-  vm.import @variadic_fn(%is : i32 ..., %fs : f32 ...) -> i32
+  vm.import private @variadic_fn(%is : i32 ..., %fs : f32 ...) -> i32
 
   // CHECK: func.func @my_module_call_variadic
   vm.func @call_variadic(%i : i32, %f : f32) -> i32 {
@@ -322,7 +322,7 @@ vm.module @my_module {
 
   // Calculate the size of the result. To avoid empty structs we insert a dummy value.
   // CHECK-NEXT: %[[RESULTSIZE:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
-  
+
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
@@ -363,7 +363,7 @@ vm.module @my_module {
   // Return ok status.
   //      CHECK: %[[OK:.+]] = emitc.call "iree_ok_status"()
   // CHECK-NEXT: return %[[OK]]
-  vm.import @ref_fn() -> ()
+  vm.import private @ref_fn() -> ()
 
   vm.func @import_ref() -> () {
     vm.call @ref_fn() : () -> ()
@@ -466,7 +466,7 @@ vm.module @my_module {
   // Return ok status.
   // CHECK-NEXT: %[[OK:.+]] = emitc.call "iree_ok_status"()
   // CHECK-NEXT: return %[[OK]]
-  vm.import @variadic_fn(%arg0 : i32, %arg1 : i32 ...) -> i32
+  vm.import private @variadic_fn(%arg0 : i32, %arg1 : i32 ...) -> i32
 
   vm.func @import_variadic(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
     %0 = vm.call.variadic @variadic_fn(%arg0, [%arg1, %arg2]) : (i32, i32 ...) -> i32
@@ -553,7 +553,7 @@ vm.module @my_module {
   // Return ok status.
   // CHECK-NEXT: %[[OK:.+]] = emitc.call "iree_ok_status"()
   // CHECK-NEXT: return %[[OK]]
-  vm.import @variadic_fn(%arg0 : i32, %arg1 : i32 ...) -> i32
+  vm.import private @variadic_fn(%arg0 : i32, %arg1 : i32 ...) -> i32
 
   vm.func @import_variadic(%arg0 : i32) -> i32 {
     %0 = vm.call.variadic @variadic_fn(%arg0, []) : (i32, i32 ...) -> i32
@@ -628,7 +628,7 @@ vm.module @my_module {
   // Return ok status.
   // CHECK-NEXT: %[[OK:.+]] = emitc.call "iree_ok_status"()
   // CHECK-NEXT: return %[[OK]]
-  vm.import @ref_fn(%arg0 : !vm.ref<?>) -> !vm.ref<?>
+  vm.import private @ref_fn(%arg0 : !vm.ref<?>) -> !vm.ref<?>
 
   vm.func @import_ref(%arg0 : !vm.ref<?>) -> !vm.ref<?> {
     %0 = vm.call @ref_fn(%arg0) : (!vm.ref<?>) -> !vm.ref<?>
@@ -715,7 +715,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  vm.import optional @optional_import_fn(%arg0 : i32) -> i32
+  vm.import private optional @optional_import_fn(%arg0 : i32) -> i32
   // CHECK-LABEL: @my_module_call_fn
   vm.func @call_fn() -> i32 {
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]} : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
