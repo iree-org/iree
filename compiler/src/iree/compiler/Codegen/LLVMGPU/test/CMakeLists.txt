@@ -48,6 +48,7 @@ iree_lit_test_suite(
     "transform_dialect_vector_distribution.mlir"
     "transform_distribute_forall.mlir"
     "transform_gpu_pipelining.mlir"
+    "transform_unroll_to_wmma.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
     "vector_to_gpu.mlir"
