@@ -212,8 +212,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     return;
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "consumerOp: " << cast<TilingInterface>(consumerOp)
-                          << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "consumerOp: " << consumerOp << "\n");
   LLVM_DEBUG(llvm::dbgs() << "tilingLevel: " << tilingLevel << "\n");
 
   auto maybeTilingSizes = getTilingSizesFromConfig(funcOp, tilingLevel);
