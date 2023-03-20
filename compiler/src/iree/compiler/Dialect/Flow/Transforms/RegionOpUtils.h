@@ -38,8 +38,7 @@ FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
 
 /// Create an DispatchRegionOp with workload
 Flow::DispatchRegionOp makeDispatchRegionWithWorkload(
-    OpBuilder &builder, Location loc,
-    std::optional<ValueRange> workload = std::nullopt);
+    OpBuilder &builder, Location loc, SmallVector<Value> workload = {});
 
 /// Clone a `target` op that is preceding the given dispatch region op into the
 /// dispatch region.

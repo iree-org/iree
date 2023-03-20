@@ -31,9 +31,6 @@ struct WorkloadBuilder {
   using RegionBuilderFn =
       std::function<void(OpBuilder &, Location, ArrayRef<BlockArgument>)>;
 
-  /// Values to be used as `workload` operands of a WorkgroupsOp.
-  SmallVector<Value> workload;
-
   /// A function that builds the workload region of a WorkgroupsOp.
   RegionBuilderFn regionBuilder;
 };
