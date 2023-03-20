@@ -680,11 +680,12 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
   auto constantsPtrValue =
       loadFieldValue(forOp, DispatchStateField::push_constants, builder);
   auto offsetValue = getIndexValue(loc, offset, builder);
-  Value constantPtrValue =
-      builder.create<LLVM::GEPOp>(loc, constantsPtrValue.getType(), resultType,
-                                  constantsPtrValue, offsetValue);
+  auto pushConstantType = IntegerType::get(context, 32);
+  Value constantPtrValue = builder.create<LLVM::GEPOp>(
+      loc, constantsPtrValue.getType(), pushConstantType, constantsPtrValue,
+      offsetValue);
   Value constantValue =
-      builder.create<LLVM::LoadOp>(loc, resultType, constantPtrValue);
+      builder.create<LLVM::LoadOp>(loc, pushConstantType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
   return buildValueDI(
       forOp, resultValue,
@@ -846,9 +847,11 @@ Value HALDispatchABI::loadExecutableConstant(Operation *forOp, StringRef key,
   // Load constant from the executable constants struct.
   auto constantsPtrValue =
       loadFieldValue(forOp, EnvironmentField::constants, builder);
-  Value constantPtrValue = builder.create<LLVM::GEPOp>(
-      loc, constantsPtrValue.getType(), constantsPtrValue, ordinalValue);
-  Value constantValue = builder.create<LLVM::LoadOp>(loc, constantPtrValue);
+  Value constantPtrValue =
+      builder.create<LLVM::GEPOp>(loc, constantsPtrValue.getType(), resultType,
+                                  constantsPtrValue, ordinalValue);
+  Value constantValue =
+      builder.create<LLVM::LoadOp>(loc, resultType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
   return buildValueDI(forOp, resultValue,
                       StringRef("executable_constant['") + key + "']",
@@ -1035,7 +1038,7 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp, EnvironmentField field,
       buildArgDI(forOp, /*argNum=*/0, getLocalArgument(forOp, 0), "environment",
                  di.getPtrOf(di.getConstOf(di.getEnvironmentV0T())), builder);
   Value environmentValue =
-      builder.create<LLVM::LoadOp>(loc, environmentPtrValue);
+      builder.create<LLVM::LoadOp>(loc, environmentType, environmentPtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
   return builder.create<LLVM::ExtractValueOp>(loc, environmentValue, position);
 }

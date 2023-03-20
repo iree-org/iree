@@ -36,15 +36,13 @@ hal.executable @abs_ex_dispatch_0 {
   }
 }
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias},
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
-//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+//  CHECK-SAME:  %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias})
 //       CHECK:   %[[C128:.+]] = llvm.mlir.constant(128 : index) : i64
-//       CHECK:   %[[PTRI8:.+]] = llvm.bitcast %[[ARG1]] : !llvm.ptr<f32> to !llvm.ptr<i8>
-//       CHECK:   %[[OFF:.+]] = llvm.getelementptr %[[PTRI8]][%[[C128]]] : (!llvm.ptr<i8>, i64) -> !llvm.ptr<i8>
-//       CHECK:   %[[PTR:.+]] = llvm.bitcast %[[OFF]] : !llvm.ptr<i8> to !llvm.ptr<f32>
-//       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
-//       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
+//       CHECK:   %[[OFF:.+]] = llvm.getelementptr %arg1[%[[C128]]] : (!llvm.ptr, i64) -> !llvm.ptr, i8
+//       CHECK:   llvm.insertvalue %[[OFF]], %{{.*}}[0] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+//       CHECK:   llvm.insertvalue %[[OFF]], %{{.*}}[1] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 //      CHECK:    nvvm.read.ptx.sreg.tid.x
 //      CHECK:    llvm.fadd
 
@@ -86,16 +84,15 @@ hal.executable @abs_dynamic {
   }
 }
 // CHECK-LABEL: llvm.func @abs_dynamic
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias},
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias}, %[[ARG2:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias},
-//  CHECK-SAME:  %[[ARG3:.+]]: i32, %[[ARG4:.+]]: i32)
+//  CHECK-SAME: (%[[ARG0:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %[[ARG3:[a-zA-Z0-9]+]]: i32, %[[ARG4:[a-zA-Z0-9]+]]: i32)
 //       CHECK:   %[[C128:.+]] = llvm.mlir.constant(128 : index) : i64
 //       CHECK:   %{{.*}} = llvm.zext %[[ARG4]] : i32 to i64
-//       CHECK:   %[[PTRI8:.+]] = llvm.bitcast %[[ARG1]] : !llvm.ptr<f32> to !llvm.ptr<i8>
-//       CHECK:   %[[OFF:.+]] = llvm.getelementptr %[[PTRI8]][%[[C128]]] : (!llvm.ptr<i8>, i64) -> !llvm.ptr<i8>
-//       CHECK:   %[[PTR:.+]] = llvm.bitcast %[[OFF]] : !llvm.ptr<i8> to !llvm.ptr<f32>
-//       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
-//       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
+//       CHECK:   %[[OFF:.+]] = llvm.getelementptr %arg1[%[[C128]]] : (!llvm.ptr, i64) -> !llvm.ptr, i8
+//       CHECK:   llvm.insertvalue %[[OFF]], %{{.*}}[0] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+//       CHECK:   llvm.insertvalue %[[OFF]], %{{.*}}[1] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 //      CHECK:    nvvm.read.ptx.sreg.tid.x
 //      CHECK:    llvm.fadd
 
@@ -135,8 +132,8 @@ hal.executable @dead_symbol {
   }
 }
 // CHECK-LABEL: llvm.func @dead_symbol
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias},
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias})
 //      CHECK:    llvm.fadd
 
 // -----
@@ -176,14 +173,12 @@ hal.executable @mixed_type {
 }
 
 // CHECK-LABEL: llvm.func @mixed_type
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias},
-//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias})
 //       CHECK:   %[[C128:.+]] = llvm.mlir.constant(128 : index) : i64
-//       CHECK:   %[[PTRI8:.+]] = llvm.bitcast %[[ARG0]] : !llvm.ptr<i32> to !llvm.ptr<i8>
-//       CHECK:   %[[OFF:.+]] = llvm.getelementptr %[[PTRI8]][%[[C128]]] : (!llvm.ptr<i8>, i64) -> !llvm.ptr<i8>
-//       CHECK:   %[[PTR:.+]] = llvm.bitcast %[[OFF]] : !llvm.ptr<i8> to !llvm.ptr<f32>
-//       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[0] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
-//       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
+//       CHECK:   %[[OFF:.+]] = llvm.getelementptr %arg0[%[[C128]]] : (!llvm.ptr, i64) -> !llvm.ptr, i8
+//       CHECK:   llvm.insertvalue %[[OFF]], %{{.*}}[0] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+//       CHECK:   llvm.insertvalue %[[OFF]], %{{.*}}[1] : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 //       CHECK:   nvvm.read.ptx.sreg.tid.x
 //       CHECK:   llvm.fadd
 
@@ -218,17 +213,14 @@ hal.executable @shared_memory_lowering {
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<16 x array<32 x f32>>>, 3>
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(2048 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<32 x array<16 x f32>>>, 3>
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4096 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<8 x array<16 x f32>>>, 3>
 
 // -----
 
@@ -286,12 +278,10 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x i8>, 3>
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<32 x f32>, 3>
 
 // -----
 
@@ -334,4 +324,4 @@ hal.executable @check_not_readonly {
   }
 }
 // CHECK-LABEL: llvm.func @check_not_readonly
-//  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+//  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},

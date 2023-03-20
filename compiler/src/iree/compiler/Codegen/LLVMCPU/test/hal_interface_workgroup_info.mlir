@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: llvm.func @workgroup_id
 func.func @workgroup_id() {
-  // CHECK: %[[STATE:.+]] = llvm.load %arg2 : !llvm.ptr<struct<"iree_hal_executable_workgroup_state_v0_t"
+  // CHECK: %[[STATE:.+]] = llvm.load %arg2 : !llvm.ptr -> !llvm.struct<"iree_hal_executable_workgroup_state_v0_t"
   // CHECK: %[[Z16:.+]] = llvm.extractvalue %[[STATE]][2]
   // CHECK: %[[Z64:.+]] = llvm.zext %[[Z16]] : i16 to i64
   %workgroup_id_z = hal.interface.workgroup.id[2] : index
@@ -19,7 +19,7 @@ llvm.func @sink(%arg0: i64) {
 
 // CHECK-LABEL: llvm.func @workgroup_size
 func.func @workgroup_size() {
-  // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
+  // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<"iree_hal_executable_dispatch_state_v0_t"
   // CHECK: %[[Z16:.+]] = llvm.extractvalue %[[STATE]][2]
   // CHECK: %[[Z64:.+]] = llvm.zext %[[Z16]] : i16 to i64
   %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -36,7 +36,7 @@ llvm.func @sink(%arg0: i64) {
 
 // CHECK-LABEL: llvm.func @workgroup_count
 func.func @workgroup_count() {
-  // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
+  // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<"iree_hal_executable_dispatch_state_v0_t"
   // CHECK: %[[Z16:.+]] = llvm.extractvalue %[[STATE]][6]
   // CHECK: %[[Z64:.+]] = llvm.zext %[[Z16]] : i16 to i64
   %workgroup_count_z = hal.interface.workgroup.count[2] : index
