@@ -111,10 +111,14 @@ static bool ukernelAddTileSizes(
                    int64_t stages) {
     tileSizes.push_back(TileWorkgroupSizePair(
 <<<<<<< HEAD
+<<<<<<< HEAD
         {{tileM, tileN, tileK}, {cudaWarpSize * nWarps, 1, 1}, stages}));
 =======
         {{tileM, tileN, tileK}, {cudaWarpSize, nWarps, 1}, stages}));
 >>>>>>> 7f9ae84b5 (use C as accumulator)
+=======
+        {{tileM, tileN, tileK}, {cudaWarpSize * nWarps, 1, 1}, stages}));
+>>>>>>> 1e9f79e80 (Use 1 dimensional CTA)
   };
 
   return adduCUDAContracts(M, N, K, elementTypeA.value().str(),

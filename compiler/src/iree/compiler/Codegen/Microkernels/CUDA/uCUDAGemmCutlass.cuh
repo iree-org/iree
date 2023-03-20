@@ -91,10 +91,10 @@ __forceinline__ __device__ void gemm_ukernel(
   cutlass::MatrixCoord tb_offset_B{
       tb_tile_offset.k(), tb_tile_offset.n() * ThreadblockMma::Shape::kN};
 
-  // Compute position within threadblock (linearized thread ID)
-  int tb_thread_id = threadIdx.y * blockDim.x + threadIdx.x;
-  int warp_id = __shfl_sync(0xffffffff, threadIdx.y, 0);
-  int lane_id = tb_thread_id & 0x1f;
+  // Compute position within threadblock 
+  int tb_thread_id = threadIdx.x;
+  int warp_id = __shfl_sync(0xffffffff, threadIdx.x / 32, 0);
+  int lane_id = threadIdx.x % 32;
 
   typename IteratorA::Params params_A(
       cutlass::layout::RowMajor::packed({problem_size.m(), problem_size.k()}));
