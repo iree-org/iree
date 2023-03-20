@@ -211,7 +211,16 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
           linalg::DepthwiseConv2DNhwcHwcQOp, linalg::DepthwiseConv2DNhwcHwcmOp,
           linalg::DepthwiseConv2DNhwcHwcmQOp,
           linalg::DepthwiseConv3DNdhwcDhwcOp,
-          linalg::DepthwiseConv3DNdhwcDhwcmOp>(linalgOp.getOperation());
+          linalg::DepthwiseConv3DNdhwcDhwcmOp>(linalgOp.getOperation()) ||
+      isa<linalg::PoolingNchwMaxOp, linalg::PoolingNchwSumOp,
+          linalg::PoolingNcwMaxOp, linalg::PoolingNcwSumOp,
+          linalg::PoolingNdhwcMaxOp, linalg::PoolingNdhwcMinOp,
+          linalg::PoolingNdhwcSumOp, linalg::PoolingNhwcMaxOp,
+          linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+          linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNhwcSumOp,
+          linalg::PoolingNwcMaxOp, linalg::PoolingNwcMaxUnsignedOp,
+          linalg::PoolingNwcMinOp, linalg::PoolingNwcMinUnsignedOp,
+          linalg::PoolingNwcSumOp>(linalgOp.getOperation());
 
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
@@ -1567,7 +1576,7 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
               linalg::PoolingNhwcMinUnsignedOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 4}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else if (isRISCV(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
@@ -1578,7 +1587,7 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
               linalg::PoolingNhwcMinUnsignedOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 4}; })
         .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   } else if (isAArch64(targetAttr)) {
     TypeSwitch<Operation *>(op.getOperation())
