@@ -3,8 +3,8 @@
 set -x
 set -e
 CLANG="${CLANG:-clang++}"
+LLVMAS="${LLVMAS:-llvm-as}"
 NVCC="${NVCC:-nvcc}"
-CLANG_INCLUDE="${CLANG_INCLUDE:-/usr/lib/llvm-13/lib/clang/13.0.0/include/}"
 IREE_SRC_DIR="$(git rev-parse --show-toplevel)"
 
 SCRIPT_DIR="$(realpath `dirname $0`)"
@@ -31,7 +31,7 @@ function make_arch_bc {
       "${SRC}/${SOURCE_FILE}" \
       -S \
       -emit-llvm
-  mv $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc
+  ${LLVMAS?} $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll -o ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc
 }
 
 function make_arch_nvcc_ptx {
@@ -96,8 +96,8 @@ function generate_ukernels {
   
   # # Generate microkernels
   make_arch_nvcc_ptx $SM $GENERATOR_FILE
-  # make_arch_nvcc_lineinfo_ptx $SM $GENERATOR_FILE
-  # make_arch_bc $SM $GENERATOR_FILE
+  make_arch_nvcc_lineinfo_ptx $SM $GENERATOR_FILE
+  make_arch_bc $SM $GENERATOR_FILE
 
   # # Remove the temps
   rm -rf $GENERATOR_FILE*
