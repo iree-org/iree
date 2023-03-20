@@ -205,7 +205,13 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
           linalg::Conv2DNhwcFhwcOp, linalg::Conv2DNhwcHwcfOp,
           linalg::Conv2DNhwcHwcfQOp, linalg::Conv2DOp,
           linalg::Conv3DNdhwcDhwcfOp, linalg::Conv3DNdhwcDhwcfQOp,
-          linalg::Conv3DOp>(linalgOp.getOperation());
+          linalg::Conv3DOp>(linalgOp.getOperation()) ||
+      isa<linalg::DepthwiseConv1DNwcWcOp, linalg::DepthwiseConv1DNwcWcmOp,
+          linalg::DepthwiseConv2DNchwChwOp, linalg::DepthwiseConv2DNhwcHwcOp,
+          linalg::DepthwiseConv2DNhwcHwcQOp, linalg::DepthwiseConv2DNhwcHwcmOp,
+          linalg::DepthwiseConv2DNhwcHwcmQOp,
+          linalg::DepthwiseConv3DNdhwcDhwcOp,
+          linalg::DepthwiseConv3DNdhwcDhwcmOp>(linalgOp.getOperation());
 
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
