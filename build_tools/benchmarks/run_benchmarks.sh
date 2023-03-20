@@ -26,7 +26,7 @@ EXECUTION_BENCHMARK_CONFIG="${2:-${IREE_EXECUTION_BENCHMARK_CONFIG}}"
 TARGET_DEVICE_NAME="${3:-${IREE_TARGET_DEVICE_NAME}}"
 BENCHMARK_RESULTS="${4:-${IREE_BENCHMARK_RESULTS}}"
 
-if [[ "${DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
+if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
     --gpus all \
     --env NVIDIA_DRIVER_CAPABILITIES=all \
@@ -38,7 +38,7 @@ if [[ "${DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
         --target_device_name="${TARGET_DEVICE_NAME}" \
         --output="${BENCHMARK_RESULTS}" \
         --verbose
-elif [[ "${DEVICE_NAME}" == "c2-standard-16" ]]; then
+elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
   ${DOCKER_WRAPPER} \
     gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
@@ -51,6 +51,6 @@ elif [[ "${DEVICE_NAME}" == "c2-standard-16" ]]; then
         --cpu_uarch=CascadeLake \
         --verbose
 else
-  echo "${DEVICE_NAME} is not supported yet."
+  echo "${TARGET_DEVICE_NAME} is not supported yet."
   exit 1
 fi
