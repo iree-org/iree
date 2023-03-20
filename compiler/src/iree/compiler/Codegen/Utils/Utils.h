@@ -25,6 +25,7 @@ namespace mlir {
 namespace iree_compiler {
 
 static constexpr unsigned kNumMaxParallelDims = 3;
+static constexpr unsigned kNumMaxWorkgroupParallelDims = 1;
 
 //===----------------------------------------------------------------------===//
 // Utility functions to get entry points

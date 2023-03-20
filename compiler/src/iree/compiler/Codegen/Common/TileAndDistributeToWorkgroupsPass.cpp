@@ -212,7 +212,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
       if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
       Value numTileAlongDim = getValueOrCreateConstantIndexOp(
           rewriter, loc, numTiles[partitionedLoop]);
-      if (numWorkgroups.size() == kNumMaxParallelDims) {
+      if (numWorkgroups.size() == kNumMaxWorkgroupParallelDims) {
         // IREE runtime only has 3 ID dimensions. After all the num of tiles are
         // combined into one.
         AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
@@ -224,7 +224,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
       numWorkgroups.push_back(numTileAlongDim);
     }
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    numWorkgroups.resize(kNumMaxParallelDims, one);
+    numWorkgroups.resize(workgroupCountOp.getNumResults(), one);
     rewriter.replaceOp(workgroupCountOp, numWorkgroups);
     return success();
   }
