@@ -102,7 +102,8 @@ class IreeRuleBuilder(object):
             target_name=target_name,
             src=str(model_import_rule.output_file_path),
             module_name=str(output_file_path),
-            flags=compile_flags)
+            flags=compile_flags,
+            friendly_name=str(module_generation_config))
     ]
 
     # TODO(#10155): Dump the compile flags from iree_bytecode_module into a flagfile.
