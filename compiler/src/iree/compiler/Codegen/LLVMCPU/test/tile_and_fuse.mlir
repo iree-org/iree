@@ -57,7 +57,7 @@ func.func @all_zeros(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : t
     } -> tensor<?x?xf32>
   return %2 : tensor<?x?xf32>
 }
-//      CHECK: func.func @matmul_bias_add(
+//      CHECK: func.func @all_zeros(
 //  CHECK-NOT:   scf.for
 //      CHECK:   linalg.fill
 //      CHECK:   linalg.matmul
