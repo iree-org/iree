@@ -31,15 +31,19 @@ endif()
 # non-trivial: it usually is CMAKE_SYSTEM_PROCESSOR, but on some platforms, we
 # have to read other variables instead.
 if(CMAKE_OSX_ARCHITECTURES)
+  # Borrowing from:
+  # https://boringssl.googlesource.com/boringssl/+/c5f0e58e653d2d9afa8facc090ce09f8aaa3fa0d/CMakeLists.txt#43
+  # https://github.com/google/XNNPACK/blob/2eb43787bfad4a99bdb613111cea8bc5a82f390d/CMakeLists.txt#L40
   list(LENGTH CMAKE_OSX_ARCHITECTURES NUM_ARCHES)
-  if(NOT ${NUM_ARCHES} EQUAL 1)
-    # Leaving _IREE_UNNORMALIZED_ARCH empty disables arch code paths. We will
-    # issue a performance warning about that below.
+  if(${NUM_ARCHES} EQUAL 1)
+    # Only one arch in CMAKE_OSX_ARCHITECTURES, use that.
+    set(_IREE_UNNORMALIZED_ARCH "${CMAKE_OSX_ARCHITECTURES}")
   endif()
-  # Only one arch in CMAKE_OSX_ARCHITECTURES, use that.
-  set(_IREE_UNNORMALIZED_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+  # Leaving _IREE_UNNORMALIZED_ARCH empty disables arch code paths. We will
+  # issue a performance warning about that below.
 elseif(CMAKE_GENERATOR MATCHES "^Visual Studio " AND CMAKE_GENERATOR_PLATFORM)
-  # Architecture is given by CMAKE_GENERATOR_PLATFORM.
+  # Borrowing from:
+  # https://github.com/google/XNNPACK/blob/2eb43787bfad4a99bdb613111cea8bc5a82f390d/CMakeLists.txt#L50
   set(_IREE_UNNORMALIZED_ARCH "${CMAKE_GENERATOR_PLATFORM}")
 else()
   set(_IREE_UNNORMALIZED_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
