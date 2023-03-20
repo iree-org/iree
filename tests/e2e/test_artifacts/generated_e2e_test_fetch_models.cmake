@@ -70,6 +70,16 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
+    "model-3dd5a95e-92a9-4486-9062-9a33224f28db"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_3dd5a95e-92a9-4486-9062-9a33224f28db_MobileNetV2_int8.0_224_quantized.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
     "model-58855e40-eba9-4a71-b878-6b35e3460244"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallStaticBatch.tflite"

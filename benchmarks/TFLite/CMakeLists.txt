@@ -175,6 +175,20 @@ set(EFFICIENTNET_INT8_MODULE
     "1x224x224x3xui8"
 )
 
+set(MOBILENET_V2_INT8_MODULE
+  NAME
+    "MobileNetV2"
+  TAGS
+    "int8"
+  SOURCE
+    # Mirror of https://tfhub.dev/tensorflow/lite-model/mobilenet_v2_1.0_224_quantized/1/default/1
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xui8"
+)
+
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################

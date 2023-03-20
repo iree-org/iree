@@ -129,3 +129,14 @@ EFFICIENTNET_INT8 = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/efficientnet_lite0_int8_2.tflite",
     entry_function="main",
     input_types=["1x224x224x3xui8"])
+
+MOBILENET_V2_INT8 = common_definitions.Model(
+    name="MobileNetV2_int8",
+    id=unique_ids.MODEL_MOBILENET_V2_INT8,
+    tags=["int8", "imagenet"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+    # Mirror of https://tfhub.dev/tensorflow/lite-model/mobilenet_v2_1.0_224_quantized/1/default/1
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite",
+    entry_function="main",
+    input_types=["1x224x224xui8"])
