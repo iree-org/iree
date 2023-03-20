@@ -167,6 +167,11 @@ typedef struct iree_thread_override_t iree_thread_override_t;
 // The priority of the thread will be the max of the base priority and the
 // overridden priority. Callers must pass the returned override token to
 // iree_thread_override_end.
+//
+// This is only a hint to the OS and may be ignored. Implementations may
+// non-deterministically return NULL and callers must gracefully handle that.
+// It's safe to pass NULL to iree_thread_override_end and in most cases as
+// callers aren't checking the returned value they won't notice.
 iree_thread_override_t* iree_thread_priority_class_override_begin(
     iree_thread_t* thread, iree_thread_priority_class_t priority_class);
 
