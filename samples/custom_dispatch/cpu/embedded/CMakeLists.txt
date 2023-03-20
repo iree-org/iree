@@ -14,7 +14,7 @@ endif()
 # detect what backends are compiled into clang. We could extend this to build
 # for the current cmake target architecture but would also need to modify the
 # MLIR file to have the new target configuration.
-if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64|amd64)")
+if(NOT IREE_ARCH STREQUAL "x86_64")
   message(STATUS "IREE custom_dispatch/cpu/embedded ignored -- only builds for x86_64 (today)")
   return()
 endif()
