@@ -102,7 +102,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         entry_function="main",
         input_types=["1xf32"])
     imported_model_a = iree_definitions.ImportedModel.from_model(model_a)
-    compile_config_a = iree_definitions.CompileConfig(
+    compile_config_a = iree_definitions.CompileConfig.build(
         id="config_a",
         tags=["defaults"],
         compile_targets=[
@@ -112,7 +112,7 @@ class CollectCompilationStatistics(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    compile_config_b = iree_definitions.CompileConfig(
+    compile_config_b = iree_definitions.CompileConfig.build(
         id="config_b",
         tags=["defaults"],
         compile_targets=[
@@ -122,9 +122,9 @@ class CollectCompilationStatistics(unittest.TestCase):
                 target_backend=iree_definitions.TargetBackend.LLVM_CPU,
                 target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ])
-    gen_config_a = iree_definitions.ModuleGenerationConfig.with_flag_generation(
+    gen_config_a = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model_a, compile_config=compile_config_a)
-    gen_config_b = iree_definitions.ModuleGenerationConfig.with_flag_generation(
+    gen_config_b = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model_a, compile_config=compile_config_b)
     benchmark_config = dict(generation_configs=serialization.serialize_and_pack(
         [gen_config_a, gen_config_b]),

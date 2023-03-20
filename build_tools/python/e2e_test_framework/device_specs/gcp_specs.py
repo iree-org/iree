@@ -9,15 +9,17 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework.device_specs import device_parameters
 
-GCP_C2_STANDARD_16 = common_definitions.DeviceSpec(
+GCP_C2_STANDARD_16 = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_16,
     device_name="c2-standard-16",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
     architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
-    device_parameters=[device_parameters.OCTA_CORES])
+    device_parameters=[device_parameters.OCTA_CORES],
+    tags=["cpu"])
 
-GCP_A2_HIGHGPU_1G = common_definitions.DeviceSpec(
+GCP_A2_HIGHGPU_1G = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_GCP_A2_HIGHGPU_1G,
     device_name="a2-highgpu-1g",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
-    architecture=common_definitions.DeviceArchitecture.CUDA_SM80)
+    architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
+    tags=["gpu"])

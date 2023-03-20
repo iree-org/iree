@@ -43,7 +43,7 @@ def generate_benchmarks(
   # For now we simply track compilation statistics of all modules.
   for gen_config in all_gen_configs:
     compile_config = gen_config.compile_config
-    compile_stats_config = iree_definitions.CompileConfig(
+    compile_stats_config = iree_definitions.CompileConfig.build(
         id=compile_config.id + COMPILE_STATS_ID_SUFFIX,
         tags=compile_config.tags + [COMPILE_STATS_TAG],
         compile_targets=compile_config.compile_targets,
@@ -54,7 +54,7 @@ def generate_benchmarks(
             "--iree-llvmcpu-debug-symbols=false"
         ])
     compile_stats_gen_configs.append(
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             imported_model=gen_config.imported_model,
             compile_config=compile_stats_config))
   all_gen_configs += compile_stats_gen_configs

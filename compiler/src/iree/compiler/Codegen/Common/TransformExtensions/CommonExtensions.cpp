@@ -107,21 +107,18 @@ transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
   vector::transferOpflowOpt(target);
   eraseDeadAllocAndStores(target);
 
-  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
 }
 
 void transform_dialect::ApplyBufferOptimizationsOp::build(
     OpBuilder &builder, OperationState &result, Value target) {
   result.addOperands(target);
-  result.addTypes({pdl::OperationType::get(target.getContext())});
 }
 
 //===---------------------------------------------------------------------===//
@@ -130,9 +127,10 @@ void transform_dialect::ApplyBufferOptimizationsOp::build(
 void transform_dialect::ApplyPatternsOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     const ApplyPatternsOpPatterns &patterns) {
-  MLIRContext *ctx = builder.getContext();
   result.addOperands(target);
+
   auto unitAttr = builder.getUnitAttr();
+
 #define ADD_PATTERN(NAME, ATTR) \
   if (patterns.NAME)            \
     result.addAttribute(ApplyPatternsOp::ATTR(result.name), unitAttr);
@@ -169,7 +167,6 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(unrollVectorsGpuMmaSync, getUnrollVectorsGpuMmaSyncAttrName)
   ADD_PATTERN(unrollVectorsGpuWmma, getUnrollVectorsGpuWmmaAttrName)
 #undef ADD_PATTERN
-  result.addTypes({pdl::OperationType::get(ctx)});
 }
 
 static void addOperands(Operation *op, SetVector<Value> &operandSet) {
@@ -450,14 +447,12 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     }
   }
 
-  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::ApplyPatternsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -471,8 +466,13 @@ DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
   IRRewriter rewriter(funcOp->getContext());
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
       rewriter, funcOp);
-  results.push_back(funcOp);
   return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::HoistStaticAllocOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===----------------------------------------------------------------------===//
@@ -547,14 +547,6 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
 //===---------------------------------------------------------------------===//
 // ForallToWorkgroupOp
 //===---------------------------------------------------------------------===//
-
-void transform_dialect::ForallToWorkgroupOp::build(OpBuilder &builder,
-                                                   OperationState &result,
-                                                   Value target) {
-  result.addOperands(target);
-  MLIRContext *ctx = builder.getContext();
-  result.addTypes({pdl::OperationType::get(ctx)});
-}
 
 /// Populate the workgroup_count region of `dispatchOp`.
 /// For now, this only supports constant index ops and empty workload
@@ -743,7 +735,6 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
     if (op.getSymName() == target.getName()) exportOp = op;
   });
   if (!exportOp) {
-    results.assign(1, nullptr);
     return mlir::emitSilenceableFailure(
         target, "no IREE::HAL::ExecutableExportOp found");
   }
@@ -758,7 +749,6 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
   });
 
   if (walkResult.wasInterrupted()) {
-    results.assign(1, nullptr);
     return mlir::emitSilenceableFailure(
         target, "could not find a unique topLevel scf.forall");
   }
@@ -768,8 +758,13 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
     return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
   }
 
-  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ForallToWorkgroupOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//
@@ -1291,47 +1286,37 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform_dialect::IREEEliminateEmptyTensorsOp::apply(
-    transform::TransformResults &results, transform::TransformState &state) {
-  ArrayRef<Operation *> payloads = state.getPayloadOps(getTarget());
-  for (Operation *payload : payloads) {
-    if (failed(eliminateEmptyTensors(payload, getBufferizationOptions()))) {
-      getOperation()->emitError() << "failed to eliminate tensor.empty ops";
-      return DiagnosedSilenceableFailure::definiteFailure();
-    }
+transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
+    ::mlir::Operation *target,
+    ::mlir::transform::ApplyToEachResultList &results,
+    ::mlir::transform::TransformState &state) {
+  if (failed(eliminateEmptyTensors(target, getBufferizationOptions()))) {
+    getOperation()->emitError() << "failed to eliminate tensor.empty ops";
+    return DiagnosedSilenceableFailure::definiteFailure();
   }
-  results.set(getOperation()->getOpResult(0), payloads);
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::IREEEliminateEmptyTensorsOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
-  result.addOperands(target);
-  MLIRContext *ctx = builder.getContext();
-  result.addTypes(pdl::OperationType::get(ctx));
+void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//
 // EraseHALDescriptorTypeFromMemRef
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
-  result.addOperands(target);
-  MLIRContext *ctx = builder.getContext();
-  result.addTypes(pdl::OperationType::get(ctx));
-}
-
 DiagnosedSilenceableFailure
-transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::apply(
-    transform::TransformResults &transformResults,
-    transform::TransformState &state) {
-  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  if (targetOps.size() != 1 || !isa<func::FuncOp>(targetOps.front())) {
+transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::applyToOne(
+    ::mlir::Operation *target,
+    ::mlir::transform::ApplyToEachResultList &results,
+    ::mlir::transform::TransformState &state) {
+  if (!isa<func::FuncOp>(target)) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "expects a func::FuncOp as the target op");
   }
-  auto funcOp = cast<func::FuncOp>(targetOps.front());
+  auto funcOp = cast<func::FuncOp>(target);
 
   if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
     return mlir::emitDefiniteFailure(
@@ -1339,8 +1324,13 @@ transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::apply(
         "failed to erase #hal.descriptor_type as MemRef memory space");
   }
 
-  transformResults.set(getOperation()->getOpResult(0), targetOps.front());
   return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

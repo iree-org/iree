@@ -19,7 +19,7 @@ def _with_caching_allocator(
     extra_flags: Optional[Sequence[str]] = None
 ) -> iree_definitions.ModuleExecutionConfig:
   extra_flags = [] if extra_flags is None else list(extra_flags)
-  return iree_definitions.ModuleExecutionConfig(
+  return iree_definitions.ModuleExecutionConfig.build(
       id=id,
       tags=tags,
       loader=loader,

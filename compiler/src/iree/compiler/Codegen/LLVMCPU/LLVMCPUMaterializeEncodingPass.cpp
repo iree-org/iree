@@ -54,8 +54,8 @@ static MatmulTileParams chooseMatmulTileParamsX86_64(
   switch (type) {
     case MatmulType::F32F32F32:
       if (hasFeature(target, "+avx512f")) return {16, 1, 16};
-      if (hasFeature(target, "+avx2")) {
-        // Note: for good performance, most +avx2 users will also want to add
+      if (hasFeature(target, "+avx")) {
+        // Note: for good performance, most +avx users will also want to add
         // +fma, but that's a local instruction selection detail and the tile
         // layout is unaffected, as there are enough registers even with the
         // need for intermediate product registers when +fma is not used.
@@ -65,8 +65,10 @@ static MatmulTileParams chooseMatmulTileParamsX86_64(
       return {8, 1, 4};
     case MatmulType::I8I8I32:
       if (hasFeature(target, "+avx512vnni")) {
-        // Aim to use VPDPWSSD.
-        return {16, 4, 16};
+        // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
+        // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
+        // call for {16, 4, 16} but we can't use it because of its unsigned LHS.
+        return {16, 2, 16};
       }
       if (hasFeature(target, "+avx512bw")) {
         // Aim to use VPMADDWD (zmm).

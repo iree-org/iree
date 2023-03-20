@@ -147,59 +147,58 @@ class BenchmarkSuiteTest(unittest.TestCase):
         source_url="",
         entry_function="predict",
         input_types=["1xf32"])
-    exec_config_a = iree_definitions.ModuleExecutionConfig(
+    exec_config_a = iree_definitions.ModuleExecutionConfig.build(
         id="exec_a",
         tags=["defaults"],
         loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
         driver=iree_definitions.RuntimeDriver.LOCAL_SYNC)
-    exec_config_b = iree_definitions.ModuleExecutionConfig(
+    exec_config_b = iree_definitions.ModuleExecutionConfig.build(
         id="exec_b",
         tags=["experimental"],
         loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
         driver=iree_definitions.RuntimeDriver.LOCAL_TASK)
-    device_spec_a = common_definitions.DeviceSpec(
+    device_spec_a = common_definitions.DeviceSpec.build(
         id="dev_a",
         device_name="a",
         architecture=common_definitions.DeviceArchitecture.RV32_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
-        device_parameters=[])
-    device_spec_b = common_definitions.DeviceSpec(
+        device_parameters=[],
+        tags=[])
+    device_spec_b = common_definitions.DeviceSpec.build(
         id="dev_b",
         device_name="b",
         architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
-        device_parameters=[])
+        device_parameters=[],
+        tags=[])
     compile_target = iree_definitions.CompileTarget(
         target_backend=iree_definitions.TargetBackend.LLVM_CPU,
         target_architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
         target_abi=iree_definitions.TargetABI.LINUX_GNU)
-    run_config_a = iree_definitions.E2EModelRunConfig.with_flag_generation(
-        module_generation_config=iree_definitions.ModuleGenerationConfig.
-        with_flag_generation(
+    run_config_a = iree_definitions.E2EModelRunConfig.build(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.build(
             imported_model=iree_definitions.ImportedModel.from_model(
                 model_tflite),
-            compile_config=iree_definitions.CompileConfig(
+            compile_config=iree_definitions.CompileConfig.build(
                 id="1", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_a,
         target_device_spec=device_spec_a,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
         tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
-    run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
-        module_generation_config=iree_definitions.ModuleGenerationConfig.
-        with_flag_generation(
+    run_config_b = iree_definitions.E2EModelRunConfig.build(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.build(
             imported_model=iree_definitions.ImportedModel.from_model(
                 model_tflite),
-            compile_config=iree_definitions.CompileConfig(
+            compile_config=iree_definitions.CompileConfig.build(
                 id="2", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_b,
         target_device_spec=device_spec_b,
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
         tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
-    run_config_c = iree_definitions.E2EModelRunConfig.with_flag_generation(
-        module_generation_config=iree_definitions.ModuleGenerationConfig.
-        with_flag_generation(
+    run_config_c = iree_definitions.E2EModelRunConfig.build(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.build(
             imported_model=iree_definitions.ImportedModel.from_model(model_tf),
-            compile_config=iree_definitions.CompileConfig(
+            compile_config=iree_definitions.CompileConfig.build(
                 id="3", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_a,
         target_device_spec=device_spec_a,
