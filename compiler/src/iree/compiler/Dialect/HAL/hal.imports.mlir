@@ -170,6 +170,9 @@ vm.import private @buffer_view.trace(
 vm.import private @channel.create(
   %device : !vm.ref<!hal.device>,
   %queue_affinity : i64,
+  %flags : i32,
+  %id : !vm.buffer,
+  %group : !vm.buffer,
   %rank : i32,
   %count : i32
 ) -> !vm.ref<!hal.channel>

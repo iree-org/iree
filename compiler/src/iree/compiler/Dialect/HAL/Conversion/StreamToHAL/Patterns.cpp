@@ -1190,6 +1190,24 @@ struct ChannelCreateOpPattern
       }
       return neg1I32;
     };
+    Value id = adaptor.getId();
+    if (!id) {
+      id = rewriter.create<IREE::Util::NullOp>(
+          createOp.getLoc(), rewriter.getType<IREE::Util::BufferType>());
+    }
+    Value group =
+        adaptor.getGroupAttr()
+            ? rewriter
+                  .create<IREE::Util::BufferConstantOp>(
+                      createOp.getLoc(),
+                      /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
+                      /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
+                  .getResult()
+            : rewriter
+                  .create<IREE::Util::NullOp>(
+                      createOp.getLoc(),
+                      rewriter.getType<IREE::Util::BufferType>())
+                  .getResult();
     Value rank =
         adaptor.getRank()
             ? rewriter.create<arith::IndexCastOp>(
@@ -1202,7 +1220,8 @@ struct ChannelCreateOpPattern
             : getDefault();
     rewriter.replaceOpWithNewOp<IREE::HAL::ChannelCreateOp>(
         createOp, rewriter.getType<IREE::HAL::ChannelType>(), device,
-        queueAffinity, rank, count);
+        queueAffinity, /*flags=*/rewriter.getI32IntegerAttr(0), id, group, rank,
+        count);
     return success();
   }
 };

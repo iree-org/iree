@@ -40,20 +40,20 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     abstraction for implementing fusion heuristics, i.e., the process of
     deciding which ops should form a dispatch region.
 
-    This op also has a second region: `workload_count`. The arguments to the 
-    region represent the workload for the dispatch, and returns the number of 
-    workgroups for the dispatch. The region is lowered directly to 
+    This op also has a second region: `workload_count`. The arguments to the
+    region represent the workload for the dispatch, and returns the number of
+    workgroups for the dispatch. The region is lowered directly to
     `workload_count` region of `dispatch.workgroups`.
   }];
 
-  let arguments = (ins FLOW_ShapeDynamicDims:$result_dims, 
+  let arguments = (ins FLOW_ShapeDynamicDims:$result_dims,
                        Variadic<FLOW_Dim>:$workload);
-  
+
   let results = (outs Variadic<AnyType>:$result);
 
   let regions = (region AnyRegion:$body,
                         AnyRegion:$workgroup_count);
-                        
+
   let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
@@ -1316,11 +1316,15 @@ def FLOW_ChannelDefaultOp : FLOW_Op<"channel.default", [
     Returns a channel initialized using the runtime environment.
   }];
 
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$group
+  );
   let results = (outs
     FLOW_Channel:$result
   );
 
   let assemblyFormat = [{
+    ($group^)?
     `:` type($result)
     attr-dict-with-keyword
   }];
