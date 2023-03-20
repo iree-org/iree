@@ -27,10 +27,10 @@ class BenchmarkDriver(object):
     self.benchmark_suite = benchmark_suite
     self.benchmark_grace_time = benchmark_grace_time
     self.verbose = verbose
-    self.seen_benchmark_names: Set[str] = set()
     self.finished_benchmarks: List[Tuple[BenchmarkInfo, pathlib.Path]] = []
     self.finished_captures: List[pathlib.Path] = []
     self.benchmark_errors = []
+    self._seen_benchmark_names: Set[str] = set()
 
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],
@@ -85,10 +85,10 @@ class BenchmarkDriver(object):
         benchmark_name = str(benchmark_info)
 
         # Sanity check for the uniqueness of benchmark names.
-        if benchmark_name in self.seen_benchmark_names:
+        if benchmark_name in self._seen_benchmark_names:
           raise ValueError(
               f"Found duplicate benchmark {benchmark_name} in the suites.")
-        self.seen_benchmark_names.add(benchmark_name)
+        self._seen_benchmark_names.add(benchmark_name)
 
         results_path, capture_path = self.__get_output_paths(benchmark_name)
         # If we continue from the previous results, check and skip if the result
@@ -112,10 +112,17 @@ class BenchmarkDriver(object):
           self.run_benchmark_case(benchmark_case, results_path, capture_path)
         except Exception as e:
           # Delete unfinished results if they exist.
+          # TODO(#11087): Use missing_ok=True once we move to Python 3.8.
           if results_path is not None:
-            results_path.unlink(missing_ok=True)
+            try:
+              results_path.unlink()
+            except FileNotFoundError:
+              pass
           if capture_path is not None:
-            capture_path.unlink(missing_ok=True)
+            try:
+              capture_path.unlink()
+            except FileNotFoundError:
+              pass
 
           if not self.config.keep_going:
             raise e
