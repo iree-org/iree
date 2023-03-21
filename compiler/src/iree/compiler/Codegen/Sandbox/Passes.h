@@ -56,7 +56,6 @@ struct LinalgSingleTilingExpertPassOptions {
   bool generalize = false;
   SmallVector<int64_t> iteratorInterchange = {};
   bool decomposeToLowerDimOp = false;
-  bool peel = false;
   bool vectorize = false;
   bool enableVectorMasking = false;
   bool vectorizePadding = false;

@@ -131,10 +131,6 @@ def LinalgSingleTilingExpert
       /*default=*/"false",
       "Convert named operations to lower-D named operations.">,
 
-    // Peeling options.
-    Option<"peel", "peel", "bool", /*default=*/"false",
-      "Peel loops enclosing the linalg op.">,
-
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,

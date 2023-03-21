@@ -104,28 +104,6 @@ struct Decompose : public Transformation {
   }
 };
 
-/// Represent one application of createLinalgStrategyPeelPass.
-struct Peel : public Transformation {
-  explicit Peel(
-      LinalgPeelOptions options,
-      LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr)
-      : Transformation(std::move(f)), options(options) {}
-
-  Peel(StringRef name, LinalgPeelOptions options,
-       LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr)
-      : Transformation(std::move(f)), opName(name), options(options) {}
-
-  void
-  addToPassPipeline(OpPassManager &pm,
-                    LinalgExt::LinalgTransformationFilter m) const override {
-    pm.addPass(createLinalgStrategyPeelPass(opName, options, m));
-  }
-
-private:
-  std::string opName;
-  LinalgPeelOptions options;
-};
-
 /// Represent one application of createLinalgStrategyVectorizePass.
 struct Vectorize : public Transformation {
   explicit Vectorize(
@@ -230,21 +208,6 @@ struct CodegenStrategy {
       bool b,
       LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr) {
     return b ? decompose(std::move(f)) : *this;
-  }
-  /// Append a pattern to peel 'LinalgOpType'.
-  CodegenStrategy &
-  peel(StringRef opName, const LinalgPeelOptions &options,
-       const LinalgExt::LinalgTransformationFilter::FilterFunction &f =
-           nullptr) {
-    transformationSequence.emplace_back(
-        std::make_unique<Peel>(opName, options, f));
-    return *this;
-  }
-  /// Conditionally append a pattern to peel 'LinalgOpType'.
-  CodegenStrategy &
-  peelIf(bool b, StringRef opName, const LinalgPeelOptions &options,
-         LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr) {
-    return b ? peel(opName, options, std::move(f)) : *this;
   }
   /// Append a pattern to rewrite `LinalgOpType` as a vector operation.
   CodegenStrategy &vectorize(

@@ -239,18 +239,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
     const LinalgExt::LinalgTransformationFilter &filter =
         LinalgExt::LinalgTransformationFilter());
 
-/// Create a LinalgStrategyPeelPass.
-using LoopsToPeelComputationFunction = std::function<void(
-    OpBuilder &, Operation *, SmallVectorImpl<scf::ForOp> &)>;
-
-struct LinalgPeelOptions {
-  LoopsToPeelComputationFunction loopsToPeelComputationFunction = nullptr;
-};
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
-    StringRef opName = "", const LinalgPeelOptions &opt = LinalgPeelOptions(),
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
-
 /// Create a LinalgStrategyVectorizePass.
 using VectorSizeComputationFunction =
     std::function<SmallVector<int64_t>(linalg::LinalgOp, ArrayRef<int64_t>)>;

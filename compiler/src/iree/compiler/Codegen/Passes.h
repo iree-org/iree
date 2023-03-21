@@ -293,6 +293,9 @@ createVerifyLinalgTransformLegalityPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
     int64_t tilingLevel = -1);
 
+/// Pass to perform peeling on non-distributed loops.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReordering = false);
