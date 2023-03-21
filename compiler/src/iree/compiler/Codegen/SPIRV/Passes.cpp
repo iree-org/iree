@@ -118,7 +118,8 @@ static void addBufferizePasses(OpPassManager &passManager,
 static void addTileAndDistributeToWorkgroupsPasses(
     OpPassManager &passManager, bool useFuseTensorPadWithConsumerPass = false,
     bool useWARForCooperativeMatrixCodegen = false) {
-  passManager.addPass(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(
+      createTileAndDistributeToWorkgroupsPass(kNumMaxParallelDims));
   auto &nestedModulePM = passManager.nest<ModuleOp>();
   if (useFuseTensorPadWithConsumerPass) {
     nestedModulePM.addNestedPass<func::FuncOp>(

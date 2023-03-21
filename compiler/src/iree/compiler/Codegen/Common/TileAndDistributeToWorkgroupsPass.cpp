@@ -312,8 +312,9 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
-  TileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims)
-      : maxWorkgroupParallelDims(maxWorkgroupParallelDims) {}
+  TileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims) {
+    this->maxWorkgroupParallelDims = maxWorkgroupParallelDims;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, IREE::HAL::HALDialect,
@@ -321,22 +322,11 @@ struct TileAndDistributeToWorkgroupsPass
                 scf::SCFDialect, tensor::TensorDialect>();
   }
 
-  void initOptions() {
-    if (TileAndDistributeToWorkgroupsBase::maxWorkgroupParallelDims.hasValue())
-      maxWorkgroupParallelDims =
-          TileAndDistributeToWorkgroupsBase::maxWorkgroupParallelDims
-              .getValue();
-  }
-
   void runOnOperation() override;
-
- private:
-  int32_t maxWorkgroupParallelDims;
 };
 }  // namespace
 
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
-  initOptions();
   MLIRContext *context = &getContext();
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp innerModule = variantOp.getInnerModule();

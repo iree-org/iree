@@ -171,8 +171,8 @@ def TileAndDistributeToWorkgroups :
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
   let options = [
     Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
-      /*default=*/ "3",
-      "Maximum dims for workgroup size.">,
+      /*default=*/ "",
+      "Maximum number of dims to distribute workgroups acrosse.">,
   ];
 }
 

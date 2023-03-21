@@ -137,7 +137,7 @@ static void addBufferizePasses(OpPassManager &passManager) {
 
 static void addTileAndDistributePasses(
     OpPassManager &pm, bool useFuseTensorPadWithConsumerPass = true) {
-  pm.addPass(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createTileAndDistributeToWorkgroupsPass(kNumMaxParallelDims));
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
