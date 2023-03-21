@@ -4,15 +4,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import dataclasses
 import json
 import pathlib
 import tempfile
+from typing import Optional
 import unittest
 
-from typing import Optional
+from common import benchmark_config
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_config import BENCHMARK_RESULTS_REL_PATH, CAPTURES_REL_PATH, BenchmarkConfig, TraceCaptureConfig
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DeviceInfo, PlatformType
 
 
@@ -24,6 +25,7 @@ class FakeBenchmarkDriver(BenchmarkDriver):
                **kwargs):
     super().__init__(*args, **kwargs)
     self.raise_exception_on_case = raise_exception_on_case
+    self.run_benchmark_cases = []
 
   def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],
@@ -31,6 +33,8 @@ class FakeBenchmarkDriver(BenchmarkDriver):
     if (self.raise_exception_on_case is not None and
         self.raise_exception_on_case in str(benchmark_case.benchmark_case_dir)):
       raise Exception("fake exception")
+
+    self.run_benchmark_cases.append(benchmark_case)
 
     if benchmark_results_filename:
       benchmark_results_filename.write_text(
@@ -45,25 +49,31 @@ class FakeBenchmarkDriver(BenchmarkDriver):
 class BenchmarkDriverTest(unittest.TestCase):
 
   def setUp(self):
-    self.tmp_dir = tempfile.TemporaryDirectory()
-    self.root_dir = tempfile.TemporaryDirectory()
+    self._tmp_dir_obj = tempfile.TemporaryDirectory()
+    self._root_dir_obj = tempfile.TemporaryDirectory()
 
-    self.tmp_dir_path = pathlib.Path(self.tmp_dir.name)
-    (self.tmp_dir_path / "build_config.txt").write_text(
+    self.tmp_dir = pathlib.Path(self._tmp_dir_obj.name)
+    (self.tmp_dir / "build_config.txt").write_text(
         "IREE_HAL_DRIVER_LOCAL_SYNC=ON\n"
         "IREE_HAL_DRIVER_LOCAL_TASK=ON\n"
         "IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF=ON\n")
 
-    self.config = BenchmarkConfig(
-        root_benchmark_dir=pathlib.Path(self.root_dir.name),
-        benchmark_results_dir=self.tmp_dir_path / BENCHMARK_RESULTS_REL_PATH,
+    self.benchmark_results_dir = (self.tmp_dir /
+                                  benchmark_config.BENCHMARK_RESULTS_REL_PATH)
+    self.captures_dir = (self.tmp_dir / benchmark_config.CAPTURES_REL_PATH)
+    self.benchmark_results_dir.mkdir()
+    self.captures_dir.mkdir()
+
+    self.config = benchmark_config.BenchmarkConfig(
+        root_benchmark_dir=pathlib.Path(self._root_dir_obj.name),
+        benchmark_results_dir=self.benchmark_results_dir,
         git_commit_hash="abcd",
-        normal_benchmark_tool_dir=self.tmp_dir_path,
-        trace_capture_config=TraceCaptureConfig(
-            traced_benchmark_tool_dir=self.tmp_dir_path,
-            trace_capture_tool=self.tmp_dir_path / "capture_tool",
-            capture_tarball=self.tmp_dir_path / "captures.tar",
-            capture_tmp_dir=self.tmp_dir_path / CAPTURES_REL_PATH))
+        normal_benchmark_tool_dir=self.tmp_dir,
+        trace_capture_config=benchmark_config.TraceCaptureConfig(
+            traced_benchmark_tool_dir=self.tmp_dir,
+            trace_capture_tool=self.tmp_dir / "capture_tool",
+            capture_tarball=self.tmp_dir / "captures.tar",
+            capture_tmp_dir=self.captures_dir))
 
     self.device_info = DeviceInfo(platform_type=PlatformType.LINUX,
                                   model="Unknown",
@@ -91,30 +101,8 @@ class BenchmarkDriverTest(unittest.TestCase):
     })
 
   def tearDown(self) -> None:
-    self.root_dir.cleanup()
-    self.tmp_dir.cleanup()
-
-  def test_add_previous_benchmarks_and_captures(self):
-    driver = BenchmarkDriver(self.device_info, self.config,
-                             self.benchmark_suite)
-    (self.tmp_dir_path / BENCHMARK_RESULTS_REL_PATH).mkdir(parents=True)
-    (self.tmp_dir_path / CAPTURES_REL_PATH).mkdir(parents=True)
-    benchmark_filename = (
-        self.tmp_dir_path / BENCHMARK_RESULTS_REL_PATH /
-        "MobileNetv2 [fp32,imagenet] (TFLite) big-core,full-inference with IREE-LLVM-CPU @ Pixel-4 (CPU-ARMv8.2-A).json"
-    )
-    benchmark_filename.touch()
-    capture_filename = (
-        self.tmp_dir_path / CAPTURES_REL_PATH /
-        "MobileNetv2 [fp32,imagenet] (TFLite) big-core,full-inference with IREE-LLVM-CPU @ Pixel-4 (CPU-ARMv8.2-A).tracy"
-    )
-    capture_filename.touch()
-
-    driver.add_previous_benchmarks_and_captures(self.tmp_dir_path)
-
-    self.assertEqual(driver.get_benchmark_result_filenames(),
-                     [benchmark_filename])
-    self.assertEqual(driver.get_capture_filenames(), [capture_filename])
+    self._tmp_dir_obj.cleanup()
+    self._root_dir_obj.cleanup()
 
   def test_run(self):
     driver = FakeBenchmarkDriver(self.device_info, self.config,
@@ -127,15 +115,15 @@ class BenchmarkDriverTest(unittest.TestCase):
     self.assertEqual(driver.get_benchmark_results().benchmarks[0].context,
                      "fake_context")
     self.assertEqual(driver.get_benchmark_result_filenames(), [
-        self.tmp_dir_path / BENCHMARK_RESULTS_REL_PATH /
+        self.benchmark_results_dir /
         "DeepNet (TFLite) 1-thread,full-inference with IREE-LLVM-CPU @ Unknown (CPU-ARMv8-A).json",
-        self.tmp_dir_path / BENCHMARK_RESULTS_REL_PATH /
+        self.benchmark_results_dir /
         "DeepNetv2 [f32] (TFLite) full-inference with IREE-LLVM-CPU-Sync @ Unknown (CPU-ARMv8-A).json"
     ])
     self.assertEqual(driver.get_capture_filenames(), [
-        self.tmp_dir_path / CAPTURES_REL_PATH /
+        self.captures_dir /
         "DeepNet (TFLite) 1-thread,full-inference with IREE-LLVM-CPU @ Unknown (CPU-ARMv8-A).tracy",
-        self.tmp_dir_path / CAPTURES_REL_PATH /
+        self.captures_dir /
         "DeepNetv2 [f32] (TFLite) full-inference with IREE-LLVM-CPU-Sync @ Unknown (CPU-ARMv8-A).tracy"
     ])
     self.assertEqual(driver.get_benchmark_errors(), [])
@@ -161,6 +149,28 @@ class BenchmarkDriverTest(unittest.TestCase):
 
     self.assertEqual(len(driver.get_benchmark_errors()), 1)
     self.assertEqual(len(driver.get_benchmark_result_filenames()), 1)
+
+  def test_run_with_previous_benchmarks_and_captures(self):
+    benchmark_filename = (
+        self.benchmark_results_dir /
+        "DeepNet (TFLite) 1-thread,full-inference with IREE-LLVM-CPU @ Unknown (CPU-ARMv8-A).json"
+    )
+    benchmark_filename.touch()
+    capture_filename = (
+        self.captures_dir /
+        "DeepNet (TFLite) 1-thread,full-inference with IREE-LLVM-CPU @ Unknown (CPU-ARMv8-A).tracy"
+    )
+    capture_filename.touch()
+    config = dataclasses.replace(self.config, continue_from_previous=True)
+    driver = FakeBenchmarkDriver(device_info=self.device_info,
+                                 benchmark_config=config,
+                                 benchmark_suite=self.benchmark_suite)
+
+    driver.run()
+
+    self.assertEqual(len(driver.run_benchmark_cases), 1)
+    self.assertEqual(len(driver.get_benchmark_result_filenames()), 2)
+    self.assertEqual(len(driver.get_capture_filenames()), 2)
 
 
 if __name__ == "__main__":

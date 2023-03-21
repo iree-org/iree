@@ -336,42 +336,6 @@ class BenchmarkInfo:
 
     return f"{model_part} {mode_tags} with {self.driver_info.pretty_name} @ {device_part}"
 
-  @staticmethod
-  def from_device_info_and_name(device_info: DeviceInfo, name: str):
-    (
-        model_name,
-        model_tags,
-        model_source,
-        mode_tags,
-        _,  # "with"
-        runner,
-        _,  # "@"
-        model,
-        _,  # Device Info
-    ) = name.split()
-    model_source = model_source.strip("()")
-    model_tags = model_tags.strip("[]").split(",")
-
-    if mode_tags.startswith("[") and mode_tags.endswith("]"):
-      bench_mode, compile_tags = mode_tags.strip("[]").split("][")
-      bench_mode = mode_tags.split(",")
-      compile_tags = compile_tags.split(",")
-    else:
-      bench_mode = mode_tags.split(",")
-      compile_tags = None
-
-    driver = IREE_PRETTY_NAME_TO_DRIVER_NAME.get(runner)
-    if not driver:
-      raise ValueError(f"Unrecognized runner: {runner}")
-
-    return BenchmarkInfo(model_name=model_name,
-                         model_tags=model_tags,
-                         model_source=model_source,
-                         bench_mode=bench_mode,
-                         compile_tags=compile_tags,
-                         driver_info=IREE_DRIVERS_INFOS[driver],
-                         device_info=device_info)
-
   def to_json_object(self) -> Dict[str, Any]:
     return {
         "model_name": self.model_name,
