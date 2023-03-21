@@ -159,12 +159,13 @@ LogicalResult ReturnOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source) {
-  build(builder, result, resultType, source, /*waitFence=*/Value{});
+                           Type resultType, Value source, StringAttr name) {
+  build(builder, result, resultType, source, /*waitFence=*/Value{}, name);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, Value waitFence) {
+                           Type resultType, Value source, Value waitFence,
+                           StringAttr name) {
   auto shapedType = resultType.cast<ShapedType>();
   assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
           shapedType.hasStaticShape()) &&
@@ -178,7 +179,7 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         builder.getIndexAttr(i)));
   }
   build(builder, result, resultType, source, TypeAttr::get(shapedType),
-        dynamicDims, waitFence);
+        dynamicDims, waitFence, name);
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
@@ -251,11 +252,11 @@ LogicalResult TensorImportOp::verify() {
 }
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source) {
+                           Type resultType, Value source, StringAttr name) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
   build(builder, result, resultType, source, TypeAttr::get(source.getType()),
-        dynamicDims, /*target_storage=*/nullptr);
+        dynamicDims, /*target_storage=*/nullptr, name);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
