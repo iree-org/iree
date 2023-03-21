@@ -4,6 +4,7 @@ _ireeCompilerEnumerateRegisteredHALTargetBackends
 _ireeCompilerErrorDestroy
 _ireeCompilerErrorGetMessage
 _ireeCompilerGetAPIVersion
+_ireeCompilerGetProcessCLArgs
 _ireeCompilerGlobalInitialize
 _ireeCompilerGlobalShutdown
 _ireeCompilerInvocationCreate
@@ -37,6 +38,7 @@ _ireeCompilerSessionCreate
 _ireeCompilerSessionDestroy
 _ireeCompilerSessionGetFlags
 _ireeCompilerSessionSetFlags
+_ireeCompilerSetupGlobalCL
 _ireeCompilerSourceDestroy
 _ireeCompilerSourceOpenFile
 _ireeCompilerSourceSplit
