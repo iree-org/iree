@@ -6,6 +6,12 @@
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_register_plugin")
 
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
 cc_library(
     name = "defs",
     includes = ["src"],

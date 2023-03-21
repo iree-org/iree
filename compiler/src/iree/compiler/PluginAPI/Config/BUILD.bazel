@@ -6,6 +6,12 @@
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
 
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
 genrule(
     name = "StaticLinkedPlugins_inc__generate",
     outs = ["StaticLinkedPlugins.inc"],
