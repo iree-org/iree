@@ -71,13 +71,6 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-// TODO(#12135): remove defaultWorkgroupTileSizeForUnpackOp
-static llvm::cl::opt<int> defaultWorkgroupTileSizeForUnpackOp(
-    "iree-codegen-llvm-generic-ops-workgroup-size-for-unpack-op",
-    llvm::cl::desc("Like iree-codegen-llvm-generic-ops-workgroup-size but "
-                   "specifically for UnpackOp"),
-    llvm::cl::init(16));
-
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
 
@@ -1037,11 +1030,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 }
 
 static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
-    TilingInterface op, int64_t defaultSize) {
+    TilingInterface op) {
   unsigned numLoops = op.getLoopIteratorTypes().size();
   auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
                               .getPartitionableLoops(kNumMaxParallelDims);
-  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultSize);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
   for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
@@ -1057,7 +1050,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
-      cast<TilingInterface>(op.getOperation()), defaultWorkgroupTileSize);
+      cast<TilingInterface>(op.getOperation()));
 
   // The default function aims to returns the number of workload per workgroup,
   // but it does not know that it is working on packed domain. We need to take
@@ -1080,12 +1073,8 @@ static LogicalResult setUnPackOpRootConfig(
     func::FuncOp entryPointFn, tensor::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
-  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
-  // TODO(#11505): Consider multi-level tiling for handling unpack + generic
-  // cases.
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
-      cast<TilingInterface>(op.getOperation()),
-      /*defaultSize=*/defaultWorkgroupTileSizeForUnpackOp);
+      cast<TilingInterface>(op.getOperation()));
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
@@ -1108,7 +1097,7 @@ static LogicalResult setRootConfig(
         DispatchLoweringPassPipeline::CPUDefault) {
   assert(!getLoweringConfig(fftOp) && "expected lowering_config is not set");
   SmallVector<int64_t> workgroupTileSizes =
-      getLinalgExtDefaultWorkgroupTileSizes(fftOp, defaultWorkgroupTileSize);
+      getLinalgExtDefaultWorkgroupTileSizes(fftOp);
   auto rank = fftOp.getOperandRank();
   if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
     APInt value;
@@ -1778,20 +1767,13 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 }
 
 /// Find the root operation for the dispatch region. The priority is:
-///   1. A tensor.unpack op.
-///   2. A Linalg operation that has reduction loops.
-///   3. Any other Lainlg op or LinalgExt op.
-///   4. An operation that implements TilingInterface.
+///   1. A Linalg operation that has reduction loops.
+///   2. Any other Lainlg op or LinalgExt op.
+///   3. An operation that implements TilingInterface.
 /// If there are multiple operations meeting the same priority, the one closer
 /// to the end of the function is the root op.
 static FailureOr<Operation *> getRootOperation(
     ArrayRef<Operation *> computeOps) {
-  // TODO(hanchung): The unpack ops are unconditionally treated as root ops.
-  // This should be fixed if there are fusion cases.
-  for (auto op : computeOps) {
-    if (isa<tensor::UnPackOp>(op)) return op;
-  }
-
   for (auto op : llvm::reverse(computeOps)) {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) continue;
@@ -1863,6 +1845,67 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
                                                tileSizesList, pipeline);
 }
 
+static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
+                                                Operation *rootOp) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
+  if (!linalgOp) return success();
+
+  // The transform dialect codegen has differnet logics and codegen flow. Ignore
+  // the adjustment for it.
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+  if (pipeline == DispatchLoweringPassPipeline::TransformDialectCodegen) {
+    return success();
+  }
+  TileSizesListType tileSizesList =
+      getLoweringConfig(linalgOp).getTileSizeVals();
+
+  bool foundUnPackOp = false;
+  SmallVector<int64_t> alignedSizes(linalgOp.getNumLoops(), 1);
+  for (OpOperand *opOperand : linalgOp.getDpsInputOperands()) {
+    auto unpackOp = opOperand->get().getDefiningOp<tensor::UnPackOp>();
+    if (!unpackOp) continue;
+
+    foundUnPackOp = true;
+    auto idxMap = linalgOp.getMatchingIndexingMap(opOperand);
+    LLVM_DEBUG(KD_DBGS() << "Find unpack op candidate: " << unpackOp << "\n"
+                         << "The corresponding indexing map is: " << idxMap
+                         << "\n");
+
+    SmallVector<int64_t> innerTiles = unpackOp.getStaticTiles();
+    ArrayRef<int64_t> dimPos = unpackOp.getInnerDimsPos();
+    for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+      if (ShapedType::isDynamic(size)) continue;
+      auto dimExpr = idxMap.getResult(pos).dyn_cast<AffineDimExpr>();
+      if (!dimExpr) return failure();
+      int mappedPos = dimExpr.getPosition();
+      alignedSizes[mappedPos] = std::lcm(alignedSizes[mappedPos], size);
+    }
+  }
+
+  if (!foundUnPackOp) return success();
+
+  LLVM_DEBUG(
+      KD_DBGS() << "The tile sizes for each dimension should be aligned to "
+                << alignedSizes);
+
+  // Fixup for making tileSizes be multiple of inner_tile_sizes.
+  for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
+    for (auto idx : llvm::seq<int64_t>(0, tileSizes.size())) {
+      if (tileSizes[idx] == 0) continue;
+      tileSizes[idx] = llvm::alignTo(tileSizes[idx], alignedSizes[idx]);
+    }
+  }
+
+  if (pipeline == DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert) {
+    LLVM_DEBUG(KD_DBGS() << "unpack fusion does not work with peeling, falling "
+                            "back to non-peeling path");
+    pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+  }
+
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
+                                               tileSizesList, pipeline);
+}
+
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult setTranslationInfoAndRootConfig(
     func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
@@ -1915,6 +1958,10 @@ static LogicalResult setTranslationInfoAndRootConfig(
   }
 
   if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
+    return failure();
+  }
+
+  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
     return failure();
   }
 

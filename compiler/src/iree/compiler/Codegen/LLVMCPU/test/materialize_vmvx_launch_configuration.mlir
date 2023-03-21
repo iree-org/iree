@@ -219,7 +219,7 @@ hal.executable private @unpack_outer_dynamic  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 16]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
 //      CHECK: hal.executable.export public @unpack_outer_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
