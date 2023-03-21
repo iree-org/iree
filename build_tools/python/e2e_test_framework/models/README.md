@@ -10,6 +10,9 @@ This directory contains the definitions of source models for e2e tests
     -   You can ask IREE team members for help if you don't have access.
 2.  Register a unique model ID in
     [build_tools/python/e2e_test_framework/unique_ids.py](/build_tools/python/e2e_test_framework/unique_ids.py).
+    -   Run `uuid.uuid4()`, or `uuidgen` on Linux, to generate a new uuid for
+        the new model. The ID is a totally arbitrary artificial key to
+        distinguish different models.
 3.  Define a new model with GCS URL and model ID in `<source_type>_models.py`.
 4.  Optionally add the model to a model group in
     [build_tools/python/e2e_test_framework/models/model_groups.py](/build_tools/python/e2e_test_framework/models/model_groups.py).

@@ -167,8 +167,8 @@ static func::FuncOp createImportWrapperFunc(
       // fence will be signaled when the tensor is ready for consumption by the
       // import.
       auto argLoc = arg.getLoc();
-      auto exportOp =
-          entryBuilder.create<IREE::HAL::TensorExportOp>(argLoc, newType, arg);
+      auto exportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
+          argLoc, newType, arg, /*name=*/nullptr);
       arguments.push_back(exportOp.getTarget());
     } else {
       arguments.push_back(arg);
@@ -201,7 +201,8 @@ static func::FuncOp createImportWrapperFunc(
       // indicating when the returned tensor is ready for consumption by the
       // program.
       results.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
-          importOp.getLoc(), oldType, result, signalFence));
+          importOp.getLoc(), oldType, result, signalFence,
+          /*name=*/nullptr));
     } else {
       results.push_back(result);
     }
@@ -293,6 +294,28 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
     auto reflectionAttr = DictionaryAttr::get(context, attrs);
     wrapperOp->setAttr("iree.reflection", reflectionAttr);
   }
+}
+
+static StringAttr getNameFromDictAttr(DictionaryAttr attr, Builder &builder) {
+  // TODO(benvanik): support naming. We could look for iree.abi.name or some
+  // other attribute that gets populated by frontends.
+  return nullptr;
+}
+
+static StringAttr inferArgumentName(int index, ArrayRef<DictionaryAttr> attrs,
+                                    Builder &builder) {
+  if (auto attrName = getNameFromDictAttr(attrs[index], builder)) {
+    return attrName;
+  }
+  return builder.getStringAttr("input " + std::to_string(index));
+}
+
+static StringAttr inferResultName(int index, ArrayRef<DictionaryAttr> attrs,
+                                  Builder &builder) {
+  if (auto attrName = getNameFromDictAttr(attrs[index], builder)) {
+    return attrName;
+  }
+  return builder.getStringAttr("output " + std::to_string(index));
 }
 
 // Creates the corresponding wrapper function for the given export function.
@@ -387,16 +410,17 @@ static func::FuncOp createExportWrapperFunc(
 
   // Marshal arguments.
   SmallVector<Value> arguments;
-  for (auto arg : llvm::enumerate(
+  for (auto [argIndex, arg] : llvm::enumerate(
            entryBlock->getArguments().slice(0, oldExportType.getNumInputs()))) {
-    auto oldType = oldExportType.getInput(arg.index());
+    auto oldType = oldExportType.getInput(argIndex);
     if (oldType.isa<TensorType>()) {
-      auto argLoc = arg.value().getLoc();
+      auto argLoc = arg.getLoc();
       auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
-          argLoc, oldType, arg.value(), waitFence);
+          argLoc, oldType, arg, waitFence,
+          inferArgumentName(argIndex, argAttrDict, entryBuilder));
       arguments.push_back(importOp.getTarget());
     } else {
-      arguments.push_back(arg.value());
+      arguments.push_back(arg);
     }
   }
 
@@ -435,7 +459,8 @@ static func::FuncOp createExportWrapperFunc(
           result.getLoc(), result, entryBuilder);
       results.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), newType, result, TypeAttr::get(result.getType()),
-          dynamicDims, resultStorages[resultIndex]));
+          dynamicDims, resultStorages[resultIndex],
+          inferResultName(resultIndex, resultAttrDict, entryBuilder)));
     } else {
       results.push_back(result);
     }

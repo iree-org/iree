@@ -29,6 +29,7 @@ class Linux_RV64_Benchmarks(object):
       tflite_models.MOBILEBERT_INT8,
       tflite_models.PERSON_DETECT_INT8,
       tflite_models.EFFICIENTNET_INT8,
+      tflite_models.MOBILENET_V2_INT8,
   ]
 
   def generate(
@@ -60,6 +61,7 @@ class Linux_RV32_Benchmarks(object):
       tflite_models.EFFICIENTNET_INT8,
       tflite_models.MOBILEBERT_INT8,
       tflite_models.PERSON_DETECT_INT8,
+      tflite_models.MOBILENET_V2_INT8,
   ]
 
   def generate(

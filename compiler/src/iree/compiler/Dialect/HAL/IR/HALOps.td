@@ -80,7 +80,8 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims,
-    Optional<HAL_Fence>:$wait_fence
+    Optional<HAL_Fence>:$wait_fence,
+    OptionalAttr<StrAttr>:$name
   );
   let results = (outs
     AnyTensor:$target
@@ -88,21 +89,24 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 
   let assemblyFormat = [{
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
-    $source `:` type($source)
-    `->`
+    $source
+    ($name^)?
+    `:` type($source) `->`
     custom<TypeAlias>($target_encoding, type($target)) (`{` $target_dims^ `}`)?
-    attr-dict-with-keyword
+    attr-dict
   }];
 
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source
+      "Value":$source,
+      "StringAttr":$name
     )>,
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source,
-      "Value":$waitFence
+      "Value":$waitFence,
+      "StringAttr":$name
     )>,
   ];
 
@@ -146,7 +150,8 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     AnyTensor:$source,
     TypeAttr:$source_encoding,
     HAL_ShapeDynamicDims:$source_dims,
-    Optional<HAL_Buffer>:$target_storage
+    Optional<HAL_Buffer>:$target_storage,
+    OptionalAttr<StrAttr>:$name
   );
   let results = (outs
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
@@ -154,18 +159,20 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
 
   let assemblyFormat = [{
     $source
+    ($name^)?
     (`into` $target_storage^)?
     `:`
     custom<TypeAlias>($source_encoding, type($source)) (`{` $source_dims^ `}`)?
     `->`
     type($target)
-    attr-dict-with-keyword
+    attr-dict
   }];
 
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source
+      "Value":$source,
+      "StringAttr":$name
     )>,
   ];
 
