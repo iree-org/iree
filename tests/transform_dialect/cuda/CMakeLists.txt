@@ -18,6 +18,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "attention.mlir"
     "mma.mlir"
     "mma_using_layout_analysis.mlir"
     "reduction.mlir"
@@ -35,6 +36,7 @@ iree_lit_test_suite(
     iree-opt
     iree-run-module
   DATA
+    attention_codegen_spec.mlir
     mma_using_layout_analysis_codegen_spec.mlir
     reduction_codegen_spec.mlir
     reduction_eltwise_codegen_spec.mlir

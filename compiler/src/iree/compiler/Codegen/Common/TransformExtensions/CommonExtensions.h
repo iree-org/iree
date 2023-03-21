@@ -32,6 +32,11 @@ class TransformTypeInterface;
 
 namespace iree_compiler {
 namespace IREE {
+
+namespace LinalgExt {
+class AttentionOp;
+}  // namespace LinalgExt
+
 namespace transform_dialect {
 /// Selected patterns for ApplyPatternOp.
 struct ApplyPatternsOpPatterns {
