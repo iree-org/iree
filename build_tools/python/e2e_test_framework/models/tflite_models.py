@@ -139,4 +139,4 @@ MOBILENET_V2_INT8 = common_definitions.Model(
     source_url=
     "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite",
     entry_function="main",
-    input_types=["1x224x224xui8"])
+    input_types=["1x224x224x3xui8"])

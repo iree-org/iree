@@ -28,6 +28,8 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//compiler/src/iree/compiler/Dialect/VM/Target/C",
         "//compiler/src/iree/compiler/Pipelines",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "//compiler/src/iree/compiler/PluginAPI:PluginManager",
         "//compiler/src/iree/compiler/Tools:init_llvmir_translations",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",

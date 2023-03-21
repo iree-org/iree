@@ -375,6 +375,17 @@ def VerifyLinalgTransformLegality :
   let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
 }
 
+def LLVMCPUTileAndFuse :
+    Pass<"iree-llvmcpu-tile-and-fuse", "func::FuncOp"> {
+  let summary = "Pass to tile and fuse TilingInterface operations.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTileAndFusePass()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
+}
+
 def ConvertToLLVM :
     Pass<"iree-convert-to-llvm", "ModuleOp"> {
   let summary =
