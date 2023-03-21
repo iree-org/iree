@@ -8,7 +8,7 @@ load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_register_plugin")
 
 cc_library(
     name = "defs",
-    include = ["src"],
+    includes = ["src"],
 )
 
 cc_library(

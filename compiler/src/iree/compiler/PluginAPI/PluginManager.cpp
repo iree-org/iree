@@ -29,6 +29,18 @@ namespace mlir::iree_compiler {
 AbstractPluginRegistration::~AbstractPluginRegistration() = default;
 AbstractPluginSession::~AbstractPluginSession() = default;
 
+LogicalResult AbstractPluginSession::activate(MLIRContext *context) {
+  if (this->context) {
+    // Already activated - ignore. But verify in debug mode that activated
+    // with the same context (which is a non-user triggerable error).
+    assert(context == this->context &&
+           "duplicate plugin activation with different context");
+    return success();
+  }
+  this->context = context;
+  return onActivate();
+}
+
 void PluginManagerOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE compiler plugin options");
 
@@ -81,10 +93,20 @@ void PluginRegistrar::registerPlugin(
   }
 }
 
-LogicalResult PluginManagerSession::activatePlugins() {
+PluginManagerSession::PluginManagerSession(PluginManager &pluginManager,
+                                           OptionsBinder &binder,
+                                           PluginManagerOptions &options)
+    : options(options) {
+  for (auto &kv : pluginManager.registrations) {
+    allPluginSessions.insert(std::make_pair(
+        kv.first(), kv.second->createUninitializedSession(binder)));
+  }
+}
+
+LogicalResult PluginManagerSession::activatePlugins(MLIRContext *context) {
   auto getAvailableIds = [&]() -> llvm::SmallVector<llvm::StringRef> {
     llvm::SmallVector<llvm::StringRef> availableIds;
-    for (auto &kv : pluginManager.registrations) {
+    for (auto &kv : allPluginSessions) {
       availableIds.push_back(kv.first());
     }
     std::sort(availableIds.begin(), availableIds.end());
@@ -102,32 +124,24 @@ LogicalResult PluginManagerSession::activatePlugins() {
   // Process activations.
   // In the future, we may make this smarter by allowing dependencies and
   // sorting accordingly. For now, what you say is what you get.
-  llvm::StringSet<> activatedPluginIds;
   for (auto &pluginId : options.plugins) {
     if (options.printPluginInfo) {
       llvm::errs() << "[IREE plugins]: Activating plugin '" << pluginId
                    << "'\n";
     }
-    if (!activatedPluginIds.insert(pluginId).second) {
-      if (options.printPluginInfo) {
-        llvm::errs() << "[IREE plugins]: Skipping duplicate plugin '"
-                     << pluginId << "'\n";
-      }
-      continue;
-    }
-    auto foundIt = pluginManager.registrations.find(pluginId);
-    if (foundIt == pluginManager.registrations.end()) {
+    auto foundIt = allPluginSessions.find(pluginId);
+    if (foundIt == allPluginSessions.end()) {
       auto diag = mlir::emitError(mlir::UnknownLoc::get(context))
-                  << "Could not activate requested IREE plugin '" << pluginId
-                  << "' because it is not registered. Available plugins: ";
+                  << "could not activate requested IREE plugin '" << pluginId
+                  << "' because it is not registered (available plugins: ";
       llvm::interleaveComma(getAvailableIds(), diag);
+      diag << ")";
       return failure();
     }
 
-    std::unique_ptr<AbstractPluginSession> instance =
-        foundIt->second->createSession(context);
-    if (failed(instance->activate())) return failure();
-    activatedSessions.push_back(std::move(instance));
+    AbstractPluginSession *instance = foundIt->second.get();
+    if (failed(instance->activate(context))) return failure();
+    activatedSessions.push_back(instance);
   }
 
   return success();

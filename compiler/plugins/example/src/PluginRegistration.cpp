@@ -26,7 +26,7 @@ struct MyOptions {
 };
 
 struct MySession : public PluginSession<MySession, MyOptions> {
-  LogicalResult activate() override {
+  LogicalResult onActivate() override {
     mlir::emitRemark(mlir::UnknownLoc::get(context))
         << "This remark is from the example plugin activation (flag="
         << options.flag << ")";

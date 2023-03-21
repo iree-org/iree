@@ -51,13 +51,17 @@ class AbstractPluginRegistration {
 
   // Performs once-only global initialization. This is called prior to any
   // sessions being created and affects everything in the process. It is
-  // best used for passes and other such things.
+  // best used for passes and other such things which require process level
+  // initialization scope (i.e. such as hal targets or vendor library setup).
+  // Since this happens unconditionally if a plugin is available, regardless
+  // of whether activated, this should be used with caution and as a last
+  // resort.
   // The default implementation does nothing.
   virtual void globalInitialize() {}
 
   // Initializes the process-global command line interface. This will be called
-  // if the CLI is enabled, and if so, it indicates that creates sessions
-  // must configure any options from the CLI environment.
+  // if the CLI is enabled, and if so, it indicates that created sessions
+  // must configure any options from the global CLI environment.
   virtual void initializeCLI() {}
 
   // If a plugin is activated, performs all needed registrations into the
@@ -69,11 +73,13 @@ class AbstractPluginRegistration {
   // interfaces or behavior changes extensions).
   virtual void registerDialects(DialectRegistry &registry) {}
 
-  // Creates a concrete session. If the CLI was initialized, then this should
-  // also ensure that any command line options were managed properly into
-  // the session instance.
-  virtual std::unique_ptr<AbstractPluginSession> createSession(
-      MLIRContext *context) = 0;
+  // Creates an uninitialized session. If the CLI was initialized, then this
+  // should also ensure that any command line options were managed properly into
+  // the session instance. This will be called globally for all available
+  // plugins so that option registration can happen first. It must have
+  // no overhead beyond allocating some memory and setting up options.
+  virtual std::unique_ptr<AbstractPluginSession> createUninitializedSession(
+      OptionsBinder &localOptionsBinder) = 0;
 
  private:
   std::string pluginId;
@@ -87,7 +93,7 @@ class AbstractPluginRegistration {
 // APIs can create as many as they want within the same process).
 //
 // Most users will inherit from this class via the PluginSession CRTP helper,
-// which adds some niceties and static support for command line option
+// which adds some niceties and support for global command line option
 // registration.
 class AbstractPluginSession {
  public:
@@ -95,7 +101,14 @@ class AbstractPluginSession {
 
   // Called after the session has been fully constructed. If it fails, then
   // it should emit an appropriate diagnostic.
-  virtual LogicalResult activate() {}
+  LogicalResult activate(MLIRContext *context);
+
+ protected:
+  // Called from the activate() method once pre-conditions are verified and the
+  // context is set.
+  virtual LogicalResult onActivate(){};
+
+  MLIRContext *context = nullptr;
 };
 
 template <typename DerivedTy, typename OptionsTy = EmptyPluginOptions>
@@ -123,13 +136,15 @@ class PluginSession : public AbstractPluginSession {
       // Forward to the CRTP derived type.
       DerivedTy::registerDialects(registry);
     }
-    std::unique_ptr<AbstractPluginSession> createSession(
-        MLIRContext *context) override {
+    std::unique_ptr<AbstractPluginSession> createUninitializedSession(
+        OptionsBinder &localOptionsBinder) override {
       auto instance = std::make_unique<DerivedTy>();
       if (globalCLIOptions) {
+        // Bootstrap the local options with global CLI options.
         instance->options = *(*globalCLIOptions);
       }
-      instance->context = context;
+      // And bind to the local binder for session level mnemonic customization.
+      instance->options.bindOptions(localOptionsBinder);
       return instance;
     }
     std::optional<OptionsTy *> globalCLIOptions;
@@ -137,7 +152,6 @@ class PluginSession : public AbstractPluginSession {
 
  protected:
   OptionsTy options;
-  MLIRContext *context = nullptr;
   friend class Registration;
 };
 
@@ -216,18 +230,20 @@ class PluginManager : public PluginRegistrar {
 // Holds activated plugins for an |iree_compiler_session_t|.
 class PluginManagerSession {
  public:
-  PluginManagerSession(PluginManager &pluginManager, MLIRContext *context,
-                       PluginManagerOptions &options)
-      : pluginManager(pluginManager), context(context), options(options) {}
+  PluginManagerSession(PluginManager &pluginManager, OptionsBinder &binder,
+                       PluginManagerOptions &options);
 
   // Activates plugins as configured.
-  LogicalResult activatePlugins();
+  LogicalResult activatePlugins(MLIRContext *context);
 
  private:
-  PluginManager &pluginManager;
-  MLIRContext *context;
   PluginManagerOptions &options;
-  llvm::SmallVector<std::unique_ptr<AbstractPluginSession>> activatedSessions;
+  // At construction, uninitialized plugin sessions are created for all
+  // registered plugins so that CLI options can be set properly.
+  llvm::StringMap<std::unique_ptr<AbstractPluginSession>> allPluginSessions;
+
+  // Activation state.
+  llvm::SmallVector<AbstractPluginSession *> activatedSessions;
 };
 
 }  // namespace mlir::iree_compiler

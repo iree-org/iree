@@ -13,6 +13,9 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     defs
+  INCLUDES
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/src>"
   PUBLIC
 )
 

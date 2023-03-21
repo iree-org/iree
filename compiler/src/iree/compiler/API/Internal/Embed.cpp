@@ -148,7 +148,7 @@ struct Session {
   LogicalResult activatePluginsOnce() {
     if (!pluginsActivated) {
       pluginsActivated = true;
-      pluginActivationStatus = pluginSession.activatePlugins();
+      pluginActivationStatus = pluginSession.activatePlugins(&context);
     }
     return pluginActivationStatus;
   }
@@ -182,7 +182,7 @@ struct Session {
 Session::Session(GlobalInit &globalInit)
     : globalInit(globalInit),
       binder(OptionsBinder::local()),
-      pluginSession(globalInit.pluginManager, &context, pluginManagerOptions) {
+      pluginSession(globalInit.pluginManager, binder, pluginManagerOptions) {
   context.allowUnregisteredDialects();
   context.appendDialectRegistry(globalInit.registry);
 
