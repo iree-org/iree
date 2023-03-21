@@ -127,8 +127,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   ireeCompilerGlobalInitialize();
   ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
   ireeCompilerSetupGlobalCL(argc, const_cast<const char **>(argv),
-                      "IREE compilation driver\n",
-                      /*installSignalHandlers=*/true);
+                            "IREE compilation driver\n",
+                            /*installSignalHandlers=*/true);
 
   // If a HAL executable is being compiled, it is only valid to output in that
   // form.
