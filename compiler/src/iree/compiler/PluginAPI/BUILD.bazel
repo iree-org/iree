@@ -26,6 +26,8 @@ iree_compiler_cc_library(
     name = "PluginManager",
     srcs = [
         "PluginManager.cpp",
+    ],
+    hdrs = [
         "PluginManager.h",
     ],
     deps = [
