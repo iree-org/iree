@@ -13,6 +13,7 @@
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
+#include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
@@ -52,10 +53,12 @@ struct GlobalInit {
 
   mlir::DialectRegistry registry;
   bool usesCommandLine;
+  PluginManager pluginManager;
 
   // Our session options can optionally be bound to the global command-line
   // environment. If that is not the case, then these will be nullptr, and
   // they should be default initialized at the session level.
+  PluginManagerOptions *clPluginManagerOptions = nullptr;
   BindingOptions *clBindingOptions = nullptr;
   InputDialectOptions *clInputOptions = nullptr;
   PreprocessingOptions *clPreprocessingOptions = nullptr;
@@ -67,7 +70,7 @@ struct GlobalInit {
 };
 
 GlobalInit::GlobalInit(bool initializeCommandLine)
-    : usesCommandLine(initializeCommandLine) {
+    : usesCommandLine(initializeCommandLine), pluginManager() {
   // Global/static registrations.
   // Allegedly need to register passes to get good reproducers
   // TODO: Verify this (I think that this was fixed some time ago).
@@ -78,6 +81,14 @@ GlobalInit::GlobalInit(bool initializeCommandLine)
   // MLIRContext registration and hooks.
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerLLVMIRTranslations(registry);
+
+  if (!pluginManager.loadAvailablePlugins()) {
+    fprintf(stderr, "Failed to initialize IREE compiler plugins.\n");
+    abort();
+  }
+  pluginManager.globalInitialize();
+  pluginManager.registerPasses();
+  pluginManager.registerDialects(registry);
 
   if (initializeCommandLine) {
     // Register MLIRContext command-line options like
@@ -91,6 +102,7 @@ GlobalInit::GlobalInit(bool initializeCommandLine)
     mlir::registerDefaultTimingManagerCLOptions();
 
     // Bind session options to the command line environment.
+    clPluginManagerOptions = &PluginManagerOptions::FromFlags::get();
     clBindingOptions = &BindingOptions::FromFlags::get();
     clInputOptions = &InputDialectOptions::FromFlags::get();
     clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
@@ -101,6 +113,8 @@ GlobalInit::GlobalInit(bool initializeCommandLine)
     clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
     clBytecodeTargetOptions =
         &IREE::VM::BytecodeTargetOptions::FromFlags::get();
+
+    pluginManager.initializeCLI();
   }
 }
 
@@ -132,9 +146,27 @@ struct Session {
     }
   }
 
+  LogicalResult activatePluginsOnce() {
+    if (!pluginsActivated) {
+      pluginsActivated = true;
+      pluginActivationStatus = pluginSession.activatePlugins(&context);
+    }
+    return pluginActivationStatus;
+  }
+
   GlobalInit &globalInit;
   OptionsBinder binder;
   MLIRContext context;
+  // PluginManagerOptions must initialize first because the session depends on
+  // it.
+  PluginManagerOptions pluginManagerOptions;
+  PluginManagerSession pluginSession;
+  // We lazily activate plugins on the first invocation. This allows plugin
+  // activation to be configured at the session level via the API, if
+  // desired.
+  bool pluginsActivated = false;
+  LogicalResult pluginActivationStatus{failure()};
+
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
@@ -149,12 +181,15 @@ struct Session {
 };
 
 Session::Session(GlobalInit &globalInit)
-    : globalInit(globalInit), binder(OptionsBinder::local()) {
+    : globalInit(globalInit),
+      binder(OptionsBinder::local()),
+      pluginSession(globalInit.pluginManager, binder, pluginManagerOptions) {
   context.allowUnregisteredDialects();
   context.appendDialectRegistry(globalInit.registry);
 
   // Bootstrap session options from the cl environment, if enabled.
   if (globalInit.usesCommandLine) {
+    pluginManagerOptions = *globalInit.clPluginManagerOptions;
     bindingOptions = *globalInit.clBindingOptions;
     inputOptions = *globalInit.clInputOptions;
     preprocessingOptions = *globalInit.clPreprocessingOptions;
@@ -397,6 +432,11 @@ bool Invocation::parseSource(Source &source) {
           diagnosticCallback(cSeverity, message.data(), message.size(),
                              diagnosticCallbackUserData);
         });
+  }
+
+  // Now that diagnostics are enabled, try to activate plugins.
+  if (failed(session.activatePluginsOnce())) {
+    return false;
   }
 
   parsedModule =

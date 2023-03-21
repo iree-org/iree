@@ -73,6 +73,13 @@ def iree_compiler_cc_library(deps = [], **kwargs):
         **kwargs
     )
 
+def iree_compiler_register_plugin(plugin_id, target):
+    """Mirror of the CMake iree_compiler_register_plugin function.
+
+    Does nothing in bazel currently.
+    """
+    pass
+
 def iree_compiler_cc_test(deps = [], **kwargs):
     """Used for cc_test targets within the //compiler tree.
 

@@ -445,6 +445,7 @@ include(iree_copts)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_compiler_plugin)
 include(iree_import_binary)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
@@ -733,6 +734,7 @@ else()
   endif()
 
   set(BUILD_SHARED_LIBS ${_IREE_ORIG_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
+  iree_compiler_configure_plugins()
 endif()
 
 #-------------------------------------------------------------------------------

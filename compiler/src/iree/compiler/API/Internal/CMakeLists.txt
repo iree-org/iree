@@ -28,6 +28,8 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Target::C
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Pipelines
+    iree::compiler::PluginAPI
+    iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_llvmir_translations
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
