@@ -488,9 +488,10 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLinalgSplitReductionPass(clEnableReassociateFpReductions));
   {
-    LinalgFusePassOptions options;
+    LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel = numLevels - 1;
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
   }
 
   if (clEnablePadConsumerFusion) {
