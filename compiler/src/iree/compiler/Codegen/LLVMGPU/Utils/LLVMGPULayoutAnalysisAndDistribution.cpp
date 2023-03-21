@@ -68,8 +68,6 @@ using DimArray = std::array<int, DimType::NumDims>;
 struct Layout {
   Layout(const DimOrderArray &orders,
          const std::array<int, maxTensorDims> &canonicalShape);
-  // Reduces the layout along the tensor dim i
-  void reduceDim(int i);
   // Updates the batch dims of the layout given the tensor dims
   void updateBatchDims(int dim0, int dim1);
   // Computes the ith dimension expression for a given state
@@ -172,15 +170,6 @@ Layout::Layout(const DimOrderArray &dimOrder,
   rank = dimOrder.size();
 }
 
-void Layout::reduceDim(int i) {
-  assert(rank > 0);
-  assert(order.size() > i);
-  for (auto dim : order[i]) {
-    shape[dim] = 1;
-  }
-  rank--;
-}
-
 void Layout::updateBatchDims(int dim0, int dim1) {
   shape[DimType::Batch0] = dim0 / canonicalShape[0];
   shape[DimType::Batch1] = dim1 / canonicalShape[1];
@@ -274,31 +263,10 @@ void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
   setLayout(cMatrix, MMAMatrixType::CMatrix, "cMatrix");
 }
 
-void propagateLayoutToReductions(vector::MultiDimReductionOp reductionOp,
-                                 DenseMap<Value, Layout> &layoutMap) {
-  Value src = reductionOp.getSource();
-  if (!layoutMap.count(src)) return;
-  // Determine layout of result (after reduction)
-  Value result = reductionOp.getResult();
-  Layout resultLayout(layoutMap.at(src));
-  auto reductionDims = reductionOp.getReductionDims().getAsRange<IntegerAttr>();
-  for (auto ia : reductionDims) {
-    resultLayout.reduceDim(ia.getInt());
-  }
-  layoutMap.try_emplace(result, resultLayout);
-  // Propagate result layout to accumulator
-  Value acc = reductionOp.getAcc();
-  layoutMap.try_emplace(acc, resultLayout);
-  layoutMap.at(result).debugPrint("reduced");
-}
-
-void propagateLayoutToBroadcasts(vector::BroadcastOp broadcastOp,
-                                 DenseMap<Value, Layout> &layoutMap) {
-  Value src = broadcastOp.getSource();
-  if (!layoutMap.count(src)) return;
-  // For now, only compute for broadcasts after reductions
-  auto reductionOp = src.getDefiningOp<vector::MultiDimReductionOp>();
-  if (!reductionOp) return;
+void propagateLayoutToReduceBroadcastTranspose(
+    vector::MultiDimReductionOp reductionOp, vector::BroadcastOp broadcastOp,
+    vector::TransposeOp transposeOp, DenseMap<Value, Layout> &layoutMap) {
+  if (!broadcastOp) return;
   Value reductionSrc = reductionOp.getSource();
   if (!layoutMap.count(reductionSrc)) return;
   // For now, require that result shape and source shape are the same
@@ -311,18 +279,15 @@ void propagateLayoutToBroadcasts(vector::BroadcastOp broadcastOp,
       reductionSrc.getType().cast<ShapedType>().getShape();
   bool success = srcShape == resultShape;
   if (!success) {
-    for (Operation *user : result.getUsers()) {
-      if (auto transposeOp = dyn_cast<vector::TransposeOp>(user)) {
-        Value transposedResult = transposeOp.getResult();
-        ArrayRef<int64_t> transposedShape =
-            transposedResult.getType().cast<ShapedType>().getShape();
-        if (transposedShape == srcShape) {
-          // We will lower reduction + broadcast + transpose at once
-          // So assign all their results the same layout
-          layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
-          layoutMap.at(transposedResult).debugPrint("transposed");
-          break;
-        }
+    if (transposeOp) {
+      Value transposedResult = transposeOp.getResult();
+      ArrayRef<int64_t> transposedShape =
+          transposedResult.getType().cast<ShapedType>().getShape();
+      if (transposedShape == srcShape) {
+        // We will lower reduction + broadcast + transpose at once
+        // So assign all their results the same layout
+        layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
+        layoutMap.at(transposedResult).debugPrint("transposed");
       }
     }
   }
@@ -334,12 +299,31 @@ void propagateLayoutToBroadcasts(vector::BroadcastOp broadcastOp,
   }
 }
 
+std::tuple<vector::BroadcastOp, vector::TransposeOp>
+checkForReduceBroadcastTranspose(vector::MultiDimReductionOp reductionOp) {
+  vector::BroadcastOp broadcastOp{nullptr};
+  vector::TransposeOp transposeOp{nullptr};
+  for (Operation *user : reductionOp.getResult().getUsers()) {
+    if (auto broadcast = dyn_cast<vector::BroadcastOp>(user)) {
+      for (Operation *bUser : broadcast.getResult().getUsers()) {
+        if (auto transpose = dyn_cast<vector::TransposeOp>(bUser)) {
+          transposeOp = transpose;
+          break;
+        }
+      }
+      broadcastOp = broadcast;
+      break;
+    }
+  }
+  return std::make_tuple(broadcastOp, transposeOp);
+}
+
 void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
   if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
-    propagateLayoutToReductions(reductionOp, layoutMap);
-  }
-  if (auto broadcastOp = dyn_cast<vector::BroadcastOp>(op)) {
-    propagateLayoutToBroadcasts(broadcastOp, layoutMap);
+    auto [broadcastOp, transposeOp] =
+        checkForReduceBroadcastTranspose(reductionOp);
+    propagateLayoutToReduceBroadcastTranspose(reductionOp, broadcastOp,
+                                              transposeOp, layoutMap);
   }
 }
 
@@ -579,23 +563,10 @@ void iterate(int dimType, ArrayRef<int> order,
 }
 
 void distributeReductionBroadcastTranspose(
-    vector::MultiDimReductionOp reductionOp, DenseMap<Value, Layout> &layoutMap,
+    vector::MultiDimReductionOp reductionOp, vector::BroadcastOp broadcastOp,
+    vector::TransposeOp transposeOp, DenseMap<Value, Layout> &layoutMap,
     DenseMap<Value, Value> &simdToSimtMap, OpBuilder &rewriter,
     SmallVectorImpl<Operation *> &ops) {
-  vector::BroadcastOp broadcastOp{nullptr};
-  vector::TransposeOp transposeOp{nullptr};
-  for (Operation *user : reductionOp.getResult().getUsers()) {
-    if (auto broadcast = dyn_cast<vector::BroadcastOp>(user)) {
-      for (Operation *bUser : broadcast.getResult().getUsers()) {
-        if (auto transpose = dyn_cast<vector::TransposeOp>(bUser)) {
-          transposeOp = transpose;
-          break;
-        }
-      }
-      broadcastOp = broadcast;
-      break;
-    }
-  }
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(reductionOp);
   Value source = reductionOp.getSource();
@@ -761,8 +732,11 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
                                opsToErase);
     }
     if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
+      auto [broadcastOp, transposeOp] =
+          checkForReduceBroadcastTranspose(reductionOp);
       distributeReductionBroadcastTranspose(
-          reductionOp, layoutMap, simdToSimtMap, rewriter, opsToErase);
+          reductionOp, broadcastOp, transposeOp, layoutMap, simdToSimtMap,
+          rewriter, opsToErase);
     }
     return WalkResult::advance();
   });
