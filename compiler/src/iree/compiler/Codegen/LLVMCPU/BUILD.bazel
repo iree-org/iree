@@ -28,6 +28,7 @@ iree_compiler_cc_library(
         "LLVMCPUMaterializeEncodingPass.cpp",
         "LLVMCPUMmt4dVectorLowering.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
+        "LLVMCPUTileAndFuse.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
         "Passes.cpp",
         "TargetMLTransformInfo.cpp",

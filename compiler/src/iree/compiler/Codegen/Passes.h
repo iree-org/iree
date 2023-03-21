@@ -289,6 +289,10 @@ void populateConcretizePadResultShapePatterns(MLIRContext *context,
 std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyLinalgTransformLegalityPass();
 
+/// Pass to tile and fuse TilingInterface ops with given tilingLevel.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
+    int64_t tilingLevel = -1);
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReordering = false);
