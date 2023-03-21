@@ -21,25 +21,9 @@
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
 #undef HANDLE_PLUGIN_ID
 
-IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::EmptyPluginOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PluginManagerOptions);
 
 namespace mlir::iree_compiler {
-
-AbstractPluginRegistration::~AbstractPluginRegistration() = default;
-AbstractPluginSession::~AbstractPluginSession() = default;
-
-LogicalResult AbstractPluginSession::activate(MLIRContext *context) {
-  if (this->context) {
-    // Already activated - ignore. But verify in debug mode that activated
-    // with the same context (which is a non-user triggerable error).
-    assert(context == this->context &&
-           "duplicate plugin activation with different context");
-    return success();
-  }
-  this->context = context;
-  return onActivate();
-}
 
 void PluginManagerOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE compiler plugin options");
@@ -85,17 +69,6 @@ void PluginManager::initializeCLI() {
 void PluginManager::registerDialects(DialectRegistry &registry) {
   for (auto &kv : registrations) {
     kv.second->registerDialects(registry);
-  }
-}
-
-void PluginRegistrar::registerPlugin(
-    std::unique_ptr<AbstractPluginRegistration> registration) {
-  std::string_view id = registration->getPluginId();
-  auto foundIt = registrations.insert(
-      std::make_pair(llvm::StringRef(id), std::move(registration)));
-  if (!foundIt.second) {
-    llvm::errs() << "ERROR: Duplicate plugin registration for '" << id << "'\n";
-    abort();
   }
 }
 

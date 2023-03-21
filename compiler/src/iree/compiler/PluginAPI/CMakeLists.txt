@@ -14,7 +14,9 @@ iree_cc_library(
   NAME
     PluginAPI
   HDRS
-    "PluginManager.h"
+    "Client.h"
+  SRCS
+    "Client.cpp"
   DEPS
     LLVMSupport
     iree::compiler::Utils
@@ -26,6 +28,7 @@ iree_cc_library(
     PluginManager
   SRCS
     "PluginManager.cpp"
+    "PluginManager.h"
   DEPS
     ::PluginAPI
     MLIRIR

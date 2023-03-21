@@ -14,7 +14,8 @@ package(
 
 iree_compiler_cc_library(
     name = "PluginAPI",
-    hdrs = ["PluginManager.h"],
+    srcs = ["Client.cpp"],
+    hdrs = ["Client.h"],
     deps = [
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
@@ -25,6 +26,7 @@ iree_compiler_cc_library(
     name = "PluginManager",
     srcs = [
         "PluginManager.cpp",
+        "PluginManager.h",
     ],
     deps = [
         ":PluginAPI",
