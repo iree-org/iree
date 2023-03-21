@@ -134,9 +134,7 @@ class PluginSession : public AbstractPluginSession {
       // Forward to the CRTP derived type.
       DerivedTy::globalInitialize();
     }
-    void registerPasses() override {
-      DerivedTy::registerPasses();
-    }
+    void registerPasses() override { DerivedTy::registerPasses(); }
     void initializeCLI() override {
       // Actually need to capture the reference, not a copy. So get a pointer.
       globalCLIOptions = &OptionsFromFlags<OptionsTy>::get();
