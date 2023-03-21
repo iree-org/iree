@@ -40,9 +40,9 @@ import re
 from typing import List
 
 LOCAL_HEADER_FILES = [
-    "Embed.h",
+    "../../../../bindings/c/iree/compiler/embedding_api.h",
+    "../../../../bindings/c/iree/compiler/tool_entry_points_api.h",
     "MLIRInterop.h",
-    "ToolEntryPoints.h",
 ]
 
 MLIR_C_HEADER_FILES = [
