@@ -60,8 +60,8 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
-    "aarch64:+dotprod"
-    "aarch64:+i8mm"
+    "arm_64:+dotprod"
+    "arm_64:+i8mm"
 )
 
 iree_generated_trace_runner_test(
@@ -102,8 +102,8 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
-    "aarch64:+dotprod"
-    "aarch64:+i8mm"
+    "arm_64:+dotprod"
+    "arm_64:+i8mm"
 )
 
 iree_generated_trace_runner_test(
@@ -145,8 +145,8 @@ iree_generated_trace_runner_test(
     "--iree-flow-enable-data-tiling"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
-    "aarch64:+dotprod"
-    "aarch64:+i8mm"
+    "arm_64:+dotprod"
+    "arm_64:+i8mm"
 )
 
 iree_generated_trace_runner_test(

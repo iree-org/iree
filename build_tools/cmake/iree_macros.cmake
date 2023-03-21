@@ -19,6 +19,79 @@ else()
   set(IREE_HOST_EXECUTABLE_SUFFIX "")
 endif()
 
+
+#-------------------------------------------------------------------------------
+# IREE_ARCH: identifies the target CPU architecture. May be empty when this is
+# ill-defined, such as multi-architecture builds.
+# This should be kept consistent with the C preprocessor token IREE_ARCH defined
+# in target_platform.h.
+#-------------------------------------------------------------------------------
+
+# First, get the raw CMake architecture name, not yet normalized. Even that is
+# non-trivial: it usually is CMAKE_SYSTEM_PROCESSOR, but on some platforms, we
+# have to read other variables instead.
+if(CMAKE_OSX_ARCHITECTURES)
+  # Borrowing from:
+  # https://boringssl.googlesource.com/boringssl/+/c5f0e58e653d2d9afa8facc090ce09f8aaa3fa0d/CMakeLists.txt#43
+  # https://github.com/google/XNNPACK/blob/2eb43787bfad4a99bdb613111cea8bc5a82f390d/CMakeLists.txt#L40
+  list(LENGTH CMAKE_OSX_ARCHITECTURES NUM_ARCHES)
+  if(${NUM_ARCHES} EQUAL 1)
+    # Only one arch in CMAKE_OSX_ARCHITECTURES, use that.
+    set(_IREE_UNNORMALIZED_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+  endif()
+  # Leaving _IREE_UNNORMALIZED_ARCH empty disables arch code paths. We will
+  # issue a performance warning about that below.
+elseif(CMAKE_GENERATOR MATCHES "^Visual Studio " AND CMAKE_GENERATOR_PLATFORM)
+  # Borrowing from:
+  # https://github.com/google/XNNPACK/blob/2eb43787bfad4a99bdb613111cea8bc5a82f390d/CMakeLists.txt#L50
+  set(_IREE_UNNORMALIZED_ARCH "${CMAKE_GENERATOR_PLATFORM}")
+else()
+  set(_IREE_UNNORMALIZED_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+string(TOLOWER "${_IREE_UNNORMALIZED_ARCH}" _IREE_UNNORMALIZED_ARCH_LOWERCASE)
+
+# Normalize _IREE_UNNORMALIZED_ARCH into IREE_ARCH.
+if (EMSCRIPTEN)
+  # TODO: figure what to do about the wasm target, which masquerades as x86.
+  # This is the one case where the IREE_ARCH CMake variable is currently
+  # inconsistent with the IREE_ARCH C preprocessor token.
+  set (IREE_ARCH "")
+elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "aarch64") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64e") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64ec"))
+  set (IREE_ARCH "arm_64")
+elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^armv[5-8]"))
+  set (IREE_ARCH "arm_32")
+elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86_64") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "amd64") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x64"))
+  set (IREE_ARCH "x86_64")
+elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^i[3-7]86$") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "win32"))
+  set (IREE_ARCH "x86_32")
+elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv64")
+  set (IREE_ARCH "riscv_64")
+elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv32")
+  set (IREE_ARCH "riscv_32")
+elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "")
+  set (IREE_ARCH "")
+  message(WARNING "Performance advisory: architecture-specific code paths "
+    "disabled because no target architecture was specified or we didn't know "
+    "which CMake variable to read. Some relevant CMake variables:\n"
+    "CMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}\n"
+    "CMAKE_GENERATOR=${CMAKE_GENERATOR}\n"
+    "CMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}\n"
+    "CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}\n"
+    )
+else()
+  set (IREE_ARCH "")
+  message(SEND_ERROR "Unrecognized target architecture ${_IREE_UNNORMALIZED_ARCH_LOWERCASE}")
+endif()
+
 #-------------------------------------------------------------------------------
 # General utilities
 #-------------------------------------------------------------------------------
@@ -427,14 +500,14 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
     list(APPEND _FLAGS "--iree-llvmcpu-target-triple=${_TARGET_TRIPLE}")
   endif()
 
-  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+  if(IREE_ARCH STREQUAL "riscv_64" AND
      CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
      NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV64 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
     # llvm-target-triple is not specified.
     list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
-  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+  elseif(IREE_ARCH STREQUAL "riscv_32" AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
          NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV32 Linux crosscompile toolchain can support iree-compile with

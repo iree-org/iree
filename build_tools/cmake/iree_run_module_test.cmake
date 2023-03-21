@@ -5,10 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Utility function to return the platform name in crosscompile.
+# TODO(#12692): stop leaking CMAKE_SYSTEM_PROCESSOR values.
 function(iree_get_platform PLATFORM)
   if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
     set(_PLATFORM "android-arm64-v8a")
-  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  elseif(IREE_ARCH STREQUAL "x86_64")
     set(_PLATFORM "x86_64")
   else()
     set(_PLATFORM "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}")
