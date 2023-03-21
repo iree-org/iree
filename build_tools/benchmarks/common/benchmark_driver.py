@@ -113,11 +113,8 @@ class BenchmarkDriver(object):
         except Exception as e:
           # Delete unfinished results if they exist.
           # TODO(#11087): Use missing_ok=True once we move to Python 3.8.
-          if results_path is not None:
-            try:
-              results_path.unlink()
-            except FileNotFoundError:
-              pass
+          if results_path is not None and results_path.is_file():
+            results_path.unlink()
           if capture_path is not None:
             try:
               capture_path.unlink()
