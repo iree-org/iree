@@ -326,6 +326,8 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME
+    "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -494,6 +496,8 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -644,6 +648,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+  FRIENDLY_NAME
+    "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
 )
 
@@ -813,6 +819,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
 )
 
@@ -907,6 +915,8 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -921,6 +931,8 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+  FRIENDLY_NAME
+    "Unet2dPT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1059,6 +1071,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-abi=lp64d"
     "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
+  FRIENDLY_NAME
+    "MobileNetV2_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -1137,6 +1151,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-abi=ilp32"
     "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
+  FRIENDLY_NAME
+    "MobileNetV2_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -2346,6 +2362,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+  FRIENDLY_NAME
+    "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -2534,6 +2552,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -2700,6 +2720,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+  FRIENDLY_NAME
+    "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
 )
 
@@ -2887,6 +2909,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
 )
 
@@ -2993,6 +3017,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3009,6 +3035,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+  FRIENDLY_NAME
+    "Unet2dPT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3161,6 +3189,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+  FRIENDLY_NAME
+    "MobileNetV2_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3247,6 +3277,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+  FRIENDLY_NAME
+    "MobileNetV2_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
