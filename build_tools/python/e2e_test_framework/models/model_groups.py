@@ -16,6 +16,7 @@ SMALL = [
     tflite_models.MOBILEBERT_INT8,
     tflite_models.MOBILENET_V1,
     tflite_models.MOBILENET_V2,
+    tflite_models.MOBILENET_V2_INT8,
     tflite_models.MOBILENET_V3SMALL,
     tflite_models.MOBILESSD_FP32,
     tflite_models.PERSON_DETECT_INT8,
