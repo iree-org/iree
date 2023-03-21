@@ -21,20 +21,90 @@ using namespace mlir;
 namespace mlir {
 namespace iree_compiler {
 
+static bool isContiguousStore(Operation* write) {
+  if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(write)) {
+    if (!transferWrite.getPermutationMap().isMinorIdentity() ||
+        !transferWrite.isDimInBounds(0)) {
+      return false;
+    }
+    return true;
+  }
+  if (isa<vector::StoreOp>(write)) {
+    return true;
+  }
+  return false;
+}
+
+static bool isContiguousRead(Operation* read) {
+  if (auto transferRead = dyn_cast<vector::TransferReadOp>(read)) {
+    if (!transferRead.isDimInBounds(0) ||
+        !transferRead.getPermutationMap().isMinorIdentity()) {
+      return false;
+    }
+    return true;
+  }
+  if (isa<vector::LoadOp>(read)) {
+    return true;
+  }
+  return false;
+}
+
+static Value getMemrefOperand(Operation* op) {
+  if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(op)) {
+    return transferWrite.getSource();
+  }
+  if (auto transferRead = dyn_cast<vector::TransferReadOp>(op)) {
+    return transferRead.getSource();
+  }
+  if (auto storeOp = dyn_cast<vector::StoreOp>(op)) {
+    return storeOp.getBase();
+  }
+  if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
+    return loadOp.getBase();
+  }
+  return Value();
+}
+
+static Value getValueStored(Operation* writeOp) {
+  if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(writeOp)) {
+    return transferWrite.getValue();
+  }
+  if (auto storeOp = dyn_cast<vector::StoreOp>(writeOp)) {
+    return storeOp.getValueToStore();
+  }
+  return Value();
+}
+
+static Operation::operand_range getIndices(Operation* op) {
+  if (auto vectorReadOp = dyn_cast<vector::LoadOp>(op))
+    return vectorReadOp.getIndices();
+  if (auto vectorStoreOp = dyn_cast<vector::StoreOp>(op))
+    return vectorStoreOp.getIndices();
+  if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(op))
+    return transferReadOp.getIndices();
+  if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op))
+    return transferWriteOp.getIndices();
+  llvm_unreachable("unsupported op type");
+}
+
 void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
   LLVM_DEBUG(DBGS() << "Start asyncGroups: useMMASync=" << useMMASync << "\n");
-  llvm::SmallSetVector<vector::TransferWriteOp, 16> copyToSharedMem;
+  llvm::SmallSetVector<Operation*, 16> copyToSharedMem;
   // Look for all the copy that can be converted to async copy ops.
-  funcOp.walk([&](vector::TransferWriteOp writeOp) {
+  funcOp.walk([&](Operation* writeOp) {
+    if (!isContiguousStore(writeOp)) {
+      return WalkResult::advance();
+    }
     LLVM_DEBUG(DBGS() << "--candidate writeOp: " << writeOp << "\n");
-    if (!writeOp.getPermutationMap().isMinorIdentity() ||
-        writeOp.getVectorType().getRank() != 1 || !writeOp.isDimInBounds(0)) {
+    Value vectorVal = getValueStored(writeOp);
+    if (vectorVal.getType().cast<VectorType>().getRank() != 1) {
       LLVM_DEBUG(
           DBGS()
           << "----writeOp is not an inbounds 1-D minor identity -> Skip \n");
       return WalkResult::advance();
     }
-    auto addressSpaceAttr = writeOp.getShapedType()
+    Value memrefOperand = getMemrefOperand(writeOp);
+    auto addressSpaceAttr = memrefOperand.getType()
                                 .cast<MemRefType>()
                                 .getMemorySpace()
                                 .dyn_cast_or_null<gpu::AddressSpaceAttr>();
@@ -43,25 +113,16 @@ void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
       LLVM_DEBUG(DBGS() << "----address space is not workgroup -> Skip \n");
       return WalkResult::advance();
     }
-    auto readOp = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
-    if (!readOp) {
+    Operation* readOp = vectorVal.getDefiningOp();
+    if (readOp == nullptr || !isContiguousRead(readOp)) {
       LLVM_DEBUG(DBGS() << "----no readOp defining the writeOp -> Skip \n");
       return WalkResult::advance();
     }
 
-    LLVM_DEBUG(DBGS() << "--candidate readOp: " << readOp << " \n");
-    if (readOp.getVectorType() != writeOp.getVectorType() ||
-        !readOp.isDimInBounds(0) ||
-        !readOp.getPermutationMap().isMinorIdentity()) {
-      LLVM_DEBUG(
-          DBGS()
-          << "----readOp is not an in-bounds 1-D minor identity -> Skip \n");
-      return WalkResult::advance();
-    }
-    if (!((readOp.getVectorType().getElementType().isF32() &&
-           readOp.getVectorType().getNumElements() <= 4) ||
-          (readOp.getVectorType().getElementType().isF16() &&
-           readOp.getVectorType().getNumElements() <= 8))) {
+    VectorType vecType = vectorVal.getType().cast<VectorType>();
+    if (!((vecType.getElementType().isF32() && vecType.getNumElements() <= 4) ||
+          (vecType.getElementType().isF16() &&
+           vecType.getNumElements() <= 8))) {
       LLVM_DEBUG(
           DBGS() << "----readOp is not (<=4)xf32 or (<=8)xf16 -> Skip \n");
       return WalkResult::advance();
@@ -73,12 +134,12 @@ void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
   });
 
   while (!copyToSharedMem.empty()) {
-    SmallVector<vector::TransferWriteOp> group;
-    vector::TransferWriteOp writeOp = *copyToSharedMem.begin();
+    SmallVector<Operation*> group;
+    Operation* writeOp = *copyToSharedMem.begin();
     // Start a group with the first write.
     copyToSharedMem.remove(writeOp);
     group.push_back(writeOp);
-    Operation* nextNode = writeOp.getOperation();
+    Operation* nextNode = writeOp;
     // Look in the next nodes for more copies to add to the same group.
     while ((nextNode = nextNode->getNextNode())) {
       // Ignore ops without side effects
@@ -86,10 +147,11 @@ void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
       if (memInterface && memInterface.hasNoEffect() &&
           !nextNode->hasTrait<OpTrait::HasRecursiveMemoryEffects>())
         continue;
-      auto readOp = dyn_cast<vector::TransferReadOp>(nextNode);
       // ignore read from a different address space.
-      if (readOp) {
-        auto addressSpaceAttr = readOp.getShapedType()
+      if (isa<vector::TransferReadOp, vector::LoadOp>(nextNode)) {
+        Operation* readOp = nextNode;
+        Value memrefOperand = getMemrefOperand(readOp);
+        auto addressSpaceAttr = memrefOperand.getType()
                                     .cast<MemRefType>()
                                     .getMemorySpace()
                                     .dyn_cast_or_null<gpu::AddressSpaceAttr>();
@@ -99,11 +161,10 @@ void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
           continue;
         }
       }
-      auto nextWriteOp = dyn_cast<vector::TransferWriteOp>(nextNode);
-      if (nextWriteOp && copyToSharedMem.count(nextWriteOp)) {
+      if (copyToSharedMem.count(nextNode)) {
         // found another copy, add it to the group.
-        copyToSharedMem.remove(nextWriteOp);
-        group.push_back(nextWriteOp);
+        copyToSharedMem.remove(nextNode);
+        group.push_back(nextNode);
         continue;
       }
       // If the op is something else stop the accumulating op in the group.
@@ -112,15 +173,18 @@ void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
     // emit the group.
     SmallVector<Value> tokens;
     OpBuilder builder(funcOp.getContext());
-    for (vector::TransferWriteOp writeOp : group) {
+    for (Operation* writeOp : group) {
       builder.setInsertionPoint(writeOp);
-      auto readOp = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
+      Value vectorVal = getValueStored(writeOp);
+      Operation* readOp = vectorVal.getDefiningOp();
+      Value storeBase = getMemrefOperand(writeOp);
+      Value loadBase = getMemrefOperand(readOp);
       Value token = builder.create<nvgpu::DeviceAsyncCopyOp>(
-          writeOp.getLoc(),
-          nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
-          writeOp.getSource(), writeOp.getIndices(), readOp.getSource(),
-          readOp.getIndices(),
-          builder.getIndexAttr(readOp.getVectorType().getNumElements()),
+          writeOp->getLoc(),
+          nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
+          getIndices(writeOp), loadBase, getIndices(readOp),
+          builder.getIndexAttr(
+              vectorVal.getType().cast<VectorType>().getNumElements()),
           Value(),
           /*bypassL1=*/useMMASync ? builder.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
@@ -132,7 +196,7 @@ void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
     builder.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
                                              nullptr);
     // Clean up old stores.
-    for (vector::TransferWriteOp writeOp : group) writeOp.erase();
+    for (Operation* writeOp : group) writeOp->erase();
   }
 }
 
