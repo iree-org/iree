@@ -66,7 +66,6 @@ struct GlobalInit {
   mlir::DialectRegistry registry;
   PluginManager pluginManager;
 
-
   // Command line handling.
   bool usesCommandLine = false;
   // Populated and retained if we have to copy and handle our own permuted
@@ -120,6 +119,7 @@ void GlobalInit::registerCommandLineOptions() {
   mlir::registerDefaultTimingManagerCLOptions();
 
   // Bind session options to the command line environment.
+  clPluginManagerOptions = &PluginManagerOptions::FromFlags::get();
   clBindingOptions = &BindingOptions::FromFlags::get();
   clInputOptions = &InputDialectOptions::FromFlags::get();
   clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
@@ -598,7 +598,7 @@ GlobalInit *globalInit = nullptr;
 bool isShutdown = false;
 
 void llvmVersionPrinter(llvm::raw_ostream &os) {
-  os << "IREE (https://openxla.github.io/):\n  ";
+  os << "IREE (https://openxla.github.io/iree):\n  ";
   std::string version = mlir::iree_compiler::getIreeRevision();
   if (version.empty()) {
     version = "(unknown)";
@@ -736,8 +736,8 @@ void ireeCompilerGlobalInitialize() {
   }
   if (isShutdown) {
     fprintf(stderr,
-            "FATAL ERROR: ireeCompilerGlobalInitialize called multiple times "
-            "at global scope\n");
+            "FATAL ERROR: ireeCompilerGlobalInitialize called after the final "
+            "ireeCompilerGlobalShutdown\n");
     abort();
   }
   globalInit = new GlobalInit();
