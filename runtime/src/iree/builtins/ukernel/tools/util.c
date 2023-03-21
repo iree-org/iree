@@ -1,4 +1,4 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -146,13 +146,13 @@ int iree_uk_type_triple_str(char* buf, int buf_length,
 }
 
 iree_uk_cpu_features_list_t iree_uk_cpu_features_list_1(const char* feature1) {
-  IREE_UK_STATIC_ASSERT(IREE_CPU_FEATURES_LIST_MAX_LENGTH >= 1);
+  IREE_UK_STATIC_ASSERT(IREE_UK_CPU_FEATURES_LIST_MAX_LENGTH >= 1);
   return (iree_uk_cpu_features_list_t){1, {feature1}};
 }
 
 iree_uk_cpu_features_list_t iree_uk_cpu_features_list_2(const char* feature1,
                                                         const char* feature2) {
-  IREE_UK_STATIC_ASSERT(IREE_CPU_FEATURES_LIST_MAX_LENGTH >= 2);
+  IREE_UK_STATIC_ASSERT(IREE_UK_CPU_FEATURES_LIST_MAX_LENGTH >= 2);
   return (iree_uk_cpu_features_list_t){2, {feature1, feature2}};
 }
 
@@ -160,7 +160,7 @@ void iree_uk_make_cpu_data_for_features(
     const iree_uk_cpu_features_list_t* cpu_features,
     iree_uk_uint64_t* out_cpu_data_fields) {
   // Bit-field tracking which features exist, to diagnose misspelled features.
-  IREE_UK_STATIC_ASSERT(IREE_CPU_FEATURES_LIST_MAX_LENGTH <= 64);
+  IREE_UK_STATIC_ASSERT(IREE_UK_CPU_FEATURES_LIST_MAX_LENGTH <= 64);
   uint64_t cpu_features_found = 0;
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
   if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \

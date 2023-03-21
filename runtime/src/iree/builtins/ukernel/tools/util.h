@@ -1,4 +1,4 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -45,11 +45,11 @@ int iree_uk_type_pair_str(char* buf, int buf_length,
 int iree_uk_type_triple_str(char* buf, int buf_length,
                             const iree_uk_type_triple_t triple);
 
-#define IREE_CPU_FEATURES_LIST_MAX_LENGTH 2
+#define IREE_UK_CPU_FEATURES_LIST_MAX_LENGTH 2
 
 typedef struct iree_uk_cpu_features_list_t {
   int size;
-  const char* entries[IREE_CPU_FEATURES_LIST_MAX_LENGTH];
+  const char* entries[IREE_UK_CPU_FEATURES_LIST_MAX_LENGTH];
 } iree_uk_cpu_features_list_t;
 
 iree_uk_cpu_features_list_t iree_uk_cpu_features_list_1(const char* feature1);

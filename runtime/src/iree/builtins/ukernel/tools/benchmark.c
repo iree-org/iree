@@ -102,11 +102,12 @@ void iree_uk_benchmark_register(
   };
   iree_string_builder_t full_name;
   iree_string_builder_initialize(iree_allocator_system(), &full_name);
-  iree_string_builder_append_cstring(&full_name, name);
+  IREE_CHECK_OK(iree_string_builder_append_cstring(&full_name, name));
   if (cpu_features) {
     for (int i = 0; i < cpu_features->size; ++i) {
-      iree_string_builder_append_cstring(&full_name, "_");
-      iree_string_builder_append_cstring(&full_name, cpu_features->entries[i]);
+      IREE_CHECK_OK(iree_string_builder_append_cstring(&full_name, "_"));
+      IREE_CHECK_OK(iree_string_builder_append_cstring(
+          &full_name, cpu_features->entries[i]));
     }
   }
   iree_benchmark_register(iree_string_builder_view(&full_name), &benchmark_def);

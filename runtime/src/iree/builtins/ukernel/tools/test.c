@@ -14,10 +14,10 @@
 #include "iree/schemas/cpu_data.h"
 
 typedef enum {
-  iree_uk_test_status_run,
-  iree_uk_test_status_ok,
-  iree_uk_test_status_failed,
-  iree_uk_test_status_skipped,
+  IREE_UK_TEST_STATUS_RUN,
+  IREE_UK_TEST_STATUS_OK,
+  IREE_UK_TEST_STATUS_FAILED,
+  IREE_UK_TEST_STATUS_SKIPPED,
 } iree_uk_test_status_t;
 
 struct iree_uk_test_t {
@@ -41,13 +41,13 @@ const iree_uk_uint64_t* iree_uk_test_cpu_data(const iree_uk_test_t* test) {
 
 const char* iree_uk_test_status_header(iree_uk_test_status_t status) {
   switch (status) {
-    case iree_uk_test_status_run:
+    case IREE_UK_TEST_STATUS_RUN:
       return "[ RUN      ] 🎲";
-    case iree_uk_test_status_ok:
+    case IREE_UK_TEST_STATUS_OK:
       return "[       OK ] ✅";
-    case iree_uk_test_status_failed:
+    case IREE_UK_TEST_STATUS_FAILED:
       return "[   FAILED ] ❌";
-    case iree_uk_test_status_skipped:
+    case IREE_UK_TEST_STATUS_SKIPPED:
       return "[  SKIPPED ] 🙈";
     default:
       IREE_UK_ASSERT(false);
@@ -64,7 +64,7 @@ static void iree_uk_test_log_status(const iree_uk_test_t* test,
       fprintf(stderr, ",%s", test->cpu_features->entries[i]);
     }
   }
-  if (status != iree_uk_test_status_run) {
+  if (status != IREE_UK_TEST_STATUS_RUN) {
     fprintf(stderr, " (%" PRIi64 " ms)",
             (iree_time_now() - test->time_start) / (1000 * 1000));
   }
@@ -97,7 +97,7 @@ void iree_uk_test(const char* name,
       // anyway.
       .random_engine = iree_uk_random_engine_init(),
   };
-  iree_uk_test_log_status(&test, iree_uk_test_status_run);
+  iree_uk_test_log_status(&test, IREE_UK_TEST_STATUS_RUN);
   // First try without any optional CPU feature (test.cpu_data is still zeros).
   // This matters even when the feature is supported by the CPU because we want
   // to test the fallback to the architecture-default code path.
@@ -120,14 +120,14 @@ void iree_uk_test(const char* name,
   // Since errors are fatal (see iree_uk_test_fail), if we reached this point,
   // we know the test didn't fail.
   iree_uk_test_log_status(
-      &test, skipped ? iree_uk_test_status_skipped : iree_uk_test_status_ok);
+      &test, skipped ? IREE_UK_TEST_STATUS_SKIPPED : IREE_UK_TEST_STATUS_OK);
 }
 
 void iree_uk_test_fail(const iree_uk_test_t* test, const char* file, int line) {
   char msg_buf[256];
   snprintf(msg_buf, sizeof msg_buf, "Error occurred at %s:%d", file, line);
   iree_uk_test_log_error(test, msg_buf);
-  iree_uk_test_log_status(test, iree_uk_test_status_failed);
+  iree_uk_test_log_status(test, IREE_UK_TEST_STATUS_FAILED);
   // Error are always fatal for now. Works well for debugging (fail at the
   // root cause), and easiest to implement.
   iree_abort();
