@@ -34,6 +34,7 @@ iree_cc_library(
     ::PluginAPI
     MLIRIR
     iree::compiler::PluginAPI::Config::StaticLinkedPlugins
+    iree::compiler::Utils
   PUBLIC
 )
 
