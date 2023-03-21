@@ -136,9 +136,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     outputFormat = OutputFormat::hal_executable;
   }
 
-  // void (*crashNow)() = nullptr;
-  // crashNow();
-
   // Stash our globals in an RAII instance.
   struct MainState {
     iree_compiler_session_t *session = ireeCompilerSessionCreate();
