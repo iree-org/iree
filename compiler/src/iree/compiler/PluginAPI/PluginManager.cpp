@@ -70,6 +70,12 @@ void PluginManager::globalInitialize() {
   }
 }
 
+void PluginManager::registerPasses() {
+  for (auto &kv : registrations) {
+    kv.second->registerPasses();
+  }
+}
+
 void PluginManager::initializeCLI() {
   for (auto &kv : registrations) {
     kv.second->initializeCLI();

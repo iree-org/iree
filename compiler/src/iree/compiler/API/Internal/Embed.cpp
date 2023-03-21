@@ -87,6 +87,7 @@ GlobalInit::GlobalInit(bool initializeCommandLine)
     abort();
   }
   pluginManager.globalInitialize();
+  pluginManager.registerPasses();
   pluginManager.registerDialects(registry);
 
   if (initializeCommandLine) {

@@ -51,13 +51,18 @@ class AbstractPluginRegistration {
 
   // Performs once-only global initialization. This is called prior to any
   // sessions being created and affects everything in the process. It is
-  // best used for passes and other such things which require process level
-  // initialization scope (i.e. such as hal targets or vendor library setup).
+  // available for interfacing with certain vendor libraries and such that
+  // require very early access.
   // Since this happens unconditionally if a plugin is available, regardless
   // of whether activated, this should be used with caution and as a last
   // resort.
   // The default implementation does nothing.
   virtual void globalInitialize() {}
+
+  // Called early in plugin loading to perform static
+  // registration of passes and pipelines so that they can be used from the
+  // command line environment and mnemonic tools.
+  virtual void registerPasses() {}
 
   // Initializes the process-global command line interface. This will be called
   // if the CLI is enabled, and if so, it indicates that created sessions
@@ -120,6 +125,7 @@ class PluginSession : public AbstractPluginSession {
   // DerivedTy default implementations (no-op). Forwarded from the
   // AbstractPluginRegistration.
   static void globalInitialize() {}
+  static void registerPasses() {}
   static void registerDialects(DialectRegistry &registry) {}
 
   struct Registration : public AbstractPluginRegistration {
@@ -127,6 +133,9 @@ class PluginSession : public AbstractPluginSession {
     void globalInitialize() override {
       // Forward to the CRTP derived type.
       DerivedTy::globalInitialize();
+    }
+    void registerPasses() override {
+      DerivedTy::registerPasses();
     }
     void initializeCLI() override {
       // Actually need to capture the reference, not a copy. So get a pointer.
@@ -214,6 +223,10 @@ class PluginManager : public PluginRegistrar {
   // Calls through to AbstractPluginRegistration::globalInitialize for all
   // available plugins.
   void globalInitialize();
+
+  // Calls through to AbstractPluginRegistration::registerPasses for all
+  // available plugins.
+  void registerPasses();
 
   // Calls through to AbstractPluginRegistration::initializeCLI for all
   // available plugins.

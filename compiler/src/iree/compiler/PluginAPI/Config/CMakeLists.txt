@@ -20,7 +20,8 @@ file(GENERATE
   CONTENT "${_STATIC_LINKED_PLUGINS_CONTENTS}"
 )
 
-message(STATUS "*** STATIC LINKING PLUGIN LIBRARIES: ${_CONFIG_LINKED_PLUGIN_LIBS}")
+# Uncomment for debugging.
+# message(STATUS "*** STATIC LINKING PLUGIN LIBRARIES: ${_CONFIG_LINKED_PLUGIN_LIBS}")
 iree_cc_library(
   NAME
     StaticLinkedPlugins
