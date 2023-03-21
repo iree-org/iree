@@ -208,17 +208,26 @@ see
 
 ```sh
 # The GCS directory has the same structure as your local ${IREE_BUILD_DIR}/e2e_test_artifacts.
-gcloud storage ls gs://iree-github-actions-postsubmit-artifacts/.../.../e2e-test-artifacts
+gcloud storage ls gs://iree-github-actions-...-artifacts/.../.../e2e-test-artifacts
 
 # Download all source and imported MLIR files:
-gcloud storage cp "gs://iree-github-actions-postsubmit-artifacts/.../.../e2e-test-artifacts/*.mlir" "<target_dir>"
+gcloud storage cp "gs://iree-github-actions-...-artifacts/.../.../e2e-test-artifacts/*.mlir" "<target_dir>"
 ```
 
 Execution and compilation benchmark configs can be downloaded at:
 
 ```sh
 # Execution benchmark config:
-gcloud storage cp gs://iree-github-actions-postsubmit-artifacts/.../.../benchmark-config.json .
+gcloud storage cp gs://iree-github-actions-...-artifacts/.../.../benchmark-config.json .
 # Compilation benchmark config:
-gcloud storage cp gs://iree-github-actions-postsubmit-artifacts/.../.../compilation-config.json .
+gcloud storage cp gs://iree-github-actions-...-artifacts/.../.../compilation-config.json .
+```
+
+Benchmark raw results and traces can be downloaded at:
+
+```sh
+# Benchmark raw results
+gcloud storage cp "gs://iree-github-actions-...-artifacts/.../.../benchmark-results/benchmark-results-*.json" .
+# Benchmark traces
+gcloud storage cp "gs://iree-github-actions-...-artifacts/.../.../benchmark-results/benchmark-traces-*.tar.gz" .
 ```
