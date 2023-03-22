@@ -267,36 +267,45 @@ void propagateLayoutToReduceBroadcastTranspose(
     vector::MultiDimReductionOp reductionOp, vector::BroadcastOp broadcastOp,
     vector::TransposeOp transposeOp, DenseMap<Value, Layout> &layoutMap) {
   if (!broadcastOp) return;
+  if (!transposeOp) return;
   Value reductionSrc = reductionOp.getSource();
   if (!layoutMap.count(reductionSrc)) return;
-  // For now, require that result shape and source shape are the same
-  // Unless there is a transpose that changes the result shape to the source
-  // shape
-  Value result = broadcastOp.getResult();
-  ArrayRef<int64_t> resultShape =
-      result.getType().cast<ShapedType>().getShape();
+  // Get the reduction dims
+  auto reductionDims = llvm::to_vector<4>(
+      reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  // Get the transpose permutation
+  SmallVector<int64_t> perm;
+  transposeOp.getTransp(perm);
+  // Don't support dim-1 broadcasted dims
+  llvm::SetVector<int64_t> dimOneBroadcastedDims =
+      broadcastOp.computeBroadcastedUnitDims();
+  if (dimOneBroadcastedDims.size() > 0) return;
+  Value broadcastSource = broadcastOp.getSource();
+  Value broadcastResult = broadcastOp.getResult();
+  int64_t broadcastSourceRank =
+      broadcastSource.getType().cast<VectorType>().getRank();
+  int64_t broadcastResultRank =
+      broadcastResult.getType().cast<VectorType>().getRank();
+  int64_t rankDiff = broadcastResultRank - broadcastSourceRank;
+  llvm::SetVector<int64_t> broadcastedDims;
+  for (int64_t i = 0; i < rankDiff; i++) broadcastedDims.insert(i);
+  ArrayRef<int64_t> broadcastShape =
+      broadcastResult.getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> srcShape =
       reductionSrc.getType().cast<ShapedType>().getShape();
-  bool success = srcShape == resultShape;
-  if (!success) {
-    if (transposeOp) {
-      Value transposedResult = transposeOp.getResult();
-      ArrayRef<int64_t> transposedShape =
-          transposedResult.getType().cast<ShapedType>().getShape();
-      if (transposedShape == srcShape) {
-        // We will lower reduction + broadcast + transpose at once
-        // So assign all their results the same layout
-        layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
-        layoutMap.at(transposedResult).debugPrint("transposed");
-      }
-    }
+  // Check that the same number of dims are reduced and broadcasted
+  if (reductionDims.size() != broadcastedDims.size()) return;
+  // Check that transpose(reductionDim) == broadcastDim
+  // and that the shapes match
+  for (IntegerAttr dimAttr : reductionDims) {
+    int64_t dim = dimAttr.getInt();
+    int64_t transposedDim = perm[dim];
+    if (!broadcastedDims.contains(transposedDim)) return;
+    if (srcShape[dim] != broadcastShape[transposedDim]) return;
   }
-  if (success) {
-    // Sets layout for either reduction + broadcast (if right shape)
-    // or reduction + broadcast + transpose
-    layoutMap.try_emplace(result, layoutMap.at(reductionSrc));
-    layoutMap.at(result).debugPrint("broadcasted");
-  }
+  Value transposedResult = transposeOp.getResult();
+  layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
+  layoutMap.at(transposedResult).debugPrint("transposed");
 }
 
 std::tuple<vector::BroadcastOp, vector::TransposeOp>
