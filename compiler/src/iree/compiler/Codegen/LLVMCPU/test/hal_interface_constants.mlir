@@ -2,10 +2,10 @@
 
 // CHECK-LABEL: llvm.func @constant_values
 func.func @constant_values() {
-  // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
+  // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr -> !llvm.struct<"iree_hal_executable_dispatch_state_v0_t"
   // CHECK: %[[PTR_BASE:.+]] = llvm.extractvalue %[[STATE]][9]
-  // CHECK: %[[VPTR:.+]] = llvm.getelementptr %[[PTR_BASE]][1] : (!llvm.ptr<i32>) -> !llvm.ptr<i32>
-  // CHECK: %[[V32:.+]] = llvm.load %[[VPTR]] : !llvm.ptr<i32>
+  // CHECK: %[[VPTR:.+]] = llvm.getelementptr %[[PTR_BASE]][1] : (!llvm.ptr) -> !llvm.ptr, i32
+  // CHECK: %[[V32:.+]] = llvm.load %[[VPTR]] : !llvm.ptr -> i32
   // CHECK: %[[V64:.+]] = llvm.zext %[[V32]] : i32 to i64
   %v1 = hal.interface.constant.load[1] : index
   // CHECK-NOT: unrealized_conversion_cast

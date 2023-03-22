@@ -56,7 +56,8 @@ py_binary(
                                    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
-    "i8",
+    # TODO: https://github.com/openxla/iree/issues/12703
+    #   "i8",
     "f32",
 ]]
 
@@ -80,7 +81,8 @@ py_binary(
                                    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
-    "i8",
+    # TODO: https://github.com/openxla/iree/issues/12703
+    #   "i8",
     "f32",
 ]]
 
@@ -108,7 +110,8 @@ py_binary(
                                    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
-    "i8",
+    # TODO: https://github.com/openxla/iree/issues/12703
+    #   "i8",
     "f32",
 ] for size in [
     "small",
