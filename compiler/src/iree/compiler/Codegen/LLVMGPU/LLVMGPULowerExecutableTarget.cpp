@@ -107,6 +107,8 @@ static LogicalResult verifyEntryPoint(
                                            verifyGPUMatmulSimtPassPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          LLVMGPUMatmulTensorCoreMmaSync:
         return verifyLoweringConfiguration(moduleOp, translationInfo,
                                            workgroupSizes,
                                            verifyGPUMatmulTensorCorePipeline);

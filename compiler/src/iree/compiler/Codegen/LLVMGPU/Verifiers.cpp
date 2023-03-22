@@ -4,11 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <iostream>
+
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -94,21 +95,22 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
-  auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+  // Only verify batched and unbatched matmul.
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
+    return success();
+  }
 
+  auto pipeline = translationInfo.getPassPipeline();
+  StringRef pipelineName = stringifyEnum(pipeline.getValue());
+  std::cout << "pipelineName: " << pipelineName.str() << std::endl;
   assert(translationInfo.getSoftwarePipelineStoreStage() == 1 &&
          "Store to workgroup memory currently expected to happen in stage 1 of "
          "software pipeline.");
 
   unsigned softwarePipelinedepth = translationInfo.getSoftwarePipelineDepth();
-  StringRef pipelineName = stringifyEnum(pipeline);
+
   if (workgroupSize.empty()) {
     return op->emitOpError("expected workgroup size for GPU pipelines");
-  }
-
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
-    return success();  // Only verify batched and unbatched matmul.
   }
 
   Type inputType = op->getOperand(0).getType();
@@ -181,10 +183,34 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
       firstLevelTileSizes[2]};
 
   // Verify the TensorCore size divides the second level tile size
-  SmallVector<int64_t, 3> tensorCoreSize({16, 16, 8});
-  if (secondLevelTileSizes[0] % tensorCoreSize[0] != 0 ||
-      secondLevelTileSizes[1] % tensorCoreSize[1] != 0 ||
-      secondLevelTileSizes[2] % tensorCoreSize[2] != 0) {
+  SmallVector<int64_t, 3> mathInstructionShape;
+  auto elementType = inputType.cast<ShapedType>().getElementType();
+  if (pipeline.getValue() ==
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore) {
+    if (elementType.isF16() || elementType.isBF16()) {
+      mathInstructionShape = {16, 16, 16};
+    } else if (elementType.isF32()) {
+      mathInstructionShape = {16, 16, 8};
+    } else {
+      return op->emitOpError("expected f16, bf16 or f32 for ") << pipelineName;
+    }
+  } else if (pipeline.getValue() ==
+             IREE::Codegen::DispatchLoweringPassPipeline::
+                 LLVMGPUMatmulTensorCoreMmaSync) {
+    if (elementType.isF16() || elementType.isBF16()) {
+      mathInstructionShape = {16, 8, 16};
+    } else if (elementType.isF32()) {
+      mathInstructionShape = {16, 8, 8};
+    } else {
+      return op->emitOpError("expected f16, bf16 or f32 for ") << pipelineName;
+    }
+  } else {
+    return op->emitOpError("expected tensor core pipeline for ")
+           << pipelineName;
+  }
+  if (secondLevelTileSizes[0] % mathInstructionShape[0] != 0 ||
+      secondLevelTileSizes[1] % mathInstructionShape[1] != 0 ||
+      secondLevelTileSizes[2] % mathInstructionShape[2] != 0) {
     return op->emitOpError(
                "tensorcore size doesn't factor into second level tile size "
                "for ")
