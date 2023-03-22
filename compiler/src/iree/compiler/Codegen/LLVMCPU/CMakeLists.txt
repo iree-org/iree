@@ -33,6 +33,7 @@ iree_cc_library(
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUPeel.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
+    "LLVMCPUTensorPad.cpp"
     "LLVMCPUTileAndFuse.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"

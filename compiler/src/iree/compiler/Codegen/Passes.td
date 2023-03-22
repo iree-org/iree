@@ -169,6 +169,11 @@ def TileAndDistributeToWorkgroups :
     Pass<"iree-codegen-tile-and-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Tile and distribute operations to workgroups";
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
+  let options = [
+    Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
+      /*default=*/ "",
+      "Maximum number of dims to distribute workgroups across.">,
+  ];
 }
 
 def WorkgroupSpecialization :
@@ -384,6 +389,13 @@ def LLVMCPUTileAndFuse :
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
       "Use default tiling level used to retrieve the configuration from lowering_config">
   ];
+}
+
+def LLVMCPUTensorPad :
+    Pass<"iree-llvmcpu-tensor-pad", "func::FuncOp"> {
+  let summary = "Pass to pad operations on tensors in top-down order.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTensorPadPass()";
 }
 
 def LLVMCPUPeel :

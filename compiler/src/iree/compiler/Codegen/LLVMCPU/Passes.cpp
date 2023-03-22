@@ -374,23 +374,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
       static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
-
-  auto pad = [&](std::string anchorOpName, bool setAnchorOpToRootOp = false,
-                 ArrayRef<int64_t> packPaddings = {}) {
-    LinalgFusePassOptions options;
-    options.padParallelDims = true;
-    if (setAnchorOpToRootOp) {
-      options.setAnchorOpToRootOp = true;
-    } else {
-      options.anchorOpName = anchorOpName;
-    }
-    options.packPaddings.assign(packPaddings.begin(), packPaddings.end());
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-  };
-
-  pad("linalg.fill");
-  pad("", /*setAnchorOpToRootOp=*/true);
-  pad("linalg.generic");
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ParallelDims));
 
   {
     LinalgSingleTilingExpertPassOptions options;
@@ -402,15 +387,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  {
-    LinalgFusePassOptions options;
-    options.padReductionDims = true;
-    options.setAnchorOpToRootOp = true;
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-  }
-
-  // Fold dim(pad) away before vectorization.
-  nestedModulePM.addPass(memref::createResolveShapedTypeResultDimsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ReductionDims));
 
   {
     LinalgSingleTilingExpertPassOptions options;
@@ -493,9 +471,10 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLinalgSplitReductionPass(clEnableReassociateFpReductions));
   {
-    LinalgFusePassOptions options;
+    LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel = numLevels - 1;
-    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
   }
 
   if (clEnablePadConsumerFusion) {

@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -43,14 +42,6 @@ static llvm::cl::opt<bool> dumpPtx(
     "iree-hal-cuda-dump-ptx", llvm::cl::init(false),
     llvm::cl::desc("Dump ptx to the debug stream."));
 
-// TODO: remove this workaround altogether once we decide not to support
-// CUDA 11.3
-static llvm::cl::opt<bool> clDisableLoopNounrollWa(
-    "iree-hal-cuda-disable-loop-nounroll-wa",
-    llvm::cl::desc("Disable the workaround for bug in ptxas for CUDA version "
-                   "before 11.4."),
-    llvm::cl::init(true));
-
 static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
     llvm::cl::init("sm_35"));
@@ -77,14 +68,6 @@ static std::string translateModuleToISA(llvm::Module &module,
     llvm::raw_string_ostream stream(targetISA);
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
-    // Workaround for CUDA driver bug
-    // (https://bugs.llvm.org/show_bug.cgi?id=48771), we mark all the loops with
-    // the no unroll metadata. This bug is fixed in cuda 11.4 but since we still
-    // run on older driver we need to keep it.
-    // TODO(thomasraoux): Remove it once we stop supporting older drivers.
-    if (!clDisableLoopNounrollWa) {
-      codegenPasses.add(llvm::createSetNoUnrollPass());
-    }
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
                                       llvm::CGFT_AssemblyFile);
     codegenPasses.run(module);
