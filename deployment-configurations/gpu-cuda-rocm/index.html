@@ -1490,9 +1490,8 @@ following command:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-hal-cuda-llvm-target-arch<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-hal-cuda-disable-loop-nounroll-wa<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-cuda.vmfb
+</span><span class="hll"><span class="w">    </span>--iree-input-type<span class="o">=</span>mhlo<span class="w"> </span><span class="se">\</span>
+</span><span class="w">    </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet-cuda.vmfb
 </code></pre></div>
 <p>Note that a cuda target architecture(<code>iree-hal-cuda-llvm-target-arch</code>) of
 the form <code>sm_&lt;arch_number&gt;</code> is needed to compile towards each GPU
