@@ -15,7 +15,6 @@
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -51,8 +50,8 @@ static bool hasDefaultOrHALAddressSpace(MemRefType memrefType) {
 /// helper function predicates operations (where predication is avialable),
 /// checks if unpredicated operations are side-effect free and acceptable to
 /// execute speculatively.
-static Operation* replaceOpWithPredicatedOp(Operation* op, Value pred,
-                                            PatternRewriter& rewriter) {
+static Operation* replaceOpWithPredicatedOp(RewriterBase& rewriter,
+                                            Operation* op, Value pred) {
   // Predication is only supported for AsyncCopyOp. Thus, for operations which
   // are *not* AsyncCopyOp additional checks are requrired in order to be issued
   // speculatively.
@@ -599,15 +598,15 @@ static FailureOr<scf::ForOp> applyPipelining(
   // is avialable a.k.a. AsyncCopyOp.
   if (!epiloguePeeling) {
     options.peelEpilogue = false;
-    options.predicateFn = [](Operation* op, Value pred,
-                             PatternRewriter& rewriter) {
-      return replaceOpWithPredicatedOp(op, pred, rewriter);
+    options.predicateFn = [](RewriterBase& rewriter, Operation* op,
+                             Value pred) {
+      return replaceOpWithPredicatedOp(rewriter, op, pred);
     };
   }
   scf::ForLoopPipeliningPattern pattern(options, forOp->getContext());
-  transform::TrivialPatternRewriter rewriter(forOp->getContext());
+  IRRewriter rewriter(forOp->getContext());
   rewriter.setInsertionPoint(forOp);
-  return pattern.returningMatchAndRewrite(forOp, rewriter);
+  return pipelineForLoop(rewriter, forOp, options);
 }
 namespace {
 struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
@@ -649,7 +648,7 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
 
 FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
     scf::ForOp forOp, PipeliningSchedulingStrategy startegy, bool peelEpilogue,
-    int64_t depth, PatternRewriter& rewriter) {
+    int64_t depth, RewriterBase& rewriter) {
   return applyPipelining(forOp, depth, peelEpilogue, startegy);
 }
 
