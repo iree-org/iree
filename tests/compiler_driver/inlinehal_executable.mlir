@@ -1,5 +1,6 @@
 // RUN: iree-compile \
-// RUN:   --mlir-print-ir-after=inline \
+// RUN:   --compile-to=hal \
+// RUN:   --mlir-print-ir-after-all \
 // RUN:   --iree-execution-model=inline-dynamic \
 // RUN:   --iree-hal-target-backends=llvm-cpu %s \
 // RUN:   --o=/dev/null 2>&1 | FileCheck %s
@@ -15,4 +16,3 @@ func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> (tensor<4xf
 // CHECK-NOT: hal.fence
 // CHECK-NOT: hal.pipeline_layout
 // CHECK-NOT: hal.semaphore
-// CHECK: vm.module public @module {
