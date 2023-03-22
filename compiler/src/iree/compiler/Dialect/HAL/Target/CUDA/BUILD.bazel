@@ -24,11 +24,9 @@ iree_compiler_cc_library(
     name = "CUDA",
     srcs = [
         "CUDATarget.cpp",
-        "NoLoopUnrollPass.cpp",
     ],
     hdrs = [
         "CUDATarget.h",
-        "LLVMPasses.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen",
