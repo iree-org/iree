@@ -18,6 +18,7 @@
 #define IREE_COMPILER_EMBEDDING_API_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "iree/compiler/api_support.h"
 
