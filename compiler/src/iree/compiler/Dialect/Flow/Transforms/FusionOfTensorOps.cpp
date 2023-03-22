@@ -73,6 +73,15 @@ static bool areFusableOps(MLIRContext *context, Operation *producerOp,
     return true;
   }
 
+  // Don't fuse if all of the consumer maps aren't projected permutations.
+  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+    if (!llvm::all_of(
+            linalgConsumerOp.getIndexingMapsArray(),
+            [](AffineMap map) { return map.isProjectedPermutation(); })) {
+      return false;
+    }
+  }
+
   // If producer has a single user, always fuse
   if (producerOp->hasOneUse()) return true;
 
