@@ -288,8 +288,18 @@ iree_compiler_error_t *ireeCompilerOutputOpenFD(
   return __ireeCompilerOutputOpenFD(fd, out_output);
 }
 
+iree_compiler_error_t *ireeCompilerOutputOpenMembuffer(
+    iree_compiler_output_t **out_output) {
+  return __ireeCompilerOutputOpenMembuffer(out_output);
+}
+
 void ireeCompilerOutputKeep(iree_compiler_output_t *output) {
   __ireeCompilerOutputKeep(output);
+}
+
+iree_compiler_error_t *ireeCompilerOutputMapMemory(
+    iree_compiler_output_t *output, void **contents, uint64_t *size) {
+  return __ireeCompilerOutputMapMemory(output, contents, size);
 }
 
 iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,

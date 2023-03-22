@@ -28,8 +28,10 @@ VER_0 {
     ireeCompilerOptionsSetFlags;
     ireeCompilerOutputDestroy;
     ireeCompilerOutputKeep;
+    ireeCompilerOutputMapMemory;
     ireeCompilerOutputOpenFD;
     ireeCompilerOutputOpenFile;
+    ireeCompilerOutputOpenMembuffer;
     ireeCompilerOutputWrite;
     ireeCompilerRegisterAllDialects;
     ireeCompilerRegisterAllPasses;
