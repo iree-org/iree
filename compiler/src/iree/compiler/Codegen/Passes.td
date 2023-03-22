@@ -172,7 +172,7 @@ def TileAndDistributeToWorkgroups :
   let options = [
     Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
       /*default=*/ "",
-      "Maximum number of dims to distribute workgroups acrosse.">,
+      "Maximum number of dims to distribute workgroups across.">,
   ];
 }
 

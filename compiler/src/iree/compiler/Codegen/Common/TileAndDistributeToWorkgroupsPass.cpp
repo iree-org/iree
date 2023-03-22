@@ -246,6 +246,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
   /// Loops that are partitioned.
   SmallVector<unsigned> partitionedLoops;
 
+  /// Maximum number of dims to distribute workgroups across.
   int32_t maxWorkgroupParallelDims;
 };
 

@@ -151,7 +151,8 @@ createTestPartitionableLoopsInterfacePass();
 
 /// Pass to tile and distribute to workgroups.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createTileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims = 3);
+createTileAndDistributeToWorkgroupsPass(
+    int32_t maxWorkgroupParallelDims = kNumMaxParallelDims);
 
 /// Pass to specialize workgroup distribution loops
 std::unique_ptr<OperationPass<func::FuncOp>>
