@@ -30,6 +30,7 @@ iree_cc_library(
     "ConvertConvNchwToNhwc.cpp"
     "ConvertLinalgMatmulToMmt.cpp"
     "GeneralizeAndFuse.cpp"
+    "GeneralizeConvolutions.cpp"
     "PadLinalgOps.cpp"
     "PassDetail.h"
     "Passes.cpp"
