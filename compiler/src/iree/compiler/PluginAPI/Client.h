@@ -107,7 +107,7 @@ class AbstractPluginSession {
  protected:
   // Called from the activate() method once pre-conditions are verified and the
   // context is set.
-  virtual LogicalResult onActivate(){};
+  virtual LogicalResult onActivate() { return success(); };
 
   MLIRContext *context = nullptr;
 };
@@ -155,7 +155,7 @@ class PluginSession : public AbstractPluginSession {
 
  protected:
   OptionsTy options;
-  friend class Registration;
+  friend struct Registration;
 };
 
 // Interface to the registration system.

@@ -16,7 +16,7 @@
 namespace mlir::iree_compiler {
 
 class PluginManager;
-struct PluginManagerSession;
+class PluginManagerSession;
 
 // Command line options for the plugin manager.
 class PluginManagerOptions {

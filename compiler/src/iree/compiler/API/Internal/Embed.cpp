@@ -21,6 +21,7 @@
 #include "iree/compiler/Tools/version.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -63,6 +64,7 @@ struct GlobalInit {
   // Reference count of balanced calls to ireeCompilerGlobalInitialize
   // and ireeCompilerGlobalShutdown. Upon reaching zero, must be deleted.
   std::atomic<int> refCount{1};
+  llvm::BumpPtrAllocator alloc;
   mlir::DialectRegistry registry;
   PluginManager pluginManager;
 
@@ -688,10 +690,11 @@ void ireeCompilerGetProcessCLArgs(int *argc, const char ***argv) {
 #ifdef _WIN32
   // See the Windows command line processing in InitLLVM.cpp. It hasn't
   // changed in forever.
-  std::string banner = std::string(argv[0]) + ": ";
-  ExitOnError(banner);
-  ExitOnError(errorCodeToError(
-      windows::GetCommandLineArguments(globalInit->retainedArgv, alloc)));
+  std::string banner = std::string((*argv)[0]) + ": ";
+  llvm::ExitOnError exitOnError(banner);
+  exitOnError(
+      llvm::errorCodeToError(llvm::sys::windows::GetCommandLineArguments(
+          globalInit->retainedArgv, globalInit->alloc)));
   // GetCommandLineArguments doesn't terminate with a nullptr per what argv
   // expects, so do that.
   globalInit->retainedArgv.push_back(nullptr);
