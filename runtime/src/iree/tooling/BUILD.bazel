@@ -150,6 +150,26 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "run_module",
+    srcs = ["run_module.c"],
+    hdrs = ["run_module.h"],
+    deps = [
+        ":comparison",
+        ":context_util",
+        ":device_util",
+        ":instrument_util",
+        ":vm_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal:types",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm/bytecode:module",
+    ],
+)
+
 # TODO(benvanik): fold these into iree/runtime and use that instead.
 iree_runtime_cc_library(
     name = "vm_util",

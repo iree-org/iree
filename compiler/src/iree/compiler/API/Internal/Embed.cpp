@@ -578,16 +578,17 @@ bool Invocation::parseSource(Source &source) {
               cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
               break;
             case DiagnosticSeverity::Warning:
-              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
+              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_WARNING;
               break;
             case DiagnosticSeverity::Error:
-              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
+              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR;
               break;
             case DiagnosticSeverity::Remark:
-              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_NOTE;
+              cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_REMARK;
               break;
             default:
               cSeverity = IREE_COMPILER_DIAGNOSTIC_SEVERITY_ERROR;
+              break;
           }
           diagnosticCallback(cSeverity, message.data(), message.size(),
                              diagnosticCallbackUserData);

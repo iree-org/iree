@@ -172,6 +172,29 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    run_module
+  HDRS
+    "run_module.h"
+  SRCS
+    "run_module.c"
+  DEPS
+    ::comparison
+    ::context_util
+    ::device_util
+    ::instrument_util
+    ::vm_util
+    iree::base
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal::types
+    iree::vm
+    iree::vm::bytecode::module
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     vm_util
   HDRS
     "vm_util.h"
