@@ -14,8 +14,7 @@ hal.executable private @distribute {
     }
     builtin.module {
 
-// TODO: this is currently broken, needs an upstream fix.
-//       CHECK: #[[$DIV32MOD8:.*]] = affine_map<()[s0] -> ((s0 floordiv 32) floordiv 8)>
+//       CHECK: #[[$DIV32MOD8:.*]] = affine_map<()[s0] -> ((s0 floordiv 32) mod 8)>
 // CHECK-LABEL: func.func @distribute
       func.func @distribute() {
         %cst_0 = arith.constant dense<0.000000e+00> : vector<1xf16>
@@ -36,7 +35,7 @@ hal.executable private @distribute {
           {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
         } {mapping = [#gpu.thread<x>]}
 
-// CHECK: %[[WX:.+]] = affine.apply #[[$DIV32MOD8]]()[%[[TX]]] : index
+// CHECK: %[[WX:.+]] = affine.apply #[[$DIV32MOD8]]()[%[[TX]]]
 // CHECK: vector.transfer_write %{{.*}}, %{{.*}}[%[[WX]]] {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
         scf.forall (%arg0) in (%c8) {
           vector.transfer_write %cst_0, %subview[%arg0]
