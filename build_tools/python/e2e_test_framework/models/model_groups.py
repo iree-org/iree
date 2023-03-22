@@ -31,8 +31,7 @@ LARGE = [
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
     tf_models.RESNET50_TF_FP32,
     torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
-    # Disabled due to https://github.com/openxla/iree/issues/11447.
-    #torch_models.MODEL_UNET_2D_FP32_TORCH,
+    torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]
 
 ALL = SMALL + LARGE
