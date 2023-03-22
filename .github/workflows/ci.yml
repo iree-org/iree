@@ -975,6 +975,7 @@ jobs:
           TRACY_CAPTURE: ${{ env.BUILD_TOOLS_DIR }}/build-traced/tracy-capture
         run: |
           gcloud storage cp "${TRACY_CAPTURE_GCS_ARTIFACT}" "${TRACY_CAPTURE}"
+          chmod +x "${TRACY_CAPTURE}"
           echo "tracy-capture=${TRACY_CAPTURE}" >> "${GITHUB_OUTPUT}"
       - name: "Creating the benchmark tools archive"
         # Here we pack a tracy-capture binary into each benchmark tools archive.
