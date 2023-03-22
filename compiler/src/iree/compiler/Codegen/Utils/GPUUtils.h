@@ -92,6 +92,15 @@ Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 /// Return true if the given memref has workgroup memory space.
 bool hasSharedMemoryAddressSpace(MemRefType memrefType);
 
+/// Packs vector of lower precision into a single 32-bit width element.
+/// (i.e <2xf16> -> i32 and <4xi8> -> i32)
+Value packVectorToSupportedWidth(Location loc, OpBuilder &builder, Value input);
+
+/// Unpack single scalar element into a target vector type.
+/// (i.e i32 -> vector<4xi8> or f32 -> vector<2xf16>)
+Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
+                     VectorType targetVecType);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
