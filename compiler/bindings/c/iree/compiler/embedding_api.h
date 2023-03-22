@@ -18,6 +18,7 @@
 #define IREE_COMPILER_EMBEDDING_API_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "iree/compiler/api_support.h"
 
@@ -309,6 +310,20 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFile(
 // Must be destroyed via ireeCompilerOutputDestroy().
 IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFD(
     int fd, iree_compiler_output_t **out_output);
+
+// Opens an output to in-memory storage. Use the API
+// |ireeCompilerOutputMapMemory| to access the mapped contents once all
+// output has been written.
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenMembuffer(
+    iree_compiler_output_t **out_output);
+
+// Maps the contents of a compiler output opened via
+// |ireeCompilerOutputOpenMembuffer|. This may be something obtained via
+// mmap or a more ordinary temporary buffer. This may fail in platform
+// specific ways unless if the output was created via
+// |ireeCompilerOutputOpenMembuffer|.
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputMapMemory(
+    iree_compiler_output_t *output, void **contents, uint64_t *size);
 
 // For file or other persistent outputs, by default they will be deleted on
 // |ireeCompilerOutputDestroy| (or exit). It is necessary to call

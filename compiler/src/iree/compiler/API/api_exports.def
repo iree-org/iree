@@ -27,8 +27,10 @@ EXPORTS
   ireeCompilerOptionsSetFlags
   ireeCompilerOutputDestroy
   ireeCompilerOutputKeep
+  ireeCompilerOutputMapMemory
   ireeCompilerOutputOpenFD
   ireeCompilerOutputOpenFile
+  ireeCompilerOutputOpenMembuffer
   ireeCompilerOutputWrite
   ireeCompilerRegisterAllDialects
   ireeCompilerRegisterAllPasses

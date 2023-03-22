@@ -4,10 +4,42 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Platform detect for memfd_create and mmap support.
+#if __linux__
+// On Linux, memfd_create is available for GLIBC >= 2.27.
+// Notably, this excludes RHEL7 (and correspondingingly manylinux2014).
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <unistd.h>
+#if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 27
+#define IREE_COMPILER_USE_MEMFD_CREATE 1
+#else
+#define IREE_COMPILER_USE_MEMFD_CREATE 0
+#endif
+#define IREE_COMPILER_USE_MMAP 1
+#elif defined(_WIN32)
+// On Windows, we don't support either memfd_create or the use of mmap.
+// The latter could be relaxes in the future by using platform specific
+// APIs.
+#define IREE_COMPILER_USE_MEMFD_CREATE 0
+#define IREE_COMPILER_USE_MMAP 0
+#else
+// Default to mmap supported but no memfd_create.
+#define IREE_COMPILER_USE_MEMFD_CREATE 0
+#define IREE_COMPILER_USE_MMAP 1
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <unistd.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <atomic>
+#include <limits>
 
 #include "iree/compiler/API/Internal/Diagnostics.h"
 #include "iree/compiler/ConstEval/Passes.h"
@@ -321,30 +353,104 @@ Error *Source::split(void (*callback)(iree_compiler_source_t *source,
 }
 
 struct Output {
+  enum class Type {
+    None,
+    File,
+    Membuffer,
+  };
+
+  ~Output();
   Error *openFile(const char *filePath);
   Error *openFD(int fd);
+  Error *openMembuffer();
   void keep();
 
   Error *getWriteError() {
-    if (outputStream->has_error()) {
-      return new Error(outputStream->error().message());
+    if (type == Type::File && outputFile->os().has_error()) {
+      return new Error(outputFile->os().error().message());
     }
     return nullptr;
   }
 
-  // If the output was configured to a file, this is it.
-  std::unique_ptr<llvm::ToolOutputFile> outputFile;
+  Error *mapMemory(void **data, uint64_t *size) {
+    if (type == Type::Membuffer) {
+      stringOutputStream->flush();
+      *data = static_cast<void *>(&outputString[0]);
+      *size = outputString.size();
+      return nullptr;
+    } else if (type == Type::File) {
+#if !IREE_COMPILER_USE_MMAP
+      return new Error(
+          "Mapping memory of a compiler output not created via "
+          "ireeCompilerOutputOpenMembuffer is not supported on this platform");
+#else
+      if (!this->mapped_data) {
+        if (!backingFileDescriptor) {
+          return new Error(
+              "Output was not opened against a file descriptor and cannot be "
+              "mapped");
+        }
+        outputFile->os().flush();
+        if (auto *error = getWriteError()) {
+          return error;
+        }
 
+        this->mapped_size = lseek(*backingFileDescriptor, 0, SEEK_END);
+        if (this->mapped_size == -1 ||
+            this->mapped_size >= std::numeric_limits<size_t>::max()) {
+          return new Error(
+              "Failed to determine size of backing file descriptor");
+        }
+        void *mmap_result =
+            mmap(nullptr, static_cast<size_t>(mapped_size), PROT_READ,
+                 MAP_SHARED, *backingFileDescriptor, 0);
+        if (mmap_result == MAP_FAILED) {
+          return new Error("Failed to mmap file descriptor");
+        }
+        this->mapped_data = mmap_result;
+      }
+      *data = this->mapped_data;
+      *size = this->mapped_size;
+      return nullptr;
+#endif
+    } else {
+      return new Error("Output was not opened in a way that supports mapping");
+    }
+  }
+
+  Type type = Type::None;
   // Description of the output. If a file, this will be the file path.
   // Otherwise, it will be some debug-quality description.
   std::string description;
+  llvm::raw_ostream *outputStream = nullptr;
 
-  // If streaming, this is the stream.
-  llvm::raw_fd_ostream *outputStream = nullptr;
+  // If we have mapped the output, the mapping is stashed here.
+  void *mapped_data = nullptr;
+  uint64_t mapped_size = 0;
+
+ private:
+  // Fields for Type::File.
+  // If the output was configured to a file, this is it.
+  std::unique_ptr<llvm::ToolOutputFile> outputFile;
+  // File descriptor if opened in a way where one was provided.
+  std::optional<int> backingFileDescriptor;
+
+  // Fields for Type::Memory.
+  std::string outputString;
+  std::optional<llvm::raw_string_ostream> stringOutputStream;
 };
+
+Output::~Output() {
+#if IREE_COMPILER_USE_MMAP
+  if (mapped_data) {
+    munmap(mapped_data, static_cast<size_t>(mapped_size));
+  }
+#endif
+}
 
 Error *Output::openFile(const char *filePath) {
   std::string err;
+  type = Type::File;
   description = filePath;
   outputFile = mlir::openOutputFile(description, &err);
   if (!outputFile) {
@@ -355,13 +461,32 @@ Error *Output::openFile(const char *filePath) {
 }
 
 Error *Output::openFD(int fd) {
+  type = Type::File;
   description = "fd-";
   description.append(std::to_string(fd));
   outputFile = std::make_unique<llvm::ToolOutputFile>(description, fd);
   // Don't try to delete, etc.
   outputFile->keep();
   outputStream = &outputFile->os();
+  this->backingFileDescriptor = fd;
   return nullptr;
+}
+
+Error *Output::openMembuffer() {
+#if IREE_COMPILER_USE_MEMFD_CREATE
+  int fd = memfd_create("iree_output.bin", 0);
+  if (fd == -1) {
+    return new Error("Error creating membuffer output via memfd_create");
+  }
+  return openFD(fd);
+#else
+  // Fallback to an std::string based accumulator if no platform support
+  // for memfiles.
+  type = Type::Membuffer;
+  stringOutputStream.emplace(outputString);
+  outputStream = &(*stringOutputStream);
+  return nullptr;
+#endif
 }
 
 void Output::keep() {
@@ -916,6 +1041,18 @@ iree_compiler_error_t *ireeCompilerOutputOpenFD(
   return wrap(output->openFD(fd));
 }
 
+iree_compiler_error_t *ireeCompilerOutputOpenMembuffer(
+    iree_compiler_output_t **out_output) {
+  auto output = new Output();
+  *out_output = wrap(output);
+  return wrap(output->openMembuffer());
+}
+
+iree_compiler_error_t *ireeCompilerOutputMapMemory(
+    iree_compiler_output_t *output, void **contents, uint64_t *size) {
+  return wrap(unwrap(output)->mapMemory(contents, size));
+}
+
 void ireeCompilerOutputKeep(iree_compiler_output_t *output) {
   unwrap(output)->keep();
 }
@@ -923,7 +1060,7 @@ void ireeCompilerOutputKeep(iree_compiler_output_t *output) {
 iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,
                                                const void *data,
                                                size_t length) {
-  llvm::raw_fd_ostream *os = unwrap(output)->outputStream;
+  llvm::raw_ostream *os = unwrap(output)->outputStream;
   if (!os) {
     return wrap(new Error("output not open for streaming"));
   }
