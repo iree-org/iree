@@ -31,6 +31,9 @@ std::unique_ptr<Pass> createGeneralizeAndFusePass();
 // Pass to convert a linalg.matmul into linalg.transpose + linalg.matmul.
 std::unique_ptr<Pass> createConvertLinalgMatmulToMmtPass();
 
+// A pass to generalize all conv-like ops.
+std::unique_ptr<Pass> createGeneralizeConvolutionsPass();
+
 // A pass to pad linalg ops to the next integer multiple of `paddingSize`.
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 
