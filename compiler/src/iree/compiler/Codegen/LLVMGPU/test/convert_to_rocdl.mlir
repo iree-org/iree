@@ -34,7 +34,8 @@ hal.executable @abs_ex_dispatch_0 {
   }
 }
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias, llvm.readonly}, %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias},
-//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32, llvm.noalias})
+//  CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+//  CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias})
 //      CHECK:    rocdl.workgroup.dim.x
 //      CHECK:    llvm.fadd

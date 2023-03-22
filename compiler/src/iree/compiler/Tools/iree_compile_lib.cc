@@ -12,7 +12,6 @@
 #include <type_traits>
 
 #include "iree/compiler/Pipelines/Pipelines.h"
-#include "iree/compiler/Tools/init_iree.h"
 #include "iree/compiler/embedding_api.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -50,9 +49,7 @@ enum class CompileMode {
 }  // namespace mlir
 
 int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
-  InitIree y(argc, argv);
   static llvm::cl::OptionCategory mainOptions("IREE Main Options");
-  ireeCompilerGlobalInitialize(/*initializeCommandLine=*/true);
 
   // General command line flags.
   llvm::cl::opt<std::string> inputFilename(
@@ -127,7 +124,11 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         exit(0);
       }));
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, "IREE compilation driver\n");
+  ireeCompilerGlobalInitialize();
+  ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
+  ireeCompilerSetupGlobalCL(argc, const_cast<const char **>(argv),
+                            "IREE compilation driver\n",
+                            /*installSignalHandlers=*/true);
 
   // If a HAL executable is being compiled, it is only valid to output in that
   // form.

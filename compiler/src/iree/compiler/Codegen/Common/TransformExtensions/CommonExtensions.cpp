@@ -634,7 +634,7 @@ LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
            static_cast<int64_t>(b.cast<gpu::GPUBlockMappingAttr>().getBlock());
   };
   SmallVector<Value> gridDimValues =
-      scf::ForallOp::getValuesSortedByKey(blockMapping, numBlocks, comparator);
+      getValuesSortedByKey(blockMapping, numBlocks, comparator);
 
   // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.

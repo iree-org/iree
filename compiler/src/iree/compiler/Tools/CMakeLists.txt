@@ -79,19 +79,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    init_iree
-  HDRS
-    "init_iree.h"
-  SRCS
-    "init_iree.cc"
-  DEPS
-    ::version
-    LLVMSupport
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     init_iree_passes_and_dialects
   HDRS
     "init_iree_dialects.h"
@@ -230,7 +217,6 @@ iree_cc_library(
   SRCS
     "iree_compile_lib.cc"
   DEPS
-    ::init_iree
     LLVMSupport
     iree::compiler::API::Internal::Embed
     iree::compiler::Pipelines

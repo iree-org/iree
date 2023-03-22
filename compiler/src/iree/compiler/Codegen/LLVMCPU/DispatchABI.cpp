@@ -340,26 +340,22 @@ LLVM::LLVMStructType HALDispatchABI::getEnvironmentType(
       context, "iree_hal_executable_environment_v0_t");
   if (structType.isInitialized()) return structType;
 
-  auto int8Type = IntegerType::get(context, 8);
+  // auto int8Type = IntegerType::get(context, 8);
   auto uint32Type = IntegerType::get(context, 32);
-  auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
-  auto uint32PtrType = LLVM::LLVMPointerType::get(uint32Type);
+  auto opaquePtrType = LLVM::LLVMPointerType::get(context);
   SmallVector<Type, 4> fieldTypes;
 
   // const uint32_t* constants;
-  fieldTypes.push_back(uint32PtrType);
+  fieldTypes.push_back(opaquePtrType);
 
   // iree_hal_executable_import_thunk_v0_t import_thunk;
   // const iree_hal_executable_import_v0_t* import_funcs;
   // const void** import_contexts;
-  auto importType = LLVM::LLVMFunctionType::get(
-      uint32Type, {int8PtrType, int8PtrType, int8PtrType});
-  auto importPtrType = LLVM::LLVMPointerType::get(importType);
   auto importThunkType = LLVM::LLVMFunctionType::get(
-      uint32Type, {importPtrType, int8PtrType, int8PtrType, int8PtrType});
+      uint32Type, {opaquePtrType, opaquePtrType, opaquePtrType, opaquePtrType});
   fieldTypes.push_back(LLVM::LLVMPointerType::get(importThunkType));
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(importPtrType));
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(int8PtrType));
+  fieldTypes.push_back(LLVM::LLVMPointerType::get(opaquePtrType));
+  fieldTypes.push_back(LLVM::LLVMPointerType::get(opaquePtrType));
 
   // iree_hal_processor_v0_t processor;
   fieldTypes.push_back(processorType);
@@ -380,13 +376,10 @@ LLVM::LLVMStructType HALDispatchABI::getDispatchStateType(
       context, "iree_hal_executable_dispatch_state_v0_t");
   if (structType.isInitialized()) return structType;
 
-  auto indexType = typeConverter->convertType(IndexType::get(context));
-  auto int8Type = IntegerType::get(context, 8);
   auto uint8Type = IntegerType::get(context, 8);
   auto uint16Type = IntegerType::get(context, 16);
   auto uint32Type = IntegerType::get(context, 32);
-  auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
-  auto uint32PtrType = LLVM::LLVMPointerType::get(uint32Type);
+  auto opaquePtrType = LLVM::LLVMPointerType::get(context);
   SmallVector<Type, 4> fieldTypes;
 
   // uint32_t workgroup_size_x;
@@ -413,11 +406,11 @@ LLVM::LLVMStructType HALDispatchABI::getDispatchStateType(
   fieldTypes.push_back(uint8Type);
 
   // const uint32_t * push_constants;
-  fieldTypes.push_back(uint32PtrType);
   // void *const * binding_ptrs;
   // const size_t * binding_lengths;
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(int8PtrType));
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(indexType));
+  fieldTypes.push_back(opaquePtrType);
+  fieldTypes.push_back(opaquePtrType);
+  fieldTypes.push_back(opaquePtrType);
 
   LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
   assert(succeeded(bodySet) &&
@@ -435,10 +428,9 @@ LLVM::LLVMStructType HALDispatchABI::getWorkgroupStateType(
       context, "iree_hal_executable_workgroup_state_v0_t");
   if (structType.isInitialized()) return structType;
 
-  auto int8Type = IntegerType::get(context, 8);
   auto uint16Type = IntegerType::get(context, 16);
   auto uint32Type = IntegerType::get(context, 32);
-  auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
+  auto opaquePtrType = LLVM::LLVMPointerType::get(context);
   SmallVector<Type, 4> fieldTypes;
 
   // uint32_t workgroup_id_x;
@@ -456,7 +448,7 @@ LLVM::LLVMStructType HALDispatchABI::getWorkgroupStateType(
 
   // void* local_memory;
   // uint32_t local_memory_size;
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(int8PtrType));
+  fieldTypes.push_back(opaquePtrType);
   fieldTypes.push_back(uint32Type);
 
   LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
@@ -470,28 +462,16 @@ LLVM::LLVMStructType HALDispatchABI::getWorkgroupStateType(
 // static
 SmallVector<Type, 5> HALDispatchABI::getInputTypes(
     MLIRContext *context, LLVMTypeConverter *typeConverter) {
-  auto environmentType = LLVM::LLVMStructType::getIdentified(
-      context, "iree_hal_executable_environment_v0_t");
-  assert(environmentType &&
-         "environment type must be defined by ConvertToLLVM");
-  auto dispatchStateType = LLVM::LLVMStructType::getIdentified(
-      context, "iree_hal_executable_dispatch_state_v0_t");
-  assert(dispatchStateType &&
-         "dispatch state type must be defined by ConvertToLLVM");
-  auto workgroupStateType = LLVM::LLVMStructType::getIdentified(
-      context, "iree_hal_executable_workgroup_state_v0_t");
-  assert(workgroupStateType &&
-         "workgroup state type must be defined by ConvertToLLVM");
   return SmallVector<Type, 5>{
       // const iree_hal_executable_environment_v0_t* IREE_RESTRICT
       //   environment
-      LLVM::LLVMPointerType::get(environmentType),
+      LLVM::LLVMPointerType::get(context),
       // const iree_hal_executable_dispatch_state_v0_t* IREE_RESTRICT
       //   dispatch_state
-      LLVM::LLVMPointerType::get(dispatchStateType),
+      LLVM::LLVMPointerType::get(context),
       // const iree_hal_executable_workgroup_state_v0_t* IREE_RESTRICT
       //   workgroup_state
-      LLVM::LLVMPointerType::get(workgroupStateType),
+      LLVM::LLVMPointerType::get(context),
   };
 }
 
@@ -695,9 +675,12 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
   auto constantsPtrValue =
       loadFieldValue(forOp, DispatchStateField::push_constants, builder);
   auto offsetValue = getIndexValue(loc, offset, builder);
+  auto pushConstantType = IntegerType::get(context, 32);
   Value constantPtrValue = builder.create<LLVM::GEPOp>(
-      loc, constantsPtrValue.getType(), constantsPtrValue, offsetValue);
-  Value constantValue = builder.create<LLVM::LoadOp>(loc, constantPtrValue);
+      loc, constantsPtrValue.getType(), pushConstantType, constantsPtrValue,
+      offsetValue);
+  Value constantValue =
+      builder.create<LLVM::LoadOp>(loc, pushConstantType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
   return buildValueDI(
       forOp, resultValue,
@@ -722,8 +705,12 @@ Value HALDispatchABI::loadBindingPtr(Operation *forOp, int64_t ordinal,
       loadFieldValue(forOp, DispatchStateField::binding_ptrs, builder);
   auto ordinalValue = getIndexValue(loc, ordinal, builder);
   auto elementPtrValue = builder.create<LLVM::GEPOp>(
-      loc, ptrsPtrValue.getType(), ptrsPtrValue, ordinalValue);
-  auto elementValue = builder.create<LLVM::LoadOp>(loc, elementPtrValue);
+      loc, ptrsPtrValue.getType(),
+      mlir::LLVM::LLVMPointerType::get(builder.getContext()), ptrsPtrValue,
+      ordinalValue);
+  auto elementValue = builder.create<LLVM::LoadOp>(
+      loc, mlir::LLVM::LLVMPointerType::get(builder.getContext()),
+      elementPtrValue);
   return buildValueDI(
       forOp, elementValue,
       StringRef("binding_ptrs[") + std::to_string(ordinal) + "]",
@@ -736,9 +723,11 @@ Value HALDispatchABI::loadBindingLength(Operation *forOp, int64_t ordinal,
   auto lengthsPtrValue =
       loadFieldValue(forOp, DispatchStateField::binding_lengths, builder);
   auto ordinalValue = getIndexValue(loc, ordinal, builder);
+  auto indexType = typeConverter->convertType(IndexType::get(context));
   auto elementPtrValue = builder.create<LLVM::GEPOp>(
-      loc, lengthsPtrValue.getType(), lengthsPtrValue, ordinalValue);
-  auto elementValue = builder.create<LLVM::LoadOp>(loc, elementPtrValue);
+      loc, lengthsPtrValue.getType(), indexType, lengthsPtrValue, ordinalValue);
+  auto elementValue =
+      builder.create<LLVM::LoadOp>(loc, indexType, elementPtrValue);
   return buildValueDI(
       forOp, elementValue,
       StringRef("binding_lengths[") + std::to_string(ordinal) + "]",
@@ -757,24 +746,20 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
 
   // Adjust by baseOffset (if needed).
   if (baseOffsetValue) {
-    basePtrValue = builder.create<LLVM::GEPOp>(loc, basePtrValue.getType(),
-                                               basePtrValue, baseOffsetValue);
+    auto i8Type = typeConverter->convertType(builder.getI8Type());
+    basePtrValue = builder.create<LLVM::GEPOp>(
+        loc, basePtrValue.getType(), i8Type, basePtrValue, baseOffsetValue);
   }
 
   // NOTE: if we wanted to check the range was in bounds here would be the
   // place to do it.
-
-  // Cast to the desired memref element type.
-  auto elementType = typeConverter->convertType(memRefType.getElementType());
-  Value typedPtrValue = builder.create<LLVM::BitcastOp>(
-      loc, LLVM::LLVMPointerType::get(elementType), basePtrValue);
 
   // Construct the MemRefDescriptor type based on the information we have.
   // NOTE: we could use the binding length to clamp this/check that the
   // requested range is valid.
   if (memRefType.hasStaticShape()) {
     return MemRefDescriptor::fromStaticShape(builder, loc, *typeConverter,
-                                             memRefType, typedPtrValue);
+                                             memRefType, basePtrValue);
   } else {
     assert(memRefType.getNumDynamicDims() == dynamicDims.size());
     int64_t rank = memRefType.getRank();
@@ -782,8 +767,8 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
     // Build MemRef descriptor for this interface binding.
     auto desc = MemRefDescriptor::undef(builder, loc,
                                         typeConverter->convertType(memRefType));
-    desc.setAllocatedPtr(builder, loc, typedPtrValue);
-    desc.setAlignedPtr(builder, loc, typedPtrValue);
+    desc.setAllocatedPtr(builder, loc, basePtrValue);
+    desc.setAlignedPtr(builder, loc, basePtrValue);
     desc.setConstantOffset(builder, loc, 0);
 
     // Update memref descriptor shape. Dynamic dimensions can be mixed with
@@ -859,9 +844,11 @@ Value HALDispatchABI::loadExecutableConstant(Operation *forOp, StringRef key,
   // Load constant from the executable constants struct.
   auto constantsPtrValue =
       loadFieldValue(forOp, EnvironmentField::constants, builder);
-  Value constantPtrValue = builder.create<LLVM::GEPOp>(
-      loc, constantsPtrValue.getType(), constantsPtrValue, ordinalValue);
-  Value constantValue = builder.create<LLVM::LoadOp>(loc, constantPtrValue);
+  Value constantPtrValue =
+      builder.create<LLVM::GEPOp>(loc, constantsPtrValue.getType(), resultType,
+                                  constantsPtrValue, ordinalValue);
+  Value constantValue =
+      builder.create<LLVM::LoadOp>(loc, resultType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
   return buildValueDI(forOp, resultValue,
                       StringRef("executable_constant['") + key + "']",
@@ -901,14 +888,24 @@ std::pair<Value, Value> HALDispatchABI::loadImportFunc(Operation *forOp,
   auto loc = forOp->getLoc();
   auto funcPtrsValue =
       loadFieldValue(forOp, EnvironmentField::import_funcs, builder);
-  auto funcPtrValue = builder.create<LLVM::GEPOp>(loc, funcPtrsValue.getType(),
-                                                  funcPtrsValue, importOrdinal);
+  auto int8Type = IntegerType::get(context, 8);
+  auto uint32Type = IntegerType::get(context, 32);
+  auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
+  auto importFuncsType = LLVM::LLVMFunctionType::get(
+      uint32Type, {int8PtrType, int8PtrType, int8PtrType});
+
+  auto funcPtrValue =
+      builder.create<LLVM::GEPOp>(loc, funcPtrsValue.getType(), importFuncsType,
+                                  funcPtrsValue, importOrdinal);
+
   auto contextPtrsValue =
       loadFieldValue(forOp, EnvironmentField::import_contexts, builder);
-  auto contextPtrValue = builder.create<LLVM::GEPOp>(
-      loc, contextPtrsValue.getType(), contextPtrsValue, importOrdinal);
-  return std::make_pair(builder.create<LLVM::LoadOp>(loc, funcPtrValue),
-                        builder.create<LLVM::LoadOp>(loc, contextPtrValue));
+  auto contextPtrValue =
+      builder.create<LLVM::GEPOp>(loc, contextPtrsValue.getType(), int8Type,
+                                  contextPtrsValue, importOrdinal);
+  return std::make_pair(
+      builder.create<LLVM::LoadOp>(loc, importFuncsType, funcPtrValue),
+      builder.create<LLVM::LoadOp>(loc, int8Type, contextPtrValue));
 }
 
 Value HALDispatchABI::isImportFuncAvailable(Operation *forOp,
@@ -939,7 +936,7 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
   assert(!weak && "calls to weak imports not yet implemented");
 
   Value nullPtrValue = builder.create<LLVM::NullOp>(
-      loc, LLVM::LLVMPointerType::get(builder.getI8Type()));
+      loc, LLVM::LLVMPointerType::get(builder.getContext()));
   auto callOp =
       builder.create<LLVM::CallOp>(loc, TypeRange{builder.getI32Type()},
                                    ValueRange{
@@ -956,6 +953,7 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
     Operation *forOp, StringRef importName, bool weak, TypeRange resultTypes,
     ValueRange args, OpBuilder &builder) {
   auto loc = forOp->getLoc();
+  auto context = builder.getContext();
 
   // Struct types are ordered [results..., args...].
   SmallVector<Type> types(resultTypes);
@@ -967,11 +965,11 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
   // Pack parameter structure.
   Type structType;
   Value paramsPtr, voidPtr;
-  auto voidPtrTy = LLVM::LLVMPointerType::get(builder.getI8Type());
+  auto voidPtrTy = LLVM::LLVMPointerType::get(context);
   if (!types.empty()) {
     // TODO(benvanik): set specific layout to match runtime.
     structType = LLVM::LLVMStructType::getLiteral(context, types);
-    auto ptrStructType = LLVM::LLVMPointerType::get(structType);
+    auto ptrStructType = LLVM::LLVMPointerType::get(context);
     Value one = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
                                                  builder.getIndexAttr(1));
     paramsPtr = builder.create<LLVM::AllocaOp>(loc, ptrStructType, one,
@@ -1047,7 +1045,7 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp, EnvironmentField field,
       buildArgDI(forOp, /*argNum=*/0, getLocalArgument(forOp, 0), "environment",
                  di.getPtrOf(di.getConstOf(di.getEnvironmentV0T())), builder);
   Value environmentValue =
-      builder.create<LLVM::LoadOp>(loc, environmentPtrValue);
+      builder.create<LLVM::LoadOp>(loc, environmentType, environmentPtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
   return builder.create<LLVM::ExtractValueOp>(loc, environmentValue, position);
 }
@@ -1067,7 +1065,8 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp, DispatchStateField field,
   auto statePtrValue = buildArgDI(
       forOp, /*argNum=*/1, getLocalArgument(forOp, 1), "dispatch_state",
       di.getPtrOf(di.getConstOf(di.getDispatchStateV0T())), builder);
-  Value stateValue = builder.create<LLVM::LoadOp>(loc, statePtrValue);
+  Value stateValue =
+      builder.create<LLVM::LoadOp>(loc, dispatchStateType, statePtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
   return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
 }
@@ -1079,7 +1078,8 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp,
   auto statePtrValue = buildArgDI(
       forOp, /*argNum=*/2, getLocalArgument(forOp, 2), "workgroup_state",
       di.getPtrOf(di.getConstOf(di.getWorkgroupStateV0T())), builder);
-  Value stateValue = builder.create<LLVM::LoadOp>(loc, statePtrValue);
+  Value stateValue =
+      builder.create<LLVM::LoadOp>(loc, workgroupStateType, statePtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
   return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
 }
