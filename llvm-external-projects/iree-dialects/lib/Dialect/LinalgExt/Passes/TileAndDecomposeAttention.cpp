@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -424,10 +425,12 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   // Construct third loop
   int64_t tileSize{32};
   OpFoldResult warpSize = rewriter.getIndexAttr(tileSize);
-  std::optional<ArrayAttr> mapping;
+  // Number of warps to distribute on
+  OpFoldResult numWarps = rewriter.getIndexAttr(4);
+  SmallVector<Attribute> warpMapping{mlir::gpu::GPUWarpMappingAttr::get(rewriter.getContext(), mlir::gpu::Warps::DimX)};
   scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
-      loc, warpSize, ValueRange({iterArgResult, iterArgMax, iterArgSum}),
-      mapping);
+      loc, numWarps, ValueRange({iterArgResult, iterArgMax, iterArgSum}),
+      rewriter.getArrayAttr(warpMapping));
   auto threadIds = llvm::to_vector(forallOp.getInductionVars());
   ivs.push_back(threadIds[0]);
   ops.push_back(forallOp);
