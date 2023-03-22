@@ -6,6 +6,7 @@ VER_0 {
     ireeCompilerErrorDestroy;
     ireeCompilerErrorGetMessage;
     ireeCompilerGetAPIVersion;
+    ireeCompilerGetProcessCLArgs;
     ireeCompilerGlobalInitialize;
     ireeCompilerGlobalShutdown;
     ireeCompilerInvocationCreate;
@@ -39,6 +40,7 @@ VER_0 {
     ireeCompilerSessionDestroy;
     ireeCompilerSessionGetFlags;
     ireeCompilerSessionSetFlags;
+    ireeCompilerSetupGlobalCL;
     ireeCompilerSourceDestroy;
     ireeCompilerSourceOpenFile;
     ireeCompilerSourceSplit;

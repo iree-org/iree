@@ -127,9 +127,20 @@ int ireeCompilerGetAPIVersion() {
   return __ireeCompilerGetAPIVersion();
 }
 
-void ireeCompilerGlobalInitialize(bool initializeCommandLine) {
+void ireeCompilerGlobalInitialize() {
   assertLoaded();
-  __ireeCompilerGlobalInitialize(initializeCommandLine);
+  __ireeCompilerGlobalInitialize();
+}
+
+void ireeCompilerGetProcessCLArgs(int *argc, const char ***argv) {
+  assertLoaded();
+  __ireeCompilerGetProcessCLArgs(argc, argv);
+}
+
+void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
+                               bool installSignalHandlers) {
+  assertLoaded();
+  __ireeCompilerSetupGlobalCL(argc, argv, banner, installSignalHandlers);
 }
 
 void ireeCompilerGlobalShutdown() {

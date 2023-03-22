@@ -18,11 +18,15 @@
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
 #include "iree/compiler/Tools/init_targets.h"
+#include "iree/compiler/Tools/version.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SMLoc.h"
+#include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/IR/AsmState.h"
@@ -39,6 +43,10 @@
 #include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
 #endif  // IREE_HAVE_C_OUTPUT_FORMAT
 
+#ifdef _WIN32
+#include "llvm/Support/Windows/WindowsSupport.h"
+#endif
+
 namespace mlir::iree_compiler::embed {
 namespace {
 
@@ -48,12 +56,21 @@ struct Error {
 };
 
 struct GlobalInit {
-  GlobalInit(bool initializeCommandLine);
+  GlobalInit();
   ~GlobalInit() { llvm::llvm_shutdown(); }
+  void registerCommandLineOptions();
 
+  // Reference count of balanced calls to ireeCompilerGlobalInitialize
+  // and ireeCompilerGlobalShutdown. Upon reaching zero, must be deleted.
+  std::atomic<int> refCount{1};
   mlir::DialectRegistry registry;
-  bool usesCommandLine;
   PluginManager pluginManager;
+
+  // Command line handling.
+  bool usesCommandLine = false;
+  // Populated and retained if we have to copy and handle our own permuted
+  // argv (i.e. Windows). Otherwise, not used.
+  llvm::SmallVector<const char *> retainedArgv;
 
   // Our session options can optionally be bound to the global command-line
   // environment. If that is not the case, then these will be nullptr, and
@@ -69,8 +86,7 @@ struct GlobalInit {
   IREE::VM::BytecodeTargetOptions *clBytecodeTargetOptions = nullptr;
 };
 
-GlobalInit::GlobalInit(bool initializeCommandLine)
-    : usesCommandLine(initializeCommandLine), pluginManager() {
+GlobalInit::GlobalInit() {
   // Global/static registrations.
   // Allegedly need to register passes to get good reproducers
   // TODO: Verify this (I think that this was fixed some time ago).
@@ -89,33 +105,32 @@ GlobalInit::GlobalInit(bool initializeCommandLine)
   pluginManager.globalInitialize();
   pluginManager.registerPasses();
   pluginManager.registerDialects(registry);
+}
 
-  if (initializeCommandLine) {
-    // Register MLIRContext command-line options like
-    // -mlir-print-op-on-diagnostic.
-    mlir::registerMLIRContextCLOptions();
-    // Register assembly printer command-line options like
-    // -mlir-print-op-generic.
-    mlir::registerAsmPrinterCLOptions();
-    // Register pass manager command-line options like -mlir-print-ir-*.
-    mlir::registerPassManagerCLOptions();
-    mlir::registerDefaultTimingManagerCLOptions();
+void GlobalInit::registerCommandLineOptions() {
+  // Register MLIRContext command-line options like
+  // -mlir-print-op-on-diagnostic.
+  mlir::registerMLIRContextCLOptions();
+  // Register assembly printer command-line options like
+  // -mlir-print-op-generic.
+  mlir::registerAsmPrinterCLOptions();
+  // Register pass manager command-line options like -mlir-print-ir-*.
+  mlir::registerPassManagerCLOptions();
+  mlir::registerDefaultTimingManagerCLOptions();
 
-    // Bind session options to the command line environment.
-    clPluginManagerOptions = &PluginManagerOptions::FromFlags::get();
-    clBindingOptions = &BindingOptions::FromFlags::get();
-    clInputOptions = &InputDialectOptions::FromFlags::get();
-    clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
-    clHighLevelOptimizationOptions =
-        &HighLevelOptimizationOptions::FromFlags::get();
-    clSchedulingOptions = &SchedulingOptions::FromFlags::get();
-    clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
-    clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
-    clBytecodeTargetOptions =
-        &IREE::VM::BytecodeTargetOptions::FromFlags::get();
+  // Bind session options to the command line environment.
+  clPluginManagerOptions = &PluginManagerOptions::FromFlags::get();
+  clBindingOptions = &BindingOptions::FromFlags::get();
+  clInputOptions = &InputDialectOptions::FromFlags::get();
+  clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
+  clHighLevelOptimizationOptions =
+      &HighLevelOptimizationOptions::FromFlags::get();
+  clSchedulingOptions = &SchedulingOptions::FromFlags::get();
+  clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
+  clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
+  clBytecodeTargetOptions = &IREE::VM::BytecodeTargetOptions::FromFlags::get();
 
-    pluginManager.initializeCLI();
-  }
+  pluginManager.initializeCLI();
 }
 
 struct Session {
@@ -582,6 +597,32 @@ namespace {
 GlobalInit *globalInit = nullptr;
 bool isShutdown = false;
 
+void llvmVersionPrinter(llvm::raw_ostream &os) {
+  os << "IREE (https://openxla.github.io/iree):\n  ";
+  std::string version = mlir::iree_compiler::getIreeRevision();
+  if (version.empty()) {
+    version = "(unknown)";
+  }
+  os << "IREE compiler version " << version << "\n  ";
+  os << "LLVM version " << LLVM_VERSION_STRING << "\n  ";
+#if LLVM_IS_DEBUG_BUILD
+  os << "DEBUG build";
+#else
+  os << "Optimized build";
+#endif
+#ifndef NDEBUG
+  os << " with assertions";
+#endif
+#if LLVM_VERSION_PRINTER_SHOW_HOST_TARGET_INFO
+  std::string CPU = std::string(sys::getHostCPUName());
+  if (CPU == "generic") CPU = "(unknown)";
+  os << ".\n"
+     << "  Default target: " << sys::getDefaultTargetTriple() << '\n'
+     << "  Host CPU: " << CPU;
+#endif
+  os << '\n';
+}
+
 //===----------------------------------------------------------------------===//
 // Internal to ABI type casters.
 //===----------------------------------------------------------------------===//
@@ -643,14 +684,63 @@ const char *ireeCompilerErrorGetMessage(iree_compiler_error_t *error) {
 
 int ireeCompilerGetAPIVersion() { return 0; }
 
-void ireeCompilerGlobalInitialize(bool initializeCommandLine) {
-  if (globalInit || isShutdown) {
-    fprintf(
-        stderr,
-        "FATAL ERROR: ireeCompilerGlobalInitialize called multiple times\n");
+void ireeCompilerGetProcessCLArgs(int *argc, const char ***argv) {
+#ifdef _WIN32
+  // See the Windows command line processing in InitLLVM.cpp. It hasn't
+  // changed in forever.
+  std::string banner = std::string(argv[0]) + ": ";
+  ExitOnError(banner);
+  ExitOnError(errorCodeToError(
+      windows::GetCommandLineArguments(globalInit->retainedArgv, alloc)));
+  // GetCommandLineArguments doesn't terminate with a nullptr per what argv
+  // expects, so do that.
+  globalInit->retainedArgv.push_back(nullptr);
+  *argc = globalInit->retainedArgv.size() - 1;
+  *argv = globalInit->retainedArgv.data();
+#endif
+}
+
+void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
+                               bool installSignalHandlers) {
+  if (globalInit->usesCommandLine) {
+    fprintf(stderr, "FATAL ERROR: ireeCompileParseCL called multiple times\n");
     abort();
   }
-  globalInit = new GlobalInit(initializeCommandLine);
+  globalInit->usesCommandLine = true;
+  globalInit->registerCommandLineOptions();
+
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
+  llvm::cl::SetVersionPrinter(llvmVersionPrinter);
+
+  if (installSignalHandlers) {
+    // A few other things from InitLLVM to setup default command-line signal
+    // handlers. See InitLLVM::InitLLVM for the initialization sequence and
+    // commentary, should it ever be necessary to revist this (it hasn't changed
+    // in many years).
+    llvm::sys::SetOneShotPipeSignalFunction(
+        llvm::sys::DefaultOneShotPipeSignalHandler);
+    static llvm::PrettyStackTraceProgram stackPrinter(argc, argv);
+    llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
+    llvm::install_out_of_memory_new_handler();
+  }
+
+  llvm::cl::ParseCommandLineOptions(argc, argv, banner);
+}
+
+void ireeCompilerGlobalInitialize() {
+  if (globalInit) {
+    globalInit->refCount.fetch_add(1);
+    return;
+  }
+  if (isShutdown) {
+    fprintf(stderr,
+            "FATAL ERROR: ireeCompilerGlobalInitialize called after the final "
+            "ireeCompilerGlobalShutdown\n");
+    abort();
+  }
+  globalInit = new GlobalInit();
 }
 
 void ireeCompilerGlobalShutdown() {
@@ -660,9 +750,14 @@ void ireeCompilerGlobalShutdown() {
             "initialized\n");
     abort();
   }
-  delete globalInit;
-  isShutdown = true;
-  globalInit = nullptr;
+  if (globalInit) {
+    if (globalInit->refCount.fetch_sub(1) == 1) {
+      delete globalInit;
+      isShutdown = true;
+      globalInit = nullptr;
+      return;
+    }
+  }
 }
 
 iree_compiler_session_t *ireeCompilerSessionCreate() {

@@ -5,6 +5,7 @@ EXPORTS
   ireeCompilerErrorDestroy
   ireeCompilerErrorGetMessage
   ireeCompilerGetAPIVersion
+  ireeCompilerGetProcessCLArgs
   ireeCompilerGlobalInitialize
   ireeCompilerGlobalShutdown
   ireeCompilerInvocationCreate
@@ -38,6 +39,7 @@ EXPORTS
   ireeCompilerSessionDestroy
   ireeCompilerSessionGetFlags
   ireeCompilerSessionSetFlags
+  ireeCompilerSetupGlobalCL
   ireeCompilerSourceDestroy
   ireeCompilerSourceOpenFile
   ireeCompilerSourceSplit

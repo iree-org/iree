@@ -61,16 +61,41 @@ IREE_EMBED_EXPORTED int ireeCompilerGetAPIVersion();
 // It is intended to be called as part of the hosting process's startup
 // sequence. Any failures that it can encounter are fatal and will abort
 // the process.
+// It is legal to call this multiple times, and each call must be balanced
+// by a call to |ireeCompilerGlobalShutdown|. The final shutdown call will
+// permanently disable the compiler for the process and subsequent calls
+// to initialize will fail/abort. If this is not desirable, some higher level
+// code must hold initialization open with its own call.
+IREE_EMBED_EXPORTED void ireeCompilerGlobalInitialize();
+
+// Processes an argc/argv from main() using platform specific dark magic,
+// possibly updating them in-place to cleaned up values. On most systems,
+// this is a no-op. However, on Windows, this will do various processing
+// to extract the original command line and decode it properly as UTF-8.
+// It is therefore essential that this be passed the actual argc/argv to main
+// and not some permutation of it. Any updated argv will persist until a
+// final call to |ireeCompilerGlobalShutdown|. This must be called after
+// |ireeCompilerGlobalInitialize|.
 //
-// If |initializeCommandLine| is true, then compiler flags will be bound to
-// the process-level command line environment. This can provide convenient
-// mnemonic access to single tenant setups but is risky in a multi-tenant
-// library.
+// We're really sorry about this. Old platforms are annoying.
+// This API is not yet considered version-stable. If using out of tree, please
+// contact the developers.
+IREE_EMBED_EXPORTED void ireeCompilerGetProcessCLArgs(int *argc,
+                                                      const char ***argv);
+
+// Initializes the command line environment from an explicit argc/argv
+// (typically the result of a prior call to ireeCompilerGetProcessCLArgs).
+// This uses dark magic to setup the usual array of expected signal handlers.
+// This API is not yet considered version-stable. If using out of tree, please
+// contact the developers.
 //
-// Note that for internal tools which use InitLLVM to manage access to the CLI,
-// it is legal for that to co-exist with this global initialize/shutdown.
-IREE_EMBED_EXPORTED void ireeCompilerGlobalInitialize(
-    bool initializeCommandLine);
+// Note that there is as yet no facility to register new global command line
+// options from the C API. However, this facility should be sufficient for
+// subordinating builtin command line options to a higher level integration
+// by tunneling global options into the initialization sequence.
+IREE_EMBED_EXPORTED void ireeCompilerSetupGlobalCL(int argc, const char **argv,
+                                                   const char *banner,
+                                                   bool installSignalHandlers);
 
 // Destroys any process level resources that the compiler may have created.
 // This must be called prior to library unloading.
