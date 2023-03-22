@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "executable_benchmarks.mlir"
     "hal_executable.mlir"
+    "inlinehal_executable.mlir"
     "preprocessing_flags.mlir"
     "smoketest.mlir"
     "streams.mlir"
