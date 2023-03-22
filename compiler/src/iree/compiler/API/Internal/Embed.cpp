@@ -6,15 +6,24 @@
 
 // Platform detect for memfd_create and mmap support.
 #if __linux__
+// On Linux, memfd_create is available for GLIBC >= 2.27.
+// Notably, this excludes RHEL7 (and correspondingingly manylinux2014).
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
+#if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 27
 #define IREE_COMPILER_USE_MEMFD_CREATE 1
+#else
+#define IREE_COMPILER_USE_MEMFD_CREATE 0
+#endif
 #define IREE_COMPILER_USE_MMAP 1
 #elif defined(_WIN32)
+// On Windows, we don't support either memfd_create or the use of mmap.
+// The latter could be relaxes in the future by using platform specific
+// APIs.
 #define IREE_COMPILER_USE_MEMFD_CREATE 0
 #define IREE_COMPILER_USE_MMAP 0
 #else
