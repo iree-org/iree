@@ -642,7 +642,7 @@ jobs:
   ######################## Community Model Coverage ############################
   # Jobs that test IREE behavior on a set of models.
   ##############################################################################
-  # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
+  # TODO(#11263): Drop this job once the IREE_BUILD_LEGACY_BENCHMARKS is removed.
   test_build_benchmark_suites:
     needs: [setup, build_all, build_tf_integrations]
     if: fromJson(needs.setup.outputs.should-run)
