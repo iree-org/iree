@@ -22,9 +22,8 @@ namespace iree_compiler {
 namespace {
 // Gathers tiled loops that aren't distribution loops from previous tiling
 // stages.
-static void collectLoopsToPeel(RewriterBase &rewriter,
-                               linalg::LinalgOp linalgOp,
-                               SmallVectorImpl<scf::ForOp> &loopsToPeel) {
+void collectLoopsToPeel(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                        SmallVectorImpl<scf::ForOp> &loopsToPeel) {
   if (!iree_compiler::getLoweringConfig(linalgOp)) return;
   if (!linalgOp) return;
 
