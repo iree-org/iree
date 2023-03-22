@@ -190,6 +190,7 @@ extractSlicesInner(Value query, Value output, Value max, Value sum,
   SmallVector<OpFoldResult> offsets(queryShape.size(), zero);
   sizes[1] = sequenceTileLength;
   sizes[2] = headDimension;
+  offsets[0] = ivs[0];
   offsets[1] = ivs[2];
   SmallVector<int64_t> tensorShape{tileSize, queryShape[2]};
   auto tensorType = RankedTensorType::get(tensorShape, elementType);
@@ -256,11 +257,11 @@ insertSlices(Value newResult, Value result, Value newMax, Value max,
   return std::make_tuple(updatedAcc, updatedMax, updatedSum);
 }
 
-static std::tuple<Value, Value, Value>
-insertSlicesInner(Value newResult, Value result, Value newMax, Value max,
-                  Value newSum, Value sum, ArrayRef<int64_t> queryShape,
-                  ArrayRef<Value> ivs, OpFoldResult sequenceTileLength,
-                  Location loc, OpBuilder &builder) {
+static void insertSlicesInner(Value newResult, Value result, Value newMax,
+                              Value max, Value newSum, Value sum,
+                              ArrayRef<int64_t> queryShape, ArrayRef<Value> ivs,
+                              OpFoldResult sequenceTileLength, Location loc,
+                              OpBuilder &builder) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
   auto headDimension = builder.getIndexAttr(queryShape.back());
@@ -269,18 +270,19 @@ insertSlicesInner(Value newResult, Value result, Value newMax, Value max,
   SmallVector<OpFoldResult> offsets(queryShape.size(), zero);
   sizes[1] = sequenceTileLength;
   sizes[2] = headDimension;
-  offsets[0] = ivs[2];
-  Value updatedAcc = builder.create<tensor::InsertSliceOp>(
-      loc, newResult, result, offsets, sizes, strides);
+  offsets[0] = ivs[0];
+  offsets[1] = ivs[2];
+  builder.create<tensor::ParallelInsertSliceOp>(loc, newResult, result, offsets,
+                                                sizes, strides);
   offsets = SmallVector<OpFoldResult>(queryShape.size() - 1, zero);
   offsets[1] = ivs[2];
   sizes = SmallVector<OpFoldResult>{one, sequenceTileLength};
   strides = SmallVector<OpFoldResult>(queryShape.size() - 1, one);
-  Value updatedMax = builder.create<tensor::InsertSliceOp>(
-      loc, newMax, max, offsets, sizes, strides);
-  Value updatedSum = builder.create<tensor::InsertSliceOp>(
-      loc, newSum, sum, offsets, sizes, strides);
-  return std::make_tuple(updatedAcc, updatedMax, updatedSum);
+  builder.create<tensor::ParallelInsertSliceOp>(loc, newMax, max, offsets,
+                                                sizes, strides);
+  builder.create<tensor::ParallelInsertSliceOp>(loc, newSum, sum, offsets,
+                                                sizes, strides);
+  return;
 }
 
 static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
@@ -390,10 +392,6 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
       loc, rewriter.getZeroAttr(elementType));
   Value largeNegativeF32 = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getFloatAttr(elementType, -1.0e+30));
-  SmallVector<Value> dynamicIndices;
-  if (ShapedType::isDynamic(queryShape[1]))
-    dynamicIndices.push_back(
-        getValueOrCreateConstantIndexOp(rewriter, loc, sequenceTileLength));
   SmallVector<OpFoldResult> dims{rewriter.getIndexAttr(1), sequenceTileLength};
   Value max = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
   Value negativeMax =
@@ -426,18 +424,28 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   // Construct third loop
   int64_t tileSize{32};
   OpFoldResult warpSize = rewriter.getIndexAttr(tileSize);
-  scf::LoopNest thirdLoopNest = createLoopNest(
-      ivs, zeroValue, getValueOrCreateConstantIndexOp(rewriter, loc, warpSize),
-      getValueOrCreateConstantIndexOp(rewriter, loc, sequenceTileLength),
-      ValueRange({iterArgResult, iterArgMax, iterArgSum}), loc, rewriter);
-  ops.push_back(thirdLoopNest.loops.back());
-
-  Value iterArgResultInner = thirdLoopNest.loops.back().getRegionIterArg(0);
-  Value iterArgMaxInner = thirdLoopNest.loops.back().getRegionIterArg(1);
-  Value iterArgSumInner = thirdLoopNest.loops.back().getRegionIterArg(2);
+  std::optional<ArrayAttr> mapping;
+  scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
+      loc, warpSize, ValueRange({iterArgResult, iterArgMax, iterArgSum}),
+      mapping);
+  auto threadIds = llvm::to_vector(forallOp.getInductionVars());
+  ivs.push_back(threadIds[0]);
+  ops.push_back(forallOp);
+  ArrayRef<BlockArgument> bbArgs = forallOp.getOutputBlockArguments();
+  assert(bbArgs.size() == 3);
+  Value iterArgResultInner = bbArgs[0];
+  Value iterArgMaxInner = bbArgs[1];
+  Value iterArgSumInner = bbArgs[2];
 
   OpBuilder::InsertionGuard guardThirdLoop(rewriter);
-  rewriter.setInsertionPointToStart(thirdLoopNest.loops.back().getBody());
+  rewriter.setInsertionPointToStart(forallOp.getBody(0));
+
+  AffineExpr d0;
+  bindDims(rewriter.getContext(), d0);
+  auto threadMap = AffineMap::get(
+      1, 0, {d0 * rewriter.getAffineConstantExpr(queryShape[1] / tileSize)},
+      rewriter.getContext());
+  ivs[2] = rewriter.create<AffineApplyOp>(loc, threadMap, ivs[2]);
 
   // Extract slices
   auto [querySlice, outputSlice, maxSlice, sumSlice] = extractSlicesInner(
@@ -450,26 +458,22 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
                           maxSlice, sumSlice, warpSize, sequenceTileLength,
                           headDimension, elementType, ops, loc, rewriter);
 
-  // Insert slices inner
-  auto [updatedAcc, updatedMax, updatedSum] = insertSlicesInner(
-      result, iterArgResultInner, newMax, iterArgMaxInner, newSum,
-      iterArgSumInner, queryShape, ivs, warpSize, loc, rewriter);
+  OpBuilder::InsertionGuard guardThirdLoopEnd(rewriter);
+  rewriter.setInsertionPointToStart(forallOp.getTerminator().getBody());
 
-  if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
-          thirdLoopNest.loops.back().getBody()->getTerminator())) {
-    rewriter.replaceOpWithNewOp<scf::YieldOp>(
-        yieldOp, ValueRange{updatedAcc, updatedMax, updatedSum});
-  }
+  // Insert slices inner
+  insertSlicesInner(result, iterArgResultInner, newMax, iterArgMaxInner, newSum,
+                    iterArgSumInner, queryShape, ivs, warpSize, loc, rewriter);
 
   if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
           secondLoopNest.loops.back().getBody()->getTerminator())) {
     // Insert slices
     OpBuilder::InsertionGuard yieldGuard(rewriter);
     rewriter.setInsertionPoint(yieldOp);
-    result = thirdLoopNest.results[0];
-    newMax = thirdLoopNest.results[1];
-    newSum = thirdLoopNest.results[2];
-    std::tie(updatedAcc, updatedMax, updatedSum) = insertSlices(
+    result = forallOp.getResult(0);
+    newMax = forallOp.getResult(1);
+    newSum = forallOp.getResult(2);
+    auto [updatedAcc, updatedMax, updatedSum] = insertSlices(
         result, iterArgResult, newMax, iterArgMax, newSum, iterArgSum,
         queryShape, ivs, sequenceTileLength, loc, rewriter);
     rewriter.replaceOpWithNewOp<scf::YieldOp>(
