@@ -391,6 +391,13 @@ def LLVMCPUTileAndFuse :
   ];
 }
 
+def LLVMCPUTensorPad :
+    Pass<"iree-llvmcpu-tensor-pad", "func::FuncOp"> {
+  let summary = "Pass to pad operations on tensors in top-down order.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTensorPadPass()";
+}
+
 def ConvertToLLVM :
     Pass<"iree-convert-to-llvm", "ModuleOp"> {
   let summary =

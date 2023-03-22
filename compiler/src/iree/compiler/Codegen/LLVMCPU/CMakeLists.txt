@@ -32,6 +32,7 @@ iree_cc_library(
     "LLVMCPUMaterializeEncodingPass.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
+    "LLVMCPUTensorPad.cpp"
     "LLVMCPUTileAndFuse.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"

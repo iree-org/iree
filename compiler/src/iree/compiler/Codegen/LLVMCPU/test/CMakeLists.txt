@@ -40,6 +40,7 @@ iree_lit_test_suite(
     "pipeline_tests.mlir"
     "split_reduction_pipeline_tests.mlir"
     "synchronize_symbol_visibility.mlir"
+    "tensor_pad.mlir"
     "test_config_mmt4d.mlir"
     "tile_and_fuse.mlir"
     "transform_dialect_bufferize.mlir"

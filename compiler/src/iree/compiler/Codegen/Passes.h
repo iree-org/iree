@@ -295,6 +295,11 @@ createVerifyLinalgTransformLegalityPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
     int64_t tilingLevel = -1);
 
+/// Pass to pad operations on tensors in top-down order.
+enum class LLVMCPUTensorPadOption { ParallelDims, ReductionDims };
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
+    LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims);
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReordering = false);
