@@ -9,6 +9,7 @@ func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> (tensor<4xf
   return %0, %arg0 : tensor<4xf32>, tensor<4xf32>
 }
 
+// // Check the IR not registered as iree_hal_module_register_loader_types
 // CHECK-NOT: hal.command_buffer
 // CHECK-NOT: hal.allocator
 // CHECK-NOT: hal.event
