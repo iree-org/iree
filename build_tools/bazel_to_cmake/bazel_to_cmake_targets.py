@@ -86,7 +86,6 @@ EXPLICIT_TARGET_MAPPING = {
     ],
     "@mlir-hlo//:map_lmhlo_to_scalar_op": [
         "tensorflow::external_mhlo_includes",
-        "LmhloDialect",  # Unfortunate.
         "MhloDialect",
     ],
     "@mlir-hlo//:map_mhlo_to_scalar_op": [
@@ -97,10 +96,7 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
         "MhloShapeOpsToStandard",
-        "MhloToArithmeticConversion",
-        "MhloToLhloConversion",
         "MhloToLinalg",
-        "MhloToMemrefConversion",
         "MhloToStandard",
         "StablehloToMhlo",
     ],
