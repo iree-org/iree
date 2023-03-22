@@ -1,8 +1,8 @@
 // RUN: iree-compile \
 // RUN:   --compile-to=hal \
 // RUN:   --mlir-print-ir-after-all \
-// RUN:   --iree-execution-model=inline-dynamic \
-// RUN:   --iree-hal-target-backends=llvm-cpu %s \
+// RUN:   --iree-execution-model=inline-static \
+// RUN:   --iree-hal-target-backends=vmvx %s \
 // RUN:   --o=/dev/null 2>&1 | FileCheck %s
 
 func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
@@ -16,3 +16,7 @@ func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> (tensor<4xf
 // CHECK-NOT: hal.fence
 // CHECK-NOT: hal.pipeline_layout
 // CHECK-NOT: hal.semaphore
+// CHECK-NOT: hal.executable
+
+// TODO(#12586): Check the IR not registered as iree_hal_module_register_common_types
+// XFAIL: *
