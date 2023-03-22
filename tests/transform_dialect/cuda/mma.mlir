@@ -31,13 +31,13 @@ transform.sequence failures(propagate) {
 ^bb1(%module: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %module
     : (!pdl.operation) -> !pdl.operation
-  %func_2 = transform.iree.apply_patterns %func { unroll_vectors_gpu_wmma }
-  %func_3 = transform.iree.vector.vector_to_mma_conversion %func_2 { use_wmma }
+  transform.iree.apply_patterns %func { unroll_vectors_gpu_wmma } : (!pdl.operation) -> ()
+  transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!pdl.operation) -> ()
 
   // Apply canonicalization post-hoc to trigger DCE and pass the test 
   // (i.e. all vector.contract are dead).
   // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
-  %func_4 = transform.iree.apply_patterns %func_3 { canonicalization }
+  transform.iree.apply_patterns %func { canonicalization } : (!pdl.operation) -> ()
 }
 
 // -----
@@ -71,11 +71,11 @@ transform.sequence failures(propagate) {
 ^bb1(%module: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %module
     : (!pdl.operation) -> !pdl.operation
-  %func_2 = transform.iree.apply_patterns %func { unroll_vectors_gpu_mma_sync }
-  %func_3 = transform.iree.vector.vector_to_mma_conversion %func_2 { use_mma_sync }
+  transform.iree.apply_patterns %func { unroll_vectors_gpu_mma_sync } : (!pdl.operation) -> ()
+  transform.iree.vector.vector_to_mma_conversion %func { use_mma_sync } : (!pdl.operation) -> ()
 
   // Apply canonicalization post-hoc to trigger DCE and pass the test 
   // (i.e. all vector.contract are dead).
   // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
-  %func_4 = transform.iree.apply_patterns %func_3 { canonicalization }
+  transform.iree.apply_patterns %func { canonicalization } : (!pdl.operation) -> ()
 }

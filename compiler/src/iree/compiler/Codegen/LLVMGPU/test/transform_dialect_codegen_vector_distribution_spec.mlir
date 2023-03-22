@@ -6,9 +6,9 @@ transform.sequence failures(propagate) {
   %isolated = transform.get_closest_isolated_parent %warp 
     : (!pdl.operation) -> !pdl.operation
   transform.iree.vector.warp_distribute %isolated
-    : (!pdl.operation) -> !pdl.operation
+    : (!pdl.operation) -> ()
 
   // Late canonicalizations to cleanup and pass the checks.
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }    
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 }

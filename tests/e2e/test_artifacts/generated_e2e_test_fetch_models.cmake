@@ -70,6 +70,16 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
+    "model-3dd5a95e-92a9-4486-9062-9a33224f28db"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_3dd5a95e-92a9-4486-9062-9a33224f28db_MobileNetV2_int8.0_224_quantized.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
     "model-58855e40-eba9-4a71-b878-6b35e3460244"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallStaticBatch.tflite"
@@ -155,5 +165,25 @@ iree_fetch_artifact(
     "https://storage.googleapis.com/iree-model-artifacts/resnet50-tf-model.tar.gz"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_CLIP_TEXT_MODEL_SEQLEN64/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8_ClipTextSeqLen64PT.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-340553d1-e6fe-41b6-b2c7-687c74ccec56"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_UNET_MODEL/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_340553d1-e6fe-41b6-b2c7-687c74ccec56_Unet2dPT.mlir"
   UNPACK
 )

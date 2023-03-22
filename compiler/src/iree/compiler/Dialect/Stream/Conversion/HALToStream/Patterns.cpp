@@ -43,10 +43,8 @@ struct ConvertTensorImportOp
       // mistake and it's better to know of a shape mismatch than just buffer
       // byte length difference.
       if (auto tensorType = targetType.dyn_cast<RankedTensorType>()) {
-        // TODO(benvanik): get a name for the tensor (argument name/etc).
-        auto message = rewriter.getStringAttr("tensor");
         if (failed(buildEncodingAssertions(op.getLoc(), adaptor.getSource(),
-                                           message, tensorType,
+                                           op.getNameAttr(), tensorType,
                                            op.getTargetDims(), rewriter))) {
           return rewriter.notifyMatchFailure(op, "unsupported tensor type");
         }
@@ -129,8 +127,8 @@ struct ConvertTensorImportOp
     }
 
     builder.create<IREE::HAL::BufferViewAssertOp>(
-        loc, bufferView, message, expectedElementType, expectedEncodingType,
-        shapeDims);
+        loc, bufferView, message ? message : builder.getStringAttr("tensor"),
+        expectedElementType, expectedEncodingType, shapeDims);
     return success();
   }
 };

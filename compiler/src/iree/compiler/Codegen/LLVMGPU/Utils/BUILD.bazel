@@ -24,6 +24,7 @@ iree_compiler_cc_library(
         "LLVMGPUUtils.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Codegen/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:FuncDialect",

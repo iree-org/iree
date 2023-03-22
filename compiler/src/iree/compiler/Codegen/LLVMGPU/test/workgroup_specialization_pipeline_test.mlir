@@ -90,9 +90,9 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 }
 
 // CHECK-LABEL: func.func @vectorized_dispatch_0_generic_102401
-//      CHECK:   %[[cst:.*]] = arith.constant 0.000000e+00 : f32
-//      CHECK:   %[[c256:.*]] = arith.constant 256 : index
-//      CHECK:   %[[c0:.*]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[cst:.*]] = arith.constant 0.000000e+00 : f32
+//  CHECK-DAG:   %[[c256:.*]] = arith.constant 256 : index
+//  CHECK-DAG:   %[[c0:.*]] = arith.constant 0 : index
 //      CHECK:   %[[ARR:.*]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[c0]]) : memref<102401xf32>
 //      CHECK:   %[[ARR2:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[c0]]) : memref<102401xf32>
 //      CHECK:   %[[BLKX:.*]] = hal.interface.workgroup.id[0] : index

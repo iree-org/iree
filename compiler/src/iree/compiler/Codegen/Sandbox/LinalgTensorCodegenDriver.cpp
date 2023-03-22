@@ -113,6 +113,7 @@ static bool getTilingOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel,
     }
     SmallVector<int64_t> tileSizes =
         mlir::iree_compiler::getTileSizes(rootOp.value(), tilingLevel);
+    if (llvm::all_of(tileSizes, [](int v) { return v == 0; })) return false;
     tilingOptions.setTileSizeComputationFunction(
         [tileSizes](OpBuilder &b, Operation *op) {
           return buildTileSizesForOp(b, op, tileSizes);

@@ -13,18 +13,15 @@ transform.sequence failures(propagate) {
   %func = transform.structured.match ops{["func.func"]} in %variant_op
     : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %func 
-    { fold_reassociative_reshapes, canonicalization, tiling_canonicalization, cse }
-  %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
-  %variant_op_3 = transform.iree.bufferize %variant_op_2
+    { fold_reassociative_reshapes, canonicalization, tiling_canonicalization, cse } : (!pdl.operation) -> ()
+  transform.iree.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
+  %variant_op_3 = transform.iree.bufferize %variant_op : (!pdl.operation) -> (!pdl.operation)
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  transform.iree.erase_hal_descriptor_type_from_memref %memref_func
-
-  // Get the function to which to apply to.
-  %func_2 = transform.structured.match ops{["linalg.matmul"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  %func_3 = transform.get_closest_isolated_parent %func_2 : (!pdl.operation) -> !pdl.operation
-  %func_4 = transform.iree.map_nested_forall_to_gpu_threads %func_3 { workgroup_size = [10, 11]}
+  transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!pdl.operation) -> ()
+  transform.iree.map_nested_forall_to_gpu_threads %memref_func 
+    workgroup_dims = [10, 11] : (!pdl.operation) -> ()
 
   // Late canonicalizations to cleanup and pass the checks
-  %func_5 = transform.iree.apply_patterns %func_4
-    { canonicalization, tiling_canonicalization, licm, cse }
+  transform.iree.apply_patterns %memref_func
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 }

@@ -184,7 +184,7 @@ hal.executable private @apply_scale_zve32x {
 // CHECK-LABEL: llvm.func @apply_scale_zve32x
 //   CHECK-DAG:   %[[RHS:.+]]    = llvm.mlir.constant(dense<19689> : vector<2xi32>) : vector<2xi32>
 //   CHECK-DAG:   %[[RHSEXT:.+]] = llvm.mlir.constant(dense<19689> : vector<2xi64>) : vector<2xi64>
-//       CHECK:   %[[LHS:.+]]    = llvm.load %{{.+}} {alignment = 4 : i64} : !llvm.ptr<vector<2xi32>>
+//       CHECK:   %[[LHS:.+]]    = llvm.load %{{.+}} {alignment = 4 : i64} : !llvm.ptr -> vector<2xi32>
 //       CHECK:   %[[LHSEXT:.+]] = llvm.sext %[[LHS]] : vector<2xi32> to vector<2xi64>
 //       CHECK:   %[[MULEXT:.*]] = llvm.mul %[[LHSEXT]], %[[RHSEXT]] : vector<2xi64>
 //       CHECK:   %[[MULLOW:.*]] = llvm.mul %[[LHS]], %[[RHS]] : vector<2xi32>
@@ -237,7 +237,7 @@ hal.executable private @apply_scale_zve32f {
 // CHECK-LABEL: llvm.func @apply_scale_zve32f
 //   CHECK-DAG:   %[[RHS:.+]]    = llvm.mlir.constant(dense<19689> : vector<2xi32>) : vector<2xi32>
 //   CHECK-DAG:   %[[RHSEXT:.+]] = llvm.mlir.constant(dense<19689> : vector<2xi64>) : vector<2xi64>
-//       CHECK:   %[[LHS:.+]]    = llvm.load %{{.+}} {alignment = 4 : i64} : !llvm.ptr<vector<2xi32>>
+//       CHECK:   %[[LHS:.+]]    = llvm.load %{{.+}} {alignment = 4 : i64} : !llvm.ptr -> vector<2xi32>
 //       CHECK:   %[[LHSEXT:.+]] = llvm.sext %[[LHS]] : vector<2xi32> to vector<2xi64>
 //       CHECK:   %[[MULEXT:.*]] = llvm.mul %[[LHSEXT]], %[[RHSEXT]] : vector<2xi64>
 //       CHECK:   %[[MULLOW:.*]] = llvm.mul %[[LHS]], %[[RHS]] : vector<2xi32>

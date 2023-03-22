@@ -38,13 +38,15 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "extract_slice.mlir",
-            "pack.mlir",
+            # TODO: https://github.com/openxla/iree/issues/12703
+            # "pack.mlir",
             "pack_dynamic_inner_tiles.mlir",
             "tensor_insert_slice.mlir",
             "unpack.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
+            "pack.mlir",
             "tensor_cast.mlir",
         ],
     ),

@@ -169,6 +169,11 @@ def TileAndDistributeToWorkgroups :
     Pass<"iree-codegen-tile-and-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Tile and distribute operations to workgroups";
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
+  let options = [
+    Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
+      /*default=*/ "",
+      "Maximum number of dims to distribute workgroups across.">,
+  ];
 }
 
 def WorkgroupSpecialization :
@@ -373,6 +378,17 @@ def VerifyLinalgTransformLegality :
     Pass<"iree-llvmcpu-verify-linalg-transform-legality", "ModuleOp"> {
   let summary = "Verify that only supported IR constructs are passed to the compiler.";
   let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
+}
+
+def LLVMCPUTileAndFuse :
+    Pass<"iree-llvmcpu-tile-and-fuse", "func::FuncOp"> {
+  let summary = "Pass to tile and fuse TilingInterface operations.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTileAndFusePass()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
 }
 
 def ConvertToLLVM :

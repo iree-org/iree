@@ -95,6 +95,7 @@ def build_iree_bytecode_module(target_name: str,
                                c_identifier: Optional[str] = None,
                                static_lib_path: Optional[str] = None,
                                deps: List[str] = [],
+                               friendly_name: Optional[str] = None,
                                testonly: bool = False,
                                public: bool = True) -> str:
   name_block = _get_string_arg_block("NAME", target_name)
@@ -106,6 +107,7 @@ def build_iree_bytecode_module(target_name: str,
                                                     compile_tool_target)
   flags_block = _get_string_list_arg_block("FLAGS", flags)
   deps_block = _get_string_list_arg_block("DEPS", deps)
+  friendly_name_block = _get_string_arg_block("FRIENDLY_NAME", friendly_name)
   testonly_block = _get_option_arg_block("TESTONLY", testonly)
   public_block = _get_option_arg_block("PUBLIC", public)
   return _convert_block_to_string(
@@ -113,8 +115,8 @@ def build_iree_bytecode_module(target_name: str,
                        parameter_blocks=[
                            name_block, src_block, module_name_block,
                            c_identifier_block, compile_tool_target_block,
-                           static_lib_block, flags_block, deps_block,
-                           testonly_block, public_block
+                           static_lib_block, flags_block, friendly_name_block,
+                           deps_block, testonly_block, public_block
                        ]))
 
 

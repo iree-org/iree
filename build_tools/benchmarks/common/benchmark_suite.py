@@ -137,7 +137,7 @@ class BenchmarkSuite(object):
         model_name_filter: model name regex.
       Returns:
         A list of matched benchmark cases.
-    """,
+    """
 
     category_dir = self.category_map.get(category)
     if category_dir is None:

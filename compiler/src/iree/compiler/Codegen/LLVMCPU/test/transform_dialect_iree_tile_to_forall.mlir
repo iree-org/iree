@@ -60,5 +60,5 @@ transform.sequence failures(propagate) {
   // Late canonicalizations to cleanup and pass the checks.
   // Needs to occur on the whole variant to perform cse on the workgroup_count region
   transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse }
+    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
 }
