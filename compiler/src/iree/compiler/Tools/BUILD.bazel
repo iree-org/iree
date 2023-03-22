@@ -52,20 +52,6 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
-    name = "init_iree",
-    srcs = [
-        "init_iree.cc",
-    ],
-    hdrs = [
-        "init_iree.h",
-    ],
-    deps = [
-        ":version",
-        "@llvm-project//llvm:Support",
-    ],
-)
-
-iree_compiler_cc_library(
     name = "init_iree_passes_and_dialects",
     hdrs = [
         "init_iree_dialects.h",
@@ -226,7 +212,6 @@ iree_compiler_cc_library(
     ],
     hdrs = ["iree_compile_lib.h"],
     deps = [
-        ":init_iree",
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API/Internal:Embed",
         "//compiler/src/iree/compiler/Pipelines",

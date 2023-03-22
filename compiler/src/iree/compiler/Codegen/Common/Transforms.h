@@ -36,11 +36,11 @@ struct TileAndFuseResult {
 };
 FailureOr<TileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     TilingInterface op, linalg::LinalgTilingOptions tilingOptions,
-    PatternRewriter &rewriter);
+    RewriterBase &rewriter);
 
 FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
     scf::ForOp forOp, PipeliningSchedulingStrategy startegy, bool peelEpilogue,
-    int64_t depth, PatternRewriter &rewriter);
+    int64_t depth, RewriterBase &rewriter);
 
 /// Populate patterns related to clean up the IR after tile and distribute to
 /// workgroups.

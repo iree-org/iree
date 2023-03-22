@@ -367,6 +367,16 @@ class BuildFileFunctions(object):
   def iree_compiler_cc_library(self, deps=[], **kwargs):
     self.cc_library(deps=deps + ["//compiler/src:defs"], **kwargs)
 
+  def iree_compiler_register_plugin(self, plugin_id, target):
+    plugin_id_block = _convert_string_arg_block("PLUGIN_ID",
+                                                plugin_id,
+                                                quote=False)
+    target_block = _convert_single_target_block("TARGET", target)
+    self.converter.body += (f"iree_compiler_register_plugin(\n"
+                            f"{plugin_id_block}"
+                            f"{target_block}"
+                            f")\n\n")
+
   def iree_runtime_cc_library(self, deps=[], **kwargs):
     self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
 

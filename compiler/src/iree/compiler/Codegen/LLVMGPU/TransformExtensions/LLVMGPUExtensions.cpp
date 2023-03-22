@@ -22,7 +22,6 @@
 #include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -100,7 +99,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   };
 
   DiagnosedSilenceableFailure diag =
-      mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+      mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, target, workgroupSize, threadIdGenerator, true, transformOp,
           threadMappingAttributes);
 
@@ -136,7 +135,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     };
     SmallVector<int64_t> numWarps = {workgroupSize[0] / kWarpSize,
                                      workgroupSize[1], workgroupSize[2]};
-    diag = mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+    diag = mlir::transform::gpu::mapNestedForallToThreadsImpl(
         rewriter, target, numWarps, warpIdGenerator, true, transformOp,
         warpMappingAttributes);
   }
@@ -786,7 +785,7 @@ DiagnosedSilenceableFailure
 transform_dialect::PipelineSharedMemoryCopiesOp::applyToOne(
     scf::ForOp forOp, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  transform::TrivialPatternRewriter rewriter(getContext());
+  IRRewriter rewriter(getContext());
   int64_t depth(getDepth());
   FailureOr<scf::ForOp> pipelinedFor = iree_compiler::pipelineSharedMemoryCopy(
       forOp, PipeliningSchedulingStrategy::loadGlobalStage0, false, depth,
