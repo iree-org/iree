@@ -99,6 +99,9 @@ EXPLICIT_TARGET_MAPPING = {
         "MhloToLinalg",
         "MhloToStandard",
         "StablehloToMhlo",
+        # Note: We deliberately omit some passes that we do not use in IREE,
+        # e.g.: MhloToArithmeticConversion, MhloToLhloConversion, or
+        # MhloToMemrefConversion.
     ],
     "@mlir-hlo//:unfuse_batch_norm": [
         "tensorflow::external_mhlo_includes",
