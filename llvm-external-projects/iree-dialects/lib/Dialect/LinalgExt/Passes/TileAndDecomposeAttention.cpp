@@ -154,25 +154,6 @@ static Value computeQKTranspose(Value query, Value key, Value output,
   return matmulOp.getResult(0);
 }
 
-Value extractQuerySlice(Value query, ArrayRef<int64_t> queryShape,
-                        ArrayRef<Value> ivs, OpFoldResult sequenceTileLength,
-                        Type elementType, Location loc, OpBuilder &builder) {
-  auto one = builder.getIndexAttr(1);
-  auto zero = builder.getIndexAttr(0);
-  auto headDimension = builder.getIndexAttr(queryShape.back());
-  SmallVector<OpFoldResult> strides(queryShape.size(), one);
-  SmallVector<OpFoldResult> sizes(queryShape.size(), one);
-  SmallVector<OpFoldResult> offsets(queryShape.size(), zero);
-  sizes[1] = sequenceTileLength;
-  sizes[2] = headDimension;
-  offsets[0] = ivs[0];
-  SmallVector<int64_t> tensorShape{queryShape[1], queryShape[2]};
-  auto tensorType = RankedTensorType::get(tensorShape, elementType);
-  Value querySlice = builder.create<tensor::ExtractSliceOp>(
-      loc, tensorType, query, offsets, sizes, strides);
-  return querySlice;
-}
-
 static std::tuple<Value, Value>
 extractSlices(Value key, Value value, ArrayRef<int64_t> queryShape,
               ArrayRef<Value> ivs, OpFoldResult sequenceTileLength,
@@ -264,8 +245,7 @@ insertSlices(Value newResult, Value result, Value newMax, Value max,
   sizes[1] = sequenceTileLength;
   sizes[2] = headDimension;
   offsets[0] = ivs[0];
-  Value updatedAcc = builder.create<tensor::InsertSliceOp>(
-      loc, newResult, result, offsets, sizes, strides);
+  Value updatedAcc = newResult;
   offsets = SmallVector<OpFoldResult>(queryShape.size() - 1, zero);
   sizes = SmallVector<OpFoldResult>{one, sequenceTileLength};
   strides = SmallVector<OpFoldResult>(queryShape.size() - 1, one);
@@ -410,8 +390,6 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
       loc, rewriter.getZeroAttr(elementType));
   Value largeNegativeF32 = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getFloatAttr(elementType, -1.0e+30));
-  auto maxType = RankedTensorType::get(SmallVector<int64_t>{1, queryShape[1]},
-                                       elementType);
   SmallVector<Value> dynamicIndices;
   if (ShapedType::isDynamic(queryShape[1]))
     dynamicIndices.push_back(

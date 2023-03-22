@@ -33,4 +33,6 @@ transform.sequence failures(propagate) {
     %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!pdl.operation) -> (!pdl.operation)
     %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
     transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!pdl.operation) -> ()
+    %func_8 = transform.structured.hoist_redundant_vector_transfers %memref_func
+    : (!pdl.operation) -> !pdl.operation
 }

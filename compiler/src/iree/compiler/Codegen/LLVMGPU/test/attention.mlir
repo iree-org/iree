@@ -11,7 +11,7 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/attention_codegen_spec.mlir | \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_attention_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // CHECK-DAG:#[[MAP:.+]] = affine_map<(d0) -> (d0 * 128)>
