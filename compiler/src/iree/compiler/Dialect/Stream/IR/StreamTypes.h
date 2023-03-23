@@ -30,7 +30,7 @@ namespace mlir {
 
 template <>
 struct FieldParser<
-    mlir::Optional<mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>> {
+    std::optional<mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>> {
   static FailureOr<mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>
   parse(AsmParser &parser) {
     std::string value;
@@ -43,7 +43,7 @@ struct FieldParser<
 };
 static inline AsmPrinter &operator<<(
     AsmPrinter &printer,
-    mlir::Optional<mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>
+    std::optional<mlir::iree_compiler::IREE::Stream::CollectiveReductionOp>
         param) {
   printer << (param.has_value()
                   ? mlir::iree_compiler::IREE::Stream::stringifyEnum(

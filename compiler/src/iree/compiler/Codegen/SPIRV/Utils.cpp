@@ -47,7 +47,7 @@ bool isInWorkgroupMemory(MemRefType memrefType) {
   return false;
 }
 
-llvm::Optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
+std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
   auto moduleOp = funcOp->getParentOfType<ModuleOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);

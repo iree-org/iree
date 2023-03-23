@@ -43,7 +43,8 @@ namespace LinalgExt {
 FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
     OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
     ArrayRef<int64_t> tileInterchange,
-    const Optional<linalg::LinalgLoopDistributionOptions> &tileDistribution) {
+    const std::optional<linalg::LinalgLoopDistributionOptions>
+        &tileDistribution) {
   assert(tileSizes.size() == tileInterchange.size() &&
          "expect the number of tile sizes and interchange dims to match");
   assert(isPermutationVector(tileInterchange) &&

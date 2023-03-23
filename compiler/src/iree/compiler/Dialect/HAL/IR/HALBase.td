@@ -522,7 +522,7 @@ def HAL_CollectiveAttr :
   }];
   let parameters = (ins
     AttrParameter<"CollectiveKind", "">:$kind,
-    OptionalParameter<"mlir::Optional<CollectiveReductionOp>">:$reduction,
+    OptionalParameter<"std::optional<CollectiveReductionOp>">:$reduction,
     AttrParameter<"CollectiveElementType", "">:$element_type
   );
   let assemblyFormat = [{
@@ -544,7 +544,7 @@ def HAL_DescriptorSetBindingAttr :
   let parameters = (ins
     AttrParameter<"int64_t", "">:$ordinal,
     AttrParameter<"DescriptorType", "">:$type,
-    OptionalParameter<"mlir::Optional<DescriptorFlags>">:$flags
+    OptionalParameter<"std::optional<DescriptorFlags>">:$flags
   );
   let assemblyFormat = [{
     `<` $ordinal `,` $type (`,` $flags^)? `>`
@@ -799,7 +799,7 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
 
     // Returns the contents of the object file or None if loading failed.
     // TODO(benvanik): better return type to support mapping/etc? eh
-    Optional<std::string> loadData();
+    std::optional<std::string> loadData();
   }];
 }
 
@@ -845,7 +845,7 @@ def HAL_ExecutableObjectsAttr : AttrDef<HAL_Dialect, "ExecutableObjects"> {
 
   let extraClassDeclaration = [{
     // Returns the objects specified for the given generic target.
-    Optional<ArrayAttr> getApplicableObjects(
+    std::optional<ArrayAttr> getApplicableObjects(
         IREE::HAL::ExecutableTargetAttr specificTargetAttr);
   }];
 }

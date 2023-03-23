@@ -126,7 +126,7 @@ def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
     OpBuilder<(ins
       "Value":$operand,
       "Type":$type,
-      "Optional<std::pair<int64_t, int64_t>>":$integerRange
+      "std::optional<std::pair<int64_t, int64_t>>":$integerRange
     ),
     [{
       IntegerAttr minValueAttr;
@@ -148,7 +148,7 @@ def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
       return true;
     }
 
-    Optional<std::pair<int64_t, int64_t>> getIntegerRange();
+    std::optional<std::pair<int64_t, int64_t>> getIntegerRange();
   }];
 }
 
@@ -488,7 +488,7 @@ def Util_GlobalOp : Util_Op<"global", [
       "StringRef":$name,
       "bool":$isMutable,
       "Type":$type,
-      "Optional<TypedAttr>":$initialValue,
+      "std::optional<TypedAttr>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,
     OpBuilder<(ins

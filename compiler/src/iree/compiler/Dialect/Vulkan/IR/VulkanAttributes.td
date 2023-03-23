@@ -77,8 +77,8 @@ def VK_CapabilitiesAttr : VK_Attr<"Capabilities", "caps"> {
     //
     // This corresponds to the `VkPhysicalDeviceSubgroupSizeControlProperties` structure:
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSubgroupSizeControlPropertiesEXT.html
-    OptionalParameter<"::llvm::Optional<int>">:$minSubgroupSize,
-    OptionalParameter<"::llvm::Optional<int>">:$maxSubgroupSize,
+    OptionalParameter<"::std::optional<int>">:$minSubgroupSize,
+    OptionalParameter<"::std::optional<int>">:$maxSubgroupSize,
 
     // VK_KHR_16bit_storage features.
     //

@@ -79,7 +79,7 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
 void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns);
 
 using GetMinMaxExprFn =
-    std::function<Optional<std::pair<AffineExpr, AffineExpr>>(
+    std::function<std::optional<std::pair<AffineExpr, AffineExpr>>(
         Value value, SmallVectorImpl<Value> &dims,
         SmallVectorImpl<Value> &symbols)>;
 

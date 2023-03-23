@@ -223,7 +223,7 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
 
     MLIRContext *context = parser.getContext();
     auto processExtension = [&](llvm::SMLoc loc, StringRef extension) {
-      if (Optional<Extension> symbol = symbolizeExtension(extension)) {
+      if (std::optional<Extension> symbol = symbolizeExtension(extension)) {
         extensions.push_back(ExtensionAttr::get(context, *symbol));
         return success();
       }

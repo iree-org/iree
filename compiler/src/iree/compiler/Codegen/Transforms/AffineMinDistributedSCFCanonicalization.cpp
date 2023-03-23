@@ -136,7 +136,7 @@ static bool isDivisible(Value v, int64_t dividend) {
 /// With N a compile time constant. This operations can be replace by
 /// `%cN = arith.constant N : index` if we can prove that %lb, %step and %ub are
 /// divisible by N.
-static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
+static std::optional<int64_t> foldAffineMin(AffineMinOp minOp) {
   AffineMap map = minOp.getAffineMap();
   int64_t constantResult = 0;
   for (AffineExpr result : map.getResults()) {
@@ -158,7 +158,7 @@ struct AffineMinDistributedSCFCanonicalizationPattern
 
   mlir::LogicalResult matchAndRewrite(
       mlir::AffineMinOp minOp, mlir::PatternRewriter &rewriter) const override {
-    Optional<int64_t> cst = foldAffineMin(minOp);
+    std::optional<int64_t> cst = foldAffineMin(minOp);
     if (!cst) return failure();
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(minOp,
                                                    rewriter.getIndexAttr(*cst));

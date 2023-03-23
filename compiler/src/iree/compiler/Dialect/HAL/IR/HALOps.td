@@ -2373,7 +2373,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
       "Value":$byte_offset,
       "ValueRange":$dynamic_dims,
       "IntegerAttr":$alignment,
-      CArg<"mlir::Optional<DescriptorFlags>", "llvm::None">:$flags
+      CArg<"std::optional<DescriptorFlags>", "llvm::None">:$flags
     )>,
   ];
 

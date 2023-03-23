@@ -263,7 +263,7 @@ class MaterializeDispatchInstrumentationPass
           // NOTE: we just choose the first instrumented export for attribution
           // as that's good enough for all current use cases. If we start
           // specializing really early we may want to fix that.
-          Optional<uint32_t> functionId;
+          std::optional<uint32_t> functionId;
           for (auto entryPointAttr : dispatchOp.getEntryPointRefs()) {
             auto it = instrumentedExports.find(entryPointAttr);
             if (it != instrumentedExports.end()) {

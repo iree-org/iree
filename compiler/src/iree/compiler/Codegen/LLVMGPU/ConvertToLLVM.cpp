@@ -165,7 +165,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     }
 
     uint64_t alignement;
-    if (llvm::Optional<uint64_t> alignementInfo = allocOp.getAlignment()) {
+    if (std::optional<uint64_t> alignementInfo = allocOp.getAlignment()) {
       alignement = alignementInfo.value();
     } else {
       // If no alignment specified align at least to the size of an element.

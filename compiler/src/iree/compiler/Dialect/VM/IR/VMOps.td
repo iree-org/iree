@@ -349,7 +349,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
   let builders = [
     OpBuilder<(ins
       "StringRef":$name, "bool":$isMutable, "Type":$type,
-      "Optional<TypedAttr>":$initialValue,
+      "std::optional<TypedAttr>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{

@@ -34,7 +34,7 @@ namespace Util {
 namespace {
 
 struct LocAttr {
-  Optional<Location> loc;
+  std::optional<Location> loc;
   Type type;
   Attribute attr;
   operator bool() const { return attr != nullptr; }

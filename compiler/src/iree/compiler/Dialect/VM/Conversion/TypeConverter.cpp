@@ -31,7 +31,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   addConversion([](IREE::VM::RefType type) { return type; });
 
   // Wrap ref types.
-  addConversion([](Type type) -> Optional<Type> {
+  addConversion([](Type type) -> std::optional<Type> {
     if (RefType::isCompatible(type)) {
       return RefType::get(type);
     }
@@ -39,7 +39,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   });
 
   // Pointer types remain as pointer types types are passed through unmodified.
-  addConversion([this](IREE::Util::PtrType type) -> Optional<Type> {
+  addConversion([this](IREE::Util::PtrType type) -> std::optional<Type> {
     // Recursively handle pointer target types (we want to convert ptr<index> to
     // ptr<i32>, for example).
     auto targetType = convertType(type.getTargetType());
@@ -50,7 +50,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   });
 
   // Convert integer types.
-  addConversion([](IntegerType integerType) -> Optional<Type> {
+  addConversion([](IntegerType integerType) -> std::optional<Type> {
     if (integerType.isInteger(32) || integerType.isInteger(64)) {
       // i32 and i64 are always supported by the runtime.
       return integerType;
@@ -62,7 +62,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   });
 
   // Convert floating-point types.
-  addConversion([this](FloatType floatType) -> Optional<Type> {
+  addConversion([this](FloatType floatType) -> std::optional<Type> {
     if (floatType.getIntOrFloatBitWidth() < 32) {
       if (targetOptions_.f32Extension) {
         // Promote f16 -> f32.
@@ -93,12 +93,12 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   });
 
   // Convert index types to the target bit width.
-  addConversion([this](IndexType indexType) -> Optional<Type> {
+  addConversion([this](IndexType indexType) -> std::optional<Type> {
     return IntegerType::get(indexType.getContext(), targetOptions_.indexBits);
   });
 
   // Vectors are used for arbitrary byte storage.
-  addConversion([](VectorType vectorType) -> Optional<Type> {
+  addConversion([](VectorType vectorType) -> std::optional<Type> {
     return IREE::VM::RefType::get(
         IREE::VM::BufferType::get(vectorType.getContext()));
   });

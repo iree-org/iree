@@ -273,7 +273,7 @@ PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
 // !stream.resource<lifetime>
 //===----------------------------------------------------------------------===//
 
-static llvm::Optional<Lifetime> parseLifetime(StringRef str) {
+static std::optional<Lifetime> parseLifetime(StringRef str) {
   if (str == "*") {
     return Lifetime::Unknown;
   } else if (str == "external") {

@@ -143,7 +143,7 @@ void populateUtilListToVMPatterns(MLIRContext *context,
                                   TypeConverter &typeConverter,
                                   RewritePatternSet &patterns) {
   typeConverter.addConversion(
-      [&typeConverter](IREE::Util::ListType type) -> Optional<Type> {
+      [&typeConverter](IREE::Util::ListType type) -> std::optional<Type> {
         Type elementType;
         if (type.getElementType().isa<IREE::Util::VariantType>()) {
           elementType = IREE::VM::OpaqueType::get(type.getContext());

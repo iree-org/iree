@@ -128,10 +128,10 @@ IREE::Util::GlobalOpInterface lookupGlobalOp(
 
 namespace detail {
 
-llvm::Optional<unsigned> getTiedResultOperandIndex(Operation *op,
-                                                   unsigned resultIndex);
+std::optional<unsigned> getTiedResultOperandIndex(Operation *op,
+                                                  unsigned resultIndex);
 void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
-                               llvm::Optional<unsigned> operandIndex);
+                               std::optional<unsigned> operandIndex);
 SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op);
 bool isOperandTied(Operation *tiedOp, unsigned operandIndex);
 SmallVector<Value> getOperandTiedResults(Operation *op, unsigned operandIndex);
@@ -152,13 +152,13 @@ void excludeTiedOperandAndResultIndices(
 
 // Walks the SSA use-def chain upwards to find the dynamic dimensions of the
 // value. Returns None if the shape cannot be found.
-Optional<ValueRange> findDynamicDims(Value shapedValue);
+std::optional<ValueRange> findDynamicDims(Value shapedValue);
 
 // Walks the SSA use-def chain to find the dynamic dimensions of the value.
 // Returns None if the shape cannot be found or if it is defined after
 // {|block|, |insertionPoint|}.
-Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
-                                     Block::iterator insertionPoint);
+std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
+                                          Block::iterator insertionPoint);
 
 // Returns the dynamic dimensions for the value at |idx|.
 ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,

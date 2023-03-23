@@ -293,7 +293,7 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
   conversionTarget.addIllegalDialect<memref::MemRefDialect>();
 
   typeConverter.addConversion(
-      [convertedBufferType](MemRefType type) -> llvm::Optional<Type> {
+      [convertedBufferType](MemRefType type) -> std::optional<Type> {
         if (isRankZeroOrOneMemRef(type)) {
           if (convertedBufferType) {
             return convertedBufferType;

@@ -746,8 +746,9 @@ struct CmdCopyOpPattern
 // NOTE: this relies on the enums being the same today. Ew.
 static IREE::HAL::CollectiveAttr convertCollectiveAttr(
     IREE::Stream::CollectiveAttr sourceAttr) {
-  auto convertReductionOp = [](Optional<IREE::Stream::CollectiveReductionOp> op)
-      -> Optional<IREE::HAL::CollectiveReductionOp> {
+  auto convertReductionOp =
+      [](std::optional<IREE::Stream::CollectiveReductionOp> op)
+      -> std::optional<IREE::HAL::CollectiveReductionOp> {
     if (!op.has_value()) return std::nullopt;
     return static_cast<IREE::HAL::CollectiveReductionOp>(op.value());
   };

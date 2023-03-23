@@ -436,7 +436,7 @@ mlir::eliminateCommonSubexpressions(Operation *op, DominanceInfo *domInfo,
                                     RewriterBase::Listener *listener) {
   assert(op->hasTrait<OpTrait::IsIsolatedFromAbove>() &&
          "can only do CSE on isolated-from-above ops");
-  Optional<DominanceInfo> defaultDomInfo;
+  std::optional<DominanceInfo> defaultDomInfo;
   if (domInfo == nullptr) {
     defaultDomInfo.emplace(op);
     domInfo = &*defaultDomInfo;

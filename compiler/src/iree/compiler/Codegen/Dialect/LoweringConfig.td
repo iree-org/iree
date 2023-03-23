@@ -216,7 +216,7 @@ def IREECodegen_CompilationInfoAttr :
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
     DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
         "The workgroup size to use during translation.">:$workgroupSize,
-    OptionalParameter<"llvm::Optional<int64_t>",
+    OptionalParameter<"std::optional<int64_t>",
         "The subgroup size to use during translation.">:$subgroupSize
   );
 
@@ -231,7 +231,7 @@ def IREECodegen_CompilationInfoAttr :
     AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
       "TranslationInfoAttr":$translationInfo,
       "ArrayRef<int64_t>":$workgroupSize,
-      "llvm::Optional<int64_t>":$subgroupSize
+      "std::optional<int64_t>":$subgroupSize
       )>,
   ];
   let extraClassDeclaration = [{

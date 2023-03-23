@@ -76,7 +76,7 @@ struct RodataRef {
   // Total size of the serialized data in bytes.
   uint64_t totalSize = 0;
   // Optional reference to the rodata in the file.
-  Optional<ArchiveWriter::File> archiveFile;
+  std::optional<ArchiveWriter::File> archiveFile;
 };
 
 }  // namespace

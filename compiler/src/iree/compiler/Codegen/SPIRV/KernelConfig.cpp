@@ -694,7 +694,7 @@ struct CooperativeMatrixSize {
 
 /// Returns the cooperative matrix (M, N, K) sizes that are supported by the
 /// target environment and match the given parameters.
-static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
+static std::optional<CooperativeMatrixSize> getCooperativeMatrixSize(
     spirv::ResourceLimitsAttr resourceLimits,
     const unsigned numSubgroupsPerWorkgroup,
     const unsigned numMNTilesPerSubgroup, Type aType, Type bType, Type cType,
@@ -837,7 +837,7 @@ LogicalResult setCooperativeMatrixConfig(
   };
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  Optional<CooperativeMatrixSize> coopMatSize = getCooperativeMatrixSize(
+  std::optional<CooperativeMatrixSize> coopMatSize = getCooperativeMatrixSize(
       limits, numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
       getElementType(lhs), getElementType(rhs), getElementType(init), dimM,
       dimN, dimK);
@@ -846,11 +846,11 @@ LogicalResult setCooperativeMatrixConfig(
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
       SPIRVCooperativeMatrixVectorize;
 
-  Optional<int64_t> subgroupSize = limits.getSubgroupSize();
+  std::optional<int64_t> subgroupSize = limits.getSubgroupSize();
   // AMD RDNA architectures supports both wave32 and wave64 modes. Prefer to use
   // wave32 mode for better performance.
   if (targetEnv.getVendorID() == spirv::Vendor::AMD) {
-    if (Optional<int> minSize = limits.getMinSubgroupSize())
+    if (std::optional<int> minSize = limits.getMinSubgroupSize())
       subgroupSize = *minSize;
   }
 
@@ -1030,7 +1030,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   if (!foundSingleReductionOutput) return failure();
 
   const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
-  Optional<int64_t> dimSize = op.getStaticLoopRanges()[reductionDims[0]];
+  std::optional<int64_t> dimSize = op.getStaticLoopRanges()[reductionDims[0]];
   if (!dimSize || *dimSize % subgroupSize != 0) return failure();
 
   const Type elementType =
@@ -1185,7 +1185,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
-                                 Optional<int64_t> lossFactor = std::nullopt) {
+                                 std::optional<int64_t> lossFactor =
+                                     std::nullopt) {
     LLVM_DEBUG(llvm::dbgs() << "\nLoss factor: " << lossFactor << "\n");
     initConfiguration();
     // If there are more than 3 parallel dim try to tile the extra higher level
