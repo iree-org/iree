@@ -447,6 +447,7 @@ include(iree_cc_library)
 include(iree_cc_test)
 include(iree_compiler_plugin)
 include(iree_import_binary)
+include(iree_install_support)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
@@ -709,6 +710,7 @@ else()
     ${MLIR_INCLUDE_DIRS}
     ${LLD_INCLUDE_DIRS}
   )
+  iree_install_targets(TARGETS IREELLVMIncludeSetup FIX_INCLUDE_DIRS)
 
   # Splice the includes setup into base LLVM libraries so that using them
   # gets everything nice and tidy. It would be super if some day, LLVM
@@ -718,11 +720,15 @@ else()
   iree_llvm_add_usage_requirements(MLIRSupport IREELLVMIncludeSetup)
 
   # Add default external projects.
+  # TODO: Order matters here until fixed. Only mlir-hlo is set up to export
+  # its targets properly. So by listing it last, we have the side-effect of
+  # having the previous targets exported into mlir-hlo, since they all share
+  # the same global property. This is the stuff of nightmares.
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
-  iree_llvm_add_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
   if(IREE_INPUT_TORCH)
     iree_llvm_add_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
   endif()
+  iree_llvm_add_external_project(mlir-hlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
 
   # Ensure that LLVM-based dependencies needed for testing are included.
   add_dependencies(iree-test-deps FileCheck)
@@ -758,6 +764,11 @@ if(IREE_ENABLE_THREADING)
   if(IREE_ENABLE_CPUINFO)
     iree_set_cpuinfo_cmake_options()
     add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+    iree_install_targets(TARGETS cpuinfo clog FIX_INCLUDE_DIRS)
+    # In addition to not using BUILD_INTERFACE properly, PUBLIC_HEADER
+    # points at files that don't exist, rendering it uninstallable.
+    set_property(TARGET cpuinfo PROPERTY PUBLIC_HEADER)
+    set_property(TARGET clog PROPERTY PUBLIC_HEADER)
   endif()
 endif()
 
@@ -770,6 +781,7 @@ endif()
 
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+  iree_install_targets(TARGETS Vulkan-Headers FIX_INCLUDE_DIRS)
 endif()
 
 if(IREE_BUILD_COMPILER)
@@ -793,6 +805,7 @@ if(IREE_TARGET_BACKEND_METAL_SPIRV)
   iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
+  iree_install_targets(TARGETS spirv-cross-core spirv-cross-msl spirv-cross-glsl)
 endif()
 
 if(IREE_TARGET_BACKEND_WEBGPU)
@@ -907,3 +920,5 @@ endif()
 if(IREE_BUILD_TESTS)
   iree_create_ctest_customization()
 endif()
+
+iree_generate_export_targets()

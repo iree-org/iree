@@ -33,7 +33,7 @@ iree_cc_library(
   NAME
     config
   HDRS
-    ${CMAKE_CURRENT_BINARY_DIR}/config.h
+    config.h
 )
 
 iree_cc_library(

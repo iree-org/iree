@@ -62,6 +62,9 @@ macro(iree_llvm_configure_bundled)
   set(LLVM_BINARY_DIR "${IREE_BINARY_DIR}/llvm-project")
   set(LLVM_TOOLS_BINARY_DIR "${LLVM_BINARY_DIR}/bin")
   set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py")
+  # Clear the export list so that other projects that accidentally use
+  # add_mlir out of tree don't try to re-export all of MLIR.
+  set_property(GLOBAL PROPERTY MLIR_EXPORTS)
 endmacro()
 
 macro(iree_llvm_configure_installed)
@@ -105,7 +108,7 @@ macro(iree_llvm_set_bundled_cmake_options)
   set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "")
   set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "")
   set(LLVM_APPEND_VC_REV OFF CACHE BOOL "")
-  set(LLVM_ENABLE_IDE ON CACHE BOOL "")
+  set(LLVM_ENABLE_IDE OFF CACHE BOOL "")
   set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "")
 
   # LLVM defaults to building all targets. We always enable targets that we need

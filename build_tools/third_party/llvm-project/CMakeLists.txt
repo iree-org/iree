@@ -12,3 +12,4 @@ add_library(MLIRLinalgStructuredOpsIncGenLib INTERFACE)
 add_dependencies(MLIRLinalgStructuredOpsIncGenLib
   MLIRLinalgStructuredOpsIncGen
 )
+iree_install_targets(TARGETS MLIRLinalgStructuredOpsIncGenLib)

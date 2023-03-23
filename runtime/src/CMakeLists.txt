@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(IREE_HDRS_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
+
 iree_cc_library(
   NAME
     defs

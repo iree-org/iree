@@ -65,8 +65,11 @@ function(iree_tablegen_library)
 
   add_library(${_NAME} INTERFACE)
   add_dependencies(${_NAME} ${_NAME}_target)
+  iree_install_targets(
+    TARGETS ${_NAME}
+  )
 
   # Alias the iree_package_name library to iree::package::name.
   iree_package_ns(_PACKAGE_NS)
-  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  iree_add_alias_library(${_PACKAGE_NS}::${_RULE_NAME} ${_NAME})
 endfunction()

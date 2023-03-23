@@ -149,6 +149,11 @@ function(external_cc_library)
     # INTERFACE libraries can't have the CXX_STANDARD property set
     set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
     set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+
+    iree_install_targets(
+      TARGETS ${_NAME}
+      HDRS ${_RULE_HDRS}
+    )
   else()
     # Generating header-only library
     add_library(${_NAME} INTERFACE)
@@ -177,15 +182,19 @@ function(external_cc_library)
       INTERFACE
         ${_RULE_DEFINES}
     )
+    iree_install_targets(
+      TARGETS ${_NAME}
+      HDRS ${_RULE_HDRS}
+    )
   endif()
 
-  add_library(${_RULE_PACKAGE}::${_RULE_NAME} ALIAS ${_NAME})
+  iree_add_alias_library(${_RULE_PACKAGE}::${_RULE_NAME} ${_NAME})
   # If the library name matches the final component of the package then treat it
   # as a default. For example, 'foo::bar' library 'bar' would end up as
   # 'foo::bar'.
   string(REGEX REPLACE "^.*::" "" _PACKAGE_DIR ${_RULE_PACKAGE})
   if(${_PACKAGE_DIR} STREQUAL ${_RULE_NAME})
 
-    add_library(${_RULE_PACKAGE} ALIAS ${_NAME})
+    iree_add_alias_library(${_RULE_PACKAGE} ${_NAME})
   endif()
 endfunction()

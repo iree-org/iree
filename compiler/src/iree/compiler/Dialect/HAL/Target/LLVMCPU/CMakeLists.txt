@@ -163,3 +163,5 @@ _add_optional_llvm_target_deps(ARM)
 _add_optional_llvm_target_deps(RISCV)
 _add_optional_llvm_target_deps(WebAssembly)
 _add_optional_llvm_target_deps(X86)
+
+iree_install_targets(TARGETS IREELLVMCPUTargetDeps)

@@ -22,6 +22,7 @@ if(IREE_ENABLE_THREADING)
       iree::base::tracing
     PUBLIC
   )
+  iree_install_targets(TARGETS benchmark)
 else()
   iree_cc_library(
     NAME
@@ -77,4 +78,4 @@ iree_cc_library(
   PUBLIC
 )
 
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+iree_install_targets(TARGETS gmock gtest)
