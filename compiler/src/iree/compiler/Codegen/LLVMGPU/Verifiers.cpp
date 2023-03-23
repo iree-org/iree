@@ -46,7 +46,7 @@ static void getInstructionShape(
       } else if (inputElementType.isF32()) {
         instructionShape = {16, 16, 8};
       } else {
-        assert("expected f16, bf16 or f32 for tensor core pipeline");
+        assert(false && "expected f16, bf16 or f32 for tensor core pipeline");
       }
       return;
     case IREE::Codegen::DispatchLoweringPassPipeline::
@@ -57,11 +57,11 @@ static void getInstructionShape(
       } else if (inputElementType.isF32()) {
         instructionShape = {16, 8, 8};
       } else {
-        assert("expected f16, bf16 or f32 for tensor core pipeline");
+        assert(false && "expected f16, bf16 or f32 for tensor core pipeline");
       }
       return;
     default:
-      assert("expected tensor core pipeline");
+      assert(false && "expected tensor core pipeline");
   }
 }
 
