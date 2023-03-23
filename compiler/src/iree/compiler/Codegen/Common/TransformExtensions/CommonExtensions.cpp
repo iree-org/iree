@@ -1334,5 +1334,21 @@ void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
+//===---------------------------------------------------------------------===//
+// TileAndDecomposeAttention
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::TileAndDecomposeAttentionOp::applyToOne(
+    IREE::LinalgExt::AttentionOp attentionOp,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  SmallVector<Operation *> ops =
+      LinalgExt::tileAndDecomposeAttention(attentionOp, rewriter);
+  for (auto op : ops) results.push_back(op);
+  return DiagnosedSilenceableFailure::success();
+}
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"

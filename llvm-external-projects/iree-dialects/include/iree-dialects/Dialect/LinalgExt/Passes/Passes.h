@@ -174,6 +174,11 @@ std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 // linalg generic ops.
 std::unique_ptr<Pass> createDecomposeSoftmaxPass();
 
+// Transform dialect version of tile and decompose attention
+SmallVector<Operation *>
+tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
+                          IRRewriter &rewriter);
+
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
 std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
@@ -222,6 +227,18 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
 /// Create a LinalgStrategyDecomposePass.
 // TODO: if/when we need finer control add an `opName` parameter.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
+    const LinalgExt::LinalgTransformationFilter &filter =
+        LinalgExt::LinalgTransformationFilter());
+
+/// Create a LinalgStrategyPeelPass.
+using LoopsToPeelComputationFunction = std::function<void(
+    OpBuilder &, Operation *, SmallVectorImpl<scf::ForOp> &)>;
+
+struct LinalgPeelOptions {
+  LoopsToPeelComputationFunction loopsToPeelComputationFunction = nullptr;
+};
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
+    StringRef opName = "", const LinalgPeelOptions &opt = LinalgPeelOptions(),
     const LinalgExt::LinalgTransformationFilter &filter =
         LinalgExt::LinalgTransformationFilter());
 
