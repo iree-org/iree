@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iostream>
-
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -101,7 +99,7 @@ LogicalResult verifyGPUMatmulPipeline(
   mlir::Type rhsType = op->getOperand(1).getType();
   assert(lhsType.cast<ShapedType>().getElementType() ==
              rhsType.cast<ShapedType>().getElementType() &&
-         "Expected lhs and rhs to have same type. Mixed input types are not "
+         "expected lhs and rhs to have same type. Mixed input types are not "
          "supported yet in IREE Codegen.");
 
   // Get lhs and rhs shapes.
@@ -123,14 +121,14 @@ LogicalResult verifyGPUMatmulPipeline(
         return op->emitError("Received batch tile dimension of ")
                << tileShape[0]
                << " instead of 1 or lower for partitionable loops with "
-               << pipelineName;
+               << "compilation pipeline " << pipelineName;
       }
     } else {
       if (tileShape[0] != 0) {
         return op->emitError("Received batch tile dimension of ")
                << tileShape[0]
-               << " instead of 0 for non-partitionable loops with"
-               << pipelineName;
+               << " instead of 0 for non-partitionable loops with compilation"
+               << " pipeline " << pipelineName;
       }
     }
 
@@ -153,13 +151,16 @@ LogicalResult verifyGPUMatmulPipeline(
 
   if (totalNumThreads > 1024) {
     return op->emitError("Total number of threads in a thread block ")
-           << totalNumThreads << " exceeds the limit of 1024";
+           << totalNumThreads
+           << " exceeds the limit of 1024 with compilation pipeline "
+           << pipelineName;
   }
 
   // Verify the number of threads in z-dim is 1.
   if (workgroupSize[kDimZ] != 1) {
-    return op->emitError("Expected workgroup size in z-dim ")
-           << workgroupSize[kDimZ] << " is not 1";
+    return op->emitError("Expected workgroup size in z-dim = 1, but got ")
+           << workgroupSize[kDimZ] << " with compilation pipeline "
+           << pipelineName;
   }
 
   // Verify shared memory usage is within the limit.
@@ -179,7 +180,9 @@ LogicalResult verifyGPUMatmulPipeline(
   if (workgroupSize[kDimX] % kWarpSize != 0) {
     return op->emitError("Number of threads in x-dim ")
            << workgroupSize[kDimX] << " is not a multiple of warp size ("
-           << kWarpSize << ") or integer units of warps in x-dim";
+           << kWarpSize
+           << ") or integer units of warps in x-dim with compilation pipeline "
+           << pipelineName;
   }
 
   // Number of warps in matmul problem dimension M, N, and K.
@@ -210,7 +213,8 @@ LogicalResult verifyGPUMatmulPipeline(
               "software pipelining ("
            << threadBlockShape[kK] << ")"
            << " * "
-           << "(" << softwarePipelineDepth << ")";
+           << "(" << softwarePipelineDepth << ")"
+           << " with compilation pipeline " << pipelineName;
   }
 
   // Verify that matmul problem shape can be tiled with the thread block shape.
