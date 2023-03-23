@@ -98,7 +98,6 @@ LogicalResult verifyGPUMatmulPipeline(
          "Store to workgroup memory currently expected to happen in stage 1 of "
          "software pipeline.");
 
-<<<<<<< HEAD
   // Get Operand/Result types.
   mlir::Type lhsType = op->getOperand(0).getType();
   mlir::Type rhsType = op->getOperand(1).getType();
@@ -113,14 +112,6 @@ LogicalResult verifyGPUMatmulPipeline(
 
   // Tile shapes in number of elements.
   SmallVector<int64_t> tileShape =
-=======
-  // Type inputType = op->getOperand(0).getType();
-  ArrayRef<int64_t> lhsShape =
-      op->getOperand(0).getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape =
-      op->getOperand(1).getType().cast<ShapedType>().getShape();
-  SmallVector<int64_t> firstLevelTileSizes =
->>>>>>> 32cb36a47 (remove old shared memeory check)
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
   SmallVector<int64_t> threadBlockShape{tileShape};
 
@@ -175,10 +166,6 @@ LogicalResult verifyGPUMatmulPipeline(
            << workgroupSize[kDimZ] << " with compilation pipeline "
            << pipelineName;
   }
-
-<<<<<<< HEAD
-  // Verify shared memory usage is within the limit.
-  // TODO(KoolJBlack): working on adding check shared memory usage.
 
   // Return success for SIMT/CUDA cores.
   if (pipeline.getValue() ==
@@ -253,19 +240,6 @@ LogicalResult verifyGPUMatmulPipeline(
            << " with compilation pipeline " << pipelineName;
   }
 
-=======
-  // Verify shared memory usage of operands after tiling requires <= 64Kb
-  // combined space.
-  // unsigned bytesSize =
-  //     inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth() / 8;
-
-  // // Input shape sizes: A [ M x K],  B [ K x N]
-  // unsigned totalSharedMemSizeBytes =
-  //     (firstLevelTileSizes[0] * firstLevelTileSizes[2] +
-  //      firstLevelTileSizes[1] * firstLevelTileSizes[2]) *
-  //     bytesSize;
-
->>>>>>> 32cb36a47 (remove old shared memeory check)
   return success();
 }
 
