@@ -411,3 +411,35 @@ hal.executable private @matmul_tensors {
 }
 
 // -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_tensors {
+  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      workgroup_size = [128 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x512xi8>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<512x256xi8>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<1024x256xi8>
+        // expected-error @+1 {{Expected f16, bf16 or f32 for Tensor Core (MMA.SYNC) pipeline}}
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<1024x512xi8>, memref<512x256xi8>)
+          outs(%result: memref<1024x256xi8>)
+        return
+      }
+    }
+  }
+}
+
+// -----

@@ -31,14 +31,14 @@ constexpr int kK = 2;
 
 /// Returns the shape of the math instruction for the given pipeline and input
 /// element type.
-static void getInstructionShape(
-    IREE::Codegen::DispatchLoweringPassPipelineAttr pipeline,
+static LogicalResult getInstructionShape(
+    Operation *op, IREE::Codegen::DispatchLoweringPassPipelineAttr pipeline,
     Type inputElementType, SmallVector<int64_t> &instructionShape) {
   switch (pipeline.getValue()) {
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
       // SIMT Pipeline / CUDA Cores
       instructionShape = {1, 1, 1};
-      return;
+      break;
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
       // Tensor Core Pipeline / WMMA API
       if (inputElementType.isF16() || inputElementType.isBF16()) {
@@ -46,9 +46,10 @@ static void getInstructionShape(
       } else if (inputElementType.isF32()) {
         instructionShape = {16, 16, 8};
       } else {
-        assert("expected f16, bf16 or f32 for tensor core pipeline");
+        return op->emitError(
+            "Expected f16, bf16 or f32 for Tensor Core (WMMA) pipeline");
       }
-      return;
+      break;
     case IREE::Codegen::DispatchLoweringPassPipeline::
         LLVMGPUMatmulTensorCoreMmaSync:
       // Tensor Core Pipeline / MMA.SYNC
@@ -57,12 +58,16 @@ static void getInstructionShape(
       } else if (inputElementType.isF32()) {
         instructionShape = {16, 8, 8};
       } else {
-        assert("expected f16, bf16 or f32 for tensor core pipeline");
+        return op->emitError(
+            "Expected f16, bf16 or f32 for Tensor Core (MMA.SYNC) pipeline");
       }
-      return;
+      break;
     default:
-      assert("expected tensor core pipeline");
+      return op->emitError(
+          "Expected matmul SIMT, TensorCore(WMMA), or TensorCore(MMA.SYNC), "
+          "compilation pipeline");
   }
+  return success();
 }
 
 /// Verifies launch configuration for matmul and batchmatmul on a GPU for CUDA
@@ -200,8 +205,11 @@ LogicalResult verifyGPUMatmulPipeline(
 
   // Instruction shape in number of elements in M, N, and K dim.
   SmallVector<int64_t> instructionShape;
-  getInstructionShape(pipeline, lhsType.cast<ShapedType>().getElementType(),
-                      instructionShape);
+  if (failed(getInstructionShape(op, pipeline,
+                                 lhsType.cast<ShapedType>().getElementType(),
+                                 instructionShape))) {
+    return failure();
+  }
 
   // Verify the matmul problem shape K has a multiple of thread block K tiles.
   if (softwarePipelineDepth > 1 && threadBlockShape[kK] == matmulShape[kK]) {
