@@ -13,7 +13,7 @@ namespace mlir {
 namespace iree_compiler {
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Constants used in the matmul lowering verifiers.
+// Constants used in the matmul lowering verifiers.
 constexpr unsigned kWorkgroupTileLevel = 0;
 
 // Use the constexpr to convey the meaning of the indices.
@@ -39,7 +39,6 @@ static void getInstructionShape(
       // SIMT Pipeline / CUDA Cores
       instructionShape = {1, 1, 1};
       return;
-
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
       // Tensor Core Pipeline / WMMA API
       if (inputElementType.isF16() || inputElementType.isBF16()) {
@@ -164,7 +163,7 @@ LogicalResult verifyGPUMatmulPipeline(
   }
 
   // Verify shared memory usage is within the limit.
-  // TODO: (@KoolJBlack) is working on adding this check.
+  // TODO(KoolJBlack): working on adding check shared memory usage.
 
   // Return success for SIMT/CUDA cores.
   if (pipeline.getValue() ==
@@ -185,20 +184,19 @@ LogicalResult verifyGPUMatmulPipeline(
            << pipelineName;
   }
 
-  // Number of warps in matmul problem dimension M, N, and K.
-  // Note the following thread dim -> problem dim mapping:
-  // DimY -> ProblemDimM, DimX -> ProblemDimN, DimZ -> ProblemDimK.
-  SmallVector<int64_t> numWarps{workgroupSize[kDimY],
-                                workgroupSize[kDimX] / kWarpSize,
-                                workgroupSize[kDimZ]};
+  // Number of warps in x, y, and z dim.
+  SmallVector<int64_t> numWarps{workgroupSize[kDimX] / kWarpSize,
+                                workgroupSize[kDimY], workgroupSize[kDimZ]};
 
   // Matrix-multiply problem shape in number of elements in M, N, and K dim.
   SmallVector<int64_t> matmulShape{lhsShape[0], rhsShape[1], lhsShape[1]};
 
   // Warp tile shape in number of elements in M, N, and K dim.
-  SmallVector<int64_t> warpShape{threadBlockShape[kM] / numWarps[kM],
-                                 threadBlockShape[kN] / numWarps[kN],
-                                 threadBlockShape[kK] / numWarps[kK]};
+  // Note that num warp in (x, y, z) dim are mapped to problem (M, N, K) dim as:
+  // DimY -> ProblemDimM, DimX -> ProblemDimN, DimZ -> ProblemDimK.
+  SmallVector<int64_t> warpShape{threadBlockShape[kM] / numWarps[kDimY],
+                                 threadBlockShape[kN] / numWarps[kDimX],
+                                 threadBlockShape[kK] / numWarps[kDimZ]};
 
   // Instruction shape in number of elements in M, N, and K dim.
   SmallVector<int64_t> instructionShape;
