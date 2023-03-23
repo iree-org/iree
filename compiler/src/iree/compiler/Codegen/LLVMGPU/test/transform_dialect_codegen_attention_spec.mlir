@@ -14,9 +14,14 @@ transform.sequence failures(propagate) {
     // Tile and decompose attention
     // ==========================================
     %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %outer_loop, %mid_loop, %inner_loop, %fill_op, %first_matmul, %reduce_max, %partial_softmax, %reduce_sum, %update,
+    %outer_loop, %max_fill, %sum_fill, %mid_loop, %inner_loop, %fill_op, %first_matmul, %reduce_max, %partial_softmax, %reduce_sum, %update,
     %softmax, %scale_acc, %second_matmul = transform.iree.tile_and_decompose_attention %attention2 :
-       (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+       (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
+
+    // Tile fill ops
+    // ==========================================
+    transform.structured.tile_to_forall_op %max_fill tile_sizes [32] ( mapping = [#gpu.warp<x>])
+    transform.structured.tile_to_forall_op %sum_fill tile_sizes [32] ( mapping = [#gpu.warp<x>])
 
     // Vectorize function
     // ==========================================
@@ -42,4 +47,7 @@ transform.sequence failures(propagate) {
 
     %func_8 = transform.structured.hoist_redundant_vector_transfers %memref_func
     : (!pdl.operation) -> !pdl.operation
+    transform.iree.apply_patterns %func_8 { canonicalization } : (!pdl.operation) -> ()
+    transform.iree.apply_patterns %func_8 { cse } : (!pdl.operation) -> ()
+    transform.iree.apply_buffer_optimizations %func_8 : (!pdl.operation) -> ()
 }

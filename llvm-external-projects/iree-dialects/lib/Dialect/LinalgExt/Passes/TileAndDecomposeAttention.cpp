@@ -200,11 +200,11 @@ extractSlicesInner(Value query, Value output, Value max, Value sum,
   Value outputSlice = builder.create<tensor::ExtractSliceOp>(
       loc, tensorType, output, offsets, sizes, strides);
 
-  offsets = SmallVector<OpFoldResult>(queryShape.size() - 1, zero);
-  sizes = SmallVector<OpFoldResult>(queryShape.size() - 1, one);
-  strides = SmallVector<OpFoldResult>(queryShape.size() - 1, one);
-  offsets[1] = ivs[2];
-  sizes[1] = sequenceTileLength;
+  offsets = SmallVector<OpFoldResult>(queryShape.size() - 2, zero);
+  sizes = SmallVector<OpFoldResult>(queryShape.size() - 2, one);
+  strides = SmallVector<OpFoldResult>(queryShape.size() - 2, one);
+  offsets[0] = ivs[2];
+  sizes[0] = sequenceTileLength;
   tensorShape = SmallVector<int64_t>{tileSize};
   tensorType = RankedTensorType::get(tensorShape, elementType);
   Value maxSlice = builder.create<tensor::ExtractSliceOp>(
@@ -248,9 +248,9 @@ insertSlices(Value newResult, Value result, Value newMax, Value max,
   sizes[2] = headDimension;
   offsets[0] = ivs[0];
   Value updatedAcc = newResult;
-  offsets = SmallVector<OpFoldResult>(queryShape.size() - 1, zero);
-  sizes = SmallVector<OpFoldResult>{one, sequenceTileLength};
-  strides = SmallVector<OpFoldResult>(queryShape.size() - 1, one);
+  offsets = SmallVector<OpFoldResult>(queryShape.size() - 2, zero);
+  sizes = SmallVector<OpFoldResult>{sequenceTileLength};
+  strides = SmallVector<OpFoldResult>(queryShape.size() - 2, one);
   Value updatedMax = builder.create<tensor::InsertSliceOp>(
       loc, newMax, max, offsets, sizes, strides);
   Value updatedSum = builder.create<tensor::InsertSliceOp>(
@@ -275,10 +275,10 @@ static void insertSlicesInner(Value newResult, Value result, Value newMax,
   offsets[1] = ivs[2];
   builder.create<tensor::ParallelInsertSliceOp>(loc, newResult, result, offsets,
                                                 sizes, strides);
-  offsets = SmallVector<OpFoldResult>(queryShape.size() - 1, zero);
-  offsets[1] = ivs[2];
-  sizes = SmallVector<OpFoldResult>{one, sequenceTileLength};
-  strides = SmallVector<OpFoldResult>(queryShape.size() - 1, one);
+  offsets = SmallVector<OpFoldResult>(queryShape.size() - 2, zero);
+  offsets[0] = ivs[2];
+  sizes = SmallVector<OpFoldResult>{sequenceTileLength};
+  strides = SmallVector<OpFoldResult>(queryShape.size() - 2, one);
   builder.create<tensor::ParallelInsertSliceOp>(loc, newMax, max, offsets,
                                                 sizes, strides);
   builder.create<tensor::ParallelInsertSliceOp>(loc, newSum, sum, offsets,
@@ -393,14 +393,16 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
       loc, rewriter.getZeroAttr(elementType));
   Value largeNegativeF32 = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getFloatAttr(elementType, -1.0e+30));
-  SmallVector<OpFoldResult> dims{rewriter.getIndexAttr(1), sequenceTileLength};
+  SmallVector<OpFoldResult> dims{sequenceTileLength};
   Value max = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
-  Value negativeMax =
-      rewriter.create<linalg::FillOp>(loc, ValueRange{largeNegativeF32}, max)
-          .result();
+  auto maxFill =
+      rewriter.create<linalg::FillOp>(loc, ValueRange{largeNegativeF32}, max);
+  Value negativeMax = maxFill.result();
+  ops.push_back(maxFill);
   Value sum = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
-  Value zeroSum =
-      rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32}, sum).result();
+  auto sumFill = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32}, sum);
+  Value zeroSum = sumFill.result();
+  ops.push_back(sumFill);
 
   // Construct second loop
   scf::LoopNest secondLoopNest = createLoopNest(
@@ -445,9 +447,9 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   AffineExpr d0;
   bindDims(rewriter.getContext(), d0);
-  auto threadMap = AffineMap::get(
-      1, 0, {d0 * rewriter.getAffineConstantExpr(queryShape[1] / tileSize)},
-      rewriter.getContext());
+  auto threadMap =
+      AffineMap::get(1, 0, {d0 * rewriter.getAffineConstantExpr(tileSize)},
+                     rewriter.getContext());
   ivs[2] = rewriter.create<AffineApplyOp>(loc, threadMap, ivs[2]);
 
   // Extract slices
