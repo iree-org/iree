@@ -156,7 +156,7 @@ static void optimizeModule(llvm::Module &module,
   llvm::PassInstrumentationCallbacks pic;
 
   llvm::StandardInstrumentations si(module.getContext(), false);
-  si.registerCallbacks(pic, &fam);
+  si.registerCallbacks(pic, &mam);
 
   llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
   llvm::ModulePassManager mpm;
