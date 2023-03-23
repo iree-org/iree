@@ -74,7 +74,7 @@ static inline iree_byte_span_t iree_byte_span_empty() {
   return v;
 }
 
-static bool iree_byte_span_is_empty(iree_byte_span_t span) {
+static inline bool iree_byte_span_is_empty(iree_byte_span_t span) {
   return span.data == NULL || span.data_length == 0;
 }
 
@@ -95,8 +95,13 @@ static inline iree_const_byte_span_t iree_const_byte_span_empty() {
   return v;
 }
 
-static bool iree_const_byte_span_is_empty(iree_const_byte_span_t span) {
+static inline bool iree_const_byte_span_is_empty(iree_const_byte_span_t span) {
   return span.data == NULL || span.data_length == 0;
+}
+
+static inline iree_const_byte_span_t iree_const_cast_byte_span(
+    iree_byte_span_t span) {
+  return iree_make_const_byte_span(span.data, span.data_length);
 }
 
 //===----------------------------------------------------------------------===//

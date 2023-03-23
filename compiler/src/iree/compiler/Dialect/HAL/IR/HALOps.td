@@ -695,17 +695,17 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
     queue. Collective operations using this channel must only be submitted on
     compatible queues.
 
-    A rank or count of -1 can be used to indicate a default inherited from the
-    environment or device configuration.
+    The group and ID are optional and may be null. A rank or count of -1 can be
+    used to indicate a default inherited from the environment or device
+    configuration.
   }];
 
   let arguments = (ins
     HAL_Device:$device,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    // TODO(benvanik): optional discriminator for groupings.
-    // TODO(benvanik): channel ID as a `Util_BufferType:$id`.
-    // TODO(benvanik): make rank/count optional (but then would need a custom vm
-    // import pattern).
+    I32Attr:$flags,
+    Util_BufferType:$id,
+    Util_BufferType:$group,
     I32:$rank,
     I32:$count
   );
@@ -716,6 +716,9 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
     `affinity` `(` $queue_affinity `)`
+    `flags` `(` $flags `)`
+    `id` `(` $id `)`
+    `group` `(` $group `)`
     `rank` `(` $rank `)`
     `count` `(` $count `)`
     `:` type($result)

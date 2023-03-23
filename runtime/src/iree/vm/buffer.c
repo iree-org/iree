@@ -186,6 +186,24 @@ IREE_API_EXPORT uint8_t* iree_vm_buffer_data(const iree_vm_buffer_t* buffer) {
   return buffer->data.data;
 }
 
+IREE_API_EXPORT iree_byte_span_t
+iree_vm_buffer_contents(const iree_vm_buffer_t* buffer) {
+  // Buffer requires mutable access.
+  if (!buffer ||
+      !iree_all_bits_set(buffer->access, IREE_VM_BUFFER_ACCESS_MUTABLE)) {
+    return iree_byte_span_empty();
+  }
+  return iree_make_byte_span(iree_vm_buffer_data(buffer),
+                             iree_vm_buffer_length(buffer));
+}
+
+IREE_API_EXPORT iree_const_byte_span_t
+iree_vm_buffer_const_contents(const iree_vm_buffer_t* buffer) {
+  return buffer ? iree_make_const_byte_span(iree_vm_buffer_data(buffer),
+                                            iree_vm_buffer_length(buffer))
+                : iree_const_byte_span_empty();
+}
+
 IREE_API_EXPORT iree_status_t iree_vm_buffer_copy_bytes(
     const iree_vm_buffer_t* source_buffer, iree_host_size_t source_offset,
     const iree_vm_buffer_t* target_buffer, iree_host_size_t target_offset,
