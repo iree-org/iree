@@ -342,75 +342,6 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
 }
 
 namespace {
-
-///
-/// Linalg peeling patterns.
-///
-
-/// Compute the loops to peel and return them in a SmallVector. Loops will be
-/// peeled in order of appearance in the SmallVector. This order will impact the
-/// output IR. If an inner-to-outer order is provided, the peeled iterations of
-/// the outer loops will also contain the peeled inner loops. If an
-/// outer-to-inner order is provided, the peeled iterations of the outer loops
-/// will not contain any peeled inner loops.
-
-/// `filter` controls LinalgTransformMarker matching and update when specified.
-struct LinalgPeelingPattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
-  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  LinalgPeelingPattern(MLIRContext *context,
-                       LinalgExt::LinalgTransformationFilter f =
-                           LinalgExt::LinalgTransformationFilter(),
-                       LinalgPeelOptions options = LinalgPeelOptions(),
-                       PatternBenefit benefit = 1);
-
-  /// Construct a pattern specifically applied to `opName`.
-  LinalgPeelingPattern(StringRef opName, MLIRContext *context,
-                       LinalgPeelOptions options = LinalgPeelOptions(),
-                       LinalgExt::LinalgTransformationFilter f =
-                           LinalgExt::LinalgTransformationFilter(),
-                       PatternBenefit benefit = 1);
-
-  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
-                                PatternRewriter &rewriter) const override;
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  const LinalgExt::LinalgTransformationFilter filter;
-  /// Peeling options.
-  const LinalgPeelOptions options;
-};
-
-LinalgPeelingPattern::LinalgPeelingPattern(
-    MLIRContext *context, LinalgExt::LinalgTransformationFilter f,
-    LinalgPeelOptions options, PatternBenefit benefit)
-    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-      filter(std::move(f)), options(std::move(options)) {}
-
-LinalgPeelingPattern::LinalgPeelingPattern(
-    StringRef opName, MLIRContext *context, LinalgPeelOptions options,
-    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
-    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-      filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
-
-LogicalResult
-LinalgPeelingPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
-                                      PatternRewriter &rewriter) const {
-  if (failed(filter.checkAndNotify(rewriter, linalgOp)))
-    return failure();
-
-  // Increase marker counter even if peeling doesn't happen for this op.
-  filter.replaceLinalgTransformationFilter(rewriter, linalgOp);
-
-  if (!options.loopsToPeelComputationFunction)
-    return failure();
-
-  SmallVector<scf::ForOp, 4> loopsToPeel;
-  options.loopsToPeelComputationFunction(rewriter, linalgOp, loopsToPeel);
-  linalg::peelLoops(rewriter, loopsToPeel);
-  return success();
-}
-
 /// Configurable pass to apply pattern-based tiling and fusion.
 struct LinalgStrategyTileAndFusePass
     : public LinalgStrategyTileAndFusePassBase<LinalgStrategyTileAndFusePass> {
@@ -531,40 +462,6 @@ struct LinalgStrategyDecomposePass
       signalPassFailure();
   }
 
-  LinalgExt::LinalgTransformationFilter filter;
-};
-
-/// Configurable pass to apply pattern-based linalg peeling.
-struct LinalgStrategyPeelPass
-    : public LinalgStrategyPeelPassBase<LinalgStrategyPeelPass> {
-
-  LinalgStrategyPeelPass() = default;
-
-  LinalgStrategyPeelPass(StringRef opName, LinalgPeelOptions opt,
-                         LinalgExt::LinalgTransformationFilter filt)
-      : options(std::move(opt)), filter(std::move(filt)) {
-    this->anchorOpName.setValue(opName.str());
-  }
-
-  void runOnOperation() override {
-    auto funcOp = getOperation();
-    if (!anchorFuncName.empty() && funcOp.getName() != anchorFuncName)
-      return;
-
-    RewritePatternSet peelingPatterns(funcOp.getContext());
-    if (!anchorOpName.empty()) {
-      peelingPatterns.add<LinalgPeelingPattern>(
-          anchorOpName, funcOp.getContext(), options, filter);
-    } else {
-      peelingPatterns.add<LinalgPeelingPattern>(funcOp.getContext(), filter,
-                                                options);
-    }
-    if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(peelingPatterns))))
-      return signalPassFailure();
-  }
-
-  LinalgPeelOptions options;
   LinalgExt::LinalgTransformationFilter filter;
 };
 
@@ -794,13 +691,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPadPass(
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
     const LinalgExt::LinalgTransformationFilter &filter) {
   return std::make_unique<LinalgStrategyDecomposePass>(filter);
-}
-
-/// Create a LinalgStrategyPeelPass.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
-    StringRef opName, const LinalgPeelOptions &opt,
-    const LinalgExt::LinalgTransformationFilter &filter) {
-  return std::make_unique<LinalgStrategyPeelPass>(opName, opt, filter);
 }
 
 /// Create a LinalgStrategyVectorizePass.

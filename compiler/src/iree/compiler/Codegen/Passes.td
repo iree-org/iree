@@ -398,6 +398,13 @@ def LLVMCPUTensorPad :
       "mlir::iree_compiler::createLLVMCPUTensorPadPass()";
 }
 
+def LLVMCPUPeel :
+    Pass<"iree-llvmcpu-peel", "func::FuncOp"> {
+  let summary = "Pass to perform peeling on non-distributed loops.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUPeelPass()";
+}
+
 def ConvertToLLVM :
     Pass<"iree-convert-to-llvm", "ModuleOp"> {
   let summary =

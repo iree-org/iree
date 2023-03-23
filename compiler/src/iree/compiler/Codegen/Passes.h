@@ -300,6 +300,9 @@ enum class LLVMCPUTensorPadOption { ParallelDims, ReductionDims };
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
     LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims);
 
+/// Pass to perform peeling on non-distributed loops.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReordering = false);
