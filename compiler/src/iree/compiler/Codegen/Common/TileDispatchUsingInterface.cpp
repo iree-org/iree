@@ -468,6 +468,7 @@ static SmallVector<tensor::ExtractSliceOp> getAllFusableProducerUses(
 
 FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
     TilingInterface op, linalg::LinalgTilingOptions tilingOptions,
+    RewriterBase &rewriter) {
   IREETileAndFuseResult tileAndFuseResult;
   auto fusableProducers = getAllFusableProducers(op);
   // Apply the tiling pattern.
