@@ -14,6 +14,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -37,6 +38,10 @@ using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
 #define DEBUG_TYPE "iree-flow-region-op-utils"
+
+//===----------------------------------------------------------------------===//
+// Methods for getting the workload information for dispatch region creation.
+//===----------------------------------------------------------------------===//
 
 static SmallVector<Range> getLoopRangesImpl(TilingInterface tilableOp,
                                             Location loc, OpBuilder &builder) {
@@ -91,6 +96,25 @@ SmallVector<Range> Flow::getLoopRanges(Operation *op, Location loc,
       .Default([](Operation *op) -> SmallVector<Range> {
         llvm_unreachable("op not supported");
       });
+}
+
+/// Compute the workload to use for the workgroup based on the root op.
+static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
+                                               Operation *rootOp) {
+  // Compute workgroup count to use for the dispatch op. These are the ranges
+  // of the outermost parallel loops that can be distributed.
+  Location loc = rootOp->getLoc();
+  SmallVector<Range> loopRanges = Flow::getLoopRanges(rootOp, loc, builder);
+  AffineExpr s0, s1, s2;
+  bindSymbols(builder.getContext(), s0, s1, s2);
+  AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
+  return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
+    Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
+    Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
+    Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
+    return builder.create<AffineApplyOp>(rootOp->getLoc(), workload,
+                                         ValueRange{offset, size, stride});
+  }));
 }
 
 /// Return `true` if the given type is a ShapedType and has at least one
@@ -212,13 +236,13 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
 }
 
 Flow::DispatchRegionOp Flow::makeDispatchRegionWithWorkload(
-    OpBuilder &builder, Location loc, std::optional<ValueRange> workload) {
+    OpBuilder &builder, Location loc, SmallVector<Value> workload) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
   auto regionOp = builder.create<Flow::DispatchRegionOp>(
       loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(),
-      /*workload=*/workload.value_or(ValueRange{}));
+      /*workload=*/workload);
   Block &body = regionOp.getBody().emplaceBlock();
   builder.setInsertionPointToStart(&body);
   builder.create<Flow::ReturnOp>(loc, ValueRange());
@@ -263,8 +287,12 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
 #ifndef NDEBUG
   DominanceInfo domInfo;
   for (OpOperand &use : target->getUses()) {
-    if (regionOp->isProperAncestor(use.getOwner())) continue;
-    assert(domInfo.properlyDominates(regionOp, use.getOwner()) &&
+    Operation *user = use.getOwner();
+    if (regionOp->isProperAncestor(use.getOwner()) ||
+        isa<tensor::DimOp>(user)) {
+      continue;
+    }
+    assert(domInfo.properlyDominates(regionOp, user) &&
            "found use that does not post-dominate target");
   }
 #endif  // NDEBUG
@@ -319,9 +347,19 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
 FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
     RewriterBase &rewriter, Operation *op,
     std::optional<Flow::WorkloadBuilder> workloadBuilder) {
-  std::optional<ValueRange> workload = std::nullopt;
-  if (workloadBuilder.has_value()) workload = workloadBuilder->workload;
-  // Make an empty dispatch region right before the op.
+  SmallVector<Value> workload;
+
+  OpBuilder::InsertionGuard g(rewriter);
+  if (workloadBuilder) {
+    rewriter.setInsertionPoint(op);
+    FailureOr<SmallVector<Value>> maybeWorkload =
+        getWorkloadForRootOp(rewriter, op);
+    if (failed(maybeWorkload)) {
+      return op->emitOpError("failed to compute workload for op");
+    }
+    workload = *maybeWorkload;
+  }
+
   rewriter.setInsertionPointAfter(op);
   Flow::DispatchRegionOp regionOp =
       Flow::makeDispatchRegionWithWorkload(rewriter, op->getLoc(), workload);
@@ -335,12 +373,11 @@ FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
     Block *body = rewriter.createBlock(&workgroupCountRegion);
     SmallVector<BlockArgument> workloadArgs;
     Location loc = newRegionOp->getLoc();
-    for (Value v : workloadBuilder->workload) {
+    for (Value v : workload) {
       workloadArgs.push_back(body->addArgument(v.getType(), loc));
     }
     rewriter.setInsertionPointToStart(body);
     workloadBuilder->regionBuilder(rewriter, loc, workloadArgs);
-    ValueRange workload(workloadBuilder->workload);
   }
 
   return newRegionOp;
