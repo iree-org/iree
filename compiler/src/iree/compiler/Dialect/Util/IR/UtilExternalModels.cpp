@@ -50,7 +50,7 @@ struct InsertSliceOpTiedOpInterface
         insertSliceOp.getDest());
   }
 
-  ::llvm::Optional<unsigned> getTiedResultOperandIndex(
+  ::std::optional<unsigned> getTiedResultOperandIndex(
       Operation *op, unsigned resultIndex) const {
     return {1};  // dest
   }
@@ -70,7 +70,7 @@ struct LinalgOpTiedOpInterface
         linalgOp.getDpsInitOperands()[resultIndex]->get());
   }
 
-  ::llvm::Optional<unsigned> getTiedResultOperandIndex(
+  ::std::optional<unsigned> getTiedResultOperandIndex(
       Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return {linalgOp.getDpsInitOperands()[resultIndex]->getOperandNumber()};

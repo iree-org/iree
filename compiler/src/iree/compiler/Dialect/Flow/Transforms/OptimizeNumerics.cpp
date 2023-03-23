@@ -70,7 +70,7 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
 }
 
 struct NarrowParams {
-  static Optional<NarrowParams> forValue(Value value) {
+  static std::optional<NarrowParams> forValue(Value value) {
     if (auto narrowOp =
             llvm::dyn_cast_or_null<IREE::Util::NumericOptionalNarrowOp>(
                 value.getDefiningOp())) {
@@ -96,7 +96,7 @@ struct NarrowParams {
   Value producer;
   Type fromType;
   Type toElementType;
-  Optional<std::pair<int64_t, int64_t>> range;
+  std::optional<std::pair<int64_t, int64_t>> range;
 };
 
 // Eliminates a cast produced by an empty by just initializing to that

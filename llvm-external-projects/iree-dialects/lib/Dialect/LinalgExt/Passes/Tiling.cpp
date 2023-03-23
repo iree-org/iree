@@ -56,7 +56,7 @@ verifySupportedTilingOptions(PatternRewriter &rewriter, Operation *op,
 /// converted to an `IntegerAttr` of that value. So here just return true if
 /// this is an attribute with a zero value.
 static bool isUntiledLoop(OpFoldResult valueOrAttr) {
-  Optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
+  std::optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
   return intVal && *intVal == 0;
 }
 

@@ -625,7 +625,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 // TODO: this should be part of LinalgOp interface, the equivalent member
 // function currently only support the case where all the dimensions are static
 // while we want to support dynamic shapes.
-static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
+static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   for (auto [mapIdx, map] : llvm::enumerate(op.getIndexingMapsArray())) {
     for (auto [dimIdx, dim] : llvm::enumerate(map.getResults())) {
       auto expr = dim.dyn_cast<AffineDimExpr>();
@@ -712,7 +712,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   }
   if (!foundSingleReductionOutput) return failure();
 
-  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
+  std::optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
 
   const Type elementType = op.getDpsInitOperand(0)

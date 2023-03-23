@@ -97,7 +97,7 @@ struct RegisterUsage {
     maxRefRegisterOrdinal = -1;
   }
 
-  Optional<int> findFirstUnsetIntOrdinalSpan(size_t byteWidth) {
+  std::optional<int> findFirstUnsetIntOrdinalSpan(size_t byteWidth) {
     unsigned int requiredAlignment = byteWidth / 4;
     unsigned int ordinalStart = intRegisters.find_first_unset();
     while (ordinalStart != -1) {
@@ -122,7 +122,7 @@ struct RegisterUsage {
     return std::nullopt;
   }
 
-  Optional<Register> allocateRegister(Type type) {
+  std::optional<Register> allocateRegister(Type type) {
     if (type.isIntOrFloat()) {
       size_t byteWidth = IREE::Util::getRoundedElementByteWidth(type);
       auto ordinalStartOr = findFirstUnsetIntOrdinalSpan(byteWidth);

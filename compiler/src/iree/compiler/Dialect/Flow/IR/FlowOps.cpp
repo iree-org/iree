@@ -114,7 +114,7 @@ static llvm::SmallBitVector getDroppedDimsImpl(
   }
   unsigned shapePos = 0;
   for (const auto &size : llvm::enumerate(mixedSizes)) {
-    Optional<int64_t> sizeVal = getConstantIntValue(size.value());
+    std::optional<int64_t> sizeVal = getConstantIntValue(size.value());
     // If the size is not 1, or if the current matched dimension of the result
     // is the same static shape as the size value (which is 1), then the
     // dimension is preserved.
@@ -129,7 +129,7 @@ static llvm::SmallBitVector getDroppedDimsImpl(
 }
 
 /// Returns the `hal.interface.binding` a value comes from.
-static Optional<BlockArgument> getBindingArgument(Value v) {
+static std::optional<BlockArgument> getBindingArgument(Value v) {
   if (BlockArgument blockArg = v.dyn_cast<BlockArgument>()) {
     if (isa<IREE::Flow::DispatchWorkgroupsOp>(
             blockArg.getOwner()->getParentOp())) {
@@ -665,7 +665,7 @@ Value DispatchTensorLoadOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::llvm::Optional<unsigned> DispatchTensorLoadOp::getTiedResultOperandIndex(
+::std::optional<unsigned> DispatchTensorLoadOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
@@ -923,7 +923,7 @@ LogicalResult DispatchWorkgroupsOp::verify() {
 }
 
 BlockArgument DispatchWorkgroupsOp::getOutputBlockArgument(unsigned idx) {
-  Optional<ArrayAttr> tiedOperands = getTiedOperands();
+  std::optional<ArrayAttr> tiedOperands = getTiedOperands();
   if (!tiedOperands.has_value() || tiedOperands->empty()) {
     unsigned numInputs = getArguments().size();
     return getWorkgroupBody().getArguments().drop_front(numInputs)[idx];
@@ -1411,7 +1411,7 @@ Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::llvm::Optional<unsigned> TensorReshapeOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorReshapeOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
@@ -1449,7 +1449,7 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }
@@ -1511,9 +1511,9 @@ struct FoldInsertSliceWithTensorStoreOp
 
     // Check that the `dest` of the `tensor.insert_slice` and target of the
     // `flow.dispatch.tensor.store` are the same interface binding.
-    Optional<BlockArgument> destBinding =
+    std::optional<BlockArgument> destBinding =
         getBindingArgument(insertSliceOp.getDest());
-    Optional<BlockArgument> targetBinding =
+    std::optional<BlockArgument> targetBinding =
         getBindingArgument(dispatchTensorStoreOp.getTarget());
     if (!destBinding || !targetBinding ||
         destBinding.value() != targetBinding.value()) {
@@ -1585,7 +1585,7 @@ Value CollectiveAllGatherOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> CollectiveAllGatherOp::getTiedResultOperandIndex(
+::std::optional<unsigned> CollectiveAllGatherOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }
@@ -1612,7 +1612,7 @@ Value CollectiveAllReduceOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> CollectiveAllReduceOp::getTiedResultOperandIndex(
+::std::optional<unsigned> CollectiveAllReduceOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }
@@ -1640,7 +1640,7 @@ Value CollectiveReduceScatterOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
 }
 
-::llvm::Optional<unsigned> CollectiveReduceScatterOp::getTiedResultOperandIndex(
+::std::optional<unsigned> CollectiveReduceScatterOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // target
 }

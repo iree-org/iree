@@ -95,7 +95,7 @@ constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
 }
 }  // namespace
 
-llvm::Optional<int32_t> getElementTypeValue(Type type) {
+std::optional<int32_t> getElementTypeValue(Type type) {
   if (auto intType = type.dyn_cast_or_null<IntegerType>()) {
     NumericalType numericalType;
     if (intType.isInteger(1)) {
@@ -134,7 +134,7 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
   return std::nullopt;
 }
 
-llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
+std::optional<int32_t> getEncodingTypeValue(Attribute attr) {
   // TODO(#6762): encoding attribute handling/mapping to enums.
   assert(!attr && "encoding types other than default not yet supported");
   // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
@@ -528,7 +528,7 @@ FailureOr<std::string> ExecutableObjectAttr::getAbsolutePath() {
   return findFileInPaths(pathAttr.getValue(), clExecutableObjectSearchPath);
 }
 
-Optional<std::string> ExecutableObjectAttr::loadData() {
+std::optional<std::string> ExecutableObjectAttr::loadData() {
   if (auto dataAttr = getData()) {
     // This is shady but so is using this feature.
     // TODO(benvanik): figure out a way to limit the attribute to signless int8.
@@ -617,7 +617,7 @@ void ExecutableObjectsAttr::print(AsmPrinter &p) const {
   os << "}>";
 }
 
-Optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
+std::optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
     IREE::HAL::ExecutableTargetAttr specificTargetAttr) {
   SmallVector<Attribute> allObjectAttrs;
   for (auto [targetAttr, objectsAttr] :

@@ -47,7 +47,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
 
 /// Follow the reverse SSA use-def chain of the given value (always taking the
 /// tied operand) and return the first value outside of `regionOp`.
-static Optional<Value> findFirstTiedValueOutsideOfRegionOp(
+static std::optional<Value> findFirstTiedValueOutsideOfRegionOp(
     Flow::DispatchRegionOp regionOp, Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {

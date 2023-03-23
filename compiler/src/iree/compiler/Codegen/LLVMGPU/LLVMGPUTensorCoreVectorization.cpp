@@ -45,7 +45,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
 
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
                                          bool useMmaSyncShape) {
-  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
+  auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (!contract) return std::nullopt;
     return gpuMmaUnrollOrder(contract);

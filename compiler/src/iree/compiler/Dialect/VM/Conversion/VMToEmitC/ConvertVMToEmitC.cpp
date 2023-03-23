@@ -117,7 +117,8 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
 
   attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
-  Optional<std::string> callingConvention = makeCallingConventionString(funcOp);
+  std::optional<std::string> callingConvention =
+      makeCallingConventionString(funcOp);
 
   // Annotate new function with calling convention string which gets used in
   // the CModuleTarget.
@@ -235,8 +236,8 @@ FailureOr<int64_t> calculateNumSpans(IREE::VM::CallVariadicOp &callOp) {
   return lastSegmentSize.getSExtValue();
 }
 
-Optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
-                                        IREE::VM::ImportOp &importOp) {
+std::optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
+                                             IREE::VM::ImportOp &importOp) {
   auto callingConvention = makeImportCallingConventionString(importOp);
   if (!callingConvention.has_value()) {
     return std::nullopt;
@@ -245,7 +246,7 @@ Optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
          "_import_shim";
 }
 
-Optional<std::string> buildVariadicFunctionName(
+std::optional<std::string> buildVariadicFunctionName(
     IREE::VM::ModuleOp &moduleOp, IREE::VM::ImportOp &importOp,
     DenseIntElementsAttr segmentSizes) {
   auto callingConvention = makeImportCallingConventionString(importOp);
@@ -266,9 +267,8 @@ Optional<std::string> buildVariadicFunctionName(
   return result;
 }
 
-Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
-                                            Operation *srcOp,
-                                            Type elementType) {
+std::optional<emitc::ApplyOp> createVmTypeDefPtr(
+    ConversionPatternRewriter &rewriter, Operation *srcOp, Type elementType) {
   auto ctx = srcOp->getContext();
   auto loc = srcOp->getLoc();
 
@@ -1321,8 +1321,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
   using OpConversionPattern<IREE::VM::ExportOp>::OpConversionPattern;
 
   struct GeneratedStruct {
-    Optional<Value> value = std::nullopt;
-    Optional<std::string> name = std::nullopt;
+    std::optional<Value> value = std::nullopt;
+    std::optional<std::string> name = std::nullopt;
     SmallVector<Value> callArguments;
   };
 
@@ -2424,7 +2424,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
 
     updatedOperands = {stackArg, import};
 
-    Optional<std::string> funcName;
+    std::optional<std::string> funcName;
     if (auto variadicOp = dyn_cast<IREE::VM::CallVariadicOp>(op)) {
       funcName = buildVariadicFunctionName(moduleOp, importOp,
                                            variadicOp.getSegmentSizes());
@@ -2513,7 +2513,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     // parameter to the call.
     for (OpResult result : op->getResults()) {
       if (result.getType().isa<IREE::VM::RefType>()) {
-        Optional<Value> ref = typeConverter->materializeRef(result);
+        std::optional<Value> ref = typeConverter->materializeRef(result);
 
         if (!ref.has_value()) {
           return op->emitError() << "local ref not found";
@@ -2546,7 +2546,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
       return operand;
     }
 
-    Optional<Value> operandRef = typeConverter->materializeRef(operand);
+    std::optional<Value> operandRef = typeConverter->materializeRef(operand);
 
     if (!operandRef.has_value()) {
       return emitError(loc) << "local ref not found";
@@ -2609,13 +2609,13 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
     bool moveRhs =
         vmAnalysis.value().get().isMove(cmpOp.getRhs(), cmpOp.getOperation());
 
-    Optional<Value> refLhs = typeConverter->materializeRef(cmpOp.getLhs());
+    std::optional<Value> refLhs = typeConverter->materializeRef(cmpOp.getLhs());
 
     if (!refLhs.has_value()) {
       return cmpOp.emitError() << "local ref not found";
     }
 
-    Optional<Value> refRhs = typeConverter->materializeRef(cmpOp.getRhs());
+    std::optional<Value> refRhs = typeConverter->materializeRef(cmpOp.getRhs());
 
     if (!refRhs.has_value()) {
       return cmpOp.emitError() << "local ref not found";
@@ -2669,7 +2669,8 @@ class CompareRefNotZeroOpConversion
     bool move = vmAnalysis.value().get().isMove(cmpOp.getOperand(),
                                                 cmpOp.getOperation());
 
-    Optional<Value> ref = typeConverter->materializeRef(cmpOp.getOperand());
+    std::optional<Value> ref =
+        typeConverter->materializeRef(cmpOp.getOperand());
 
     if (!ref.has_value()) {
       return cmpOp.emitError() << "local ref not found";
@@ -2735,7 +2736,7 @@ class ConstRefZeroOpConversion
     IREE::VM::EmitCTypeConverter *typeConverter =
         getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    Optional<Value> ref =
+    std::optional<Value> ref =
         typeConverter->materializeRef(constRefZeroOp.getResult());
 
     if (!ref.has_value()) {
@@ -2802,7 +2803,7 @@ class ConstRefRodataOpConversion
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    Optional<Value> ref =
+    std::optional<Value> ref =
         typeConverter->materializeRef(constRefRodataOp.getResult());
 
     if (!ref.has_value()) {
@@ -2881,8 +2882,10 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
         assert(operand.getType().isa<IREE::VM::RefType>());
         assert(blockArg.getType().isa<IREE::VM::RefType>());
 
-        Optional<Value> operandRef = typeConverter->materializeRef(operand);
-        Optional<Value> blockArgRef = typeConverter->materializeRef(blockArg);
+        std::optional<Value> operandRef =
+            typeConverter->materializeRef(operand);
+        std::optional<Value> blockArgRef =
+            typeConverter->materializeRef(blockArg);
 
         if (!operandRef.has_value()) {
           return op.emitError() << "local ref not found";
@@ -3041,7 +3044,8 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
                emitc::PointerType::get(
                    emitc::OpaqueType::get(ctx, "iree_vm_ref_t")));
 
-        Optional<Value> operandRef = typeConverter->materializeRef(operand);
+        std::optional<Value> operandRef =
+            typeConverter->materializeRef(operand);
 
         if (!operandRef.has_value()) {
           return op->emitError() << "local ref not found";
@@ -3341,7 +3345,7 @@ class GlobalLoadStoreRefOpConversion
 
     Value localValue = isLoad ? op->getResult(0) : op->getOperand(0);
 
-    Optional<Value> localRef = typeConverter->materializeRef(localValue);
+    std::optional<Value> localRef = typeConverter->materializeRef(localValue);
 
     if (!localRef.has_value()) {
       return op->emitError() << "local ref not found";
@@ -3498,8 +3502,8 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
         Type objectType =
             originalType.cast<IREE::VM::RefType>().getObjectType();
 
-        Optional<std::pair<StringRef, StringRef>> vmNames =
-            TypeSwitch<Type, Optional<std::pair<StringRef, StringRef>>>(
+        std::optional<std::pair<StringRef, StringRef>> vmNames =
+            TypeSwitch<Type, std::optional<std::pair<StringRef, StringRef>>>(
                 objectType)
                 .Case<IREE::VM::ListType>([&](auto t) {
                   return std::make_pair(StringRef("iree_vm_list_t"),
@@ -3588,7 +3592,7 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
 
     for (OpResult result : op->getResults()) {
       if (result.getType().isa<IREE::VM::RefType>()) {
-        Optional<Value> ref = typeConverter->materializeRef(result);
+        std::optional<Value> ref = typeConverter->materializeRef(result);
 
         if (!ref.has_value()) {
           return op->emitError() << "local ref not found";
@@ -3637,8 +3641,8 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
 
     Type objectType =
         op.getType().template cast<IREE::VM::RefType>().getObjectType();
-    Optional<Type> elementType = extractElementType(ctx, objectType);
-    Optional<CNames> cNames = extractCNames(op);
+    std::optional<Type> elementType = extractElementType(ctx, objectType);
+    std::optional<CNames> cNames = extractCNames(op);
 
     if (!elementType.has_value() || !cNames.has_value()) {
       return op.emitError() << "unknown container type";
@@ -3667,7 +3671,7 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
         /*memberName=*/"allocator",
         /*operand=*/stateArg);
 
-    Optional<SmallVector<Value>> operands = getOperands(
+    std::optional<SmallVector<Value>> operands = getOperands(
         op, adaptor, rewriter, elementType.value(), containerPtr, allocator);
 
     if (!operands.has_value()) {
@@ -3712,7 +3716,7 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
     return success();
   }
 
-  Optional<Type> extractElementType(MLIRContext *ctx, Type t) const {
+  std::optional<Type> extractElementType(MLIRContext *ctx, Type t) const {
     if (auto listType = t.dyn_cast<IREE::VM::ListType>()) {
       return listType.getElementType();
     } else if (auto bufferType = t.dyn_cast<IREE::VM::BufferType>()) {
@@ -3721,7 +3725,7 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
     return std::nullopt;
   }
 
-  Optional<CNames> extractCNames(SrcOpTy op) const {
+  std::optional<CNames> extractCNames(SrcOpTy op) const {
     if (isa<IREE::VM::ListAllocOp>(op)) {
       return CNames{"iree_vm_list_t", "iree_vm_list_type_id",
                     "iree_vm_list_create"};
@@ -3735,14 +3739,13 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
     return std::nullopt;
   }
 
-  Optional<SmallVector<Value>> getOperands(IREE::VM::ListAllocOp op,
-                                           Adaptor adaptor,
-                                           ConversionPatternRewriter &rewriter,
-                                           Type elementType, Value containerPtr,
-                                           Value allocator) const {
+  std::optional<SmallVector<Value>> getOperands(
+      IREE::VM::ListAllocOp op, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
+      Value allocator) const {
     SmallVector<Value> result;
 
-    Optional<emitc::ApplyOp> elementTypePtrOp =
+    std::optional<emitc::ApplyOp> elementTypePtrOp =
         createVmTypeDefPtr(rewriter, op.getOperation(), elementType);
 
     if (!elementTypePtrOp.has_value()) {
@@ -3759,11 +3762,10 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
     return result;
   }
 
-  Optional<SmallVector<Value>> getOperands(IREE::VM::BufferAllocOp op,
-                                           Adaptor adaptor,
-                                           ConversionPatternRewriter &rewriter,
-                                           Type elementType, Value containerPtr,
-                                           Value allocator) const {
+  std::optional<SmallVector<Value>> getOperands(
+      IREE::VM::BufferAllocOp op, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
+      Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
@@ -3792,11 +3794,10 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
     return result;
   }
 
-  Optional<SmallVector<Value>> getOperands(IREE::VM::BufferCloneOp op,
-                                           Adaptor adaptor,
-                                           ConversionPatternRewriter &rewriter,
-                                           Type elementType, Value containerPtr,
-                                           Value allocator) const {
+  std::optional<SmallVector<Value>> getOperands(
+      IREE::VM::BufferCloneOp op, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter, Type elementType, Value containerPtr,
+      Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
@@ -3859,12 +3860,12 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
     auto ctx = getOp.getContext();
     auto loc = getOp.getLoc();
 
-    Optional<StringRef> valueTypeEnum;
-    Optional<StringRef> valueExtractor;
+    std::optional<StringRef> valueTypeEnum;
+    std::optional<StringRef> valueExtractor;
 
     std::tie(valueTypeEnum, valueExtractor) =
-        TypeSwitch<Operation *,
-                   std::pair<Optional<StringRef>, Optional<StringRef>>>(
+        TypeSwitch<Operation *, std::pair<std::optional<StringRef>,
+                                          std::optional<StringRef>>>(
             getOp.getOperation())
             .Case<IREE::VM::ListGetI32Op>([&](auto op) {
               return std::make_pair(StringRef("IREE_VM_VALUE_TYPE_I32"),
@@ -4067,8 +4068,8 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
     auto ctx = setOp.getContext();
     auto loc = setOp.getLoc();
 
-    Optional<StringRef> valueConstructor =
-        TypeSwitch<Operation *, Optional<StringRef>>(setOp.getOperation())
+    std::optional<StringRef> valueConstructor =
+        TypeSwitch<Operation *, std::optional<StringRef>>(setOp.getOperation())
             .Case<IREE::VM::ListSetI32Op>(
                 [&](auto op) { return StringRef("iree_vm_value_make_i32"); })
             .template Case<IREE::VM::ListSetI64Op>(

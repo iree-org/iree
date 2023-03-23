@@ -38,7 +38,7 @@ class FixedPointIteratorPass
   void getDependentDialects(DialectRegistry &registry) const override;
   void runOnOperation() override;
 
-  Optional<OpPassManager> pipeline;
+  std::optional<OpPassManager> pipeline;
 
   // Serialized form of the body pipeline.
   Option<std::string> pipelineStr{

@@ -23,7 +23,7 @@ LogicalResult setUserConfig(
   if (failed(setTranslationInfo(entryPointFn, info))) return failure();
 
   SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
-  llvm::Optional<int64_t> subgroupSize = compilationInfo.getSubgroupSize();
+  std::optional<int64_t> subgroupSize = compilationInfo.getSubgroupSize();
   if (failed(setDispatchConfig(entryPointFn, workgroupSize, subgroupSize))) {
     return failure();
   }

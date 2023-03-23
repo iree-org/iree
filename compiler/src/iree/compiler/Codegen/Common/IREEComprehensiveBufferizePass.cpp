@@ -60,10 +60,11 @@ class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
   explicit IREEComprehensiveBufferizePass(
-      Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
-      Optional<BufferizationOptions::DeallocationFn> deallocationFn =
+      std::optional<BufferizationOptions::AllocationFn> allocationFn =
           std::nullopt,
-      Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
+      std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
+          std::nullopt,
+      std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
       : allocationFn(allocationFn),
         deallocationFn(deallocationFn),
         memCpyFn(memCpyFn) {}
@@ -89,9 +90,9 @@ class IREEComprehensiveBufferizePass
   void runOnOperation() override;
 
  private:
-  const Optional<BufferizationOptions::AllocationFn> allocationFn;
-  const Optional<BufferizationOptions::DeallocationFn> deallocationFn;
-  const Optional<BufferizationOptions::MemCpyFn> memCpyFn;
+  const std::optional<BufferizationOptions::AllocationFn> allocationFn;
+  const std::optional<BufferizationOptions::DeallocationFn> deallocationFn;
+  const std::optional<BufferizationOptions::MemCpyFn> memCpyFn;
 };
 }  // namespace
 
@@ -218,9 +219,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    Optional<BufferizationOptions::AllocationFn> allocationFn,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+    std::optional<BufferizationOptions::AllocationFn> allocationFn,
+    std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   if (!allocationFn) allocationFn = defaultAllocationFn;
   if (!deallocationFn) deallocationFn = defaultDeallocationFn;
   if (!memCpyFn) memCpyFn = defaultMemCpyFn;
@@ -241,9 +242,9 @@ void addIREEPostBufferizationPasses(OpPassManager &passManager) {
 
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    Optional<BufferizationOptions::AllocationFn> allocationFn,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+    std::optional<BufferizationOptions::AllocationFn> allocationFn,
+    std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   passManager.addPass(createEliminateEmptyTensorsPass());
   passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   passManager.addPass(createIREEComprehensiveBufferizePass(

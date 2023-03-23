@@ -212,7 +212,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
 }
 
 Flow::DispatchRegionOp Flow::makeDispatchRegionWithWorkload(
-    OpBuilder &builder, Location loc, Optional<ValueRange> workload) {
+    OpBuilder &builder, Location loc, std::optional<ValueRange> workload) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
@@ -318,8 +318,8 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
 
 FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
     RewriterBase &rewriter, Operation *op,
-    Optional<Flow::WorkloadBuilder> workloadBuilder) {
-  Optional<ValueRange> workload = std::nullopt;
+    std::optional<Flow::WorkloadBuilder> workloadBuilder) {
+  std::optional<ValueRange> workload = std::nullopt;
   if (workloadBuilder.has_value()) workload = workloadBuilder->workload;
   // Make an empty dispatch region right before the op.
   rewriter.setInsertionPointAfter(op);

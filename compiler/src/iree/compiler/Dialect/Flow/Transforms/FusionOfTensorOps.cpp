@@ -32,8 +32,8 @@ namespace IREE {
 namespace Flow {
 
 /// Check if any of the use dominates all other uses of the operation.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo &dominanceInfo) {
+static std::optional<OpOperand *> getFusableUse(Operation *op,
+                                                DominanceInfo &dominanceInfo) {
   auto uses = op->getUses();
   for (OpOperand &source : uses) {
     Operation *sourceOp = source.getOwner();
@@ -167,7 +167,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
       return;
     }
 
-    Optional<OpOperand *> fusableUse = getFusableUse(genericOp, dominanceInfo);
+    std::optional<OpOperand *> fusableUse =
+        getFusableUse(genericOp, dominanceInfo);
     if (!fusableUse) return;
     if (!linalg::areElementwiseOpsFusable(fusableUse.value())) return;
 

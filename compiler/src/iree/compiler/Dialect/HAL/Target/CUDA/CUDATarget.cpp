@@ -228,7 +228,8 @@ class CUDATargetBackend final : public TargetBackend {
     SmallVector<uint32_t> workgroupLocalMemories;
     for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
       std::array<int32_t, 3> workgroupSize;
-      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+      if (std::optional<ArrayAttr> workgroupSizeAttr =
+              exportOp.getWorkgroupSize()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
           workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
         }

@@ -227,7 +227,8 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.target
 /// looked up from this op.
-static Optional<int64_t> getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
+static std::optional<int64_t> getNativeVectorSizeInBytes(
+    func::FuncOp entryPointFn) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto nativeVectorSizeAttr =
       getConfigIntegerAttr(targetAttr, "native_vector_size");
@@ -241,7 +242,7 @@ static Optional<int64_t> getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
 /// of elements that correspond to the native vector size. Returns 1 as the
 /// fallback.
 static int64_t getVectorSize(func::FuncOp entryPointFn, unsigned byteWidth) {
-  if (Optional<int64_t> nativeVectorSize =
+  if (std::optional<int64_t> nativeVectorSize =
           getNativeVectorSizeInBytes(entryPointFn)) {
     return nativeVectorSize.value() / byteWidth;
   }
@@ -1693,7 +1694,7 @@ static LogicalResult setRootConfig(
   SmallVector<Range> iterationDomain =
       tilingInterfaceOp.getIterationDomain(builder);
   auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
-    Optional<int64_t> intVal = getConstantIntValue(ofr);
+    std::optional<int64_t> intVal = getConstantIntValue(ofr);
     if (!intVal) return ShapedType::kDynamic;
     return intVal.value();
   };

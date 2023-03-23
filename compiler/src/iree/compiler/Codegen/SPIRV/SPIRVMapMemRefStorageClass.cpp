@@ -22,7 +22,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-Optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(Attribute attr) {
+std::optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(
+    Attribute attr) {
   if (auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>()) {
     switch (dtAttr.getValue()) {
       case IREE::HAL::DescriptorType::UniformBuffer:
@@ -44,7 +45,8 @@ Optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(Attribute attr) {
   return spirv::mapMemorySpaceToVulkanStorageClass(attr);
 }
 
-Optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(Attribute attr) {
+std::optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(
+    Attribute attr) {
   if (auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>()) {
     switch (dtAttr.getValue()) {
       case IREE::HAL::DescriptorType::UniformBuffer:

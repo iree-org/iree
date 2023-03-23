@@ -66,7 +66,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           op, op.getSymName(), op.getIsMutable(), convertedType,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(32)) {
-      llvm::Optional<TypedAttr> convertedValue = std::nullopt;
+      std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getI32IntegerAttr(static_cast<int32_t>(
             op.getInitialValue().value().cast<IntegerAttr>().getInt()));
@@ -75,7 +75,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(64)) {
-      llvm::Optional<TypedAttr> convertedValue = std::nullopt;
+      std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getI64IntegerAttr(
             op.getInitialValue().value().cast<IntegerAttr>().getInt());
@@ -84,7 +84,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF32()) {
-      llvm::Optional<TypedAttr> convertedValue = std::nullopt;
+      std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getF32FloatAttr(static_cast<float>(
             op.getInitialValue().value().cast<FloatAttr>().getValueAsDouble()));
@@ -93,7 +93,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF64()) {
-      llvm::Optional<TypedAttr> convertedValue = std::nullopt;
+      std::optional<TypedAttr> convertedValue = std::nullopt;
       if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getF64FloatAttr(
             op.getInitialValue().value().cast<FloatAttr>().getValueAsDouble());

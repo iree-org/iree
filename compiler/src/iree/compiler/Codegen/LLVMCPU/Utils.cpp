@@ -14,29 +14,30 @@
 namespace mlir {
 namespace iree_compiler {
 
-Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
+std::optional<StringRef> getCpuFeatures(
+    IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
   if (!cpuFeatures) return std::nullopt;
   return cpuFeatures->getValue();
 }
 
 bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
   return triple && triple.value().isX86();
 }
 
 bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
   return triple && triple.value().getArch() == llvm::Triple::x86_64;
 }
 
 bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
   return triple && triple.value().isAArch64();
 }
 
 bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
   return triple && triple.value().isRISCV();
 }
 
@@ -51,7 +52,7 @@ bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
 bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
-  Optional<StringRef> features = getCpuFeatures(targetAttr);
+  std::optional<StringRef> features = getCpuFeatures(targetAttr);
   if (!features) {
     return false;
   }

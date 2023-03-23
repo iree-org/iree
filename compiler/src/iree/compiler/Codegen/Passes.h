@@ -44,10 +44,11 @@ void addIREEPostBufferizationPasses(OpPassManager &passManager);
 using bufferization::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn =
+    std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+    std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
+        std::nullopt,
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -100,10 +101,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 /// with the allocated MemRefType having no stride map (i.e. default row-major
 /// striding) and default memory space.
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn =
+    std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+    std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
+        std::nullopt,
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();

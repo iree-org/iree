@@ -1508,7 +1508,7 @@ areNotFullTiles(ArrayRef<int64_t> inputShape,
       continue;
     auto it = dimAndTileMapping.find(dim);
     if (it != dimAndTileMapping.end()) {
-      Optional<int64_t> constantTile = getConstantIntValue(it->second);
+      std::optional<int64_t> constantTile = getConstantIntValue(it->second);
       if (!constantTile)
         continue;
       if (inputShape[dim] % (*constantTile) != 0)
@@ -1645,7 +1645,7 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
           llvm::zip(packedType.getShape().take_back(mixedTiles.size()),
                     mixedTiles),
           [](std::tuple<int64_t, OpFoldResult> it) {
-            Optional<int64_t> constTileSize =
+            std::optional<int64_t> constTileSize =
                 getConstantIntValue(std::get<1>(it));
             int64_t shape = std::get<0>(it);
             if (!constTileSize) {
@@ -1677,7 +1677,7 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
 void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
                    Value output, ArrayRef<int64_t> innerDimsPos,
                    ArrayRef<OpFoldResult> innerTiles,
-                   Optional<Value> paddingValue,
+                   std::optional<Value> paddingValue,
                    ArrayRef<int64_t> outerDimsPerm) {
   assert(innerDimsPos.size() == innerTiles.size() &&
          "number of tile sizes specified must match the specified number of "

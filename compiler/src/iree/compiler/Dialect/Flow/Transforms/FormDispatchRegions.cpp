@@ -78,7 +78,7 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps) {
   for (tensor::DimOp dimOp : dimOps) {
     // Only DimOps with static indices are supported.
-    Optional<int64_t> idx = dimOp.getConstantIndex();
+    std::optional<int64_t> idx = dimOp.getConstantIndex();
     if (!idx.has_value()) continue;
     // Only DimOps with ranked tensors are supported.
     auto tensorType = dimOp.getSource().getType().dyn_cast<RankedTensorType>();
@@ -331,9 +331,8 @@ static bool hasCompatibleOuterParallelLoops(
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo const &dominanceInfo,
-                                           bool fuseMultiUse) {
+static std::optional<OpOperand *> getFusableUse(
+    Operation *op, DominanceInfo const &dominanceInfo, bool fuseMultiUse) {
   if (!fuseMultiUse && !op->hasOneUse()) return std::nullopt;
 
   for (auto &use : op->getUses()) {
@@ -496,7 +495,7 @@ static void fuseRootsWithConsumers(MLIRContext *context,
         appendToFusionGroup(currRoot, rootNumber);
       };
 
-      Optional<OpOperand *> fusableUse =
+      std::optional<OpOperand *> fusableUse =
           getFusableUse(currRoot, dominanceInfo, /*fuseMultiUse=*/fuseMultiUse);
       if (!fusableUse) continue;
 
@@ -567,7 +566,7 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      Optional<OpOperand *> fusableUse =
+      std::optional<OpOperand *> fusableUse =
           getFusableUse(producer, dominanceInfo, /*fuseMultiUse=*/fuseMultiUse);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
@@ -720,11 +719,11 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Flow::DispatchRegionOp> regionOps;
-  DenseMap<Flow::DispatchRegionOp, Optional<Flow::WorkloadBuilder>>
+  DenseMap<Flow::DispatchRegionOp, std::optional<Flow::WorkloadBuilder>>
       workloadBuilders;
   for (const auto &it : llvm::enumerate(roots)) {
     // Compute workload.
-    Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
+    std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
     if (generateWorkloadRegion) {
       auto maybeBuilder = iree_compiler::IREE::Flow::getWorkloadBuilder(
           rewriter, /*rootOp=*/it.value());
