@@ -32,12 +32,13 @@ class Linux_CUDA_Benchmarks(object):
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
-    models = model_groups.LARGE
+    excluded_models = [torch_models.VAE_FP32_TORCH]
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.SM_80_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in models
+        for model in model_groups.CUDA_MODELS
+        if model not in excluded_models
     ]
     sm80_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.CUDA_SM80,

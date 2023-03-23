@@ -7,7 +7,7 @@
 
 from typing import List, Tuple
 from e2e_test_framework.device_specs import device_collections
-from e2e_test_framework.models import model_groups, tf_models
+from e2e_test_framework.models import model_groups, tf_models, torch_models
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import unique_ids
 from benchmark_suites.iree import module_execution_configs
@@ -46,15 +46,18 @@ class Linux_x86_64_Benchmarks(object):
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.CASCADELAKE_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in model_groups.SMALL + model_groups.LARGE
+        for model in model_groups.x86_64_MODELS
     ]
     # TODO(#11174): Excludes ResNet50
-    excluded_models_for_experiments = [tf_models.RESNET50_TF_FP32]
+    excluded_models_for_experiments = [
+        tf_models.RESNET50_TF_FP32, torch_models.EFFICIENTNET_V2_S_FP32_TORCH,
+        torch_models.EFFICIENTNET_B7_FP32_TORCH
+    ]
     gen_configs += [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in model_groups.SMALL + model_groups.LARGE
+        for model in model_groups.x86_64_MODELS
         if model not in excluded_models_for_experiments
     ]
     default_execution_configs = [
