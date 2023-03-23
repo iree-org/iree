@@ -96,7 +96,7 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
   // For zero dim tensor, consider it's too small to access using all threads.
   if (shape.size() == 0) return false;
   int64_t threadsAvailable = threadCount;
-  for (auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
+  for (const auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
     int64_t numElementPerThread = index == 0 ? vectorSize : 1;
     int64_t numThreads = dim / numElementPerThread;
     if (numThreads == 0) return false;
