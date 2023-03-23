@@ -43,7 +43,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:TosaDialect",
-        "@mlir-hlo//:lhlo",
         "@mlir-hlo//:mlir_hlo",
         "@mlir-hlo//stablehlo:chlo_ops",
         "@mlir-hlo//stablehlo:stablehlo_ops",
