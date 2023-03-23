@@ -66,12 +66,13 @@ static SmallVector<Range> getLoopRangesFromValue(Value source, Location loc,
   }));
 }
 
-static SmallVector<Range> getLoopRangesImpl(tensor::ExtractSliceOp sliceOp,
-                                            Location loc, OpBuilder &builder) {
+static SmallVector<Range> getLoopRangesImpl(
+    ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
+    OpBuilder &builder) {
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   ReifiedRankedShapedTypeDims resultDims;
-  LogicalResult status = sliceOp.reifyResultShapes(builder, resultDims);
+  LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
   return llvm::to_vector(llvm::map_range(resultDims[0], [&](OpFoldResult v) {
@@ -87,11 +88,11 @@ SmallVector<Range> Flow::getLoopRanges(Operation *op, Location loc,
             tensor::InsertSliceOp>([&](auto op) {
         return getLoopRangesFromValue(op.getSource(), loc, builder);
       })
-      .Case<tensor::ExtractSliceOp>([&](auto sliceOp) {
-        return getLoopRangesImpl(sliceOp, loc, builder);
-      })
       .Case<TilingInterface>([&](TilingInterface op) {
         return getLoopRangesImpl(op, loc, builder);
+      })
+      .Case<ReifyRankedShapedTypeOpInterface>([&](auto shapedOp) {
+        return getLoopRangesImpl(shapedOp, loc, builder);
       })
       .Default([](Operation *op) -> SmallVector<Range> {
         llvm_unreachable("op not supported");
@@ -288,8 +289,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
   DominanceInfo domInfo;
   for (OpOperand &use : target->getUses()) {
     Operation *user = use.getOwner();
-    if (regionOp->isProperAncestor(use.getOwner()) ||
-        isa<tensor::DimOp>(user)) {
+    if (regionOp->isProperAncestor(user) || isa<tensor::DimOp>(user)) {
       continue;
     }
     assert(domInfo.properlyDominates(regionOp, user) &&
@@ -393,8 +393,7 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
   if (isa<AffineApplyOp, arith::IndexCastOp, linalg::FillOp, tensor::EmptyOp,
-          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp,
-          tensor::PadOp>(op)) {
+          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp>(op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
