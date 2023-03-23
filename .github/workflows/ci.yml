@@ -284,7 +284,7 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
-          brew install ninja
+          brew install ninja ccache
       # Attempt to restore from cache unconditionally.
       # Note: this will first try to grab a cache entry for this exact commit
       #       then it will fall back to the latest for any commit.
