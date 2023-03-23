@@ -274,17 +274,18 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
-      - name: Setting up Python
+      - name: "Setting up Python"
         uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
         with:
           python-version: "3.10"
           cache: "pip"
-      - name: Installing dependencies
+      - name: "Installing Python packages"
         run: |
           python3 -m venv .venv
           source .venv/bin/activate
           pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
-          brew install ninja ccache
+      - name: "Installing requirements"
+        run: brew install ninja ccache
       # Attempt to restore from cache unconditionally.
       # Note: this will first try to grab a cache entry for this exact commit
       #       then it will fall back to the latest for any commit.
@@ -311,9 +312,9 @@ jobs:
           #   * 20% cache hits -> ~15-20 minutes to build
           CCACHE_MAXSIZE: 4G
           CCACHE_COMPRESSLEVEL: 5
-        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       # Write cache (if configured to) after all other steps are finished.
       - name: "Saving cache (CMake/ccache)"
         if: needs.setup.outputs.write-caches == '1'
