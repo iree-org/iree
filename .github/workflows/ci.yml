@@ -312,9 +312,13 @@ jobs:
           #   * 20% cache hits -> ~15-20 minutes to build
           CCACHE_MAXSIZE: 4G
           CCACHE_COMPRESSLEVEL: 5
-        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        run: |
+          .venv/Scripts/activate.bat
+          ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
-        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: |
+          .venv/Scripts/activate.bat
+          ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       # Write cache (if configured to) after all other steps are finished.
       - name: "Saving cache (CMake/ccache)"
         if: needs.setup.outputs.write-caches == '1'
