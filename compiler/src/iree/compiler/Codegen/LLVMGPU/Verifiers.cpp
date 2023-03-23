@@ -205,11 +205,11 @@ LogicalResult verifyGPUMatmulPipeline(
 
   // Instruction shape in number of elements in M, N, and K dim.
   SmallVector<int64_t> instructionShape;
-  if (getInstructionShape(op, pipeline,
-                          lhsType.cast<ShapedType>().getElementType(),
-                          instructionShape)
-          .failed())
+  if (failed(getInstructionShape(op, pipeline,
+                                 lhsType.cast<ShapedType>().getElementType(),
+                                 instructionShape))) {
     return failure();
+  }
 
   // Verify the matmul problem shape K has a multiple of thread block K tiles.
   if (softwarePipelineDepth > 1 && threadBlockShape[kK] == matmulShape[kK]) {
