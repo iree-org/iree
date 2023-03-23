@@ -84,11 +84,6 @@ EXPLICIT_TARGET_MAPPING = {
         "ChloOps",
         "MhloDialect",
     ],
-    "@mlir-hlo//:map_lmhlo_to_scalar_op": [
-        "tensorflow::external_mhlo_includes",
-        "LmhloDialect",  # Unfortunate.
-        "MhloDialect",
-    ],
     "@mlir-hlo//:map_mhlo_to_scalar_op": [
         "tensorflow::external_mhlo_includes",
         "MhloDialect",
@@ -97,12 +92,12 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
         "MhloShapeOpsToStandard",
-        "MhloToArithmeticConversion",
-        "MhloToLhloConversion",
         "MhloToLinalg",
-        "MhloToMemrefConversion",
         "MhloToStandard",
         "StablehloToMhlo",
+        # Note: We deliberately omit some passes that we do not use in IREE,
+        # e.g.: MhloToArithmeticConversion, MhloToLhloConversion, or
+        # MhloToMemrefConversion.
     ],
     "@mlir-hlo//:unfuse_batch_norm": [
         "tensorflow::external_mhlo_includes",

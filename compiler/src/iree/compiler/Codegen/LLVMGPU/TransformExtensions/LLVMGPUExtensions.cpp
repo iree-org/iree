@@ -359,7 +359,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
            << "export op is missing --- the transform is not applied";
   }
 
-  Optional<ArrayAttr> maybeAttr = exportOp.getWorkgroupSize();
+  std::optional<ArrayAttr> maybeAttr = exportOp.getWorkgroupSize();
   // TODO: Pervasive 3 constant in IREE.
   if (!maybeAttr || maybeAttr->size() != 3) {
     // Return a silenceable failure and set the expected 1 result to nullptr.

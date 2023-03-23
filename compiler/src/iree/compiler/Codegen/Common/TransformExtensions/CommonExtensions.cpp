@@ -280,7 +280,7 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
                                 bool swapPaddingElideCornerCase) {
   patterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(
       patterns.getContext(),
-      [&](tensor::ExtractSliceOp) -> llvm::Optional<bool> {
+      [&](tensor::ExtractSliceOp) -> std::optional<bool> {
         return !swapPaddingElideCornerCase;
       });
 }
@@ -290,13 +290,13 @@ static void addTilingCanonicalizationPatterns(RewritePatternSet &patterns) {
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeMmaSyncVectorSize(
-    Operation *op) {
+static std::optional<SmallVector<int64_t>>
+getGPUTensorCoreNativeMmaSyncVectorSize(Operation *op) {
   return getMmaNativeVectorSize(op);
 }
 
 static void addUnrollVectorsGpuMmaSyncPatterns(RewritePatternSet &patterns) {
-  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
+  auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (!contract) return std::nullopt;
     return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
@@ -307,13 +307,13 @@ static void addUnrollVectorsGpuMmaSyncPatterns(RewritePatternSet &patterns) {
                     .setUnrollTraversalOrderFn(unrollOrder));
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeWmmaVectorSize(
+static std::optional<SmallVector<int64_t>> getGPUTensorCoreNativeWmmaVectorSize(
     Operation *op) {
   return getWmmaNativeVectorSize(op);
 }
 
 static void addUnrollVectorsGpuWmmaPatterns(RewritePatternSet &patterns) {
-  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
+  auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
     if (!contract) return std::nullopt;
     return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
@@ -851,7 +851,7 @@ void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
 static LogicalResult lowerWorkgroupCountComputingRegion(
     transform::TransformState &state, RewriterBase &rewriter, Location loc,
     HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> numThreads,
-    ArrayRef<OpFoldResult> tileSizes, Optional<ArrayAttr> mapping) {
+    ArrayRef<OpFoldResult> tileSizes, std::optional<ArrayAttr> mapping) {
   Region &r = exportOp.getWorkgroupCount();
   if (!r.hasOneBlock()) {
     return rewriter.notifyMatchFailure(exportOp,

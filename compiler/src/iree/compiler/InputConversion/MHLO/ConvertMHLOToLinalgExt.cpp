@@ -41,7 +41,8 @@ static Type convertIntegerToSignless(IntegerType intType) {
                           intType.getIntOrFloatBitWidth());
 }
 
-static Optional<Type> convertRank0TensorToScalar(RankedTensorType tensorType) {
+static std::optional<Type> convertRank0TensorToScalar(
+    RankedTensorType tensorType) {
   if (tensorType.getRank() != 0) return std::nullopt;
   Type elementType = tensorType.getElementType();
   if (auto intType = elementType.dyn_cast<IntegerType>()) {
@@ -56,8 +57,8 @@ static Type convertShapedToSignless(ShapedType shapedType) {
   return shapedType;
 }
 
-static Optional<Value> materializeCast(OpBuilder &builder, Type toType,
-                                       ValueRange inputs, Location loc) {
+static std::optional<Value> materializeCast(OpBuilder &builder, Type toType,
+                                            ValueRange inputs, Location loc) {
   assert(inputs.size() == 1 && "too many inputs to type conversion");
   Value fromValue = inputs[0];
   auto fromType = fromValue.getType().dyn_cast<RankedTensorType>();

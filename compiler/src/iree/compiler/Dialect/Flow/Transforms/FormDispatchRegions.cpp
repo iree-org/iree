@@ -19,7 +19,6 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -78,7 +77,7 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps) {
   for (tensor::DimOp dimOp : dimOps) {
     // Only DimOps with static indices are supported.
-    Optional<int64_t> idx = dimOp.getConstantIndex();
+    std::optional<int64_t> idx = dimOp.getConstantIndex();
     if (!idx.has_value()) continue;
     // Only DimOps with ranked tensors are supported.
     auto tensorType = dimOp.getSource().getType().dyn_cast<RankedTensorType>();
@@ -190,29 +189,6 @@ static bool isRootOp(Operation *op) {
   // now.
   return (isa<TilingInterface>(op) && !isa<tensor::PadOp>(op)) ||
          isa<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp>(op);
-}
-
-//===----------------------------------------------------------------------===//
-// Methods for getting the workload information for dispatch region creation.
-//===----------------------------------------------------------------------===//
-
-/// Compute the workload to use for the workgroup based on the root op.
-static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
-                                               Operation *rootOp) {
-  // Compute workgroup count to use for the dispatch op. These are the ranges
-  // of the outermost parallel loops that can be distributed.
-  Location loc = rootOp->getLoc();
-  SmallVector<Range> loopRanges = getLoopRanges(rootOp, loc, builder);
-  AffineExpr s0, s1, s2;
-  bindSymbols(builder.getContext(), s0, s1, s2);
-  AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
-  return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
-    Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
-    Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
-    Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
-    return builder.create<AffineApplyOp>(rootOp->getLoc(), workload,
-                                         ValueRange{offset, size, stride});
-  }));
 }
 
 //===----------------------------------------------------------------------===//
@@ -331,9 +307,8 @@ static bool hasCompatibleOuterParallelLoops(
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo const &dominanceInfo,
-                                           bool fuseMultiUse) {
+static std::optional<OpOperand *> getFusableUse(
+    Operation *op, DominanceInfo const &dominanceInfo, bool fuseMultiUse) {
   if (!fuseMultiUse && !op->hasOneUse()) return std::nullopt;
 
   for (auto &use : op->getUses()) {
@@ -496,7 +471,7 @@ static void fuseRootsWithConsumers(MLIRContext *context,
         appendToFusionGroup(currRoot, rootNumber);
       };
 
-      Optional<OpOperand *> fusableUse =
+      std::optional<OpOperand *> fusableUse =
           getFusableUse(currRoot, dominanceInfo, /*fuseMultiUse=*/fuseMultiUse);
       if (!fusableUse) continue;
 
@@ -567,7 +542,7 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      Optional<OpOperand *> fusableUse =
+      std::optional<OpOperand *> fusableUse =
           getFusableUse(producer, dominanceInfo, /*fuseMultiUse=*/fuseMultiUse);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
@@ -663,16 +638,6 @@ static void buildDefaultWorkloadRegion(OpBuilder &builder, Location loc,
 FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
                                                     Operation *rootOp) {
   Flow::WorkloadBuilder result;
-
-  // Compute workload (before entering the dispatch region).
-  OpBuilder::InsertionGuard g(builder);
-  SmallVector<Value> workload;
-  builder.setInsertionPoint(rootOp);
-  FailureOr<SmallVector<Value>> maybeWorkload =
-      getWorkloadForRootOp(builder, rootOp);
-  if (failed(maybeWorkload)) return failure();
-  result.workload = *maybeWorkload;
-
   // The workload region of the WorkgroupsOp is populated by the
   // `regionBuilder` during ConvertRegionToWorkgroups .
   if (isa<LinalgExt::SetEncodingOp>(rootOp)) {
@@ -720,11 +685,11 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Flow::DispatchRegionOp> regionOps;
-  DenseMap<Flow::DispatchRegionOp, Optional<Flow::WorkloadBuilder>>
+  DenseMap<Flow::DispatchRegionOp, std::optional<Flow::WorkloadBuilder>>
       workloadBuilders;
   for (const auto &it : llvm::enumerate(roots)) {
     // Compute workload.
-    Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
+    std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
     if (generateWorkloadRegion) {
       auto maybeBuilder = iree_compiler::IREE::Flow::getWorkloadBuilder(
           rewriter, /*rootOp=*/it.value());
@@ -733,9 +698,11 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
     }
 
     // Simplify tensor::DimOps.
-    SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-    if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
-      return failure();
+    {
+      SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        return failure();
+      }
     }
 
     // Create fusion group.
@@ -744,6 +711,14 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
         Flow::wrapOpInDispatchRegion(rewriter, it.value(), workloadBuilder);
     if (failed(maybeRegionOp)) return failure();
     regionOp = *maybeRegionOp;
+
+    // Simplify tensor::DimOps.
+    {
+      SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        return failure();
+      }
+    }
 
     // Sort producers topologically. All producers must be in the same block
     // as the root.

@@ -258,7 +258,7 @@ namespace {
 
 // TODO(antigainst): enable dynamic shape support once they are needed.
 template <typename TensorReshapeOp>
-static Optional<Value> getStaticReshapeOpSrc(TensorReshapeOp reshapeOp) {
+static std::optional<Value> getStaticReshapeOpSrc(TensorReshapeOp reshapeOp) {
   auto reshapeSrcType =
       reshapeOp.getSrc().getType().template cast<ShapedType>();
   auto reshapeDstType = reshapeOp.getType().template cast<ShapedType>();
@@ -293,7 +293,7 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
-    Optional<Value> reshapeSrc =
+    std::optional<Value> reshapeSrc =
         getStaticReshapeOpSrc<TensorReshapeOp>(reshapeOp);
     if (!reshapeSrc) return failure();
 
@@ -370,7 +370,7 @@ struct FoldReshapeIntoInterfaceTensorStore
       return failure();
 
     // Dynamic shapes are currently unsupported.
-    Optional<Value> reshapeSrc =
+    std::optional<Value> reshapeSrc =
         isa<tensor::CollapseShapeOp>(reshapeOp)
             ? getStaticReshapeOpSrc<tensor::CollapseShapeOp>(
                   cast<tensor::CollapseShapeOp>(reshapeOp))

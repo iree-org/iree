@@ -677,7 +677,7 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
 // Numeric ops
 //===----------------------------------------------------------------------===//
 
-Optional<std::pair<int64_t, int64_t>>
+std::optional<std::pair<int64_t, int64_t>>
 NumericOptionalNarrowOp::getIntegerRange() {
   if (!getMinValue() || !getMaxValue()) return {};
   bool signExtend = isSigned();
@@ -762,7 +762,7 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
-                     Optional<TypedAttr> initialValue,
+                     std::optional<TypedAttr> initialValue,
                      ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
@@ -1034,7 +1034,7 @@ void BufferSubspanOp::setSubrangeOperand(unsigned operandIndex,
   getResultSizeMutable().assign(operand.length);
 }
 
-::llvm::Optional<unsigned> BufferSubspanOp::getTiedResultOperandIndex(
+::std::optional<unsigned> BufferSubspanOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }

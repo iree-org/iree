@@ -32,7 +32,7 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
 
 namespace detail {
 size_t getSegmentSpanSize(Type spanType);
-Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
+std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
     ConversionPatternRewriter &rewriter);
 }  // namespace detail
@@ -56,7 +56,7 @@ void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp);
 // Automatically handles type conversion and special logic for variadic operands
 // and special types (such as ranked shape).
 template <typename T, typename Adaptor = typename T::Adaptor>
-Optional<SmallVector<Value>> rewriteToCall(
+std::optional<SmallVector<Value>> rewriteToCall(
     T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
     TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
   auto *operation = op.getOperation();

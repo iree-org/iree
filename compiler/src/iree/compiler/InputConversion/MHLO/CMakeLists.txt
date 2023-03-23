@@ -59,7 +59,6 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
-    LmhloDialect
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRArithDialect
@@ -87,10 +86,7 @@ iree_cc_library(
     MhloDialect
     MhloPasses
     MhloShapeOpsToStandard
-    MhloToArithmeticConversion
-    MhloToLhloConversion
     MhloToLinalg
-    MhloToMemrefConversion
     MhloToStandard
     StablehloBroadcastUtils
     StablehloToMhlo

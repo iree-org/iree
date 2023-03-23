@@ -62,7 +62,7 @@ void Artifact::keep() const {
   if (outputFile) outputFile->keep();
 }
 
-Optional<std::vector<int8_t>> Artifact::read() const {
+std::optional<std::vector<int8_t>> Artifact::read() const {
   auto fileData = llvm::MemoryBuffer::getFile(path);
   if (!fileData) {
     llvm::errs() << "failed to load library output file '" << path << "'";

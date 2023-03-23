@@ -29,7 +29,7 @@ EmitCTypeConverter::EmitCTypeConverter() {
     assert(inputs.size() == 1);
     assert(inputs[0].getType().isa<IREE::VM::RefType>());
     Value ref = inputs[0];
-    Optional<Value> result = materializeRef(ref);
+    std::optional<Value> result = materializeRef(ref);
     return result.has_value() ? result.value() : Value{};
   });
 
@@ -128,7 +128,7 @@ EmitCTypeConverter::lookupAnalysis(Operation *op) {
 
 // TODO(simon-camp): Make this a target materialization and cleanup the call
 // sites in the conversion.
-Optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
+std::optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
   assert(ref.getType().isa<IREE::VM::RefType>());
 
   mlir::func::FuncOp funcOp;

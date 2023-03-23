@@ -17,7 +17,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
+static std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);

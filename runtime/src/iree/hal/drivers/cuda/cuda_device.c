@@ -47,6 +47,9 @@ typedef struct iree_hal_cuda_device_t {
   // Parameters used to control device behavior.
   iree_hal_cuda_device_params_t params;
 
+  // Optional channel provider used to get defaults/create channels.
+  iree_hal_channel_provider_t channel_provider;
+
   CUdevice device;
 
   // TODO: support multiple streams.
@@ -68,7 +71,7 @@ static iree_hal_cuda_device_t* iree_hal_cuda_device_cast(
   return (iree_hal_cuda_device_t*)base_value;
 }
 
-void iree_hal_cuda_device_params_initialize(
+IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
     iree_hal_cuda_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
@@ -265,24 +268,62 @@ static iree_status_t iree_hal_cuda_device_query_i64(
       (int)category.size, category.data, (int)key.size, key.data);
 }
 
-// Returns true if |id| is all zeros indicating an empty ID.
-static bool iree_hal_cuda_nccl_id_is_empty(const iree_hal_cuda_nccl_id_t* id) {
-  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(id->data); ++i) {
-    if (id->data[i] != 0) return false;
+IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_get_unique_id(
+    iree_hal_device_t* base_device, iree_hal_cuda_nccl_id_t* out_id) {
+  IREE_ASSERT_ARGUMENT(base_device);
+  IREE_ASSERT_ARGUMENT(out_id);
+  memset(out_id, 0, sizeof(*out_id));
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  if (!device->context_wrapper.syms->nccl_library) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "NCCL not loaded as it was not requested on device "
+                            "creation - collective operations not available");
   }
-  return true;
+  return iree_hal_cuda_nccl_get_unique_id_from_context(&device->context_wrapper,
+                                                       out_id);
 }
 
 static iree_status_t iree_hal_cuda_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  if (!device->context_wrapper.syms->nccl_library) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "NCCL not loaded as it was not requested on device "
+                            "creation - collective operations not available");
+  }
+
+  // Today we only allow a single logical device per channel.
+  // We could multiplex channels but it'd be better to surface that to the
+  // compiler so that it can emit the right rank math.
+  int requested_count = iree_math_count_ones_u64(queue_affinity);
+  // TODO(#12206): properly assign affinity in the compiler.
+  if (requested_count != 64 && requested_count != 1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "exactly one participant is allowed in a "
+                            "channel but %d were specified",
+                            requested_count);
+  }
+
+  // Ask for the defaults.
+  iree_hal_cuda_nccl_id_t id;
+  memset(&id, 0, sizeof(id));
+  if (device->channel_provider.query_group_params) {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0,
+                                "iree_hal_channel_provider_query_group_params");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, device->channel_provider.query_group_params(
+                device->channel_provider.self, base_device, queue_affinity,
+                iree_make_byte_span((void*)&id, sizeof(id)), &params));
+    IREE_TRACE_ZONE_END(z0);
+  }
 
   // Try to use the ID specified in the parameters and fall back to the default.
-  iree_hal_cuda_nccl_id_t id;
   if (iree_const_byte_span_is_empty(params.id)) {
-    // User wants the default.
-    id = device->params.nccl_default_id;
+    // User wants the default ID which should have been set above.
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "default collective channel ID requested but no "
+                            "channel provider specified on the device");
   } else if (params.id.data_length != IREE_ARRAYSIZE(id.data)) {
     // User provided something but it's not what we expect.
     return iree_make_status(
@@ -299,35 +340,11 @@ static iree_status_t iree_hal_cuda_device_create_channel(
                             "no default NCCL ID specified (all zeros)");
   }
 
-  // Today we only allow a single logical device per channel.
-  // We could multiplex channels but it'd be better to surface that to the
-  // compiler so that it can emit the right rank math.
-  int requested_count = iree_math_count_ones_u64(queue_affinity);
-  // TODO(#12206): properly assign affinity in the compiler.
-  if (requested_count != 64 && requested_count != 1) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "exactly one participant is allowed in a "
-                            "channel but %d were specified",
-                            requested_count);
-  }
-
-  // Users can either specify a specific rank or allow this device
-  // implementation to decide. This allows us to run the same programs acting as
-  // different ranks by setting flags/environment variables/API options/etc.
-  int rank = params.rank;
-  if (rank == IREE_HAL_CHANNEL_RANK_DEFAULT) {
-    rank = device->params.nccl_default_rank;
-  }
-  int count = params.count;
-  if (count == IREE_HAL_CHANNEL_COUNT_DEFAULT) {
-    count = device->params.nccl_default_count;
-  }
-
   // TODO: when we support multiple logical devices we'll want to pass in the
   // context of the device mapped to the queue_affinity. For now since this
   // implementation only supports one device we pass in the only one we have.
-  return iree_hal_cuda_nccl_channel_create(&device->context_wrapper, &id, rank,
-                                           count, out_channel);
+  return iree_hal_cuda_nccl_channel_create(
+      &device->context_wrapper, &id, params.rank, params.count, out_channel);
 }
 
 static iree_status_t iree_hal_cuda_device_create_command_buffer(

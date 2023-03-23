@@ -27,12 +27,13 @@ struct MatmulTileParams {
 };
 
 /// Extracts encoding from the `tensorType` if specified.
-Optional<IREE::LinalgExt::TensorEncoding> getEncoding(
+std::optional<IREE::LinalgExt::TensorEncoding> getEncoding(
     RankedTensorType tensorType);
 
-Optional<MatmulType> getMatmulType(IREE::LinalgExt::TensorEncoding encoding);
+std::optional<MatmulType> getMatmulType(
+    IREE::LinalgExt::TensorEncoding encoding);
 
-Optional<MatmulOperandRole> getMatmulOperandRole(
+std::optional<MatmulOperandRole> getMatmulOperandRole(
     IREE::LinalgExt::TensorEncoding encoding);
 
 void adjustTileSizesToNarrowStaticShape(

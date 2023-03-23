@@ -39,11 +39,11 @@ struct LinalgTransformationFilter {
 
   explicit LinalgTransformationFilter(
       ArrayRef<StringAttr> matchDisjunction = {},
-      Optional<StringAttr> replacement = std::nullopt);
+      std::optional<StringAttr> replacement = std::nullopt);
 
   explicit LinalgTransformationFilter(
       const FilterFunction &f, ArrayRef<StringAttr> matchDisjunction = {},
-      Optional<StringAttr> replacement = std::nullopt);
+      std::optional<StringAttr> replacement = std::nullopt);
 
   LinalgTransformationFilter(LinalgTransformationFilter &&) = default;
   LinalgTransformationFilter(const LinalgTransformationFilter &) = default;
@@ -78,7 +78,7 @@ struct LinalgTransformationFilter {
 private:
   SmallVector<FilterFunction> filters;
   SmallVector<StringAttr> matchDisjunction;
-  Optional<StringAttr> replacement;
+  std::optional<StringAttr> replacement;
   /// When set to true, if the attribute is not set, it will be treated as
   /// a match. Default is false.
   bool matchByDefault;
@@ -236,18 +236,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPadPass(
 /// Create a LinalgStrategyDecomposePass.
 // TODO: if/when we need finer control add an `opName` parameter.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
-
-/// Create a LinalgStrategyPeelPass.
-using LoopsToPeelComputationFunction = std::function<void(
-    OpBuilder &, Operation *, SmallVectorImpl<scf::ForOp> &)>;
-
-struct LinalgPeelOptions {
-  LoopsToPeelComputationFunction loopsToPeelComputationFunction = nullptr;
-};
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
-    StringRef opName = "", const LinalgPeelOptions &opt = LinalgPeelOptions(),
     const LinalgExt::LinalgTransformationFilter &filter =
         LinalgExt::LinalgTransformationFilter());
 

@@ -65,14 +65,14 @@ inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 
 /// Returns the subgroup size specified on the `exportOp`.
-llvm::Optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp);
+std::optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 
 /// Sets and overwrites the dispatch workgroup/subgroup size for the given entry
 /// point function. Returns failure if the given entry point is not exported via
 /// hal.executable.export.
 LogicalResult setDispatchConfig(func::FuncOp entryPoint,
                                 ArrayRef<int64_t> workgroupSize,
-                                llvm::Optional<int64_t> subgroupSize);
+                                std::optional<int64_t> subgroupSize);
 
 /// Sets and overwites the translate executable info for the given entry point.
 /// Returns failure if the given entry point is not exported via
@@ -127,7 +127,7 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     func::FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
-    llvm::Optional<int64_t> subgroupSize = {},
+    std::optional<int64_t> subgroupSize = {},
     unsigned softwarePipelineDepth = 0,
     unsigned softwarePipelineStoreStage = 1) {
   MLIRContext *context = entryPointFn.getContext();

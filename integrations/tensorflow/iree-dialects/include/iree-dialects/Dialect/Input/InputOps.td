@@ -97,7 +97,7 @@ def IREEInput_GlobalOp : IREEInput_Op<"global", [
       "StringRef":$name,
       "bool":$isMutable,
       "Type":$type,
-      "Optional<TypedAttr>":$initialValue,
+      "std::optional<TypedAttr>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,
     OpBuilder<(ins

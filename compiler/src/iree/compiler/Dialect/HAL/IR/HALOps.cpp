@@ -39,7 +39,8 @@ static ParseResult parseDescriptorType(OpAsmParser &parser,
                                        DescriptorTypeAttr &dtAttr) {
   StringRef enumKeyword;
   if (failed(parser.parseKeyword(&enumKeyword))) return failure();
-  Optional<DescriptorType> maybeEnum = symbolizeDescriptorType(enumKeyword);
+  std::optional<DescriptorType> maybeEnum =
+      symbolizeDescriptorType(enumKeyword);
   if (!maybeEnum) return failure();
   dtAttr = DescriptorTypeAttr::get(parser.getContext(), *maybeEnum);
   return success();
@@ -186,7 +187,7 @@ Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::llvm::Optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
@@ -263,7 +264,7 @@ Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::llvm::Optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
@@ -299,7 +300,7 @@ Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
       getSources()[resultIndex]);
 }
 
-::llvm::Optional<unsigned> TensorBarrierOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorBarrierOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {resultIndex};  // sources[i]
 }
@@ -1065,7 +1066,7 @@ void InterfaceBindingSubspanOp::build(
     OpBuilder &builder, OperationState &result, Type resultType, APInt set,
     APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
     ValueRange dynamic_dims, IntegerAttr alignment,
-    Optional<DescriptorFlags> flags) {
+    std::optional<DescriptorFlags> flags) {
   IREE::HAL::DescriptorFlagsAttr descriptorAttr;
   if (flags.has_value()) {
     descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),

@@ -27,7 +27,7 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 //===---------------------------------------------------------------------===//
 
 /// Extract encoding from the `tensorType` if specified.
-static Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
+static std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
   auto encodingAttr = tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
   if (!encodingAttr)
     return std::nullopt;
@@ -40,7 +40,7 @@ static Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
 static RankedTensorType
 getMaterializedType(RankedTensorType tensorType,
                     MaterializeEncodingFn materializeEncodingFn) {
-  Optional<TensorEncoding> encoding = getEncoding(tensorType);
+  std::optional<TensorEncoding> encoding = getEncoding(tensorType);
   if (!encoding)
     return tensorType;
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
@@ -72,7 +72,7 @@ getMaterializedType(RankedTensorType tensorType,
 // iree/compiler/src/iree/compiler/Codegen/Common/MaterializeEncodingPass.cpp
 static FailureOr<MaterializeEncodingInfo>
 chooseEncodingInfo(RankedTensorType tensorType) {
-  Optional<TensorEncoding> encoding = getEncoding(tensorType);
+  std::optional<TensorEncoding> encoding = getEncoding(tensorType);
   if (!encoding)
     return failure();
   switch (*encoding) {
@@ -101,7 +101,7 @@ chooseEncodingInfo(RankedTensorType tensorType) {
 /// Utility method to get the optional padding value to use with pack operation
 /// if source is defined using a `tensor.pad` operation. Note `source` is
 /// passed by reference. It is updated to use the source of the pad operation.
-static Optional<Value> getPaddingValue(Value &source) {
+static std::optional<Value> getPaddingValue(Value &source) {
   auto padOp = source.getDefiningOp<tensor::PadOp>();
   if (!padOp || padOp.getNofold() || !padOp.hasZeroLowPad())
     return std::nullopt;
@@ -137,7 +137,7 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  Optional<TensorEncoding> encoding = getEncoding(resultType);
+  std::optional<TensorEncoding> encoding = getEncoding(resultType);
   if (!encoding)
     return failure();
   SmallVector<OpFoldResult> resultDims = tensor::PackOp::getResultShape(
@@ -146,7 +146,7 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
       materializeEncodingInfo->outerDimsPerm);
   auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
                                                   resultType.getElementType());
-  Optional<Value> paddingValue = getPaddingValue(source);
+  std::optional<Value> paddingValue = getPaddingValue(source);
   auto packOp = rewriter.create<tensor::PackOp>(
       loc, source, emptyOp, materializeEncodingInfo->innerDimsPos,
       *innerTileSizesOfr, paddingValue, materializeEncodingInfo->outerDimsPerm);
@@ -208,11 +208,11 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
     return failure();
   auto inputs = matmulOp.getDpsInputOperands();
   auto outputs = matmulOp.getDpsInitOperands();
-  Optional<TensorEncoding> lhsEncoding =
+  std::optional<TensorEncoding> lhsEncoding =
       getEncoding(inputs[0]->get().getType().cast<RankedTensorType>());
-  Optional<TensorEncoding> rhsEncoding =
+  std::optional<TensorEncoding> rhsEncoding =
       getEncoding(inputs[1]->get().getType().cast<RankedTensorType>());
-  Optional<TensorEncoding> resultEncoding =
+  std::optional<TensorEncoding> resultEncoding =
       getEncoding(outputs[0]->get().getType().cast<RankedTensorType>());
   if (!lhsEncoding ||
       (lhsEncoding.value() != TensorEncoding::MATMUL_F32F32F32_LHS &&

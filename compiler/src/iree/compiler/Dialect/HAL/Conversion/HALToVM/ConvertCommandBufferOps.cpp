@@ -16,9 +16,9 @@ namespace iree_compiler {
 namespace {
 
 // TODO(benvanik): import op handling of optional values.
-// It'd be nice if the Optional<Index>:$binding_capacity could be emitted as 0
-// when not present; today it'll be omitted entirely (as it's not in the operand
-// set) but we need it for the fixed call signature.
+// It'd be nice if the std::optional<Index>:$binding_capacity could be emitted
+// as 0 when not present; today it'll be omitted entirely (as it's not in the
+// operand set) but we need it for the fixed call signature.
 class CommandBufferCreateOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferCreateOp> {
  public:

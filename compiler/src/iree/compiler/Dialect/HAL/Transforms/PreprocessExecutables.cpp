@@ -219,8 +219,8 @@ class PreprocessExecutablesPass
  public:
   PreprocessExecutablesPass() = default;
   PreprocessExecutablesPass(const PreprocessExecutablesPass &pass) {}
-  PreprocessExecutablesPass(Optional<std::string> pipeline,
-                            Optional<std::string> command) {
+  PreprocessExecutablesPass(std::optional<std::string> pipeline,
+                            std::optional<std::string> command) {
     if (pipeline.has_value()) {
       this->pipeline = std::move(pipeline).value();
     } else if (command.has_value()) {

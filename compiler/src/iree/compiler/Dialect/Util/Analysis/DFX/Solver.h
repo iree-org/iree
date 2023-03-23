@@ -269,7 +269,7 @@ class Solver {
   void rememberDependences();
 
   // Maximum number of fixed point iterations or None for default.
-  Optional<unsigned> maxFixpointIterations;
+  std::optional<unsigned> maxFixpointIterations;
 
   // A flag that indicates which stage of the process we are in.
   enum class Phase {

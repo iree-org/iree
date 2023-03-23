@@ -44,10 +44,11 @@ void addIREEPostBufferizationPasses(OpPassManager &passManager);
 using bufferization::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn =
+    std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+    std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
+        std::nullopt,
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -100,10 +101,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 /// with the allocated MemRefType having no stride map (i.e. default row-major
 /// striding) and default memory space.
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn =
+    std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+    std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
+        std::nullopt,
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();
@@ -295,6 +297,14 @@ createVerifyLinalgTransformLegalityPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
     int64_t tilingLevel = -1);
 
+/// Pass to pad operations on tensors in top-down order.
+enum class LLVMCPUTensorPadOption { ParallelDims, ReductionDims };
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
+    LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims);
+
+/// Pass to perform peeling on non-distributed loops.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReordering = false);
@@ -446,21 +456,19 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
 void addGPUVectorizationPassPipeline(OpPassManager &pm);
 
 /// Lowering calling vectorization patterns.
-LogicalResult verifyGPUMatmulSimtPassPipeline(
+LogicalResult verifyGPUMatmulPipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
+
+/// Lowering using SIMT CUDA core operations.
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
-LogicalResult verifyGPUMatmulTensorCorePipeline(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize);
-/// Lowering using wmma tensorcore operations.
+/// Lowering using wmma Tensor Core operations.
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
 
-/// Lowering using mma.sync tensorcore operations.
+/// Lowering using mma.sync Tensor Core operations.
 void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
                                                unsigned pipelineDepth);
 
