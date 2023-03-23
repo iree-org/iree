@@ -100,20 +100,8 @@ static LogicalResult verifyEntryPoint(
     for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
       workgroupSizes[index] = attr.cast<IntegerAttr>().getInt();
     }
-
-    switch (translationInfo.getDispatchLoweringPassPipeline()) {
-      case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-        return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                           workgroupSizes,
-                                           verifyGPUMatmulSimtPassPipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
-        return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                           workgroupSizes,
-                                           verifyGPUMatmulTensorCorePipeline);
-        break;
-      default:;
-    }
+    return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                       workgroupSizes, verifyGPUMatmulPipeline);
   }
   return success();
 }

@@ -12,217 +12,229 @@
 namespace mlir {
 namespace iree_compiler {
 
+////////////////////////////////////////////////////////////////////////////////
+// Constants used in the matmul lowering verifiers.
 constexpr unsigned kWorkgroupTileLevel = 0;
-constexpr int kSharedMemSizeBytes = 64 * 1024;
 
-LogicalResult verifyGPUMatmulSimtPassPipeline(
+// Use the constexpr to convey the meaning of the indices.
+// Dimenstions identifiers for: workgroup size (x, y, z), and thread (x, y, z).
+constexpr int kDimX = 0;
+constexpr int kDimY = 1;
+constexpr int kDimZ = 2;
+
+// Dimenstions identifiers for: matmul problem shapes (m, n, k), thread block
+// shape (m, n, k), warp shape, and instruction shape (m, n, k).
+constexpr int kM = 0;
+constexpr int kN = 1;
+constexpr int kK = 2;
+////////////////////////////////////////////////////////////////////////////////
+
+/// Returns the shape of the math instruction for the given pipeline and input
+/// element type.
+static void getInstructionShape(
+    IREE::Codegen::DispatchLoweringPassPipelineAttr pipeline,
+    Type inputElementType, SmallVector<int64_t> &instructionShape) {
+  switch (pipeline.getValue()) {
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
+      // SIMT Pipeline / CUDA Cores
+      instructionShape = {1, 1, 1};
+      return;
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
+      // Tensor Core Pipeline / WMMA API
+      if (inputElementType.isF16() || inputElementType.isBF16()) {
+        instructionShape = {16, 16, 16};
+      } else if (inputElementType.isF32()) {
+        instructionShape = {16, 16, 8};
+      } else {
+        assert("expected f16, bf16 or f32 for tensor core pipeline");
+      }
+      return;
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUMatmulTensorCoreMmaSync:
+      // Tensor Core Pipeline / MMA.SYNC
+      if (inputElementType.isF16() || inputElementType.isBF16()) {
+        instructionShape = {16, 8, 16};
+      } else if (inputElementType.isF32()) {
+        instructionShape = {16, 8, 8};
+      } else {
+        assert("expected f16, bf16 or f32 for tensor core pipeline");
+      }
+      return;
+    default:
+      assert("expected tensor core pipeline");
+  }
+}
+
+/// Verifies launch configuration for matmul and batchmatmul on a GPU for CUDA
+/// and Tensor Core pipelines.
+LogicalResult verifyGPUMatmulPipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
-  auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt;
-  StringRef pipelineName = stringifyEnum(pipeline);
+  // Only verify batched and unbatched matmul.
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
+    return success();
+  }
+
+  // Early exit if the workgroup size is not set.
   if (workgroupSize.empty()) {
     return op->emitOpError("expected workgroup size for GPU pipelines");
   }
-
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
-    return success();  // Only verify batched and unbatched matmul.
-  }
-
-  Type inputType = op->getOperand(0).getType();
-  SmallVector<int64_t> firstLevelTileSizes =
-      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
-
-  if (linalg::BatchMatmulOp batchMatmulOp =
-          dyn_cast<linalg::BatchMatmulOp>(op)) {
-    // Inspect first tile dimensions separately for batched. It should be 1 for
-    // parallelizable loops and 0 for non-parallelizable. Continue with other
-    // dimensions for remaining comparisons.
-    if (cast<PartitionableLoopsInterface>(op).getPartitionableLoops(
-            kNumMaxParallelDims)[0] == 0) {  // The first dimension is
-      if (firstLevelTileSizes[0] > 1) {
-        return op->emitError("Received first tile dimension of ")
-               << firstLevelTileSizes[0] << " instead of 1 or 0 for "
-               << pipelineName;
-      }
-    } else {
-      if (firstLevelTileSizes[0] != 0) {
-        return op->emitError("Received first tile dimension of ")
-               << firstLevelTileSizes[0] << " instead of 0 for "
-               << pipelineName;
-      }
-    }
-    firstLevelTileSizes = {firstLevelTileSizes[1], firstLevelTileSizes[2],
-                           firstLevelTileSizes[3]};
-  }
-
-  // Verify the total workgroup size is <= 1024
-  int64_t totalWorkgroupSize =
-      workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  if (totalWorkgroupSize > 1024) {
-    return op->emitOpError("expected workgroup size to be <=1024 for ")
-           << pipelineName << ", got " << totalWorkgroupSize;
-  }
-
-  // Verify the workgroup.z component should always be 1
-  if (workgroupSize[2] != 1) {
-    return op->emitOpError("expected workgroup z component to be 1 for ")
-           << pipelineName << ", got " << workgroupSize[2];
-  }
-
-  // Verify shared memory usage of operands after tiling requires <= 64Kb
-  // combined space.
-  unsigned bytesSize =
-      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth() / 8;
-
-  // Input shape sizes: A [ M x K],  B [ K x N]
-  unsigned totalSharedMemSizeBytes =
-      (firstLevelTileSizes[0] * firstLevelTileSizes[2] +
-       firstLevelTileSizes[1] * firstLevelTileSizes[2]) *
-      bytesSize;
-
-  if (totalSharedMemSizeBytes > kSharedMemSizeBytes) {
-    return op->emitOpError("expected shared memory usage <= 64Kb for ")
-           << pipelineName << ", got " << totalSharedMemSizeBytes;
-  }
-
-  return success();
-}
-
-LogicalResult verifyGPUMatmulTensorCorePipeline(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize) {
-  auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
 
   assert(translationInfo.getSoftwarePipelineStoreStage() == 1 &&
          "Store to workgroup memory currently expected to happen in stage 1 of "
          "software pipeline.");
 
-  unsigned softwarePipelinedepth = translationInfo.getSoftwarePipelineDepth();
-  StringRef pipelineName = stringifyEnum(pipeline);
-  if (workgroupSize.empty()) {
-    return op->emitOpError("expected workgroup size for GPU pipelines");
-  }
+  // Get compilation pipeline.
+  auto pipeline = translationInfo.getPassPipeline();
+  StringRef pipelineName = stringifyEnum(pipeline.getValue());
 
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
-    return success();  // Only verify batched and unbatched matmul.
-  }
+  assert(translationInfo.getSoftwarePipelineStoreStage() == 1 &&
+         "Store to workgroup memory currently expected to happen in stage 1 of "
+         "software pipeline.");
 
-  Type inputType = op->getOperand(0).getType();
-  ArrayRef<int64_t> lhsShape =
-      op->getOperand(0).getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape =
-      op->getOperand(1).getType().cast<ShapedType>().getShape();
-  SmallVector<int64_t> firstLevelTileSizes =
+  // Get Operand/Result types.
+  mlir::Type lhsType = op->getOperand(0).getType();
+  mlir::Type rhsType = op->getOperand(1).getType();
+  assert(lhsType.cast<ShapedType>().getElementType() ==
+             rhsType.cast<ShapedType>().getElementType() &&
+         "expected lhs and rhs to have same type. Mixed input types are not "
+         "supported yet in IREE Codegen.");
+
+  // Get lhs and rhs shapes.
+  ArrayRef<int64_t> lhsShape = lhsType.cast<ShapedType>().getShape();
+  ArrayRef<int64_t> rhsShape = rhsType.cast<ShapedType>().getShape();
+
+  // Tile shapes in number of elements.
+  SmallVector<int64_t> tileShape =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
+  SmallVector<int64_t> threadBlockShape{tileShape};
 
-  if (linalg::BatchMatmulOp batchMatmulOp =
-          dyn_cast<linalg::BatchMatmulOp>(op)) {
-    // First dimension is the batch dimension. We don't check the shape batch.
-    lhsShape = lhsShape.drop_front(1);
-    rhsShape = rhsShape.drop_front(1);
-
-    // Inspect first tile dimensions separately for batched. It should be 1 for
-    // parallelizable loops and 0 for non-parallelizable. Continue with other
-    // dimensions for remaining comparisons.
+  if (auto batchMatmulOp = dyn_cast<linalg::BatchMatmulOp>(op)) {
+    // Inspect the batch tile dimensions separately for batch. The batch tile
+    // dim should be strictly greater than 1 for parallelizable loops and 0
+    // for non-parallelizable.
     if (cast<PartitionableLoopsInterface>(op).getPartitionableLoops(
-            kNumMaxParallelDims)[0] == 0) {  // The first dimension is
-      if (firstLevelTileSizes[0] > 1) {
-        return op->emitError("Received first tile dimension of ")
-               << firstLevelTileSizes[0] << " instead of 1 or 0 for "
-               << pipelineName;
+            kNumMaxParallelDims)[0] == 0) {
+      if (tileShape[0] > 1) {
+        return op->emitError("Received batch tile dimension of ")
+               << tileShape[0]
+               << " instead of 1 or lower for partitionable loops with "
+               << "compilation pipeline " << pipelineName;
       }
     } else {
-      if (firstLevelTileSizes[0] != 0) {
-        return op->emitError("Received first tile dimension of ")
-               << firstLevelTileSizes[0] << " instead of 0 for "
-               << pipelineName;
+      if (tileShape[0] != 0) {
+        return op->emitError("Received batch tile dimension of ")
+               << tileShape[0]
+               << " instead of 0 for non-partitionable loops with compilation"
+               << " pipeline " << pipelineName;
       }
     }
-    firstLevelTileSizes = {firstLevelTileSizes[1], firstLevelTileSizes[2],
-                           firstLevelTileSizes[3]};
+
+    // Remove the batch dimension from the threadBlockShape, lhsShape, and
+    // rhsShape.
+    threadBlockShape = {tileShape[1], tileShape[2], tileShape[3]};
+    lhsShape = lhsShape.drop_front();
+    rhsShape = rhsShape.drop_front();
   }
 
-  // Verify the total workgroup size is <= 1024
-  int64_t totalWorkgroupSize =
-      workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  if (totalWorkgroupSize > 1024) {
-    return op->emitOpError("expected workgroup size to be <=1024 for ")
-           << pipelineName << ", got " << totalWorkgroupSize;
-  }
+  // Number of software pipeline stages/depth.
+  int64_t softwarePipelineDepth = translationInfo.getSoftwarePipelineDepth();
 
-  // Verify that the workgroup X dimension is 32 aligned
-  if (workgroupSize[0] % 32 != 0) {
-    return op->emitOpError("workgroup size is not 32 aligned for ")
-           << pipelineName << ", got " << workgroupSize[0];
-  }
-  if (softwarePipelinedepth > 1 && firstLevelTileSizes[2] == lhsShape[1]) {
-    return op->emitError(
-               "Software pipelining is not supported when first level K tile "
-               "size is same as matrix reduction size.\n This dispatch has\nk "
-               "tile: ")
-           << firstLevelTileSizes[2]
-           << "\nMatrix reduction size: " << lhsShape[1]
-           << "\nPipelinedepth: " << softwarePipelinedepth;
-  }
-  // Verify the workgroup.z component should always be 1
-  if (workgroupSize[2] != 1) {
-    return op->emitOpError("expected workgroup z component to be 1 for ")
-           << pipelineName << ", got " << workgroupSize[2];
-  }
+  //
+  // Begin verification for CUDA and Tensor Core pipelines.
+  //
 
-  // The second level of tiling = [M / numWarp.y, N / numWarp.x, K].
-  SmallVector<int64_t, 3> secondLevelTileSizes = {
-      firstLevelTileSizes[0] / workgroupSize[1],
-      firstLevelTileSizes[1] / (workgroupSize[0] / kWarpSize),
-      firstLevelTileSizes[2]};
+  // Verify the total number of threads in a thread block.
+  int totalNumThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
 
-  // Verify the TensorCore size divides the second level tile size
-  SmallVector<int64_t, 3> tensorCoreSize({16, 16, 8});
-  if (secondLevelTileSizes[0] % tensorCoreSize[0] != 0 ||
-      secondLevelTileSizes[1] % tensorCoreSize[1] != 0 ||
-      secondLevelTileSizes[2] % tensorCoreSize[2] != 0) {
-    return op->emitOpError(
-               "tensorcore size doesn't factor into second level tile size "
-               "for ")
+  if (totalNumThreads > 1024) {
+    return op->emitError("Total number of threads in a thread block ")
+           << totalNumThreads
+           << " exceeds the limit of 1024 with compilation pipeline "
            << pipelineName;
   }
 
-  // Verify the first level tile size divides the matmul
-  // inputs A [M x K] & B [K x N]
-  if (lhsShape[0] % firstLevelTileSizes[0] != 0 ||
-      lhsShape[1] % firstLevelTileSizes[2] != 0) {
-    return op->emitOpError(
-               "lhsShape doesn't factor into first level tile size for ")
-           << pipelineName << " [ " << lhsShape[0] << ", " << lhsShape[1]
-           << "]";
-  }
-  if (rhsShape[0] % firstLevelTileSizes[2] != 0 ||
-      rhsShape[1] % firstLevelTileSizes[1] != 0) {
-    return op->emitOpError(
-               "rhsShape doesn't factor into first level tile size for ")
-           << pipelineName << " [ " << rhsShape[0] << ", " << rhsShape[1]
-           << "]";
+  // Verify the number of threads in z-dim is 1.
+  if (workgroupSize[kDimZ] != 1) {
+    return op->emitError("Expected workgroup size in z-dim = 1, but got ")
+           << workgroupSize[kDimZ] << " with compilation pipeline "
+           << pipelineName;
   }
 
-  // Verify shared memory usage of operands after tiling requires <= 64Kb
-  // combined space.
-  unsigned bytesSize =
-      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth() / 8;
+  // Verify shared memory usage is within the limit.
+  // TODO(KoolJBlack): working on adding check shared memory usage.
 
-  // Input shape sizes: A [ M x K],  B [ K x N]
-  unsigned totalSharedMemSizeBytes =
-      (firstLevelTileSizes[0] * firstLevelTileSizes[2] +
-       firstLevelTileSizes[1] * firstLevelTileSizes[2]) *
-      bytesSize;
+  // Return success for SIMT/CUDA cores.
+  if (pipeline.getValue() ==
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt)
+    return success();
 
-  if (totalSharedMemSizeBytes > kSharedMemSizeBytes) {
-    return op->emitOpError("expected shared memory usage <= 64Kb for ")
-           << pipelineName << ", got " << totalSharedMemSizeBytes;
+  //
+  // Additional verification Tensor Core pipelines.
+  //
+
+  // Verify that x-dim has multiple of kWarpSize threads or has integer units of
+  // warps in x-dim.
+  if (workgroupSize[kDimX] % kWarpSize != 0) {
+    return op->emitError("Number of threads in x-dim ")
+           << workgroupSize[kDimX] << " is not a multiple of warp size ("
+           << kWarpSize
+           << ") or integer units of warps in x-dim with compilation pipeline "
+           << pipelineName;
   }
+
+  // Number of warps in x, y, and z dim.
+  SmallVector<int64_t> numWarps{workgroupSize[kDimX] / kWarpSize,
+                                workgroupSize[kDimY], workgroupSize[kDimZ]};
+
+  // Matrix-multiply problem shape in number of elements in M, N, and K dim.
+  SmallVector<int64_t> matmulShape{lhsShape[0], rhsShape[1], lhsShape[1]};
+
+  // Warp tile shape in number of elements in M, N, and K dim.
+  // Note that num warp in (x, y, z) dim are mapped to problem (M, N, K) dim as:
+  // DimY -> ProblemDimM, DimX -> ProblemDimN, DimZ -> ProblemDimK.
+  SmallVector<int64_t> warpShape{threadBlockShape[kM] / numWarps[kDimY],
+                                 threadBlockShape[kN] / numWarps[kDimX],
+                                 threadBlockShape[kK] / numWarps[kDimZ]};
+
+  // Instruction shape in number of elements in M, N, and K dim.
+  SmallVector<int64_t> instructionShape;
+  getInstructionShape(pipeline, lhsType.cast<ShapedType>().getElementType(),
+                      instructionShape);
+
+  // Verify the matmul problem shape K has a multiple of thread block K tiles.
+  if (softwarePipelineDepth > 1 && threadBlockShape[kK] == matmulShape[kK]) {
+    return op->emitError("Matmul problem shape K ")
+           << matmulShape[kK]
+           << " is not in the multiple of thread block K tiles needed for "
+              "software pipelining ("
+           << threadBlockShape[kK] << ")"
+           << " * "
+           << "(" << softwarePipelineDepth << ")"
+           << " with compilation pipeline " << pipelineName;
+  }
+
+  // Verify that matmul problem shape can be tiled with the thread block shape.
+  // TODO: This check should be relaxed as we allow unaligned matmul shapes.
+  if (matmulShape[kM] % threadBlockShape[kM] != 0 ||
+      matmulShape[kN] % threadBlockShape[kN] != 0 ||
+      matmulShape[kK] % threadBlockShape[kK] != 0) {
+    return op->emitError("Thread block shape ")
+           << threadBlockShape << " cannot be tiled on matmul shape "
+           << matmulShape << " with compilation pipeline " << pipelineName;
+  }
+
+  // Verify that if warp shape can be tiled using warp-level Tensor core
+  // instruction shape.
+  if (warpShape[kM] % instructionShape[kM] != 0 ||
+      warpShape[kN] % instructionShape[kN] != 0 ||
+      warpShape[kK] % instructionShape[kK] != 0) {
+    return op->emitError("Tensor Core instruction shape ")
+           << instructionShape << " cannot be tiled on warp shape " << warpShape
+           << " with compilation pipeline " << pipelineName;
+  }
+
   return success();
 }
 
