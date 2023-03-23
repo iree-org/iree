@@ -27,13 +27,23 @@
 #define SSTRINGIZE(x) STRINGIZE(x)
 #pragma message(SSTRINGIZE(KERNELNAME))
 
+#ifdef CUDA_ENTRY_GLOBAL
+#define CUDA_ENTRY __global__
+#else
+#if defined(__clang__)
+#define CUDA_ENTRY __device__
+#else
+#define CUDA_ENTRY __device__
+#endif
+#endif
+
 //===----------------------------------------------------------------------===//
 // C Trampoline Microkernel
 //===----------------------------------------------------------------------===//
 
 extern "C" {
 /* clang-format off */ 
-__device__ void TEMPLATE(
+CUDA_ENTRY void TEMPLATE(
     KERNEL_NAME, ELEMENT_A, ELEMENT_B, ELEMENT_C,
     TILE_M, TILE_N, TILE_K, 
     WARP_M, WARP_N,  

@@ -299,10 +299,6 @@ static std::string linkUKernelsPTX(std::string ptxImage,
     return ptxImage;
   }
 
-  // Make externs functions visible
-  std::string prefix = ugpu_kernel_prefix();
-  std::string ukernels_name = ".extern .func " + prefix;
-  std::string ukernels_visible_name = ".visible .func " + prefix;
   auto replaceAll = [](std::string &content, const std::string &from,
                        const std::string &to) {
     size_t start_pos = 0;
@@ -311,6 +307,10 @@ static std::string linkUKernelsPTX(std::string ptxImage,
       start_pos += to.length();
     }
   };
+  // Make externs functions visible
+  std::string prefix = ugpu_kernel_prefix();
+  std::string ukernels_name = ".extern .func " + prefix;
+  std::string ukernels_visible_name = ".visible .func " + prefix;
   replaceAll(ptxImage, ukernels_name, ukernels_visible_name);
 
   ptxImage.append("//===-------------------------------------------===//\n");
@@ -598,7 +598,7 @@ class CUDATargetBackend final : public TargetBackend {
         llvm::Triple triple("nvptx64-nvidia-cuda");
         std::string targetChip = clTargetChip;
         // PTX version is backward compatible
-        std::string features = "+ptx78";
+        std::string features = "+ptx77";
         std::string error;
         const llvm::Target *target =
             llvm::TargetRegistry::lookupTarget("", triple, error);

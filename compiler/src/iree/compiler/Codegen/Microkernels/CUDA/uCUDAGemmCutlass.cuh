@@ -11,8 +11,8 @@
 #include "cutlass/epilogue/threadblock/default_epilogue_tensor_op.h"
 #include "cutlass/gemm/threadblock/default_mma.h"
 #include "cutlass/gemm/threadblock/default_mma_core_sm80.h"
-#include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
 #include "cutlass/gemm/threadblock/threadblock_swizzle.h"
+#include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
 
 #ifndef DEBUG_CUTLASS
 #include "cutlass/util/debug.h"
@@ -24,9 +24,9 @@ template <class ElementA, class ElementB, class ElementC, int Tile_m,
           int Inst_n, int Inst_k, int Stages, bool hasLinalgFill,
           bool writeBack2Global>
 __forceinline__ __device__ void gemm_ukernel(
-    ElementA* lhs, int64_t lhs_offset, int64_t lhs_dim2, ElementB* rhs,
-    int64_t rhs_offset, int64_t rhs_dim2, ElementC* res, int64_t res_offset,
-    int64_t res_dim2, ElementC* shmem, ElementC fillValue) {
+    ElementA* lhs, int32_t lhs_offset, int32_t lhs_dim2, ElementB* rhs,
+    int32_t rhs_offset, int32_t rhs_dim2, ElementC* res, int32_t res_offset,
+    int32_t res_dim2, ElementC* shmem, ElementC fillValue) {
   using ElementAccumulator = ElementC;
   // todo(guray) Can be templatized
   using LayoutA = cutlass::layout::RowMajor;
@@ -61,20 +61,24 @@ __forceinline__ __device__ void gemm_ukernel(
 
   // Set entire matrix as the problem size
   cutlass::gemm::GemmCoord problem_size(SZ_M, SZ_N, SZ_K);
-  
+
   const int split_k_slices = 1;
 
-  using ThreadblockSwizzle = cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>; 
+  using ThreadblockSwizzle =
+      cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>;
   ThreadblockSwizzle threadblock_swizzle;
 
-  cutlass::gemm::GemmCoord grid_tiled_shape = threadblock_swizzle.get_tiled_shape(
-      problem_size,
-      {ThreadblockShape::kM, ThreadblockShape::kN, ThreadblockShape::kK}, split_k_slices);
+  cutlass::gemm::GemmCoord grid_tiled_shape =
+      threadblock_swizzle.get_tiled_shape(
+          problem_size,
+          {ThreadblockShape::kM, ThreadblockShape::kN, ThreadblockShape::kK},
+          split_k_slices);
 
   int swizzle_log_tile = ThreadblockSwizzle().get_log_tile(grid_tiled_shape);
 
   // Compute threadblock location
-  cutlass::gemm::GemmCoord tb_tile_offset = threadblock_swizzle.get_tile_offset(swizzle_log_tile);
+  cutlass::gemm::GemmCoord tb_tile_offset =
+      threadblock_swizzle.get_tile_offset(swizzle_log_tile);
 
   // Dynamic shared memory base pointer
   extern __shared__ ElementC GemmSharedStorageBase[];
@@ -84,14 +88,13 @@ __forceinline__ __device__ void gemm_ukernel(
       reinterpret_cast<typename ThreadblockMma::SharedStorage*>(
           GemmSharedStorageBase);
 
-
   cutlass::MatrixCoord tb_offset_A{
       tb_tile_offset.m() * ThreadblockMma::Shape::kM, tb_tile_offset.k()};
 
   cutlass::MatrixCoord tb_offset_B{
       tb_tile_offset.k(), tb_tile_offset.n() * ThreadblockMma::Shape::kN};
 
-  // Compute position within threadblock 
+  // Compute position within threadblock
   int tb_thread_id = threadIdx.x;
   int warp_id = __shfl_sync(0xffffffff, threadIdx.x / 32, 0);
   int lane_id = threadIdx.x % 32;
