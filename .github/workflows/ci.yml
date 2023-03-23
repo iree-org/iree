@@ -312,7 +312,14 @@ jobs:
           #   * 20% cache hits -> ~15-20 minutes to build
           CCACHE_MAXSIZE: 4G
           CCACHE_COMPRESSLEVEL: 5
-        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        run: |
+          # First make ninja binary accessible in PATH.
+          NINJA_PIP_PATH=$(pip show ninja | grep Location | cut -d' ' -f2)
+          NINJA_BIN_PATH=$(dirname $(find ${NINJA_PIP_PATH} -name "ninja" -type f))
+          export PATH=$NINJA_BIN_PATH:$PATH
+          echo $PATH
+          which ninja
+          ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       # Write cache (if configured to) after all other steps are finished.
