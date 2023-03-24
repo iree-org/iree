@@ -260,7 +260,7 @@ jobs:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_windows_${{ github.sha }}
 
-  build_test_all_macos:
+  build_test_all_macos_arm64:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on:
@@ -292,6 +292,69 @@ jobs:
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+
+  build_test_all_macos_x86_64:
+    needs: setup
+    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
+    runs-on: macos-12-xl
+    env:
+      BUILD_DIR: build-macos
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Updating git submodules"
+        run: git submodule update --init --jobs 8 --depth 1
+      - name: "Setting up Python"
+        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - name: "Installing Python packages"
+        run: pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Installing requirements"
+        # We need coreutils for `realpath` used in scripts.
+        # We need bash because the default one on macOS is fairly old and lacks
+        # features we use in scripts.
+        run: brew install ninja ccache coreutils bash
+      # Attempt to restore from cache unconditionally.
+      # Note: this will first try to grab a cache entry for this exact commit
+      #       then it will fall back to the latest for any commit.
+      - name: "Fetching cache (CMake/ccache)"
+        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache_all_macos_${{ github.sha }}
+          restore-keys: ccache_all_macos
+      # Finally: build and run tests.
+      - name: "Building IREE"
+        env:
+          IREE_READ_REMOTE_CCACHE: 0
+          IREE_WRITE_REMOTE_CCACHE: 0
+          IREE_READ_LOCAL_CCACHE: 1
+          IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          # Cache size and compression level settings are a delicate balance.
+          # * A full build cache is around 2-5GB depending on compression level
+          # * Upload/download is slow (double compression may or may not help)
+          # * We have a limit of 10GB across all cached files per repository
+          # * Cache misses are quite costly:
+          #   * 99% cache hits -> ~5 minutes to build
+          #   * 20% cache hits -> ~15-20 minutes to build
+          CCACHE_MAXSIZE: 4G
+          CCACHE_COMPRESSLEVEL: 5
+        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: "Testing IREE"
+        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+      # Write cache (if configured to) after all other steps are finished.
+      - name: "Saving cache (CMake/ccache)"
+        if: needs.setup.outputs.write-caches == '1'
+        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache_all_macos_${{ github.sha }}
 
   build_test_all_bazel:
     needs: setup
@@ -1341,7 +1404,8 @@ jobs:
       # Basic
       - build_all
       - build_test_all_windows
-      - build_test_all_macos
+      - build_test_all_macos_arm64
+      - build_test_all_macos_x86_64
       - build_test_all_bazel
       - test_all
       - test_gpu
