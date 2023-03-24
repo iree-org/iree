@@ -24,7 +24,7 @@ std::optional<std::string> InitializeCompilerForProcess(
     return {};
   }
 
-  ireeCompilerGlobalInitialize(/*initializeCommandLine=*/false);
+  ireeCompilerGlobalInitialize();
 
   return library_path;
 }
