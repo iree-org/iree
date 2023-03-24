@@ -93,6 +93,17 @@ function(iree_compiler_add_plugin plugin_id plugin_src_dir)
   set(IREE_COMPILER_IN_ADD_PLUGIN "${plugin_id}")
   set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_INCLUDED_PLUGIN_IDS "${plugin_id}")
   set(_binary_dir "${IREE_BINARY_DIR}/compiler/plugins/${_plugin_id}")
+
+  # Force enable BUILD_SHARED_LIBS for the compiler if instructed.
+  set(_IREE_ORIG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+  if(IREE_COMPILER_BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+  endif()
+
   add_subdirectory("${plugin_src_dir}" "${_binary_dir}")
+
+  # Reset BUILD_SHARED_LIBS.
+  set(BUILD_SHARED_LIBS ${_IREE_ORIG_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
+
   unset(IREE_COMPILER_IN_ADD_PLUGIN)
 endfunction()
