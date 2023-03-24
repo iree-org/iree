@@ -125,14 +125,10 @@ iree_cc_library(
     x86_64
   HDRS
     "mmt4d_x86_64.h"
-    "pack_x86_64.h"
     "query_tile_sizes_x86_64.h"
-    "unpack_x86_64.h"
   SRCS
     "mmt4d_x86_64.c"
-    "pack_x86_64.c"
     "query_tile_sizes_x86_64.c"
-    "unpack_x86_64.c"
   DEPS
     ::common_x86_64
     iree::base::core_headers
