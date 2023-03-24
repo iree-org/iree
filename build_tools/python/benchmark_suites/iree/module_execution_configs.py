@@ -67,7 +67,7 @@ def get_elf_local_task_config(thread_num: int):
       tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
       loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
       driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
-      extra_flags=[f"--task_topology_group_count={thread_num}"])
+      extra_flags=[f"--task_topology_max_group_count={thread_num}"])
 
 
 def get_vmvx_local_task_config(thread_num: int):
@@ -77,4 +77,4 @@ def get_vmvx_local_task_config(thread_num: int):
       tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
       loader=iree_definitions.RuntimeLoader.VMVX_MODULE,
       driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
-      extra_flags=[f"--task_topology_group_count={thread_num}"])
+      extra_flags=[f"--task_topology_max_group_count={thread_num}"])
