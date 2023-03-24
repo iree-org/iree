@@ -66,7 +66,7 @@ class PluginManager : public PluginRegistrar {
 
   // Calls through to AbstractPluginRegistration::registerDialects for all
   // available plugins.
-  void registerDialects(DialectRegistry &registry);
+  void registerGlobalDialects(DialectRegistry &registry);
 
  private:
   friend class PluginManagerSession;
@@ -78,6 +78,12 @@ class PluginManagerSession {
   PluginManagerSession(PluginManager &pluginManager, OptionsBinder &binder,
                        PluginManagerOptions &options);
 
+  // Initializes all plugins that should be activated by default.
+  LogicalResult initializePlugins();
+
+  // Invokes registerDialects() on all initialized plugins.
+  void registerDialects(DialectRegistry &registry);
+
   // Activates plugins as configured.
   LogicalResult activatePlugins(MLIRContext *context);
 
@@ -87,8 +93,8 @@ class PluginManagerSession {
   // registered plugins so that CLI options can be set properly.
   llvm::StringMap<std::unique_ptr<AbstractPluginSession>> allPluginSessions;
 
-  // Activation state.
-  llvm::SmallVector<AbstractPluginSession *> activatedSessions;
+  // Initialized list of plugins.
+  llvm::SmallVector<AbstractPluginSession *> initializedSessions;
 };
 
 }  // namespace mlir::iree_compiler

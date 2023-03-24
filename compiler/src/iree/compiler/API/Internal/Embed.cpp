@@ -138,7 +138,7 @@ GlobalInit::GlobalInit() {
   }
   pluginManager.globalInitialize();
   pluginManager.registerPasses();
-  pluginManager.registerDialects(registry);
+  pluginManager.registerGlobalDialects(registry);
 }
 
 void GlobalInit::registerCommandLineOptions() {
@@ -198,7 +198,13 @@ struct Session {
   LogicalResult activatePluginsOnce() {
     if (!pluginsActivated) {
       pluginsActivated = true;
-      pluginActivationStatus = pluginSession.activatePlugins(&context);
+      if (failed(pluginSession.initializePlugins())) {
+        pluginActivationStatus = failure();
+      } else {
+        DialectRegistry registry;
+        pluginSession.registerDialects(registry);
+        pluginActivationStatus = pluginSession.activatePlugins(&context);
+      }
     }
     return pluginActivationStatus;
   }

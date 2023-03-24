@@ -31,7 +31,9 @@ LogicalResult AbstractPluginSession::activate(MLIRContext *context) {
 
 void PluginRegistrar::registerPlugin(
     std::unique_ptr<AbstractPluginRegistration> registration) {
-  std::string_view id = registration->getPluginId();
+  // Need to copy the id since in the error case, the registration will be
+  // deleted before reporting the error message.
+  std::string id = std::string(registration->getPluginId());
   auto foundIt = registrations.insert(
       std::make_pair(llvm::StringRef(id), std::move(registration)));
   if (!foundIt.second) {

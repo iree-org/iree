@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 set(IREE_COMPILER_PLUGINS "" CACHE STRING "List of named in-tree plugins (under compiler/plugins) to statically compile")
+set(IREE_COMPILER_PLUGIN_PATHS "" CACHE STRING "Paths to external compiler plugins")
 
 # Ids of all plugins that have been included in the configure step. This
 # may include plugins that we do not statically link but we do build.
@@ -58,6 +59,17 @@ function(iree_compiler_configure_plugins)
   # Process in-tree plugins.
   foreach(_plugin_id ${IREE_COMPILER_PLUGINS})
     set(_plugin_src_dir "${IREE_SOURCE_DIR}/compiler/plugins/${_plugin_id}")
+    iree_compiler_add_plugin("${_plugin_id}" "${_plugin_src_dir}")
+  endforeach()
+  unset(_plugin_id)
+  unset(_plugin_src_dir)
+
+  # Process out of tree plugins.
+  foreach(_plugin_src_dir ${IREE_COMPILER_PLUGIN_PATHS})
+    # TODO: Support some path mangling to allow overriding the plugin id
+    # if it is not literally the last path component.
+    cmake_path(ABSOLUTE_PATH _plugin_src_dir BASE_DIRECTORY "${IREE_SOURCE_DIR}" NORMALIZE)
+    cmake_path(GET _plugin_src_dir FILENAME _plugin_id)
     iree_compiler_add_plugin("${_plugin_id}" "${_plugin_src_dir}")
   endforeach()
 endfunction()

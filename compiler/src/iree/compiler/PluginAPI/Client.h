@@ -72,7 +72,7 @@ class AbstractPluginRegistration {
   // change behavior. It is safer to customize the context on a per-session
   // basis in a plugin session's activate() method (i.e. if registering
   // interfaces or behavior changes extensions).
-  virtual void registerDialects(DialectRegistry &registry) {}
+  virtual void registerGlobalDialects(DialectRegistry &registry) {}
 
   // Creates an uninitialized session. If the CLI was initialized, then this
   // should also ensure that any command line options were managed properly into
@@ -100,11 +100,20 @@ class AbstractPluginSession {
  public:
   virtual ~AbstractPluginSession();
 
+  // Called prior to context initialization in order to register dialects.
+  void registerDialects(DialectRegistry &registry) {
+    onRegisterDialects(registry);
+  }
+
   // Called after the session has been fully constructed. If it fails, then
   // it should emit an appropriate diagnostic.
   LogicalResult activate(MLIRContext *context);
 
  protected:
+  // Called from registerDialects() prior to initializing the context and
+  // prior to onActivate().
+  virtual void onRegisterDialects(DialectRegistry &registry) {}
+
   // Called from the activate() method once pre-conditions are verified and the
   // context is set.
   virtual LogicalResult onActivate() { return success(); };
@@ -122,7 +131,7 @@ class PluginSession : public AbstractPluginSession {
   // AbstractPluginRegistration.
   static void globalInitialize() {}
   static void registerPasses() {}
-  static void registerDialects(DialectRegistry &registry) {}
+  static void registerGlobalDialects(DialectRegistry &registry) {}
 
   struct Registration : public AbstractPluginRegistration {
     using AbstractPluginRegistration::AbstractPluginRegistration;
@@ -135,9 +144,9 @@ class PluginSession : public AbstractPluginSession {
       // Actually need to capture the reference, not a copy. So get a pointer.
       globalCLIOptions = &OptionsFromFlags<OptionsTy>::get();
     }
-    void registerDialects(DialectRegistry &registry) override {
+    void registerGlobalDialects(DialectRegistry &registry) override {
       // Forward to the CRTP derived type.
-      DerivedTy::registerDialects(registry);
+      DerivedTy::registerGlobalDialects(registry);
     }
     std::unique_ptr<AbstractPluginSession> createUninitializedSession(
         OptionsBinder &localOptionsBinder) override {
