@@ -23,6 +23,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -1288,6 +1289,112 @@ LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.func
+//===----------------------------------------------------------------------===//
+
+FuncOp FuncOp::create(Location location, StringRef name, FunctionType type,
+                      ArrayRef<int64_t> tiedOperands,
+                      ArrayRef<NamedAttribute> attrs,
+                      ArrayRef<DictionaryAttr> argAttrs,
+                      ArrayRef<DictionaryAttr> resAttrs) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  FuncOp::build(builder, state, name, type,
+                builder.getIndexArrayAttr(tiedOperands), attrs, argAttrs,
+                resAttrs);
+  return cast<FuncOp>(Operation::create(state));
+}
+
+void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
+                   FunctionType type, ArrayAttr tiedOperands,
+                   ArrayRef<NamedAttribute> attrs,
+                   ArrayRef<DictionaryAttr> argAttrs,
+                   ArrayRef<DictionaryAttr> resAttrs) {
+  state.addAttribute(SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(name));
+  state.addAttribute(SymbolTable::getVisibilityAttrName(),
+                     builder.getStringAttr("private"));
+  state.addAttribute("function_type", TypeAttr::get(type));
+  state.attributes.append(attrs.begin(), attrs.end());
+  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                     tiedOperands);
+  state.addRegion();
+  if (!argAttrs.empty() || !resAttrs.empty()) {
+    assert(type.getNumInputs() == argAttrs.size());
+    assert(type.getNumResults() == resAttrs.size());
+    function_interface_impl::addArgAndResultAttrs(
+        builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
+        builder.getStringAttr("res_attrs"));
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// flow.call
+//===----------------------------------------------------------------------===//
+
+void CallOp::build(OpBuilder &builder, OperationState &state,
+                   SymbolRefAttr callee, TypeRange resultTypes,
+                   ValueRange resultDims, ValueRange arguments,
+                   ValueRange argumentDims, ArrayAttr tiedOperands,
+                   ArrayRef<NamedAttribute> attributes) {
+  state.addAttribute("callee", callee);
+  state.addTypes(resultTypes);
+  state.addOperands(arguments);
+  state.addOperands(argumentDims);
+  state.addOperands(resultDims);
+  state.addAttributes(attributes);
+  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                     tiedOperands);
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
+                         static_cast<int32_t>(arguments.size()),
+                         static_cast<int32_t>(argumentDims.size()),
+                         static_cast<int32_t>(resultDims.size()),
+                     }));
+}
+
+FunctionType CallOp::getCalleeType() {
+  auto argumentTypes = llvm::to_vector(llvm::map_range(
+      getArgOperands(), [](Value arg) { return arg.getType(); }));
+  return FunctionType::get(getContext(), argumentTypes, getResultTypes());
+}
+
+std::pair<unsigned, unsigned> CallOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(0);  // $arguments
+}
+
+LogicalResult CallOp::verify() {
+  Operation *op = getOperation();
+  if (failed(verifyOpDynamicDims(op, getArguments(), getArgumentDims())) ||
+      failed(verifyOpDynamicDims(op, getResults(), getResultDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+
+  auto calleeOp = symbolTable.lookupNearestSymbolFrom<IREE::Flow::FuncOp>(
+      op, getCalleeAttr());
+  if (!calleeOp) {
+    return op->emitOpError() << "undefined external call: " << getCallee();
+  }
+
+  auto expectedType = getCalleeType();
+  auto calleeType = calleeOp.getFunctionType();
+  if (calleeType != expectedType) {
+    return emitOpError("function type mismatch; expected ")
+           << expectedType << " but callee is " << calleeType;
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.clone
 //===----------------------------------------------------------------------===//
 
@@ -1597,7 +1704,6 @@ void CollectiveAllGatherOp::build(OpBuilder &builder, OperationState &state,
                                   Value target, Value source, Value channel) {
   auto targetDims =
       IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
-
   build(builder, state, elementType, target, targetDims, source, channel,
         builder.getIndexArrayAttr({0}));
 }
@@ -1625,7 +1731,6 @@ void CollectiveAllReduceOp::build(OpBuilder &builder, OperationState &state,
                                   Value target, Value source, Value channel) {
   auto targetDims =
       IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
-
   build(builder, state, reductionOp, elementType, target, targetDims, source,
         channel, builder.getIndexArrayAttr({0}));
 }
@@ -1655,7 +1760,6 @@ void CollectiveReduceScatterOp::build(OpBuilder &builder, OperationState &state,
                                       Value channel) {
   auto targetDims =
       IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
-
   build(builder, state, reductionOp, elementType, target, targetDims, source,
         channel, builder.getIndexArrayAttr({0}));
 }

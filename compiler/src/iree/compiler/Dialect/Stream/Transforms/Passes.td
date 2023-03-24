@@ -134,7 +134,7 @@ def ElideTimepoints :
 //===----------------------------------------------------------------------===//
 
 def ScheduleAllocation :
-    InterfacePass<"iree-stream-schedule-allocation", "mlir::CallableOpInterface"> {
+    Pass<"iree-stream-schedule-allocation", "mlir::ModuleOp"> {
   let summary = "Allocates resources and converts to explicit stream commands.";
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createScheduleAllocationPass()

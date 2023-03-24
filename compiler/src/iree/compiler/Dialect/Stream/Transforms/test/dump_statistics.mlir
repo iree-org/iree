@@ -13,8 +13,8 @@
 // CHECK-PRETTY: Executables: 2, 33% reuse
 
 // CHECK-CSV: ; Aggregate Statistics
-// CHECK-CSV: "Constants","Constant Size","Variables","Variable Size","Awaits","Submissions","Transient Size","Fills","Copies","Dispatches","Executables"
-// CHECK-CSV: 1,0,0,0,2,3,0,0,2,3,2
+// CHECK-CSV: "Constants","Constant Size","Variables","Variable Size","Awaits","Submissions","Transient Size","Fills","Copies","Dispatches","Async Calls","Executables"
+// CHECK-CSV: 1,0,0,0,2,3,0,0,2,3,0,2
 // CHECK-CSV: ; Execution
 // CHECK-CSV: "Depth","Command","Symbol","Length","Invocations","Workload","Operands","Resources"
 // CHECK-CSV: 0,"copy",,192,,,,

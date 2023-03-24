@@ -131,8 +131,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideTimepointsPass();
 // Allocation and command issuing
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<InterfacePass<CallableOpInterface>>
-createScheduleAllocationPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createScheduleAllocationPass();
 
 std::unique_ptr<InterfacePass<CallableOpInterface>> createPackConstantsPass();
 std::unique_ptr<InterfacePass<CallableOpInterface>> createPackAllocationsPass();

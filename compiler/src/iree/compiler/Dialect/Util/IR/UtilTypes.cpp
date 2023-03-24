@@ -296,20 +296,25 @@ IREE::Util::GlobalOpInterface lookupGlobalOp(
 
 std::optional<unsigned> detail::getTiedResultOperandIndex(
     Operation *op, unsigned resultIndex) {
-  auto storageAttr =
-      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
+  auto storageAttr = op->getAttrOfType<ArrayAttr>(
+      IREE::Util::TiedOpInterface::getStorageAttrName());
   if (!storageAttr) return std::nullopt;
   auto valueAttrs = storageAttr.getValue();
   if (valueAttrs.empty()) return std::nullopt;
-  auto tiedOp = cast<TiedOpInterface>(op);
-  auto indexAndLength = tiedOp.getTiedResultsIndexAndLength();
-  if (resultIndex < indexAndLength.first) return std::nullopt;
-  resultIndex -= indexAndLength.first;
-  if (resultIndex >= indexAndLength.second) return std::nullopt;
+  if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+    auto indexAndLength = tiedOp.getTiedResultsIndexAndLength();
+    if (resultIndex < indexAndLength.first) return std::nullopt;
+    resultIndex -= indexAndLength.first;
+    if (resultIndex >= indexAndLength.second) return std::nullopt;
+  }
   int64_t value = valueAttrs[resultIndex].cast<IntegerAttr>().getInt();
-  if (value == TiedOpInterface::kUntiedIndex) return std::nullopt;
-  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
-  return tiedOperandsOffset + static_cast<unsigned>(value);
+  if (value == IREE::Util::TiedOpInterface::kUntiedIndex) return std::nullopt;
+  if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+    unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+    return tiedOperandsOffset + static_cast<unsigned>(value);
+  } else {
+    return static_cast<unsigned>(value);
+  }
 }
 
 void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,

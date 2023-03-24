@@ -249,6 +249,19 @@ func.func @asyncDispatchNoWorkload(%arg0: !stream.resource<*>, %arg1: index) -> 
 
 // -----
 
+stream.async.func private @asyncExtern(%arg0: !stream.resource<*>, %arg1: index) -> %arg0
+
+// CHECK-LABEL: @asyncCall
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[SIZE0:.+]]: index)
+func.func @asyncCall(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: = stream.async.call @asyncExtern(%[[ARG0]][%c0 to %[[SIZE0]] for %[[SIZE0]]], %[[SIZE0]]) : (!stream.resource<*>{%[[SIZE0]]}, index) -> %[[ARG0]]{%[[SIZE0]]}
+  %call = stream.async.call @asyncExtern(%arg0[%c0 to %arg1 for %arg1], %arg1) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  return %call : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @asyncExecute
 func.func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
   // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> %arg0{%arg1} {

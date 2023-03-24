@@ -449,6 +449,70 @@ struct CmdDispatchOpPattern
   }
 };
 
+struct CmdFuncOpPattern : public OpConversionPattern<IREE::Stream::CmdFuncOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::CmdFuncOp funcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type> newArgTypes;
+    SmallVector<Type> newResultTypes;
+    if (failed(getTypeConverter()->convertTypes(funcOp.getArgumentTypes(),
+                                                newArgTypes)) ||
+        failed(getTypeConverter()->convertTypes(funcOp.getResultTypes(),
+                                                newResultTypes))) {
+      return rewriter.notifyMatchFailure(funcOp, "failed to convert types");
+    }
+    auto newOp = rewriter.replaceOpWithNewOp<func::FuncOp>(
+        funcOp, funcOp.getName(),
+        rewriter.getFunctionType(newArgTypes, newResultTypes),
+        funcOp.getSymVisibilityAttr(), funcOp.getAllArgAttrs(),
+        funcOp.getAllResultAttrs());
+    newOp->setDialectAttrs(funcOp->getDialectAttrs());
+    return success();
+  }
+};
+
+struct CmdCallOpPattern : public OpConversionPattern<IREE::Stream::CmdCallOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::CmdCallOp callOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> operands;
+    size_t resourceIndex = 0;
+    for (auto [originalOperand, convertedOperand] : llvm::zip_equal(
+             callOp.getResourceOperands(), adaptor.getResourceOperands())) {
+      if (originalOperand.getType().isa<IREE::Stream::ResourceType>()) {
+        // Resource type, add offset/length.
+        auto resourceSize = adaptor.getResourceOperandSizes()[resourceIndex];
+        auto storage = getResourceStorage(callOp.getLoc(), convertedOperand,
+                                          resourceSize, rewriter);
+        operands.push_back(storage.buffer);
+        operands.push_back(adaptor.getResourceOperandOffsets()[resourceIndex]);
+        operands.push_back(adaptor.getResourceOperandLengths()[resourceIndex]);
+        ++resourceIndex;
+      } else {
+        // Primitive/custom type.
+        operands.push_back(convertedOperand);
+      }
+    }
+
+    SmallVector<Type> resultTypes;
+    for (auto result : callOp.getResults()) {
+      SmallVector<Type> convertedTypes;
+      if (failed(getTypeConverter()->convertType(result.getType(),
+                                                 convertedTypes))) {
+        return rewriter.notifyMatchFailure(callOp.getLoc(),
+                                           "unconvertable result type");
+      }
+      llvm::append_range(resultTypes, convertedTypes);
+    }
+
+    rewriter.replaceOpWithNewOp<func::CallOp>(callOp, callOp.getCalleeAttr(),
+                                              resultTypes, operands);
+    return success();
+  }
+};
+
 struct CmdExecuteOpPattern
     : public OpConversionPattern<IREE::Stream::CmdExecuteOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -646,8 +710,9 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
   patterns
       .insert<CmdFlushOpPattern, CmdInvalidateOpPattern, CmdDiscardOpPattern,
               CmdFillOpPattern, CmdCopyOpPattern, CmdDispatchOpPattern,
-              CmdExecuteOpPattern, CmdSerialOpPattern, CmdConcurrentOpPattern>(
-          typeConverter, context);
+              CmdFuncOpPattern, CmdCallOpPattern, CmdExecuteOpPattern,
+              CmdSerialOpPattern, CmdConcurrentOpPattern>(typeConverter,
+                                                          context);
 
   patterns.insert<GlobalTimepointConversionPattern>(typeConverter, context);
   patterns.insert<TimepointImmediateOpPattern, TimepointImportOpPattern,

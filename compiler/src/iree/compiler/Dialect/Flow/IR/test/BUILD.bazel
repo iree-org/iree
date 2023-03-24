@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "call_ops.mlir",
             "dispatch_ops.mlir",
             "dispatch_tensor_folding.mlir",
             "dispatch_workgroups.mlir",

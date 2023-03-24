@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "convert_streamable_ops.mlir"
     "wrap_entry_points.mlir"
     "wrap_entry_points_coarse_fences.mlir"
   TOOLS

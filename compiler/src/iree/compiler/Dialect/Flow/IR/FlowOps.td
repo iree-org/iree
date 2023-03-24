@@ -10,8 +10,10 @@
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -747,6 +749,16 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     Variadic<AnyType>:$results
   );
 
+  let assemblyFormat = [{
+    $entry_point
+    (`[` $workload^ `]`)? ``
+    `(` $arguments `)` attr-dict `:`
+    custom<ShapedFunctionType>(ref($arguments),
+                               type($arguments), $argument_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
+  }];
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
@@ -784,14 +796,163 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     }
   }];
 
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Streamable call ops
+//===----------------------------------------------------------------------===//
+
+def FLOW_FuncOp : FLOW_Op<"func", [
+  CallableOpInterface,
+  FunctionOpInterface,
+  IsolatedFromAbove,
+]> {
+  let summary = [{streamable function declaration}];
+  let description = [{
+    Declares a function that can be called as an asynchronous streaming
+    operation via `flow.call`. Today only external functions are allowed.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
   let assemblyFormat = [{
-    $entry_point
-    (`[` $workload^ `]`)? ``
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    ``
+    custom<ShapedFunctionSignature>($function_type,
+                                    $tied_operands,
+                                    $arg_attrs,
+                                    $res_attrs)
+    attr-dict-with-keyword
+    ($body^)?
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "FunctionType":$type,
+      CArg<"ArrayAttr", "{}">:$tied_operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$resAttrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    static FuncOp create(Location location, StringRef name, FunctionType type,
+                         ArrayRef<int64_t> tiedOperands = {},
+                         ArrayRef<NamedAttribute> attrs = {},
+                         ArrayRef<DictionaryAttr> argAttrs = {},
+                         ArrayRef<DictionaryAttr> resAttrs = {});
+
+    bool isDeclaration() { return true; }
+
+    ::mlir::Region *getCallableRegion() { return nullptr; }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
+    ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+  }];
+}
+
+def FLOW_CallOp : FLOW_Op<"call", [
+  AttrSizedOperandSegments,
+  CallOpInterface,
+  FLOW_StreamableOp,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{calls a streamable external host function}];
+  let description = [{
+    Calls a function taking/returning tensor values with stream semantics.
+    Tensors have their shapes captured and may be tied to denote in-place
+    operations. Asynchronous calls must have no side-effects.
+
+    Note that returned tensors must have their shapes declared prior to the call
+    as this is what allows the call to be made on the stream. If external host
+    logic is required to compute the shape (avoid at all costs!) a separate
+    func.call can be used outside of the stream to do so. If shapes are
+    unknowable until the operation is performed it should be made as a normal
+    asynchronous host call with 'coarse-fences' instead.
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    Variadic<AnyType>:$arguments,
+    FLOW_ShapeDynamicDims:$argument_dims,
+    FLOW_ShapeDynamicDims:$result_dims,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    $callee
     `(` $arguments `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($arguments),
                                type($arguments), $argument_dims,
                                type($results), $result_dims,
                                $tied_operands)
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "SymbolRefAttr":$callee,
+      "TypeRange":$resultTypes,
+      "ValueRange":$arguments,
+      "ArrayAttr":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+    OpBuilder<(ins
+      "SymbolRefAttr":$callee,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayAttr":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+  ];
+
+  let extraClassDeclaration = [{
+    FunctionType getCalleeType();
+
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    operand_iterator arg_operand_begin() { return getArguments().begin(); }
+    operand_iterator arg_operand_end() { return getArguments().end(); }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+
+    // StreamableOpInterface:
+    bool isTransfer() { return false; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, getArguments(), getArgumentDims());
+    }
+    ValueRange getResultDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+    }
   }];
 
   let hasVerifier = 1;

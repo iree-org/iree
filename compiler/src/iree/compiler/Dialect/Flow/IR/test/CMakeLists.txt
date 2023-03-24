@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "call_ops.mlir"
     "dispatch_ops.mlir"
     "dispatch_tensor_folding.mlir"
     "dispatch_workgroups.mlir"

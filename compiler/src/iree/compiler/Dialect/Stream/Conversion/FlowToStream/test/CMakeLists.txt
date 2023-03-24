@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "call_ops.mlir"
     "collective_ops.mlir"
     "dispatch_ops.mlir"
     "executable_ops.mlir"

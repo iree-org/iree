@@ -419,6 +419,22 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
             getState() ^= resultUsage.getState();
           }
         })
+        .Case([&](IREE::Stream::AsyncCallOp op) {
+          // We treat calls as transfer + dispatch as any particular callee may
+          // use either (or both).
+          removeAssumedBits(NOT_TRANSFER_WRITE | NOT_DISPATCH_WRITE);
+          auto tiedOperand = op.getTiedResultOperand(result);
+          if (tiedOperand) {
+            auto tiedUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(tiedOperand),
+                DFX::Resolution::REQUIRED);
+            getState() ^= tiedUsage.getState();
+          } else {
+            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+            getState() ^= resultUsage.getState();
+          }
+        })
         .Default([&](Operation *op) {});
   }
 
@@ -606,6 +622,17 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         })
         .Case([&](IREE::Stream::AsyncDispatchOp op) {
           removeAssumedBits(NOT_DISPATCH_READ);
+          for (auto result : op.getOperandTiedResults(operandIdx)) {
+            removeAssumedBits(NOT_MUTATED | NOT_DISPATCH_WRITE);
+            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+            getState() ^= resultUsage.getState();
+          }
+        })
+        .Case([&](IREE::Stream::AsyncCallOp op) {
+          // We treat calls as transfer + dispatch as any particular callee may
+          // use either (or both).
+          removeAssumedBits(NOT_TRANSFER_READ | NOT_DISPATCH_READ);
           for (auto result : op.getOperandTiedResults(operandIdx)) {
             removeAssumedBits(NOT_MUTATED | NOT_DISPATCH_WRITE);
             auto resultUsage = solver.getElementFor<ValueResourceUsage>(

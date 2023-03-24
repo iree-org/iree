@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "ConvertStreamableOps.cpp"
     "Passes.cpp"
     "WrapEntryPoints.cpp"
   DEPS
