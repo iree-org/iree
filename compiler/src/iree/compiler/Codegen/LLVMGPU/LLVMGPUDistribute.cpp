@@ -42,29 +42,11 @@ struct LLVMGPUDistributePass
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
 
     IRRewriter rewriter(funcOp->getContext());
-    rewriter.setInsertionPoint(funcOp);
-    MLIRContext* ctx = funcOp->getContext();
-    SmallVector<DeviceMappingAttrInterface> threadMappingAttributes = {
-        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimX),
-        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimY),
-        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimZ)};
-
-    auto threadIdGenerator = [](RewriterBase& rewriter, scf::ForallOp forallOp,
-                                SmallVectorImpl<Value>& threadIds) {
-      Location loc = forallOp.getLoc();
-      IndexType indexType = rewriter.getIndexType();
-      threadIds.assign(
-          {rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x),
-           rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y),
-           rewriter.create<gpu::ThreadIdOp>(loc, indexType,
-                                            gpu::Dimension::z)});
-    };
-
-    DiagnosedSilenceableFailure const result =
+    rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+    DiagnosedSilenceableFailure result =
         mlir::transform::gpu::mapNestedForallToThreadsImpl(
-            rewriter, funcOp, workgroupSize, threadIdGenerator, false,
-            std::nullopt, threadMappingAttributes);
-
+            rewriter, std::nullopt, funcOp, workgroupSize, /*warpDims=*/{},
+            false);
     if (!result.succeeded()) return signalPassFailure();
   }
 };

@@ -378,13 +378,13 @@ struct LegalizeResultElementType : public ConversionPattern {
 
     // Move all the regions from the old op to the new op and legalize its
     // signature.
-    for (auto &[index, region] : llvm::enumerate(op->getRegions())) {
+    for (const auto &[index, region] : llvm::enumerate(op->getRegions())) {
       Region &newOpRegion = newOp->getRegion(index);
       rewriter.inlineRegionBefore(region, newOpRegion, newOpRegion.begin());
       TypeConverter::SignatureConversion signatureConverter(
           newOpRegion.getNumArguments());
       bool doSignatureConversion = false;
-      for (auto &[argIndex, arg] :
+      for (const auto &[argIndex, arg] :
            llvm::enumerate(newOpRegion.getArguments())) {
         Type argType = arg.getType();
         Type legalizedType = this->typeConverter->convertType(argType);

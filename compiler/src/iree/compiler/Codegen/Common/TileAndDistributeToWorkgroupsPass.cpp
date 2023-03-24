@@ -425,8 +425,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
     IRRewriter rewriter(context);
     if (failed(tileAndFuseDispatchUsingSCFForOp(
-            cast<TilingInterface>(computeOps.back()), linalgTilingOptions,
-            rewriter))) {
+            rewriter, cast<TilingInterface>(computeOps.back()),
+            linalgTilingOptions))) {
       funcOp.emitOpError("Tile+Distribute failed");
       return signalPassFailure();
     }

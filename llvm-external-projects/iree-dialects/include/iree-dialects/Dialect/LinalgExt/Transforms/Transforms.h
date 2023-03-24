@@ -30,7 +30,7 @@ namespace LinalgExt {
 struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
-  FailureOr<Operation *>
+  FailureOr<TilingResult>
   returningMatchAndRewrite(tensor::ExtractSliceOp sliceOp,
                            PatternRewriter &rewriter) const;
 

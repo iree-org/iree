@@ -3032,7 +3032,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
         funcOp.getNumArguments() - op.getOperands().size();
 
     IRMapping refMapping;
-    for (auto &pair : llvm::enumerate(op.getOperands())) {
+    for (const auto &pair : llvm::enumerate(op.getOperands())) {
       Value operand = pair.value();
       size_t index = pair.index();
 
@@ -3492,7 +3492,7 @@ class ContainerOpConversion : public OpConversionPattern<SrcOpTy> {
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
     SmallVector<Value> unwrappedOperands;
-    for (auto &operand : llvm::enumerate(adaptor.getOperands())) {
+    for (const auto &operand : llvm::enumerate(adaptor.getOperands())) {
       if (refArgumentIndices.contains(operand.index())) {
         Type originalType =
             op.getOperation()->getOperand(operand.index()).getType();

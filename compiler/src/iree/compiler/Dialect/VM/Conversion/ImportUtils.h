@@ -93,7 +93,7 @@ std::optional<SmallVector<Value>> rewriteToCall(
       auto newOperands =
           llvm::to_vector<4>(adaptor.getODSOperands(inputSetIndex));
       ++inputSetIndex;
-      if (auto inputTupleType = inputType.dyn_cast<TupleType>()) {
+      if (auto inputTupleType = inputType.template dyn_cast<TupleType>()) {
         // Unpack a tuple<...> from the variadic.
         // This only supports a single level of unpacking.
         if (inputTupleType.size() != newOperands.size()) {

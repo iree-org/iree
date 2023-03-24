@@ -179,10 +179,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     }
 
     // Add more fusion candidates to the worklist.
-    if (auto fusedProducerOp =
-            fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
-      addCandidateSlices(fusedProducerOp, candidates);
-      tiledOps.push_back(fusedProducerOp);
+    for (auto tiledOp : fusedProducer->tiledOps) {
+      addCandidateSlices(tiledOp, candidates);
+      tiledOps.push_back(tiledOp);
     }
   }
 

@@ -81,6 +81,7 @@ func.func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, 
 
 // -----
 
+
 func.func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index, %i3: index) {
   %dim0 = hal.interface.constant.load[0] : index
   %dim1 = hal.interface.constant.load[1] : index

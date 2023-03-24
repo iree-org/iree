@@ -89,30 +89,27 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
   // the op by invoking the TiledOpInterface methods.
   if (loopDepth == tileSizes.size()) {
     TiledOp ret;
-    SmallVector<Operation *> tiledOps =
+    FailureOr<TilingResult> tiledOps =
         tilableOp.getTiledImplementation(builder, offsets, tileSizes);
-    if (tiledOps.empty()) {
+    if (failed(tiledOps)) {
       return static_cast<LogicalResult>(
           tilableOp.emitOpError("failed to get tiled implementation"));
     }
-    assert(
-        (tiledOps.size() == 1) &&
-        "expected only a single operation returned from tiling implementation");
-    ret.op.assign(tiledOps);
-    for (auto result : llvm::enumerate(ret.op.back()->getResults())) {
-      if (!result.value().getType().isa<RankedTensorType>()) {
-        ret.results.push_back(result.value());
+    ret.op.append(tiledOps->tiledOps);
+    for (auto [index, result] : llvm::enumerate(tilableOp->getResults())) {
+      if (!result.getType().isa<RankedTensorType>()) {
+        ret.results.push_back(result);
         continue;
       }
       SmallVector<OpFoldResult> resultOffsets, resultSizes;
-      if (succeeded(tilableOp.getResultTilePosition(
-              builder, result.index(), offsets, tileSizes, resultOffsets,
-              resultSizes))) {
+      if (succeeded(tilableOp.getResultTilePosition(builder, index, offsets,
+                                                    tileSizes, resultOffsets,
+                                                    resultSizes))) {
         SmallVector<OpFoldResult> resultStrides(resultOffsets.size(),
                                                 builder.getIndexAttr(1));
         Value insertSlice = builder.create<tensor::InsertSliceOp>(
-            loc, ret.op.back()->getResult(result.index()),
-            outputs[result.index()], resultOffsets, resultSizes, resultStrides);
+            loc, tiledOps->tiledValues[index], outputs[index], resultOffsets,
+            resultSizes, resultStrides);
         ret.results.push_back(insertSlice);
       }
     }

@@ -19,7 +19,7 @@ transform.sequence failures(propagate) {
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!pdl.operation) -> ()
   transform.iree.map_nested_forall_to_gpu_threads %memref_func 
-    workgroup_dims = [10, 11] : (!pdl.operation) -> ()
+    workgroup_dims = [10, 11, 1] : (!pdl.operation) -> ()
 
   // Late canonicalizations to cleanup and pass the checks
   transform.iree.apply_patterns %memref_func
