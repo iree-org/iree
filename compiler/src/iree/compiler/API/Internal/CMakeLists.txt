@@ -20,6 +20,7 @@ iree_cc_library(
     "Embed.cpp"
   DEPS
     LLVMSupport
+    MLIRBuiltinToLLVMIRTranslation
     MLIRIR
     MLIRParser
     MLIRSupport
@@ -103,6 +104,7 @@ iree_cc_library(
   SRCS
     "MLIRInterop.cpp"
   DEPS
+    MLIRBuiltinToLLVMIRTranslation
     MLIRCAPIIR
     MLIRIR
     iree::compiler::API::MLIRInteropHeaders
