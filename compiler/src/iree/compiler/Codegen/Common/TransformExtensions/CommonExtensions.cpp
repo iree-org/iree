@@ -151,6 +151,7 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
+  ADD_PATTERN(foldTensorSubsets, getFoldTensorSubsetsAttrName)
   ADD_PATTERN(licm, getLicmAttrName)
   ADD_PATTERN(linalgElementwiseGreedyFusion,
               getLinalgElementwiseGreedyFusionAttrName)
@@ -255,6 +256,10 @@ static void addFoldTensorEmptyExtract(RewritePatternSet &patterns) {
 
 static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
+}
+
+static void addFoldTensorSubsetsPatterns(RewritePatternSet &patterns) {
+  tensor::populateFoldTensorSubsetOpPatterns(patterns);
 }
 
 static void addEraseUnnecessaryTensorOperandsPatterns(
@@ -368,6 +373,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
+  if (getFoldTensorSubsets()) addFoldTensorSubsetsPatterns(patterns);
   if (getLinalgElementwiseGreedyFusion())
     linalg::populateElementwiseOpsFusionPatterns(patterns,
                                                  setFusedOpOperandLimit<3>);
