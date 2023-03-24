@@ -145,6 +145,9 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
       shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
           loc, RankedTensorType::get({shmemSizeRemaining}, elementType),
           ValueRange{});
+    } else {
+      // Just pass something to match the ABI
+      shmemBufferRemaining = shmemBufferOut;
     }
     //  todo(guray) Verify that we have sufficient shared memory here
 

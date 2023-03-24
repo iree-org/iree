@@ -24,9 +24,9 @@ template <class ElementA, class ElementB, class ElementC, int Tile_m,
           int Inst_n, int Inst_k, int Stages, bool hasLinalgFill,
           bool writeBack2Global>
 __forceinline__ __device__ void gemm_ukernel(
-    ElementA* lhs, int32_t lhs_offset, int32_t lhs_dim2, ElementB* rhs,
-    int32_t rhs_offset, int32_t rhs_dim2, ElementC* res, int32_t res_offset,
-    int32_t res_dim2, ElementC* shmem, ElementC fillValue) {
+    ElementA* lhs, int64_t lhs_offset, int64_t lhs_dim2, ElementB* rhs,
+    int64_t rhs_offset, int64_t rhs_dim2, ElementC* res, int64_t res_offset,
+    int64_t res_dim2, ElementC* shmem, ElementC fillValue) {
   using ElementAccumulator = ElementC;
   // todo(guray) Can be templatized
   using LayoutA = cutlass::layout::RowMajor;

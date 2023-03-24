@@ -22,8 +22,11 @@ function make_arch_bc {
   local SOURCE=$2
   local SOURCE_FILE=$SOURCE.cu
   local FILE_BASENAME="${OUT}/microkernels_${SM}"  
+  rm -rf ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc
+         
   ${CLANG?} \
       -O1 \
+      --cuda-device-only \
       -std=c++17 \
       -Xclang -fcuda-allow-variadic-functions \
       --cuda-gpu-arch=sm_${SM} \
@@ -35,14 +38,17 @@ function make_arch_bc {
       -I"${CUTLASS}"/include \
       -I"${CUTLASS}"/tools/util/include/ \
       "${SRC}/${SOURCE_FILE}" \
+      -w \
+      -fcuda-approx-transcendentals \
+      -fcuda-short-ptr \
+      -ffp-contract=fast \
       -S \
-      -emit-llvm      
+      -emit-llvm
   
-  mv $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc
-  $LLVMDIS ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc -o ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll
   # todo(guray) bad hack
-  sed -i 's/local_unnamed_addr #0/local_unnamed_addr alwaysinline #0/g' ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll
-  $OPT ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll -o ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc
+  sed -i 's/local_unnamed_addr #0/local_unnamed_addr alwaysinline #0/g' $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll
+  $OPT $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll -o ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc
+  mv $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll microkernels.ll
 }
 
 function make_arch_nvcc_ptx {
@@ -56,8 +62,7 @@ function make_arch_nvcc_ptx {
       "${SRC}/${SOURCE_FILE}" \
       -ccbin=g++-11 \
       --ptx \
-      -rdc=false \
-      -DCUDA_ENTRY_GLOBAL
+      -dc
   
   # Remove these since nvvm also generates
   sed -i 's/.version 7.8//g' $2.ptx
@@ -107,9 +112,9 @@ function generate_ukernels {
   # Generate Template instantiater
   generate_generator ../uCUDAKernelGenerator.cpp $GENERATOR_FILE
   
-  # # Generate microkernels
+  # Generate microkernels
   make_arch_nvcc_ptx $SM $GENERATOR_FILE
-  # make_arch_nvcc_lineinfo_ptx $SM $GENERATOR_FILE
+  make_arch_nvcc_lineinfo_ptx $SM $GENERATOR_FILE
   make_arch_bc $SM $GENERATOR_FILE
 
   # # Remove the temps
