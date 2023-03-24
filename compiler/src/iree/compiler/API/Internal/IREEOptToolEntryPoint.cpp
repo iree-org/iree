@@ -24,7 +24,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Tools/ParseUtilities.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
 using namespace llvm;

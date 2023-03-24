@@ -20,11 +20,9 @@ iree_cc_library(
     "Embed.cpp"
   DEPS
     LLVMSupport
-    MLIRDebug
     MLIRIR
     MLIRParser
     MLIRSupport
-    MLIRTranslateLib
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C
@@ -73,6 +71,7 @@ iree_cc_library(
     "IREEOptToolEntryPoint.cpp"
   DEPS
     LLVMSupport
+    MLIRDebug
     MLIRIR
     MLIROptLib
     MLIRPass
