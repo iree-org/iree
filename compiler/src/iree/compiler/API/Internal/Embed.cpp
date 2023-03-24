@@ -138,7 +138,7 @@ GlobalInit::GlobalInit() {
   }
   pluginManager.globalInitialize();
   pluginManager.registerPasses();
-  pluginManager.registerDialects(registry);
+  pluginManager.registerGlobalDialects(registry);
 }
 
 void GlobalInit::registerCommandLineOptions() {
@@ -198,7 +198,14 @@ struct Session {
   LogicalResult activatePluginsOnce() {
     if (!pluginsActivated) {
       pluginsActivated = true;
-      pluginActivationStatus = pluginSession.activatePlugins(&context);
+      if (failed(pluginSession.initializePlugins())) {
+        pluginActivationStatus = failure();
+      } else {
+        DialectRegistry registry;
+        pluginSession.registerDialects(registry);
+        context.appendDialectRegistry(registry);
+        pluginActivationStatus = pluginSession.activatePlugins(&context);
+      }
     }
     return pluginActivationStatus;
   }
@@ -503,17 +510,9 @@ struct Invocation {
   Error *outputVMCSource(Output &output);
   Error *outputHALExecutable(Output &output);
 
-  IREEVMPipelineHooks &getHooks() {
-    static IREEVMPipelineHooks hooks = {
-        // buildConstEvalPassPipelineCallback =
-        [](OpPassManager &pm) {
-          pm.addPass(ConstEval::createJitGlobalsPass());
-        }};
-    return hooks;
-  }
-
   Session &session;
   PassManager passManager;
+  IREEVMPipelineHooks pipelineHooks;
 
   // Diagnostic handlers are instantiated upon parsing the source (when we
   // have the SrcMgr) and held for the duration of the invocation. Each will
@@ -543,6 +542,16 @@ Invocation::Invocation(Session &session)
     mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   }
   passManager.addInstrumentation(std::make_unique<PassTracing>());
+
+  // Since the jitter invokes much of the top-level compiler recursively,
+  // it must be injected at the top-level here vs in the pass pipeline
+  // (or else the circular dependency cannot be resolved).
+  pipelineHooks.buildConstEvalPassPipelineCallback = [](OpPassManager &pm) {
+    pm.addPass(ConstEval::createJitGlobalsPass());
+  };
+  // The PluginSession implements PipelineExtensions and delegates it to
+  // activated plugins.
+  pipelineHooks.pipelineExtensions = &session.pluginSession;
 }
 
 bool Invocation::parseSource(Source &source) {
@@ -610,7 +619,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
           session.bindingOptions, session.inputOptions,
           session.preprocessingOptions, session.highLevelOptimizationOptions,
           session.schedulingOptions, session.halTargetOptions,
-          session.vmTargetOptions, getHooks(), passManager, *compileToPhase);
+          session.vmTargetOptions, pipelineHooks, passManager, *compileToPhase);
       break;
     }
     case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {

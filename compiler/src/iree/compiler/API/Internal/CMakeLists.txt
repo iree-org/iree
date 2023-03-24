@@ -71,9 +71,12 @@ iree_cc_library(
     "IREEOptToolEntryPoint.cpp"
   DEPS
     LLVMSupport
+    MLIRDebug
     MLIRIR
     MLIROptLib
+    MLIRPass
     MLIRSupport
+    iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
     iree::compiler::bindings::c::headers

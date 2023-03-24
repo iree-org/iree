@@ -127,7 +127,8 @@ void buildIREEVMTransformPassPipeline(
       break;
     default:
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Preprocessing");
-      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions);
+      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions,
+                                           hooks.pipelineExtensions);
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Preprocessing");
       if (compileTo == IREEVMPipelinePhase::Preprocessing)
         return;  // early-exit
