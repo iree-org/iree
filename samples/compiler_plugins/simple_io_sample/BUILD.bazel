@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library", "iree_compiler_register_plugin")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_register_plugin", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -24,10 +24,12 @@ cc_library(
         "src/PluginRegistration.cpp",
     ],
     deps = [
-        ":defs",
         ":IR",
+        ":Transforms",
+        ":defs",
         "//compiler/src/iree/compiler/PluginAPI",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
     ],
 )
 
@@ -41,6 +43,7 @@ iree_td_library(
     srcs = enforce_glob(
         [
             "src/simple_io_sample/IR/SimpleIOOps.td",
+            "src/simple_io_sample/Transforms/Passes.td",
         ],
         include = ["*.td"],
     ),
@@ -57,9 +60,9 @@ iree_td_library(
 cc_library(
     name = "IR",
     srcs = [
-      "src/simple_io_sample/IR/SimpleIODialect.cpp",
-      "src/simple_io_sample/IR/SimpleIOOps.cpp",
-      "src/simple_io_sample/IR/SimpleIOOps.cpp.inc",
+        "src/simple_io_sample/IR/SimpleIODialect.cpp",
+        "src/simple_io_sample/IR/SimpleIOOps.cpp",
+        "src/simple_io_sample/IR/SimpleIOOps.cpp.inc",
     ],
     hdrs = [
         "src/simple_io_sample/IR/SimpleIODialect.h",
@@ -67,8 +70,8 @@ cc_library(
         "src/simple_io_sample/IR/SimpleIOOps.h.inc",
     ],
     deps = [
-        ":defs",
         ":SimpleIOOpsGen",
+        ":defs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
@@ -99,6 +102,41 @@ iree_gentbl_cc_library(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "src/simple_io_sample/IR/SimpleIOOps.td",
     deps = [":td_files"],
+)
+
+cc_library(
+    name = "Transforms",
+    srcs = [
+        "src/simple_io_sample/Transforms/LegalizeSimpleIO.cpp",
+    ],
+    hdrs = [
+        "src/simple_io_sample/Transforms/Passes.h",
+        "src/simple_io_sample/Transforms/Passes.h.inc",
+    ],
+    deps = [
+        ":IR",
+        ":PassesIncGen",
+        ":defs",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "src/simple_io_sample/Transforms/Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "src/simple_io_sample/Transforms/Passes.td",
+    deps = [
+        ":td_files",
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
 )
 
 iree_tablegen_doc(

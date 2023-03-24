@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_
+#define IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_
+
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -73,7 +76,7 @@ class PluginManager : public PluginRegistrar {
 };
 
 // Holds activated plugins for an |iree_compiler_session_t|.
-class PluginManagerSession {
+class PluginManagerSession : public PipelineExtensions {
  public:
   PluginManagerSession(PluginManager &pluginManager, OptionsBinder &binder,
                        PluginManagerOptions &options);
@@ -87,6 +90,13 @@ class PluginManagerSession {
   // Activates plugins as configured.
   LogicalResult activatePlugins(MLIRContext *context);
 
+  // Forward pipeline extensions.
+  void extendPreprocessingPassPipeline(OpPassManager &passManager) override {
+    for (auto *s : initializedSessions) {
+      s->extendPreprocessingPassPipeline(passManager);
+    }
+  }
+
  private:
   PluginManagerOptions &options;
   // At construction, uninitialized plugin sessions are created for all
@@ -98,3 +108,5 @@ class PluginManagerSession {
 };
 
 }  // namespace mlir::iree_compiler
+
+#endif  // IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_

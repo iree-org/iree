@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_PLUGINAPI_CLIENT_H_
+#define IREE_COMPILER_PLUGINAPI_CLIENT_H_
+
 #include <optional>
 #include <string_view>
 
@@ -13,6 +16,7 @@
 namespace mlir {
 class DialectRegistry;
 class MLIRContext;
+class OpPassManager;
 }  // namespace mlir
 
 namespace mlir::iree_compiler {
@@ -27,6 +31,16 @@ using PluginRegistrationFunction = bool (*)(PluginRegistrar *);
 // Used by default if a plugin does not support options.
 struct EmptyPluginOptions {
   static void bindOptions(OptionsBinder &binder) {}
+};
+
+// Entrypoints for extending IREE's pass pipelines at various stages.
+// Override what is needed.
+class PipelineExtensions {
+ public:
+  virtual ~PipelineExtensions();
+
+  // Adds passes to the |buildPreprocessingPassPipeline| pipeline at the end.
+  virtual void extendPreprocessingPassPipeline(OpPassManager &passManager) {}
 };
 
 // Abstract class representing a plugin registration. It is responsible for
@@ -96,7 +110,7 @@ class AbstractPluginRegistration {
 // Most users will inherit from this class via the PluginSession CRTP helper,
 // which adds some niceties and support for global command line option
 // registration.
-class AbstractPluginSession {
+class AbstractPluginSession : public PipelineExtensions {
  public:
   virtual ~AbstractPluginSession();
 
@@ -190,3 +204,5 @@ class PluginRegistrar {
 };
 
 }  // namespace mlir::iree_compiler
+
+#endif  // IREE_COMPILER_PLUGINAPI_CLIENT_H_

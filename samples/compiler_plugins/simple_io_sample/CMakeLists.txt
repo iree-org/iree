@@ -26,8 +26,10 @@ iree_cc_library(
     "src/PluginRegistration.cpp"
   DEPS
     ::IR
+    ::Transforms
     ::defs
     MLIRIR
+    MLIRPass
     iree::compiler::PluginAPI
   PUBLIC
 )
@@ -70,6 +72,30 @@ iree_tablegen_library(
     --gen-dialect-defs src/simple_io_sample/IR/SimpleIODialect.cpp.inc
     --gen-op-decls src/simple_io_sample/IR/SimpleIOOps.h.inc
     --gen-op-defs src/simple_io_sample/IR/SimpleIOOps.cpp.inc
+)
+
+iree_cc_library(
+  NAME
+    Transforms
+  HDRS
+    "src/simple_io_sample/Transforms/Passes.h"
+    "src/simple_io_sample/Transforms/Passes.h.inc"
+  SRCS
+    "src/simple_io_sample/Transforms/LegalizeSimpleIO.cpp"
+  DEPS
+    ::PassesIncGen
+    ::defs
+    MLIRPass
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "src/simple_io_sample/Transforms/Passes.td"
+  OUTS
+    --gen-pass-decls src/simple_io_sample/Transforms/Passes.h.inc
 )
 
 iree_tablegen_doc(

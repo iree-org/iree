@@ -14,6 +14,8 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::EmptyPluginOptions);
 
 namespace mlir::iree_compiler {
 
+PipelineExtensions::~PipelineExtensions() = default;
+
 AbstractPluginRegistration::~AbstractPluginRegistration() = default;
 AbstractPluginSession::~AbstractPluginSession() = default;
 
