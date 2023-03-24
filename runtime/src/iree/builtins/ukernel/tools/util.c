@@ -6,6 +6,7 @@
 
 #include "iree/builtins/ukernel/tools/util.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -145,22 +146,105 @@ int iree_uk_type_triple_str(char* buf, int buf_length,
   return snprintf(buf, buf_length, "%s%s%s", type0_buf, type1_buf, type2_buf);
 }
 
-iree_uk_cpu_features_list_t iree_uk_cpu_features_list_1(const char* feature1) {
-  IREE_UK_STATIC_ASSERT(IREE_UK_CPU_FEATURES_LIST_MAX_LENGTH >= 1);
-  return (iree_uk_cpu_features_list_t){1, {feature1}};
+// Just a vector of pointers to literal strings, used to hold CPU feature names.
+struct iree_uk_cpu_features_list_t {
+  // Number of string pointers.
+  int size;
+  // Number of string pointers that we have already allocated room for.
+  int capacity;
+  // Buffer of string pointers.
+  const char** entries;
+  // Optional: if not NULL, gives a shorthand name to this CPU features list.
+  const char* name;
+};
+
+static iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_empty(
+    void) {
+  iree_uk_cpu_features_list_t* list =
+      malloc(sizeof(iree_uk_cpu_features_list_t));
+  memset(list, 0, sizeof *list);
+  return list;
 }
 
-iree_uk_cpu_features_list_t iree_uk_cpu_features_list_2(const char* feature1,
-                                                        const char* feature2) {
-  IREE_UK_STATIC_ASSERT(IREE_UK_CPU_FEATURES_LIST_MAX_LENGTH >= 2);
-  return (iree_uk_cpu_features_list_t){2, {feature1, feature2}};
+void iree_uk_cpu_features_list_destroy(iree_uk_cpu_features_list_t* list) {
+  free(list->entries);
+  free(list);
+}
+
+static void iree_uk_cpu_features_list_append_one(
+    iree_uk_cpu_features_list_t* list, const char* entry) {
+  if (list->capacity == 0) {
+    // TODO: Generalize if needed. Currently naive growth to fixed capacity.
+    list->capacity = 64;
+    IREE_UK_ASSERT(!list->entries);
+    list->entries = malloc(list->capacity * sizeof list->entries[0]);
+  }
+  IREE_UK_ASSERT(list->size < list->capacity);
+  list->entries[list->size++] = entry;
+}
+
+static void iree_uk_cpu_features_list_append_va(
+    iree_uk_cpu_features_list_t* list, int count, va_list args) {
+  for (int i = 0; i < count; ++i) {
+    iree_uk_cpu_features_list_append_one(list, va_arg(args, const char*));
+  }
+}
+
+iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create(int count, ...) {
+  iree_uk_cpu_features_list_t* list = iree_uk_cpu_features_list_create_empty();
+  va_list args;
+  va_start(args, count);
+  iree_uk_cpu_features_list_append_va(list, count, args);
+  va_end(args);
+  return list;
+}
+
+void iree_uk_cpu_features_list_append(iree_uk_cpu_features_list_t* list,
+                                      int count, ...) {
+  va_list args;
+  va_start(args, count);
+  iree_uk_cpu_features_list_append_va(list, count, args);
+  va_end(args);
+}
+
+iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_extend(
+    iree_uk_cpu_features_list_t* list, int count, ...) {
+  iree_uk_cpu_features_list_t* newlist =
+      iree_uk_cpu_features_list_create_empty();
+  for (int i = 0; i < list->size; ++i) {
+    iree_uk_cpu_features_list_append_one(newlist, list->entries[i]);
+  }
+  va_list args;
+  va_start(args, count);
+  iree_uk_cpu_features_list_append_va(newlist, count, args);
+  va_end(args);
+  return newlist;
+}
+
+int iree_uk_cpu_features_list_size(const iree_uk_cpu_features_list_t* list) {
+  return list->size;
+};
+
+const char* iree_uk_cpu_features_list_entry(
+    const iree_uk_cpu_features_list_t* list, int index) {
+  IREE_UK_ASSERT(index < list->size);
+  return list->entries[index];
+}
+
+void iree_uk_cpu_features_list_set_name(iree_uk_cpu_features_list_t* list,
+                                        const char* name) {
+  list->name = name;
+}
+
+const char* iree_uk_cpu_features_list_get_name(
+    const iree_uk_cpu_features_list_t* list) {
+  return list->name;
 }
 
 void iree_uk_make_cpu_data_for_features(
     const iree_uk_cpu_features_list_t* cpu_features,
     iree_uk_uint64_t* out_cpu_data_fields) {
   // Bit-field tracking which features exist, to diagnose misspelled features.
-  IREE_UK_STATIC_ASSERT(IREE_UK_CPU_FEATURES_LIST_MAX_LENGTH <= 64);
   uint64_t cpu_features_found = 0;
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
   if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \
@@ -198,4 +282,18 @@ bool iree_uk_cpu_supports(const iree_uk_uint64_t* cpu_data_fields) {
     if (cpu_data_fields[i] & ~iree_cpu_data_field(i)) return false;
   }
   return true;
+}
+
+const char* iree_uk_cpu_first_unsupported_feature(
+    const iree_uk_cpu_features_list_t* cpu_features) {
+  for (int i = 0; i < cpu_features->size; ++i) {
+    int64_t supported = 0;
+    IREE_CHECK_OK(iree_cpu_lookup_data_by_key(IREE_SV(cpu_features->entries[i]),
+                                              &supported));
+    if (!supported) return cpu_features->entries[i];
+  }
+  IREE_UK_ASSERT(false &&
+                 "This function should only be called if there is an "
+                 "unsupported CPU feature");
+  return NULL;
 }

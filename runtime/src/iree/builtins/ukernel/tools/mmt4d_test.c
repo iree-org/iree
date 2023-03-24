@@ -207,12 +207,15 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 9, 6, 3, NULL);
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_cpu_features_list_t cpu_dotprod =
-      iree_uk_cpu_features_list_1("dotprod");
-  iree_uk_cpu_features_list_t cpu_i8mm = iree_uk_cpu_features_list_1("i8mm");
+  iree_uk_cpu_features_list_t* cpu_dotprod =
+      iree_uk_cpu_features_list_create(1, "dotprod");
+  iree_uk_cpu_features_list_t* cpu_i8mm =
+      iree_uk_cpu_features_list_create(1, "i8mm");
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 4, &cpu_dotprod);
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8, &cpu_i8mm);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 4, cpu_dotprod);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8, cpu_i8mm);
+  iree_uk_cpu_features_list_destroy(cpu_dotprod);
+  iree_uk_cpu_features_list_destroy(cpu_i8mm);
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 }
