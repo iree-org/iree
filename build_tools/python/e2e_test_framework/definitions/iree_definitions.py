@@ -8,9 +8,10 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
+import pathlib
 from typing import List, Optional, Sequence
 
-from e2e_test_framework.definitions import common_definitions
+from e2e_test_framework.definitions import common_definitions, utils
 from e2e_test_framework import serialization, unique_ids
 
 
@@ -147,7 +148,7 @@ class MLIRDialectType(Enum):
 
 # Placeholder to be replaced with entry function name when outputting the actual
 # flag list.
-IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
+IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = r"${ENTRY_FUNCTION_PLACEHOLDER}"
 
 
 @serialization.serializable(type_key="iree_import_configs")
@@ -166,10 +167,12 @@ class ImportConfig(object):
   def materialize_import_flags(self,
                                model: common_definitions.Model) -> List[str]:
     """Materialize flags with dependent values."""
-    return [
-        flag.replace(IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER,
-                     model.entry_function) for flag in self.import_flags
-    ]
+    return utils.transform_flags(
+        flags=self.import_flags,
+        map_funcs=[
+            lambda value: value.replace(
+                IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER, model.entry_function)
+        ])
 
 
 DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
@@ -245,6 +248,11 @@ class ImportedModel(object):
                import_config=config)
 
 
+# Placeholder to be replaced with module dir path. The following path segments
+# should be written in the POSIX format.
+MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER = r"${MODULE_DIR}"
+
+
 @serialization.serializable(type_key="iree_module_generation_configs",
                             id_field="composite_id")
 @dataclass(frozen=True)
@@ -263,9 +271,20 @@ class ModuleGenerationConfig(object):
   def __str__(self):
     return self.name
 
-  def materialize_compile_flags(self):
+  def materialize_compile_flags(self, module_dir_path: pathlib.PurePath):
     """Materialize flags with dependent values."""
-    return self.compile_flags
+
+    def _replace_module_dir_placeholder(value: str) -> str:
+      if MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER not in value:
+        return value
+      if not value.startswith(MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER):
+        raise ValueError(r"${MODULE_DIR} needs to be the head of flag value.")
+      # Properly construct the platform-dependent path from POSIX path string.
+      sub_path = pathlib.PurePosixPath(value).parts[1:]
+      return str(module_dir_path.joinpath(*sub_path))
+
+    return utils.transform_flags(flags=self.compile_flags,
+                                 map_funcs=[_replace_module_dir_placeholder])
 
   @classmethod
   def build(cls, imported_model: ImportedModel, compile_config: CompileConfig):
@@ -314,10 +333,12 @@ class E2EModelRunConfig(object):
 
   def materialize_run_flags(self, gpu_id: str = "0"):
     """Materialize flags with dependent values."""
-    return [
-        flag.replace(E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER, gpu_id)
-        for flag in self.run_flags
-    ]
+    return utils.transform_flags(
+        flags=self.run_flags,
+        map_funcs=[
+            lambda value: value.replace(E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER,
+                                        gpu_id)
+        ])
 
   @classmethod
   def build(cls, module_generation_config: ModuleGenerationConfig,

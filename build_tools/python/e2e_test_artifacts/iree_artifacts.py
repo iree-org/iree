@@ -13,6 +13,7 @@ from e2e_test_framework.definitions import common_definitions, iree_definitions
 
 IREE_ARTIFACT_PREFIX = "iree"
 MODULE_FILENAME = "module.vmfb"
+SCHEDULING_STATS_FILENAME = "scheduling_stats.json"
 
 
 def _get_model_prefix(imported_model: iree_definitions.ImportedModel) -> str:

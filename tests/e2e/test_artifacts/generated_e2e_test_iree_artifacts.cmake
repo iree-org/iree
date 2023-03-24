@@ -2354,6 +2354,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_2f2e448f73ef190ed35af1b25b6179ce15faba7ee7c12f4956730c441e9a27bd/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2373,6 +2375,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_module_c370b55d34f6d3c76aa838ff0a7be520de10a4824c5feaa773e2fb73a588ad8c/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2392,6 +2396,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_module_ef1ba1216f0f304c80b7a5b8bac545a987d04a100d9c1e5e66b75ce88636534c/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV1_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2411,6 +2417,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_1c4bc4b5ba3b5862efdbcbb9b3bf4a02f7ff9aa36e852e9b94dbe265d6bfaa99/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2430,6 +2438,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_module_2cb62cec021aeb2abd869ba5276996e362bae130db7cc2d79389cccee6e372b9/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2449,6 +2459,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_4a3b570ba18c3c9eee458455aaff4aa29293a5c936a19862c698b4b3ddaf06e7/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2468,6 +2480,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_a05a2b521a968e99411712e0e5191c3cd1d6295991f3b78acf61faca5d1cf85e/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2544,6 +2558,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_01d35de2a55b9800e05151455eace0bf4493337ac1210fcc4904d630b075599a/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNetV2STF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2563,6 +2579,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_2957930127e9b01e90ccddb7290e1c4b4abf6373cc36929809040e2c144d3fd7/scheduling_stats.json"
   FRIENDLY_NAME
     "MiniLML12H384Uncased(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2620,6 +2638,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_module_ddd1657bc5433ccca5c8ce562f581626457a793670958cd8b4016c426191a9c4/scheduling_stats.json"
   FRIENDLY_NAME
     "BertForMaskedLMTF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2639,6 +2659,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_8ee3c7b136703472b53bc8a19d8d28945aca93953612ccc65e55cd1b3dfda6c8/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargeTF(tf_v1) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2721,6 +2743,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_de34105293194986d706823bd3d20ce784506ec5918c4d0efac9839020bb5fdd/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2742,6 +2766,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_module_373b890bed4c0f4828b957e37d319509bf41e39a4e47746285e27101d40f90bd/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2763,6 +2789,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16_module_6e31f637a133e03db37c47d8a920a61306e366362e066f41c0eac0455cc6c77a/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2847,6 +2875,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_e0533bdae79e15707a6eb26eb7f09c4d7dbdbfc40b993a4ad6289cf2bb1f13cb/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2868,6 +2898,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_ad9a410e86dd9d649de58f5a7dbdc6cd2300fb6b6a363f4483e930d9944d2d07/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2889,6 +2921,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_c9a7c5b08db10ed782045b6810cb4ee157da9e95590456d3839c06163ee30fa7/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNetV2STF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2910,6 +2944,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_838cc09b422958a332fd76cf12a6a2a95b8346c8e8d2fe7b15cb5ace4c20581e/scheduling_stats.json"
   FRIENDLY_NAME
     "MiniLML12H384Uncased(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2931,6 +2967,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_8231a286cdc63a48f3f70a12ab5a182142c00cbebaccdc79e35ca552f02422e7/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargeTF(tf_v1) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2949,6 +2987,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_23a395a0b9ec63ecaeffe98988633de34fc32c267c35bc2584651d639a15af6e/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargePTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -2967,6 +3007,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_eb1a0a23dc0205fd44ae3b5ca385c651de811b10b6d98fa8b0fb9ef54002c728/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargePTBatch16(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3147,6 +3189,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_module_8b19868be1c797cb585551c871c4171e78817e0efc49d30d91b9d722be283de9/scheduling_stats.json"
   FRIENDLY_NAME
     "BertForMaskedLMTF(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3165,6 +3209,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_c2085883b1f5c767f37508ab998a4bcd17d169fe6a5197d28e4dca8772c90253/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargeTF(tf_v1) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3183,6 +3229,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_88b6b5f712cd2f40d07a136e7f911c05b976c390e07f104c970292dee9a77e9a/scheduling_stats.json"
   FRIENDLY_NAME
     "ClipTextSeqLen64PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3201,6 +3249,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_925cdb19f2aa31a1907c81b5a9e179d91280c77b08a039c1cbf146f71683dde9/scheduling_stats.json"
   FRIENDLY_NAME
     "Unet2dPT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3241,6 +3291,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_16b5b80aaf1271b5ad782570340cc0c7c1c97e10b7e6c6cc6e5f3ede8393cb6c/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3263,6 +3315,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_65fa033050b916e8143d44b5081ee45db3b1946a5d77de223328a7fe92a1cc66/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3285,6 +3339,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_module_16ef56b6869d10b17e983fec62e9f48e6bb87e9a348ab52a0b2faabca2b03578/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV1_fp32(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3307,6 +3363,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_56bc9128e294585d749b8ebe34fd03060ba34d200eef185837b6002d0dcbfccb/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3329,6 +3387,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_module_eb1b1732e5d30ce4689b871f8ec18c50b30eedd418eb80330807fe505bb78f7e/scheduling_stats.json"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3351,6 +3411,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_module_bd32992875a8fc7a494c75933b1693d6d8b845fccf2b12504a8cba64d80ad110/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3373,6 +3435,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_module_5e966f45b952e5406271a1a23edd5d9ffab75524b450b7cf4ee35263bb0830f3/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3395,6 +3459,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_module_ff7ed59e05efe8b9a397a179726f63da68a8a1ac3ea731924b4bd24dab491b34/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3417,6 +3483,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_8e2d1286ad9a7e360b0c26019146a22ec9188f8bdf8ad99341eb5531cdea2417/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3439,6 +3507,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_module_d967e293594998e48355d30d900dbdf77dbd6eedbff768112dbe8e7ec332b9eb/scheduling_stats.json"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3461,6 +3531,8 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_module_94a5cba0f45ffc2dc028a5f9fa5780fa61ed91b27382c86c4d96de0e2cd002f3/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3479,6 +3551,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_91a35228ead480e04b85998ccf3edfc891f44b5f79017b7fcab72cb66a812b07/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3497,6 +3571,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_f58c00ccab797ad4dbca3de3b50633588a68db0122aa011bdf81a9aca5ea692b/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3515,6 +3591,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_bfb6239769f044d2228f2efb5ce6aa51132455d9a8178e5a5ec8525ff5836e0d/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3533,6 +3611,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_469056c2ca5935d7c63d5424c635a439f94593a307e96483e4db16af1c15186e/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3551,6 +3631,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_3aab34d7c719c9d828a741a7900b4794302a587927c462b4ec8feec3f7d43e99/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3569,6 +3651,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_11a9de4ea6e17feff81429ed53e52a70e89c1cfeef0a73f10740c8420341b81d/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3587,6 +3671,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_9c01136785f28f0d2c969cee8ce87bde3267d63425c5d86d39137abdf7f0f196/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3608,6 +3694,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_3160a297a2c9d3d21caeec097b6fe19150c3feae5fa872e21817af0be8a8176a/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d,compile-stats]"
   PUBLIC
@@ -3629,6 +3717,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_0bf641c301b26975b8919a18de98d9dfd6444d6542085dd2d8e8155ea6bc8efe/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d,compile-stats]"
   PUBLIC
@@ -3650,6 +3740,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_058ea3aae7385269d001efd9eb2303887614d138ff69150b20a703fc7b97c2c6/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d,compile-stats]"
   PUBLIC
@@ -3671,6 +3763,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d,compile-stats]"
   PUBLIC
@@ -3693,6 +3787,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_14ce4459cb4ea8aa84b5315222e9cfe00fe8a3b456b2ae75a5eb943036279d68/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d,compile-stats]"
   PUBLIC
@@ -3715,6 +3811,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_0b2b90bac148aa9f7c2ee34db723a002823dbc0d5981e47511f09cafa3693101/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d,compile-stats]"
   PUBLIC
@@ -3737,6 +3835,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_bd015dc23ff2f9bf5d681039cbb0f6418cd3d09d09124c0238d8c2caf01dba24/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d,dotprod,compile-stats]"
   PUBLIC
@@ -3755,6 +3855,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_e02e0460e54ee222b46c25e876f937eed5582b0823cad1b1d009fe406b160c33/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -3773,6 +3875,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_d6590e27e94d8aac1b2bfb1e7c60e31dcddacd3a10687cdae998979fc31720fc/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -3791,6 +3895,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_50567a33e0bd9aa5a32a6f61fca9ef8a70ac4d94313024f2c4ec92d9c543c599/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -3809,6 +3915,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_6b9353f591f5044f661ecbbaafee502d710cf263527525d4f843b26cd43f11f7/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -3827,6 +3935,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_5f03fee30980d1fb1074b82d329a1fa63b365858539743e672ad56c039dd732a/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -3845,6 +3955,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_611a54141f98b17aa94abdba55d8a0487aa722bba4da6853c090f786975c5884/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -3864,6 +3976,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_0d524f6ce80da6d1998eb8978623a2f6efd413e0b973c6f2dddf52a46b19907e/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -3883,6 +3997,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_dd2a6a43dceabe7a807e280b43177cdf892d4ad20fdef4e3d3b6e39be7b9b09d/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -3902,6 +4018,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_823ec09bcc061f124fa9229747054945cedf352e11d661a68785cb26af5f83b6/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -3921,6 +4039,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_899c2de5e339b7e19528e80de1129a38511948ba3331932c22e23223707af4ca/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -3940,6 +4060,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_c3cb44c1331872dc53919d0d8b2cab4c256dcdf8b0038f9b6a692a5c874f855b/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -3959,6 +4081,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_dc81a08fe0e5140f22f328d9dfea1828e7318d67899a2534d3b02ff36032cb61/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -3979,6 +4103,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_1171fb017e88de21814d71ea2d35564de6904d3d2359ef53e0fa2c67ea6e9914/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -3999,6 +4125,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_9b9a47b0a97a0bd002bd7fd1f104caaa94b8bf60cf02ffcc2b50129679e4c6f3/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4019,6 +4147,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_4f5ab4bfb26a82d0f83133b9e85585f0c5b97cdb00143de31675158a5a71b457/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4039,6 +4169,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_480b59f233af720e16db8e5da1988a8d69bd61169bf5b5899f425ff98dc0dc19/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [adreno-generic-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4057,6 +4189,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_7731488e1eb90da5480e76b4cd98b12c16b83d7c7011b0aa9ef3a5d6d2059a3c/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4075,6 +4209,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_61decb77e61b184a2c353fac3d60af1cd7c73abc867c23e9519f5e398265a728/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4093,6 +4229,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_4ec47dd2b4a43dd434d041d4d9db548076b70cfd63a2fec2971035394954f1d5/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4111,6 +4249,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_b0309994482c31c79242ee8ef3902b4cc54c1479688824734b33d2f554d6aff6/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4129,6 +4269,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_113994770711e5784a73ac623cbde328267c94b6341e001328b053c02b8bc08f/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4147,6 +4289,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_954bc3dc1fd0c22768ebfe898a67c0db3743d74e8fb776fced75eafb0421058f/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4166,6 +4310,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16_module_6bb61b9c7107a9a30ad20c154321e7e9b14aefc407a8aeda41ac6df5eac757c4/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp16(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,demote-f32-to-f16,compile-stats]"
   PUBLIC
@@ -4184,6 +4330,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_2a38d4c2e9ce2c3f9a78f5dce9e889145a1d4ec821d5776f15d6d6e679901474/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4202,6 +4350,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_module_660bd6b0861f368e51c6ecac52d6dce2998d863bc0a4bbd9dbdd77508ea761d4/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4220,6 +4370,8 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_module_224bd124c8446c300caa77db186ca926e71e79cf187980db5dea593d6f29d434/scheduling_stats.json"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
@@ -4239,6 +4391,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_7bec578c7016cb7e017057c227a9b677901d14c0fff35e31c4a5cf12692db105/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4258,6 +4412,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_89a91c770dfce869ecb04e4b37e3b4d7da508a240da395cf240cc20ee8573857/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4277,6 +4433,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_e6049d40d7925bccce4859e5408f2ad53eb68309aa38b46b8a7e47c94a2cd8a3/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4296,6 +4454,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_a4194c053541ebc49b4912bbdf3ca211331fdca5d157440837144e59d279bf1f/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4315,6 +4475,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_599701d7114956cf64777412899cff57ea5be0478f9a2331377770beaad8f923/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4334,6 +4496,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_1d26fcfdb7387659356dd99ce7e10907c8560b0925ad839334b0a6155d25167a/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4354,6 +4518,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16_module_b74ccbdce4ec07bb65313ee96b67c1b946a6c959158714706209a9df2b93ab0d/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp16(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,demote-f32-to-f16,compile-stats]"
   PUBLIC
@@ -4373,6 +4539,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_b8ee6e3d12e6662f0c78b851876a0759da23967e71ae1a2b5569d0ec3101b43b/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4392,6 +4560,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_module_96e2ebf26260627484f375448ef478c35608ada2d2a0f81c0bec697db9ea3105/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4411,6 +4581,8 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_module_0ee6c4e8f636f98e5443974526d95e057d5a62bb311bb6dbadd87d50b395a373/scheduling_stats.json"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -4431,6 +4603,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_module_178907b155b6322dedfa947937f9caca5158ff3af167470f2de90347dba357f4/scheduling_stats.json"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4451,6 +4625,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_7dcabfd6caa769a75657e07e7315dd42f52b3d4cbc37d75098aca446d3ff4066/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4471,6 +4647,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_247b38beca9631678d80755b0b4db2b323ddc4d95772617889a6a4bb813c6b74/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4491,6 +4669,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_d39340f50384e970b103694a38d7d21d5b1171d7304630d25e925c5c2486bf10/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4511,6 +4691,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_d8f22b5a700abdef68fe791ad08acdfc6d238d82e00f264367d922b99b369ff7/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4531,6 +4713,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_c6a4903d1769d721782cf2b6e84837aca21f87fcf8759912a86ae2f572e8440d/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4552,6 +4736,8 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16_module_3c43472d6cb0f74a1c08920e3f580b701e995a85305fd4b2e370542b4d449b18/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp16(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,demote-f32-to-f16,compile-stats]"
   PUBLIC
@@ -4572,6 +4758,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_6e207112c3da58908537a07d168c78e7d166fe6803659d4b9f07848c968d6d12/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4592,6 +4780,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_module_75259bfdbf7eb331691860ffb18e04a146168a72b7b10cf070d5db7f67dd2378/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4612,6 +4802,8 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_module_5ef6657fb694df545b7f87fbb78dfa99af891778790ac0924c08a87d335c1bf9/scheduling_stats.json"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [valhall-mali-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,repeated-kernel,compile-stats]"
   PUBLIC
@@ -4629,6 +4821,8 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_02b72f9538e4dfc9c789e63d722d5eab4333f3f55f8375503f433a790da119cc/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [vmvx-generic-vmvx-vmvx][default-flags,compile-stats]"
   PUBLIC
@@ -4646,6 +4840,8 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_e7bd41e564750501f39ac9690c18d1a2e77dc7999da710d0c0bf80751dda84a0/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [vmvx-generic-vmvx-vmvx][default-flags,compile-stats]"
   PUBLIC

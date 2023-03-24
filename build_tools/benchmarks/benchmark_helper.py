@@ -45,15 +45,16 @@ def _dump_cmds_of_generation_config(
   imported_model = gen_config.imported_model
   imported_model_path = iree_artifacts.get_imported_model_path(
       imported_model=imported_model, root_path=root_path)
-  module_path = iree_artifacts.get_module_dir_path(
-      module_generation_config=gen_config,
-      root_path=root_path) / iree_artifacts.MODULE_FILENAME
+  module_dir_path = iree_artifacts.get_module_dir_path(
+      module_generation_config=gen_config, root_path=root_path)
+  module_path = module_dir_path / iree_artifacts.MODULE_FILENAME
   compile_cmds = [
       IREE_COMPILER_NAME,
       str(imported_model_path), "-o",
       str(module_path)
   ]
-  compile_cmds += gen_config.materialize_compile_flags()
+  compile_cmds += gen_config.materialize_compile_flags(
+      module_dir_path=module_dir_path)
   compile_cmd_str = _convert_to_cmd_string(compile_cmds)
 
   if imported_model.import_config.tool == iree_definitions.ImportTool.NONE:

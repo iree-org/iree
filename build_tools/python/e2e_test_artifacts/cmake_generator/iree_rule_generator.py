@@ -92,7 +92,8 @@ class IreeRuleBuilder(object):
       module_generation_config: iree_definitions.ModuleGenerationConfig,
       output_file_path: pathlib.PurePath) -> IreeModuleCompileRule:
 
-    compile_flags = module_generation_config.materialize_compile_flags()
+    compile_flags = module_generation_config.materialize_compile_flags(
+        module_dir_path=output_file_path.parent)
 
     # Module target name: iree-module-<gen_config_id>
     target_name = f"iree-module-{module_generation_config.composite_id}"
