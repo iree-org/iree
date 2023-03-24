@@ -8,7 +8,7 @@
 # TODO: Turn this into a real test and wire it up.
 # Usage:
 #   iree-compile --iree-plugin=simple_io_sample print.mlir -o print.vmfb
-#   run_mock print.vmfb
+#   run_mock.py print.vmfb
 
 import iree.runtime as rt
 import sys
