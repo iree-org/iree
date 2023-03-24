@@ -200,8 +200,8 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 }
 
 // CHECK-LABEL:   hal.executable public @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
-//       CHECK:   %[[CST:.*]] = arith.constant 0.000000e+00 : f32
-//       CHECK:   %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[CST:.*]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:   %[[D0:.*]] = gpu.thread_id  x
 //       CHECK:   %[[D1:.*]] = gpu.thread_id  y
 //       CHECK:   %[[D2:.*]] = gpu.thread_id  z
@@ -267,8 +267,8 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 }
 
 // CHECK-LABEL:   hal.executable public @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
-//       CHECK:   %[[CST:.*]] = arith.constant 0.000000e+00 : f32
-//       CHECK:   %[[C0:.*]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[CST:.*]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //       CHECK:   %[[D0:.*]] = gpu.thread_id  x
 //       CHECK:   %[[D1:.*]] = gpu.thread_id  y
 //       CHECK:   %[[D2:.*]] = gpu.thread_id  z

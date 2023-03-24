@@ -29,7 +29,7 @@ class EmitCTypeConverter : public mlir::TypeConverter {
       IREE::VM::FuncOp &funcOp) {
     return lookupAnalysis(funcOp.getOperation());
   }
-  Optional<Value> materializeRef(Value ref);
+  std::optional<Value> materializeRef(Value ref);
 
   // This is the same as convertType, but returns `iree_vm_ref_t` rather than a
   // pointer to it for `vm.ref` types.

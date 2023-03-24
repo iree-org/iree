@@ -29,7 +29,6 @@ using namespace mlir;
 // using namespace mlir::linalg;
 
 using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
-using mlir::iree_compiler::IREE::LinalgExt::LinalgPeelOptions;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgTransformationFilter;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgTransforms;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationOptions;
@@ -282,7 +281,6 @@ struct LinalgSingleTilingExpertPass
     this->generalize = options.generalize;
     this->iteratorInterchange = options.iteratorInterchange;
     this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
-    this->peel = options.peel;
     this->vectorize = options.vectorize;
     this->enableVectorMasking = options.enableVectorMasking;
     this->vectorizePadding = options.vectorizePadding;
@@ -479,30 +477,6 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
     tilingOptions = tilingOptions.setInterchange(tileInterchange);
   }
 
-  // Gather tiled loops that aren't distribution loops from previous tiling
-  // stages.
-  LinalgPeelOptions peelingOptions;
-  peelingOptions.loopsToPeelComputationFunction =
-      [](OpBuilder &builder, Operation *op,
-         SmallVectorImpl<scf::ForOp> &loopsToPeel) {
-        if (!iree_compiler::getLoweringConfig(op)) return;
-        auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-        if (!linalgOp) return;
-
-        auto maxNumLoopsToPeel = linalgOp.getNumLoops();
-        Operation *currentOp = op;
-        for (int i = 0; i < maxNumLoopsToPeel; ++i) {
-          currentOp = currentOp->getParentOfType<scf::ForOp>();
-          auto loop = llvm::cast_or_null<scf::ForOp>(currentOp);
-          if (!loop || iree_compiler::isTiledAndDistributedLoop(loop)) {
-            break;
-          }
-          loopsToPeel.push_back(loop);
-        }
-
-        std::reverse(loopsToPeel.begin(), loopsToPeel.end());
-      };
-
   LinalgVectorizationOptions vectorizationOptions;
   vectorizationOptions.setVectorizePadding(vectorizePadding);
   vectorizationOptions.setEnableVectorMasking(enableVectorMasking);
@@ -516,7 +490,6 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   StringRef genericOpName = linalg::GenericOp::getOperationName();
   strategy.tileIf(doTiling, anchorOpName, tilingOptions)
       .decomposeIf(decomposeToLowerDimOp)
-      .peelIf(peel, generalize ? genericOpName : anchorOpName, peelingOptions)
       .vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
                    vectorizationOptions);
 

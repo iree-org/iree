@@ -1855,7 +1855,7 @@ hal.executable private @tile_multiuse_producer {
 //   CHECK-DAG:         flow.dispatch.tensor.store %[[GENERIC0]], %[[RESULT_BINDING2]], offsets = [%[[IV0]], %[[IV1]]]
 
 // -----
-
+ 
 hal.executable private @no_tile {
   hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {}> {
     hal.executable.export public @no_tile ordinal(0) layout(#hal.pipeline.layout<
@@ -2279,7 +2279,6 @@ hal.executable private @elem_pack {
         %18 = tensor.pack %16#0 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %17 {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, 64]]>} : tensor<384x512xf32> -> tensor<48x512x8x1xf32>
         flow.dispatch.tensor.store %18, %6, offsets = [0, 0, 0, 0], sizes = [48, 512, 8, 1], strides = [1, 1, 1, 1] : tensor<48x512x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<48x512x8x1xf32>>
         flow.dispatch.tensor.store %16#0, %7, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : tensor<384x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
-        flow.dispatch.tensor.store %16#1, %8, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : tensor<384x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
         return
       }
     }
@@ -2292,7 +2291,6 @@ hal.executable private @elem_pack {
 // CHECK:             %[[PACK:.+]] = tensor.pack
 // CHECK-DAG:         flow.dispatch.tensor.store %[[PACK]], {{.*}} sizes = [8, 64, 8, 1]
 // CHECK-DAG:         flow.dispatch.tensor.store %[[ELEM]]#0, {{.*}} sizes = [64, 64]
-// CHECK-DAG:         flow.dispatch.tensor.store %[[ELEM]]#1, {{.*}} sizes = [64, 64]
 
 // -----
 

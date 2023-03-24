@@ -332,14 +332,19 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
                                              bool enableVectorMasking) {
   addTileAndDistributePasses(passManager);
 
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  {
     // Skip tiling reduction loops because this is expected to apply on copy ops
     // only.
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
-    options.peel = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+  }
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
+  {
+    LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -480,9 +485,12 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
   }
 
+  if (enablePeeling) {
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
+  }
+
   {
     LinalgSingleTilingExpertPassOptions options;
-    options.peel = enablePeeling;
     options.vectorize = true;
     options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(

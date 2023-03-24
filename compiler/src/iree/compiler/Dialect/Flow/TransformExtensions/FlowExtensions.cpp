@@ -826,7 +826,7 @@ transform_dialect::WrapInDispatchRegionOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(target->getContext());
-  Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
+  std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
   if (getGenerateWorkload()) {
     auto maybeBuilder = Flow::getWorkloadBuilder(rewriter, target);
     if (failed(maybeBuilder)) {

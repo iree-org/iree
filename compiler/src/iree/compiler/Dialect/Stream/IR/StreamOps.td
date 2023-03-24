@@ -3021,7 +3021,7 @@ def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
   }];
 
   let arguments = (ins
-    // TODO(benvanik): optional discriminator for groupings.
+    OptionalAttr<StrAttr>:$group,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -3030,6 +3030,7 @@ def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
+    (`group` `(` $group^ `)`)?
     `:` type($result)
     attr-dict-with-keyword
   }];
@@ -3046,12 +3047,14 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
     affinity. Collective operations using this channel must only be submitted on
     compatible affinities.
 
-    The rank can be omitted to indicate a default inherited from the environment
-    or device configuration at runtime.
+    The group and ID are optional and may be null. The rank and count can be
+    omitted to indicate a default inherited from the environment or device
+    configuration at runtime.
   }];
 
   let arguments = (ins
-    // TODO(benvanik): optional discriminator for groupings.
+    Optional<Util_BufferType>:$id,
+    OptionalAttr<StrAttr>:$group,
     Optional<Index>:$rank,
     Optional<Index>:$count,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -3062,6 +3065,8 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
+    (`id` `(` $id^ `)`)?
+    (`group` `(` $group^ `)`)?
     (`rank` `(` $rank^ `)`)?
     (`count` `(` $count^ `)`)?
     `:` type($result)

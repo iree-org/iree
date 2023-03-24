@@ -88,7 +88,7 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
       if (!loopInfo) return failure();
       LLVM_DEBUG(llvm::dbgs() << *loopInfo);
 
-      Optional<int64_t> untiledStep =
+      std::optional<int64_t> untiledStep =
           getConstantIntValue(loopInfo->untiledStep);
       // For IREE right now the original untiled loop should have step 1..
       if (!untiledStep || *untiledStep != 1) return failure();

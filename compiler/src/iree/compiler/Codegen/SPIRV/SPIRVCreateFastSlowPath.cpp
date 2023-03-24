@@ -36,7 +36,7 @@ namespace iree_compiler {
 
 /// Returns true if the the given `attrOrValue` is a constant zero.
 static bool isZero(OpFoldResult attrOrValue) {
-  if (Optional<int64_t> val = getConstantIntValue(attrOrValue)) {
+  if (std::optional<int64_t> val = getConstantIntValue(attrOrValue)) {
     return val.value() == 0;
   }
   return false;

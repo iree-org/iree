@@ -14,7 +14,6 @@
 #include "iree/hal/drivers/cuda/cuda_device.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/status_util.h"
-#include "third_party/nccl/nccl.h"
 
 // Maximum device name length we support.
 #define IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH 128
@@ -49,28 +48,6 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
   out_options->default_device_index = 0;
 }
 
-static iree_status_t iree_hal_nccl_get_unique_id_from_env(
-    iree_hal_cuda_driver_t* driver) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  char* nccl_comm_id_str = getenv("NCCL_COMM_ID");
-  if (!nccl_comm_id_str) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "expected NCCL_COMM_ID environment variable to be "
-                            "set when using the default NCCL configuration");
-  }
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, NCCL_RESULT_TO_STATUS(
-              &driver->syms,
-              ncclGetUniqueId(
-                  (ncclUniqueId*)&driver->default_params.nccl_default_id),
-              "ncclGetUniqueId"));
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_cuda_driver_create_internal(
     iree_string_view_t identifier,
     const iree_hal_cuda_device_params_t* default_params,
@@ -92,16 +69,13 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
 
   iree_status_t status =
       iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
-  if (iree_status_is_ok(status)) {
-    // Initialize NCCL if NPROCS is set.
-    if (driver->default_params.nccl_default_count > 0) {
-      status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
-                                                             &driver->syms);
-      if (iree_status_is_ok(status)) {
-        // Get a unique ID from the environmental variable.
-        status = iree_hal_nccl_get_unique_id_from_env(driver);
-      }
-    }
+
+  // Initialize NCCL too if a channel provider is defined or any default
+  // collective group values.
+  if (iree_status_is_ok(status) &&
+      default_params->channel_provider.query_group_params) {
+    status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
+                                                           &driver->syms);
   }
 
   if (iree_status_is_ok(status)) {

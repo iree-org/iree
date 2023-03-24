@@ -357,7 +357,7 @@ class null_crc32_ostream : public llvm::raw_ostream {
 // appendZIPFile implementation used when |os| is a stream without random
 // access (like stdout). This requires us to serialize the file twice in order
 // to compute the total length and CRC32.
-static Optional<ZIPFileRef> appendZIPFileToStream(
+static std::optional<ZIPFileRef> appendZIPFileToStream(
     std::string fileName, uint64_t filePadding, uint64_t fileLength,
     std::function<LogicalResult(llvm::raw_ostream &os)> write,
     llvm::raw_ostream &os) {
@@ -416,7 +416,7 @@ class crc32_ostream : public llvm::raw_ostream {
 // appendZIPFile implementation used when |os| is a file with random access.
 // This allows us to write the header and backpatch the CRC computed while while
 // serializing the file contents.
-static Optional<ZIPFileRef> appendZIPFileToFD(
+static std::optional<ZIPFileRef> appendZIPFileToFD(
     std::string fileName, uint64_t filePadding, uint64_t fileLength,
     std::function<LogicalResult(llvm::raw_ostream &os)> write,
     llvm::raw_fd_ostream &os) {
@@ -450,7 +450,7 @@ static Optional<ZIPFileRef> appendZIPFileToFD(
 // Appends a file wrapped in a ZIP header and data descriptor.
 // |write| is used to stream the file contents to |os| while also capturing its
 // CRC as required for the central directory.
-static Optional<ZIPFileRef> appendZIPFile(
+static std::optional<ZIPFileRef> appendZIPFile(
     std::string fileName, uint64_t filePadding, uint64_t fileLength,
     std::function<LogicalResult(llvm::raw_ostream &os)> write,
     llvm::raw_ostream &os) {

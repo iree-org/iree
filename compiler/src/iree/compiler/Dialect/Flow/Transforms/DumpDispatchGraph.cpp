@@ -53,7 +53,8 @@ static StringRef getShape(Operation *op) {
 /// Return the size limits for eliding large attributes.
 static int64_t getLargeAttributeSizeLimit() {
   // Use the default from the printer flags if possible.
-  if (Optional<int64_t> limit = OpPrintingFlags().getLargeElementsAttrLimit())
+  if (std::optional<int64_t> limit =
+          OpPrintingFlags().getLargeElementsAttrLimit())
     return *limit;
   return 16;
 }
@@ -118,11 +119,11 @@ using AttributeMap = llvm::StringMap<std::string>;
 /// cluster, an invisible "anchor" node is created.
 struct Node {
  public:
-  Node(int id = 0, Optional<int> clusterId = std::nullopt)
+  Node(int id = 0, std::optional<int> clusterId = std::nullopt)
       : id(id), clusterId(clusterId) {}
 
   int id;
-  Optional<int> clusterId;
+  std::optional<int> clusterId;
 };
 
 /// This pass generates a Graphviz dataflow visualization of an MLIR operation.
@@ -485,7 +486,7 @@ class DumpDispatchGraphPass
         valueToNode[blockArg] = emitNodeStmt(getLabel(blockArg));
 
       // Emit a node for each operation.
-      Optional<Node> prevNode;
+      std::optional<Node> prevNode;
       for (Operation &op : block) {
         Node nextNode = processOperation(&op);
         if (printControlFlowEdges && prevNode)

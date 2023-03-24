@@ -49,7 +49,7 @@ struct Artifact {
   void keep() const;
 
   // Reads the artifact file contents as bytes.
-  Optional<std::vector<int8_t>> read() const;
+  std::optional<std::vector<int8_t>> read() const;
 
   // Reads the artifact file and writes it into the given |stream|.
   bool readInto(raw_ostream &targetStream) const;
@@ -105,7 +105,7 @@ class LinkerTool {
   // Links the given object files into a dynamically loadable library.
   // The resulting library (and other associated artifacts) will be returned on
   // success.
-  virtual Optional<Artifacts> linkDynamicLibrary(
+  virtual std::optional<Artifacts> linkDynamicLibrary(
       StringRef libraryName, ArrayRef<Artifact> objectFiles) = 0;
 
  protected:

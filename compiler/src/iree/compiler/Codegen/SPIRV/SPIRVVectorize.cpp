@@ -118,7 +118,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::TransposeOp op) {
   return nativeSize;
 }
 
-Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
+std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
@@ -127,7 +127,7 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
     }
   }
 
-  return TypeSwitch<Operation *, Optional<SmallVector<int64_t>>>(op)
+  return TypeSwitch<Operation *, std::optional<SmallVector<int64_t>>>(op)
       .Case<VectorTransferOpInterface, vector::ContractionOp,
             vector::MultiDimReductionOp, vector::ReductionOp,
             vector::TransposeOp>(

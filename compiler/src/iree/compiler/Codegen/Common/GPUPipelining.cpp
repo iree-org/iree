@@ -647,9 +647,9 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
 }  // namespace
 
 FailureOr<scf::ForOp> pipelineSharedMemoryCopy(
-    scf::ForOp forOp, PipeliningSchedulingStrategy startegy, bool peelEpilogue,
-    int64_t depth, RewriterBase& rewriter) {
-  return applyPipelining(forOp, depth, peelEpilogue, startegy);
+    RewriterBase& rewriter, scf::ForOp forOp,
+    PipeliningSchedulingStrategy strategy, bool peelEpilogue, int64_t depth) {
+  return applyPipelining(forOp, depth, peelEpilogue, strategy);
 }
 
 /// Pass options

@@ -70,7 +70,7 @@ static bool getUsesIfAllTransferOp(Value value,
 }
 
 /// Returns the bitwidth of a scalar or vector type.
-static Optional<unsigned> getBitWidth(Type type) {
+static std::optional<unsigned> getBitWidth(Type type) {
   if (type.isIntOrFloat()) {
     return type.getIntOrFloatBitWidth();
   }
@@ -93,7 +93,8 @@ static unsigned calculateMemRefVectorNumBits(
     }
     auto transferOp = dyn_cast<VectorTransferOpInterface>(op);
     if (!transferOp) return 0;
-    Optional<unsigned> transferSize = getBitWidth(transferOp.getVectorType());
+    std::optional<unsigned> transferSize =
+        getBitWidth(transferOp.getVectorType());
     if (!transferSize) return 0;
     minBits = std::min(minBits, *transferSize);
   }
@@ -115,7 +116,8 @@ static unsigned calculateMemRefVectorNumBits(
     // The `leadingDimension` attributes specifies the stride (numer of
     // *elements*) over the memref for the leading dimension.
     auto memrefType = memrefVal.getType().cast<MemRefType>();
-    Optional<unsigned> elementBits = getBitWidth(memrefType.getElementType());
+    std::optional<unsigned> elementBits =
+        getBitWidth(memrefType.getElementType());
     if (!elementBits) return 0;
     int64_t strideBits = stride * *elementBits;
     // Make sure the stride is aligned with the planned vector bitwidth.
@@ -248,7 +250,7 @@ class MemRefConversionPattern : public OpConversionPattern<OpTy> {
         memrefUsageAnalysis(memrefUsageAnalysis) {}
 
  protected:
-  Optional<MemRefType> getVectorizedMemRefType(
+  std::optional<MemRefType> getVectorizedMemRefType(
       ConversionPatternRewriter &rewriter, Value memRefValue) const;
 
   /// Adjusts indices for vector transfer / GPU MMA load/store ops to index into
@@ -294,9 +296,9 @@ class ProcessTransferRead final
     auto readVectorType = read.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) return failure();
 
-    Optional<unsigned> vectorMemrefElemSize =
+    std::optional<unsigned> vectorMemrefElemSize =
         getBitWidth(vectorMemrefType.getElementType());
-    Optional<unsigned> readVecSize = getBitWidth(readVectorType);
+    std::optional<unsigned> readVecSize = getBitWidth(readVectorType);
 
     auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
                                  adaptor.getIndices(), rewriter, loc);
@@ -346,9 +348,9 @@ class ProcessTransferWrite final
     auto writeVectorType = write.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) return failure();
 
-    Optional<unsigned> vectorMemrefElemSize =
+    std::optional<unsigned> vectorMemrefElemSize =
         getBitWidth(vectorMemrefType.getElementType());
-    Optional<unsigned> writeVecSize = getBitWidth(writeVectorType);
+    std::optional<unsigned> writeVecSize = getBitWidth(writeVectorType);
 
     auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
                                  adaptor.getIndices(), rewriter, loc);
@@ -382,7 +384,8 @@ class ProcessTransferWrite final
 /// * memref<1024xf16> vectorized with a size of 128bits will return
 /// memref<128xvec<4xf32>>
 template <typename OpTy>
-Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
+std::optional<MemRefType>
+MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
     ConversionPatternRewriter &rewriter, Value memRefValue) const {
   MemRefType type = memRefValue.getType().cast<MemRefType>();
   unsigned vectorNumBits =
@@ -416,9 +419,9 @@ FailureOr<SmallVector<Value>> MemRefConversionPattern<OpTy>::adjustIndices(
     MemRefType scalarMemrefType, MemRefType vectorMemrefType,
     ValueRange indices, ConversionPatternRewriter &rewriter,
     Location loc) const {
-  Optional<unsigned> vectorMemrefElemSize =
+  std::optional<unsigned> vectorMemrefElemSize =
       getBitWidth(vectorMemrefType.getElementType());
-  Optional<unsigned> scalarMemrefElemSize =
+  std::optional<unsigned> scalarMemrefElemSize =
       getBitWidth(scalarMemrefType.getElementType());
   if (!vectorMemrefElemSize || !scalarMemrefElemSize) return failure();
 

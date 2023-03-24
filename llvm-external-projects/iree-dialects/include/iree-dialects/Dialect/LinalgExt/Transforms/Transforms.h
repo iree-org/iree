@@ -30,7 +30,7 @@ namespace LinalgExt {
 struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
-  FailureOr<Operation *>
+  FailureOr<TilingResult>
   returningMatchAndRewrite(tensor::ExtractSliceOp sliceOp,
                            PatternRewriter &rewriter) const;
 
@@ -311,7 +311,7 @@ struct LinalgBasePromotionPattern : public RewritePattern {
     // the op and deleting the previous op. This
     // needs more investigation.
     rewriter.startRootUpdate(op);
-    Optional<linalg::LinalgOp> promotedOp =
+    std::optional<linalg::LinalgOp> promotedOp =
         promoteSubViews(rewriter, op, options);
     if (!promotedOp) {
       rewriter.cancelRootUpdate(op);
@@ -407,7 +407,8 @@ private:
 FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
     OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
     ArrayRef<int64_t> tileInterchange,
-    const Optional<linalg::LinalgLoopDistributionOptions> &tileDistribution);
+    const std::optional<linalg::LinalgLoopDistributionOptions>
+        &tileDistribution);
 
 } // namespace LinalgExt
 } // namespace IREE

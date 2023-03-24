@@ -93,7 +93,7 @@ struct GlobalOpExpansion
     auto resourceOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
         globalOp, globalOp.getName(), globalOp.getIsMutable(), resourceType,
         initialValue && !tensorInitializerRequired
-            ? llvm::Optional<TypedAttr>{initialValue}
+            ? std::optional<TypedAttr>{initialValue}
             : std::nullopt);
     resourceOp.setVisibility(globalOp.getVisibility());
 
@@ -108,7 +108,7 @@ struct GlobalOpExpansion
     auto indexType = rewriter.getIndexType();
     auto resourceSizeOp = rewriter.create<IREE::Util::GlobalOp>(
         globalOp.getLoc(), (globalOp.getName() + "__size").str(),
-        globalOp.getIsMutable(), indexType, Optional<TypedAttr>{});
+        globalOp.getIsMutable(), indexType, std::optional<TypedAttr>{});
     resourceSizeOp.setVisibility(globalOp.getVisibility());
 
     // Materialize the initializer if we need to setup a tensor-like constant.

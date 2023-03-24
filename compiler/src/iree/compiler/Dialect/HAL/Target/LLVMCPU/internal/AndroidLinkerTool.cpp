@@ -133,7 +133,7 @@ class AndroidLinkerTool : public LinkerTool {
         .str();
   }
 
-  Optional<Artifacts> linkDynamicLibrary(
+  std::optional<Artifacts> linkDynamicLibrary(
       StringRef libraryName, ArrayRef<Artifact> objectFiles) override {
     Artifacts artifacts;
 

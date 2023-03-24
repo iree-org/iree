@@ -7,6 +7,7 @@
 #include "iree/hal/drivers/cuda/nccl_channel.h"
 
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
@@ -27,6 +28,25 @@ static uint64_t iree_hal_cuda_nccl_hash_id(const iree_hal_cuda_nccl_id_t* id) {
     hash += id->data[i];
   }
   return hash;
+}
+
+iree_status_t iree_hal_cuda_nccl_get_unique_id_from_context(
+    iree_hal_cuda_context_wrapper_t* context_wrapper,
+    iree_hal_cuda_nccl_id_t* out_id) {
+  IREE_ASSERT_ARGUMENT(context_wrapper);
+  IREE_ASSERT_ARGUMENT(out_id);
+  memset(out_id, 0, sizeof(*out_id));
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  static_assert(sizeof(*out_id) == sizeof(ncclUniqueId),
+                "NCCL ID size mismatch");
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, NCCL_RESULT_TO_STATUS(context_wrapper->syms,
+                                ncclGetUniqueId((ncclUniqueId*)out_id),
+                                "ncclGetUniqueId"));
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }
 
 typedef struct iree_hal_cuda_nccl_channel_t {

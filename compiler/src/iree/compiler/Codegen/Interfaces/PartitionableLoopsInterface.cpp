@@ -32,8 +32,7 @@ static llvm::SmallVector<unsigned> pruneUnitTripParallelLoops(
 
 /// Returns the partitionable loops for all Linalg ops.
 llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
-    linalg::LinalgOp linalgOp,
-    llvm::Optional<unsigned> maxNumPartitionedLoops) {
+    linalg::LinalgOp linalgOp, std::optional<unsigned> maxNumPartitionedLoops) {
   llvm::SmallVector<unsigned> parallelLoops;
   linalgOp.getParallelDims(parallelLoops);
   // Get the static loop ranges.
@@ -65,7 +64,7 @@ struct LinalgOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           LinalgOpPartitionableLoops<OpTy>, OpTy> {
   llvm::SmallVector<unsigned> getPartitionableLoops(
-      Operation *op, llvm::Optional<unsigned> maxNumPartitionedLoops) const {
+      Operation *op, std::optional<unsigned> maxNumPartitionedLoops) const {
     auto linalgOp = cast<linalg::LinalgOp>(op);
     return getPartitionableLoopsImpl(linalgOp, maxNumPartitionedLoops);
   }
@@ -76,7 +75,7 @@ struct Mmt4DOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           Mmt4DOpPartitionableLoops, linalg::Mmt4DOp> {
   llvm::SmallVector<unsigned> getPartitionableLoops(
-      Operation *op, llvm::Optional<unsigned> maxNumPartitionedLoops) const {
+      Operation *op, std::optional<unsigned> maxNumPartitionedLoops) const {
     return {0, 1};
   }
 };
@@ -88,7 +87,7 @@ struct OuterParallelAsPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           OuterParallelAsPartitionableLoops<OpTy>, OpTy> {
   llvm::SmallVector<unsigned> getPartitionableLoops(
-      Operation *op, llvm::Optional<unsigned> maxNumPartitionedLoops) const {
+      Operation *op, std::optional<unsigned> maxNumPartitionedLoops) const {
     // For now just return the loops that are returned by the
     // `TiledOpInterface`. This needs to be further pruned to remove unit-dim
     // loops, but that needs the interface to return the static sizes of the
@@ -120,7 +119,7 @@ template <typename OpTy>
 struct NoPartitionableLoops : public PartitionableLoopsInterface::ExternalModel<
                                   NoPartitionableLoops<OpTy>, OpTy> {
   llvm::SmallVector<unsigned> getPartitionableLoops(
-      Operation *op, llvm::Optional<unsigned> maxNumPartitionedLoops) const {
+      Operation *op, std::optional<unsigned> maxNumPartitionedLoops) const {
     return {};
   }
 };
@@ -130,7 +129,7 @@ struct FftOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           FftOpPartitionableLoops, IREE::LinalgExt::FftOp> {
   llvm::SmallVector<unsigned> getPartitionableLoops(
-      Operation *op, llvm::Optional<unsigned> maxNumPartitionedLoops) const {
+      Operation *op, std::optional<unsigned> maxNumPartitionedLoops) const {
     auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
     auto range = llvm::seq<unsigned>(0, fftOp.getOperandRank());
     SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
@@ -157,7 +156,7 @@ struct AllParallelAsPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           AllParallelAsPartitionableLoops<OpTy>, OpTy> {
   llvm::SmallVector<unsigned> getPartitionableLoops(
-      Operation *op, llvm::Optional<unsigned> maxNumPartitionedLoops) const {
+      Operation *op, std::optional<unsigned> maxNumPartitionedLoops) const {
     SmallVector<unsigned> partitionableLoops;
     auto interfaceOp = cast<OpTy>(op);
     for (auto iteratorType :
