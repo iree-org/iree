@@ -455,6 +455,12 @@ py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       dtype_code = "d";
       break;
+    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
+      dtype_code = "complex64";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
+      dtype_code = "complex128";
+      break;
     default:
       throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
   }
