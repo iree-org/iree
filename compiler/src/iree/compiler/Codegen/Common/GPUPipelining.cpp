@@ -296,15 +296,16 @@ struct MainLoopInfo {
 
     // If the operation is a ldmatrix or ld.shared, then add it to the set of
     // the current kgroup load operations.
-    if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(op)) {
+    if (isa<nvgpu::LdMatrixOp, memref::LoadOp, vector::ExtractStridedSliceOp,
+            vector::InsertOp>(op)) {
       if (op->getBlock() == block) {
         loadOperations.insert(op);
       }
       return;
     }
-
+#if 0
     // If the operation is not a ldmatrix or ld.shared, then it has to be a
-    // vector.extract_strided_slice or vector.insert operation  to recurse up
+    // vector.extract_strided_slice or vector.insert operation to recurse up
     // the chain to find the ldmatrix or ld.shared Shared Memory load operation.
     if (!isa<vector::ExtractStridedSliceOp, vector::InsertOp>(op)) {
       LLVM_DEBUG({
@@ -320,9 +321,12 @@ struct MainLoopInfo {
     // Recurse upwards towards the definition until a Shared Memory load is
     // found. Only vector.extract_strided_slice or vector.insert operations
     // leading up to a Shared Memory loads are considered.
-    Operation* defOp = op->getOperand(0).getDefiningOp();
-
-    backtrackToFindSmemLoad(defOp, loadOperations, block);
+    for (Value operand : op->getOperands()) {
+      Operation* defOp = operand.getDefiningOp();
+      if (defOp && defOp->getBlock() == block)
+        backtrackToFindSmemLoad(defOp, loadOperations, block);
+    }
+#endif
   }
 
   // Recursively traverse the chain of mma operations for all kgroups from 0
@@ -389,6 +393,28 @@ struct MainLoopInfo {
       }
     }
 
+    // Debug print warpOperations for kgroup-by-kgroup.
+    LLVM_DEBUG({
+      for (int i = 0; i < warpOperations.size(); ++i) {
+        llvm::dbgs() << "kgroup: " << i << "\n";
+        llvm::dbgs() << "mma.sync: \n";
+        for (auto op : warpOperations[i].mmaOperations) {
+          op->dump();
+        }
+        llvm::dbgs() << "\n";
+        llvm::dbgs() << "load for operand A: \n";
+        for (auto op : warpOperations[i].loadOperationsA) {
+          op->dump();
+        }
+        llvm::dbgs() << "\n";
+        llvm::dbgs() << "load for operand B: \n";
+        for (auto op : warpOperations[i].loadOperationsB) {
+          op->dump();
+        }
+        llvm::dbgs() << "\n";
+      }
+    });
+
     // If one of the ingredients (`cp.async`, `cp.commit_group`,
     // `cp.wait_group`, `bar.sync`, `mma.sync`, `ldmatrix` or `ld.shared`) for
     // scheduling is missing, the mainloop cannot be scheduled.
@@ -412,7 +438,8 @@ struct MainLoopInfo {
     // operations seperated by kgroups for fine-grained instruction scheduling.
     for (int kgroup = 0; kgroup < getNumberOfKgroups(); ++kgroup) {
       for (Operation& op : forOp.getBody()->getOperations()) {
-        if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(&op)) {
+        if (isa<nvgpu::LdMatrixOp, memref::LoadOp,
+                vector::ExtractStridedSliceOp, vector::InsertOp>(&op)) {
           if (warpOperations[kgroup].loadOperationsA.count(&op)) {
             backwardSliceOfDependentOps(warpOperations[kgroup].loadOperationsA,
                                         &op, forOp.getBody());
@@ -449,7 +476,7 @@ static void debugMainloopSchedule(
     llvm::dbgs() << " Number of kgroups: " << mainloop.getNumberOfKgroups()
                  << "\n";
     llvm::dbgs() << " Number of mainloop instructions " << ops.size() << "\n";
-    llvm::dbgs() << " Mainloop instructions schedule and stage assignment: ";
+    llvm::dbgs() << " Mainloop instructions schedule and stage assignment: \n";
     for (auto& stage_op_pair : ops) {
       llvm::dbgs() << " Stage (" << stage_op_pair.second << ") , Operation: ";
       stage_op_pair.first->dump();
