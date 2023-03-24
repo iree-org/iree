@@ -11,7 +11,7 @@ from enum import Enum
 import pathlib
 from typing import List, Optional, Sequence
 
-from e2e_test_framework.definitions import common_definitions
+from e2e_test_framework.definitions import common_definitions, utils
 from e2e_test_framework import serialization, unique_ids
 
 
@@ -148,7 +148,7 @@ class MLIRDialectType(Enum):
 
 # Placeholder to be replaced with entry function name when outputting the actual
 # flag list.
-IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
+IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = r"${ENTRY_FUNCTION_PLACEHOLDER}"
 
 
 @serialization.serializable(type_key="iree_import_configs")
@@ -246,7 +246,9 @@ class ImportedModel(object):
                import_config=config)
 
 
-MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER = "${MODULE_DIR}"
+# Placeholder to be replaced with module dir path. The following path segment
+# should be written in the POSIX format.
+MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER = r"${MODULE_DIR}"
 
 
 @serialization.serializable(type_key="iree_module_generation_configs",
@@ -269,10 +271,17 @@ class ModuleGenerationConfig(object):
 
   def materialize_compile_flags(self, module_dir_path: pathlib.PurePath):
     """Materialize flags with dependent values."""
-    return [
-        flag.replace(MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER,
-                     str(module_dir_path)) for flag in self.compile_flags
-    ]
+
+    def _replace_module_dir_placeholder(value: str) -> str:
+      if MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER not in value:
+        return value
+      if not value.startswith(MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER):
+        raise ValueError(r"${MODULE_DIR} needs to be the head of flag value.")
+      sub_path = pathlib.PurePosixPath(value).parts[1:]
+      return str(module_dir_path.joinpath(*sub_path))
+
+    return utils.materialize_flags(flags=self.compile_flags,
+                                   map_funcs=[_replace_module_dir_placeholder])
 
   @classmethod
   def build(cls, imported_model: ImportedModel, compile_config: CompileConfig):
