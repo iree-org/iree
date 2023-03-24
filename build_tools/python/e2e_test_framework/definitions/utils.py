@@ -7,7 +7,7 @@
 
 from typing import Callable, List, Sequence
 
-MAX_MAGERIALIZE_ITERATIONS = 10
+MAX_SUBSTITUTION_ITERATIONS = 10
 
 
 def materialize_flags(flags: Sequence[str],
@@ -48,8 +48,8 @@ def materialize_flags(flags: Sequence[str],
       if new_value == prev_value:
         break
       iterations += 1
-      if iterations > MAX_MAGERIALIZE_ITERATIONS:
-        raise RuntimeError(f"Too many iterations to materialize: {flag}")
+      if iterations > MAX_SUBSTITUTION_ITERATIONS:
+        raise ValueError(f"Too many iterations to materialize: {flag}")
       prev_value = new_value
 
     materialized_flags.append(flag[:value_pos] + new_value)

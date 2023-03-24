@@ -7,6 +7,7 @@
 
 from typing import List, Tuple
 
+from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 from benchmark_suites.iree import (riscv_benchmarks, x86_64_benchmarks,
                                    adreno_benchmarks, armv8_a_benchmarks,
@@ -53,7 +54,7 @@ def generate_benchmarks(
             # Disable debug symbols to provide correct component sizes.
             "--iree-llvmcpu-debug-symbols=false",
             "--iree-scheduling-dump-statistics-format=json",
-            f"--iree-scheduling-dump-statistics-file={iree_definitions.MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER}/stream_stats.json"
+            f"--iree-scheduling-dump-statistics-file={iree_definitions.MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER}/{iree_artifacts.STREAM_STATS_FILENAME}"
         ])
     compile_stats_gen_configs.append(
         iree_definitions.ModuleGenerationConfig.build(

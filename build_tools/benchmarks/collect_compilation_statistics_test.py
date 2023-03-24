@@ -143,8 +143,11 @@ class CollectCompilationStatistics(unittest.TestCase):
         target_arch=f"[cpu-x86_64-cascadelake-linux-gnu]",
         compile_tags=tuple(gen_config_a.compile_config.tags),
         gen_config_id=gen_config_a.composite_id)
-    module_a_path = iree_artifacts.get_module_dir_path(
-        gen_config_a, root_dir) / iree_artifacts.MODULE_FILENAME
+    module_dir_a = pathlib.Path(
+        iree_artifacts.get_module_dir_path(gen_config_a, root_dir))
+    module_info_a = collect_compilation_statistics.ModuleInfo(
+        module_path=module_dir_a / iree_artifacts.MODULE_FILENAME,
+        stream_stats_path=module_dir_a / iree_artifacts.STREAM_STATS_FILENAME)
     compile_info_b = common.benchmark_definition.CompilationInfo(
         model_name=model_a.name,
         model_tags=tuple(model_a.tags),
@@ -152,11 +155,14 @@ class CollectCompilationStatistics(unittest.TestCase):
         target_arch=f"[cpu-riscv_64-generic-linux-gnu]",
         compile_tags=tuple(gen_config_a.compile_config.tags),
         gen_config_id=gen_config_b.composite_id)
-    module_b_path = iree_artifacts.get_module_dir_path(
-        gen_config_b, root_dir) / iree_artifacts.MODULE_FILENAME
+    module_dir_b = pathlib.Path(
+        iree_artifacts.get_module_dir_path(gen_config_b, root_dir))
+    module_info_b = collect_compilation_statistics.ModuleInfo(
+        module_path=module_dir_b / iree_artifacts.MODULE_FILENAME,
+        stream_stats_path=module_dir_b / iree_artifacts.STREAM_STATS_FILENAME)
     self.assertEqual(module_map, {
-        compile_info_a: module_a_path,
-        compile_info_b: module_b_path
+        compile_info_a: module_info_a,
+        compile_info_b: module_info_b
     })
 
 

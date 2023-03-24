@@ -165,12 +165,13 @@ def get_module_map_from_compilation_benchmark_config(
         target_arch=f"[{','.join(target_archs)}]",
         compile_tags=tuple(compile_config.tags),
         gen_config_id=gen_config.composite_id)
-    module_dir_path = iree_artifacts.get_module_dir_path(
-        module_generation_config=gen_config, root_path=e2e_test_artifacts_dir)
+    module_dir_path = pathlib.Path(
+        iree_artifacts.get_module_dir_path(module_generation_config=gen_config,
+                                           root_path=e2e_test_artifacts_dir))
     module_path = module_dir_path / iree_artifacts.MODULE_FILENAME
+    stream_stats_path = module_dir_path / iree_artifacts.STREAM_STATS_FILENAME
     module_map[compilation_info] = ModuleInfo(
-        module_path=pathlib.Path(module_path),
-        stream_stats_path=module_dir_path / "stream_stats.json")
+        module_path=module_path, stream_stats_path=stream_stats_path)
 
   return module_map
 
