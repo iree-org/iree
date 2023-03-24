@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterPassBase.h"
@@ -93,7 +92,6 @@ class TransformDialectInterpreterPass
     vector::registerBufferizableOpInterfaceExternalModels(registry);
 
     registry.addExtensions<
-        mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension,
         transform_ext::StructuredTransformOpsExtension>();
     iree_compiler::registerTransformDialectCommonExtension(registry);
     iree_compiler::registerTransformDialectFlowExtension(registry);

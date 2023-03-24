@@ -86,7 +86,6 @@ iree_cc_library(
   DEPS
     IREEInputDialect
     IREELinalgExtDialect
-    IREELinalgExtTransformOps
     IREELinalgExtTransforms
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses

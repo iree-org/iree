@@ -349,46 +349,6 @@ alias(
     actual = ":IREELinalgExtPassesAndTransforms",
 )
 
-gentbl_cc_library(
-    name = "IREELinalgExtTransformOpsIncGen",
-    strip_include_prefix = "include",
-    tbl_outs = [
-        (
-            ["--gen-op-decls"],
-            "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h.inc",
-        ),
-        (
-            ["--gen-op-defs"],
-            "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.td",
-    deps = [
-        ":TdFiles",
-        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
-    ],
-)
-
-cc_library(
-    name = "IREELinalgExtTransformOps",
-    srcs = glob(["lib/Dialect/LinalgExt/TransformOps/*.cpp"]),
-    hdrs = glob(["include/iree-dialects/Dialect/LinalgExt/TransformOps/*.h"]),
-    deps = [
-        ":IREEDialectsTransforms",
-        ":IREELinalgExtDialect",
-        ":IREELinalgExtTransformOpsIncGen",
-        ":IREELinalgExtTransforms",
-        ":IREELinalgTransformDialect",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:DialectUtils",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:PDLDialect",
-        "@llvm-project//mlir:TransformDialect",
-    ],
-)
-
 cc_library(
     name = "IREELinalgExtPassesAndTransforms",
     srcs = glob([
@@ -627,7 +587,6 @@ cc_library(
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
-        ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
         ":IREELinalgTransformDialectPasses",
         "@llvm-project//mlir:CAPIIR",
@@ -675,7 +634,6 @@ cc_binary(
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
         ":IREELinalgExtPasses",
-        ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
         ":IREELinalgTransformDialectPasses",
         "@llvm-project//llvm:Support",

@@ -1,8 +1,5 @@
 add_mlir_library(IREELinalgExtTransforms
   CodegenStrategy.cpp
-  ForeachThreadToAsync.cpp
-  ForeachThreadToSequentialFor.cpp
-  Fusion.cpp
   Tiling.cpp
   Transforms.cpp
   Utils.cpp

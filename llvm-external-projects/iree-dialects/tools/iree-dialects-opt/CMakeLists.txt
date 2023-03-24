@@ -3,7 +3,6 @@ set(LIBS
   IREEInputDialect
   IREELinalgExtDialect
   IREELinalgExtPasses
-  IREELinalgExtTransformOps
   IREELinalgExtTransforms
   IREELinalgTransformDialect
   IREELinalgTransformDialectPasses

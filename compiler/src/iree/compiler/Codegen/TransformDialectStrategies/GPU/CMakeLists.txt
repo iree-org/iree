@@ -25,7 +25,6 @@ iree_cc_library(
   DEPS
     IREEDialectsTransforms
     IREELinalgExtDialect
-    IREELinalgExtTransformOps
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect

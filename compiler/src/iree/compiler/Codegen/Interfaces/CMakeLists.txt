@@ -22,7 +22,6 @@ iree_cc_library(
     ::PartitionableLoopsInterface
     ::ProcessorOpInterfaces
     ::UKernelOpInterface
-    IREELinalgExtTransformOps
     IREELinalgTransformDialect
     MLIRAffineTransformOps
     MLIRBufferizationTransformOps

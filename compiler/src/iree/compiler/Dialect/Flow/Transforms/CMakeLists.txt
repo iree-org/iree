@@ -70,7 +70,6 @@ iree_cc_library(
     IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtPasses
-    IREELinalgExtTransformOps
     IREELinalgExtTransforms
     IREELinalgExtUtils
     IREELinalgTransformDialect

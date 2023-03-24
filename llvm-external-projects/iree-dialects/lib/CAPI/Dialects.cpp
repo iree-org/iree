@@ -8,7 +8,6 @@
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
@@ -61,7 +60,6 @@ void ireeRegisterTransformExtensions(MlirContext context) {
   MLIRContext *ctx = unwrap(context);
   DialectRegistry registry;
   registry.addExtensions<
-      mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension,
       mlir::transform_ext::StructuredTransformOpsExtension>();
   ctx->appendDialectRegistry(registry);
 }
