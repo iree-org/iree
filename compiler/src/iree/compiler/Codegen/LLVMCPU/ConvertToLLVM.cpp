@@ -825,15 +825,15 @@ void ConvertToLLVMPass::runOnOperation() {
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use outerproduct.
     vector::populateVectorContractLoweringPatterns(
-        patterns, vector::VectorTransformsOptions());
+        patterns, vector::VectorTransformsOptions().setVectorTransformsOptions(
+                      vector::VectorContractLowering::OuterProduct));
     vector::populateVectorMaskMaterializationPatterns(
         patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
-    // TODO: doubtful that the "default" does what one want here, it is likely
-    // better to use shuffle.
     vector::populateVectorTransposeLoweringPatterns(
-        patterns, vector::VectorTransformsOptions());
+        patterns, vector::VectorTransformsOptions().setVectorTransposeLowering(
+                      vector::VectorTransposeLowering::EltWise));
     populateConvertArmNeon2dToIntrPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {

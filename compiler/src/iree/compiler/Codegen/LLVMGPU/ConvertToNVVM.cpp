@@ -116,10 +116,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
               vector::VectorContractLowering::OuterProduct));
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       vector::populateVectorShapeCastLoweringPatterns(patterns);
-      // TODO: doubtful that the "default" does what one want here, it is likely
-      // better to use something else.
       vector::populateVectorTransposeLoweringPatterns(
-          patterns, vector::VectorTransformsOptions());
+          patterns,
+          vector::VectorTransformsOptions().setVectorTransposeLowering(
+              vector::VectorTransposeLowering::EltWise));
       vector::populateVectorTransferLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
