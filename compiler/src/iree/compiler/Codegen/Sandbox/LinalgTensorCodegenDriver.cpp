@@ -195,53 +195,6 @@ static SmallVector<int64_t> getVectorSizes(
   return vecSize;
 }
 
-/// Constructs padding attributes for given anchor op. Returns failure if there
-/// are multiple anchor ops.
-static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
-                                     StringRef anchorOpName,
-                                     SmallVectorImpl<Attribute> &attrs) {
-  linalg::LinalgOp linalgOp;
-  auto result = funcOp.walk([&](linalg::LinalgOp op) -> WalkResult {
-    if (op->getName().getStringRef() != anchorOpName)
-      return WalkResult::advance();
-    if (linalgOp) return WalkResult::interrupt();
-
-    linalgOp = op;
-    return WalkResult::advance();
-  });
-  if (result.wasInterrupted()) return failure();
-  // No need to set padding attributes.
-  if (!linalgOp) return success();
-
-  OpBuilder builder(funcOp.getContext());
-  for (auto &operand : linalgOp->getOpOperands()) {
-    auto elemType = getElementTypeOrSelf(operand.get().getType());
-    attrs.push_back(builder.getZeroAttr(elemType));
-  }
-
-  return success();
-}
-
-static LogicalResult getPaddingDims(func::FuncOp funcOp,
-                                    utils::IteratorType targetIterType,
-                                    SmallVectorImpl<int64_t> &paddingDims) {
-  FailureOr<Operation *> rootOp = getRootOp(funcOp);
-  if (failed(rootOp)) return failure();
-
-  // No need to set padding dims.
-  if (!rootOp.value()) return success();
-
-  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(rootOp.value());
-  for (auto [index, iterType] :
-       llvm::enumerate(linalgOp.getIteratorTypesArray())) {
-    if (iterType == targetIterType) {
-      paddingDims.push_back(index);
-    }
-  }
-
-  return success();
-}
-
 /// Default method to get tile sizes for tile-and-fuse in IREE. These could be
 /// ovveridden by the command line options if specified.
 static LogicalResult getTileAndFuseOptionsFromConfig(
@@ -304,34 +257,6 @@ static FailureOr<int64_t> getSplitReductionSizeFromConfig(func::FuncOp funcOp) {
 
 namespace {
 
-struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
-  LinalgFusePass(int64_t tilingLevel = -1, bool vectorize = false) {
-    this->tilingLevel.setValue(tilingLevel);
-    this->vectorize.setValue(vectorize);
-  }
-  LinalgFusePass(const LinalgFusePass &pass) {}
-  LinalgFusePass(const LinalgFusePassOptions &options) {
-    this->anchorFuncOpName = options.anchorFuncOpName;
-    this->anchorOpName = options.anchorOpName;
-    this->setAnchorOpToRootOp = options.setAnchorOpToRootOp;
-    this->tileSizes = options.tileSizes;
-    this->tileInterchange = options.tileInterchange;
-    this->pad = options.pad;
-    this->padParallelDims = options.padParallelDims;
-    this->padReductionDims = options.padReductionDims;
-    this->paddingValues = options.paddingValues;
-    this->paddingDimensions = options.paddingDimensions;
-    this->packPaddings = options.packPaddings;
-    this->hoistPaddings = options.hoistPaddings;
-    this->transposePaddings = options.transposePaddings;
-    this->vectorize = options.vectorize;
-    this->enableVectorMasking = options.enableVectorMasking;
-    this->vectorizePadding = options.vectorizePadding;
-    this->tilingLevel = options.tilingLevel;
-  }
-  void runOnOperation() override;
-};
-
 struct LinalgSplitReductionPass
     : public LinalgSplitReductionBase<LinalgSplitReductionPass> {
   LinalgSplitReductionPass(bool enableFpReductionReordering, int64_t size = 0) {
@@ -353,12 +278,6 @@ struct LinalgSingleTilingExpertPass
     this->anchorOpName = options.anchorOpName;
     this->tileSizes = options.tileSizes;
     this->tileInterchange = options.tileInterchange;
-    this->pad = options.pad;
-    this->paddingValues = options.paddingValues;
-    this->packPaddings = options.packPaddings;
-    this->hoistPaddings = options.hoistPaddings;
-    this->transposePaddings = options.transposePaddings;
-    this->packPaddings = options.packPaddings;
     this->generalize = options.generalize;
     this->iteratorInterchange = options.iteratorInterchange;
     this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
@@ -394,146 +313,6 @@ struct LinalgVectorLoweringPass
 };
 }  // namespace
 
-/// Collect all Linalg ops, they must all have tensor semantics.
-/// For now this just fuses everything.
-// TODO: finer control.
-void LinalgFusePass::runOnOperation() {
-  func::FuncOp funcOp = getOperation();
-
-  // Set up tile-and-fuse options.
-  // After getting the tile sizes from the root op, it splits the sizes into two
-  // parts: the tile sizes on parallel dims and the tile sizes on reduction
-  // dims. Then tile-and-fuse is applild on parallel dims and tiling is applied
-  // on reduction dims, since we shouldn't blindly fuse ops on reduction dims.
-  // See the getTileAndFuseOptionsFromConfig for more details.
-  SmallVector<int64_t> derivedTileAndFuseSizes;
-  SmallVector<int64_t> derivedTileOnlySizes;
-  SmallVector<int64_t> derivedTileInterchange;
-  if (failed(getTileAndFuseOptionsFromConfig(
-          funcOp, tilingLevel, derivedTileAndFuseSizes, derivedTileOnlySizes,
-          derivedTileInterchange))) {
-    return;
-  }
-  if (!tileSizes.empty()) {
-    // If tile sizes are from the option, we interpret it as the config for
-    // tile-and-fuse.
-    derivedTileAndFuseSizes = llvm::to_vector(tileSizes);
-    derivedTileOnlySizes.clear();
-  }
-  if (!tileInterchange.empty()) {
-    derivedTileInterchange = llvm::to_vector(tileInterchange);
-  }
-
-  scf::SCFTilingOptions tileAndFuseOptions;
-  scf::SCFTilingOptions tilingOptions;
-  auto anyNonZeroSizes = [](ArrayRef<int64_t> sizes) {
-    return llvm::any_of(sizes, [](int64_t size) { return size > 0; });
-  };
-  bool doTileAndFuse = anyNonZeroSizes(derivedTileAndFuseSizes);
-  if (doTileAndFuse) {
-    tileAndFuseOptions
-        .setTileSizeComputationFunction(
-            [derivedTileAndFuseSizes](OpBuilder &b, Operation *op) {
-              return buildTileSizesForOp(b, op, derivedTileAndFuseSizes);
-            })
-        .setInterchange(derivedTileInterchange);
-  }
-  bool doTiling = anyNonZeroSizes(derivedTileOnlySizes);
-  if (doTiling) {
-    tilingOptions
-        .setTileSizeComputationFunction(
-            [derivedTileOnlySizes](OpBuilder &b, Operation *op) {
-              return buildTileSizesForOp(b, op, derivedTileOnlySizes);
-            })
-        .setInterchange(derivedTileInterchange);
-  }
-
-  if (setAnchorOpToRootOp) {
-    FailureOr<Operation *> rootOp = getRootOp(funcOp);
-    if (failed(rootOp)) return signalPassFailure();
-    StringRef str = rootOp.value()->getName().getStringRef();
-    anchorOpName = std::string(str.begin(), str.end());
-  }
-
-  assert(!(padParallelDims && padReductionDims) &&
-         "expected only one type of dims is set");
-  pad = pad || padParallelDims || padReductionDims;
-  if (padParallelDims) {
-    SmallVector<int64_t> dims;
-    assert(paddingDimensions.empty());
-    if (failed(getPaddingDims(funcOp, utils::IteratorType::parallel, dims))) {
-      return signalPassFailure();
-    }
-    paddingDimensions = dims;
-  }
-  if (padReductionDims) {
-    SmallVector<int64_t> dims;
-    assert(paddingDimensions.empty());
-    if (failed(getPaddingDims(funcOp, utils::IteratorType::reduction, dims))) {
-      return signalPassFailure();
-    }
-    paddingDimensions = dims;
-  }
-
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
-  // This is different from sandbox because we don't want to hardcode padding
-  // values. Instead, they are set by looking into anchor op.
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
-  SmallVector<Attribute> paddingValueAttributes;
-  if (!paddingValues.empty()) {
-    for (const std::string &paddingValue : paddingValues) {
-      paddingValueAttributes.push_back(
-          parseAttribute(paddingValue, &getContext()));
-    }
-  } else if (pad && !anchorOpName.empty()) {
-    // If there are failures to get padding attributes, fallback to not pad the
-    // operation.
-    if (failed(getPaddingAttrs(funcOp, anchorOpName, paddingValueAttributes))) {
-      pad = false;
-    }
-  }
-
-  // Set up padding options.
-  SmallVector<SmallVector<int64_t>> transposePaddingVectors;
-  for (const std::string &transposePadding : transposePaddings) {
-    SmallVector<int64_t> transposeVector = {};
-    SmallVector<StringRef> tokens;
-    StringRef(transposePadding).split(tokens, ':');
-    for (StringRef token : tokens)
-      transposeVector.push_back(std::stoi(token.str()));
-    transposePaddingVectors.push_back(transposeVector);
-  }
-
-  linalg::LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValues(paddingValueAttributes);
-  paddingOptions.setPaddingDimensions(
-      SmallVector<int64_t>{paddingDimensions.begin(), paddingDimensions.end()});
-  paddingOptions.setPackPaddings(
-      SmallVector<bool>{packPaddings.begin(), packPaddings.end()});
-  paddingOptions.setHoistPaddings(
-      SmallVector<int64_t>{hoistPaddings.begin(), hoistPaddings.end()});
-  paddingOptions.setTransposePaddings(transposePaddingVectors);
-
-  LinalgVectorizationOptions vectorizationOptions;
-  vectorizationOptions.setVectorizePadding(vectorizePadding);
-
-  CodegenStrategy strategy;
-  strategy.tileAndFuseIf(doTileAndFuse, anchorOpName, tileAndFuseOptions)
-      .tileIf(doTiling, anchorOpName, tilingOptions)
-      .padIf(pad, anchorOpName, paddingOptions)
-      .vectorizeIf(vectorize, "", vectorizationOptions);
-
-  // Created a nested OpPassManager and run.
-  OpPassManager dynamicPM(func::FuncOp::getOperationName());
-  strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
-  dynamicPM.addPass(
-      iree_compiler::IREE::LinalgExt::createLinalgStrategyEnablePass());
-
-  if (failed(runPipeline(dynamicPM, funcOp))) {
-    return signalPassFailure();
-  }
-}
-namespace {
 /// Pattern to wrap splitReduction transformation.
 struct CodegenSplitReduction
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
@@ -652,7 +431,6 @@ struct CodegenSplitReduction
   int64_t size;
   LinalgTransformationFilter filter;
 };
-}  // namespace
 
 void LinalgSplitReductionPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
@@ -699,32 +477,6 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
     tilingOptions = tilingOptions.setInterchange(tileInterchange);
   }
 
-  // Parse the padding values.
-  SmallVector<Attribute> paddingValueAttributes;
-  for (const std::string &paddingValue : paddingValues) {
-    paddingValueAttributes.push_back(
-        parseAttribute(paddingValue, &getContext()));
-  }
-
-  // Set up padding options.
-  SmallVector<SmallVector<int64_t>> transposePaddingVectors;
-  for (const std::string &transposePadding : transposePaddings) {
-    SmallVector<int64_t> transposeVector = {};
-    SmallVector<StringRef> tokens;
-    StringRef(transposePadding).split(tokens, ':');
-    for (StringRef token : tokens)
-      transposeVector.push_back(std::stoi(token.str()));
-    transposePaddingVectors.push_back(transposeVector);
-  }
-
-  linalg::LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValues(paddingValueAttributes);
-  paddingOptions.setPackPaddings(
-      SmallVector<bool>{packPaddings.begin(), packPaddings.end()});
-  paddingOptions.setHoistPaddings(
-      SmallVector<int64_t>{hoistPaddings.begin(), hoistPaddings.end()});
-  paddingOptions.setTransposePaddings(transposePaddingVectors);
-
   LinalgVectorizationOptions vectorizationOptions;
   vectorizationOptions.setVectorizePadding(vectorizePadding);
   vectorizationOptions.setEnableVectorMasking(enableVectorMasking);
@@ -737,7 +489,6 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   CodegenStrategy strategy;
   StringRef genericOpName = linalg::GenericOp::getOperationName();
   strategy.tileIf(doTiling, anchorOpName, tilingOptions)
-      .padIf(pad, anchorOpName, paddingOptions)
       .decomposeIf(decomposeToLowerDimOp)
       .vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
                    vectorizationOptions);
@@ -835,14 +586,6 @@ void LinalgVectorLoweringPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass() {
-  return std::make_unique<LinalgFusePass>();
-}
-std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass(
-    const mlir::LinalgFusePassOptions &options) {
-  return std::make_unique<LinalgFusePass>(options);
-}
-
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgSplitReductionPass(const bool enableFpReductionReordering,
                                      const int64_t size) {
@@ -881,16 +624,6 @@ void mlir::addLowerToVectorTransforms(OpPassManager &passManager,
     passManager.addPass(createCanonicalizerPass());
     passManager.addPass(createCSEPass());
   }
-}
-
-//===----------------------------------------------------------------------===//
-// IREE specific pass creation methods to allow invocation from within IREEs
-// backend pipelines
-//===----------------------------------------------------------------------===//
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::iree_compiler::createLinalgFusePass(int64_t tilingLevel, bool vectorize) {
-  return std::make_unique<LinalgFusePass>(tilingLevel, vectorize);
 }
 
 namespace mlir {

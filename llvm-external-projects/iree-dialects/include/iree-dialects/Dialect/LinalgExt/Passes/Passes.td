@@ -106,35 +106,10 @@ def TileAndDecomposeAttention :
 // TODO: Deprecate all this.
 //===---------------------------------------------------------------------====//
 
-def LinalgStrategyTileAndFusePass
-    : Pass<"iree-linalg-strategy-tile-and-fuse-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to apply pattern-based tiling and fusion.";
-  let constructor = "createLinalgStrategyTileAndFusePass()";
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which linalg op within the func is the anchor to latch on.">,
-  ];
-}
-
 def LinalgStrategyTilePass
     : Pass<"iree-linalg-strategy-tile-pass", "func::FuncOp"> {
   let summary = "Configurable pass to apply pattern-based linalg tiling.";
   let constructor = "createLinalgStrategyTilePass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which linalg op within the func is the anchor to latch on.">,
-  ];
-}
-
-def LinalgStrategyPadPass
-    : Pass<"iree-linalg-strategy-pad-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to apply padding and hoisting.";
-  let constructor = "createLinalgStrategyPadPass()";
   let dependentDialects = ["linalg::LinalgDialect"];
   let options = [
     Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",

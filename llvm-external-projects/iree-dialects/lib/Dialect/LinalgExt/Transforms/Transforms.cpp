@@ -203,120 +203,6 @@ SCFTilingPattern::returningMatchAndRewrite(TilingInterface op,
   return success();
 }
 
-/// Starting from `op` walk all operands backwards to find all
-/// potentially fusable operations, i.e. operations that implement
-/// the `TilingInterface`.
-llvm::SmallDenseSet<Operation *> static collectTiledAndFusedOps(Operation *op) {
-  SmallVector<Operation *> worklist;
-  llvm::SmallDenseSet<Operation *> producers;
-  worklist.push_back(op);
-  producers.insert(op);
-  while (!worklist.empty()) {
-    Operation *current = worklist.pop_back_val();
-    for (OpOperand &operand : current->getOpOperands()) {
-      Operation *producer = operand.get().getDefiningOp();
-      if (!producer || !isa<TilingInterface>(producer) ||
-          producers.count(producer))
-        continue;
-      worklist.push_back(producer);
-      producers.insert(producer);
-    }
-  }
-  return producers;
-}
-
-LogicalResult
-SCFTileAndFusePattern::matchAndRewrite(TilingInterface rootOp,
-                                       PatternRewriter &rewriter) const {
-  if (failed(filter.checkAndNotify(rewriter, rootOp)))
-    return failure();
-
-  // Collect list of operations that can be tiled and fused.
-  llvm::SmallDenseSet<Operation *> origTiledAndFusedOps =
-      collectTiledAndFusedOps(rootOp);
-  auto isIgnoredUser = [&](Operation *user, scf::ForOp outerMostTiledLoop) {
-    return origTiledAndFusedOps.count(user) || isa<tensor::DimOp>(user) ||
-           outerMostTiledLoop->isAncestor(user);
-  };
-
-  // The rest of this method is similar to
-  // scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp, except that also
-  // yields replacements for values of the fused producer.
-
-  // 1. Tile the consumer.
-  SmallVector<OpResult> yieldedValuesToOrigValues;
-  SmallVector<Operation *> tiledOps;
-  FailureOr<scf::SCFTilingResult> tilingResult =
-      scf::tileUsingSCFForOp(rewriter, rootOp, options);
-  if (failed(tilingResult)) {
-    return rewriter.notifyMatchFailure(rootOp, "failed to tile base operation");
-  }
-  yieldedValuesToOrigValues.append(rootOp->result_begin(),
-                                   rootOp->result_end());
-  tiledOps.append(tilingResult->tiledOps);
-
-  // 2. Tiling each operation results in generation of slices. The source of
-  // these slices could be producers that can be fused into the tiled loops by
-  // computing the slices of these producers in-place. This results in more
-  // slices created for operands of the "fused producer". This open up more
-  // opportunities for fusion. Use a worklist to fuse greedily.
-  auto addCandidateSlices = [](Operation *fusedOp,
-                               std::deque<tensor::ExtractSliceOp> &candidates) {
-    for (Value operand : fusedOp->getOperands())
-      if (auto sliceOp = operand.getDefiningOp<tensor::ExtractSliceOp>())
-        candidates.push_back(sliceOp);
-  };
-
-  std::deque<tensor::ExtractSliceOp> candidates;
-  addCandidateSlices(tilingResult->tiledOps.back(), candidates);
-  OpBuilder::InsertionGuard g(rewriter);
-  while (!candidates.empty()) {
-    // Traverse the slices in BFS fashion.
-    tensor::ExtractSliceOp candidateSliceOp = candidates.front();
-    candidates.pop_front();
-
-    // Materialize the slice of the producer in place.
-    std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
-        tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,
-                                   tilingResult->loops);
-    if (!fusedProducer)
-      continue;
-
-    // Check if the fused producer has other uses that require the value
-    // to be yielded from within the tiled loop.
-    OpResult untiledProducer = fusedProducer->origProducer;
-    if (llvm::any_of(untiledProducer.getUsers(), [&](Operation *user) {
-          return !isIgnoredUser(user, tilingResult->loops.front());
-        })) {
-      yieldReplacementForFusedProducer(rewriter, candidateSliceOp,
-                                       fusedProducer.value(),
-                                       tilingResult->loops);
-      yieldedValuesToOrigValues.push_back(untiledProducer);
-    }
-
-    // Add more fusion candidates to the worklist.
-    for (auto tiledOp : fusedProducer->tiledOps) {
-      addCandidateSlices(tiledOp, candidates);
-      tiledOps.push_back(tiledOp);
-    }
-  }
-
-  scf::ForOp outermostLoop = tilingResult->loops.front();
-  for (auto [index, origVal] : llvm::enumerate(yieldedValuesToOrigValues)) {
-    Value replacement = outermostLoop.getResult(index);
-    rewriter.replaceUsesWithIf(origVal, replacement, [&](OpOperand &use) {
-      return !isIgnoredUser(use.getOwner(), outermostLoop);
-    });
-  }
-  for (auto tiledOp : tiledOps) {
-    filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
-  }
-  for (auto origOp : origTiledAndFusedOps) {
-    filter.replaceLinalgTransformationFilter(rewriter, origOp);
-  }
-  return success();
-}
-
 LinalgVectorizationPattern::LinalgVectorizationPattern(
     MLIRContext *context, LinalgVectorizationOptions opts,
     LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
@@ -342,42 +228,6 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
 }
 
 namespace {
-/// Configurable pass to apply pattern-based tiling and fusion.
-struct LinalgStrategyTileAndFusePass
-    : public LinalgStrategyTileAndFusePassBase<LinalgStrategyTileAndFusePass> {
-
-  LinalgStrategyTileAndFusePass() = default;
-
-  LinalgStrategyTileAndFusePass(StringRef opName, scf::SCFTilingOptions options,
-                                LinalgExt::LinalgTransformationFilter filt)
-      : options(std::move(options)), filter(std::move(filt)) {
-    this->anchorOpName.setValue(opName.str());
-  }
-
-  void runOnOperation() override {
-    auto funcOp = getOperation();
-    if (!anchorFuncName.empty() && funcOp.getName() != anchorFuncName)
-      return;
-
-    RewritePatternSet tilingAndFusionPattern(funcOp.getContext());
-    if (!anchorOpName.empty()) {
-      tilingAndFusionPattern.add<SCFTileAndFusePattern>(
-          anchorOpName, funcOp.getContext(), options, filter);
-    } else {
-      tilingAndFusionPattern.add<SCFTileAndFusePattern>(funcOp.getContext(),
-                                                        options, filter);
-    }
-    // Search the root operation using bottom up traversal.
-    GreedyRewriteConfig config;
-    config.useTopDownTraversal = false;
-    (void)applyPatternsAndFoldGreedily(
-        funcOp, std::move(tilingAndFusionPattern), config);
-  }
-
-  scf::SCFTilingOptions options;
-  LinalgExt::LinalgTransformationFilter filter;
-};
-
 /// Configurable pass to apply pattern-based linalg tiling.
 struct LinalgStrategyTilePass
     : public LinalgStrategyTilePassBase<LinalgStrategyTilePass> {
@@ -406,38 +256,6 @@ struct LinalgStrategyTilePass
   }
 
   scf::SCFTilingOptions options;
-  LinalgExt::LinalgTransformationFilter filter;
-};
-
-/// Configurable pass to apply hoisting and padding.
-struct LinalgStrategyPadPass
-    : public LinalgStrategyPadPassBase<LinalgStrategyPadPass> {
-
-  LinalgStrategyPadPass() = default;
-
-  LinalgStrategyPadPass(StringRef opName, linalg::LinalgPaddingOptions opt,
-                        LinalgExt::LinalgTransformationFilter filt)
-      : options(std::move(opt)), filter(std::move(filt)) {
-    this->anchorOpName.setValue(opName.str());
-  }
-
-  void runOnOperation() override {
-    auto funcOp = getOperation();
-    if (!anchorFuncName.empty() && funcOp.getName() != anchorFuncName)
-      return;
-
-    RewritePatternSet paddingPattern(funcOp.getContext());
-    if (!anchorOpName.empty()) {
-      paddingPattern.add<LinalgPaddingPattern>(
-          anchorOpName, funcOp.getContext(), options, filter);
-    } else {
-      paddingPattern.add<LinalgPaddingPattern>(funcOp.getContext(), options,
-                                               filter);
-    }
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(paddingPattern));
-  }
-
-  linalg::LinalgPaddingOptions options;
   LinalgExt::LinalgTransformationFilter filter;
 };
 
@@ -663,27 +481,11 @@ struct LinalgStrategyRemoveMarkersPass
 };
 } // namespace
 
-/// Create a LinalgStrategyTileAndFusePass.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgStrategyTileAndFusePass(
-    StringRef opName, const scf::SCFTilingOptions &options,
-    const LinalgExt::LinalgTransformationFilter &filter) {
-  return std::make_unique<LinalgStrategyTileAndFusePass>(opName, options,
-                                                         filter);
-}
-
 /// Create a LinalgStrategyTilePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
     StringRef opName, const scf::SCFTilingOptions &options,
     const LinalgExt::LinalgTransformationFilter &filter) {
   return std::make_unique<LinalgStrategyTilePass>(opName, options, filter);
-}
-
-/// Create a LinalgStrategyPadPass.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPadPass(
-    StringRef opName, const linalg::LinalgPaddingOptions &opt,
-    const LinalgExt::LinalgTransformationFilter &filter) {
-  return std::make_unique<LinalgStrategyPadPass>(opName, opt, filter);
 }
 
 /// Create a LinalgStrategyDecomposePass.

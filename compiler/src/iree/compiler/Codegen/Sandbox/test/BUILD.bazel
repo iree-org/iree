@@ -18,7 +18,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "fusion_expert.mlir",
             "single_tiling_expert.mlir",
         ],
         include = ["*.mlir"],

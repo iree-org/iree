@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "fusion_expert.mlir"
     "single_tiling_expert.mlir"
   TOOLS
     FileCheck
