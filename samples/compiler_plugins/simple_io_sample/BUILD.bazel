@@ -40,13 +40,10 @@ iree_compiler_register_plugin(
 
 iree_td_library(
     name = "td_files",
-    srcs = enforce_glob(
-        [
-            "src/simple_io_sample/IR/SimpleIOOps.td",
-            "src/simple_io_sample/Transforms/Passes.td",
-        ],
-        include = ["*.td"],
-    ),
+    srcs = [
+        "src/simple_io_sample/IR/SimpleIOOps.td",
+        "src/simple_io_sample/Transforms/Passes.td",
+    ],
     deps = [
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:FuncTdFiles",
