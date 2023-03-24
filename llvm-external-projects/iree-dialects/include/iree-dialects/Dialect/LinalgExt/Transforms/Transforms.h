@@ -26,20 +26,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
-/// Pattern to swap a `TilingInterface` op -> `tensor::ExtractSliceOp`.
-struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-
-  FailureOr<TilingResult>
-  returningMatchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(sliceOp, rewriter);
-  }
-};
-
 /// Pattern to rewrite a scf::ForallOp to the async dialect.
 struct ForallOpToAsyncRewriter : public OpRewritePattern<scf::ForallOp> {
   using OpRewritePattern::OpRewritePattern;
