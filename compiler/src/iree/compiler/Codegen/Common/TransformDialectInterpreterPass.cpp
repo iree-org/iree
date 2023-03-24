@@ -91,8 +91,7 @@ class TransformDialectInterpreterPass
     tensor::registerBufferizableOpInterfaceExternalModels(registry);
     vector::registerBufferizableOpInterfaceExternalModels(registry);
 
-    registry.addExtensions<
-        transform_ext::StructuredTransformOpsExtension>();
+    registry.addExtensions<transform_ext::StructuredTransformOpsExtension>();
     iree_compiler::registerTransformDialectCommonExtension(registry);
     iree_compiler::registerTransformDialectFlowExtension(registry);
     iree_compiler::registerTransformDialectLLVMCPUExtension(registry);

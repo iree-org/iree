@@ -59,8 +59,8 @@ void mlirIREELinalgTransformRegisterPasses() {
 void ireeRegisterTransformExtensions(MlirContext context) {
   MLIRContext *ctx = unwrap(context);
   DialectRegistry registry;
-  registry.addExtensions<
-      mlir::transform_ext::StructuredTransformOpsExtension>();
+  registry
+      .addExtensions<mlir::transform_ext::StructuredTransformOpsExtension>();
   ctx->appendDialectRegistry(registry);
 }
 
