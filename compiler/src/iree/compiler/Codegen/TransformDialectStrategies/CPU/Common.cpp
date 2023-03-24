@@ -19,6 +19,8 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 
@@ -33,19 +35,55 @@ using iree_compiler::cpu::ReductionConfig;
 using iree_compiler::cpu::ReductionStrategy;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
-using transform::LowerVectorsOp;
+using transform::ApplyTransferPermutationPatternsOp;
+using transform::LowerContractionOp;
+using transform::LowerMultiReductionOp;
+using transform::LowerShapeCastOp;
+using transform::LowerTransferOp;
+using transform::LowerTransposeOp;
 using transform::MatchOp;
 using transform::SplitHandlesOp;
+using transform::SplitTransferFullPartialOp;
+using transform::TransferToScfOp;
 using transform_ext::AllDims;
 using transform_ext::m_StructuredOp;
 using transform_ext::NumEqualsTo;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::ShapeKind;
 using transform_ext::StructuredOpMatcher;
+using vector::VectorContractLoweringAttr;
 
 //===----------------------------------------------------------------------===//
 // Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
 //===----------------------------------------------------------------------===//
+
+// TODO: better builders.
+static Value buildDefaultVectorLoweringStrategy(
+    ImplicitLocOpBuilder &b, Value funcH,
+    const vector::LowerVectorsOptions &lowerVectorsOpts) {
+  auto pdlOperation = pdl::OperationType::get(b.getContext());
+  funcH = b.create<LowerContractionOp>(
+      pdlOperation, funcH,
+      /*loweringStrategy*/ lowerVectorsOpts.vectorContractLowering);
+  funcH = b.create<ApplyTransferPermutationPatternsOp>(pdlOperation, funcH);
+  funcH = b.create<LowerMultiReductionOp>(
+      pdlOperation, funcH,
+      /*loweringStrategy=*/lowerVectorsOpts.vectorMultiReductionLowering);
+  funcH = b.create<SplitTransferFullPartialOp>(
+      pdlOperation, funcH,
+      /*splitTransferStrategy=*/lowerVectorsOpts.vectorTransferSplit);
+  funcH = b.create<TransferToScfOp>(
+      pdlOperation, funcH,
+      /*maxTransferRank=*/1,
+      /*fullUnroll=*/lowerVectorsOpts.unrollVectorTransfers);
+  funcH = b.create<LowerTransferOp>(pdlOperation, funcH, /*maxTransferRank=*/1);
+  funcH = b.create<LowerShapeCastOp>(pdlOperation, funcH);
+  funcH = b.create<LowerTransposeOp>(
+      pdlOperation, funcH,
+      /*loweringStrategy=*/lowerVectorsOpts.vectorTransposeLowering,
+      /*avx2LoweringStrategy=*/lowerVectorsOpts.transposeAVX2Lowering);
+  return funcH;
+}
 
 /// Take care of the last common steps in a CPU strategy (i.e. vectorize,
 /// bufferize and map to blocks).
@@ -81,9 +119,7 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
   b.create<ForallToWorkgroupOp>(funcH);
 
   // Step N. Lower vectors.
-  // TODO: Control the lowering to vectors.
-  auto pdlOperation = pdl::OperationType::get(b.getContext());
-  funcH = b.create<LowerVectorsOp>(pdlOperation, funcH, lowerVectorsOpts);
+  funcH = buildDefaultVectorLoweringStrategy(b, funcH, lowerVectorsOpts);
   return std::make_pair(variantH, funcH);
 }
 
