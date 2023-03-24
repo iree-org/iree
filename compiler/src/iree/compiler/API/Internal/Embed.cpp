@@ -543,6 +543,9 @@ Invocation::Invocation(Session &session)
   }
   passManager.addInstrumentation(std::make_unique<PassTracing>());
 
+  // Since the jitter invokes much of the top-level compiler recursively,
+  // it must be injected at the top-level here vs in the pass pipeline
+  // (or else the circular dependency cannot be resolved).
   pipelineHooks.buildConstEvalPassPipelineCallback = [](OpPassManager &pm) {
     pm.addPass(ConstEval::createJitGlobalsPass());
   };

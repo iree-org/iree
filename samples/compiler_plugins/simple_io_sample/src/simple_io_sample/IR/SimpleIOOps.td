@@ -12,11 +12,6 @@ include "mlir/IR/OpBase.td"
 def SimpleIO_Dialect : Dialect {
   let name = "simple_io";
   let cppNamespace = "::mlir::iree_compiler::IREE::SimpleIO";
-
-  let summary = [{
-  }];
-  let description = [{
-  }];
 }
 
 class SimpleIO_Op<string mnemonic, list<Trait> traits = []> :
@@ -25,10 +20,6 @@ class SimpleIO_Op<string mnemonic, list<Trait> traits = []> :
 
 def SimpleIO_PrintOp : SimpleIO_Op<"print", []> {
   let summary = [{Print}];
-  let description = [{
-
-  }];
-
   let arguments = (ins);
   let results = (outs);
 

@@ -10,9 +10,8 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
 
-// clang-format off: must be included after all LLVM/MLIR eaders
+// Include generated.
 #define GET_OP_CLASSES
 #include "simple_io_sample/IR/SimpleIOOps.h.inc"  // IWYU pragma: keep
-// clang-format on
 
 #endif  // IREE_SAMPLES_COMPILER_PLUGINS_SIMPLE_IO_SAMPLE_IR_SIMPLEIOOPS_H_

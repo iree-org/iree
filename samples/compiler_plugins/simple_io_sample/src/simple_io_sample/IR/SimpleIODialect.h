@@ -10,8 +10,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 
-// clang-format off: must be included after all LLVM/MLIR eaders
+// Include generated.
 #include "simple_io_sample/IR/SimpleIODialect.h.inc"  // IWYU pragma: keep
-// clang-format on
 
 #endif  // IREE_SAMPLES_COMPILER_PLUGINS_SIMPLE_IO_SAMPLE_IR_SIMPLEIODIALECT_H_

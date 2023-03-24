@@ -22,6 +22,9 @@ class LegalizeSimpleIOPass
  public:
   void runOnOperation() override {
     auto *context = &getContext();
+    // TODO: This is all just a placeholder. To make it real, we should be
+    // checking if the import already exists and likely doing some more fancy
+    // lowering.
     // Add imports.
     auto m = getOperation();
     auto importBuilder = OpBuilder::atBlockBegin(m.getBody());
