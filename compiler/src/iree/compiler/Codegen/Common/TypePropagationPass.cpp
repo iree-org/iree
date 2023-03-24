@@ -414,7 +414,10 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
         ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
         ForwardSourceType<arith::TruncIOp>, GenericOpTypePropagation,
         LinalgFillTypePropagation, LegalizeResultElementType,
-        NamedOpTypePropagation<linalg::MatmulOp>, TensorExtractTypePropagation>(
+        NamedOpTypePropagation<linalg::BatchMatmulOp>,
+        NamedOpTypePropagation<linalg::MatmulOp>,
+        NamedOpTypePropagation<linalg::MatvecOp>,
+        NamedOpTypePropagation<linalg::DotOp>, TensorExtractTypePropagation>(
         typeConverter, context);
 
     ConversionTarget target(*context);
