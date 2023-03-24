@@ -83,8 +83,11 @@ iree_cc_library(
   SRCS
     "src/simple_io_sample/Transforms/LegalizeSimpleIO.cpp"
   DEPS
+    ::IR
     ::PassesIncGen
     ::defs
+    MLIRFuncDialect
+    MLIRIR
     MLIRPass
   PUBLIC
 )
