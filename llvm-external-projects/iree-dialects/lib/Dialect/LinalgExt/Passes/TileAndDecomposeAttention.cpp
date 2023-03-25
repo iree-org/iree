@@ -260,9 +260,6 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
   Value qkTranspose = computeQKTranspose(querySlice, keySlice, emptySquare,
                                          zero, loc, builder, ops);
 
-  Value empty = builder.create<tensor::EmptyOp>(
-      loc, SmallVector<OpFoldResult>{sequenceTileLength}, elementType);
-
   // Compute current statistics
   Value newMax = computeRowwiseReduction<arith::MaxFOp>(qkTranspose, maxSlice,
                                                         loc, builder, ops);
@@ -276,7 +273,7 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
       scalePartialSoftmax(partialSoftmax, newSum, loc, builder, ops);
 
   // Update accumulator
-  empty = builder.create<tensor::EmptyOp>(
+  Value empty = builder.create<tensor::EmptyOp>(
       loc, SmallVector<OpFoldResult>{sequenceTileLength, headDimension},
       elementType);
   Value scaledAcc = scaleAccumulator(outputSlice, scaledOldSum, newSum, empty,
@@ -332,20 +329,14 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   rewriter.setInsertionPointToStart(firstLoopNest.loops.back().getBody());
 
   // Create max and sum statistics
-  Value zeroF32 = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(elementType));
-  Value largeNegativeF32 = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getFloatAttr(elementType, -1.0e+30));
-  SmallVector<OpFoldResult> dims{rewriter.getIndexAttr(1), sequenceTileLength};
-  Value max = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
-  auto maxFill =
-      rewriter.create<linalg::FillOp>(loc, ValueRange{largeNegativeF32}, max);
-  Value negativeMax = maxFill.result();
-  ops.push_back(maxFill);
-  Value sum = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
-  auto sumFill = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32}, sum);
-  Value zeroSum = sumFill.result();
-  ops.push_back(sumFill);
+  float zero{0.0};
+  float negInf{-1.0e+30};
+  auto statType = RankedTensorType::get(SmallVector<int64_t>{1, queryShape[1]},
+                                        elementType);
+  Value zeroSum = rewriter.create<arith::ConstantOp>(
+      loc, statType, DenseElementsAttr::get(statType, zero));
+  Value negativeMax = rewriter.create<arith::ConstantOp>(
+      loc, statType, DenseElementsAttr::get(statType, negInf));
 
   // Construct second loop
   scf::LoopNest secondLoopNest = createLoopNest(

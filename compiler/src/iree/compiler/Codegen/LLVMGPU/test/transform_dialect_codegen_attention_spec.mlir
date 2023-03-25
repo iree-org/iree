@@ -14,27 +14,9 @@ transform.sequence failures(propagate) {
     // Tile and decompose attention
     // ==========================================
     %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %outer_loop, %max_fill, %sum_fill, %inner_loop, %fill_op, %first_matmul, %reduce_max, %partial_softmax, %reduce_sum, %update,
+    %outer_loop, %inner_loop, %fill_op, %first_matmul, %reduce_max, %partial_softmax, %reduce_sum, %update,
     %softmax, %scale_acc, %second_matmul = transform.iree.tile_and_decompose_attention %attention2 :
-       (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
-
-    // Tile and fuse attention
-    // ==========================================
-    // TODO: Currently, we cannot fuse all of these ops together using tile and fuse
-    %forall2, %_ = transform.structured.tile_to_forall_op %second_matmul tile_sizes [32] ( mapping = [#gpu.warp<x>])
-    transform.structured.fuse_into_containing_op %scale_acc into %forall2
-    transform.structured.tile_to_forall_op %softmax tile_sizes [32] ( mapping = [#gpu.warp<x>])
-    transform.structured.tile_to_forall_op %update tile_sizes [32] ( mapping = [#gpu.warp<x>])
-    transform.structured.tile_to_forall_op %reduce_sum tile_sizes [32] ( mapping = [#gpu.warp<x>])
-    transform.structured.tile_to_forall_op %partial_softmax tile_sizes [32] ( mapping = [#gpu.warp<x>])
-    transform.structured.tile_to_forall_op %reduce_max tile_sizes [32] ( mapping = [#gpu.warp<x>])
-    %forall, %grid = transform.structured.tile_to_forall_op %first_matmul tile_sizes [32] ( mapping = [#gpu.warp<x>])
-    transform.structured.fuse_into_containing_op %fill_op into %forall
-
-    // Tile fill ops
-    // ==========================================
-    transform.structured.tile_to_forall_op %max_fill tile_sizes [32] ( mapping = [#gpu.warp<x>])
-    transform.structured.tile_to_forall_op %sum_fill tile_sizes [32] ( mapping = [#gpu.warp<x>])
+       (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
 
     // Vectorize function
     // ==========================================
