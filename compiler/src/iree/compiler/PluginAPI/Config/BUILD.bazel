@@ -15,13 +15,25 @@ package(
 genrule(
     name = "StaticLinkedPlugins_inc__generate",
     outs = ["StaticLinkedPlugins.inc"],
-    # No plugins for Bazel yet.
-    cmd = "echo '' > $@",
+    # TODO: Should be pulling from a file generated in @iree_plugins which
+    # derives its content from the environment.
+    # For now, just enumerate all in-tree plugins.
+    cmd = (
+        "echo '" +
+        "HANDLE_PLUGIN_ID(example)\n" +
+        "HANDLE_PLUGIN_ID(simple_io_sample)\n" +
+        "' > $@"
+    ),
 )
 
 iree_compiler_cc_library(
     name = "StaticLinkedPlugins",
     hdrs = ["StaticLinkedPlugins.inc"],
-    # No plugins for Bazel yet.
-    deps = [],
+    deps = [
+        # TODO: Should depend on a generated target in @iree_plugins which
+        # generates its deps from the environment.
+        # For now, we just hard include all in-tree plugins.
+        "//samples/compiler_plugins/example:registration",
+        "//samples/compiler_plugins/simple_io_sample:registration",
+    ],
 )
