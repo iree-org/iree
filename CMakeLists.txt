@@ -115,6 +115,38 @@ option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
 
 #-------------------------------------------------------------------------------
+# Compiler plugins
+# IREE compiler plugins can be statically built into the compiler by adding
+# directories to IREE_COMPILER_PLUGIN_PATHS. If directories are relative, they
+# are interpreted against the IREE source directory.
+#
+# In addition, certain in-tree plugin directories are included regardless of
+# this variable (possibly based on other flags).
+#
+# A plugin directory must contain an iree_compiler_plugin_group.cmake file that
+# is loaded and must specify:
+#   - any needed add_subdirectory() calls to populate targets.
+#   - iree_compiler_register_plugin() targets (either directly or transitively)
+#     which associates a plugin id with a registration target.
+#
+# All iree_compiler_plugin_group.cmake files are included from the binary
+# directory ${IREE_BINARY_DIR}/compiler/plugins and must create a sub binary
+# directory that is globally unique. It is recommended to prefix with org
+# name or project. The following names are reserved:
+#   - builtin
+#   - samples
+#
+# Example:
+#   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/example samples/example)
+#-------------------------------------------------------------------------------
+
+set(IREE_COMPILER_PLUGIN_PATHS "" CACHE STRING "Paths to external compiler plugins")
+set(IREE_COMPILER_BUILTIN_PLUGIN_PATHS "compiler/plugins")
+if(IREE_BUILD_SAMPLES)
+  list(APPEND IREE_COMPILER_BUILTIN_PLUGIN_PATHS "samples/compiler_plugins")
+endif()
+
+#-------------------------------------------------------------------------------
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
@@ -734,7 +766,6 @@ else()
   endif()
 
   set(BUILD_SHARED_LIBS ${_IREE_ORIG_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
-  iree_compiler_configure_plugins()
 endif()
 
 #-------------------------------------------------------------------------------
@@ -896,7 +927,7 @@ add_subdirectory(build_tools/benchmarks)
 add_subdirectory(build_tools/python)
 
 #-------------------------------------------------------------------------------
-# Samples
+# Optional features
 #-------------------------------------------------------------------------------
 
 # samples/ can depend on anything, so we include it last
