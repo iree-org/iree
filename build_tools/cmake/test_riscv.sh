@@ -86,7 +86,7 @@ if [[ "${RISCV_PLATFORM}-${RISCV_ARCH}" == "linux-riscv_32" ]]; then
   )
 fi
 
-test_exclude_args=(
+test_exclude_args+=(
   # TODO(#12703): Enable the test.
   "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_small_llvm-cpu_local-task"
 )
