@@ -7,135 +7,142 @@
 from typing import Dict, List
 import re
 
-# Explicit target mappings that are loaded by default.
-EXPLICIT_TARGET_MAPPING = {
-    # Internal utilities to emulate various binary/library options.
-    "//build_tools:default_linkopts": [],
-    "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
-    "//compiler/src/iree/compiler/API:CAPI": ["IREECompilerCAPILib"],
-
-    # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:CAPI": ["IREEDialectsCAPI"],
-
-    # Disable all hard-coded codegen targets (they are expanded dynamically
-    # in CMake).
-    "@llvm-project//llvm:AArch64AsmParser": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:AArch64CodeGen": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:ARMAsmParser": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:ARMCodeGen": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:RISCVAsmParser": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:RISCVCodeGen": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:WebAssemblyAsmParser": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:WebAssemblyCodeGen": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:X86AsmParser": ["IREELLVMCPUTargetDeps"],
-    "@llvm-project//llvm:X86CodeGen": ["IREELLVMCPUTargetDeps"],
-
-    # Clang
-    "@llvm-project//clang": ["${IREE_CLANG_TARGET}"],
-
-    # LLD
-    "@llvm-project//lld": ["${IREE_LLD_TARGET}"],
-    "@llvm-project//lld:COFF": ["lldCOFF"],
-    "@llvm-project//lld:Common": ["lldCommon"],
-    "@llvm-project//lld:ELF": ["lldELF"],
-    "@llvm-project//lld:MachO": ["lldMachO"],
-    "@llvm-project//lld:Wasm": ["lldWasm"],
-
-    # LLVM
-    "@llvm-project//llvm:config": [],
-    "@llvm-project//llvm:IPO": ["LLVMipo"],
-    "@llvm-project//llvm:FileCheck": ["FileCheck"],
-    "@llvm-project//llvm:not": ["not"],
-    "@llvm-project//llvm:llvm-link": ["${IREE_LLVM_LINK_TARGET}"],
-
-    # MLIR
-    "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
-    "@llvm-project//mlir:DialectUtils": [""],
-    "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
-    "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
-    "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
-        "MLIRLinalgStructuredOpsIncGenLib"
-    ],
-    "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
-    "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
-    "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
-    "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],
-    "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
-    "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
-    "@llvm-project//mlir:VectorOps": ["MLIRVector"],
-
-    # MHLO.
-    # TODO: Rework this upstream so that Bazel and CMake rules match up
-    # better.
-    # All of these have to depend on tensorflow::external_mhlo_includes to
-    # ensure that include directories are inherited.
-    "@mlir-hlo//:chlo_legalize_to_hlo": [
-        "tensorflow::external_mhlo_includes",
-        "ChloPasses",
-    ],
-    "@mlir-hlo//:mlir_hlo": [
-        "tensorflow::external_mhlo_includes",
-        "MhloDialect",
-        "MLIRMhloUtils",
-    ],
-    "@mlir-hlo//:map_chlo_to_hlo_op": [
-        "ChloOps",
-        "MhloDialect",
-    ],
-    "@mlir-hlo//:map_mhlo_to_scalar_op": [
-        "tensorflow::external_mhlo_includes",
-        "MhloDialect",
-    ],
-    "@mlir-hlo//:mhlo_passes": [
-        "tensorflow::external_mhlo_includes",
-        "MhloPasses",
-        "MhloShapeOpsToStandard",
-        "MhloToLinalg",
-        "MhloToStandard",
-        "StablehloToMhlo",
-        # Note: We deliberately omit some passes that we do not use in IREE,
-        # e.g.: MhloToArithmeticConversion, MhloToLhloConversion, or
-        # MhloToMemrefConversion.
-    ],
-    "@mlir-hlo//:unfuse_batch_norm": [
-        "tensorflow::external_mhlo_includes",
-        "MhloPasses",
-    ],
-    "@mlir-hlo//stablehlo:chlo_ops": ["ChloOps",],
-    "@mlir-hlo//:stablehlo_legalize_to_hlo_pass": ["StablehloToMhlo",],
-    "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
-
-    # NCCL
-    "@nccl//:headers": ["nccl::headers",],
-
-    # Torch-MLIR.
-    "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
-        "TorchMLIRTMTensorDialect"
-    ],
-
-    # Tracy.
-    "@tracy_client//:runtime_impl": ["tracy_client::runtime_impl"],
-
-    # Vulkan
-    "@vulkan_headers": ["Vulkan::Headers"],
-    # Misc single targets
-    "@com_google_benchmark//:benchmark": ["benchmark"],
-    "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
-    "@com_github_dvidelabs_flatcc//:parsing": ["flatcc::parsing"],
-    "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
-    "@com_github_yaml_libyaml//:yaml": ["yaml"],
-    "@com_google_googletest//:gtest": ["gmock", "gtest"],
-    "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
-    "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
-    "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
-}
-
 
 class TargetConverter:
 
   def __init__(self, repo_map: Dict[str, str]):
-    self._explicit_target_mapping = dict(EXPLICIT_TARGET_MAPPING)
+    self._explicit_target_mapping = {}
     self._repo_map = repo_map
+
+    iree_core_repo = self._repo_alias("@iree_core")
+    self._update_target_mappings({
+        # Internal utilities to emulate various binary/library options.
+        f"{iree_core_repo}//build_tools:default_linkopts": [],
+        f"{iree_core_repo}//build_tools:dl": ["${CMAKE_DL_LIBS}"],
+        f"{iree_core_repo}//compiler/src/iree/compiler/API:CAPI": [
+            "IREECompilerCAPILib"
+        ],
+
+        # IREE llvm-external-projects
+        f"{iree_core_repo}//llvm-external-projects/iree-dialects:CAPI": [
+            "IREEDialectsCAPI"
+        ],
+
+        # Disable all hard-coded codegen targets (they are expanded dynamically
+        # in CMake).
+        "@llvm-project//llvm:AArch64AsmParser": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:AArch64CodeGen": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:ARMAsmParser": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:ARMCodeGen": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:RISCVAsmParser": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:RISCVCodeGen": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:WebAssemblyAsmParser": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:WebAssemblyCodeGen": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:X86AsmParser": ["IREELLVMCPUTargetDeps"],
+        "@llvm-project//llvm:X86CodeGen": ["IREELLVMCPUTargetDeps"],
+
+        # Clang
+        "@llvm-project//clang": ["${IREE_CLANG_TARGET}"],
+
+        # LLD
+        "@llvm-project//lld": ["${IREE_LLD_TARGET}"],
+        "@llvm-project//lld:COFF": ["lldCOFF"],
+        "@llvm-project//lld:Common": ["lldCommon"],
+        "@llvm-project//lld:ELF": ["lldELF"],
+        "@llvm-project//lld:MachO": ["lldMachO"],
+        "@llvm-project//lld:Wasm": ["lldWasm"],
+
+        # LLVM
+        "@llvm-project//llvm:config": [],
+        "@llvm-project//llvm:IPO": ["LLVMipo"],
+        "@llvm-project//llvm:FileCheck": ["FileCheck"],
+        "@llvm-project//llvm:not": ["not"],
+        "@llvm-project//llvm:llvm-link": ["${IREE_LLVM_LINK_TARGET}"],
+
+        # MLIR
+        "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
+        "@llvm-project//mlir:DialectUtils": [""],
+        "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
+        "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
+        "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
+            "MLIRLinalgStructuredOpsIncGenLib"
+        ],
+        "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
+        "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
+        "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
+        "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],
+        "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
+        "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
+        "@llvm-project//mlir:VectorOps": ["MLIRVector"],
+
+        # MHLO.
+        # TODO: Rework this upstream so that Bazel and CMake rules match up
+        # better.
+        # All of these have to depend on tensorflow::external_mhlo_includes to
+        # ensure that include directories are inherited.
+        "@mlir-hlo//:chlo_legalize_to_hlo": [
+            "tensorflow::external_mhlo_includes",
+            "ChloPasses",
+        ],
+        "@mlir-hlo//:mlir_hlo": [
+            "tensorflow::external_mhlo_includes",
+            "MhloDialect",
+            "MLIRMhloUtils",
+        ],
+        "@mlir-hlo//:map_chlo_to_hlo_op": [
+            "ChloOps",
+            "MhloDialect",
+        ],
+        "@mlir-hlo//:map_mhlo_to_scalar_op": [
+            "tensorflow::external_mhlo_includes",
+            "MhloDialect",
+        ],
+        "@mlir-hlo//:mhlo_passes": [
+            "tensorflow::external_mhlo_includes",
+            "MhloPasses",
+            "MhloShapeOpsToStandard",
+            "MhloToLinalg",
+            "MhloToStandard",
+            "StablehloToMhlo",
+            # Note: We deliberately omit some passes that we do not use in IREE,
+            # e.g.: MhloToArithmeticConversion, MhloToLhloConversion, or
+            # MhloToMemrefConversion.
+        ],
+        "@mlir-hlo//:unfuse_batch_norm": [
+            "tensorflow::external_mhlo_includes",
+            "MhloPasses",
+        ],
+        "@mlir-hlo//stablehlo:chlo_ops": ["ChloOps",],
+        "@mlir-hlo//:stablehlo_legalize_to_hlo_pass": ["StablehloToMhlo",],
+        "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
+
+        # NCCL
+        "@nccl//:headers": ["nccl::headers",],
+
+        # Torch-MLIR.
+        "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
+            "TorchMLIRTMTensorDialect"
+        ],
+
+        # Tracy.
+        "@tracy_client//:runtime_impl": ["tracy_client::runtime_impl"],
+
+        # Vulkan
+        "@vulkan_headers": ["Vulkan::Headers"],
+        # Misc single targets
+        "@com_google_benchmark//:benchmark": ["benchmark"],
+        "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
+        "@com_github_dvidelabs_flatcc//:parsing": ["flatcc::parsing"],
+        "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
+        "@com_github_yaml_libyaml//:yaml": ["yaml"],
+        "@com_google_googletest//:gtest": ["gmock", "gtest"],
+        "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
+        "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
+        "@vulkan_memory_allocator//:impl_header_only": [
+            "vulkan_memory_allocator"
+        ],
+    })
+
     self._initialize()
 
   def _initialize(self):
