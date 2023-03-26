@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-spirv-vectorize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-spirv-vectorize -canonicalize %s | FileCheck %s
 
 func.func @vector_gather(%arg0: memref<16x1082x1922xi8>, %index_vec: vector<16xindex>) -> vector<16xi8> {
   %c0 = arith.constant 0 : index
@@ -11,17 +11,11 @@ func.func @vector_gather(%arg0: memref<16x1082x1922xi8>, %index_vec: vector<16xi
 // CHECK-LABEL: func.func @vector_gather
 // CHECK-SAME:  %[[ARG0:.+]]: memref<16x1082x1922xi8>
 // CHECK-SAME:  %[[INDEX_VEC:.+]]: vector<16xindex>
-// CHECK:         %[[TRUE:.+]] = arith.constant true
-// CHECK:         %[[C0:.+]] = arith.constant 0 : index
-// CHECK:         %[[INIT:.+]] = arith.constant dense<0> : vector<16xi8>
-// CHECK:         %[[IND:.+]] = vector.extract %[[INDEX_VEC]][0] : vector<16xindex>
-// CHECK:         %{{.*}} = scf.if %[[TRUE]] -> (vector<16xi8>) {
-// CHECK:           %[[LOAD:.+]] = vector.load %[[ARG0]][%[[C0]], %[[C0]], %[[IND]]] : memref<16x1082x1922xi8>, vector<1xi8>
-// CHECK:           %[[EXTRACT:.+]] = vector.extract %[[LOAD]][0] : vector<1xi8>
-// CHECK:           %[[INSERT:.+]] = vector.insert %[[EXTRACT]], %[[INIT]] [0] : i8 into vector<16xi8>
-// CHECK:           scf.yield %[[INSERT:.+]] : vector<16xi8>
-// CHECK:         } else {
-// CHECK:           scf.yield %[[INIT]] : vector<16xi8>
-// CHECK:         }
-// CHECK-15:        vector.load %[[ARG0]][%[[C0]], %[[C0]], %{{.*}}] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK:       %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[INIT:.+]] = arith.constant dense<0> : vector<16xi8>
+// CHECK:       %[[IND:.+]] = vector.extract %[[INDEX_VEC]][0] : vector<16xindex>
+// CHECK:       %[[LOAD:.+]] = vector.load %[[ARG0]][%[[C0]], %[[C0]], %[[IND]]] : memref<16x1082x1922xi8>, vector<1xi8>
+// CHECK:       %[[EXTRACT:.+]] = vector.extract %[[LOAD]][0] : vector<1xi8>
+// CHECK:       %[[INSERT:.+]] = vector.insert %[[EXTRACT]], %[[INIT]] [0] : i8 into vector<16xi8>
+// CHECK-15:    vector.load %[[ARG0]][%[[C0]], %[[C0]], %{{.*}}] : memref<16x1082x1922xi8>, vector<1xi8>
 

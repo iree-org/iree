@@ -263,6 +263,22 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // Similarly for vector.gather ops, whose lowering patterns unroll
+    // internally.
+    {
+      RewritePatternSet patterns(context);
+      vector::populateVectorGatherLoweringPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After lowering gather ops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // Then unroll vectors to native vector size. We try to use 128-bit
     // vectors for memory access and 4/2/1 vector sizes for computation.
     {
@@ -394,7 +410,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    // Lower vector broadcast/transpose, contraction, and gather.
+    // Lower vector broadcast/transpose and contraction.
     {
       RewritePatternSet patterns(context);
       auto options = vector::VectorTransformsOptions()
@@ -407,7 +423,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
-      vector::populateVectorGatherLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
