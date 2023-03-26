@@ -57,6 +57,21 @@ public:
 #endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
   }
 
+  DiagnosedSilenceableFailure check(Location loc) {
+    if (failed(checkErrorState()))
+      return emitDefiniteFailure(loc, "listener failed");
+    return DiagnosedSilenceableFailure::success();
+  }
+  DiagnosedSilenceableFailure check(Location loc,
+                                    DiagnosedSilenceableFailure &&diag) {
+    LogicalResult listenerState = checkErrorState();
+    if (failed(listenerState)) {
+      (void)diag.checkAndReport();
+      return emitDefiniteFailure(loc, "listener failed");
+    }
+    return std::move(diag);
+  }
+
   void notifyOperationReplaced(Operation *op, ValueRange newValues) override;
 
   void notifyOperationRemoved(Operation *op) override;
