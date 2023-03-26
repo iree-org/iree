@@ -185,24 +185,6 @@ extractSlices(Value key, Value value, Value query, Value output,
   return std::make_tuple(keySlice, valueSlice, querySlice, outputSlice);
 }
 
-static std::tuple<Value, Value>
-extractStatSlices(Value max, Value sum, ArrayRef<int64_t> queryShape,
-                  OpFoldResult sequenceTileLength, Type elementType,
-                  Location loc, OpBuilder &builder) {
-  auto one = builder.getIndexAttr(1);
-  auto zero = builder.getIndexAttr(0);
-  SmallVector<OpFoldResult> strides(2, one);
-  SmallVector<OpFoldResult> sizes{one, sequenceTileLength};
-  SmallVector<OpFoldResult> offsets(2, zero);
-  SmallVector<int64_t> tensorShape{queryShape[1]};
-  auto tensorType = RankedTensorType::get(tensorShape, elementType);
-  Value maxSlice = builder.create<tensor::ExtractSliceOp>(
-      loc, tensorType, max, offsets, sizes, strides);
-  Value sumSlice = builder.create<tensor::ExtractSliceOp>(
-      loc, tensorType, sum, offsets, sizes, strides);
-  return std::make_tuple(maxSlice, sumSlice);
-}
-
 static std::tuple<Value, Value, Value>
 insertSlices(Value newResult, Value result, Value newMax, Value max,
              Value newSum, Value sum, ArrayRef<int64_t> queryShape,
@@ -222,11 +204,7 @@ insertSlices(Value newResult, Value result, Value newMax, Value max,
   offsets = SmallVector<OpFoldResult>(queryShape.size() - 1, zero);
   sizes = SmallVector<OpFoldResult>{one, sequenceTileLength};
   strides = SmallVector<OpFoldResult>(queryShape.size() - 1, one);
-  Value updatedMax = builder.create<tensor::InsertSliceOp>(
-      loc, newMax, max, offsets, sizes, strides);
-  Value updatedSum = builder.create<tensor::InsertSliceOp>(
-      loc, newSum, sum, offsets, sizes, strides);
-  return std::make_tuple(updatedAcc, updatedMax, updatedSum);
+  return std::make_tuple(updatedAcc, newMax, newSum);
 }
 
 static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
@@ -329,14 +307,20 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   rewriter.setInsertionPointToStart(firstLoopNest.loops.back().getBody());
 
   // Create max and sum statistics
-  float zero{0.0};
-  float negInf{-1.0e+30};
-  auto statType = RankedTensorType::get(SmallVector<int64_t>{1, queryShape[1]},
-                                        elementType);
-  Value zeroSum = rewriter.create<arith::ConstantOp>(
-      loc, statType, DenseElementsAttr::get(statType, zero));
-  Value negativeMax = rewriter.create<arith::ConstantOp>(
-      loc, statType, DenseElementsAttr::get(statType, negInf));
+  Value zeroF32 = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(elementType));
+  Value largeNegativeF32 = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getFloatAttr(elementType, -1.0e+30));
+  SmallVector<OpFoldResult> dims{sequenceTileLength};
+  Value max = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
+  auto maxFill =
+      rewriter.create<linalg::FillOp>(loc, ValueRange{largeNegativeF32}, max);
+  Value negativeMax = maxFill.result();
+  ops.push_back(maxFill);
+  Value sum = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
+  auto sumFill = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32}, sum);
+  Value zeroSum = sumFill.result();
+  ops.push_back(sumFill);
 
   // Construct second loop
   scf::LoopNest secondLoopNest = createLoopNest(
@@ -358,13 +342,9 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
       extractSlices(key, value, query, iterArgResult, queryShape, ivs,
                     sequenceTileLength, elementType, loc, rewriter);
 
-  auto [maxSlice, sumSlice] =
-      extractStatSlices(iterArgMax, iterArgSum, queryShape, sequenceTileLength,
-                        elementType, loc, rewriter);
-
   // Create body of innermost loop
   auto [result, newMax, newSum] = createAttentionBody(
-      keySlice, valueSlice, querySlice, outputSlice, maxSlice, sumSlice,
+      keySlice, valueSlice, querySlice, outputSlice, iterArgMax, iterArgSum,
       sequenceTileLength, headDimension, elementType, ops, loc, rewriter);
 
   // Insert slices
