@@ -4,17 +4,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from typing import Dict, List
 import re
 
-# Bazel to CMake target name conversions used by bazel_to_cmake.py.
-
+# Explicit target mappings that are loaded by default.
 EXPLICIT_TARGET_MAPPING = {
     # Internal utilities to emulate various binary/library options.
     "//build_tools:default_linkopts": [],
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
-    "//compiler/src:defs": [],
     "//compiler/src/iree/compiler/API:CAPI": ["IREECompilerCAPILib"],
-    "//runtime/src:runtime_defines": [],
 
     # IREE llvm-external-projects
     "//llvm-external-projects/iree-dialects:CAPI": ["IREEDialectsCAPI"],
@@ -133,110 +131,130 @@ EXPLICIT_TARGET_MAPPING = {
 }
 
 
-def _convert_mlir_target(target):
-  # Default to a pattern substitution approach.
-  # Take "MLIR" and append the name part of the full target identifier, e.g.
-  #   "@llvm-project//mlir:IR"   -> "MLIRIR"
-  #   "@llvm-project//mlir:Pass" -> "MLIRPass"
-  # MLIR does not have header-only targets apart from the libraries. Here
-  # we redirect any request for a CAPI{Name}Headers to a target within IREE
-  # that sets this up.
-  label = target.rsplit(":")[-1]
-  if label.startswith("CAPI") and label.endswith("Headers"):
-    return [f"IREELLVMIncludeSetup"]
-  else:
-    return [f"MLIR{label}"]
+class TargetConverter:
 
+  def __init__(self, repo_map: Dict[str, str]):
+    self._explicit_target_mapping = dict(EXPLICIT_TARGET_MAPPING)
+    self._repo_map = repo_map
+    self._initialize()
 
-def _convert_llvm_target(target):
-  # Default to a pattern substitution approach.
-  # Prepend "LLVM" to the Bazel target name.
-  #   "@llvm-project//llvm:AsmParser" -> "LLVMAsmParser"
-  #   "@llvm-project//llvm:Core" -> "LLVMCore"
-  return ["LLVM" + target.rsplit(":")[-1]]
+  def _initialize(self):
+    pass
 
+  def _repo_alias(self, repo_name: str) -> str:
+    """Returns the prefix of a repo (i.e. '@iree_core') given the repo map."""
+    if repo_name in self._repo_map:
+      return self._repo_map[repo_name]
+    else:
+      return repo_name
 
-def _convert_iree_cuda_target(target):
-  # Convert like:
-  #   @iree_cuda//:libdevice_embedded -> iree_cuda::libdevice_embedded
-  label = target.rsplit(":")[-1]
-  return [f"iree_cuda::{label}"]
+  def _update_target_mappings(self, mappings: Dict[str, List[str]]):
+    self._explicit_target_mapping.update(mappings)
 
+  def _convert_mlir_target(self, target):
+    # Default to a pattern substitution approach.
+    # Take "MLIR" and append the name part of the full target identifier, e.g.
+    #   "@llvm-project//mlir:IR"   -> "MLIRIR"
+    #   "@llvm-project//mlir:Pass" -> "MLIRPass"
+    # MLIR does not have header-only targets apart from the libraries. Here
+    # we redirect any request for a CAPI{Name}Headers to a target within IREE
+    # that sets this up.
+    label = target.rsplit(":")[-1]
+    if label.startswith("CAPI") and label.endswith("Headers"):
+      return [f"IREELLVMIncludeSetup"]
+    else:
+      return [f"MLIR{label}"]
 
-def _convert_iree_dialects_target(target):
-  # Just take the target name as-is.
-  return [target.rsplit(":")[-1]]
+  def _convert_llvm_target(self, target):
+    # Default to a pattern substitution approach.
+    # Prepend "LLVM" to the Bazel target name.
+    #   "@llvm-project//llvm:AsmParser" -> "LLVMAsmParser"
+    #   "@llvm-project//llvm:Core" -> "LLVMCore"
+    return ["LLVM" + target.rsplit(":")[-1]]
 
+  def _convert_iree_cuda_target(self, target):
+    # Convert like:
+    #   @iree_cuda//:libdevice_embedded -> iree_cuda::libdevice_embedded
+    label = target.rsplit(":")[-1]
+    return [f"iree_cuda::{label}"]
 
-def _convert_to_cmake_path(bazel_path_fragment: str) -> str:
-  cmake_path = bazel_path_fragment
-  # Bazel `//iree/base`     -> CMake `iree::base`
-  # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
-  if cmake_path.startswith("//"):
-    cmake_path = cmake_path[len("//"):]
-  cmake_path = cmake_path.replace(":", "::")  # iree/base::foo or ::foo
-  cmake_path = cmake_path.replace("/", "::")  # iree::base
-  return cmake_path
+  def _convert_iree_dialects_target(self, target):
+    # Just take the target name as-is.
+    return [target.rsplit(":")[-1]]
 
+  def _convert_to_cmake_path(self, bazel_path_fragment: str) -> str:
+    cmake_path = bazel_path_fragment
+    # Bazel `//iree/base`     -> CMake `iree::base`
+    # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
+    if cmake_path.startswith("//"):
+      cmake_path = cmake_path[len("//"):]
+    cmake_path = cmake_path.replace(":", "::")  # iree/base::foo or ::foo
+    cmake_path = cmake_path.replace("/", "::")  # iree::base
+    return cmake_path
 
-def convert_target(target):
-  """Converts a Bazel target to a list of CMake targets.
+  def convert_target(self, target):
+    """Converts a Bazel target to a list of CMake targets.
 
-  IREE targets are expected to follow a standard form between Bazel and CMake
-  that facilitates conversion. External targets *may* have their own patterns,
-  or they may be purely special cases.
+    IREE targets are expected to follow a standard form between Bazel and CMake
+    that facilitates conversion. External targets *may* have their own patterns,
+    or they may be purely special cases.
 
-  Multiple target in Bazel may map to a single target in CMake and a Bazel
-  target may map to multiple CMake targets.
+    Multiple target in Bazel may map to a single target in CMake and a Bazel
+    target may map to multiple CMake targets.
 
-  Returns:
-    A list of converted targets if it was successfully converted.
+    Returns:
+      A list of converted targets if it was successfully converted.
 
-  Raises:
-    KeyError: No conversion was found for the target.
-  """
-  if target in EXPLICIT_TARGET_MAPPING:
-    return EXPLICIT_TARGET_MAPPING[target]
-  if target.startswith("@llvm-project//llvm"):
-    return _convert_llvm_target(target)
-  if target.startswith("@llvm-project//mlir"):
-    return _convert_mlir_target(target)
-  if target.startswith("@iree_cuda//"):
-    return _convert_iree_cuda_target(target)
-  if target.startswith("@"):
-    raise KeyError(f"No conversion found for target '{target}'")
+    Raises:
+      KeyError: No conversion was found for the target.
+    """
+    if target in self._explicit_target_mapping:
+      return self._explicit_target_mapping[target]
+    if target.startswith("@llvm-project//llvm"):
+      return self._convert_llvm_target(target)
+    if target.startswith("@llvm-project//mlir"):
+      return self._convert_mlir_target(target)
+    if target.startswith("@iree_cuda//"):
+      return self._convert_iree_cuda_target(target)
+    if target.startswith("@"):
+      raise KeyError(f"No conversion found for target '{target}'")
 
-  if target.startswith("//llvm-external-projects/iree-dialects"):
-    return _convert_iree_dialects_target(target)
+    iree_core_repo = self._repo_alias("@iree_core")
+    if target.startswith(
+        f"{iree_core_repo}//llvm-external-projects/iree-dialects"):
+      return self._convert_iree_dialects_target(target)
 
-  # IREE root paths map to package names based on explicit rules.
-  #   * src/iree/ directories (compiler/src/iree/ and runtime/src/iree/)
-  #     creating their own root paths by trimming down to just "iree"
-  #   * tools/ uses an empty root, for binary targets names like "iree-compile"
-  #   * other top level directories add back an 'iree' prefix
-  # If changing these, make the corresponding change in iree_macros.cmake
-  # (iree_package_ns function).
+    # IREE root paths map to package names based on explicit rules.
+    #   * src/iree/ directories (compiler/src/iree/ and runtime/src/iree/)
+    #     creating their own root paths by trimming down to just "iree"
+    #   * tools/ uses an empty root, for binary targets names like "iree-compile"
+    #   * other top level directories add back an 'iree' prefix
+    # If changing these, make the corresponding change in iree_macros.cmake
+    # (iree_package_ns function).
 
-  # Map //compiler/src/iree/(.*) -> iree::\1 (i.e. iree::compiler::\1)
-  m = re.match("^//compiler/src/iree/(.+)", target)
-  if m:
-    return ["iree::" + _convert_to_cmake_path(m.group(1))]
+    # Map //compiler/src/iree/(.*) -> iree::\1 (i.e. iree::compiler::\1)
+    m = re.match(f"^{iree_core_repo}//compiler/src/iree/(.+)", target)
+    if m:
+      return ["iree::" + self._convert_to_cmake_path(m.group(1))]
 
-  # Map //runtime/src/iree/(.*) -> iree::\1
-  m = re.match("^//runtime/src/iree/(.+)", target)
-  if m:
-    return ["iree::" + _convert_to_cmake_path(m.group(1))]
+    # Map //runtime/src/iree/(.*) -> iree::\1
+    m = re.match(f"^{iree_core_repo}//runtime/src/iree/(.+)", target)
+    if m:
+      return ["iree::" + self._convert_to_cmake_path(m.group(1))]
 
-  # Map //tools/(.*) -> \1
-  m = re.match("^//tools[/|:](.+)", target)
-  if m:
-    return [_convert_to_cmake_path(m.group(1))]
+    # Map //tools/(.*) -> \1
+    m = re.match(f"^{iree_core_repo}//tools[/|:](.+)", target)
+    if m:
+      return [self._convert_to_cmake_path(m.group(1))]
 
-  # Pass through package-relative targets
-  #   :target_name
-  #   file_name.txt
-  if target.startswith(":") or ":" not in target:
-    return [_convert_to_cmake_path(target)]
+    # Pass through package-relative targets
+    #   :target_name
+    #   file_name.txt
+    if target.startswith(":") or ":" not in target:
+      return [self._convert_to_cmake_path(target)]
 
-  # Default rewrite: prefix with "iree::", without pruning the path.
-  return ["iree::" + _convert_to_cmake_path(target)]
+    return self._convert_unmatched_target(target)
+
+  def _convert_unmatched_target(self, target: str) -> str:
+    """Converts unmatched targets in a repo specific way."""
+    raise ValueError(f"No target matching for {target}")
