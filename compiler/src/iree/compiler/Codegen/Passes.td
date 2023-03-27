@@ -257,6 +257,9 @@ def TileAndDistributeToWorkgroups :
     Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
       /*default=*/ "",
       "Maximum number of dims to distribute workgroups across.">,
+    Option<"skipDistributionLoops", "skip-distribution-loops", "bool",
+      /*default=*/ "false",
+      "Don't emit distribution loops as we distribute one tile per thread.">      
   ];
 }
 

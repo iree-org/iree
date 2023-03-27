@@ -559,9 +559,15 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 }
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes) {
-  return {[&tileSizes](OpBuilder &builder, Location loc,
-                       ArrayRef<Range> parallelLoopRanges) {
+    const SmallVector<int64_t> &tileSizes, bool skipDistributionLoops) {
+  // The number of workgroups is calculated so that each workgroup gets
+  // exactly one tile so we can skip emitting the loop.
+  linalg::DistributionMethod distributionMethod =
+      skipDistributionLoops
+          ? linalg::DistributionMethod::CyclicNumProcsEqNumIters
+          : linalg::DistributionMethod::Cyclic;
+  return {[&tileSizes, distributionMethod](OpBuilder &builder, Location loc,
+                                           ArrayRef<Range> parallelLoopRanges) {
     SmallVector<int64_t> nonZeroTileSizes;
     for (int64_t size : tileSizes) {
       if (size != 0) nonZeroTileSizes.push_back(size);
@@ -593,11 +599,8 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
           dimValue = builder.create<arith::RemUIOp>(loc, splitDim, numTiles);
           splitDim = builder.create<arith::DivUIOp>(loc, splitDim, numTiles);
         }
-        procInfo[numParallelDims - dim - 1] = {
-            dimValue,
-            numTiles,
-            linalg::DistributionMethod::Cyclic,
-        };
+        procInfo[numParallelDims - dim - 1] = {dimValue, numTiles,
+                                               distributionMethod};
         continue;
       }
       procInfo[numParallelDims - dim - 1] = {
@@ -605,7 +608,7 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
                                                                      dim),
           buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(builder,
                                                                         dim),
-          linalg::DistributionMethod::Cyclic};
+          distributionMethod};
     }
     return procInfo;
   }};
@@ -808,6 +811,30 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
     }
     sinkOp->moveBefore(firstUse);
   }
+}
+
+/// Infer the number of workgroups from exportOp.
+SmallVector<int64_t> getNumWorkgroup(func::FuncOp funcOp) {
+  SmallVector<int64_t> result;
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (failed(exportOp)) return result;
+
+  Block *body = exportOp->getWorkgroupCountBody();
+  if (!body) return result;
+
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  assert(returnOp.getNumOperands() == 3);
+
+  for (unsigned i = 0; i < 3; ++i) {
+    Operation *defOp = returnOp.getOperand(i).getDefiningOp();
+    if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
+      result.push_back(indexOp.value());
+    } else {
+      return SmallVector<int64_t>();
+    }
+  }
+
+  return result;
 }
 
 }  // namespace iree_compiler

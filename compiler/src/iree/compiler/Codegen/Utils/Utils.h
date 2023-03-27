@@ -72,6 +72,10 @@ bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// operation.
 bool isReadOnly(Value v);
 
+/// Return the static number of workgroup dispatched if it is known and
+/// constant. Return an empty vector otherwise.
+SmallVector<int64_t> getNumWorkgroup(func::FuncOp funcOp);
+
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
@@ -152,7 +156,7 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes);
+    const SmallVector<int64_t> &tileSizes, bool skipDistributionLoops);
 
 //===---------------------------------------------------------------------===//
 // Misc. utility functions.

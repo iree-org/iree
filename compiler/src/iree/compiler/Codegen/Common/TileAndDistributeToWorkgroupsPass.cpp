@@ -313,8 +313,10 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
-  TileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims) {
+  TileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims,
+                                    bool skipDistributionLoops) {
     this->maxWorkgroupParallelDims = maxWorkgroupParallelDims;
+    this->skipDistributionLoops = skipDistributionLoops;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -413,8 +415,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
-            .setDistributionOptions(
-                getIREELinalgLoopDistributionOptions(tileSizes))
+            .setDistributionOptions(getIREELinalgLoopDistributionOptions(
+                tileSizes, skipDistributionLoops))
             .setInterchange(llvm::to_vector<4>(
                 llvm::map_range(interchange,
                                 [](int64_t v) -> unsigned {
@@ -448,12 +450,14 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     });
 
     {
+      SmallVector<int64_t> staticNumWorkgroup = getNumWorkgroup(funcOp);
       // Apply linalg tiling optimization patterns, which includes folding
       // casting ops into tiled operations.
       RewritePatternSet patterns(context);
       linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
       tensor::populateFoldTensorEmptyPatterns(patterns);
-      populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+      populateFoldAffineMinInDistributedLoopsPatterns(patterns,
+                                                      staticNumWorkgroup);
       context->getOrLoadDialect<tensor::TensorDialect>()
           ->getCanonicalizationPatterns(patterns);
       context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
@@ -483,9 +487,10 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createTileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims) {
+createTileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims,
+                                        bool skipDistributionLoops) {
   return std::make_unique<TileAndDistributeToWorkgroupsPass>(
-      maxWorkgroupParallelDims);
+      maxWorkgroupParallelDims, skipDistributionLoops);
 }
 
 }  // namespace iree_compiler
