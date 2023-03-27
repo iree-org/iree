@@ -83,6 +83,8 @@ if(IREE_UK_BUILD_X86_64_AVX2_FMA)
       x86_64_avx2_fma
     SRCS
       "mmt4d_x86_64_avx2_fma.c"
+      "pack_x86_64_avx2_fma.c"
+      "unpack_x86_64_avx2_fma.c"
     COPTS
       "${IREE_UK_COPTS_X86_64_AVX2_FMA}"
     DEPS
@@ -97,6 +99,8 @@ if(IREE_UK_BUILD_X86_64_AVX512_BASE)
       x86_64_avx512_base
     SRCS
       "mmt4d_x86_64_avx512_base.c"
+      "pack_x86_64_avx512_base.c"
+      "unpack_x86_64_avx512_base.c"
     COPTS
       "${IREE_UK_COPTS_X86_64_AVX512_BASE}"
     DEPS
@@ -125,10 +129,14 @@ iree_cc_library(
     x86_64
   HDRS
     "mmt4d_x86_64.h"
+    "pack_x86_64.h"
     "query_tile_sizes_x86_64.h"
+    "unpack_x86_64.h"
   SRCS
     "mmt4d_x86_64.c"
+    "pack_x86_64.c"
     "query_tile_sizes_x86_64.c"
+    "unpack_x86_64.c"
   DEPS
     ::common_x86_64
     iree::base::core_headers

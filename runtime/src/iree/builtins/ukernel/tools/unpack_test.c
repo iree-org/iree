@@ -109,14 +109,9 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
       {1, 0},
       // Non-degenerate cases.
       {1, 1},
-      {2, 2},
       {3, 2},
-      {8, 8},
-      {11, 13},
-      {13, 11},
+      {7, 8},
       {31, 33},
-      {33, 31},
-      {123, 89},
   };
   typedef enum {
     pad_none,
@@ -137,8 +132,12 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
           params.in_size0 = in_size0;
           params.in_size1 = in_size1;
           if (pad == pad_a_lot) {
-            params.in_size0 += 64;
-            params.in_size1 += 64;
+            // Makes the test expensive, and covers a corner case that shouldn't
+            // require large sizes. Try to be economical.
+            if (params.in_size0 <= 8 && params.in_size1 <= 8) {
+              params.in_size0 += 64;
+              params.in_size1 += 64;
+            }
           }
           iree_uk_ssize_t tile_size0 = params.in_size2;
           iree_uk_ssize_t tile_size1 = params.in_size3;
@@ -196,5 +195,20 @@ int main(int argc, char** argv) {
 #if defined(IREE_UK_ARCH_ARM_64)
   iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 8, 8, NULL);
   iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 8, 8, NULL);
+#elif defined(IREE_UK_ARCH_X86_64)
+  iree_uk_cpu_features_list_t* cpu_avx2_fma =
+      iree_uk_cpu_features_list_create(3, "avx", "avx2", "fma");
+  iree_uk_cpu_features_list_set_name(cpu_avx2_fma, "avx2_fma");
+  iree_uk_cpu_features_list_t* cpu_avx512_base =
+      iree_uk_cpu_features_list_create_extend(cpu_avx2_fma, 5, "avx512f",
+                                              "avx512bw", "avx512dq",
+                                              "avx512vl", "avx512cd");
+  iree_uk_cpu_features_list_set_name(cpu_avx512_base, "avx512_base");
+  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 8, 8, cpu_avx2_fma);
+  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 8, 8, cpu_avx2_fma);
+  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 16, 16, cpu_avx512_base);
+  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 16, 16, cpu_avx512_base);
+  iree_uk_cpu_features_list_destroy(cpu_avx2_fma);
+  iree_uk_cpu_features_list_destroy(cpu_avx512_base);
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 }
