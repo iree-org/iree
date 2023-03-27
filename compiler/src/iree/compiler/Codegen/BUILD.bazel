@@ -38,6 +38,8 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:NVGPUDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
     ],

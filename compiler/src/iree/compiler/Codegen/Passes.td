@@ -47,6 +47,90 @@ def DecomposeLinalgGeneric :
   let constructor = "mlir::iree_compiler::createDecomposeLinalgGenericPass()";
 }
 
+def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
+  let summary = "Decompose `affine.apply` operations into sub `affine.apply`";
+  let description = [{
+    Decompose `affine.apply` operations into sub `affine.apply` where each
+    sub expression references values that are defined in the same loop scope.
+    The sub expression are then stitched back together following the loop
+    nest order.
+
+    The goal of this pass is to break down `affine.apply` expressions such
+    that the resulting sub expressions can be hoisted out in their respective
+    loop.
+
+    E.g., Let's say we have
+    ```mlir
+    %res = affine.apply
+             affine_map<()[s0, s1, s2] -> (s0 * 1024 + s1 * 32 + s2)>()
+               [%loopVariant, %inv1, %inv2]
+    ```
+    Where `%inv1` and `%inv2` are loop invariant and `%loopVariant` is not.
+    This will produce the following subexpressions:
+    ```mlir
+    // Loop invariant computations first.
+    %inv1x32 =
+      affine.apply affine_map<()[s0] -> (s0 * 32)>()[%inv1]
+    %inv1x32_plus_inv2 =
+      affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%inv1x32, %inv2]
+    // Loop variant computation next.
+    %loopVariantx1024 =
+      affine.apply affine_map<()[s0] -> (s0 * 1024)>()[%loopVariant]
+    // Compose things back together.
+    %res =
+      affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()
+        [%loopVariant, %inv1x32_plus_inv2]
+    ```
+    Now the sequence of instructions leading to and including
+    `%inv1x32_plus_inv2` can be hoisted out of the loop.
+
+    This pass requires `scf.for` structures to still be around otherwise
+    the break down will be meaningless.
+
+    Note: The decomposition performed by this pass will be undone by
+    canonicalization. Make sure to lower the resulting ops before that.
+  }];
+  let constructor = "mlir::iree_compiler::createDecomposeAffineOpsPass()";
+  let dependentDialects = [
+      "AffineDialect"
+  ];
+}
+
+def ExtractAddressComputation: Pass<"extract-address-computation"> {
+  let summary = "Extract address computations from memory accesses";
+  let description = [{
+    Extract the address computation from the instructions with memory
+    accesses such that these memory accesses use only a base pointer.
+
+    For instance,
+    ```mlir
+    memref.load %base[%off0, ...]
+    ```
+
+    Will be rewritten in:
+    ```mlir
+    %new_base = memref.subview %base[%off0,...][1,...][1,...]
+    memref.load %new_base[%c0,...]
+    ```
+  }];
+  let constructor = "mlir::iree_compiler::createExtractAddressComputationPass()";
+  let dependentDialects = [
+      "memref::MemRefDialect"
+  ];
+}
+
+def ExtractAddressComputationGPU: Pass<"extract-address-computation-gpu"> {
+  let summary = "Extract address computations from memory accesses";
+  let description = [{
+     This pass is similar to `extract-address-computation` except it also
+     supports memory accesses that are specific to GPUs.
+  }];
+  let constructor = "mlir::iree_compiler::createExtractAddressComputationGPUPass()";
+  let dependentDialects = [
+      "memref::MemRefDialect", "nvgpu::NVGPUDialect", "AffineDialect"
+  ];
+}
+
 def FixupSubspanWithOffsets :
     Pass<"iree-codegen-fixup-subspan-with-offsets", "func::FuncOp"> {
   let summary = "Fixes up `hal.interface.binding.subspan` ops with offsets";

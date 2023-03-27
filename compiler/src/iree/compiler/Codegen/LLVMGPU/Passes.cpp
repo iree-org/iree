@@ -459,6 +459,28 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
 }
 
+// Sub pipeline to make the address computation more explicit and
+// optimize them.
+// The idea here is to be less dependent on what the backend is able to
+// do by heavy lifting most of the work while we still have the
+// information about loops.
+// Note: This needs to run before SCF -> CF.
+static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
+  pm.addPass(createExtractAddressComputationGPUPass());
+  pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  pm.addPass(memref::createExpandStridedMetadataPass());
+  // Hoist loop invariant variables to give decompose affine pass the right loop
+  // dependencies.
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  // Decompose the `affine.apply`s.
+  pm.addPass(createDecomposeAffineOpsPass());
+  // Get rid of the redundant computations.
+  pm.addPass(createCSEPass());
+  // Hoist the resulting decompositions.
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(createLowerAffinePass());
+}
+
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -485,6 +507,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createFoldTensorExtractOpPass());
 
   pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorLoweringPass());
+
+  // THIS NEEDS TO RUN BEFORE SCF ->CF ON
+  addLowerAndOptimzeAddressComputation(pm);
+  // THIS NEEDS TO RUN BEFORE SCF ->CF OFF
 
   // SCF -> STD
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
