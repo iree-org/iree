@@ -12,7 +12,17 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Structure to represent target features.
+struct TargetInfo {
+  // TODO: add finer grain control for other tensorcore types.
+  bool hasTF32TensorCore = false;
+  bool hasWarpShuffle = false;
+};
+
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp);
+
+/// Attempts to find entry point of the given op, afterwards, it finds TargetInfo. 
+FailureOr<TargetInfo> getTargetInfoFromAnyOp(Operation *op);
 
 }  // namespace iree_compiler
 }  // namespace mlir

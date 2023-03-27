@@ -225,17 +225,6 @@ static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
   return info;
 }
 
-FailureOr<TargetInfo> mlir::iree_compiler::getTargetInfoFromAnyOp(
-    Operation *op) {
-  if (auto result = dyn_cast<func::FuncOp>(op)) {
-    return getTargetInfo(result);
-  }
-  if (auto result = op->getParentOfType<func::FuncOp>()) {
-    return getTargetInfo(result);
-  }
-  return failure();
-}
-
 static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
                                const TargetInfo &targetInfo) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose

@@ -55,7 +55,7 @@ static llvm::cl::opt<bool> dumpPtx(
     llvm::cl::desc("Dump ptx to the debug stream."));
 
 static llvm::cl::opt<bool> linkUKernelBitcode(
-    "iree-hal-cuda-link-uk-bitcode", llvm::cl::init(false),
+    "iree-hal-cuda-link-uk-bitcode", llvm::cl::init(true),
     llvm::cl::desc(
         "Links clang precompiled bitcode instead of precompiled PTX"));
 

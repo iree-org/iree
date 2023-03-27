@@ -13,11 +13,14 @@
 #include "cutlass/gemm/threadblock/default_mma_core_sm80.h"
 #include "cutlass/gemm/threadblock/threadblock_swizzle.h"
 #include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
+#include "cutlass/tfloat32.h"
 
 #ifndef DEBUG_CUTLASS
 #include "cutlass/util/debug.h"
 #include "cutlass/util/device_dump.h"
 #endif
+
+using tf32 = cutlass::tfloat32_t;
 
 template <class ElementA, class ElementB, class ElementC, int Tile_m,
           int Tile_n, int Tile_k, int Warp_m, int Warp_n, int Inst_m,

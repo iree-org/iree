@@ -89,6 +89,10 @@ static std::string generate_ukernel_name(std::string LHS, std::string RHS,
     uGPUKernel ukernel(LHS, RHS, RES, {TILE_M, TILE_N, TILE_K}, {64, 64},
                        {16, 8, 8}, numStages, hasFill, writeback2Global);
     return ukernel.generate_ukernel_name();
+  } else if (LHS == RHS && LHS == "tf32") {
+    uGPUKernel ukernel(LHS, RHS, RES, {TILE_M, TILE_N, TILE_K}, {64, 64},
+                       {16, 8, 8}, numStages, hasFill, writeback2Global);
+    return ukernel.generate_ukernel_name();
   }
   // todo(guray) not supported types
   assert(true);  
@@ -123,6 +127,17 @@ struct uGPUContracts {
     // Pipeline Stages 5
     generateVariant(t, t, t, {128, 128, 16}, {64, 64}, {16, 8, 8}, 5);
     generateVariant(t, t, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 5);
+    auto tf = "tf32";
+    // Pipeline Stages 3
+    generateVariant(tf, tf  , t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 3);
+    generateVariant(tf, tf, t, {128, 256, 32}, {64, 64}, {16, 8, 8}, 3);
+    generateVariant(tf, tf, t, {256, 128, 32}, {64, 64}, {16, 8, 8}, 3);
+
+    generateVariant(tf, tf, t, {128, 256, 16}, {64, 64}, {16, 8, 8}, 3);
+    generateVariant(tf, tf, t, {128, 128, 16}, {64, 64}, {16, 8, 8}, 3);
+    // Pipeline Stages 5
+    generateVariant(tf, tf, t, {128, 128, 16}, {64, 64}, {16, 8, 8}, 5);
+    generateVariant(tf, tf, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 5);
   }
 };
 
