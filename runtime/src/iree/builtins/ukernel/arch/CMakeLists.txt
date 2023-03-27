@@ -17,10 +17,7 @@ if(IREE_UK_ENABLE_ARCH_SPECIFIC_CODE)
     set(IREE_UK_ARCH_ARM_64 TRUE)
     add_subdirectory(arm_64)
     list(APPEND IREE_UK_ARCH_DEPS
-      "iree::builtins::ukernel::arch::arm_64::mmt4d_arm_64"
-      "iree::builtins::ukernel::arch::arm_64::pack_arm_64"
-      "iree::builtins::ukernel::arch::arm_64::query_tile_sizes_arm_64"
-      "iree::builtins::ukernel::arch::arm_64::unpack_arm_64"
+      "iree::builtins::ukernel::arch::arm_64"
     )
   endif()
 endif()  # IREE_UK_ENABLE_ARCH_SPECIFIC_CODE
