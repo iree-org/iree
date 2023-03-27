@@ -7,6 +7,7 @@
 
 from e2e_test_framework.models import tf_models, tflite_models, torch_models
 
+# yapf: disable
 # Small models that require less computational resources.
 SMALL = [
     tflite_models.DEEPLABV3_FP32,
@@ -23,7 +24,9 @@ SMALL = [
     tflite_models.POSENET_FP32,
     tf_models.EFFICIENTNET_V2_S_FP32,
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
+    torch_models.EFFICIENTNET_V2_S_FP32_TORCH
 ]
+# yapf: enable
 
 # Large models that require more computational resources.
 LARGE = [

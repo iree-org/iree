@@ -140,6 +140,16 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
+    "model-cc474102-7d2f-4ec1-92ae-84e83ba0f390"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_V2_S/batch_1/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_cc474102-7d2f-4ec1-92ae-84e83ba0f390_EfficientNetV2SPT.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
     "model-39d157ad-f0ec-4a76-963b-d783beaed60f"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/bert-for-masked-lm-seq512-tf-model.tar.gz"
