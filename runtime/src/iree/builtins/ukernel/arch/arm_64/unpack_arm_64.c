@@ -10,7 +10,7 @@
 
 #include "iree/builtins/ukernel/arch/arm_64/common_arm_neon.h"
 
-static void iree_uk_unpack_tile_8x8_x32_arm_64(
+static void iree_uk_unpack_tile_8x8_x32_arm_64_direct(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
     iree_uk_ssize_t out_stride0, iree_uk_ssize_t in_stride1,
@@ -36,7 +36,7 @@ iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_arm_64(
   // Unpack is currently only used in practice with esize==4 and non-transpose.
   if (esize != 4 || transpose) return 0;
   if (params->in_size2 == 8 && params->in_size3 == 8) {
-    return iree_uk_unpack_tile_8x8_x32_arm_64;
+    return iree_uk_unpack_tile_8x8_x32_arm_64_direct;
   }
   return 0;
 }
