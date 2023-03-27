@@ -51,8 +51,14 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
                << "can't find lowering_config, skip SplitReduction");
     return;
   }
-  int64_t reductionRatio =
-      maybeLoweringConfig.value().getTileSizeVals().back().back();
+  auto reductionSizes = maybeLoweringConfig.value().getTileSizeVals().back();
+  if (reductionSizes.empty()) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "the list of reduction tiling sizes is empty, skip SplitReduction");
+    return;
+  }
+  int64_t reductionRatio = reductionSizes.back();
 
   SmallVector<linalg::GenericOp> candidates;
   funcOp.walk([&](linalg::GenericOp op) { candidates.push_back(op); });
