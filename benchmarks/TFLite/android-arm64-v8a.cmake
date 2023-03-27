@@ -81,7 +81,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=1"
+    "--task_topology_max_group_count=1"
 )
 
 # TODO(#7792): Re-enable these when we are able to run different benchmarks
@@ -114,7 +114,7 @@ iree_benchmark_suite(
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
-#     "--task_topology_group_count=2"
+#     "--task_topology_max_group_count=2"
 # )
 
 # iree_benchmark_suite(
@@ -145,7 +145,7 @@ iree_benchmark_suite(
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
-#     "--task_topology_group_count=3"
+#     "--task_topology_max_group_count=3"
 # )
 
 iree_benchmark_suite(
@@ -177,7 +177,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=4"
+    "--task_topology_max_group_count=4"
 )
 
 ################################################################################
@@ -302,7 +302,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=1"
+    "--task_topology_max_group_count=1"
 )
 
 # CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference, +dotprod
@@ -336,7 +336,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=1"
+    "--task_topology_max_group_count=1"
 )
 
 # TODO(#7792): Re-enable these when we are able to run different benchmarks
@@ -370,7 +370,7 @@ iree_benchmark_suite(
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
-#     "--task_topology_group_count=2"
+#     "--task_topology_max_group_count=2"
 # )
 
 # iree_benchmark_suite(
@@ -402,7 +402,7 @@ iree_benchmark_suite(
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
-#     "--task_topology_group_count=3"
+#     "--task_topology_max_group_count=3"
 # )
 
 # CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference.
@@ -441,7 +441,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=4"
+    "--task_topology_max_group_count=4"
 )
 
 # CPU, LLVM, local-sync, big/little-core, full-inference, +dotprod
@@ -476,7 +476,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=4"
+    "--task_topology_max_group_count=4"
 )
 
 # CPU, VMVX, 4-thread, big-core, full-inference
@@ -507,7 +507,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=4"
+    "--task_topology_max_group_count=4"
 )
 
 ################################################################################
