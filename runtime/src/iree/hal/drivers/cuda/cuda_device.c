@@ -47,9 +47,6 @@ typedef struct iree_hal_cuda_device_t {
   // Parameters used to control device behavior.
   iree_hal_cuda_device_params_t params;
 
-  // Optional channel provider used to get defaults/create channels.
-  iree_hal_channel_provider_t channel_provider;
-
   CUdevice device;
 
   // TODO: support multiple streams.
@@ -308,13 +305,14 @@ static iree_status_t iree_hal_cuda_device_create_channel(
   // Ask for the defaults.
   iree_hal_cuda_nccl_id_t id;
   memset(&id, 0, sizeof(id));
-  if (device->channel_provider.query_group_params) {
+  if (device->params.channel_provider.query_group_params) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z0,
                                 "iree_hal_channel_provider_query_group_params");
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, device->channel_provider.query_group_params(
-                device->channel_provider.self, base_device, queue_affinity,
-                iree_make_byte_span((void*)&id, sizeof(id)), &params));
+        z0,
+        device->params.channel_provider.query_group_params(
+            device->params.channel_provider.self, base_device, queue_affinity,
+            iree_make_byte_span((void*)&id, sizeof(id)), &params));
     IREE_TRACE_ZONE_END(z0);
   }
 
