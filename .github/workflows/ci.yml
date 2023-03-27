@@ -1423,6 +1423,7 @@ jobs:
       - test_build_benchmark_suites
 
       # Configurations
+      - python_release_packages
       - asan
       - tsan
       - small_runtime
