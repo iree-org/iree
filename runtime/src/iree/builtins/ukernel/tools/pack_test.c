@@ -201,16 +201,33 @@ int main(int argc, char** argv) {
   iree_uk_test_pack(iree_uk_pack_type_f32f32, 3, 5, NULL);
   iree_uk_test_pack(iree_uk_pack_type_i8i8, 4, 2, NULL);
   iree_uk_test_pack(iree_uk_pack_type_i32i32, 3, 4, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 8, NULL);
 
 #if defined(IREE_UK_ARCH_ARM_64)
   iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, NULL);
   iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 8, NULL);
   iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 1, NULL);
   iree_uk_test_pack(iree_uk_pack_type_i32i32, 8, 8, NULL);
-  // Tile size selected with cpu feature "dotprod".
+  // Tile size selected with CPU feature dotprod.
+  // Not passing a cpu_features_list because the packing code itself
+  // does not depend on any features.
   iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 4, NULL);
-  // Tile size selected for cpu feature "i8mm".
+  // Tile size selected for CPU feature i8mm. Same comment as for dotprod.
   iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 8, NULL);
+#elif defined(IREE_UK_ARCH_X86_64)
+  iree_uk_cpu_features_list_t* cpu_avx2_fma =
+      iree_uk_cpu_features_list_create(3, "avx", "avx2", "fma");
+  iree_uk_cpu_features_list_set_name(cpu_avx2_fma, "avx2_fma");
+  iree_uk_cpu_features_list_t* cpu_avx512_base =
+      iree_uk_cpu_features_list_create_extend(cpu_avx2_fma, 5, "avx512f",
+                                              "avx512bw", "avx512dq",
+                                              "avx512vl", "avx512cd");
+  iree_uk_cpu_features_list_set_name(cpu_avx512_base, "avx512_base");
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, cpu_avx2_fma);
+  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 2, cpu_avx2_fma);
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 16, 1, cpu_avx512_base);
+  iree_uk_test_pack(iree_uk_pack_type_i8i8, 16, 2, cpu_avx512_base);
+  // avx512_vnni uses the same tile size and same pack code as avx512_base.
+  iree_uk_cpu_features_list_destroy(cpu_avx2_fma);
+  iree_uk_cpu_features_list_destroy(cpu_avx512_base);
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 }

@@ -146,6 +146,25 @@ int main(int argc, char** argv) {
 #if defined(IREE_UK_ARCH_ARM_64)
   iree_uk_benchmark_register_unpack(iree_uk_unpack_type_f32f32, 8, 8, NULL);
   iree_uk_benchmark_register_unpack(iree_uk_unpack_type_i32i32, 8, 8, NULL);
+#elif defined(IREE_UK_ARCH_X86_64)
+  iree_uk_cpu_features_list_t* cpu_avx2_fma =
+      iree_uk_cpu_features_list_create(3, "avx", "avx2", "fma");
+  iree_uk_cpu_features_list_set_name(cpu_avx2_fma, "avx2_fma");
+  iree_uk_cpu_features_list_t* cpu_avx512_base =
+      iree_uk_cpu_features_list_create_extend(cpu_avx2_fma, 5, "avx512f",
+                                              "avx512bw", "avx512dq",
+                                              "avx512vl", "avx512cd");
+  iree_uk_cpu_features_list_set_name(cpu_avx512_base, "avx512_base");
+  iree_uk_benchmark_register_unpack(iree_uk_unpack_type_f32f32, 8, 8,
+                                    cpu_avx2_fma);
+  iree_uk_benchmark_register_unpack(iree_uk_unpack_type_i32i32, 8, 8,
+                                    cpu_avx2_fma);
+  iree_uk_benchmark_register_unpack(iree_uk_unpack_type_f32f32, 16, 16,
+                                    cpu_avx512_base);
+  iree_uk_benchmark_register_unpack(iree_uk_unpack_type_i32i32, 16, 16,
+                                    cpu_avx512_base);
+  iree_uk_cpu_features_list_destroy(cpu_avx2_fma);
+  iree_uk_cpu_features_list_destroy(cpu_avx512_base);
 #else   // defined(IREE_UK_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.

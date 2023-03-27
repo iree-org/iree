@@ -10,7 +10,7 @@
 
 #include "iree/builtins/ukernel/arch/arm_64/common_arm_neon.h"
 
-static void iree_uk_unpack_tile_8x8_x32_arm_64_direct(
+static void iree_uk_unpack_tile_8x8_x32_arm_64(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_ssize_t outer_size1,
     iree_uk_ssize_t out_stride0, iree_uk_ssize_t in_stride1,
@@ -31,13 +31,12 @@ static void iree_uk_unpack_tile_8x8_x32_arm_64_direct(
 
 iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_arm_64(
     const iree_uk_unpack_params_t* params) {
-  // At the moment, as sum-reductions are not yet part of pack ops,
-  // no arithmetic whatsoever is being done here, so only the element type
-  // size matters, not the type itself.
   int esize = iree_uk_type_size(iree_uk_unpack_out_type(params->type));
   bool transpose = params->flags & IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER;
-  if (esize == 4 && params->in_size2 == 8 && params->in_size3 == 8) {
-    return transpose ? 0 : iree_uk_unpack_tile_8x8_x32_arm_64_direct;
+  // Unpack is currently only used in practice with esize==4 and non-transpose.
+  if (esize != 4 || transpose) return 0;
+  if (params->in_size2 == 8 && params->in_size3 == 8) {
+    return iree_uk_unpack_tile_8x8_x32_arm_64;
   }
   return 0;
 }
