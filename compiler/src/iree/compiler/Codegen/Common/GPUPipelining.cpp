@@ -227,21 +227,21 @@ static bool setPipeliningMarkers(scf::ForOp forOp, bool pipelineStoreStage) {
 }
 
 /// Warp-level TensorOp.
-/// The data structures holds the operations and their dependencies for the
-/// Shared Memory and Tensor Core (mma.sync) for a kgroup.
+/// The data structure holds the warp-level Tensor Core (mma.sync) operations
+/// and their dependencies for a kgroup.
 struct WarpMmaOp {
-  // Load matrixA from Shared Memory to Registers.
-  llvm::SetVector<Operation*> loadOperationsA;
-  // Load matrixB from Shared Memory to Registers.
-  llvm::SetVector<Operation*> loadOperationsB;
-  // Warp-level Tensor Core operations on Registers.
+  // Defining op and its dependencies for mma.sync's lhs/matrixA/OperandA.
+  llvm::SetVector<Operation*> lhsOperations;
+  // Defining op and its dependencies for mma.sync's rhs/matrixB/OperandB.
+  llvm::SetVector<Operation*> rhsOperations;
+  // Warp-level Tensor Core operations on operands in registers.
   llvm::SetVector<Operation*> mmaOperations;
 };
 
 /// Structure to hold the matmul's mainloop information:
 /// Seperates the mma operations into kgroups and collects the Shared Memory
 /// loads for each kgroup. This information is used to pipeline the mainloop and
-/// to generate an optimal schedule interleaving Global Memory loads, Shared
+/// to generate an optimal schedule; interleaving Global Memory loads, Shared
 /// Memory loads, and math operations.
 struct MainLoopInfo {
   // Mainloop asyncronous copy operations:
@@ -286,48 +286,29 @@ struct MainLoopInfo {
     }
   }
 
-  // Backtrack from the MmaSyncOp operand (mlir::OpOperand) to its defining
-  // mlir::Operation to find the ldmatrix or ld.shared operations that load
-  // MmaSyncOp operands.
-  void backtrackToFindSmemLoad(Operation* op,
-                               llvm::SetVector<Operation*>& loadOperations,
-                               Block* block) {
+  // Obtains nvgpu.ldmatrix, memref.load, vector.extract_strided_slice, or
+  // vector.insert operations that is the defining operations of the mma.sync
+  // operand. The operations are added to a set of specific kgroup operations.
+  void mmaOperandDefOperation(Operation* op,
+                              llvm::SetVector<Operation*>& defOperation,
+                              Block* block) {
     if (!op) return;
 
-    // If the operation is a ldmatrix or ld.shared, then add it to the set of
-    // the current kgroup load operations.
-    if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(op)) {
+    // If the operations defining the mma.sync's operand is one of the
+    // qualifying operations, add the operations to the current kgroup defining
+    // operations set.
+    if (isa<nvgpu::LdMatrixOp, memref::LoadOp, vector::ExtractStridedSliceOp,
+            vector::InsertOp>(op)) {
       if (op->getBlock() == block) {
-        loadOperations.insert(op);
+        defOperation.insert(op);
       }
       return;
     }
-
-    // If the operation is not a ldmatrix or ld.shared, then it has to be a
-    // vector.extract_strided_slice or vector.insert operation  to recurse up
-    // the chain to find the ldmatrix or ld.shared Shared Memory load operation.
-    if (!isa<vector::ExtractStridedSliceOp, vector::InsertOp>(op)) {
-      LLVM_DEBUG({
-        llvm::dbgs()
-            << "Unable to find Shared Memory load for MmaSyncOp. Thus, the "
-               "Shared Memory load into the register operand will not be "
-               "pipelined."
-            << "\n";
-      });
-      return;
-    }
-
-    // Recurse upwards towards the definition until a Shared Memory load is
-    // found. Only vector.extract_strided_slice or vector.insert operations
-    // leading up to a Shared Memory loads are considered.
-    Operation* defOp = op->getOperand(0).getDefiningOp();
-
-    backtrackToFindSmemLoad(defOp, loadOperations, block);
   }
 
   // Recursively traverse the chain of mma operations for all kgroups from 0
   // (start) to numKgroups (ends scf.yield).
-  // Assumption: The mma operations are in a chain in monotonic increasing
+  // Assumption: The mma operations are in a chain of monotonicaly increasing
   // kgroup order.
   void vistMmaSyncOp(Operation* op, int kgroup) {
     // if the operation in an `scf.yield`, we reached the end of MmaSyncOp chain
@@ -340,13 +321,13 @@ struct MainLoopInfo {
     if (warpOperations.size() < kgroup + 1)
       warpOperations.push_back(WarpMmaOp());
 
-    backtrackToFindSmemLoad(op->getOperand(0).getDefiningOp(),
-                            warpOperations[kgroup].loadOperationsA,
-                            op->getBlock());
+    mmaOperandDefOperation(op->getOperand(0).getDefiningOp(),
+                           warpOperations[kgroup].lhsOperations,
+                           op->getBlock());
 
-    backtrackToFindSmemLoad(op->getOperand(1).getDefiningOp(),
-                            warpOperations[kgroup].loadOperationsB,
-                            op->getBlock());
+    mmaOperandDefOperation(op->getOperand(1).getDefiningOp(),
+                           warpOperations[kgroup].rhsOperations,
+                           op->getBlock());
 
     warpOperations[kgroup].mmaOperations.insert(op);
 
@@ -389,6 +370,28 @@ struct MainLoopInfo {
       }
     }
 
+    // Debug print warpOperations for kgroup-by-kgroup.
+    LLVM_DEBUG({
+      for (int i = 0; i < warpOperations.size(); ++i) {
+        llvm::dbgs() << "kgroup: " << i << "\n";
+        llvm::dbgs() << "mma.sync: \n";
+        for (auto op : warpOperations[i].mmaOperations) {
+          op->dump();
+        }
+        llvm::dbgs() << "\n";
+        llvm::dbgs() << "defining operations for lhs: \n";
+        for (auto op : warpOperations[i].lhsOperations) {
+          op->dump();
+        }
+        llvm::dbgs() << "\n";
+        llvm::dbgs() << "defining operations for rhs: \n";
+        for (auto op : warpOperations[i].rhsOperations) {
+          op->dump();
+        }
+        llvm::dbgs() << "\n";
+      }
+    });
+
     // If one of the ingredients (`cp.async`, `cp.commit_group`,
     // `cp.wait_group`, `bar.sync`, `mma.sync`, `ldmatrix` or `ld.shared`) for
     // scheduling is missing, the mainloop cannot be scheduled.
@@ -408,17 +411,19 @@ struct MainLoopInfo {
       }
     }
 
-    // Collect the dependent operations for `mma.sync` and `ldmatrix/ld.shared`
-    // operations seperated by kgroups for fine-grained instruction scheduling.
+    // Collect the dependent operations for `mma.sync`, lhs, and rhs defining
+    // operations. The operation and their dependencies are seperated by kgroups
+    // for fine-grained instruction scheduling.
     for (int kgroup = 0; kgroup < getNumberOfKgroups(); ++kgroup) {
       for (Operation& op : forOp.getBody()->getOperations()) {
-        if (isa<nvgpu::LdMatrixOp, memref::LoadOp>(&op)) {
-          if (warpOperations[kgroup].loadOperationsA.count(&op)) {
-            backwardSliceOfDependentOps(warpOperations[kgroup].loadOperationsA,
+        if (isa<nvgpu::LdMatrixOp, memref::LoadOp,
+                vector::ExtractStridedSliceOp, vector::InsertOp>(&op)) {
+          if (warpOperations[kgroup].lhsOperations.count(&op)) {
+            backwardSliceOfDependentOps(warpOperations[kgroup].lhsOperations,
                                         &op, forOp.getBody());
           }
-          if (warpOperations[kgroup].loadOperationsB.count(&op)) {
-            backwardSliceOfDependentOps(warpOperations[kgroup].loadOperationsB,
+          if (warpOperations[kgroup].rhsOperations.count(&op)) {
+            backwardSliceOfDependentOps(warpOperations[kgroup].rhsOperations,
                                         &op, forOp.getBody());
           }
         }
@@ -449,7 +454,7 @@ static void debugMainloopSchedule(
     llvm::dbgs() << " Number of kgroups: " << mainloop.getNumberOfKgroups()
                  << "\n";
     llvm::dbgs() << " Number of mainloop instructions " << ops.size() << "\n";
-    llvm::dbgs() << " Mainloop instructions schedule and stage assignment: ";
+    llvm::dbgs() << " Mainloop instructions schedule and stage assignment: \n";
     for (auto& stage_op_pair : ops) {
       llvm::dbgs() << " Stage (" << stage_op_pair.second << ") , Operation: ";
       stage_op_pair.first->dump();
@@ -503,8 +508,8 @@ static void getNvidiaAmpereTensorCorePipeline(
 
     // Load the next kgroup into registers.
     for (Operation& op : forOp.getBody()->getOperations()) {
-      if (mainloop.warpOperations[kgroup + 1].loadOperationsA.count(&op) ||
-          mainloop.warpOperations[kgroup + 1].loadOperationsB.count(&op)) {
+      if (mainloop.warpOperations[kgroup + 1].lhsOperations.count(&op) ||
+          mainloop.warpOperations[kgroup + 1].rhsOperations.count(&op)) {
         ops.push_back(std::make_pair(&op, numStages - 1));
       }
     }
@@ -543,8 +548,8 @@ static void getNvidiaAmpereTensorCorePipeline(
   // Schedule the Shared Memory loads for the first kgroup and pipeline them
   // into one stage ahead.
   for (Operation& op : forOp.getBody()->getOperations()) {
-    if (mainloop.warpOperations[0].loadOperationsA.count(&op) ||
-        mainloop.warpOperations[0].loadOperationsB.count(&op))
+    if (mainloop.warpOperations[0].lhsOperations.count(&op) ||
+        mainloop.warpOperations[0].rhsOperations.count(&op))
       ops.push_back(std::make_pair(&op, numStages - 2));
   }
 
