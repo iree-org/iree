@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
     "convert_to_destination_passing_style.mlir"
+    "convolutions.mlir"
     "dead_alloc.mlir"
     "decompose_affine_ops.mlir"
     "decompose_linalg_generic.mlir"
@@ -62,6 +63,7 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
+    convolution_match_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir
 )
