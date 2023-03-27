@@ -9,23 +9,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LinalgSplitReduction : Pass<"linalg-split-reduction", "func::FuncOp"> {
-  let summary = "Pass to splitReduce linalg operations.";
-  let constructor = "mlir::createLinalgSplitReductionPass()";
-  let dependentDialects = [
-    "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect"
-  ];
-  let options = [
-    // This corresponds to the value in the last level of tiling.
-    // `size=0` triggers reading the `lowering_config` and if there's no
-    // `lowering_config`, this pass doesn't execute. Executing this pass with
-    // tile size of 1 is strictly worse than not executing the pass (and instead
-    // relying on tiling from TileAndFuse pass).
-    Option<"size", "size", "int64_t", /*default=*/"0",
-      "Size that splitReduction should use for parallel reduction results.">,
-  ];
-}
-
 def LinalgSingleTilingExpert
     : Pass<"linalg-single-tiling-expert-driver", "func::FuncOp"> {
   let summary = "Pass to drive transformations on Linalg on tensors.";

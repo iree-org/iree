@@ -469,7 +469,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   // Run SplitReductionPass before the final reduction Fuse pass, because
   // SplitReductionPass takes care of banked-tiling.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLinalgSplitReductionPass(clEnableReassociateFpReductions));
+      createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
   {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel = numLevels - 1;
@@ -604,7 +604,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   // Run SplitReductionPass before the final reduction Fuse pass, because
   // SplitReductionPass takes care of banked-tiling.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLinalgSplitReductionPass(clEnableReassociateFpReductions));
+      createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
   {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
