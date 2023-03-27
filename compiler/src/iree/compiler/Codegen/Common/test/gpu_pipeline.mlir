@@ -1325,7 +1325,7 @@ func.func @nvidia_tenscore_schedule_f32() {
 //          CHECK-NV:  nvgpu.device_async_wait %{{.*}} {numGroups = 1 : i32}
 //          CHECK-NV:  gpu.barrier
 //  CHECK-NV-COUNT-4:  nvgpu.ldmatrix
-//  CHECK-NV-COUNT-8:  memref.load
+//  CHECK-NV-COUNT-16:  memref.load
 //          CHECK-NV:  scf.for
 //  CHECK-NV-COUNT-4:    nvgpu.ldmatrix
 //  CHECK-NV-COUNT-16:   memref.load
