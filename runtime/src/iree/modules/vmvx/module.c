@@ -796,6 +796,7 @@ static iree_status_t iree_vmvx_pack_f(iree_uk_pack_type_t type,
       .out_size3 = args->out_size3,
       .padding_value = &args->padding_value,
       .flags = args->flags,
+      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
   iree_uk_pack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
@@ -837,6 +838,7 @@ static iree_status_t iree_vmvx_pack_i(iree_uk_pack_type_t type,
       .out_size3 = args->out_size3,
       .padding_value = &args->padding_value,
       .flags = args->flags,
+      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
   iree_uk_pack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
@@ -910,6 +912,7 @@ static iree_status_t iree_vmvx_unpack(iree_uk_unpack_type_t type,
       .out_size0 = args->out_size0,
       .out_size1 = args->out_size1,
       .flags = args->flags,
+      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
   iree_uk_unpack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
