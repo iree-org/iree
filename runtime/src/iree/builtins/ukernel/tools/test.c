@@ -58,10 +58,18 @@ const char* iree_uk_test_status_header(iree_uk_test_status_t status) {
 static void iree_uk_test_log_status(const iree_uk_test_t* test,
                                     iree_uk_test_status_t status) {
   fprintf(stderr, "%s %s", iree_uk_test_status_header(status), test->name);
-  if (test->cpu_features && test->cpu_features->size) {
-    fprintf(stderr, ", cpu_features:%s", test->cpu_features->entries[0]);
-    for (int i = 1; i < test->cpu_features->size; ++i) {
-      fprintf(stderr, ",%s", test->cpu_features->entries[i]);
+  if (test->cpu_features) {
+    fprintf(stderr, ", cpu_features:");
+    const char* cpu_features_name =
+        iree_uk_cpu_features_list_get_name(test->cpu_features);
+    if (cpu_features_name) {
+      fprintf(stderr, "%s", cpu_features_name);
+    } else {
+      for (int i = 0; i < iree_uk_cpu_features_list_size(test->cpu_features);
+           ++i) {
+        fprintf(stderr, "%s%s", i ? "," : "",
+                iree_uk_cpu_features_list_entry(test->cpu_features, i));
+      }
     }
   }
   if (status != IREE_UK_TEST_STATUS_RUN) {
@@ -113,8 +121,10 @@ void iree_uk_test(const char* name,
       test_func(&test, params);
     } else {
       skipped = true;
-      iree_uk_test_log_info(&test, "🦕",
-                            "CPU does not support required features");
+      char msg[128];
+      snprintf(msg, sizeof msg, "CPU does not support required feature %s",
+               iree_uk_cpu_first_unsupported_feature(cpu_features));
+      iree_uk_test_log_info(&test, "🦕", msg);
     }
   }
   // Since errors are fatal (see iree_uk_test_fail), if we reached this point,
