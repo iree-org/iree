@@ -35,6 +35,7 @@ LARGE = [
     tf_models.RESNET50_TF_FP32,
     torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     torch_models.MODEL_UNET_2D_FP32_TORCH,
+    torch_models.EFFICIENTNET_B7_FP32_TORCH,
 ]
 
 ALL = SMALL + LARGE

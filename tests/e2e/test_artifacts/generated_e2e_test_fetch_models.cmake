@@ -197,3 +197,13 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/model_340553d1-e6fe-41b6-b2c7-687c74ccec56_Unet2dPT.mlir"
   UNPACK
 )
+
+iree_fetch_artifact(
+  NAME
+    "model-68caa96e-b8bb-48a2-bb08-a3044981a370"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_68caa96e-b8bb-48a2-bb08-a3044981a370_EfficientNetB7PT.mlir"
+  UNPACK
+)
