@@ -63,6 +63,8 @@ EDIT_BLOCKING_PATTERN = re.compile(
     flags=re.IGNORECASE)
 
 PRESERVE_TAG = "### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###"
+REPO_CFG_FILE = ".bazel_to_cmake.cfg.py"
+REPO_CFG_MODULE_NAME = "bazel_to_cmake_repo_config"
 
 
 class Status(Enum):
@@ -124,10 +126,8 @@ def setup_environment():
   global repo_cfg
 
   # Scan up the directory tree for a repo config file.
-  REPO_CFG_FILE = ".bazel_to_cmake.cfg.py"
-  REPO_CFG_MODULE_NAME = "bazel_to_cmake_repo_config"
   check_dir = os.getcwd()
-  while not os.path.exists(REPO_CFG_FILE):
+  while not os.path.exists(os.path.join(check_dir, REPO_CFG_FILE)):
     new_check_dir = os.path.dirname(check_dir)
     if not new_check_dir or new_check_dir == check_dir:
       print(f"ERROR: Could not find {REPO_CFG_FILE} in a parent directory "
@@ -138,12 +138,14 @@ def setup_environment():
   log(f"Using repo root {repo_root}")
 
   # Dynamically load the config file as a module.
+  orig_dont_write_bytecode = sys.dont_write_bytecode
   sys.dont_write_bytecode = True  # Don't generate __pycache__ dir
   spec = importlib.util.spec_from_file_location(
       REPO_CFG_MODULE_NAME, os.path.join(repo_root, REPO_CFG_FILE))
   repo_cfg = importlib.util.module_from_spec(spec)
   sys.modules[REPO_CFG_MODULE_NAME] = repo_cfg
   spec.loader.exec_module(repo_cfg)
+  sys.dont_write_bytecode = orig_dont_write_bytecode
 
 
 def repo_relpath(path):

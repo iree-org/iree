@@ -127,6 +127,7 @@ class BuildFileFunctions(object):
 
   def _convert_td_file_block(self, td_file):
     if td_file.startswith("//iree"):
+      # TODO: This should be generalized for out of tree.
       # Bazel `//iree/dir/td_file.td`
       # -> CMake `${IREE_ROOT_DIR}/iree/dir/td_file.td
       # Bazel `//iree/dir/IR:td_file.td`
@@ -883,20 +884,13 @@ def convert_build_file(build_file_code,
                        allow_partial_conversion=False):
   converter = Converter()
   # Allow overrides of TargetConverter and BuildFileFunctions from repo cfg.
-  if hasattr(repo_cfg, "REPO_MAP"):
-    repo_map = repo_cfg.REPO_MAP
-  else:
-    repo_map = {}
-  if hasattr(repo_cfg, "CustomTargetConverter"):
-    target_converter = repo_cfg.CustomTargetConverter(repo_map=repo_map)
-  else:
-    target_converter = bazel_to_cmake_targets.TargetConverter()
-  if hasattr(repo_cfg, "CustomBuildFileFunctions"):
-    build_file_functions = repo_cfg.CustomBuildFileFunctions(
-        converter=converter, targets=target_converter)
-  else:
-    build_file_functions = BuildFileFunctions(converter=converter,
-                                              targets=target_converter)
+  repo_map = getattr(repo_cfg, "REPO_MAP", {})
+  target_converter = getattr(
+      repo_cfg, "CustomTargetConverter",
+      bazel_to_cmake_targets.TargetConverter)(repo_map=repo_map)
+  build_file_functions = getattr(repo_cfg, "CustomBuildFileFunctions",
+                                 BuildFileFunctions)(converter=converter,
+                                                     targets=target_converter)
 
   exec(build_file_code, GetDict(build_file_functions))
   converted_text = converter.convert()

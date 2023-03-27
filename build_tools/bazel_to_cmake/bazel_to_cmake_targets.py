@@ -150,10 +150,7 @@ class TargetConverter:
 
   def _repo_alias(self, repo_name: str) -> str:
     """Returns the prefix of a repo (i.e. '@iree_core') given the repo map."""
-    if repo_name in self._repo_map:
-      return self._repo_map[repo_name]
-    else:
-      return repo_name
+    return self._repo_map.get(repo_name, repo_name)
 
   def _update_target_mappings(self, mappings: Dict[str, List[str]]):
     self._explicit_target_mapping.update(mappings)
