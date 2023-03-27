@@ -272,7 +272,7 @@ iree_fetch_artifact(
   NAME
     "model-9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8"
   SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_CLIP_TEXT_MODEL_SEQLEN64/linalg.mlir"
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/SD_CLIP_TEXT_MODEL_SEQLEN64/batch_1/linalg.mlir"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8_ClipTextSeqLen64PT.mlir"
   UNPACK
@@ -280,9 +280,19 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
+    "model-976c8bae-0d2b-44b3-a200-2246173841df"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230416.810_1681707432/SD_VAE_MODEL/batch_1/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_976c8bae-0d2b-44b3-a200-2246173841df_VaePT.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
     "model-340553d1-e6fe-41b6-b2c7-687c74ccec56"
   SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_UNET_MODEL/linalg.mlir"
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/SD_UNET_MODEL/batch_1/linalg.mlir"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_340553d1-e6fe-41b6-b2c7-687c74ccec56_Unet2dPT.mlir"
   UNPACK

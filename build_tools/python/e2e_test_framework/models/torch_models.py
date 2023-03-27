@@ -20,13 +20,13 @@ from e2e_test_framework.definitions import common_definitions
 # Used in Stable Diffusion to convert a text prompt into an embedding for input to the `Unet2d` model.
 #
 # Converted from https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel
-MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH = common_definitions.Model(
+CLIP_TEXT_SEQLEN64_FP32_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     name="ClipTextSeqLen64PT",
     tags=["fp32", "seqlen64"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_CLIP_TEXT_MODEL_SEQLEN64/linalg.mlir",
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/SD_CLIP_TEXT_MODEL_SEQLEN64/batch_1/linalg.mlir",
     entry_function="forward",
     input_types=["1x77xi64", "1x77xi64"])
 
@@ -43,15 +43,33 @@ MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH = common_definitions.Model(
 # Once complete, output is upsampled using a Variation Auto Encoder (`VAE`).
 #
 # Converted from https://huggingface.co/docs/diffusers/api/models#diffusers.UNet2DConditionModel
-MODEL_UNET_2D_FP32_TORCH = common_definitions.Model(
+UNET_2D_FP32_TORCH = common_definitions.Model(
     id=unique_ids.MODEL_UNET_2D_FP32_TORCH,
     name="Unet2dPT",
     tags=["fp32"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
     source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_UNET_MODEL/linalg.mlir",
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/SD_UNET_MODEL/batch_1/linalg.mlir",
     entry_function="forward",
     input_types=["1x4x64x64xf32", "1x77x768xf32"])
+
+# `VAE`: Variational auto-encoder.
+#
+# Compresses an input image into latent space using its encoder.
+# Uncompresses latents into images using the decoder.
+#
+# Allows Stable Diffusion to perform diffusion in the latent space and convert to a higher resolution image using the `VAE` decoder.
+#
+# Converted from https://huggingface.co/docs/diffusers/api/models#diffusers.AutoencoderKL.
+VAE_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_VAE_FP32_TORCH,
+    name="VaePT",
+    tags=["fp32", "cnn"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230416.810_1681707432/SD_VAE_MODEL/batch_1/linalg.mlir",
+    entry_function="forward",
+    input_types=["1x4x64x64xf32"])
 
 # Converted from https://pytorch.org/vision/stable/models/generated/torchvision.models.efficientnet_v2_s.html#torchvision.models.efficientnet_v2_s
 EFFICIENTNET_V2_S_FP32_TORCH = common_definitions.Model(
