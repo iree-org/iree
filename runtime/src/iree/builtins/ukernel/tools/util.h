@@ -47,6 +47,8 @@ int iree_uk_type_triple_str(char* buf, int buf_length,
 
 typedef struct iree_uk_cpu_features_list_t iree_uk_cpu_features_list_t;
 
+iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_empty(void);
+iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_host(void);
 iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create(int count, ...);
 void iree_uk_cpu_features_list_destroy(iree_uk_cpu_features_list_t* list);
 void iree_uk_cpu_features_list_append(iree_uk_cpu_features_list_t* list,
@@ -86,5 +88,8 @@ typedef struct iree_uk_standard_cpu_features_t {
 iree_uk_standard_cpu_features_t* iree_uk_standard_cpu_features_create(void);
 void iree_uk_standard_cpu_features_destroy(
     iree_uk_standard_cpu_features_t* cpu);
+
+iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_by_name(
+    const char* name, const iree_uk_standard_cpu_features_t* cpu);
 
 #endif  // IREE_BUILTINS_UKERNEL_TOOLS_UTIL_H_

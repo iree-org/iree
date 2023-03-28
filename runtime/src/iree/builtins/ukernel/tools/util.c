@@ -155,14 +155,21 @@ struct iree_uk_cpu_features_list_t {
   // Buffer of string pointers.
   const char** entries;
   // Optional: if not NULL, gives a shorthand name to this CPU features list.
+  // Special case: if this name is "host" then the list must be empty (size==0)
+  // and this is interpreted as auto-detecting host CPU capabilities.
   const char* name;
 };
 
-static iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_empty(
-    void) {
+iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_empty(void) {
   iree_uk_cpu_features_list_t* list =
       malloc(sizeof(iree_uk_cpu_features_list_t));
   memset(list, 0, sizeof *list);
+  return list;
+}
+
+iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_host(void) {
+  iree_uk_cpu_features_list_t* list = iree_uk_cpu_features_list_create_empty();
+  list->name = "host";
   return list;
 }
 
@@ -173,11 +180,10 @@ void iree_uk_cpu_features_list_destroy(iree_uk_cpu_features_list_t* list) {
 
 static void iree_uk_cpu_features_list_append_one(
     iree_uk_cpu_features_list_t* list, const char* entry) {
-  if (list->capacity == 0) {
-    // TODO: Generalize if needed. Currently naive growth to fixed capacity.
-    list->capacity = 64;
-    IREE_UK_ASSERT(!list->entries);
-    list->entries = malloc(list->capacity * sizeof list->entries[0]);
+  if (list->size >= list->capacity) {
+    list->capacity = (list->capacity == 0) ? 1 : (2 * list->capacity);
+    list->entries =
+        realloc(list->entries, list->capacity * sizeof list->entries[0]);
   }
   IREE_UK_ASSERT(list->size < list->capacity);
   list->entries[list->size++] = entry;
@@ -278,6 +284,14 @@ void iree_uk_standard_cpu_features_destroy(
 void iree_uk_make_cpu_data_for_features(
     const iree_uk_cpu_features_list_t* cpu_features,
     iree_uk_uint64_t* out_cpu_data_fields) {
+  // Special case: when the name is "host", the list is required to be empty and
+  // we detect capabilities of the host CPU.
+  if (!strcmp(cpu_features->name, "host")) {
+    IREE_UK_ASSERT(cpu_features->size == 0);
+    memcpy(out_cpu_data_fields, iree_cpu_data_fields(),
+           IREE_CPU_DATA_FIELD_COUNT * sizeof(out_cpu_data_fields[0]));
+    return;
+  }
   // Bit-field tracking which features exist, to diagnose misspelled features.
   uint64_t cpu_features_found = 0;
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
@@ -329,5 +343,26 @@ const char* iree_uk_cpu_first_unsupported_feature(
   IREE_UK_ASSERT(false &&
                  "This function should only be called if there is an "
                  "unsupported CPU feature");
+  return NULL;
+}
+
+iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_by_name(
+    const char* name, const iree_uk_standard_cpu_features_t* cpu) {
+  if (!strcmp(name, "")) {
+    return iree_uk_cpu_features_list_create_empty();
+  }
+  if (!strcmp(name, "host")) {
+    return iree_uk_cpu_features_list_create_host();
+  }
+#if defined(IREE_UK_ARCH_ARM_64)
+  if (!strcmp(name, "dotprod")) return cpu->dotprod;
+  if (!strcmp(name, "i8mm")) return cpu->i8mm;
+#elif defined(IREE_UK_ARCH_X86_64)
+  if (!strcmp(name, "avx2_fma")) return cpu->avx2_fma;
+  if (!strcmp(name, "avx512_base")) return cpu->avx512_base;
+  if (!strcmp(name, "avx512_vnni")) return cpu->avx512_vnni;
+#endif
+  fprintf(stderr, "Unrecognized CPU features set name: \"%s\"\n", name);
+  iree_abort();
   return NULL;
 }

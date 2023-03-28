@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <immintrin.h>
+#include <stdio.h>
 
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
 #include "iree/builtins/ukernel/mmt4d.h"
@@ -13,6 +14,10 @@ void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
     iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
+  fprintf(stderr,
+          "iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base flags=%u "
+          "params->flags=%u\n",
+          (unsigned)flags, (unsigned)params->flags);
   float* IREE_UK_RESTRICT out_ptr = out_tile;
   const float* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const float* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
