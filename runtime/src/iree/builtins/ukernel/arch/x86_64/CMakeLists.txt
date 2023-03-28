@@ -74,7 +74,8 @@ iree_cc_library(
   HDRS
     "common_x86_64.h"
   DEPS
-    ::config
+    iree::builtins::ukernel::headers
+    iree::schemas::cpu_data
 )
 
 if(IREE_UK_BUILD_X86_64_AVX2_FMA)
@@ -140,7 +141,6 @@ iree_cc_library(
   DEPS
     ::common_x86_64
     iree::base::core_headers
-    iree::schemas::cpu_data
     iree::builtins::ukernel::headers
     ${IREE_UK_X86_64_DEPS}
   PUBLIC
