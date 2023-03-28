@@ -58,7 +58,7 @@ struct LLVMCPUTilePass : LLVMCPUTileBase<LLVMCPUTilePass> {
 
 void LLVMCPUTilePass::runOnOperation() {
   if (tilingLevel == -1) {
-    LLVM_DEBUG(llvm::dbgs() << "tilingLevel not set, skip tiling");
+    LLVM_DEBUG(llvm::dbgs() << "tilingLevel not set, skip tiling\n");
     return;
   }
   MLIRContext *context = &getContext();
@@ -68,11 +68,15 @@ void LLVMCPUTilePass::runOnOperation() {
   FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
       getLoweringConfig(computeOps);
   if (failed(maybeLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling");
+    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
     return;
   }
   SmallVector<int64_t> tileSizes =
       maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
+  if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
+    LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
+    return;
+  }
 
   for (auto computeOp : computeOps) {
     auto op = cast<TilingInterface>(computeOp);
