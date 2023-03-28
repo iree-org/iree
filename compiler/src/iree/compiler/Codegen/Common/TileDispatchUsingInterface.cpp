@@ -409,12 +409,14 @@ static FailureOr<IREETilingResult> tileDispatchUsingSCFFopOp(
     rewriter.eraseOp(op);
     return tilingResult;
   }
-
+  Block *body = tilingResult.loops.empty()
+                    ? op->getBlock()
+                    : tilingResult.loops.back().getBody();
   // Rewrite all `flow.dispatch.tensor.store` operation with tiled version
   // of the store. Its valid to this for all stores of the root untiled op.
   if (failed(replaceAllStoresWithTiledVersion(
           rewriter, op, tilingResult.tileOffsets, tilingResult.tileSizes,
-          tilingResult.tiledValues, tilingResult.loops.back().getBody()))) {
+          tilingResult.tiledValues, body))) {
     return failure();
   }
   return tilingResult;
@@ -511,14 +513,16 @@ FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
                                            "fusion along slice op failed");
       }
 
+      Block *body = tileAndFuseResult.loops.empty()
+                        ? op->getBlock()
+                        : tileAndFuseResult.loops.back().getBody();
       // 2c. Finally replace any `flow.dispatch.tensor.store` operation with
       //     tiled version of the operation. It is only valid to do this under
       //     the above assumption that the producer and consumer share the loops
       //     that can be tiled.
       if (failed(replaceStoresWithTiledVersion(
               rewriter, untiledValue, swapSliceResult->tiledValues[0],
-              sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(),
-              tileAndFuseResult.loops.back().getBody()))) {
+              sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(), body))) {
         return failure();
       }
       rewriter.replaceOp(sliceOp, swapSliceResult->tiledValues[0]);

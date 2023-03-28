@@ -165,7 +165,9 @@ createTestPartitionableLoopsInterfacePass();
 /// Pass to tile and distribute to workgroups.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass(
-    int32_t maxWorkgroupParallelDims = kNumMaxParallelDims);
+    int32_t maxWorkgroupParallelDims = kNumMaxParallelDims,
+    linalg::DistributionMethod distributionMethod =
+        linalg::DistributionMethod::Cyclic);
 
 /// Pass to specialize workgroup distribution loops
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -270,7 +272,7 @@ createInstrumentMemoryAccessesPass();
 /// Populates `patterns` with patterns to fold `affine.min` ops in tiled and
 /// distributed loops.
 void populateFoldAffineMinInDistributedLoopsPatterns(
-    RewritePatternSet &patterns);
+    RewritePatternSet &patterns, ArrayRef<int64_t> staticNumWorkgroup = {});
 
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on

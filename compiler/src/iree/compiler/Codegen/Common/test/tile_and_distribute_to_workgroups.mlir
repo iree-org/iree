@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups)), canonicalize, cse)' --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{max-workgroup-parallel-dims=1})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=CHECKW
-
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{distribution-method=2})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=NO-LOOP
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -1057,6 +1057,18 @@ hal.executable private @generic_static {
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       %[[RESULT:.+]] = linalg.generic
 //      CHECK:       flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[IV0]], %[[IV1]]]
+
+//  NO-LOOP-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 16)>
+//  NO-LOOP-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//      NO-LOOP: func.func @generic_static()
+//  NO-LOOP-DAG:   %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
+//  NO-LOOP-DAG:   %[[IDY:.+]] = hal.interface.workgroup.id[1] : index
+//  NO-LOOP-DAG:   %[[OFFX:.+]] = affine.apply #[[MAP1]]()[%[[IDX]]]
+//  NO-LOOP-DAG:   %[[OFFY:.+]] = affine.apply #[[MAP0]]()[%[[IDY]]]
+//  NO-LOOP-NOT:   scf.for
+//      NO-LOOP:   %[[RESULT:.+]] = linalg.generic
+//      NO-LOOP:   -> tensor<16x32xf32>
+//      NO-LOOP:   flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[OFFY]], %[[OFFX]]]
 
 // -----
 

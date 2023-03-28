@@ -257,6 +257,9 @@ def TileAndDistributeToWorkgroups :
     Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
       /*default=*/ "",
       "Maximum number of dims to distribute workgroups across.">,
+    Option<"distributionMethod", "distribution-method", "int32_t",
+      /*default=*/ "0",
+      "Pick the distribution method">      
   ];
 }
 

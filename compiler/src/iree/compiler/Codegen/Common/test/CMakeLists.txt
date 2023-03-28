@@ -28,6 +28,7 @@ iree_lit_test_suite(
     "fixup_subspan_with_offsets.mlir"
     "flatten_memref_subspan.mlir"
     "fold_affine_min_in_distributed_loops.mlir"
+    "fold_affine_min_of_block_id.mlir"
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
     "gpu_pipeline.mlir"
