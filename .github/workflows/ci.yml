@@ -978,11 +978,11 @@ jobs:
           chmod +x "${TRACY_CAPTURE}"
           echo "tracy-capture=${TRACY_CAPTURE}" >> "${GITHUB_OUTPUT}"
       - name: "Creating the benchmark tools archive"
-        # Here we pack a tracy-capture binary into each benchmark tools archive.
-        # This could be wasteful because multiple benchmark tools archives might
-        # pack the same tracy-capture binary. But it simplifies the process to
-        # fetch required tools to run benchmarks and we only have a few versions
-        # of the benchmark tools archives.
+        # Here we pack a tracy-capture binary (~7MB) into each benchmark tools
+        # archive. This could be wasteful because multiple benchmark tools
+        # archives might pack the same tracy-capture binary. But it simplifies
+        # the process to fetch required tools to run benchmarks and we only have
+        # a few versions of the benchmark tools archives.
         # Detailed reason: The generated benchmark matrix fetches the benchmark
         # tools archive based on the target device. However, there is a scenario
         # that the tracy-capture is running on a different host. E.g. Mobile
