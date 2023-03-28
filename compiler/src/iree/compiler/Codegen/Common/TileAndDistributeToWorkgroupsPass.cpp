@@ -313,10 +313,11 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
-  TileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims,
-                                    bool skipDistributionLoops) {
+  TileAndDistributeToWorkgroupsPass(
+      int32_t maxWorkgroupParallelDims,
+      linalg::DistributionMethod distributionMethod) {
     this->maxWorkgroupParallelDims = maxWorkgroupParallelDims;
-    this->skipDistributionLoops = skipDistributionLoops;
+    this->distributionMethod = (int32_t)distributionMethod;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -413,14 +414,12 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
           }));
     };
 
-    linalg::DistributionMethod distributionMethod =
-        skipDistributionLoops
-            ? linalg::DistributionMethod::CyclicNumProcsEqNumIters
-            : linalg::DistributionMethod::Cyclic;
+    linalg::DistributionMethod distributionMethodValue =
+        (linalg::DistributionMethod)(distributionMethod.getValue());
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
             .setDistributionOptions(getIREELinalgLoopDistributionOptions(
-                tileSizes, distributionMethod))
+                tileSizes, distributionMethodValue))
             .setInterchange(llvm::to_vector<4>(
                 llvm::map_range(interchange,
                                 [](int64_t v) -> unsigned {
@@ -491,10 +490,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createTileAndDistributeToWorkgroupsPass(int32_t maxWorkgroupParallelDims,
-                                        bool skipDistributionLoops) {
+createTileAndDistributeToWorkgroupsPass(
+    int32_t maxWorkgroupParallelDims,
+    linalg::DistributionMethod distributionMethod) {
   return std::make_unique<TileAndDistributeToWorkgroupsPass>(
-      maxWorkgroupParallelDims, skipDistributionLoops);
+      maxWorkgroupParallelDims, distributionMethod);
 }
 
 }  // namespace iree_compiler

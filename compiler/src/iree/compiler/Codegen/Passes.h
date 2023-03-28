@@ -166,7 +166,8 @@ createTestPartitionableLoopsInterfacePass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass(
     int32_t maxWorkgroupParallelDims = kNumMaxParallelDims,
-    bool skipDistributionLoops = false);
+    linalg::DistributionMethod distributionMethod =
+        linalg::DistributionMethod::Cyclic);
 
 /// Pass to specialize workgroup distribution loops
 std::unique_ptr<OperationPass<func::FuncOp>>

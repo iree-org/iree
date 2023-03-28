@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups)), canonicalize, cse)' --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{max-workgroup-parallel-dims=1})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=CHECKW
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{skip-distribution-loops})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=NO-LOOP
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{distribution-method=2})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=NO-LOOP
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
