@@ -34,6 +34,42 @@ namespace IREE {
 namespace Util {
 namespace {
 
+Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
+                         Location loc) {
+  Type eTy = getElementTypeOrSelf(type);
+  Type inputETy = getElementTypeOrSelf(inputs[0].getType());
+  if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
+
+  if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth())
+    return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
+
+  if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth())
+    return builder.create<arith::ExtFOp>(loc, type, inputs[0]);
+
+  return nullptr;
+};
+
+Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
+                           Location loc) {
+  Type eTy = getElementTypeOrSelf(type);
+  Type inputETy = getElementTypeOrSelf(inputs[0].getType());
+  if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
+  bool isUnsigned = eTy.isUnsignedInteger();
+
+  if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth())
+    return builder.create<arith::TruncIOp>(loc, type, inputs[0]);
+
+  if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth() &&
+      isUnsigned)
+    return builder.create<arith::ExtUIOp>(loc, type, inputs[0]);
+
+  if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth() &&
+      !isUnsigned)
+    return builder.create<arith::ExtSIOp>(loc, type, inputs[0]);
+
+  return nullptr;
+};
+
 // Converts from |SourceType| to |TargetType|.
 template <typename SourceType, typename TargetType>
 struct PrimitiveTypeConverter : public TypeConverter {
@@ -65,6 +101,24 @@ struct PrimitiveTypeConverter : public TypeConverter {
   // Returns the newly converted type of |type|.
   // Subclasses can override to pass additional type parameters.
   virtual Type getTargetType(SourceType type) = 0;
+};
+
+template <typename SourceType, typename TargetType>
+struct FloatTypeConverter
+    : public PrimitiveTypeConverter<SourceType, TargetType> {
+  explicit FloatTypeConverter() {
+    this->addArgumentMaterialization(convertRankedFloat);
+    this->addSourceMaterialization(convertRankedFloat);
+  }
+};
+
+template <typename SourceType, typename TargetType>
+struct IntegerTypeConverter
+    : public PrimitiveTypeConverter<SourceType, TargetType> {
+  explicit IntegerTypeConverter() {
+    this->addArgumentMaterialization(convertRankedInteger);
+    this->addSourceMaterialization(convertRankedInteger);
+  }
 };
 
 // Tries to completely convert a generic Operation.
@@ -151,6 +205,7 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
 
 template <typename Base, typename Converter>
 struct ConvertTypesPass : public Base {
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
@@ -170,15 +225,21 @@ struct ConvertTypesPass : public Base {
     patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtSIOp, IntegerType,
                                                     std::less<unsigned>>>(
         typeConverter, context);
-    populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
-        patterns, typeConverter);
     ConversionTarget target(*context);
+
+    if (this->preserveFunc) {
+      target.addLegalOp<func::ReturnOp>();
+    } else {
+      populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
+          patterns, typeConverter);
+    }
 
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
       if (auto globalOp = dyn_cast<IREE::Util::GlobalOp>(op)) {
         return typeConverter.isLegal(globalOp.getType());
       } else if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
+        if (this->preserveFunc) return true;
         for (Type type : funcOp.getFunctionType().getInputs()) {
           if (!typeConverter.isLegal(type)) return false;
         }
@@ -212,7 +273,7 @@ struct ConvertTypesPass : public Base {
 
 namespace {
 struct DemoteI64ToI32Converter
-    : public PrimitiveTypeConverter<IntegerType, IntegerType> {
+    : public IntegerTypeConverter<IntegerType, IntegerType> {
   bool isSourceType(IntegerType type) override { return type.isInteger(64); }
   Type getTargetType(IntegerType type) override {
     return IntegerType::get(type.getContext(), 32, type.getSignedness());
@@ -229,7 +290,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass() {
 
 namespace {
 struct DemoteF32ToF16Converter
-    : public PrimitiveTypeConverter<Float32Type, Float16Type> {
+    : public FloatTypeConverter<Float32Type, Float16Type> {
   Type getTargetType(Float32Type type) override {
     return Float16Type::get(type.getContext());
   }
@@ -245,7 +306,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass() {
 
 namespace {
 struct PromoteF16ToF32Converter
-    : public PrimitiveTypeConverter<Float16Type, Float32Type> {
+    : public FloatTypeConverter<Float16Type, Float32Type> {
   Type getTargetType(Float16Type type) override {
     return Float32Type::get(type.getContext());
   }
@@ -261,7 +322,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass() {
 
 namespace {
 struct PromoteBF16ToF32Converter
-    : public PrimitiveTypeConverter<BFloat16Type, Float32Type> {
+    : public FloatTypeConverter<BFloat16Type, Float32Type> {
   Type getTargetType(BFloat16Type type) override {
     return Float32Type::get(type.getContext());
   }
@@ -277,7 +338,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass() {
 
 namespace {
 struct DemoteF64ToF32Converter
-    : public PrimitiveTypeConverter<Float64Type, Float32Type> {
+    : public FloatTypeConverter<Float64Type, Float32Type> {
   Type getTargetType(Float64Type type) override {
     return Float32Type::get(type.getContext());
   }

@@ -110,6 +110,10 @@ def DemoteI64ToI32 : Pass<"iree-util-demote-i64-to-i32", "mlir::ModuleOp"> {
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createDemoteI64ToI32Pass()
   }];
+  let options = [
+    Option<"preserveFunc", "preserve-func-type", "bool",
+            /*default=*/"false", "Preserve function args and returns">
+  ];
 }
 
 def DemoteF32ToF16 : Pass<"iree-util-demote-f32-to-f16", "mlir::ModuleOp"> {
@@ -117,6 +121,10 @@ def DemoteF32ToF16 : Pass<"iree-util-demote-f32-to-f16", "mlir::ModuleOp"> {
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createDemoteF32ToF16Pass()
   }];
+  let options = [
+    Option<"preserveFunc", "preserve-func-type", "bool",
+            /*default=*/"false", "Preserve function args and returns">
+  ];
 }
 
 def DemoteF64ToF32 : Pass<"iree-util-demote-f64-to-f32", "mlir::ModuleOp"> {
@@ -124,6 +132,10 @@ def DemoteF64ToF32 : Pass<"iree-util-demote-f64-to-f32", "mlir::ModuleOp"> {
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createDemoteF64ToF32Pass()
   }];
+  let options = [
+    Option<"preserveFunc", "preserve-func-type", "bool",
+            /*default=*/"false", "Preserve function args and returns">
+  ];
 }
 
 def PromoteF16ToF32 : Pass<"iree-util-promote-f16-to-f32", "mlir::ModuleOp"> {
@@ -131,6 +143,10 @@ def PromoteF16ToF32 : Pass<"iree-util-promote-f16-to-f32", "mlir::ModuleOp"> {
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createPromoteF16ToF32Pass()
   }];
+  let options = [
+    Option<"preserveFunc", "preserve-func-type", "bool",
+            /*default=*/"false", "Preserve function args and returns">
+  ];
 }
 
 def PromoteBF16ToF32 : Pass<"iree-util-promote-bf16-to-f32", "mlir::ModuleOp"> {
@@ -138,6 +154,10 @@ def PromoteBF16ToF32 : Pass<"iree-util-promote-bf16-to-f32", "mlir::ModuleOp"> {
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createPromoteBF16ToF32Pass()
   }];
+  let options = [
+    Option<"preserveFunc", "preserve-func-type", "bool",
+            /*default=*/"false", "Preserve function args and returns">
+  ];
 }
 
 //===----------------------------------------------------------------------===//

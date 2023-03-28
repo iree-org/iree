@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-util-demote-f64-to-f32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-demote-f64-to-f32="preserve-func-type=true" %s | FileCheck %s --check-prefix=PRESERVE
 
 // NOTE: for more comprehensive tests see demote_i64_to_i32.mlir.
 
@@ -10,6 +11,9 @@ func.func @constantF64() -> f64 {
   return %c1234 : f64
 }
 
+// PRESERVE-LABEL: func.func @constantF64
+// PRESERVE-SAME: () -> f64
+
 // -----
 
 // CHECK-LABEL: func.func @tensorTypesF64
@@ -18,6 +22,10 @@ func.func @tensorTypesF64(%arg0 : tensor<4x4xf64>) -> tensor<4x4xf64> {
   // CHECK-NEXT: return %arg0 : tensor<4x4xf32>
   return %arg0 : tensor<4x4xf64>
 }
+
+// PRESERVE-LABEL: func.func @tensorTypesF64
+// PRESERVE-SAME: (%arg0: tensor<4x4xf64>) -> tensor<4x4xf64>
+// PRESERVE-NEXT: return %arg0 : tensor<4x4xf64>
 
 // -----
 
@@ -32,6 +40,14 @@ func.func @simple_f64() -> (tensor<4xf64>) {
   %1 = util.global.load.indirect %0 : !util.ptr<tensor<4xf64>> -> tensor<4xf64>
   return %1 : tensor<4xf64>
 }
+
+
+//       PRESERVE: util.global {{.*}} : tensor<4xf32>
+// PRESERVE-LABEL: func.func @simple_f64() -> tensor<4xf64>
+//  PRESERVE-NEXT: %{{.*}} = util.global.address @__global : !util.ptr<tensor<4xf32>>
+//  PRESERVE-NEXT: %{{.*}} = util.global.load.indirect %{{.*}} : !util.ptr<tensor<4xf32>> -> tensor<4xf32>
+//  PRESERVE-NEXT: %{{.*}} = arith.extf %{{.*}} : tensor<4xf32> to tensor<4xf64>
+//  PRESERVE-NEXT: return %{{.*}} : tensor<4xf64>
 
 // -----
 
@@ -52,6 +68,11 @@ func.func @nested_region_f64() -> (tensor<?xf64>) {
   } : tensor<?xf64>
   return %2 : tensor<?xf64>
 }
+
+// PRESERVE-LABEL: func.func @nested_region_f64()
+// PRESERVE: f64
+// PRESERVE: arith.extf
+// PRESERVE: return
 
 // -----
 
@@ -81,4 +102,3 @@ func.func @complexTypesF64(%arg0 : complex<f64>) -> complex<f64> {
   // CHECK-NEXT: return %arg0 : complex<f32>
   return %arg0 : complex<f64>
 }
-
