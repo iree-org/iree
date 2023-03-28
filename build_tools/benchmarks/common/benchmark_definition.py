@@ -319,7 +319,12 @@ class BenchmarkInfo:
   def build_with_legacy_name(cls, model_name: str, model_tags: Sequence[str],
                              model_source: str, bench_mode: Sequence[str],
                              driver_info: DriverInfo, device_info: DeviceInfo):
-    """Build legacy name for legacy benchmark suites."""
+    """Build legacy name by combining the components of the BenchmarkInfo.
+
+    This is the legacy way to construct the name and still used as primary key
+    in the legacy benchmark system. It's deprecated and the new benchmark suites
+    use a human-defined name which can be more concise.
+    """
     # TODO(#11076): Remove when we drop the legacy path in
     # BenchmarkDriver.__get_benchmark_info_from_case
 
@@ -487,7 +492,12 @@ class CompilationInfo(object):
   def build_with_legacy_name(cls, model_name: str, model_tags: Sequence[str],
                              model_source: str, target_arch: str,
                              compile_tags: Sequence[str]):
-    """Build legacy name for legacy benchmark suites."""
+    """Build legacy name by combining the components of the CompilationInfo.
+
+    This is the legacy way to construct the name and still used as primary key
+    in the legacy benchmark system. It's deprecated and the new benchmark suites
+    use a human-defined name which can be more concise.
+    """
     # TODO(#11076): Remove when we drop
     # collect_compilation_statistics.get_module_map_from_benchmark_suite
     if model_tags:
