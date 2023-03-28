@@ -54,7 +54,6 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
-    transform_dialect_codegen_attention_spec.mlir
     transform_dialect_codegen_bufferize_spec.mlir
     transform_dialect_codegen_foreach_to_gpu_spec.mlir
     transform_dialect_codegen_vector_distribution_spec.mlir
