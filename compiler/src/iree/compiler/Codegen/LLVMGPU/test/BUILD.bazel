@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "attention.mlir",
             "conv_pipeline_test.mlir",
             "convert_to_nvvm.mlir",
             "convert_to_nvvm_error.mlir",
