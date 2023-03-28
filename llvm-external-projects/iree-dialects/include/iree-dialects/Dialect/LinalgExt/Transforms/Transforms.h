@@ -390,12 +390,6 @@ private:
   LinalgTransformationFilter filter;
 };
 
-FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
-    OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
-    ArrayRef<int64_t> tileInterchange,
-    const std::optional<linalg::LinalgLoopDistributionOptions>
-        &tileDistribution);
-
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler
