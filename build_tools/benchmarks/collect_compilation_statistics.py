@@ -152,7 +152,7 @@ def get_module_map_from_compilation_benchmark_config(
           (f"{arch.type.value}-{arch.architecture}-{arch.microarchitecture}-"
            f"{compile_target.target_abi.value}"))
     compilation_info = CompilationInfo(
-        benchmark_name=gen_config.name,
+        name=gen_config.name,
         model_name=model.name,
         model_tags=tuple(model.tags),
         model_source=model.source_type.value,

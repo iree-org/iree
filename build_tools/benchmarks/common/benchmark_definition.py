@@ -289,7 +289,7 @@ class BenchmarkInfo:
   """An object describing the current benchmark.
 
   It includes the following benchmark characteristics:
-  - benchmark_name: the benchmark name
+  - name: the benchmark name
   - model_name: the model name, e.g., 'MobileNetV2'
   - model_tags: a list of tags used to describe additional model information,
       e.g., ['imagenet']
@@ -302,7 +302,7 @@ class BenchmarkInfo:
   - device_info: an DeviceInfo object describing the device where benchmarks run
   """
 
-  benchmark_name: str
+  name: str
   model_name: str
   model_tags: Sequence[str]
   model_source: str
@@ -313,12 +313,16 @@ class BenchmarkInfo:
   run_config_id: Optional[str] = None
 
   def __str__(self):
-    return self.benchmark_name
+    return self.name
 
   @classmethod
   def build_with_legacy_name(cls, model_name: str, model_tags: Sequence[str],
                              model_source: str, bench_mode: Sequence[str],
                              driver_info: DriverInfo, device_info: DeviceInfo):
+    """Build legacy name for legacy benchmark suites."""
+    # TODO(#11076): Remove when we drop the legacy path in
+    # BenchmarkDriver.__get_benchmark_info_from_case
+
     # Get the target architecture and better driver name depending on the runner.
     target_arch = None
     if driver_info.device_type == 'GPU':
@@ -338,9 +342,9 @@ class BenchmarkInfo:
     device_part = f"{device_info.model} ({target_arch})"
 
     mode_tags = ",".join(bench_mode)
-    benchmark_name = f"{model_part} {mode_tags} with {driver_info.pretty_name} @ {device_part}"
+    name = f"{model_part} {mode_tags} with {driver_info.pretty_name} @ {device_part}"
 
-    return cls(benchmark_name=benchmark_name,
+    return cls(name=name,
                model_name=model_name,
                model_tags=model_tags,
                model_source=model_source,
@@ -350,7 +354,7 @@ class BenchmarkInfo:
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
-        "benchmark_name": self.benchmark_name,
+        "name": self.name,
         "model_name": self.model_name,
         "model_tags": self.model_tags,
         "model_source": self.model_source,
@@ -368,7 +372,7 @@ class BenchmarkInfo:
     if not driver_info:
       raise ValueError(f"Unrecognized runner: {json_object['runner']}")
 
-    return BenchmarkInfo(benchmark_name=json_object["benchmark_name"],
+    return BenchmarkInfo(name=json_object["name"],
                          model_name=json_object["model_name"],
                          model_tags=json_object["model_tags"],
                          model_source=json_object["model_source"],
@@ -468,7 +472,7 @@ class BenchmarkResults(object):
 
 @dataclass(frozen=True)
 class CompilationInfo(object):
-  benchmark_name: str
+  name: str
   model_name: str
   model_tags: Tuple[str]
   model_source: str
@@ -477,20 +481,23 @@ class CompilationInfo(object):
   gen_config_id: Optional[str] = None
 
   def __str__(self):
-    return self.benchmark_name
+    return self.name
 
   @classmethod
   def build_with_legacy_name(cls, model_name: str, model_tags: Sequence[str],
                              model_source: str, target_arch: str,
                              compile_tags: Sequence[str]):
+    """Build legacy name for legacy benchmark suites."""
+    # TODO(#11076): Remove when we drop
+    # collect_compilation_statistics.get_module_map_from_benchmark_suite
     if model_tags:
       tags = ",".join(model_tags)
       model_part = f"{model_name} [{tags}] ({model_source})"
     else:
       model_part = f"{model_name} ({model_source})"
     compile_tags_str = ",".join(compile_tags)
-    benchmark_name = f"{model_part} {target_arch} {compile_tags_str}"
-    return cls(benchmark_name=benchmark_name,
+    name = f"{model_part} {target_arch} {compile_tags_str}"
+    return cls(name=name,
                model_name=model_name,
                model_tags=tuple(model_tags),
                model_source=model_source,
@@ -499,7 +506,7 @@ class CompilationInfo(object):
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return CompilationInfo(benchmark_name=json_object["benchmark_name"],
+    return CompilationInfo(name=json_object["name"],
                            model_name=json_object["model_name"],
                            model_tags=tuple(json_object["model_tags"]),
                            model_source=json_object["model_source"],

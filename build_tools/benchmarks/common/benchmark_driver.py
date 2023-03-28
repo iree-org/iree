@@ -194,7 +194,7 @@ class BenchmarkDriver(object):
 
     run_tags = run_config.module_execution_config.tags
     compile_tags = run_config.module_generation_config.compile_config.tags
-    return BenchmarkInfo(benchmark_name=run_config.name,
+    return BenchmarkInfo(name=run_config.name,
                          model_name=benchmark_case.model_name,
                          model_tags=benchmark_case.model_tags,
                          model_source=category,
