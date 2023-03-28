@@ -152,6 +152,7 @@ def get_module_map_from_compilation_benchmark_config(
           (f"{arch.type.value}-{arch.architecture}-{arch.microarchitecture}-"
            f"{compile_target.target_abi.value}"))
     compilation_info = CompilationInfo(
+        name=gen_config.name,
         model_name=model.name,
         model_tags=tuple(model.tags),
         model_source=model.source_type.value,
@@ -186,7 +187,7 @@ def get_module_map_from_benchmark_suite(
       if module_path is None:
         raise RuntimeError(
             f"Can't find the module file in the flagfile: {flag_file_path}")
-      compilation_info = CompilationInfo(
+      compilation_info = CompilationInfo.build_with_legacy_name(
           model_name=benchmark_case.model_name,
           model_tags=tuple(benchmark_case.model_tags),
           model_source=category,
