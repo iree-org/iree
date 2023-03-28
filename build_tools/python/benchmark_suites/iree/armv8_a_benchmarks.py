@@ -81,8 +81,8 @@ class Android_ARMv8_A_Benchmarks(object):
         module_execution_configs.ELF_LOCAL_SYNC_CONFIG
     ]
     local_task_execution_configs = [
-        module_execution_configs.get_elf_local_task_config(thread_num)
-        for thread_num in [1, 4]
+        module_execution_configs.get_elf_system_scheduling_local_task_config(
+            thread_num) for thread_num in [1, 4]
     ]
 
     default_gen_confings = [
