@@ -259,30 +259,6 @@ struct LinalgStrategyTilePass
   LinalgExt::LinalgTransformationFilter filter;
 };
 
-/// Configurable pass to apply lowering of coarser-grained named linalg ops into
-/// finer-grained named versions.
-struct LinalgStrategyDecomposePass
-    : public LinalgStrategyDecomposePassBase<LinalgStrategyDecomposePass> {
-
-  LinalgStrategyDecomposePass() = default;
-
-  LinalgStrategyDecomposePass(LinalgExt::LinalgTransformationFilter filter)
-      : filter(std::move(filter)) {}
-
-  void runOnOperation() override {
-    auto funcOp = getOperation();
-    if (!anchorFuncName.empty() && funcOp.getName() != anchorFuncName)
-      return;
-    RewritePatternSet decompositionPattern(funcOp.getContext());
-    linalg::populateDecomposeConvolutionPatterns(decompositionPattern);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(decompositionPattern))))
-      signalPassFailure();
-  }
-
-  LinalgExt::LinalgTransformationFilter filter;
-};
-
 /// Configurable pass to apply pattern-based linalg vectorization.
 struct LinalgStrategyVectorizePass
     : public LinalgStrategyVectorizePassBase<LinalgStrategyVectorizePass> {
@@ -486,13 +462,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
     StringRef opName, const scf::SCFTilingOptions &options,
     const LinalgExt::LinalgTransformationFilter &filter) {
   return std::make_unique<LinalgStrategyTilePass>(opName, options, filter);
-}
-
-/// Create a LinalgStrategyDecomposePass.
-// TODO: if/when we need finer control add an `opName` parameter.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
-    const LinalgExt::LinalgTransformationFilter &filter) {
-  return std::make_unique<LinalgStrategyDecomposePass>(filter);
 }
 
 /// Create a LinalgStrategyVectorizePass.

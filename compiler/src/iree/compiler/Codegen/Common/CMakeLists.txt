@@ -182,6 +182,7 @@ iree_cc_library(
     "LinalgOpInfo.h"
     "UserConfig.h"
   SRCS
+    "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "ExtractAddressComputation.cpp"
     "FoldAffineMinInDistributedLoops.cpp"

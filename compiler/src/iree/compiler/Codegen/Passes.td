@@ -47,6 +47,13 @@ def DecomposeLinalgGeneric :
   let constructor = "mlir::iree_compiler::createDecomposeLinalgGenericPass()";
 }
 
+def DecomposeConvolutionToLowerDimOps :
+    Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
+  let summary = "Decomposes linalg convolution ops to lower dim ops";
+  let constructor =
+  "mlir::iree_compiler::createDecomposeConvolutionToLowerDimOpsPass()";
+}
+
 def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   let summary = "Decompose `affine.apply` operations into sub `affine.apply`";
   let description = [{

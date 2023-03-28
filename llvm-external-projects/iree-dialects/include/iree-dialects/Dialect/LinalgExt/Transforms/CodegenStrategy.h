@@ -55,19 +55,6 @@ private:
   scf::SCFTilingOptions options;
 };
 
-/// Represent one application of createLinalgStrategyDecomposePass.
-struct Decompose : public Transformation {
-  explicit Decompose(
-      LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr)
-      : Transformation(std::move(f)) {}
-
-  void
-  addToPassPipeline(OpPassManager &pm,
-                    LinalgExt::LinalgTransformationFilter m) const override {
-    pm.addPass(createLinalgStrategyDecomposePass(m));
-  }
-};
-
 /// Represent one application of createLinalgStrategyVectorizePass.
 struct Vectorize : public Transformation {
   explicit Vectorize(
@@ -125,19 +112,6 @@ struct CodegenStrategy {
   tileIf(bool b, StringRef opName, scf::SCFTilingOptions options,
          LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr) {
     return b ? tile(opName, std::move(options), std::move(f)) : *this;
-  }
-  /// Append patterns to decompose convolutions.
-  CodegenStrategy &
-  decompose(const LinalgExt::LinalgTransformationFilter::FilterFunction &f =
-                nullptr) {
-    transformationSequence.emplace_back(std::make_unique<Decompose>(f));
-    return *this;
-  }
-  /// Conditionally append patterns to decompose convolutions.
-  CodegenStrategy &decomposeIf(
-      bool b,
-      LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr) {
-    return b ? decompose(std::move(f)) : *this;
   }
   /// Append a pattern to rewrite `LinalgOpType` as a vector operation.
   CodegenStrategy &vectorize(
