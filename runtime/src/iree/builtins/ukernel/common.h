@@ -96,6 +96,17 @@
 // or stick to generic code.
 #include "iree/builtins/ukernel/arch/config.h"
 
+// Now that we have IREE_UK_ARCH_ARM_64 et al defined, based on that we can
+// include the architecture-specific configured header. What it defines is
+// architecture-specific details that we don't necessarily need in this header,
+// but having it included here ensures that all files consistently have this
+// defined.
+#if defined(IREE_UK_ARCH_ARM_64)
+#include "iree/builtins/ukernel/arch/arm_64/config.h"
+#elif defined(IREE_UK_ARCH_X86_64)
+#include "iree/builtins/ukernel/arch/x86_64/config.h"
+#endif
+
 // Include common flag values, shared with the compiler.
 #include "iree/builtins/ukernel/exported_bits.h"
 

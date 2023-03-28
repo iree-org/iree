@@ -6,7 +6,6 @@
 
 #include <immintrin.h>
 
-#include "iree/builtins/ukernel/arch/x86_64/config.h"
 #include "iree/builtins/ukernel/common.h"
 #include "iree/schemas/cpu_data.h"
 

@@ -241,6 +241,40 @@ const char* iree_uk_cpu_features_list_get_name(
   return list->name;
 }
 
+iree_uk_standard_cpu_features_t* iree_uk_standard_cpu_features_create(void) {
+  iree_uk_standard_cpu_features_t* cpu =
+      malloc(sizeof(iree_uk_standard_cpu_features_t));
+  memset(cpu, 0, sizeof *cpu);
+#if defined(IREE_UK_ARCH_ARM_64)
+  cpu->dotprod = iree_uk_cpu_features_list_create(1, "dotprod");
+  cpu->i8mm = iree_uk_cpu_features_list_create(1, "i8mm");
+#elif defined(IREE_UK_ARCH_X86_64)
+  cpu->avx2_fma = iree_uk_cpu_features_list_create(3, "avx", "avx2", "fma");
+  iree_uk_cpu_features_list_set_name(cpu->avx2_fma, "avx2_fma");
+  cpu->avx512_base = iree_uk_cpu_features_list_create_extend(
+      cpu->avx2_fma, 5, "avx512f", "avx512bw", "avx512dq", "avx512vl",
+      "avx512cd");
+  iree_uk_cpu_features_list_set_name(cpu->avx512_base, "avx512_base");
+  cpu->avx512_vnni = iree_uk_cpu_features_list_create_extend(cpu->avx512_base,
+                                                             1, "avx512vnni");
+  iree_uk_cpu_features_list_set_name(cpu->avx512_vnni, "avx512_vnni");
+#endif
+  return cpu;
+}
+
+void iree_uk_standard_cpu_features_destroy(
+    iree_uk_standard_cpu_features_t* cpu) {
+#if defined(IREE_UK_ARCH_ARM_64)
+  iree_uk_cpu_features_list_destroy(cpu->dotprod);
+  iree_uk_cpu_features_list_destroy(cpu->i8mm);
+#elif defined(IREE_UK_ARCH_X86_64)
+  iree_uk_cpu_features_list_destroy(cpu->avx2_fma);
+  iree_uk_cpu_features_list_destroy(cpu->avx512_base);
+  iree_uk_cpu_features_list_destroy(cpu->avx512_vnni);
+#endif
+  free(cpu);
+}
+
 void iree_uk_make_cpu_data_for_features(
     const iree_uk_cpu_features_list_t* cpu_features,
     iree_uk_uint64_t* out_cpu_data_fields) {
