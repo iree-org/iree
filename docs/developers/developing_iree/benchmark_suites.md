@@ -151,7 +151,7 @@ If you don't have aritfacts locally, see
 find the GCS directory of the CI artifacts. Then fetch the needed files:
 
 ```sh
-export GCS_URL="gs://iree-github-actions-...-artifacts/.../..."
+export GCS_URL="gs://iree-github-actions-<presubmit|postsubmit>-artifacts/<run_id>/<run_attempt>"
 export E2E_TEST_ARTIFACTS_DIR="e2e_test_artifacts"
 
 # Download all artifacts
@@ -189,8 +189,8 @@ by clicking the green check mark. Click the `Details` of job
 
 On the job detail page, expand the step `Uploading e2 test artifacts`, you will
 see a bunch of lines like below. The
-URL`gs://iree-github-actions-...-artifacts/.../.../` is the directory of
-artifacts:
+URL`gs://iree-github-actions-<presubmit|postsubmit>-artifacts/<run_id>/<run_attempt>/`
+is the directory of artifacts:
 
 ```
 Copying file://build-e2e-test-artifacts/e2e_test_artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb to gs://iree-github-actions-postsubmit-artifacts/4360950546/1/e2e-test-artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb
@@ -206,19 +206,39 @@ more usages). If you want to use CI artifacts to reproduce benchmarks locally,
 see
 [Find Compile and Run Commands to Reproduce Benchmarks](#find-compile-and-run-commands-to-reproduce-benchmarks).
 
+Set the GCS directory URL from the step
+[2. Get the GCS directory of the built artifacts](#2-get-the-gcs-directory-of-the-built-artifacts):
+
+```sh
+export GCS_URL="gs://iree-github-actions-<presubmit|postsubmit>-artifacts/<run_id>/<run_attempt>"
+```
+
+Download artifacts:
+
 ```sh
 # The GCS directory has the same structure as your local ${IREE_BUILD_DIR}/e2e_test_artifacts.
-gcloud storage ls gs://iree-github-actions-postsubmit-artifacts/.../.../e2e-test-artifacts
+gcloud storage ls "${GCS_URL}/e2e-test-artifacts"
 
 # Download all source and imported MLIR files:
-gcloud storage cp "gs://iree-github-actions-postsubmit-artifacts/.../.../e2e-test-artifacts/*.mlir" "<target_dir>"
+gcloud storage cp "${GCS_URL}/e2e-test-artifacts/*.mlir" "<target_dir>"
 ```
 
 Execution and compilation benchmark configs can be downloaded at:
 
 ```sh
 # Execution benchmark config:
-gcloud storage cp gs://iree-github-actions-postsubmit-artifacts/.../.../benchmark-config.json .
+gcloud storage cp "${GCS_URL}/benchmark-config.json" exec_config.json
+
 # Compilation benchmark config:
-gcloud storage cp gs://iree-github-actions-postsubmit-artifacts/.../.../compilation-config.json .
+gcloud storage cp "${GCS_URL}/compilation-config.json" comp_config.json
+```
+
+Benchmark raw results and traces can be downloaded at:
+
+```sh
+# Benchmark raw results
+gcloud storage cp "${GCS_URL}/benchmark-results/benchmark-results-*.json" .
+
+# Benchmark traces
+gcloud storage cp "${GCS_URL}/benchmark-results/benchmark-traces-*.tar.gz" .
 ```
