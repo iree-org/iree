@@ -63,6 +63,8 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
+    convolution_implicit_gemm_nchw_spec.mlir
+    convolution_implicit_gemm_nhwc_spec.mlir
     convolution_match_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir

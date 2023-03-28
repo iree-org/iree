@@ -74,6 +74,8 @@ iree_lit_test_suite(
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.
     data = [
+        "convolution_implicit_gemm_nchw_spec.mlir",
+        "convolution_implicit_gemm_nhwc_spec.mlir",
         "convolution_match_spec.mlir",
         "reductions_codegen_spec.mlir",
         "reductions_match_spec.mlir",

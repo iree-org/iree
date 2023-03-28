@@ -16,12 +16,15 @@ iree_compiler_cc_library(
     name = "TransformDialectStrategies",
     srcs = [
         "Common.cpp",
+        "ConvolutionImplicitGemmStrategy.cpp",
         "SmallReductionStrategy.cpp",
         "StagedReductionStrategy.cpp",
     ],
     hdrs = [
+        "AbstractConvolutionStrategy.h",
         "AbstractReductionStrategy.h",
         "Common.h",
+        "ConvolutionImplicitGemmStrategy.h",
         "SmallReductionStrategy.h",
         "StagedReductionStrategy.h",
     ],

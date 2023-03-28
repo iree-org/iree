@@ -10,7 +10,9 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractConvolutionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/ConvolutionImplicitGemmStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/SmallReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/StagedReductionStrategy.h"
 #include "llvm/Support/Debug.h"
@@ -53,6 +55,9 @@ using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
 using iree_compiler::gpu::buildSmallReductionStrategy;
 using iree_compiler::gpu::buildStagedReductionStrategy;
+using iree_compiler::gpu::ConvolutionConfig;
+using iree_compiler::gpu::ConvolutionImplicitGemmStrategy;
+using iree_compiler::gpu::ConvolutionStrategy;
 using iree_compiler::gpu::GPUModel;
 using iree_compiler::gpu::kCudaMaxNumThreads;
 using iree_compiler::gpu::kCudaMaxVectorLoadBitWidth;
@@ -422,6 +427,80 @@ LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
       auto strategy = StagedReductionStrategy::create(
           op->getContext(), captures, reductionConfig);
       return buildStagedReductionStrategy(b, variant, strategy);
+    } else {
+      return llvm_unreachable("Unknown strategy");
+    }
+  };
+
+  // 3. Build strategy embedded into the IR.
+  createTransformRegion(entryPoint, strategyBuilder);
+
+  return success();
+}
+
+//===--------------------------------------------------------------------===//
+// Convolution strategies
+//===--------------------------------------------------------------------===//
+
+static ConvolutionConfig getConvolutionConfig(
+    const transform_ext::MatchedConvolutionCaptures &captures,
+    const GPUModel &gpuModel) {
+  int64_t bitWidth = captures.convolutionOutputElementalTypeBitWidth;
+  int64_t vectorSize = scaleUpByBitWidth(4, bitWidth);
+  int64_t maxNumThreads = 8 * gpuModel.subgroupSize;
+  int64_t subgroupSize = gpuModel.subgroupSize;
+  return ConvolutionConfig{maxNumThreads, vectorSize, subgroupSize,
+                           gpuModel.isSpirv, ConvolutionStrategy::ImplicitGemm};
+}
+
+static LogicalResult verifyImplicitGemmCompatibleConvolutionCaptures(
+    const transform_ext::MatchedConvolutionCaptures &captures,
+    const GPUModel &gpuModel) {
+  bool isNchw = captures.convolutionDims.outputChannel[0] <
+                captures.convolutionDims.outputImage[0];
+  int channelSize = 1;
+  int imageSize = 1;
+  for (auto dim : captures.convolutionDims.outputChannel)
+    channelSize *= captures.convolutionOpSizes[dim];
+  for (auto dim : captures.convolutionDims.outputImage)
+    imageSize *= captures.convolutionOpSizes[dim];
+
+  int mSize, nSize;
+  if (isNchw) {
+    mSize = channelSize;
+    nSize = imageSize;
+  } else {
+    mSize = imageSize;
+    nSize = channelSize;
+  }
+
+  int kSize = 1;
+  for (auto dim : captures.convolutionDims.filterLoop)
+    kSize *= captures.convolutionOpSizes[dim];
+  for (auto dim : captures.convolutionDims.inputChannel)
+    kSize *= captures.convolutionOpSizes[dim];
+
+  if (mSize % 16 != 0 || nSize % 16 != 0 || kSize % 16 != 0) return failure();
+  return success();
+}
+
+LogicalResult mlir::iree_compiler::gpu::matchAndSetConvolutionStrategy(
+    func::FuncOp entryPoint, linalg::LinalgOp op, const GPUModel &gpuModel) {
+  // 1. Match a reduction and surrounding ops.
+  StructuredOpMatcher *convolution;
+  transform_ext::MatchedConvolutionCaptures captures;
+  transform_ext::MatcherContext matcherContext;
+  makeConvolutionMatcher(matcherContext, convolution, captures);
+  if (!matchPattern(op, *convolution)) return failure();
+
+  // 2. Construct the configuration and the strategy builder.
+  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+    ConvolutionConfig convolutionConfig =
+        getConvolutionConfig(captures, gpuModel);
+    if (convolutionConfig.strategy == ConvolutionStrategy::ImplicitGemm) {
+      auto strategy = ConvolutionImplicitGemmStrategy::create(
+          op->getContext(), captures, convolutionConfig);
+      return buildConvolutionImplicitGemmStrategy(b, variant, strategy);
     } else {
       return llvm_unreachable("Unknown strategy");
     }
