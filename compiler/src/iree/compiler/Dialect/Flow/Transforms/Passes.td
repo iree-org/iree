@@ -71,6 +71,10 @@ def FormDispatchRegions :
            /*default=*/"false", "Fuse multi-use ops">,
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
+    Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
+           /*default=*/"false", "Enalbe fusing pad with consumer">,
+    Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",
+           /*default=*/"false", "Enable fusion of pad with producers">
   ];
 }
 

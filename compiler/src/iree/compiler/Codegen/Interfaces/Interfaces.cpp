@@ -43,7 +43,6 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerTransformDialectLLVMCPUExtension(registry);
   registerTransformDialectLLVMGPUExtension(registry);
   linalg::registerTilingInterfaceExternalModels(registry);
-
   affine::registerTransformDialectExtension(registry);
   bufferization::registerTransformDialectExtension(registry);
   gpu::registerTransformDialectExtension(registry);

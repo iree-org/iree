@@ -289,10 +289,16 @@ def TensorToVectorVectorizePad :
       "mlir::iree_compiler::createVectorizePadPass()";
 }
 
+def DecomposePackUnPackOps :
+    Pass<"iree-codegen-decompose-pack-unpack-ops", "func::FuncOp"> {
+  let summary = "Decompose pack/unpack ops into vectorizable ops";
+  let constructor = "mlir::iree_compiler::createDecomposePackUnPackOpsPass()";
+}
+
 def VectorizePackUnPackOps :
     Pass<"iree-codegen-vectorize-pack-unpack-ops", "func::FuncOp"> {
-  let summary = "Vectorize a very specific form of tensor.pad with "
-                "control flows";
+  let summary = "Vectorize ops that are created after decomposition of "
+                "pack/unpack ops";
   let constructor =
       "mlir::iree_compiler::createVectorizePackUnPackOpsPass()";
 }

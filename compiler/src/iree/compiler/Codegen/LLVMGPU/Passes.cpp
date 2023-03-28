@@ -433,6 +433,8 @@ void addGPUPackUnPackPasses(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
   nestedModulePM.addNestedPass<func::FuncOp>(
+      createDecomposePackUnPackOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
       createVectorizePackUnPackOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());

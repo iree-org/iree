@@ -136,6 +136,10 @@ createConvertToDestinationPassingStylePass(
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 
+/// Creates a pass to decompose tensor.pack and tensor.unpack ops. The pass does
+/// tiling and generalization. See implementation for more details.
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass();
+
 /// Creates a pass to vectorize tensor.pack and tensor.unpack ops. The pass does
 /// tiling, generalization, and kicking in the generic vectorizer. See
 /// implementation for more details.

@@ -332,8 +332,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
                                              bool enableVectorMasking) {
   addTileAndDistributePasses(passManager);
 
-    // Skip tiling reduction loops because this is expected to apply on copy ops
-    // only.
+  // Skip tiling reduction loops because this is expected to apply on copy ops
+  // only.
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   {
     LinalgSingleTilingExpertPassOptions options;
@@ -490,6 +490,10 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   }
 
   {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createDecomposePackUnPackOpsPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.enableVectorMasking = enableVectorMasking;
@@ -500,8 +504,6 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     // TODO(hanchung): Merge two vectorization passes into a pass. All the ops
     // should be vectorized altogether. Otherwise, there would be tensor.empty
     // ops which becomes a stack allocation in bufferization.
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createVectorizePackUnPackOpsPass());
   }
 
   addBufferizePasses(nestedModulePM);
@@ -640,6 +642,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 void addCPUDataTilingPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createDecomposePackUnPackOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createVectorizePackUnPackOpsPass());
   addBufferizePasses(nestedModulePM);
