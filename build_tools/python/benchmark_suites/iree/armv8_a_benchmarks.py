@@ -89,7 +89,8 @@ class Android_ARMv8_A_Benchmarks(object):
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in self.NONQUANT_MODELS + self.MOBILENET_MODELS + self.QUANT_MODELS
+        for model in self.NONQUANT_MODELS + self.MOBILENET_MODELS +
+        self.QUANT_MODELS
     ]
     experimental_gen_confings = [
         iree_definitions.ModuleGenerationConfig.build(
