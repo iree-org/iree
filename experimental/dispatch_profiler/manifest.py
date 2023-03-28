@@ -6,6 +6,55 @@ from library import *
 from matmul import *
 
 
+###############################################################################
+class EmitSourceMLIR:
+  """Emitters for the operation MLIR source files."""
+
+  def __init__(self, operation_path, dispatch_collection):
+    self.operation_path = operation_path
+    self.dispatch_collection = dispatch_collection
+    self.operation = dispatch_collection.operation
+    self.operation_kind = self.operation.operation_kind
+    self.configuration_list = dispatch_collection.configuration_list
+    self.operation_filepath = os.path.join(self.operation_path, \
+                                           self.operation.name() + ".mlir")
+
+    mlir_configuration_emitter = {
+        OperationKind.Matmul: EmitMatmulCompilationInfo,
+        #OperationKind.Conv2d : EmitConv2dCompilationInfo, TODO: Add conv2d
+    }
+    self.configuration_emitter = mlir_configuration_emitter[
+        self.operation_kind]()
+
+    mlir_dispatch_emitter = {
+        OperationKind.Matmul: EmitLinalgMatmulDispatch,
+        #OperationKind.Conv2d : EmitLinalgConv2dDispatch, TODO: Add conv2d
+    }
+    self.dispatch_emitter = mlir_dispatch_emitter[self.operation_kind]()
+
+  def __enter__(self):
+    self.operation_file = open(self.operation_filepath, "w")
+    self.operation_file.write('// Finename: ' + self.operation_filepath)
+
+    # Emit all the configuration attribute tags.
+    for configuration in self.configuration_list:
+      self.operation_file.write(self.configuration_emitter.emit(configuration))
+    return self
+
+  def emit(self):
+    """Emit the op func.func for each dispatch (operation + configuration)"""
+    for dispatch in self.dispatch_collection.get_dispatches():
+      print(
+          f"    Emitting {OperationKindNames[self.operation_kind]} tuning parameters: "\
+          f"{dispatch.configuration.name()}"
+      )
+      self.operation_file.write(self.dispatch_emitter.emit(dispatch))
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.operation_file.close()
+
+
+###############################################################################
 class Manifest:
   """Manifest collects, filters, and stores dispatches in a data structure.
      Manifest organizes the dispatches in a dictionary of `OperationKind` 
@@ -108,14 +157,15 @@ class Manifest:
     for dispatch_collection in dispatch_collection_list:
       self.append_dispatch_collection(dispatch_collection)
 
+  def load(self):
+    """Loads the manifest with pre-defined dispatches for supported operations."""
+    matmul_dispatch_collection_list = MatmulGenerator(self.args).generate()
+    self.append(matmul_dispatch_collection_list)
+
   def emit(self, mlir_dialect=MlirDialect.Linalg):
     """Emits the operations in the Manifest to the build directory as MLIR source files.
         The operations are emitted in the dialect specified by the `mlir_dialect` flag.
     """
-    mlir_source_emitter = {
-        OperationKind.Matmul: EmitMatmulSourceMlir,
-        #OperationKind.Conv2d : EmitConv2dSourceMlir, TODO: Add conv2d
-    }
 
     generated_path = os.path.join(self.args.build_dir, 'generated',
                                   MlirDialectNames[mlir_dialect])
@@ -146,10 +196,10 @@ class Manifest:
           shutil.rmtree(operation_path)
         os.makedirs(operation_path)
 
-        with mlir_source_emitter[operation_kind](operation_path, dispatch_collection)\
-                            as mlir_source:
+        with EmitSourceMLIR(operation_path,
+                            dispatch_collection) as emit_mlir_source:
 
           print(">> Generating MLIR operation: " +
                 dispatch_collection.operation.name())
           # Emit mlir source file for the dispatch_collection.operation with all the configurations
-          mlir_source.emit()
+          emit_mlir_source.emit()
