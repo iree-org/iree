@@ -123,7 +123,7 @@ class RemoveSingleIterationLoopPass final
     if (failed(exportOp)) return;
 
     SmallVector<int64_t> workgroupSize = getWorkgroupSize(*exportOp);
-    SmallVector<int64_t> numWorkgroups = getNumWorkgroup(funcOp);
+    SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
 
     if (failed(removeOneTripTiledLoops(funcOp, workgroupSize, numWorkgroups))) {
       return signalPassFailure();

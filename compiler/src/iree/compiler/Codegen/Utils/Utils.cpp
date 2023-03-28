@@ -559,13 +559,8 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 }
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes, bool skipDistributionLoops) {
-  // The number of workgroups is calculated so that each workgroup gets
-  // exactly one tile so we can skip emitting the loop.
-  linalg::DistributionMethod distributionMethod =
-      skipDistributionLoops
-          ? linalg::DistributionMethod::CyclicNumProcsEqNumIters
-          : linalg::DistributionMethod::Cyclic;
+    const SmallVector<int64_t> &tileSizes,
+    linalg::DistributionMethod distributionMethod) {
   return {[&tileSizes, distributionMethod](OpBuilder &builder, Location loc,
                                            ArrayRef<Range> parallelLoopRanges) {
     SmallVector<int64_t> nonZeroTileSizes;
@@ -814,7 +809,7 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 }
 
 /// Infer the number of workgroups from exportOp.
-SmallVector<int64_t> getNumWorkgroup(func::FuncOp funcOp) {
+SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp) {
   SmallVector<int64_t> result;
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) return result;

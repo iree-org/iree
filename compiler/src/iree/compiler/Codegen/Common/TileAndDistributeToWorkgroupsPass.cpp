@@ -413,10 +413,14 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
           }));
     };
 
+    linalg::DistributionMethod distributionMethod =
+        skipDistributionLoops
+            ? linalg::DistributionMethod::CyclicNumProcsEqNumIters
+            : linalg::DistributionMethod::Cyclic;
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
             .setDistributionOptions(getIREELinalgLoopDistributionOptions(
-                tileSizes, skipDistributionLoops))
+                tileSizes, distributionMethod))
             .setInterchange(llvm::to_vector<4>(
                 llvm::map_range(interchange,
                                 [](int64_t v) -> unsigned {
@@ -450,7 +454,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     });
 
     {
-      SmallVector<int64_t> staticNumWorkgroup = getNumWorkgroup(funcOp);
+      SmallVector<int64_t> staticNumWorkgroup = getStaticNumWorkgroups(funcOp);
       // Apply linalg tiling optimization patterns, which includes folding
       // casting ops into tiled operations.
       RewritePatternSet patterns(context);

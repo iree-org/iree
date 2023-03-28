@@ -159,7 +159,7 @@ struct FoldAffineMinInDistributedLoopsPass final
           FoldAffineMinInDistributedLoopsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    SmallVector<int64_t> numWorkgroups = getNumWorkgroup(getOperation());
+    SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(getOperation());
     populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
