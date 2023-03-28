@@ -923,13 +923,15 @@ jobs:
         target:
           - platform: "linux"
             arch: "x86_64"
-            docker_image: "gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8"
+            docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd"
             # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
           - platform: "linux"
             arch: "riscv_64"
             docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
             build_script: "./build_tools/cmake/build_riscv.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
@@ -966,14 +968,38 @@ jobs:
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
+      - name: "Downloading pre-built tracy capture tool"
+        id: download-tracy-capture
+        env:
+          TRACY_CAPTURE_GCS_ARTIFACT: ${{ matrix.target.tracy_capture }}
+          TRACY_CAPTURE: ${{ env.BUILD_TOOLS_DIR }}/build-traced/tracy-capture
+        run: |
+          gcloud storage cp "${TRACY_CAPTURE_GCS_ARTIFACT}" "${TRACY_CAPTURE}"
+          chmod +x "${TRACY_CAPTURE}"
+          echo "tracy-capture=${TRACY_CAPTURE}" >> "${GITHUB_OUTPUT}"
       - name: "Creating the benchmark tools archive"
+        # Here we pack a tracy-capture binary (~7MB) into each benchmark tools
+        # archive. This could be wasteful because multiple benchmark tools
+        # archives might pack the same tracy-capture binary. But it simplifies
+        # the process to fetch required tools to run benchmarks and we only have
+        # a few versions of the benchmark tools archives.
+        # Detailed reason: The generated benchmark matrix fetches the benchmark
+        # tools archive based on the target device. However, there is a scenario
+        # that the tracy-capture is running on a different host. E.g. Mobile
+        # benchmarks have the benchmark tool forwarding the data from the phones
+        # to the tracy-capture running on Linux host. Embedding the host of
+        # tracy-capture will overloads the benchmark matrix and puts too much
+        # unrelated machine setup in it. So we simply pack everything needed
+        # into each benchmark tools archive.
         id: archive
         env:
-          BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools.tar
+          TRACY_CAPTURE: ${{ steps.download-tracy-capture.outputs.tracy-capture }}
+          BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM }}-${{ env.ARCH }}-benchmark-tools.tar
         run: |
           tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
             "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
-            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt
+            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt \
+            "${TRACY_CAPTURE}"
           echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading the benchmark tools archive"
         id: upload

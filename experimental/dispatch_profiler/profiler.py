@@ -56,11 +56,9 @@ if __name__ == "__main__":
   parser.add_argument("--dispatches", default='', help="Comma delimited list to "\
                       "filter dispatches by name. A dispatch is a combination of "\
                       "operation and tuning configuration.")
-  parser.add_argument("--mlir-dialect",
-                      default='linalg',
-                      help='MLIR dialect entry "\
-                      "point at which operation is emitter. For example, "\
-                      "linalg*, mhlo, etc.')
+  parser.add_argument("--mlir-dialect", default='linalg', help="MLIR dialect entry "\
+                      "point at which operation is emitter.",
+                      choices=["linalg", "flow", "all"])
   # Compilation-specific options
   parser.add_argument("--device", default="cuda", \
                       help="Target backend device to benchmark the operation on. "\
@@ -119,9 +117,8 @@ if __name__ == "__main__":
   # Manifests metadata for a group of accompanying operations and configurations.
   manifest = Manifest(args)
 
-  # Collect all the avialable operations in a manifest.
-  gpu_matmul_tensor_cores_f16(manifest)
-  #gpu_matmul_tensor_cores_f32(manifest)
+  # Load all the pre-defined dispatches in a manifest.
+  manifest.load()
 
   # Performance report
   perf_report = PerformanceReport(args)

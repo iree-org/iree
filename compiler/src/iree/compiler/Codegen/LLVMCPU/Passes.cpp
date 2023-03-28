@@ -524,16 +524,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   }
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
       static_cast<int64_t>(StrategyTilingLevel::ReductionTiles)));
-
-  // Add the sandbox single tiling expert to tile.
-  {
-    LinalgSingleTilingExpertPassOptions options;
-    options.decomposeToLowerDimOp = true;
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createDecomposeConvolutionToLowerDimOpsPass());
 
   if (clEnablePadConsumerFusion) {
     nestedModulePM.addNestedPass<func::FuncOp>(

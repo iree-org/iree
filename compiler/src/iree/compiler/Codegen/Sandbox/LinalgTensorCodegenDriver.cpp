@@ -239,7 +239,6 @@ struct LinalgSingleTilingExpertPass
     this->anchorOpName = options.anchorOpName;
     this->generalize = options.generalize;
     this->iteratorInterchange = options.iteratorInterchange;
-    this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
     this->vectorize = options.vectorize;
     this->enableVectorMasking = options.enableVectorMasking;
     this->vectorizePadding = options.vectorizePadding;
@@ -431,9 +430,8 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   CodegenStrategy strategy;
   StringRef genericOpName = linalg::GenericOp::getOperationName();
-  strategy.decomposeIf(decomposeToLowerDimOp)
-      .vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
-                   vectorizationOptions);
+  strategy.vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
+                       vectorizationOptions);
 
   // Created a nested OpPassManager and run.
   OpPassManager dynamicPM(func::FuncOp::getOperationName());

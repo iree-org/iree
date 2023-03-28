@@ -181,25 +181,28 @@ class BenchmarkDriver(object):
 
   def __get_benchmark_info_from_case(
       self, category: str, benchmark_case: BenchmarkCase) -> BenchmarkInfo:
-    if benchmark_case.run_config is None:
+    run_config = benchmark_case.run_config
+    if run_config is None:
       # TODO(#11076): Remove legacy path.
-      return BenchmarkInfo(model_name=benchmark_case.model_name,
-                           model_tags=benchmark_case.model_tags,
-                           model_source=category,
-                           bench_mode=benchmark_case.bench_mode,
-                           driver_info=benchmark_case.driver_info,
-                           device_info=self.device_info)
+      return BenchmarkInfo.build_with_legacy_name(
+          model_name=benchmark_case.model_name,
+          model_tags=benchmark_case.model_tags,
+          model_source=category,
+          bench_mode=benchmark_case.bench_mode,
+          driver_info=benchmark_case.driver_info,
+          device_info=self.device_info)
 
-    run_tags = benchmark_case.run_config.module_execution_config.tags
-    compile_tags = benchmark_case.run_config.module_generation_config.compile_config.tags
-    return BenchmarkInfo(model_name=benchmark_case.model_name,
+    run_tags = run_config.module_execution_config.tags
+    compile_tags = run_config.module_generation_config.compile_config.tags
+    return BenchmarkInfo(name=run_config.name,
+                         model_name=benchmark_case.model_name,
                          model_tags=benchmark_case.model_tags,
                          model_source=category,
                          bench_mode=run_tags,
                          compile_tags=compile_tags,
                          driver_info=benchmark_case.driver_info,
                          device_info=self.device_info,
-                         run_config_id=benchmark_case.run_config.composite_id)
+                         run_config_id=run_config.composite_id)
 
   def __get_available_drivers_and_loaders(
       self) -> Tuple[Sequence[str], Sequence[str]]:
