@@ -207,6 +207,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "Common",
     srcs = [
+        "DecomposeConvolutionToLowerDimOps.cpp",
         "DecomposeLinalgGeneric.cpp",
         "ExtractAddressComputation.cpp",
         "FoldAffineMinInDistributedLoops.cpp",

@@ -51,14 +51,6 @@ def LinalgSingleTilingExpert
                "Interator interchange.",
                "llvm::cl::ZeroOrMore">,
 
-    // Decomposition options.
-    // TODO: atm this is applied to all supported ops. If/when we need finer
-    // control this should be exposed with an opName + filter and a proper
-    // pattern.
-    Option<"decomposeToLowerDimOp", "decompose-to-lower-dim", "bool",
-      /*default=*/"false",
-      "Convert named operations to lower-D named operations.">,
-
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,

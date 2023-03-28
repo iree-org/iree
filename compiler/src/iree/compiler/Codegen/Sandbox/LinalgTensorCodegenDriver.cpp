@@ -280,7 +280,6 @@ struct LinalgSingleTilingExpertPass
     this->tileInterchange = options.tileInterchange;
     this->generalize = options.generalize;
     this->iteratorInterchange = options.iteratorInterchange;
-    this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
     this->vectorize = options.vectorize;
     this->enableVectorMasking = options.enableVectorMasking;
     this->vectorizePadding = options.vectorizePadding;
@@ -489,7 +488,6 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   CodegenStrategy strategy;
   StringRef genericOpName = linalg::GenericOp::getOperationName();
   strategy.tileIf(doTiling, anchorOpName, tilingOptions)
-      .decomposeIf(decomposeToLowerDimOp)
       .vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
                    vectorizationOptions);
 

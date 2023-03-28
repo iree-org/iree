@@ -24,7 +24,6 @@ struct LinalgSingleTilingExpertPassOptions {
   SmallVector<int64_t> tileInterchange = {};
   bool generalize = false;
   SmallVector<int64_t> iteratorInterchange = {};
-  bool decomposeToLowerDimOp = false;
   bool vectorize = false;
   bool enableVectorMasking = false;
   bool vectorizePadding = false;

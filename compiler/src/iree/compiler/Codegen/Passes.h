@@ -64,6 +64,9 @@ createBufferizeCopyOnlyDispatchesPass();
 // one op in the body.
 std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 
+// Decomposes high-D convolution ops into low-D ones.
+std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass();
+
 // Decompose affine.apply operations into sub affine.apply that can be
 // hoisted in different loops.
 std::unique_ptr<Pass> createDecomposeAffineOpsPass();
