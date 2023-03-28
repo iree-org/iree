@@ -148,5 +148,21 @@ DiagnosedSilenceableFailure LinalgExt::RewriteForallToScfForOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
+//===---------------------------------------------------------------------===//
+// TileAndDecomposeAttention
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure LinalgExt::TileAndDecomposeAttentionOp::applyToOne(
+    LinalgExt::AttentionOp attentionOp,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  SmallVector<Operation *> ops =
+      LinalgExt::tileAndDecomposeAttention(attentionOp, rewriter);
+  for (auto op : ops)
+    results.push_back(op);
+  return DiagnosedSilenceableFailure::success();
+}
+
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.cpp.inc"

@@ -15,7 +15,7 @@ transform.sequence failures(propagate) {
     // ==========================================
     %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!pdl.operation) -> !pdl.operation
     %outer_loop, %max_fill, %sum_fill, %inner_loop, %fill_op, %first_matmul, %reduce_max, %partial_softmax, %reduce_sum, %update,
-    %softmax, %scale_acc, %second_matmul = transform.iree.tile_and_decompose_attention %attention2 :
+    %softmax, %scale_acc, %second_matmul = tile_and_decompose_attention %attention2 :
        (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation,!pdl.operation,  !pdl.operation, !pdl.operation)
 
     // Vectorize function
