@@ -37,13 +37,6 @@ def LinalgSingleTilingExpert
     Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
       "Which linalg op within the func is the anchor to latch on.">,
 
-    // Tiling options.
-    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"tileInterchange", "tile-interchange", "int64_t",
-                "Tile loop interchange",
-                "llvm::cl::ZeroOrMore">,
-
     // Generalization options.
     Option<"generalize", "generalize", "bool", /*default=*/"false",
       "Convert named operations to their generic form.">,
