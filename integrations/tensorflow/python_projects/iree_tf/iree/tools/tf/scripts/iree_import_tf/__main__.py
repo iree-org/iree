@@ -10,10 +10,7 @@ from pathlib import Path
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-p',
-                    '--saved_model_path',
-                    dest='saved_model_path',
-                    required=True,
+parser.add_argument('saved_model_path',
                     help='Path to the saved model directory to import.')
 parser.add_argument('-o',
                     '--output_path',
