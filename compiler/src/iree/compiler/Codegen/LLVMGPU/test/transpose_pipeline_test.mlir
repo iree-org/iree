@@ -42,20 +42,20 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //       CHECK:  %[[D5:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<4096x4096xf32>
 //       CHECK:  memref.assume_alignment %[[D5]], 64 : memref<4096x4096xf32>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D6:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %[[D1]], %[[D2]], %{{.*}}]
-//       CHECK:  %[[D7:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %{{.*}}]
-//       CHECK:  %[[D8:.*]] = vector.transfer_read %[[D4]]{{\[}}%[[D6]], %[[D7]]], %[[CST]] {in_bounds = [true, true]} : memref<4096x4096xf32>, vector<1x4xf32>
-//       CHECK:  %[[D9:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %[[D1]], %[[D2]]]
-//       CHECK:  %[[D10:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]]]
-//       CHECK:  vector.transfer_write %[[D8]], %[[D3]]{{\[}}%[[D9]], %[[D10]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<32x33xf32, #gpu.address_space<workgroup>>
+//       CHECK:  %[[D6:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]], %[[D1]], %[[D2]]]
+//       CHECK:  %[[D7:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
+//       CHECK:  %[[D8:.*]] = vector.transfer_read %[[D4]][%[[D6]], %[[D7]]], %[[CST]] {in_bounds = [true, true]} : memref<4096x4096xf32>, vector<1x4xf32>
+//       CHECK:  %[[D9:.*]] = affine.apply #{{.*}}()[%[[D0]], %[[D1]], %[[D2]]]
+//       CHECK:  %[[D10:.*]] = affine.apply #{{.*}}()[%[[D0]]]
+//       CHECK:  vector.transfer_write %[[D8]], %[[D3]][%[[D9]], %[[D10]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D11:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]]]
-//       CHECK:  %[[D12:.*]] = vector.transfer_read %[[D3]]{{\[}}%[[D11]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:  %[[D11:.*]] = affine.apply #{{.*}}()[%[[D0]]]
+//       CHECK:  %[[D12:.*]] = vector.transfer_read %[[D3]][%[[D11]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:  %[[D13:.*]] = vector.shape_cast %[[D12]] : vector<4x1xf32> to vector<1x4xf32>
 //       CHECK:  %[[D14:.*]] = vector.extract %[[D13]][0] : vector<1x4xf32>
-//       CHECK:  %[[D15:.*]] = affine.apply #{{.*}}(){{\[}}%{{.*}}, %[[D1]]]
-//       CHECK:  %[[D16:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %{{.*}}]
-//       CHECK:  vector.transfer_write %[[D14]], %[[D5]]{{\[}}%[[D15]], %[[D16]]] {in_bounds = [true]} : vector<4xf32>, memref<4096x4096xf32>
+//       CHECK:  %[[D15:.*]] = affine.apply #{{.*}}()[%[[D1]], %{{.*}}]
+//       CHECK:  %[[D16:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
+//       CHECK:  vector.transfer_write %[[D14]], %[[D5]][%[[D15]], %[[D16]]] {in_bounds = [true]} : vector<4xf32>, memref<4096x4096xf32>
 
 // -----
 
@@ -107,22 +107,22 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //       CHECK:  %[[D6:.*]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<768x2048xf32>
 //       CHECK:  memref.assume_alignment %[[D6]], 64 : memref<768x2048xf32>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D7:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %[[D1]], %[[D2]], %{{.*}}]
-//       CHECK:  %[[D8:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %{{.*}}]
-//       CHECK:  %[[D9:.*]] = vector.transfer_read %[[D4]]{{\[}}%[[D7]], %[[D8]]], %[[CST]] {in_bounds = [true, true]} : memref<2048x768xf32>, vector<1x4xf32>
-//       CHECK:  %[[D10:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %[[D1]], %[[D2]]]
-//       CHECK:  %[[D11:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]]]
-//       CHECK:  vector.transfer_write %[[D9]], %[[D3]]{{\[}}%[[D10]], %[[D11]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<32x33xf32, #gpu.address_space<workgroup>>
+//       CHECK:  %[[D7:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]], %[[D1]], %[[D2]]]
+//       CHECK:  %[[D8:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
+//       CHECK:  %[[D9:.*]] = vector.transfer_read %[[D4]][%[[D7]], %[[D8]]], %[[CST]] {in_bounds = [true, true]} : memref<2048x768xf32>, vector<1x4xf32>
+//       CHECK:  %[[D10:.*]] = affine.apply #{{.*}}()[%[[D0]], %[[D1]], %[[D2]]]
+//       CHECK:  %[[D11:.*]] = affine.apply #{{.*}}()[%[[D0]]]
+//       CHECK:  vector.transfer_write %[[D9]], %[[D3]][%[[D10]], %[[D11]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D12:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]]]
-//       CHECK:  %[[D13:.*]] = vector.transfer_read %[[D3]]{{\[}}%[[D12]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:  %[[D12:.*]] = affine.apply #{{.*}}()[%[[D0]]]
+//       CHECK:  %[[D13:.*]] = vector.transfer_read %[[D3]][%[[D12]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:  %[[D14:.*]] = vector.shape_cast %[[D13]] : vector<4x1xf32> to vector<1x4xf32>
-//       CHECK:  %[[D15:.*]] = affine.apply #{{.*}}(){{\[}}%{{.*}}, %[[D1]]]
-//       CHECK:  %[[D16:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %{{.*}}]
-//       CHECK:  %[[D17:.*]] = vector.transfer_read %[[D5]]{{\[}}%[[D15]], %[[D16]]], %[[CST]] {in_bounds = [true]} : memref<768x2048xf32>, vector<4xf32>
+//       CHECK:  %[[D15:.*]] = affine.apply #{{.*}}()[%[[D1]], %{{.*}}]
+//       CHECK:  %[[D16:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
+//       CHECK:  %[[D17:.*]] = vector.transfer_read %[[D5]][%[[D15]], %[[D16]]], %[[CST]] {in_bounds = [true]} : memref<768x2048xf32>, vector<4xf32>
 //       CHECK:  %[[D18:.*]] = vector.extract %[[D14]][0] : vector<1x4xf32>
 //       CHECK:  %[[D19:.*]] = arith.addf %[[D18]], %[[D17]] : vector<4xf32>
-//       CHECK:  vector.transfer_write %[[D19]], %[[D6]]{{\[}}%[[D15]], %[[D16]]] {in_bounds = [true]} : vector<4xf32>, memref<768x2048xf32>
+//       CHECK:  vector.transfer_write %[[D19]], %[[D6]][%[[D15]], %[[D16]]] {in_bounds = [true]} : vector<4xf32>, memref<768x2048xf32>
 
 // -----
 
@@ -213,23 +213,23 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //       CHECK:   %[[D6:.*]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<10x768x2048xf32>
 //       CHECK:   memref.assume_alignment %[[D6]], 64 : memref<10x768x2048xf32>
 //       CHECK:   gpu.barrier
-//       CHECK:   %[[D7:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %[[D1]], %[[D2]], %{{.*}}]
-//       CHECK:   %[[D8:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %{{.*}}]
-//       CHECK:   %[[D9:.*]] = vector.transfer_read %[[D4]]{{\[}}%{{.*}}, %[[D7]], %[[D8]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x2048x768xf32>, vector<1x1x4xf32>
-//       CHECK:   %[[D10:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %[[D1]], %[[D2]]]
-//       CHECK:   %[[D11:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]]]
-//       CHECK:   vector.transfer_write %[[D9]], %[[D3]]{{\[}}%[[C0]], %[[D10]], %[[D11]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
+//       CHECK:   %[[D7:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]], %[[D1]], %[[D2]]]
+//       CHECK:   %[[D8:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
+//       CHECK:   %[[D9:.*]] = vector.transfer_read %[[D4]][%{{.*}}, %[[D7]], %[[D8]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x2048x768xf32>, vector<1x1x4xf32>
+//       CHECK:   %[[D10:.*]] = affine.apply #{{.*}}()[%[[D0]], %[[D1]], %[[D2]]]
+//       CHECK:   %[[D11:.*]] = affine.apply #{{.*}}()[%[[D0]]]
+//       CHECK:   vector.transfer_write %[[D9]], %[[D3]][%[[C0]], %[[D10]], %[[D11]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:   gpu.barrier
-//       CHECK:   %[[D12:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]]]
-//       CHECK:   %[[D13:.*]] = vector.transfer_read %[[D3]]{{\[}}%[[C0]], %[[D12]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:   %[[D12:.*]] = affine.apply #{{.*}}()[%[[D0]]]
+//       CHECK:   %[[D13:.*]] = vector.transfer_read %[[D3]][%[[C0]], %[[D12]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:   %[[D14:.*]] = vector.broadcast %[[D13]] : vector<4x1xf32> to vector<1x4x1xf32>
 //       CHECK:   %[[D15:.*]] = vector.shape_cast %[[D14]] : vector<1x4x1xf32> to vector<1x1x4xf32>
-//       CHECK:   %[[D16:.*]] = affine.apply #{{.*}}(){{\[}}%{{.*}}, %[[D1]]]
-//       CHECK:   %[[D17:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %{{.*}}]
-//       CHECK:   %[[D18:.*]] = vector.transfer_read %[[D5]]{{\[}}%{{.*}}, %[[D16]], %[[D17]]], %[[CST]] {in_bounds = [true]} : memref<10x768x2048xf32>, vector<4xf32>
+//       CHECK:   %[[D16:.*]] = affine.apply #{{.*}}()[%[[D1]], %{{.*}}]
+//       CHECK:   %[[D17:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
+//       CHECK:   %[[D18:.*]] = vector.transfer_read %[[D5]][%{{.*}}, %[[D16]], %[[D17]]], %[[CST]] {in_bounds = [true]} : memref<10x768x2048xf32>, vector<4xf32>
 //       CHECK:   %[[D19:.*]] = vector.extract %[[D15]][0, 0] : vector<1x1x4xf32>
 //       CHECK:   %[[D20:.*]] = arith.addf %[[D19]], %[[D18]] : vector<4xf32>
-//       CHECK:   vector.transfer_write %[[D20]], %[[D6]]{{\[}}%{{.*}}, %[[D16]], %[[D17]]] {in_bounds = [true]} : vector<4xf32>, memref<10x768x2048xf32>
+//       CHECK:   vector.transfer_write %[[D20]], %[[D6]][%{{.*}}, %[[D16]], %[[D17]]] {in_bounds = [true]} : vector<4xf32>, memref<10x768x2048xf32>
 
 // -----
 
@@ -281,25 +281,25 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //       CHECK:   %[[D7:.*]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%[[C0]]) : memref<10x2048x768xf32>
 //       CHECK:   memref.assume_alignment %[[D7]], 64 : memref<10x2048x768xf32>
 //       CHECK:   gpu.barrier
-//       CHECK:   %[[D8:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %[[D1]], %[[D2]], %{{.*}}]
-//       CHECK:   %[[D9:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %{{.*}}]
-//       CHECK:   %[[D10:.*]] = vector.transfer_read %[[D5]]{{\[}}%{{.*}}, %[[D8]], %[[D9]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x768x2048xf32>, vector<1x1x4xf32>
-//       CHECK:   %[[D11:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %[[D1]], %[[D2]]]
-//       CHECK:   %[[D12:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]]]
-//       CHECK:   vector.transfer_write %[[D10]], %[[D4]]{{\[}}%[[C0]], %[[D11]], %[[D12]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
-//       CHECK:   %[[D13:.*]] = vector.transfer_read %[[D6]]{{\[}}%{{.*}}, %[[D8]], %[[D9]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x768x2048xf32>, vector<1x1x4xf32>
-//       CHECK:   vector.transfer_write %[[D13]], %[[D3]]{{\[}}%[[C0]], %[[D11]], %[[D12]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
+//       CHECK:   %[[D8:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]], %[[D1]], %[[D2]]]
+//       CHECK:   %[[D9:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
+//       CHECK:   %[[D10:.*]] = vector.transfer_read %[[D5]][%{{.*}}, %[[D8]], %[[D9]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x768x2048xf32>, vector<1x1x4xf32>
+//       CHECK:   %[[D11:.*]] = affine.apply #{{.*}}()[%[[D0]], %[[D1]], %[[D2]]]
+//       CHECK:   %[[D12:.*]] = affine.apply #{{.*}}()[%[[D0]]]
+//       CHECK:   vector.transfer_write %[[D10]], %[[D4]][%[[C0]], %[[D11]], %[[D12]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
+//       CHECK:   %[[D13:.*]] = vector.transfer_read %[[D6]][%{{.*}}, %[[D8]], %[[D9]]], %[[CST]] {in_bounds = [true, true, true]} : memref<10x768x2048xf32>, vector<1x1x4xf32>
+//       CHECK:   vector.transfer_write %[[D13]], %[[D3]][%[[C0]], %[[D11]], %[[D12]]] {in_bounds = [true, true, true]} : vector<1x1x4xf32>, memref<1x32x33xf32, #gpu.address_space<workgroup>>
 //       CHECK:   gpu.barrier
-//       CHECK:   %[[D14:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]]]
-//       CHECK:   %[[D15:.*]] = vector.transfer_read %[[D4]]{{\[}}%[[C0]], %[[D14]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
-//       CHECK:   %[[D16:.*]] = vector.transfer_read %[[D3]]{{\[}}%[[C0]], %[[D14]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:   %[[D14:.*]] = affine.apply #{{.*}}()[%[[D0]]]
+//       CHECK:   %[[D15:.*]] = vector.transfer_read %[[D4]][%[[C0]], %[[D14]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
+//       CHECK:   %[[D16:.*]] = vector.transfer_read %[[D3]][%[[C0]], %[[D14]], %[[D1]]], %[[CST]] {in_bounds = [true, true]} : memref<1x32x33xf32, #gpu.address_space<workgroup>>, vector<4x1xf32>
 //       CHECK:   %[[D17:.*]] = arith.addf %[[D15]], %[[D16]] : vector<4x1xf32>
 //       CHECK:   %[[D18:.*]] = vector.broadcast %[[D17]] : vector<4x1xf32> to vector<1x4x1xf32>
 //       CHECK:   %[[D19:.*]] = vector.shape_cast %[[D18]] : vector<1x4x1xf32> to vector<1x1x4xf32>
 //       CHECK:   %[[D20:.*]] = vector.extract %[[D19]][0, 0] : vector<1x1x4xf32>
-//       CHECK:   %[[D21:.*]] = affine.apply #{{.*}}(){{\[}}%{{.*}}, %[[D1]]]
-//       CHECK:   %[[D22:.*]] = affine.apply #{{.*}}(){{\[}}%[[D0]], %{{.*}}]
-//       CHECK:   vector.transfer_write %[[D20]], %[[D7]]{{\[}}%{{.*}}, %[[D21]], %[[D22]]] {in_bounds = [true]} : vector<4xf32>, memref<10x2048x768xf32>
+//       CHECK:   %[[D21:.*]] = affine.apply #{{.*}}()[%[[D1]], %{{.*}}]
+//       CHECK:   %[[D22:.*]] = affine.apply #{{.*}}()[%{{.*}}, %[[D0]]]
+//       CHECK:   vector.transfer_write %[[D20]], %[[D7]][%{{.*}}, %[[D21]], %[[D22]]] {in_bounds = [true]} : vector<4xf32>, memref<10x2048x768xf32>
 
 // -----
 
