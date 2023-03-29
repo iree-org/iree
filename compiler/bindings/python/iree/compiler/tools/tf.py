@@ -182,7 +182,7 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
   return cl
 
 
-def _get_mlir(saved_model_dir, exported_names=None):
+def get_mlir(saved_model_dir, exported_names=None):
   if exported_names is None:
     exported_names = []
   result = pywrap_mlir.experimental_convert_saved_model_to_mlir(
@@ -219,7 +219,7 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
 
   with tempfile.NamedTemporaryFile(mode="w") as temp_file:
     # Generate MLIR
-    mlir = _get_mlir(saved_model_dir, exported_names=options.exported_names)
+    mlir = get_mlir(saved_model_dir, exported_names=options.exported_names)
     temp_file.write(mlir)
     temp_file.flush()
     import_cl = ["cat", temp_file.name]
