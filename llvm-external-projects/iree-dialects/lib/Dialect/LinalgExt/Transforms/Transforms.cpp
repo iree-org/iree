@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
@@ -259,10 +260,10 @@ struct LinalgStrategyLowerVectorsPass
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     // In a progressive lowering of vectors, this would be the 1st step.
     if (options.contractionLowering) {
-      patterns.add<vector::ContractionOpToOuterProductOpLowering,
-                   vector::ContractionOpToMatmulOpLowering,
-                   vector::ContractionOpLowering>(
-          options.vectorTransformOptions, context);
+      vector::populateVectorContractLoweringPatterns(
+          patterns, options.vectorTransformOptions,
+          /*benefit=*/1,
+          /*disableOuterProductLowering=*/true);
       vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
     }
     // In a progressive lowering of vectors, this would be the 2nd step.
@@ -273,8 +274,8 @@ struct LinalgStrategyLowerVectorsPass
     }
     // In a progressive lowering of vectors, this would be the 3rd step.
     if (options.transferPartialRewrite) {
-      patterns.add<vector::VectorTransferFullPartialRewriter>(
-          context, options.vectorTransformOptions);
+      populateVectorTransferFullPartialPatterns(patterns,
+                                                options.vectorTransformOptions);
     }
     // In a progressive lowering of vectors, this would be the 4th step.
     if (options.transferLowering) {

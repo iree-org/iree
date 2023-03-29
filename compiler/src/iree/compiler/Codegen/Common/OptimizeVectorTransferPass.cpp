@@ -112,7 +112,8 @@ struct OptimizeVectorTransferPass
     // TODO(thomasraoux): Remove it once the fix is merged.
     loopInvariantCodeMotion(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
-    vector::transferOpflowOpt(funcOp);
+    IRRewriter rewriter(funcOp->getContext());
+    vector::transferOpflowOpt(rewriter, funcOp);
 
     // Move bitcast inwards from loop region boundaries to increase chances to
     // cancel them.
