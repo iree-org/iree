@@ -85,15 +85,14 @@ static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
 
 // Track temporary allocations that are never read from. If this is the case
 // it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(RewriterBase &rewriter,
-                                    Operation *parentOp) {
+static void eraseDeadAllocAndStores(Operation *parentOp) {
   std::vector<Operation *> opToErase;
   parentOp->walk([&](memref::AllocOp op) {
     if (allUsesAreStores(op, opToErase)) {
       opToErase.push_back(op.getOperation());
     }
   });
-  for (Operation *op : opToErase) rewriter.eraseOp(op);
+  for (Operation *op : opToErase) op->erase();
 }
 
 //===---------------------------------------------------------------------===//
@@ -103,14 +102,10 @@ DiagnosedSilenceableFailure
 transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  Location loc = target->getLoc();
-  IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
-  rewriter.setListener(&listener);
   // Apply store to load forwarding and dead store elimination.
-  vector::transferOpflowOpt(rewriter, target);
-  eraseDeadAllocAndStores(rewriter, target);
-  return listener.check(loc);
+  vector::transferOpflowOpt(target);
+  eraseDeadAllocAndStores(target);
+  return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
