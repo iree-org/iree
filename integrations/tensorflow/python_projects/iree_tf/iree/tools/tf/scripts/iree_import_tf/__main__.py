@@ -8,7 +8,6 @@ import argparse
 import iree.compiler.tf
 from pathlib import Path
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument('saved_model_path',
                     help='Path to the saved model directory to import.')
@@ -37,7 +36,7 @@ args = parser.parse_args()
 
 def main():
   Path(args.output_path).write_text(
-    iree.compiler.tf.get_mlir(args.saved_model_path))
+      iree.compiler.tf.get_mlir(args.saved_model_path))
 
 
 if __name__ == "__main__":
