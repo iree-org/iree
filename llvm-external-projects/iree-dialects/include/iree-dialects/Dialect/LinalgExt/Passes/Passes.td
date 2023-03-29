@@ -106,19 +106,6 @@ def TileAndDecomposeAttention :
 // TODO: Deprecate all this.
 //===---------------------------------------------------------------------====//
 
-def LinalgStrategyTilePass
-    : Pass<"iree-linalg-strategy-tile-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to apply pattern-based linalg tiling.";
-  let constructor = "createLinalgStrategyTilePass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which linalg op within the func is the anchor to latch on.">,
-  ];
-}
-
 def LinalgStrategyVectorizePass
     : Pass<"iree-linalg-strategy-vectorize-pass", "func::FuncOp"> {
   let summary = "Configurable pass to apply pattern-based linalg vectorization.";

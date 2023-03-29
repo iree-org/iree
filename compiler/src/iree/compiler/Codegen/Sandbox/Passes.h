@@ -20,8 +20,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgSplitReductionPass(
 struct LinalgSingleTilingExpertPassOptions {
   std::string anchorFuncOpName = "";
   std::string anchorOpName = "";
-  SmallVector<int64_t> tileSizes = {};
-  SmallVector<int64_t> tileInterchange = {};
   bool generalize = false;
   SmallVector<int64_t> iteratorInterchange = {};
   bool vectorize = false;

@@ -313,6 +313,10 @@ void populateConcretizePadResultShapePatterns(MLIRContext *context,
 std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyLinalgTransformLegalityPass();
 
+/// Pass to tile TilingInterface ops with given tilingLevel.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
+    int64_t tilingLevel = -1);
+
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
     int64_t tilingLevel = -1);

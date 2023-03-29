@@ -34,6 +34,7 @@ iree_cc_library(
     "LLVMCPUPeel.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTensorPad.cpp"
+    "LLVMCPUTile.cpp"
     "LLVMCPUTileAndFuse.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"

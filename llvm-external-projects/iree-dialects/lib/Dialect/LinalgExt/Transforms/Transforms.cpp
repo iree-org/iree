@@ -168,41 +168,6 @@ LinalgTilingPattern::returningMatchAndRewrite(linalg::LinalgOp op,
   return res;
 }
 
-/// Linalg SCF tiling pattern.
-SCFTilingPattern::SCFTilingPattern(MLIRContext *context,
-                                   scf::SCFTilingOptions options,
-                                   LinalgExt::LinalgTransformationFilter f,
-                                   PatternBenefit benefit)
-    : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-      filter(std::move(f)), options(std::move(options)) {}
-
-SCFTilingPattern::SCFTilingPattern(StringRef opName, MLIRContext *context,
-                                   scf::SCFTilingOptions options,
-                                   LinalgExt::LinalgTransformationFilter f,
-                                   PatternBenefit benefit)
-    : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-      filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
-
-LogicalResult
-SCFTilingPattern::returningMatchAndRewrite(TilingInterface op,
-                                           PatternRewriter &rewriter) const {
-  if (failed(filter.checkAndNotify(rewriter, op)))
-    return failure();
-
-  FailureOr<scf::SCFTilingResult> tiledResults =
-      scf::tileUsingSCFForOp(rewriter, op, options);
-  if (failed(tiledResults))
-    return failure();
-
-  rewriter.replaceOp(op, tiledResults->replacements);
-
-  for (auto tiledOp : tiledResults->tiledOps) {
-    filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
-  }
-
-  return success();
-}
-
 LinalgVectorizationPattern::LinalgVectorizationPattern(
     MLIRContext *context, LinalgVectorizationOptions opts,
     LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
@@ -228,37 +193,6 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
 }
 
 namespace {
-/// Configurable pass to apply pattern-based linalg tiling.
-struct LinalgStrategyTilePass
-    : public LinalgStrategyTilePassBase<LinalgStrategyTilePass> {
-
-  LinalgStrategyTilePass() = default;
-
-  LinalgStrategyTilePass(StringRef opName, scf::SCFTilingOptions options,
-                         LinalgExt::LinalgTransformationFilter filt)
-      : options(std::move(options)), filter(std::move(filt)) {
-    this->anchorOpName.setValue(opName.str());
-  }
-
-  void runOnOperation() override {
-    auto funcOp = getOperation();
-    if (!anchorFuncName.empty() && funcOp.getName() != anchorFuncName)
-      return;
-
-    MLIRContext *ctx = funcOp.getContext();
-    RewritePatternSet tilingPattern(ctx);
-    if (!anchorOpName.empty())
-      tilingPattern.add<SCFTilingPattern>(anchorOpName, ctx, options, filter);
-    else
-      tilingPattern.add<SCFTilingPattern>(ctx, options, filter);
-
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(tilingPattern));
-  }
-
-  scf::SCFTilingOptions options;
-  LinalgExt::LinalgTransformationFilter filter;
-};
-
 /// Configurable pass to apply pattern-based linalg vectorization.
 struct LinalgStrategyVectorizePass
     : public LinalgStrategyVectorizePassBase<LinalgStrategyVectorizePass> {
@@ -456,13 +390,6 @@ struct LinalgStrategyRemoveMarkersPass
   }
 };
 } // namespace
-
-/// Create a LinalgStrategyTilePass.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
-    StringRef opName, const scf::SCFTilingOptions &options,
-    const LinalgExt::LinalgTransformationFilter &filter) {
-  return std::make_unique<LinalgStrategyTilePass>(opName, options, filter);
-}
 
 /// Create a LinalgStrategyVectorizePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(

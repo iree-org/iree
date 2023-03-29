@@ -217,13 +217,6 @@ struct LinalgEnablingOptions {
   }
 };
 
-/// Create a LinalgStrategyTilePass.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
-    StringRef opName = "",
-    const scf::SCFTilingOptions &options = scf::SCFTilingOptions(),
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
-
 /// Create a LinalgStrategyDecomposePass.
 // TODO: if/when we need finer control add an `opName` parameter.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
