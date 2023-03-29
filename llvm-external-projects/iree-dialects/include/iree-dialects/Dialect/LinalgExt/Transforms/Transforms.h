@@ -337,59 +337,6 @@ struct LinalgPromotionPattern : public LinalgBasePromotionPattern {
       : LinalgBasePromotionPattern(opName, context, options, f, benefit) {}
 };
 
-/// Wraps upstream Linalg pattern in a filter check + update.
-template <typename Conv2DOp, typename Conv1DOp>
-struct DownscaleSizeOneWindowed2DConvolution final
-    : public OpRewritePattern<Conv2DOp> {
-  DownscaleSizeOneWindowed2DConvolution(MLIRContext *context,
-                                        LinalgTransformationFilter f)
-      : OpRewritePattern<Conv2DOp>(context, /*benefit=*/1),
-        filter(std::move(f)) {}
-
-  LogicalResult matchAndRewrite(Conv2DOp convOp,
-                                PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, convOp)))
-      return failure();
-    linalg::DownscaleSizeOneWindowed2DConvolution<Conv2DOp, Conv1DOp> p(
-        convOp.getContext());
-    auto maybeConv1DOp = p.returningMatchAndRewrite(convOp, rewriter);
-    if (failed(maybeConv1DOp))
-      return failure();
-    filter.replaceLinalgTransformationFilter(rewriter, *maybeConv1DOp);
-    return success();
-  }
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-};
-
-/// Wraps upstream Linalg pattern in a filter check + update.
-struct DownscaleDepthwiseConv2DNhwcHwcOp final
-    : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
-  DownscaleDepthwiseConv2DNhwcHwcOp(MLIRContext *context,
-                                    LinalgTransformationFilter f)
-      : OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>(context,
-                                                           /*benefit=*/1),
-        filter(std::move(f)) {}
-
-  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
-                                PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, convOp)))
-      return failure();
-    linalg::DownscaleDepthwiseConv2DNhwcHwcOp p(convOp.getContext());
-    auto maybeConv1DOp = p.returningMatchAndRewrite(convOp, rewriter);
-    if (failed(maybeConv1DOp))
-      return failure();
-    filter.replaceLinalgTransformationFilter(rewriter, *maybeConv1DOp);
-    return success();
-  }
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-};
-
 FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
     OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
     ArrayRef<int64_t> tileInterchange,

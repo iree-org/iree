@@ -175,6 +175,7 @@ cc_binary(
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm/bytecode:module",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Parser",

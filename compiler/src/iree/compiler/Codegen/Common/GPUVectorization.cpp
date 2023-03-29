@@ -82,21 +82,12 @@ struct GPUVectorizationPass
     MLIRContext *context = &getContext();
 
     // Pre-process convolution ops.
-    RewritePatternSet decompositionPattern(funcOp.getContext());
-    IREE::LinalgExt::LinalgTransformationFilter f(
-        {StringAttr::get(context, getWorkgroupKTiledMarker())},
-        StringAttr::get(context, getVectorizeMarker()));
-    f.setMatchByDefault();
-    decompositionPattern
-        .add<IREE::LinalgExt::DownscaleSizeOneWindowed2DConvolution<
-                 linalg::Conv2DNhwcHwcfOp, linalg::Conv1DNwcWcfOp>,
-             IREE::LinalgExt::DownscaleSizeOneWindowed2DConvolution<
-                 linalg::Conv2DNchwFchwOp, linalg::Conv1DNcwFcwOp>,
-             IREE::LinalgExt::DownscaleDepthwiseConv2DNhwcHwcOp>(
-            funcOp.getContext(), f);
+    RewritePatternSet decompositionPattern(context);
+    linalg::populateDecomposeConvolutionPatterns(decompositionPattern);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(decompositionPattern))))
+                                            std::move(decompositionPattern)))) {
       return signalPassFailure();
+    }
 
     RewritePatternSet vectorizationPatterns(context);
     populateVectorizationPatterns(vectorizationPatterns, maxVectorSize);

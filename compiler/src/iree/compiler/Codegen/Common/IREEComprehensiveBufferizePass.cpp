@@ -156,13 +156,13 @@ static OneShotBufferizationOptions getBufferizationOptions() {
 }
 
 LogicalResult eliminateEmptyTensors(
-    Operation *op, const OneShotBufferizationOptions &options) {
+    RewriterBase &rewriter, Operation *op,
+    const OneShotBufferizationOptions &options) {
   // Analyze IR.
   OneShotAnalysisState state(op, options);
   if (failed(analyzeOp(op, state))) return failure();
 
   // Rewrite tensor.empty ops that are anchored on specific ops.
-  IRRewriter rewriter(op->getContext());
   if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
           rewriter, op, state)))
     return failure();
@@ -176,7 +176,9 @@ LogicalResult eliminateEmptyTensors(
 void EliminateEmptyTensorsPass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
   OneShotBufferizationOptions options = getBufferizationOptions();
-  if (failed(eliminateEmptyTensors(moduleOp, options)))
+
+  IRRewriter rewriter(moduleOp->getContext());
+  if (failed(eliminateEmptyTensors(rewriter, moduleOp, options)))
     return signalPassFailure();
 }
 

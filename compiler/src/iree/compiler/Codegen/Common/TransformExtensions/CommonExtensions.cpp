@@ -92,9 +92,7 @@ static void eraseDeadAllocAndStores(Operation *parentOp) {
       opToErase.push_back(op.getOperation());
     }
   });
-  for (Operation *op : opToErase) {
-    op->erase();
-  }
+  for (Operation *op : opToErase) op->erase();
 }
 
 //===---------------------------------------------------------------------===//
@@ -107,7 +105,6 @@ transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
   // Apply store to load forwarding and dead store elimination.
   vector::transferOpflowOpt(target);
   eraseDeadAllocAndStores(target);
-
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -385,6 +382,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addUnrollVectorsGpuMmaSyncPatterns(patterns);
   if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
 
+  Location loc = target->getLoc();
   TrackingListener listener(state);
   GreedyRewriteConfig config;
   config.listener = &listener;
@@ -397,11 +395,12 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   LogicalResult result =
       applyOpPatternsAndFold(ops, std::move(patterns), config);
   if (failed(result)) {
-    return mlir::emitDefiniteFailure(target, "greedy patterns failed");
+    return listener.check(
+        loc, mlir::emitDefiniteFailure(target, "greedy patterns failed"));
   }
-  LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(listenerResult))
-    return mlir::emitDefiniteFailure(target, "pattern listener tracker fail");
+
+  auto diag = listener.check(loc);
+  if (!diag.succeeded()) return diag;
 
   if (getLicm()) {
     target->walk([&](func::FuncOp funcOp) {
@@ -432,8 +431,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
       result =
           eliminateCommonSubexpressions(funcOp, /*domInfo=*/nullptr, &listener);
       if (failed(result)) return WalkResult::interrupt();
-      listenerResult = listener.checkErrorState();
-      if (failed(listenerResult)) return WalkResult::interrupt();
+      if (failed(listener.checkErrorState())) return WalkResult::interrupt();
       return WalkResult::advance();
     });
     if (walkResult.wasInterrupted()) {
@@ -441,14 +439,13 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
         return mlir::emitDefiniteFailure(lastFuncVisited,
                                          "greedy patterns failed");
       }
-      LogicalResult listenerResult = listener.checkErrorState();
-      if (failed(listenerResult))
+      if (failed(listener.checkErrorState()))
         return mlir::emitDefiniteFailure(lastFuncVisited,
                                          "pattern listener tracker fail");
     }
   }
 
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 void transform_dialect::ApplyPatternsOp::getEffects(
@@ -462,12 +459,15 @@ void transform_dialect::ApplyPatternsOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
-    func::FuncOp funcOp, transform::ApplyToEachResultList &results,
+    func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(funcOp->getContext());
+  Location loc = target->getLoc();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
-      rewriter, funcOp);
-  return DiagnosedSilenceableFailure::success();
+      rewriter, target);
+  return listener.check(loc);
 }
 
 void transform_dialect::HoistStaticAllocOp::getEffects(
@@ -554,7 +554,7 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
 /// operands. Assumes the HAL::ExecutableExportOp is built with an empty
 /// region.
 static LogicalResult populateWorkgroupCountComputingRegion(
-    PatternRewriter &rewriter, scf::ForallOp forallOp,
+    RewriterBase &rewriter, scf::ForallOp forallOp,
     HAL::ExecutableExportOp exportOp) {
   Location loc = forallOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
@@ -587,9 +587,9 @@ static LogicalResult populateWorkgroupCountComputingRegion(
 // Patterns for ForallToWorkgroup rewrite.
 //===---------------------------------------------------------------------===//
 
-LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
-                                       IREE::HAL::ExecutableExportOp exportOp,
-                                       PatternRewriter &rewriter) {
+LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
+                                       scf::ForallOp forallOp,
+                                       IREE::HAL::ExecutableExportOp exportOp) {
   // Step 0. Target-specific verifications. There is no good place to anchor
   // those right now: the ForallOp is target-independent and the
   // transform op does not apply to individual ForallOp.
@@ -754,12 +754,17 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
         target, "could not find a unique topLevel scf.forall");
   }
 
-  SimplePatternRewriter rewriter(topLevelForallOp);
-  if (failed(rewriteForallToWorkgroup(topLevelForallOp, exportOp, rewriter))) {
-    return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
+  Location loc = target->getLoc();
+  IRRewriter rewriter(topLevelForallOp->getContext());
+  rewriter.setInsertionPoint(topLevelForallOp);
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp, exportOp))) {
+    return listener.check(loc, mlir::emitDefiniteFailure(
+                                   target, "rewriteForallToWorkgroup failed"));
   }
 
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 void transform_dialect::ForallToWorkgroupOp::getEffects(
@@ -1221,11 +1226,13 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
+  Operation *target = payload.front();
+  Location loc = target->getLoc();
+  TrackingListener listener(state);
   //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
   {
     RewritePatternSet patterns(getContext());
     patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
-    TrackingListener listener(state);
     GreedyRewriteConfig config;
     config.listener = &listener;
     // Manually gather list of ops because the other GreedyPatternRewriteDriver
@@ -1238,12 +1245,15 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
         applyOpPatternsAndFold(ops, std::move(patterns), config);
     LogicalResult listenerResult = listener.checkErrorState();
     if (failed(result)) {
-      return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                       "greedy pattern application failed");
+      return listener.check(
+          loc, mlir::emitDefiniteFailure(state.getTopLevel(),
+                                         "greedy pattern application failed"));
     }
-    if (failed(listenerResult))
-      return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                       "listener tracking failed");
+    if (failed(listenerResult)) {
+      return listener.check(
+          loc, mlir::emitDefiniteFailure(state.getTopLevel(),
+                                         "listener tracking failed"));
+    }
   }
 
   //   2. Run one-shot-bufferize, without the pass baggage.
@@ -1254,12 +1264,12 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
   if (failed(runIREEOneShotBufferize(state.getTopLevel(), options)))
-    return DiagnosedSilenceableFailure::definiteFailure();
+    return listener.check(loc, emitDefaultDefiniteFailure(target));
 
   // Early exit if test_analysis_only is set.
   if (getTestAnalysisOnly()) {
     results.set(getOperation()->getOpResult(0), payload.front());
-    return DiagnosedSilenceableFailure::success();
+    return listener.check(loc);
   }
 
   //   3. Post-bufferization passes are fine.
@@ -1276,10 +1286,10 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return WalkResult::advance();
   });
   if (res.wasInterrupted())
-    return DiagnosedSilenceableFailure::definiteFailure();
+    return listener.check(loc, emitDefaultDefiniteFailure(target));
 
   results.set(getOperation()->getOpResult(0), payload.front());
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 //===---------------------------------------------------------------------===//
@@ -1291,11 +1301,16 @@ transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
     ::mlir::Operation *target,
     ::mlir::transform::ApplyToEachResultList &results,
     ::mlir::transform::TransformState &state) {
-  if (failed(eliminateEmptyTensors(target, getBufferizationOptions()))) {
+  Location loc = target->getLoc();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  if (failed(
+          eliminateEmptyTensors(rewriter, target, getBufferizationOptions()))) {
     getOperation()->emitError() << "failed to eliminate tensor.empty ops";
-    return DiagnosedSilenceableFailure::definiteFailure();
+    return listener.check(loc, emitDefaultDefiniteFailure(target));
   }
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(

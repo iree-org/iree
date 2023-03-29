@@ -15,7 +15,8 @@ namespace iree_compiler {
 
 /// Helper to convert copy to shared memory to async copy. This creates groups
 /// of consecutive copies and emit wait operation right after.
-void createAsyncGroups(func::FuncOp funcOp, bool useMMASync);
+void createAsyncGroups(RewriterBase &rewriter, func::FuncOp funcOp,
+                       bool useMMASync);
 
 /// Function to do layout analysis and distribution.
 void doLayoutAnalysisAndDistribution(IRRewriter &rewriter, func::FuncOp funcOp);
