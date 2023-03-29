@@ -596,8 +596,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   }
 }
 
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
-                                      bool enableVectorMasking) {
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -617,7 +616,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
-    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
   }
