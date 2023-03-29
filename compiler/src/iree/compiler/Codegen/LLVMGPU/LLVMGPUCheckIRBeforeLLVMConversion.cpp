@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Pass/Pass.h"
@@ -54,12 +55,7 @@ static LogicalResult checkGPUAllocationSize(func::FuncOp funcOp) {
   int cumSize = 0;
   for (auto allocOp : allocOps) {
     auto allocType = allocOp.getType().cast<MemRefType>();
-    if (auto attr = allocType.getMemorySpace()
-                        .dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
-      if (attr.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace()) {
-        continue;
-      }
-    } else {
+    if (!hasSharedMemoryAddressSpace(allocType)) {
       continue;
     }
     if (!allocOp.getDynamicSizes().empty()) {
