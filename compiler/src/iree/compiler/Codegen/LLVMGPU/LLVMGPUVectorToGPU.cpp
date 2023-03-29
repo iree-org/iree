@@ -86,7 +86,7 @@ struct LLVMGPUVectorToGPUPass
         return signalPassFailure();
       }
     }
-    createAsyncGroups(funcOp, targetMmaSync);
+    createAsyncGroups(rewriter, funcOp, targetMmaSync);
 
     if (targetMmaSync) {
       swizzleSharedMemory(funcOp);
