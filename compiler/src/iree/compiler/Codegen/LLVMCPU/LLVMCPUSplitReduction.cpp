@@ -96,7 +96,6 @@ LogicalResult splitReductionPrecondition(Operation *op,
 /// followed by simple inner reduction.
 LogicalResult splitReductionImpl(Operation *op, int64_t size,
                                  RewriterBase &rewriter) {
-  return rewriter.notifyMatchFailure(op, "test");
   IRRewriter::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(op);
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
