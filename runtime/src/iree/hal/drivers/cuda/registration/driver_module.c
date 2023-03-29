@@ -14,6 +14,10 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/api.h"
 
+#if IREE_USE_MPI
+#include "mpi.h"
+#endif  // IREE_USE_MPI
+
 // Force using CUDA streams until we support command buffer caching to avoid the
 // overhead of graph creation.
 IREE_FLAG(
@@ -45,6 +49,29 @@ static iree_status_t iree_hal_cuda_nccl_query_group_params(
     iree_hal_channel_params_t* params) {
   IREE_ASSERT_EQ(id_storage.data_length, sizeof(iree_hal_cuda_nccl_id_t));
 
+#if IREE_USE_MPI
+  if (params->rank == IREE_HAL_CHANNEL_RANK_DEFAULT) {
+    MPI_Comm_rank(MPI_COMM_WORLD, &params->rank);
+  }
+  if (params->count == IREE_HAL_CHANNEL_COUNT_DEFAULT) {
+    MPI_Comm_size(MPI_COMM_WORLD, &params->count);
+  }
+
+  iree_hal_cuda_nccl_id_t* id = (iree_hal_cuda_nccl_id_t*)id_storage.data;
+  if (params->rank == 0) {
+    // The root process of the group creates the unique ID and broadcasts it
+    // to the others.
+    IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
+  }
+
+  int mpi_status =
+      MPI_Bcast(id, id_storage.data_length, MPI_BYTE, 0, MPI_COMM_WORLD);
+  if (mpi_status != MPI_SUCCESS) {
+    return iree_make_status(IREE_STATUS_INTERNAL, "MPI_Bcast() returned %d",
+                            mpi_status);
+  }
+  params->id = iree_const_cast_byte_span(id_storage);
+#else
   // Users can either specify a specific rank or allow this device
   // implementation to decide. This allows us to run the same programs acting as
   // different ranks by setting flags/environment variables/API options/etc.
@@ -70,6 +97,7 @@ static iree_status_t iree_hal_cuda_nccl_query_group_params(
     IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
     params->id = iree_const_cast_byte_span(id_storage);
   }
+#endif  // IREE_USE_MPI
 
   return iree_ok_status();
 }
@@ -108,6 +136,14 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
   default_params.stream_tracing = FLAG_cuda_tracing;
 
+#if IREE_USE_MPI
+  // Only setup channels if we're running collectives. Setting this will require
+  // NCCL to be available at runtime.
+  default_params.channel_provider = (iree_hal_channel_provider_t){
+      .self = NULL,
+      .query_group_params = iree_hal_cuda_nccl_query_group_params,
+  };
+#else
   // Only setup channels if we're running collectives. Setting this will require
   // NCCL to be available at runtime.
   if (FLAG_cuda_nccl_default_count != 0) {
@@ -116,10 +152,18 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
         .query_group_params = iree_hal_cuda_nccl_query_group_params,
     };
   }
+#endif  // IREE_USE_MPI
 
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);
+#if IREE_USE_MPI
+  // use the rank as the cuda device index.
+  int rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  driver_options.default_device_index = rank;
+#else
   driver_options.default_device_index = FLAG_cuda_default_index;
+#endif  // IREE_USE_MPI
 
   iree_status_t status =
       iree_hal_cuda_driver_create(driver_name, &default_params, &driver_options,

@@ -168,6 +168,29 @@ iree_cc_binary(
 )
 endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
 
+if(IREE_USE_MPI)
+iree_cc_binary(
+  NAME
+    iree-run-module
+  SRCS
+    "iree-run-module-main.cc"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal::types
+    iree::tooling::comparison
+    iree::tooling::context_util
+    iree::tooling::device_util
+    iree::tooling::instrument_util
+    iree::tooling::vm_util
+    iree::vm
+    mpi::headers_and_libs
+  DEFINES
+    "IREE_USE_MPI=1"
+)
+else()
 iree_cc_binary(
   NAME
     iree-run-module
@@ -186,6 +209,7 @@ iree_cc_binary(
     iree::tooling::vm_util
     iree::vm
 )
+endif()
 
 iree_cc_binary(
   NAME

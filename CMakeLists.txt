@@ -822,6 +822,13 @@ add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
+# MPI is used when NCCL needs a host side communication to exchange
+# NCCL unique IDs for a channel creation.
+option(IREE_USE_MPI "Use MPI" OFF)
+if(IREE_USE_MPI)
+  add_subdirectory(build_tools/third_party/mpi EXCLUDE_FROM_ALL)
+endif()
+
 iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 
