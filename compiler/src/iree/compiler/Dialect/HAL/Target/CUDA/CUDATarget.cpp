@@ -25,7 +25,11 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/Internalize.h"
@@ -47,10 +51,80 @@ static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
     llvm::cl::init("sm_35"));
 
+static llvm::cl::opt<std::string> usePTXASfrom(
+    "iree-hal-use-ptxas-from", llvm::cl::init(""),
+    llvm::cl::desc("Compile the generated PTX code using the given ptxas "
+                   "compiler and keeps cubin file into vmfb file."));
+
+static llvm::cl::opt<std::string> usePTXASparams(
+    "iree-hal-use-ptxas-params", llvm::cl::init(""),
+    llvm::cl::desc("Additional parameters to pass ptxas."));
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+/// Compiles the given generated PTX code with the given ptxas compiler.
+static FailureOr<std::string> compileWithPTXAS(std::string ptxas_exe,
+                                               std::string sm,
+                                               std::string ptxas_params,
+                                               std::string ptx) {
+  if (!llvm::sys::path::is_absolute(ptxas_exe) ||
+      !llvm::sys::fs::exists(ptxas_exe))
+    return failure();
+
+  // Step 1. Create temporary files: ptx source file, log file and cubin file
+  llvm::SmallString<64> fname_ptx_src, fname_log;
+  llvm::sys::fs::createTemporaryFile("iree-cuda-ptx-src", "", fname_ptx_src);
+  llvm::sys::fs::createTemporaryFile("iree-cuda-ptx-log", "", fname_log);
+  std::string fname_cubin = std::string(fname_ptx_src) + ".cubin";
+  llvm::FileRemover logRemover(fname_log);
+  llvm::FileRemover binRemover(fname_cubin);
+
+  // Step 2. Write the generated PTX into a file, so we can pass it to ptxas
+  // compiler
+  std::error_code ec;
+  llvm::raw_fd_ostream f_ptx_source(fname_ptx_src, ec);
+  f_ptx_source << ptx;
+  f_ptx_source.close();
+  if (f_ptx_source.has_error()) return failure();
+
+  // Step 3. Build the ptxas command line
+  std::string commandLine = llvm::Twine(ptxas_exe.c_str())
+                                .concat(" -arch ")
+                                .concat(sm.c_str())
+                                .concat(" ")
+                                .concat(ptxas_params.c_str())
+                                .concat(" ")
+                                .concat(fname_ptx_src.c_str())
+                                .concat(" -o ")
+                                .concat(fname_cubin.c_str())
+                                .concat(" 2> ")
+                                .concat(fname_log.c_str())
+                                .str();
+  llvm::errs() << "NOTE: Compiling the generated PTX code \n $ " << commandLine
+               << "\n";
+
+  // Step 4. Execute the command line for ptxas compiler that generates cubin
+  int exitCode = system(commandLine.c_str());
+  if (exitCode) return failure();
+
+  // Step 5. The output of ptxas if verbose flag is set. This is useful because
+  // it shows local memory usage, register usage, and etc.
+  if (commandLine.find_first_of("-v")) {
+    auto flog = llvm::MemoryBuffer::getFile(fname_log);
+    if (flog) {
+      llvm::errs() << std::string((*flog)->getBuffer());
+    }
+  }
+
+  // Step 6. Read the cubin file, and return. It will eventually be written into
+  // vmfb file.
+  auto fcubin = llvm::MemoryBuffer::getFile(fname_cubin);
+  if (!fcubin) return failure();
+  llvm::FileRemover srcRemover(fname_ptx_src);
+  return std::string((*fcubin)->getBuffer());
+}
 
 static void dumpBitcodeToPath(StringRef path, StringRef baseName,
                               StringRef suffix, StringRef extension,
@@ -381,6 +455,17 @@ class CUDATargetBackend final : public TargetBackend {
     if (!options.dumpBinariesPath.empty()) {
       dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
                      variantOp.getName(), ".ptx", ptxImage);
+    }
+
+    if (!usePTXASfrom.empty()) {
+      auto maybePtxImage = compileWithPTXAS(usePTXASfrom, clTargetChip,
+                                            usePTXASparams, ptxImage);
+      if (succeeded(maybePtxImage)) {
+        ptxImage = maybePtxImage.value();
+      } else {
+        llvm::errs() << "NOTE: Failed `ptxas` compilation. Fallbacks to ptx "
+                        "compilation on the runtime.\n";
+      }
     }
 
     FlatbufferBuilder builder;
