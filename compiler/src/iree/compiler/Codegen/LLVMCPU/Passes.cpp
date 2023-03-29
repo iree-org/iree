@@ -596,8 +596,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   }
 }
 
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
-                                      bool enableVectorMasking) {
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -606,8 +605,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 
   // Run SplitReductionPass before the final reduction Fuse pass, because
   // SplitReductionPass takes care of banked-tiling.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLinalgSplitReductionPass(clEnableReassociateFpReductions));
   {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
@@ -616,18 +613,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
         createLinalgSingleTilingExpertPass(options));
   }
 
-  if (clEnablePadConsumerFusion) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createFuseTensorPadWithConsumerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createConcretizePadResultShapePass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
-  }
-
   {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
-    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
   }

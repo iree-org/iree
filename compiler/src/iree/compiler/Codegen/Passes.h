@@ -436,8 +436,7 @@ void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
-                                      bool enableVectorMasking);
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
