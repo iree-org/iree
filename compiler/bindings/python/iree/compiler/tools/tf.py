@@ -104,7 +104,7 @@ class ImportOptions(CompilerOptions):
 
   exported_names: Sequence[str] = ()
   import_only: bool = False
-  import_type: Union[ImportType, str] = ImportType.OBJECT_GRAPH
+  import_type: ImportType = ImportType.OBJECT_GRAPH
   input_type: Union[InputType, str] = InputType.XLA
   saved_model_tags: Set[str] = field(default_factory=set)
   import_extra_args: Sequence[str] = ()
