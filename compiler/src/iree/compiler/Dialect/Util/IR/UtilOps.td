@@ -428,6 +428,18 @@ def Util_InitializerOp : Util_Op<"initializer", [
     Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return {}; }
 
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
+
     /// Make symbol optional as this op has no symbol.
     bool isOptionalSymbol() { return true; }
   }];

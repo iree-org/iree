@@ -155,6 +155,18 @@ def VM_FuncOp : VM_Op<"func", [
       return getFunctionType().getResults();
     }
 
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
+
     /// Adds or overrides a reflection attribute.
     void setReflectionAttr(StringRef name, Attribute value);
   }];
@@ -261,6 +273,18 @@ def VM_ImportOp : VM_Op<"import", [
     ArrayRef<Type> getCallableResults() {
       return getFunctionType().getResults();
     }
+
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
   }];
 }
 
@@ -309,6 +333,18 @@ def VM_InitializerOp : VM_Op<"initializer", [
 
     Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return {}; }
+
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
 
     /// Make symbol optional as this op has no symbol.
     bool isOptionalSymbol() { return true; }
