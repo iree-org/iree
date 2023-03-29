@@ -217,16 +217,8 @@ struct LinalgEnablingOptions {
   }
 };
 
-/// Create a LinalgStrategyDecomposePass.
-// TODO: if/when we need finer control add an `opName` parameter.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
-
-/// Create a LinalgStrategyVectorizePass.
 using VectorSizeComputationFunction =
     std::function<SmallVector<int64_t>(linalg::LinalgOp, ArrayRef<int64_t>)>;
-
 struct LinalgVectorizationOptions {
   /// Enable vector masking during vectorization.
   bool enableVectorMasking = false;
@@ -266,12 +258,6 @@ struct LinalgVectorizationOptions {
     return *this;
   }
 };
-
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(
-    StringRef opName = "",
-    const LinalgVectorizationOptions &options = LinalgVectorizationOptions(),
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyEnablePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyEnablePass(

@@ -31,7 +31,6 @@ using namespace mlir;
 using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgTransformationFilter;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgTransforms;
-using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationOptions;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
@@ -83,115 +82,6 @@ static FailureOr<Operation *> getRootOp(Operation *op) {
   return rootOp;
 }
 
-/// Computes the canonical shape used to vectorize this dispatch. Retrieves
-/// the vectorization tile sizes (parallel and reduction levels) out of the
-/// lowering config and adjusts them to the format expected by the Linalg
-/// vectorizer.
-static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
-  FailureOr<Operation *> rootOp = getRootOp(funcOp);
-  if (failed(rootOp)) {
-    return {};
-  }
-
-  unsigned numTileLevels =
-      mlir::iree_compiler::getNumTileLevels(rootOp.value());
-  if (numTileLevels < 3) {
-    return {};
-  }
-
-  // Retrieve the tile sizes from the last two tiling levels (parallel and
-  // reduction) used for vectorization.
-  SmallVector<int64_t> canonicalVectorShape =
-      mlir::iree_compiler::getTileSizes(rootOp.value(), numTileLevels - 2);
-  SmallVector<int64_t> reductionTileSizes =
-      mlir::iree_compiler::getTileSizes(rootOp.value(), numTileLevels - 1);
-
-  if (!reductionTileSizes.empty()) {
-    assert(canonicalVectorShape.size() == reductionTileSizes.size() &&
-           "Unexpected tile sizes");
-
-    // Combine the reduction tile sizes with the parallel tile sizes already in
-    // the canonical vector shape.
-    for (int i = 0, end = canonicalVectorShape.size(); i < end; ++i) {
-      if (reductionTileSizes[i] > 0)
-        canonicalVectorShape[i] = reductionTileSizes[i];
-    }
-  }
-
-  // Replace zeros in canonical vector shape to turn it into a valid shape.
-  std::replace(canonicalVectorShape.begin(), canonicalVectorShape.end(), 0, 1);
-  return canonicalVectorShape;
-}
-
-// Give the canonical vector shape of a dispatch, returns the vector sizes for a
-// particular linalg op within that dispatch.
-static SmallVector<int64_t> getVectorSizes(
-    linalg::LinalgOp linalgOp, ArrayRef<int64_t> canonicalVectorShape) {
-  FailureOr<Operation *> rootOp = getRootOp(linalgOp);
-  if (failed(rootOp)) {
-    return {};
-  }
-
-  // TODO: Infer the tiles sizes for an op that is not the root op.
-  if (*rootOp != linalgOp.getOperation()) {
-    return {};
-  }
-
-  if (canonicalVectorShape.empty()) {
-    return {};
-  }
-
-  assert(canonicalVectorShape.size() >= linalgOp.getNumLoops() &&
-         "Unexpected canonical vector shape or number of loops");
-
-  // Return the valid canonical vector shape subset based on the number of loops
-  // of the linalg op.
-  SmallVector<int64_t> vecSize(
-      canonicalVectorShape.take_front(linalgOp.getNumLoops()));
-  for (auto [idx, val] : llvm::enumerate(linalgOp.getStaticLoopRanges())) {
-    if (ShapedType::isDynamic(val)) continue;
-    vecSize[idx] = std::max(vecSize[idx], val);
-  }
-
-  return vecSize;
-}
-
-/// Default method to get tile sizes for tile-and-fuse in IREE. These could be
-/// ovveridden by the command line options if specified.
-static LogicalResult getTileAndFuseOptionsFromConfig(
-    func::FuncOp funcOp, int64_t tilingLevel,
-    SmallVector<int64_t> &tileAndFuseSizes, SmallVector<int64_t> &tileOnlySizes,
-    SmallVector<int64_t> &tileInterchange) {
-  if (tilingLevel == -1) {
-    return success();
-  }
-
-  FailureOr<Operation *> rootOp = getRootOp(funcOp);
-  if (failed(rootOp) || !rootOp.value()) return failure();
-  auto tilingOp = cast<TilingInterface>(rootOp.value());
-
-  iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig =
-      iree_compiler::getLoweringConfig(tilingOp);
-  SmallVector<int64_t> tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
-
-  auto iteratorTypes = tilingOp.getLoopIteratorTypes();
-  tileAndFuseSizes = SmallVector<int64_t>(iteratorTypes.size(), /*default=*/0);
-  tileOnlySizes = SmallVector<int64_t>(iteratorTypes.size(), /*default=*/0);
-  // Splits the tileSizes into two sizes vectors. We want to tile-and-fuse on
-  // parallel dims and tile-only on reduction dims.
-  for (size_t i = 0; i < tileSizes.size() && i < iteratorTypes.size(); ++i) {
-    if (iteratorTypes[i] == utils::IteratorType::parallel) {
-      tileAndFuseSizes[i] = tileSizes[i];
-    } else {
-      tileOnlySizes[i] = tileSizes[i];
-    }
-  }
-
-  tileInterchange = loweringConfig.getTileInterchangeVals(tilingLevel);
-
-  return success();
-}
-
 /// Default method to initialize the split reduction size in IREE. These could
 /// be overriden by the command line options if specified.
 static FailureOr<int64_t> getSplitReductionSizeFromConfig(func::FuncOp funcOp) {
@@ -228,26 +118,6 @@ struct LinalgSplitReductionPass
 
  private:
   bool fpReductionReordering = false;
-};
-
-struct LinalgSingleTilingExpertPass
-    : public LinalgSingleTilingExpertBase<LinalgSingleTilingExpertPass> {
-  LinalgSingleTilingExpertPass() = default;
-  LinalgSingleTilingExpertPass(
-      const LinalgSingleTilingExpertPassOptions &options) {
-    this->anchorFuncOpName = options.anchorFuncOpName;
-    this->anchorOpName = options.anchorOpName;
-    this->generalize = options.generalize;
-    this->iteratorInterchange = options.iteratorInterchange;
-    this->vectorize = options.vectorize;
-    this->enableVectorMasking = options.enableVectorMasking;
-    this->vectorizePadding = options.vectorizePadding;
-    this->tilingLevel = options.tilingLevel;
-  }
-  LinalgSingleTilingExpertPass(const LinalgSingleTilingExpertPass &pass) {}
-
-  /// Function pass entry point.
-  void runOnOperation() override;
 };
 
 struct LinalgVectorLoweringPass
@@ -416,33 +286,6 @@ void LinalgSplitReductionPass::runOnOperation() {
   });
 }
 
-void LinalgSingleTilingExpertPass::runOnOperation() {
-  func::FuncOp funcOp = getOperation();
-
-  LinalgVectorizationOptions vectorizationOptions;
-  vectorizationOptions.setVectorizePadding(vectorizePadding);
-  vectorizationOptions.setEnableVectorMasking(enableVectorMasking);
-  if (enableVectorMasking) {
-    vectorizationOptions.setCanonicalVectorSizes(
-        getCanonicalVectorShape(funcOp));
-    vectorizationOptions.setVectorSizeComputationFunction(getVectorSizes);
-  }
-
-  CodegenStrategy strategy;
-  StringRef genericOpName = linalg::GenericOp::getOperationName();
-  strategy.vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
-                       vectorizationOptions);
-
-  // Created a nested OpPassManager and run.
-  OpPassManager dynamicPM(func::FuncOp::getOperationName());
-  strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
-  dynamicPM.addPass(
-      iree_compiler::IREE::LinalgExt::createLinalgStrategyEnablePass());
-  if (failed(runPipeline(dynamicPM, funcOp))) {
-    return signalPassFailure();
-  }
-}
-
 void LinalgVectorLoweringPass::runOnOperation() {
   LLVM_DEBUG(llvm::dbgs() << "\n ---- Stage : " << vectorLoweringStage;);
   vector::VectorTransposeLowering vectorTransposeLowering =
@@ -531,15 +374,6 @@ mlir::createLinalgSplitReductionPass(const bool enableFpReductionReordering,
                                      const int64_t size) {
   return std::make_unique<LinalgSplitReductionPass>(enableFpReductionReordering,
                                                     size);
-}
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::createLinalgSingleTilingExpertPass() {
-  return std::make_unique<LinalgSingleTilingExpertPass>();
-}
-std::unique_ptr<OperationPass<func::FuncOp>>
-mlir::createLinalgSingleTilingExpertPass(
-    const LinalgSingleTilingExpertPassOptions &passOptions) {
-  return std::make_unique<LinalgSingleTilingExpertPass>(passOptions);
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

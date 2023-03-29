@@ -37,6 +37,7 @@ iree_cc_library(
     "LLVMCPUTile.cpp"
     "LLVMCPUTileAndFuse.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
+    "LLVMCPUVectorization.cpp"
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
     "Utils.cpp"

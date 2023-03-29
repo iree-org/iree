@@ -339,11 +339,10 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
       static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   {
-    LinalgSingleTilingExpertPassOptions options;
-    options.vectorize = true;
+    LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
+        createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -377,12 +376,11 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ReductionDims));
 
   {
-    LinalgSingleTilingExpertPassOptions options;
-    options.vectorize = true;
+    LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
+        createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -476,16 +474,12 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
         createDecomposePackUnPackOpsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-    LinalgSingleTilingExpertPassOptions options;
-    options.vectorize = true;
+    LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
+        createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-    // TODO(hanchung): Merge two vectorization passes into a pass. All the ops
-    // should be vectorized altogether. Otherwise, there would be tensor.empty
-    // ops which becomes a stack allocation in bufferization.
   }
 
   addBufferizePasses(nestedModulePM);
@@ -535,17 +529,12 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
   }
 
-  // Add the sandbox single tiling expert to vectorize.
-  // We can't do the vectorization in the tiling expert above due to an issue in
-  // codegen strategy pipeline. Since we are moving to the transform dialect, we
-  // choose to have a workaround here by splitting them into two stages.
   {
-    LinalgSingleTilingExpertPassOptions options;
-    options.vectorize = true;
+    LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
+        createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -578,12 +567,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
       static_cast<int64_t>(StrategyTilingLevel::ReductionTiles)));
 
-  {
-    LinalgSingleTilingExpertPassOptions options;
-    options.vectorize = true;
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   addBufferizePasses(nestedModulePM);
 

@@ -329,6 +329,14 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
 /// Pass to perform peeling on non-distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
 
+struct LLVMCPUVectorizationPassOptions {
+  bool enableVectorMasking = false;
+  bool vectorizePadding = false;
+};
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
+    const LLVMCPUVectorizationPassOptions &options);
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReordering = false);
