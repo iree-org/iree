@@ -325,3 +325,43 @@ hal.executable @check_not_readonly {
 }
 // CHECK-LABEL: llvm.func @check_not_readonly
 //  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>,
+  #hal.descriptor_set.layout<1, bindings = [
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @complex {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @complex layout(#pipeline_layout)
+    builtin.module {
+      func.func @complex() {
+        %c0 = arith.constant 0 : index
+        %c128 = arith.constant 128 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xcomplex<f32>>
+        %2 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<16xf32>
+        %3 = gpu.block_id x
+        %4 = gpu.block_dim x
+        %5 = gpu.thread_id x
+        %6 = arith.muli %3, %4 : index
+        %7 = arith.addi %6, %5 : index
+        %9 = memref.load %0[%7] : memref<16xcomplex<f32>>
+        %10 = complex.re %9 : complex<f32>
+        %11 = complex.im %9 : complex<f32>
+        %12 = arith.addf %10, %11 : f32
+        memref.store %12, %2[%7] : memref<16xf32>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: llvm.func @complex
+//   CHECK-NOT: unrealized
+//       CHECK: llvm.return
+

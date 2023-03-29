@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
@@ -66,10 +67,6 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
-    if (failed(verifyLLVMConversionCompatibility(m))) {
-      signalPassFailure();
-      return;
-    }
 
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
@@ -132,6 +129,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       RewritePatternSet llvmPatterns(&getContext());
       populateLowerHALInterfaceOp(llvmPatterns);
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
+      populateComplexToLLVMConversionPatterns(converter, llvmPatterns);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       memref::populateExpandStridedMetadataPatterns(llvmPatterns);
       populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
