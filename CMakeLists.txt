@@ -87,13 +87,18 @@ option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility sh
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
 # Properties building and controlling benchmark suites.
+# Leave the old name around for a bit so that people can update their configs
+# and previous cached values will automatically carry over.
+# TODO(pzread): Remove this option after 2023-04-13
 option(IREE_BUILD_BENCHMARKS "DEPRECATED alias for IREE_BUILD_LEGACY_BENCHMARKS" OFF)
 option(IREE_BUILD_LEGACY_BENCHMARKS "Builds legacy IREE benchmark suites." "${IREE_BUILD_BENCHMARKS}")
 cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "DEPRECATED alias for IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS" OFF "${IREE_BUILD_BENCHMARKS}" OFF)
 cmake_dependent_option(
   IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS
   "Builds legacy IREE benchmark suites for compilation statistics."
+  # Read the value from the old name as fallback so people can update their configs.
   "${IREE_ENABLE_COMPILATION_BENCHMARKS}"
+  # Only available if IREE_BUILD_LEGACY_BENCHMARKS is set (or by IREE_BUILD_BENCHMARKS transitively).
   "${IREE_BUILD_LEGACY_BENCHMARKS}"
   OFF
 )
