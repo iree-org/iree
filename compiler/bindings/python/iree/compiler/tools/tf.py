@@ -13,8 +13,6 @@ import logging
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
 
-from tensorflow.python import pywrap_mlir
-
 from .core import (
     CompilerOptions,
     DEFAULT_TESTING_BACKENDS,
@@ -183,6 +181,8 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
 
 
 def get_mlir(saved_model_dir, exported_names=None):
+  from tensorflow.python import pywrap_mlir
+
   if exported_names is None:
     exported_names = []
   result = pywrap_mlir.experimental_convert_saved_model_to_mlir(
