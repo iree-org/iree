@@ -39,23 +39,15 @@ void iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma(
   for (iree_uk_int32_t k = 0; k < K; ++k) {
     __m256 rhs = _mm256_loadu_ps(rhs_ptr);
     rhs_ptr += 8;
-    __m256 lhs0 = _mm256_broadcast_ss(lhs_ptr + 0);
-    __m256 lhs1 = _mm256_broadcast_ss(lhs_ptr + 1);
-    __m256 lhs2 = _mm256_broadcast_ss(lhs_ptr + 2);
-    __m256 lhs3 = _mm256_broadcast_ss(lhs_ptr + 3);
-    __m256 lhs4 = _mm256_broadcast_ss(lhs_ptr + 4);
-    __m256 lhs5 = _mm256_broadcast_ss(lhs_ptr + 5);
-    __m256 lhs6 = _mm256_broadcast_ss(lhs_ptr + 6);
-    __m256 lhs7 = _mm256_broadcast_ss(lhs_ptr + 7);
+    acc0 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 0), rhs, acc0);
+    acc1 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 1), rhs, acc1);
+    acc2 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 2), rhs, acc2);
+    acc3 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 3), rhs, acc3);
+    acc4 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 4), rhs, acc4);
+    acc5 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 5), rhs, acc5);
+    acc6 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 6), rhs, acc6);
+    acc7 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 7), rhs, acc7);
     lhs_ptr += 8;
-    acc0 = _mm256_fmadd_ps(lhs0, rhs, acc0);
-    acc1 = _mm256_fmadd_ps(lhs1, rhs, acc1);
-    acc2 = _mm256_fmadd_ps(lhs2, rhs, acc2);
-    acc3 = _mm256_fmadd_ps(lhs3, rhs, acc3);
-    acc4 = _mm256_fmadd_ps(lhs4, rhs, acc4);
-    acc5 = _mm256_fmadd_ps(lhs5, rhs, acc5);
-    acc6 = _mm256_fmadd_ps(lhs6, rhs, acc6);
-    acc7 = _mm256_fmadd_ps(lhs7, rhs, acc7);
   }
   _mm256_storeu_ps(out_ptr + 0 * 8, acc0);
   _mm256_storeu_ps(out_ptr + 1 * 8, acc1);
