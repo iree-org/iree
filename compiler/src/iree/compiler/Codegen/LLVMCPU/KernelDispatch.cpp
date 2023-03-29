@@ -754,7 +754,10 @@ static LogicalResult setMatmulPadRootConfig(
                                          workgroupTileSizes.end());
   parallelTileSizes.back() = 0;
 
-  // Clamp inner tiling sizes to avoid masking.
+  // Clamp inner tiling sizes to avoid masking. The vector masking takes the
+  // last level of tiling to create masks. It would lead to incorrect masking if
+  // the inner tiling sizes are not clamped. Because padding won't be applied
+  // along those dimensions.
   for (const auto &[index, size] : llvm::enumerate(flowTileSizes)) {
     if (!size) continue;
     parallelTileSizes[index] = std::min(parallelTileSizes[index], size);
