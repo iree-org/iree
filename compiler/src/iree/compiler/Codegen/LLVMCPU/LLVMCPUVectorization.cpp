@@ -167,9 +167,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
 
   IRRewriter rewriter(context);
   SmallVector<linalg::LinalgOp> candidates;
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    candidates.push_back(linalgOp);
-  });
+  funcOp.walk(
+      [&](linalg::LinalgOp linalgOp) { candidates.push_back(linalgOp); });
   for (auto linalgOp : candidates) {
     SmallVector<int64_t> vectorSizes;
     if (enableVectorMasking) {
