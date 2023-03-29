@@ -53,6 +53,7 @@ iree_cc_library(
     LLVMTargetParser
     MLIRAffineDialect
     MLIRAffineToStandard
+    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithToLLVM
@@ -86,6 +87,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
+    MLIRSCFUtils
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTosaDialect
