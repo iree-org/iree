@@ -85,8 +85,6 @@ struct TileWorkgroupSizePair {
   int64_t pipelineDepth;
 };
 
-// Software pipeline depths
-constexpr unsigned softwarePipelineDepthTensorCore = 4;
 // Simt codegen does not do software pipelining.
 constexpr unsigned softwarePipelineDepthSimt = 0;
 }  // namespace
@@ -129,7 +127,7 @@ static void getTensorCoreConfig(
   } else {
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
       tileSizes.push_back(
-          TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
+          TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
     }
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));

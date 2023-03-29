@@ -8,8 +8,8 @@ add_mlir_library(IREELinalgExtTransformOps
   IREEDialectsTransforms
   MLIRRewrite
   MLIRTransformDialect
-  
   IREELinalgExtDialect
+  IREELinalgExtPasses
   IREELinalgExtTransforms
 
   MLIRPDLDialect

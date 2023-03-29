@@ -87,7 +87,8 @@ static Operation::operand_range getIndices(Operation* op) {
   llvm_unreachable("unsupported op type");
 }
 
-void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
+void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
+                       bool useMMASync) {
   LLVM_DEBUG(DBGS() << "Start asyncGroups: useMMASync=" << useMMASync << "\n");
   llvm::SmallSetVector<Operation*, 16> copyToSharedMem;
   // Look for all the copy that can be converted to async copy ops.
@@ -172,31 +173,30 @@ void createAsyncGroups(func::FuncOp funcOp, bool useMMASync) {
     }
     // emit the group.
     SmallVector<Value> tokens;
-    OpBuilder builder(funcOp.getContext());
     for (Operation* writeOp : group) {
-      builder.setInsertionPoint(writeOp);
+      rewriter.setInsertionPoint(writeOp);
       Value vectorVal = getValueStored(writeOp);
       Operation* readOp = vectorVal.getDefiningOp();
       Value storeBase = getMemrefOperand(writeOp);
       Value loadBase = getMemrefOperand(readOp);
-      Value token = builder.create<nvgpu::DeviceAsyncCopyOp>(
+      Value token = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
           writeOp->getLoc(),
           nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
           getIndices(writeOp), loadBase, getIndices(readOp),
-          builder.getIndexAttr(
+          rewriter.getIndexAttr(
               vectorVal.getType().cast<VectorType>().getNumElements()),
           Value(),
-          /*bypassL1=*/useMMASync ? builder.getUnitAttr() : UnitAttr());
+          /*bypassL1=*/useMMASync ? rewriter.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
     }
     // Create the group and wait for it right after.
-    Value groupToken = builder.create<nvgpu::DeviceAsyncCreateGroupOp>(
+    Value groupToken = rewriter.create<nvgpu::DeviceAsyncCreateGroupOp>(
         funcOp.getLoc(), nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
         tokens);
-    builder.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
-                                             nullptr);
+    rewriter.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
+                                              nullptr);
     // Clean up old stores.
-    for (Operation* writeOp : group) writeOp->erase();
+    for (Operation* writeOp : group) rewriter.eraseOp(writeOp);
   }
 }
 

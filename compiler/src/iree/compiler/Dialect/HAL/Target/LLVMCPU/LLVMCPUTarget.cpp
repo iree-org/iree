@@ -33,6 +33,7 @@
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
@@ -126,6 +127,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
   std::string name() const override { return "llvm-cpu"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     // TODO: make inclusion of ArmNeon conditional?
     // clang-format off

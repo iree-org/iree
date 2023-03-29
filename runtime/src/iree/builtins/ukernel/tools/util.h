@@ -72,4 +72,19 @@ bool iree_uk_cpu_supports(const iree_uk_uint64_t* cpu_data_fields);
 const char* iree_uk_cpu_first_unsupported_feature(
     const iree_uk_cpu_features_list_t* cpu_features);
 
+typedef struct iree_uk_standard_cpu_features_t {
+#if defined(IREE_UK_ARCH_ARM_64)
+  iree_uk_cpu_features_list_t* dotprod;
+  iree_uk_cpu_features_list_t* i8mm;
+#elif defined(IREE_UK_ARCH_X86_64)
+  iree_uk_cpu_features_list_t* avx2_fma;
+  iree_uk_cpu_features_list_t* avx512_base;
+  iree_uk_cpu_features_list_t* avx512_vnni;
+#endif
+} iree_uk_standard_cpu_features_t;
+
+iree_uk_standard_cpu_features_t* iree_uk_standard_cpu_features_create(void);
+void iree_uk_standard_cpu_features_destroy(
+    iree_uk_standard_cpu_features_t* cpu);
+
 #endif  // IREE_BUILTINS_UKERNEL_TOOLS_UTIL_H_

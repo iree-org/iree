@@ -18,201 +18,197 @@ import re
 
 import bazel_to_cmake_targets
 
-# ------------------------------------------------------------------------- #
-# Conversion utilities, written to reduce boilerplate and allow for reuse   #
-# between similar rule conversions (e.g. cc_library and cc_binary).         #
-# ------------------------------------------------------------------------- #
-
-
-def _expand_cmake_var(var):
-  return "${" + var + "}"
-
-
-def _convert_string_arg_block(name, value, quote=True):
-  #  NAME
-  #    "value"
-  if value is None:
-    return ""
-  if quote:
-    return f'  {name}\n    "{value}"\n'
-  else:
-    return f"  {name}\n    {value}\n"
-
-
-# Match Bazel's timeout values
-# https://docs.bazel.build/versions/main/test-encyclopedia.html
-timeout_map = {
-    "short": 60,
-    "moderate": 300,
-    "long": 900,
-    "eternal": 3600,
-}
-
-
-def _should_skip_target(tags=None, **kwargs):
-  if tags and "skip-bazel_to_cmake" in tags:
-    return True
-  return False
-
-
-def _convert_timeout_arg_block(name, value):
-  if value is None:
-    return ""
-  value = timeout_map[value]
-  return f"  {name}\n    {value}\n"
-
-
-def _convert_string_list_block(name, values, quote=True, sort=False):
-  # Note this deliberately distinguishes between an empty list (argument
-  # explicitly specified) and None (argument left as default).
-  if values is None:
-    return ""
-
-  if sort:
-    values = sorted(values)
-
-  if quote:
-    values_list = "\n".join([f'    "{v}"' for v in values])
-  else:
-    values_list = "\n".join([f"    {v}" for v in values])
-
-  return f"  {name}\n{values_list}\n"
-
-
-def _convert_option_block(option, option_value):
-  if option_value:
-    # Note: this is a truthiness check as well as an existence check, e.g.
-    # Bazel `testonly = False` will be handled correctly by this condition.
-    return f"  {option}\n"
-  else:
-    return ""
-
-
-def _convert_target_block(name, target):
-  if target is None:
-    return ""
-
-  # Convert the target name from its Bazel name to the corresponding CMake name.
-  # The specific conversion pattern depends on the target location. In general,
-  # Bazel targets are fully qualified and use slashes as delimiters, while
-  # targets in CMake are rooted on subtrees and use _ (with :: aliases).
-  cmake_aliases = bazel_to_cmake_targets.convert_target(target)
-  if len(cmake_aliases) != 1:
-    raise ValueError(
-        f"Expected a CMake alias from {target}. Got {cmake_aliases}")
-  target = cmake_aliases[0]
-  # Replace aliased :: target names with their explicit _ names.
-  target = target.replace("::", "_")
-  return _convert_string_arg_block(name, target, quote=False)
-
-
-def _convert_srcs_block(srcs):
-  if srcs is None:
-    return ""
-  generated_srcs = [src for src in srcs if src.startswith(":")]
-  srcs = [src for src in srcs if src not in generated_srcs]
-  sets = []
-  if srcs:
-    sets.append(_convert_string_list_block("SRCS", srcs, sort=True))
-  if generated_srcs:
-    sets.append(
-        _convert_string_list_block("GENERATED_SRCS",
-                                   [src[1:] for src in generated_srcs],
-                                   sort=True))
-  return "\n".join(sets)
-
-
-def _convert_td_file_block(td_file):
-  if td_file.startswith("//iree"):
-    # Bazel `//iree/dir/td_file.td`
-    # -> CMake `${IREE_ROOT_DIR}/iree/dir/td_file.td
-    # Bazel `//iree/dir/IR:td_file.td`
-    # -> CMake `${IREE_ROOT_DIR}/iree/dir/IR/td_file.td
-    td_file = td_file.replace("//iree", "${IREE_ROOT_DIR}/iree")
-    td_file = td_file.replace(":", "/")
-  return _convert_string_arg_block("TD_FILE", td_file)
-
-
-def _convert_tbl_outs_block(tbl_outs):
-  outs_list = "\n".join(
-      [f"    {' '.join(flags)} {value}" for flags, value in tbl_outs])
-  return f"  OUTS\n{outs_list}\n"
-
-
-def _convert_tblgen_block(tblgen):
-  if tblgen.endswith("iree-tblgen"):
-    return "  TBLGEN\n    IREE\n"
-  else:
-    return ""
-
-
-def _convert_target(target):
-  """Returns a list of targets that correspond to the specified Bazel target.
-  Note that this must be a list because some targets have a one to many mapping.
-  """
-  return bazel_to_cmake_targets.convert_target(target)
-
-
-def _convert_single_target(target):
-  replacement_targets = _convert_target(target)
-  if len(replacement_targets) != 1:
-    raise RuntimeError(f"Expected single target replacement for {target},"
-                       f" but got multiple: {replacement_targets}")
-  return replacement_targets[0]
-
-
-def _convert_single_target_block(name, target):
-  mapped_target = _convert_single_target(target)
-  return _convert_string_arg_block(name, mapped_target, quote=False)
-
-
-def _convert_target_list_block(list_name, targets):
-  if targets is None:
-    return ""
-
-  #  DEPS
-  #    package1::target1
-  #    package1::target2
-  #    package2::target
-  targets = [_convert_target(t) for t in targets]
-  # Flatten lists
-  targets = list(itertools.chain.from_iterable(targets))
-  # Remove duplicates
-  targets = set(targets)
-  # Remove Falsey (None and empty string) values
-  targets = filter(None, targets)
-
-  return _convert_string_list_block(list_name, targets, sort=True, quote=False)
-
-
-def _convert_includes_block(includes):
-  if not includes:
-    return ""
-  dirs = []
-  for include in includes:
-    dirs.append("$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/%s>" %
-                (include,))
-    dirs.append("$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/%s>" %
-                (include,))
-  return _convert_string_list_block("INCLUDES", dirs, sort=False, quote=True)
-
 
 class BuildFileFunctions(object):
   """Object passed to `exec` that has handlers for BUILD file functions."""
 
-  def __init__(self, converter):
-    self.converter = converter
+  def __init__(self, *, converter: "Converter",
+               targets: bazel_to_cmake_targets.TargetConverter):
+    self._converter = converter
+    self._targets = targets
+    self._custom_initialize()
+
+  def _custom_initialize(self):
+    pass
+
+  # ------------------------------------------------------------------------- #
+  # Conversion utilities, written to reduce boilerplate and allow for reuse   #
+  # between similar rule conversions (e.g. cc_library and cc_binary).         #
+  # ------------------------------------------------------------------------- #
+
+  def _expand_cmake_var(self, var):
+    return "${" + var + "}"
+
+  def _convert_string_arg_block(self, name, value, quote=True):
+    #  NAME
+    #    "value"
+    if value is None:
+      return ""
+    if quote:
+      return f'  {name}\n    "{value}"\n'
+    else:
+      return f"  {name}\n    {value}\n"
+
+  # Match Bazel's timeout values
+  # https://docs.bazel.build/versions/main/test-encyclopedia.html
+  _timeout_map = {
+      "short": 60,
+      "moderate": 300,
+      "long": 900,
+      "eternal": 3600,
+  }
+
+  def _should_skip_target(self, tags=None, **kwargs):
+    if tags and "skip-bazel_to_cmake" in tags:
+      return True
+    return False
+
+  def _convert_timeout_arg_block(self, name, value):
+    if value is None:
+      return ""
+    value = self._timeout_map[value]
+    return f"  {name}\n    {value}\n"
+
+  def _convert_string_list_block(self, name, values, quote=True, sort=False):
+    # Note this deliberately distinguishes between an empty list (argument
+    # explicitly specified) and None (argument left as default).
+    if values is None:
+      return ""
+
+    if sort:
+      values = sorted(values)
+
+    if quote:
+      values_list = "\n".join([f'    "{v}"' for v in values])
+    else:
+      values_list = "\n".join([f"    {v}" for v in values])
+
+    return f"  {name}\n{values_list}\n"
+
+  def _convert_option_block(self, option, option_value):
+    if option_value:
+      # Note: this is a truthiness check as well as an existence check, e.g.
+      # Bazel `testonly = False` will be handled correctly by this condition.
+      return f"  {option}\n"
+    else:
+      return ""
+
+  def _convert_target_block(self, name, target):
+    if target is None:
+      return ""
+
+    # Convert the target name from its Bazel name to the corresponding CMake name.
+    # The specific conversion pattern depends on the target location. In general,
+    # Bazel targets are fully qualified and use slashes as delimiters, while
+    # targets in CMake are rooted on subtrees and use _ (with :: aliases).
+    cmake_aliases = self._targets.convert_target(target)
+    if len(cmake_aliases) != 1:
+      raise ValueError(
+          f"Expected a CMake alias from {target}. Got {cmake_aliases}")
+    target = cmake_aliases[0]
+    # Replace aliased :: target names with their explicit _ names.
+    target = target.replace("::", "_")
+    return self._convert_string_arg_block(name, target, quote=False)
+
+  def _convert_srcs_block(self, srcs):
+    if srcs is None:
+      return ""
+    generated_srcs = [src for src in srcs if src.startswith(":")]
+    srcs = [src for src in srcs if src not in generated_srcs]
+    sets = []
+    if srcs:
+      sets.append(self._convert_string_list_block("SRCS", srcs, sort=True))
+    if generated_srcs:
+      sets.append(
+          self._convert_string_list_block("GENERATED_SRCS",
+                                          [src[1:] for src in generated_srcs],
+                                          sort=True))
+    return "\n".join(sets)
+
+  def _convert_td_file_block(self, td_file):
+    if td_file.startswith("//iree"):
+      # TODO: This should be generalized for out of tree.
+      # Bazel `//iree/dir/td_file.td`
+      # -> CMake `${IREE_ROOT_DIR}/iree/dir/td_file.td
+      # Bazel `//iree/dir/IR:td_file.td`
+      # -> CMake `${IREE_ROOT_DIR}/iree/dir/IR/td_file.td
+      td_file = td_file.replace("//iree", "${IREE_ROOT_DIR}/iree")
+      td_file = td_file.replace(":", "/")
+    return self._convert_string_arg_block("TD_FILE", td_file)
+
+  def _convert_tbl_outs_block(self, tbl_outs):
+    outs_list = "\n".join(
+        [f"    {' '.join(flags)} {value}" for flags, value in tbl_outs])
+    return f"  OUTS\n{outs_list}\n"
+
+  def _convert_tblgen_block(self, tblgen):
+    if tblgen.endswith("iree-tblgen"):
+      return "  TBLGEN\n    IREE\n"
+    else:
+      return ""
+
+  def _convert_target(self, target):
+    """Returns a list of targets that correspond to the specified Bazel target.
+    Note that this must be a list because some targets have a one to many mapping.
+    """
+    return self._targets.convert_target(target)
+
+  def _convert_single_target(self, target):
+    replacement_targets = self._convert_target(target)
+    if len(replacement_targets) != 1:
+      raise RuntimeError(f"Expected single target replacement for {target},"
+                         f" but got multiple: {replacement_targets}")
+    return replacement_targets[0]
+
+  def _convert_single_target_block(self, name, target):
+    mapped_target = self._convert_single_target(target)
+    return self._convert_string_arg_block(name, mapped_target, quote=False)
+
+  def _convert_target_list_block(self, list_name, targets):
+    if targets is None:
+      return ""
+
+    #  DEPS
+    #    package1::target1
+    #    package1::target2
+    #    package2::target
+    targets = [self._convert_target(t) for t in targets]
+    # Flatten lists
+    targets = list(itertools.chain.from_iterable(targets))
+    # Remove duplicates
+    targets = set(targets)
+    # Remove Falsey (None and empty string) values
+    targets = filter(None, targets)
+
+    return self._convert_string_list_block(list_name,
+                                           targets,
+                                           sort=True,
+                                           quote=False)
+
+  def _convert_includes_block(self, includes):
+    if not includes:
+      return ""
+    dirs = []
+    for include in includes:
+      dirs.append("$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/%s>" %
+                  (include,))
+      dirs.append("$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/%s>" %
+                  (include,))
+    return self._convert_string_list_block("INCLUDES",
+                                           dirs,
+                                           sort=False,
+                                           quote=True)
 
   def _convert_unimplemented_function(self, function, details=""):
     message = f"Unimplemented {function}: {details}"
-    if not self.converter.first_error:
-      self.converter.first_error = NotImplementedError(message)
+    if not self._converter.first_error:
+      self._converter.first_error = NotImplementedError(message)
     # Avoid submitting the raw results from non-strict runs. These are still
     # useful but are generally not safe to submit as-is. An upstream check
     # prevents changes with this phrase from being submitted.
     # Written as separate literals to avoid the check triggering here.
     submit_blocker = "DO" + " NOT" + " SUBMIT."
-    self.converter.body += f"# {submit_blocker} {message}\n"
+    self._converter.body += f"# {submit_blocker} {message}\n"
 
   # ------------------------------------------------------------------------- #
   # Function handlers that convert BUILD definitions to CMake definitions.    #
@@ -264,7 +260,7 @@ class BuildFileFunctions(object):
     self._convert_unimplemented_function("filegroup", name)
 
   def sh_binary(self, name, **kwargs):
-    if _should_skip_target(**kwargs):
+    if self._should_skip_target(**kwargs):
       return
     self._convert_unimplemented_function("sh_binary", name)
 
@@ -288,23 +284,24 @@ class BuildFileFunctions(object):
       # Bazel `*.mlir` glob -> CMake Variable `_GLOB_X_MLIR`
       var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()
       glob_vars.append(var)
-      self.converter.body += (
+      self._converter.body += (
           f"file(GLOB {var} LIST_DIRECTORIES false"
-          f" RELATIVE {_expand_cmake_var('CMAKE_CURRENT_SOURCE_DIR')}"
+          f" RELATIVE {self._expand_cmake_var('CMAKE_CURRENT_SOURCE_DIR')}"
           f" CONFIGURE_DEPENDS {pattern})\n")
     for pattern in exclude:
       if "**" in pattern:
         raise NotImplementedError("Recursive globs not supported")
       exclude_var = ("_GLOB_" +
                      pattern.replace("*", "X").replace(".", "_").upper())
-      self.converter.body += (
+      self._converter.body += (
           f"file(GLOB {exclude_var} LIST_DIRECTORIES false"
-          f" RELATIVE {_expand_cmake_var('CMAKE_CURRENT_SOURCE_DIR')}"
+          f" RELATIVE {self._expand_cmake_var('CMAKE_CURRENT_SOURCE_DIR')}"
           f" CONFIGURE_DEPENDS {pattern})\n")
       for glob_var in glob_vars:
-        self.converter.body += (
-            f"list(REMOVE_ITEM {glob_var} {_expand_cmake_var(exclude_var)})\n")
-    return [_expand_cmake_var(var) for var in glob_vars]
+        self._converter.body += (
+            f"list(REMOVE_ITEM {glob_var} {self._expand_cmake_var(exclude_var)})\n"
+        )
+    return [self._expand_cmake_var(var) for var in glob_vars]
 
   # TODO(gcmn) implement these types of functions in a less hard-coded way
   def platform_trampoline_deps(self, basename, path="base"):
@@ -334,51 +331,45 @@ class BuildFileFunctions(object):
                  linkopts=None,
                  includes=None,
                  **kwargs):
-    if _should_skip_target(**kwargs):
+    if self._should_skip_target(**kwargs):
       return
     if linkopts:
       self._convert_unimplemented_function("linkopts")
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
-    textual_hdrs_block = _convert_string_list_block("TEXTUAL_HDRS",
-                                                    textual_hdrs,
-                                                    sort=True)
-    srcs_block = _convert_srcs_block(srcs)
-    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
-    defines_block = _convert_string_list_block("DEFINES", defines)
-    data_block = _convert_target_list_block("DATA", data)
-    deps_block = _convert_target_list_block("DEPS", deps)
-    testonly_block = _convert_option_block("TESTONLY", testonly)
-    includes_block = _convert_includes_block(includes)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    hdrs_block = self._convert_string_list_block("HDRS", hdrs, sort=True)
+    textual_hdrs_block = self._convert_string_list_block("TEXTUAL_HDRS",
+                                                         textual_hdrs,
+                                                         sort=True)
+    srcs_block = self._convert_srcs_block(srcs)
+    copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = self._convert_string_list_block("DEFINES", defines)
+    data_block = self._convert_target_list_block("DATA", data)
+    deps_block = self._convert_target_list_block("DEPS", deps)
+    testonly_block = self._convert_option_block("TESTONLY", testonly)
+    includes_block = self._convert_includes_block(includes)
 
-    self.converter.body += (f"iree_cc_library(\n"
-                            f"{name_block}"
-                            f"{copts_block}"
-                            f"{hdrs_block}"
-                            f"{textual_hdrs_block}"
-                            f"{srcs_block}"
-                            f"{data_block}"
-                            f"{deps_block}"
-                            f"{defines_block}"
-                            f"{testonly_block}"
-                            f"{includes_block}"
-                            f"  PUBLIC\n)\n\n")
-
-  def iree_compiler_cc_library(self, deps=[], **kwargs):
-    self.cc_library(deps=deps + ["//compiler/src:defs"], **kwargs)
+    self._converter.body += (f"iree_cc_library(\n"
+                             f"{name_block}"
+                             f"{copts_block}"
+                             f"{hdrs_block}"
+                             f"{textual_hdrs_block}"
+                             f"{srcs_block}"
+                             f"{data_block}"
+                             f"{deps_block}"
+                             f"{defines_block}"
+                             f"{testonly_block}"
+                             f"{includes_block}"
+                             f"  PUBLIC\n)\n\n")
 
   def iree_compiler_register_plugin(self, plugin_id, target):
-    plugin_id_block = _convert_string_arg_block("PLUGIN_ID",
-                                                plugin_id,
-                                                quote=False)
-    target_block = _convert_single_target_block("TARGET", target)
-    self.converter.body += (f"iree_compiler_register_plugin(\n"
-                            f"{plugin_id_block}"
-                            f"{target_block}"
-                            f")\n\n")
-
-  def iree_runtime_cc_library(self, deps=[], **kwargs):
-    self.cc_library(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
+    plugin_id_block = self._convert_string_arg_block("PLUGIN_ID",
+                                                     plugin_id,
+                                                     quote=False)
+    target_block = self._convert_single_target_block("TARGET", target)
+    self._converter.body += (f"iree_compiler_register_plugin(\n"
+                             f"{plugin_id_block}"
+                             f"{target_block}"
+                             f")\n\n")
 
   def cc_test(self,
               name,
@@ -393,39 +384,33 @@ class BuildFileFunctions(object):
               tags=None,
               includes=None,
               **kwargs):
-    if _should_skip_target(tags=tags, **kwargs):
+    if self._should_skip_target(tags=tags, **kwargs):
       return
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
-    srcs_block = _convert_srcs_block(srcs)
-    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
-    defines_block = _convert_string_list_block("DEFINES", defines)
-    data_block = _convert_target_list_block("DATA", data)
-    deps_block = _convert_target_list_block("DEPS", deps)
-    args_block = _convert_string_list_block("ARGS", args)
-    labels_block = _convert_string_list_block("LABELS", tags)
-    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
-    includes_block = _convert_includes_block(includes)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    hdrs_block = self._convert_string_list_block("HDRS", hdrs, sort=True)
+    srcs_block = self._convert_srcs_block(srcs)
+    copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = self._convert_string_list_block("DEFINES", defines)
+    data_block = self._convert_target_list_block("DATA", data)
+    deps_block = self._convert_target_list_block("DEPS", deps)
+    args_block = self._convert_string_list_block("ARGS", args)
+    labels_block = self._convert_string_list_block("LABELS", tags)
+    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
+    includes_block = self._convert_includes_block(includes)
 
-    self.converter.body += (f"iree_cc_test(\n"
-                            f"{name_block}"
-                            f"{hdrs_block}"
-                            f"{srcs_block}"
-                            f"{copts_block}"
-                            f"{defines_block}"
-                            f"{data_block}"
-                            f"{deps_block}"
-                            f"{args_block}"
-                            f"{labels_block}"
-                            f"{timeout_block}"
-                            f"{includes_block}"
-                            f")\n\n")
-
-  def iree_runtime_cc_test(self, deps=[], **kwargs):
-    self.cc_test(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
-
-  def iree_compiler_cc_test(self, deps=[], **kwargs):
-    self.cc_test(deps=deps + ["//compiler/src:defs"], **kwargs)
+    self._converter.body += (f"iree_cc_test(\n"
+                             f"{name_block}"
+                             f"{hdrs_block}"
+                             f"{srcs_block}"
+                             f"{copts_block}"
+                             f"{defines_block}"
+                             f"{data_block}"
+                             f"{deps_block}"
+                             f"{args_block}"
+                             f"{labels_block}"
+                             f"{timeout_block}"
+                             f"{includes_block}"
+                             f")\n\n")
 
   def cc_binary(self,
                 name,
@@ -438,35 +423,29 @@ class BuildFileFunctions(object):
                 testonly=None,
                 includes=None,
                 **kwargs):
-    if _should_skip_target(**kwargs):
+    if self._should_skip_target(**kwargs):
       return
     if linkopts:
       self._convert_unimplemented_function("linkopts")
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
-    defines_block = _convert_string_list_block("DEFINES", defines)
-    srcs_block = _convert_srcs_block(srcs)
-    data_block = _convert_target_list_block("DATA", data)
-    deps_block = _convert_target_list_block("DEPS", deps)
-    testonly_block = _convert_option_block("TESTONLY", testonly)
-    includes_block = _convert_includes_block(includes)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = self._convert_string_list_block("DEFINES", defines)
+    srcs_block = self._convert_srcs_block(srcs)
+    data_block = self._convert_target_list_block("DATA", data)
+    deps_block = self._convert_target_list_block("DEPS", deps)
+    testonly_block = self._convert_option_block("TESTONLY", testonly)
+    includes_block = self._convert_includes_block(includes)
 
-    self.converter.body += (f"iree_cc_binary(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{copts_block}"
-                            f"{defines_block}"
-                            f"{data_block}"
-                            f"{deps_block}"
-                            f"{testonly_block}"
-                            f"{includes_block}"
-                            f")\n\n")
-
-  def iree_runtime_cc_binary(self, deps=[], **kwargs):
-    self.cc_binary(deps=deps + ["//runtime/src:runtime_defines"], **kwargs)
-
-  def iree_compiler_cc_binary(self, deps=[], **kwargs):
-    self.cc_binary(deps=deps + ["//compiler/src:defs"], **kwargs)
+    self._converter.body += (f"iree_cc_binary(\n"
+                             f"{name_block}"
+                             f"{srcs_block}"
+                             f"{copts_block}"
+                             f"{defines_block}"
+                             f"{data_block}"
+                             f"{deps_block}"
+                             f"{testonly_block}"
+                             f"{includes_block}"
+                             f")\n\n")
 
   def c_embed_data(self,
                    name,
@@ -479,29 +458,29 @@ class BuildFileFunctions(object):
                    identifier=None,
                    deps=None,
                    **kwargs):
-    if _should_skip_target(**kwargs):
+    if self._should_skip_target(**kwargs):
       return
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    c_file_output_block = _convert_string_arg_block("C_FILE_OUTPUT",
-                                                    c_file_output)
-    h_file_output_block = _convert_string_arg_block("H_FILE_OUTPUT",
-                                                    h_file_output)
-    testonly_block = _convert_option_block("TESTONLY", testonly)
-    identifier_block = _convert_string_arg_block("IDENTIFIER", identifier)
-    flatten_block = _convert_option_block("FLATTEN", flatten)
-    deps_block = _convert_target_list_block("DEPS", deps)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = self._convert_srcs_block(srcs)
+    c_file_output_block = self._convert_string_arg_block(
+        "C_FILE_OUTPUT", c_file_output)
+    h_file_output_block = self._convert_string_arg_block(
+        "H_FILE_OUTPUT", h_file_output)
+    testonly_block = self._convert_option_block("TESTONLY", testonly)
+    identifier_block = self._convert_string_arg_block("IDENTIFIER", identifier)
+    flatten_block = self._convert_option_block("FLATTEN", flatten)
+    deps_block = self._convert_target_list_block("DEPS", deps)
 
-    self.converter.body += (f"iree_c_embed_data(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{deps_block}"
-                            f"{c_file_output_block}"
-                            f"{h_file_output_block}"
-                            f"{identifier_block}"
-                            f"{testonly_block}"
-                            f"{flatten_block}"
-                            f"  PUBLIC\n)\n\n")
+    self._converter.body += (f"iree_c_embed_data(\n"
+                             f"{name_block}"
+                             f"{srcs_block}"
+                             f"{deps_block}"
+                             f"{c_file_output_block}"
+                             f"{h_file_output_block}"
+                             f"{identifier_block}"
+                             f"{testonly_block}"
+                             f"{flatten_block}"
+                             f"  PUBLIC\n)\n\n")
 
   def iree_bitcode_library(self,
                            name,
@@ -513,28 +492,28 @@ class BuildFileFunctions(object):
                            clang_tool=None,
                            builtin_headers=None,
                            testonly=None):
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
-    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
-    defines_block = _convert_string_list_block("DEFINES", defines)
-    data_block = _convert_target_list_block("DATA", data)
-    clang_tool_block = _convert_target_block("CLANG_TOOL", clang_tool)
-    builtin_headers_block = _convert_target_list_block("BUILTIN_HEADERS",
-                                                       builtin_headers)
-    testonly_block = _convert_option_block("TESTONLY", testonly)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = self._convert_srcs_block(srcs)
+    hdrs_block = self._convert_string_list_block("HDRS", hdrs, sort=True)
+    copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = self._convert_string_list_block("DEFINES", defines)
+    data_block = self._convert_target_list_block("DATA", data)
+    clang_tool_block = self._convert_target_block("CLANG_TOOL", clang_tool)
+    builtin_headers_block = self._convert_target_list_block(
+        "BUILTIN_HEADERS", builtin_headers)
+    testonly_block = self._convert_option_block("TESTONLY", testonly)
 
-    self.converter.body += (f"iree_bitcode_library(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{hdrs_block}"
-                            f"{copts_block}"
-                            f"{defines_block}"
-                            f"{data_block}"
-                            f"{clang_tool_block}"
-                            f"{builtin_headers_block}"
-                            f"{testonly_block}"
-                            f"  PUBLIC\n)\n\n")
+    self._converter.body += (f"iree_bitcode_library(\n"
+                             f"{name_block}"
+                             f"{srcs_block}"
+                             f"{hdrs_block}"
+                             f"{copts_block}"
+                             f"{defines_block}"
+                             f"{data_block}"
+                             f"{clang_tool_block}"
+                             f"{builtin_headers_block}"
+                             f"{testonly_block}"
+                             f"  PUBLIC\n)\n\n")
 
   def iree_bytecode_module(self,
                            name,
@@ -546,40 +525,43 @@ class BuildFileFunctions(object):
                            static_lib_path=None,
                            deps=None,
                            testonly=None):
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    src_block = _convert_string_arg_block("SRC", src)
-    module_name_block = _convert_string_arg_block("MODULE_FILE_NAME",
-                                                  module_name)
-    c_identifier_block = _convert_string_arg_block("C_IDENTIFIER", c_identifier)
-    static_lib_block = _convert_string_arg_block("STATIC_LIB_PATH",
-                                                 static_lib_path)
-    compile_tool_block = _convert_target_block("COMPILE_TOOL", compile_tool)
-    flags_block = _convert_string_list_block("FLAGS", flags)
-    deps_block = _convert_target_list_block("DEPS", deps)
-    testonly_block = _convert_option_block("TESTONLY", testonly)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    src_block = self._convert_string_arg_block("SRC", src)
+    module_name_block = self._convert_string_arg_block("MODULE_FILE_NAME",
+                                                       module_name)
+    c_identifier_block = self._convert_string_arg_block("C_IDENTIFIER",
+                                                        c_identifier)
+    static_lib_block = self._convert_string_arg_block("STATIC_LIB_PATH",
+                                                      static_lib_path)
+    compile_tool_block = self._convert_target_block("COMPILE_TOOL",
+                                                    compile_tool)
+    flags_block = self._convert_string_list_block("FLAGS", flags)
+    deps_block = self._convert_target_list_block("DEPS", deps)
+    testonly_block = self._convert_option_block("TESTONLY", testonly)
 
-    self.converter.body += (f"iree_bytecode_module(\n"
-                            f"{name_block}"
-                            f"{src_block}"
-                            f"{module_name_block}"
-                            f"{c_identifier_block}"
-                            f"{compile_tool_block}"
-                            f"{static_lib_block}"
-                            f"{flags_block}"
-                            f"{deps_block}"
-                            f"{testonly_block}"
-                            f"  PUBLIC\n)\n\n")
+    self._converter.body += (f"iree_bytecode_module(\n"
+                             f"{name_block}"
+                             f"{src_block}"
+                             f"{module_name_block}"
+                             f"{c_identifier_block}"
+                             f"{compile_tool_block}"
+                             f"{static_lib_block}"
+                             f"{flags_block}"
+                             f"{deps_block}"
+                             f"{testonly_block}"
+                             f"  PUBLIC\n)\n\n")
 
   def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None):
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    flatcc_args_block = _convert_string_list_block("FLATCC_ARGS", flatcc_args)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = self._convert_srcs_block(srcs)
+    flatcc_args_block = self._convert_string_list_block("FLATCC_ARGS",
+                                                        flatcc_args)
 
-    self.converter.body += (f"flatbuffer_c_library(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{flatcc_args_block}"
-                            f"  PUBLIC\n)\n\n")
+    self._converter.body += (f"flatbuffer_c_library(\n"
+                             f"{name_block}"
+                             f"{srcs_block}"
+                             f"{flatcc_args_block}"
+                             f"  PUBLIC\n)\n\n")
 
   def gentbl_cc_library(self,
                         name,
@@ -591,20 +573,20 @@ class BuildFileFunctions(object):
                         includes=None,
                         strip_include_prefix=None,
                         test=None):
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    tblgen_block = _convert_tblgen_block(tblgen)
-    td_file_block = _convert_td_file_block(td_file)
-    outs_block = _convert_tbl_outs_block(tbl_outs)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    tblgen_block = self._convert_tblgen_block(tblgen)
+    td_file_block = self._convert_td_file_block(td_file)
+    outs_block = self._convert_tbl_outs_block(tbl_outs)
 
-    self.converter.body += (f"iree_tablegen_library(\n"
-                            f"{name_block}"
-                            f"{td_file_block}"
-                            f"{outs_block}"
-                            f"{tblgen_block}"
-                            f")\n\n")
+    self._converter.body += (f"iree_tablegen_library(\n"
+                             f"{name_block}"
+                             f"{td_file_block}"
+                             f"{outs_block}"
+                             f"{tblgen_block}"
+                             f")\n\n")
 
   def iree_gentbl_cc_library(self, **kwargs):
-    if _should_skip_target(**kwargs):
+    if self._should_skip_target(**kwargs):
       return
     # The bazel version of this rule adds some include directories and defs
     # that are implicitly handled by the cmake version.
@@ -619,17 +601,17 @@ class BuildFileFunctions(object):
                         includes=None,
                         deps=None,
                         test=None):
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    tblgen_block = _convert_tblgen_block(tblgen)
-    td_file_block = _convert_td_file_block(td_file)
-    outs_block = _convert_tbl_outs_block(tbl_outs)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    tblgen_block = self._convert_tblgen_block(tblgen)
+    td_file_block = self._convert_td_file_block(td_file)
+    outs_block = self._convert_tbl_outs_block(tbl_outs)
 
-    self.converter.body += (f"iree_tablegen_doc(\n"
-                            f"{name_block}"
-                            f"{td_file_block}"
-                            f"{outs_block}"
-                            f"{tblgen_block}"
-                            f")\n\n")
+    self._converter.body += (f"iree_tablegen_doc(\n"
+                             f"{name_block}"
+                             f"{td_file_block}"
+                             f"{outs_block}"
+                             f"{tblgen_block}"
+                             f")\n\n")
 
   def iree_lit_test_suite(self,
                           name,
@@ -639,23 +621,23 @@ class BuildFileFunctions(object):
                           tags=None,
                           timeout=None,
                           **kwargs):
-    if _should_skip_target(tags=tags, **kwargs):
+    if self._should_skip_target(tags=tags, **kwargs):
       return
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    tools_block = _convert_target_list_block("TOOLS", tools)
-    data_block = _convert_target_list_block("DATA", data)
-    labels_block = _convert_string_list_block("LABELS", tags)
-    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = self._convert_srcs_block(srcs)
+    tools_block = self._convert_target_list_block("TOOLS", tools)
+    data_block = self._convert_target_list_block("DATA", data)
+    labels_block = self._convert_string_list_block("LABELS", tags)
+    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
 
-    self.converter.body += (f"iree_lit_test_suite(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{tools_block}"
-                            f"{data_block}"
-                            f"{labels_block}"
-                            f"{timeout_block}"
-                            f")\n\n")
+    self._converter.body += (f"iree_lit_test_suite(\n"
+                             f"{name_block}"
+                             f"{srcs_block}"
+                             f"{tools_block}"
+                             f"{data_block}"
+                             f"{labels_block}"
+                             f"{timeout_block}"
+                             f")\n\n")
 
   def iree_check_single_backend_test_suite(self,
                                            name,
@@ -669,32 +651,33 @@ class BuildFileFunctions(object):
                                            target_cpu_features=None,
                                            timeout=None,
                                            **kwargs):
-    if _should_skip_target(tags=tags, **kwargs):
+    if self._should_skip_target(tags=tags, **kwargs):
       return
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    target_backend_block = _convert_string_arg_block("TARGET_BACKEND",
-                                                     target_backend)
-    driver_block = _convert_string_arg_block("DRIVER", driver)
-    compiler_flags_block = _convert_string_list_block("COMPILER_FLAGS",
-                                                      compiler_flags)
-    runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
-    labels_block = _convert_string_list_block("LABELS", tags)
-    target_cpu_features_block = _convert_string_arg_block(
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = self._convert_srcs_block(srcs)
+    target_backend_block = self._convert_string_arg_block(
+        "TARGET_BACKEND", target_backend)
+    driver_block = self._convert_string_arg_block("DRIVER", driver)
+    compiler_flags_block = self._convert_string_list_block(
+        "COMPILER_FLAGS", compiler_flags)
+    runner_args_block = self._convert_string_list_block("RUNNER_ARGS",
+                                                        runner_args)
+    labels_block = self._convert_string_list_block("LABELS", tags)
+    target_cpu_features_block = self._convert_string_arg_block(
         "TARGET_CPU_FEATURES", target_cpu_features)
-    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
+    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
 
-    self.converter.body += (f"iree_check_single_backend_test_suite(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{target_backend_block}"
-                            f"{driver_block}"
-                            f"{compiler_flags_block}"
-                            f"{runner_args_block}"
-                            f"{labels_block}"
-                            f"{target_cpu_features_block}"
-                            f"{timeout_block}"
-                            f")\n\n")
+    self._converter.body += (f"iree_check_single_backend_test_suite(\n"
+                             f"{name_block}"
+                             f"{srcs_block}"
+                             f"{target_backend_block}"
+                             f"{driver_block}"
+                             f"{compiler_flags_block}"
+                             f"{runner_args_block}"
+                             f"{labels_block}"
+                             f"{target_cpu_features_block}"
+                             f"{timeout_block}"
+                             f")\n\n")
 
   def iree_check_test_suite(self,
                             name,
@@ -706,7 +689,7 @@ class BuildFileFunctions(object):
                             target_cpu_features_variants=None,
                             timeout=None,
                             **kwargs):
-    if _should_skip_target(tags=tags, **kwargs):
+    if self._should_skip_target(tags=tags, **kwargs):
       return
     target_backends = None
     drivers = None
@@ -714,30 +697,31 @@ class BuildFileFunctions(object):
       target_backends = [it[0] for it in target_backends_and_drivers]
       drivers = [it[1] for it in target_backends_and_drivers]
 
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    target_backends_block = _convert_string_list_block("TARGET_BACKENDS",
-                                                       target_backends)
-    drivers_block = _convert_string_list_block("DRIVERS", drivers)
-    compiler_flags_block = _convert_string_list_block("COMPILER_FLAGS",
-                                                      compiler_flags)
-    runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
-    labels_block = _convert_string_list_block("LABELS", tags)
-    target_cpu_features_variants_block = _convert_string_list_block(
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = self._convert_srcs_block(srcs)
+    target_backends_block = self._convert_string_list_block(
+        "TARGET_BACKENDS", target_backends)
+    drivers_block = self._convert_string_list_block("DRIVERS", drivers)
+    compiler_flags_block = self._convert_string_list_block(
+        "COMPILER_FLAGS", compiler_flags)
+    runner_args_block = self._convert_string_list_block("RUNNER_ARGS",
+                                                        runner_args)
+    labels_block = self._convert_string_list_block("LABELS", tags)
+    target_cpu_features_variants_block = self._convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
-    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
+    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
 
-    self.converter.body += (f"iree_check_test_suite(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{target_backends_block}"
-                            f"{drivers_block}"
-                            f"{compiler_flags_block}"
-                            f"{runner_args_block}"
-                            f"{labels_block}"
-                            f"{target_cpu_features_variants_block}"
-                            f"{timeout_block}"
-                            f")\n\n")
+    self._converter.body += (f"iree_check_test_suite(\n"
+                             f"{name_block}"
+                             f"{srcs_block}"
+                             f"{target_backends_block}"
+                             f"{drivers_block}"
+                             f"{compiler_flags_block}"
+                             f"{runner_args_block}"
+                             f"{labels_block}"
+                             f"{target_cpu_features_variants_block}"
+                             f"{timeout_block}"
+                             f")\n\n")
 
   def iree_generated_trace_runner_test(self,
                                        name,
@@ -750,7 +734,7 @@ class BuildFileFunctions(object):
                                        tags=None,
                                        target_cpu_features_variants=None,
                                        **kwargs):
-    if _should_skip_target(tags=tags, **kwargs):
+    if self._should_skip_target(tags=tags, **kwargs):
       return
     target_backends = None
     drivers = None
@@ -758,38 +742,40 @@ class BuildFileFunctions(object):
       target_backends = [it[0] for it in target_backends_and_drivers]
       drivers = [it[1] for it in target_backends_and_drivers]
 
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
     # For now we assume that the generator target is a py_binary with a single
     # source .py file named like it.
     generator_py = f"{generator.split(':')[-1]}.py"
-    generator_block = _convert_string_arg_block("GENERATOR",
-                                                generator_py,
-                                                quote=True)
-    generator_args_block = _convert_string_list_block("GENERATOR_ARGS",
-                                                      generator_args)
-    trace_runner_block = _convert_target_block("TRACE_RUNNER", trace_runner)
-    target_backends_block = _convert_string_list_block("TARGET_BACKENDS",
-                                                       target_backends)
-    drivers_block = _convert_string_list_block("DRIVERS", drivers)
-    compiler_flags_block = _convert_string_list_block("COMPILER_FLAGS",
-                                                      compiler_flags)
-    runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
-    labels_block = _convert_string_list_block("LABELS", tags)
-    target_cpu_features_variants_block = _convert_string_list_block(
+    generator_block = self._convert_string_arg_block("GENERATOR",
+                                                     generator_py,
+                                                     quote=True)
+    generator_args_block = self._convert_string_list_block(
+        "GENERATOR_ARGS", generator_args)
+    trace_runner_block = self._convert_target_block("TRACE_RUNNER",
+                                                    trace_runner)
+    target_backends_block = self._convert_string_list_block(
+        "TARGET_BACKENDS", target_backends)
+    drivers_block = self._convert_string_list_block("DRIVERS", drivers)
+    compiler_flags_block = self._convert_string_list_block(
+        "COMPILER_FLAGS", compiler_flags)
+    runner_args_block = self._convert_string_list_block("RUNNER_ARGS",
+                                                        runner_args)
+    labels_block = self._convert_string_list_block("LABELS", tags)
+    target_cpu_features_variants_block = self._convert_string_list_block(
         "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
 
-    self.converter.body += (f"iree_generated_trace_runner_test(\n"
-                            f"{name_block}"
-                            f"{generator_block}"
-                            f"{generator_args_block}"
-                            f"{trace_runner_block}"
-                            f"{target_backends_block}"
-                            f"{drivers_block}"
-                            f"{compiler_flags_block}"
-                            f"{runner_args_block}"
-                            f"{labels_block}"
-                            f"{target_cpu_features_variants_block}"
-                            f")\n\n")
+    self._converter.body += (f"iree_generated_trace_runner_test(\n"
+                             f"{name_block}"
+                             f"{generator_block}"
+                             f"{generator_args_block}"
+                             f"{trace_runner_block}"
+                             f"{target_backends_block}"
+                             f"{drivers_block}"
+                             f"{compiler_flags_block}"
+                             f"{runner_args_block}"
+                             f"{labels_block}"
+                             f"{target_cpu_features_variants_block}"
+                             f")\n\n")
 
   def native_test(self,
                   name,
@@ -798,23 +784,23 @@ class BuildFileFunctions(object):
                   data=None,
                   tags=None,
                   timeout=None):
-    if _should_skip_target(tags=tags):
+    if self._should_skip_target(tags=tags):
       return
     if data is not None:
       self._convert_unimplemented_function("native_test", name + " has data")
 
-    name_block = _convert_string_arg_block("NAME", name)
-    test_binary_block = _convert_single_target_block("SRC", src)
-    args_block = _convert_string_list_block("ARGS", args)
-    labels_block = _convert_string_list_block("LABELS", tags)
-    timeout_block = _convert_timeout_arg_block("TIMEOUT", timeout)
+    name_block = self._convert_string_arg_block("NAME", name)
+    test_binary_block = self._convert_single_target_block("SRC", src)
+    args_block = self._convert_string_list_block("ARGS", args)
+    labels_block = self._convert_string_list_block("LABELS", tags)
+    timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
 
-    self.converter.body += (f"iree_native_test(\n"
-                            f"{name_block}"
-                            f"{args_block}"
-                            f"{test_binary_block}"
-                            f"{labels_block}"
-                            f")\n\n")
+    self._converter.body += (f"iree_native_test(\n"
+                             f"{name_block}"
+                             f"{args_block}"
+                             f"{test_binary_block}"
+                             f"{labels_block}"
+                             f")\n\n")
 
   def cc_binary_benchmark(
       self,
@@ -830,35 +816,35 @@ class BuildFileFunctions(object):
       # unused
       size="small",
       timeout=None):
-    if _should_skip_target(tags=tags):
+    if self._should_skip_target(tags=tags):
       return
-    name_block = _convert_string_arg_block("NAME", name, quote=False)
-    srcs_block = _convert_srcs_block(srcs)
-    data_block = _convert_target_list_block("DATA", data)
-    deps_block = _convert_target_list_block("DEPS", deps)
-    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
-    defines_block = _convert_string_list_block("DEFINES", defines)
-    defines_block = _convert_string_list_block("LINKOPTS", linkopts)
-    testonly_block = _convert_option_block("TESTONLY", testonly)
-    labels_block = _convert_string_list_block("LABELS", tags)
+    name_block = self._convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = self._convert_srcs_block(srcs)
+    data_block = self._convert_target_list_block("DATA", data)
+    deps_block = self._convert_target_list_block("DEPS", deps)
+    copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = self._convert_string_list_block("DEFINES", defines)
+    defines_block = self._convert_string_list_block("LINKOPTS", linkopts)
+    testonly_block = self._convert_option_block("TESTONLY", testonly)
+    labels_block = self._convert_string_list_block("LABELS", tags)
 
-    self.converter.body += (f"iree_cc_binary_benchmark(\n"
-                            f"{name_block}"
-                            f"{srcs_block}"
-                            f"{data_block}"
-                            f"{deps_block}"
-                            f"{copts_block}"
-                            f"{defines_block}"
-                            f"{defines_block}"
-                            f"{testonly_block}"
-                            f"{labels_block}"
-                            f")\n\n")
+    self._converter.body += (f"iree_cc_binary_benchmark(\n"
+                             f"{name_block}"
+                             f"{srcs_block}"
+                             f"{data_block}"
+                             f"{deps_block}"
+                             f"{copts_block}"
+                             f"{defines_block}"
+                             f"{defines_block}"
+                             f"{testonly_block}"
+                             f"{labels_block}"
+                             f")\n\n")
 
   def iree_cmake_extra_content(self, content, inline=False):
     if inline:
-      self.converter.body += (f"\n{content}\n")
+      self._converter.body += (f"\n{content}\n")
     else:
-      self.converter.header += (f"\n{content}\n")
+      self._converter.header += (f"\n{content}\n")
 
 
 class Converter(object):
@@ -893,9 +879,20 @@ def GetDict(obj):
   return ret
 
 
-def convert_build_file(build_file_code, allow_partial_conversion=False):
+def convert_build_file(build_file_code,
+                       repo_cfg,
+                       allow_partial_conversion=False):
   converter = Converter()
-  exec(build_file_code, GetDict(BuildFileFunctions(converter)))
+  # Allow overrides of TargetConverter and BuildFileFunctions from repo cfg.
+  repo_map = getattr(repo_cfg, "REPO_MAP", {})
+  target_converter = getattr(
+      repo_cfg, "CustomTargetConverter",
+      bazel_to_cmake_targets.TargetConverter)(repo_map=repo_map)
+  build_file_functions = getattr(repo_cfg, "CustomBuildFileFunctions",
+                                 BuildFileFunctions)(converter=converter,
+                                                     targets=target_converter)
+
+  exec(build_file_code, GetDict(build_file_functions))
   converted_text = converter.convert()
   if not allow_partial_conversion and converter.first_error:
     raise converter.first_error  # pylint: disable=raising-bad-type

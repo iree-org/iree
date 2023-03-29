@@ -20,27 +20,12 @@ def LinalgSingleTilingExpert
     Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
       "Which linalg op within the func is the anchor to latch on.">,
 
-    // Tiling options.
-    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"tileInterchange", "tile-interchange", "int64_t",
-                "Tile loop interchange",
-                "llvm::cl::ZeroOrMore">,
-
     // Generalization options.
     Option<"generalize", "generalize", "bool", /*default=*/"false",
       "Convert named operations to their generic form.">,
     ListOption<"iteratorInterchange", "iterator-interchange", "int64_t",
                "Interator interchange.",
                "llvm::cl::ZeroOrMore">,
-
-    // Decomposition options.
-    // TODO: atm this is applied to all supported ops. If/when we need finer
-    // control this should be exposed with an opName + filter and a proper
-    // pattern.
-    Option<"decomposeToLowerDimOp", "decompose-to-lower-dim", "bool",
-      /*default=*/"false",
-      "Convert named operations to lower-D named operations.">,
 
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",

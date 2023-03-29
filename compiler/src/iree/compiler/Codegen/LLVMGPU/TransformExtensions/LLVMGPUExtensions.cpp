@@ -7,6 +7,7 @@
 #include "LLVMGPUExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -94,21 +95,22 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
+  Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, transformOp, target, getWorkgroupDims(), getWarpDims(),
           true);
-
   if (diag.succeeded()) {
     auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
     rewriter.startRootUpdate(exportOp);
     exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
     rewriter.finalizeRootUpdate(exportOp);
   }
-
-  return diag;
+  return listener.check(loc, std::move(diag));
 }
 
 void transform_dialect::MapNestedForallToGpuThreadsOp::getEffects(
@@ -210,7 +212,7 @@ struct VectorDistributionResult {
 };
 
 static FailureOr<VectorDistributionResult> rewriteScfIfAsWarpExecuteOnLane0(
-    PatternRewriter &rewriter, Location loc, scf::IfOp ifOp,
+    RewriterBase &rewriter, Location loc, scf::IfOp ifOp,
     int64_t workgroupSizeX, int64_t warpSize) {
   // Bail if cond is not `if (threadIdx.x == 0)`.
   FailureOr<gpu::ThreadIdOp> maybeThreadIdxxOp =
@@ -336,21 +338,27 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
            << warpSize << " --- the transform is not applied";
   }
 
-  SimplePatternRewriter rewriter(target);
+  Location loc = target->getLoc();
+  IRRewriter rewriter(target->getContext());
+  rewriter.setInsertionPoint(target);
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
   FailureOr<VectorDistributionResult> vectorDistributionResult =
-      rewriteScfIfAsWarpExecuteOnLane0(rewriter, target->getLoc(), target,
-                                       workgroupSizeX, warpSize);
+      rewriteScfIfAsWarpExecuteOnLane0(rewriter, loc, target, workgroupSizeX,
+                                       warpSize);
   if (failed(vectorDistributionResult)) {
     // Return a silenceable failure and set the expected 1 result to
     // nullptr.
     results.assign(1, nullptr);
-    return emitDefaultSilenceableFailure(target)
-           << "scf::ifOp needs to be predicated on threadIdx.x == 0 "
-              "--- the "
-              "transform is not applied";
+    return listener.check(
+        loc, emitDefaultSilenceableFailure(target)
+                 << "scf::ifOp needs to be predicated on threadIdx.x == 0 "
+                    "--- the "
+                    "transform is not applied");
   }
+
   results.push_back(vectorDistributionResult->warpOp);
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 //===---------------------------------------------------------------------===//
@@ -405,9 +413,8 @@ static OpOperand *getWarpResult(vector::WarpExecuteOnLane0Op warpOp,
 }
 
 namespace {
-
-/// Pattern to convert InsertElement to broadcast, this is a workaround until
-/// MultiDimReduction distribution is supported.
+/// Pattern to convert InsertElement to broadcast, this is a workaround
+/// until MultiDimReduction distribution is supported.
 class InsertElementToBroadcast final
     : public OpRewritePattern<vector::InsertElementOp> {
  public:
@@ -682,18 +689,20 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
     return emitDefaultDefiniteFailure(target);
   }
 
-  IRRewriter rewriter(getContext());
+  Location loc = target->getLoc();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  auto diag = DiagnosedSilenceableFailure::success();
   if (getUseWmma()) {
-    if (failed(convertVectorToMMAOps(rewriter, target))) {
-      target->emitOpError("vector to wmma patterns failed to apply");
-      return emitDefaultDefiniteFailure(target);
-    }
-    return DiagnosedSilenceableFailure::success();
+    if (failed(convertVectorToMMAOps(rewriter, target)))
+      diag = emitDefiniteFailure("vector to wmma patterns failed to apply");
+    return listener.check(loc, std::move(diag));
   }
 
   if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp))) {
     target->emitOpError("vector to mma patterns failed to apply");
-    return emitDefaultDefiniteFailure(target);
+    return listener.check(loc, emitDefaultDefiniteFailure(target));
   }
   // Using TF32 for Float.
   RewritePatternSet f32ToTF32patterns(funcOp.getContext());
@@ -702,9 +711,9 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                           std::move(f32ToTF32patterns)))) {
     target->emitOpError("vector to mma F32ToTF32 patterns failed to apply");
-    return emitDefaultDefiniteFailure(target);
+    return listener.check(loc, emitDefaultDefiniteFailure(target));
   }
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc, std::move(diag));
 }
 
 //===----------------------------------------------------------------------===//
@@ -714,6 +723,7 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
 DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
+  Location loc = target->getLoc();
   IRRewriter rewriter(getContext());
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(target);
@@ -725,8 +735,7 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
   for (int64_t index : indices) {
     if ((index >= 0) && (index < numOperands)) {
       FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-          rewriter, target->getLoc(), target->getOperand(index), false, options,
-          true);
+          rewriter, loc, target->getOperand(index), false, options, true);
       if (failed(ret)) {
         return emitDefaultDefiniteFailure(target)
                << "failed to promote operand";
@@ -771,8 +780,13 @@ void transform_dialect::CreateAsyncGroupsOp::getEffects(
 DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
     func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  iree_compiler::createAsyncGroups(cast<func::FuncOp>(target), getUseMmaSync());
-  return DiagnosedSilenceableFailure::success();
+  Location loc = target->getLoc();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  iree_compiler::createAsyncGroups(rewriter, cast<func::FuncOp>(target),
+                                   getUseMmaSync());
+  return listener.check(loc);
 }
 
 //===---------------------------------------------------------------------===//

@@ -47,6 +47,13 @@ def DecomposeLinalgGeneric :
   let constructor = "mlir::iree_compiler::createDecomposeLinalgGenericPass()";
 }
 
+def DecomposeConvolutionToLowerDimOps :
+    Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
+  let summary = "Decomposes linalg convolution ops to lower dim ops";
+  let constructor =
+  "mlir::iree_compiler::createDecomposeConvolutionToLowerDimOpsPass()";
+}
+
 def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   let summary = "Decompose `affine.apply` operations into sub `affine.apply`";
   let description = [{
@@ -257,6 +264,9 @@ def TileAndDistributeToWorkgroups :
     Option<"maxWorkgroupParallelDims", "max-workgroup-parallel-dims", "int32_t",
       /*default=*/ "",
       "Maximum number of dims to distribute workgroups across.">,
+    Option<"distributionMethod", "distribution-method", "int32_t",
+      /*default=*/ "0",
+      "Pick the distribution method">      
   ];
 }
 
@@ -286,10 +296,16 @@ def TensorToVectorVectorizePad :
       "mlir::iree_compiler::createVectorizePadPass()";
 }
 
+def DecomposePackUnPackOps :
+    Pass<"iree-codegen-decompose-pack-unpack-ops", "func::FuncOp"> {
+  let summary = "Decompose pack/unpack ops into vectorizable ops";
+  let constructor = "mlir::iree_compiler::createDecomposePackUnPackOpsPass()";
+}
+
 def VectorizePackUnPackOps :
     Pass<"iree-codegen-vectorize-pack-unpack-ops", "func::FuncOp"> {
-  let summary = "Vectorize a very specific form of tensor.pad with "
-                "control flows";
+  let summary = "Vectorize ops that are created after decomposition of "
+                "pack/unpack ops";
   let constructor =
       "mlir::iree_compiler::createVectorizePackUnPackOpsPass()";
 }
@@ -462,6 +478,17 @@ def VerifyLinalgTransformLegality :
     Pass<"iree-llvmcpu-verify-linalg-transform-legality", "ModuleOp"> {
   let summary = "Verify that only supported IR constructs are passed to the compiler.";
   let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
+}
+
+def LLVMCPUTile :
+    Pass<"iree-llvmcpu-tile", "func::FuncOp"> {
+  let summary = "Pass to tile TilingInterface operations.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTilePass()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
 }
 
 def LLVMCPUTileAndFuse :

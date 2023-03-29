@@ -1572,6 +1572,9 @@ static ParseResult parseDispatchOperands(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceEnds,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths) {
+  if (failed(parser.parseLParen())) return failure();
+  // Handle the case of no operands specially.
+  if (succeeded(parser.parseOptionalRParen())) return success();
   do {
     // All entries at least have an %operand.
     resourceOperands.emplace_back();
@@ -1591,6 +1594,7 @@ static ParseResult parseDispatchOperands(
       }
     }
   } while (succeeded(parser.parseOptionalComma()));
+  if (failed(parser.parseRParen())) return failure();
   return success();
 }
 
@@ -1599,6 +1603,7 @@ static void printDispatchOperands(OpAsmPrinter &p, Operation *op,
                                   ValueRange resourceOffsets,
                                   ValueRange resourceEnds,
                                   ValueRange resourceLengths) {
+  p << "(";
   unsigned resourceIndex = 0;
   llvm::interleaveComma(resourceOperands, p, [&](Value operand) {
     p.printOperand(operand);
@@ -1613,6 +1618,7 @@ static void printDispatchOperands(OpAsmPrinter &p, Operation *op,
       ++resourceIndex;
     }
   });
+  p << ")";
 }
 
 LogicalResult AsyncDispatchOp::verify() {

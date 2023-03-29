@@ -30,10 +30,12 @@ iree_runtime_cc_library(
     name = "elf_module",
     srcs = [
         "elf_module.c",
+        "fatelf.c",
     ],
     hdrs = [
         "elf_module.h",
         "elf_types.h",
+        "fatelf.h",
     ],
     deps = [
         ":arch",

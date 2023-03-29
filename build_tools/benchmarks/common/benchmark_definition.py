@@ -289,6 +289,7 @@ class BenchmarkInfo:
   """An object describing the current benchmark.
 
   It includes the following benchmark characteristics:
+  - name: the benchmark name
   - model_name: the model name, e.g., 'MobileNetV2'
   - model_tags: a list of tags used to describe additional model information,
       e.g., ['imagenet']
@@ -301,6 +302,7 @@ class BenchmarkInfo:
   - device_info: an DeviceInfo object describing the device where benchmarks run
   """
 
+  name: str
   model_name: str
   model_tags: Sequence[str]
   model_source: str
@@ -311,33 +313,53 @@ class BenchmarkInfo:
   run_config_id: Optional[str] = None
 
   def __str__(self):
+    return self.name
+
+  @classmethod
+  def build_with_legacy_name(cls, model_name: str, model_tags: Sequence[str],
+                             model_source: str, bench_mode: Sequence[str],
+                             driver_info: DriverInfo, device_info: DeviceInfo):
+    """Build legacy name by combining the components of the BenchmarkInfo.
+
+    This is the legacy way to construct the name and still used as primary key
+    in the legacy benchmark system. It's deprecated and the new benchmark suites
+    use a human-defined name which can be more concise.
+    """
+    # TODO(#11076): Remove when we drop the legacy path in
+    # BenchmarkDriver.__get_benchmark_info_from_case
+
     # Get the target architecture and better driver name depending on the runner.
     target_arch = None
-    if self.driver_info.device_type == 'GPU':
-      target_arch = "GPU-" + self.device_info.gpu_name
-    elif self.driver_info.device_type == 'CPU':
-      target_arch = "CPU-" + self.device_info.get_detailed_cpu_arch_name()
+    if driver_info.device_type == 'GPU':
+      target_arch = "GPU-" + device_info.gpu_name
+    elif driver_info.device_type == 'CPU':
+      target_arch = "CPU-" + device_info.get_detailed_cpu_arch_name()
     else:
       raise ValueError(
-          f"Unrecognized device type '{self.driver_info.device_type}' of the driver '{self.driver_info.pretty_name}'"
+          f"Unrecognized device type '{driver_info.device_type}' of the driver '{driver_info.pretty_name}'"
       )
 
-    if self.model_tags:
-      tags = ",".join(self.model_tags)
-      model_part = f"{self.model_name} [{tags}] ({self.model_source})"
+    if model_tags:
+      tags = ",".join(model_tags)
+      model_part = f"{model_name} [{tags}] ({model_source})"
     else:
-      model_part = f"{self.model_name} ({self.model_source})"
-    device_part = f"{self.device_info.model} ({target_arch})"
+      model_part = f"{model_name} ({model_source})"
+    device_part = f"{device_info.model} ({target_arch})"
 
-    if self.compile_tags is not None:
-      mode_tags = f'[{",".join(self.compile_tags)}][{",".join(self.bench_mode)}]'
-    else:
-      mode_tags = ",".join(self.bench_mode)
+    mode_tags = ",".join(bench_mode)
+    name = f"{model_part} {mode_tags} with {driver_info.pretty_name} @ {device_part}"
 
-    return f"{model_part} {mode_tags} with {self.driver_info.pretty_name} @ {device_part}"
+    return cls(name=name,
+               model_name=model_name,
+               model_tags=model_tags,
+               model_source=model_source,
+               bench_mode=bench_mode,
+               driver_info=driver_info,
+               device_info=device_info)
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
+        "name": self.name,
         "model_name": self.model_name,
         "model_tags": self.model_tags,
         "model_source": self.model_source,
@@ -355,7 +377,8 @@ class BenchmarkInfo:
     if not driver_info:
       raise ValueError(f"Unrecognized runner: {json_object['runner']}")
 
-    return BenchmarkInfo(model_name=json_object["model_name"],
+    return BenchmarkInfo(name=json_object["name"],
+                         model_name=json_object["model_name"],
                          model_tags=json_object["model_tags"],
                          model_source=json_object["model_source"],
                          bench_mode=json_object["bench_mode"],
@@ -454,6 +477,7 @@ class BenchmarkResults(object):
 
 @dataclass(frozen=True)
 class CompilationInfo(object):
+  name: str
   model_name: str
   model_tags: Tuple[str]
   model_source: str
@@ -462,17 +486,38 @@ class CompilationInfo(object):
   gen_config_id: Optional[str] = None
 
   def __str__(self):
-    if self.model_tags:
-      tags = ",".join(self.model_tags)
-      model_part = f"{self.model_name} [{tags}] ({self.model_source})"
+    return self.name
+
+  @classmethod
+  def build_with_legacy_name(cls, model_name: str, model_tags: Sequence[str],
+                             model_source: str, target_arch: str,
+                             compile_tags: Sequence[str]):
+    """Build legacy name by combining the components of the CompilationInfo.
+
+    This is the legacy way to construct the name and still used as primary key
+    in the legacy benchmark system. It's deprecated and the new benchmark suites
+    use a human-defined name which can be more concise.
+    """
+    # TODO(#11076): Remove when we drop
+    # collect_compilation_statistics.get_module_map_from_benchmark_suite
+    if model_tags:
+      tags = ",".join(model_tags)
+      model_part = f"{model_name} [{tags}] ({model_source})"
     else:
-      model_part = f"{self.model_name} ({self.model_source})"
-    compile_tags_str = ",".join(self.compile_tags)
-    return f"{model_part} {self.target_arch} {compile_tags_str}"
+      model_part = f"{model_name} ({model_source})"
+    compile_tags_str = ",".join(compile_tags)
+    name = f"{model_part} {target_arch} {compile_tags_str}"
+    return cls(name=name,
+               model_name=model_name,
+               model_tags=tuple(model_tags),
+               model_source=model_source,
+               target_arch=target_arch,
+               compile_tags=tuple(compile_tags))
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return CompilationInfo(model_name=json_object["model_name"],
+    return CompilationInfo(name=json_object["name"],
+                           model_name=json_object["model_name"],
                            model_tags=tuple(json_object["model_tags"]),
                            model_source=json_object["model_source"],
                            target_arch=json_object["target_arch"],

@@ -13,6 +13,8 @@ if __name__ == "__main__":
   parser.add_argument("--build-dir", default=".", \
                       help="IREE top-level build directory is used to generate "\
                         "operations and npy files")
+  parser.add_argument("--verbose", default='False', \
+                      help='Prints verbose output and commands executed.')
   parser.add_argument("--operation_kind", default="all", \
                       help="Specifies the operation kinds to generate.", \
                       choices=["matmul", "conv2d", "all"])
@@ -23,15 +25,16 @@ if __name__ == "__main__":
                       default='linalg',\
                       help="MLIR dialect entry point at which operation is emitter.", \
                       choices=["linalg", "flow", "all"])
-
+  parser.add_argument("--device", default="cuda", \
+                      help="Target backend device to benchmark the operation on. "\
+                        "For example, cuda, vulkan, etc.")
   args = parser.parse_args()
 
   # Manifests dispatches for a group of accompanying operations and configurations.
   manifest = Manifest(args)
 
-  # Collect all the pre-defined dispatches in a manifest for various operations.
-  gpu_matmul_tensor_cores_f16(manifest)
-  #gpu_matmul_tensor_cores_f32(manifest)
+  # Load all the pre-defined dispatches in a manifest.
+  manifest.load()
 
   # Emit the dispatches in MLIR source files.
   manifest.emit(MlirDialect.Linalg)

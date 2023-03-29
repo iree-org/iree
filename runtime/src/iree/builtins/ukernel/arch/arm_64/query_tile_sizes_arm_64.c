@@ -6,7 +6,6 @@
 
 #include "iree/builtins/ukernel/arch/arm_64/query_tile_sizes_arm_64.h"
 
-#include "iree/builtins/ukernel/arch/arm_64/config.h"
 #include "iree/schemas/cpu_data.h"
 
 static iree_uk_matmul_tile_sizes_t

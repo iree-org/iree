@@ -15,13 +15,6 @@ enum class AddressSpace : uint32_t;
 }
 namespace iree_compiler {
 
-/// Verifies compatibility of the module for application of the LLVM
-/// conversion patterns. If not compatible, an error is issued and the
-/// pass should be failed.
-/// This is primarily used to eagerly reject modules with features not
-/// (yet) supported by the NVVM conversions.
-LogicalResult verifyLLVMConversionCompatibility(ModuleOp moduleOp);
-
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter);

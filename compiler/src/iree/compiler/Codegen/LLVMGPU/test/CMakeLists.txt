@@ -14,9 +14,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "attention.mlir"
     "conv_pipeline_test.mlir"
     "convert_to_nvvm.mlir"
-    "convert_to_nvvm_error.mlir"
     "convert_to_rocdl.mlir"
     "create_async_groups.mlir"
     "distribute_foreach.mlir"

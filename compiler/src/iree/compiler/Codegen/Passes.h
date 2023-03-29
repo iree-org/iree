@@ -64,6 +64,9 @@ createBufferizeCopyOnlyDispatchesPass();
 // one op in the body.
 std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 
+// Decomposes high-D convolution ops into low-D ones.
+std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass();
+
 // Decompose affine.apply operations into sub affine.apply that can be
 // hoisted in different loops.
 std::unique_ptr<Pass> createDecomposeAffineOpsPass();
@@ -136,6 +139,10 @@ createConvertToDestinationPassingStylePass(
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 
+/// Creates a pass to decompose tensor.pack and tensor.unpack ops. The pass does
+/// tiling and generalization. See implementation for more details.
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass();
+
 /// Creates a pass to vectorize tensor.pack and tensor.unpack ops. The pass does
 /// tiling, generalization, and kicking in the generic vectorizer. See
 /// implementation for more details.
@@ -165,7 +172,9 @@ createTestPartitionableLoopsInterfacePass();
 /// Pass to tile and distribute to workgroups.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass(
-    int32_t maxWorkgroupParallelDims = kNumMaxParallelDims);
+    int32_t maxWorkgroupParallelDims = kNumMaxParallelDims,
+    linalg::DistributionMethod distributionMethod =
+        linalg::DistributionMethod::Cyclic);
 
 /// Pass to specialize workgroup distribution loops
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -270,7 +279,7 @@ createInstrumentMemoryAccessesPass();
 /// Populates `patterns` with patterns to fold `affine.min` ops in tiled and
 /// distributed loops.
 void populateFoldAffineMinInDistributedLoopsPatterns(
-    RewritePatternSet &patterns);
+    RewritePatternSet &patterns, ArrayRef<int64_t> staticNumWorkgroup = {});
 
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on
@@ -303,6 +312,10 @@ void populateConcretizePadResultShapePatterns(MLIRContext *context,
 // no Linalg transform markers are set).
 std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyLinalgTransformLegalityPass();
+
+/// Pass to tile TilingInterface ops with given tilingLevel.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
+    int64_t tilingLevel = -1);
 
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
@@ -431,8 +444,7 @@ void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
-                                      bool enableVectorMasking);
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.

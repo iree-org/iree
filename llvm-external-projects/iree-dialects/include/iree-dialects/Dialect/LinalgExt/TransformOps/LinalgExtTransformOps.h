@@ -20,6 +20,13 @@ namespace scf {
 class ForOp;
 class ForallOp;
 } // namespace scf
+namespace iree_compiler {
+namespace IREE {
+namespace LinalgExt {
+class AttentionOp;
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
 } // namespace mlir
 
 #define GET_OP_CLASSES

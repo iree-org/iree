@@ -97,6 +97,8 @@ static Block::iterator findInsertionPointBefore(Operation *earliestOp,
 static LogicalResult sinkOp(Operation *op, Operation *targetOp) {
   auto ip = findInsertionPointBefore(op, targetOp);
   if (ip == Block::iterator(op)) return failure();
+  // If the moveBefore would be a no-op, then there is no work to do.
+  if (ip == std::next(Block::iterator(op))) return failure();
   op->moveBefore(targetOp);
   return success();
 }

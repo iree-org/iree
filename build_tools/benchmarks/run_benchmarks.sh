@@ -21,18 +21,24 @@ set -euo pipefail
 
 DOCKER_WRAPPER="${IREE_DOCKER_WRAPPER:-./build_tools/docker/docker_run.sh}"
 NORMAL_BENCHMARK_TOOLS_DIR="${IREE_NORMAL_BENCHMARK_TOOLS_DIR}"
+TRACED_BENCHMARK_TOOLS_DIR="${IREE_TRACED_BENCHMARK_TOOLS_DIR}"
+TRACY_CAPTURE_TOOL="${IREE_TRACY_CAPTURE_TOOL}"
 E2E_TEST_ARTIFACTS_DIR="${1:-${IREE_E2E_TEST_ARTIFACTS_DIR}}"
 EXECUTION_BENCHMARK_CONFIG="${2:-${IREE_EXECUTION_BENCHMARK_CONFIG}}"
 TARGET_DEVICE_NAME="${3:-${IREE_TARGET_DEVICE_NAME}}"
 BENCHMARK_RESULTS="${4:-${IREE_BENCHMARK_RESULTS}}"
+BENCHMARK_TRACES="${5:-${IREE_BENCHMARK_TRACES}}"
 
 if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
     --gpus all \
     --env NVIDIA_DRIVER_CAPABILITIES=all \
-    gcr.io/iree-oss/nvidia@sha256:0088a9efa980de8c699dc75eb89a5d758e38c9f825181d8d5e679ac5a09a7da6 \
+    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:5651a746a052990af1acb5190f526b5160a72dd645e81b50e76a7cc074d60970 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
+        --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
+        --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
+        --capture_tarball="${BENCHMARK_TRACES}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
         --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
         --target_device_name="${TARGET_DEVICE_NAME}" \
@@ -43,6 +49,9 @@ elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
     gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
+        --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
+        --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
+        --capture_tarball="${BENCHMARK_TRACES}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
         --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
         --target_device_name="${TARGET_DEVICE_NAME}" \

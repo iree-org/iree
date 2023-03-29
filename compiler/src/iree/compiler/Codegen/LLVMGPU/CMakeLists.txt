@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRArithToLLVM
     MLIRArithTransforms
     MLIRBufferizationDialect
+    MLIRComplexToLLVM
     MLIRComplexToStandard
     MLIRControlFlowToLLVM
     MLIRFuncDialect

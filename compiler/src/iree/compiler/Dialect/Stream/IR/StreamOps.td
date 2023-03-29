@@ -1974,10 +1974,10 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     (`on` `(` $affinity^ `)`)?
     $entry_point
     (`[` $workload^ `]`)? ``
-    `(` custom<DispatchOperands>($resource_operands,
-                                 $resource_operand_offsets,
-                                 $resource_operand_ends,
-                                 $resource_operand_lengths) `)` attr-dict `:`
+    custom<DispatchOperands>($resource_operands,
+                             $resource_operand_offsets,
+                             $resource_operand_ends,
+                             $resource_operand_lengths) attr-dict `:`
     custom<ShapedFunctionType>(ref($resource_operands),
                                type($resource_operands), $resource_operand_sizes,
                                type($results), $result_sizes,

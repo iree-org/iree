@@ -61,8 +61,18 @@ static llvm::cl::opt<bool> clDemoteF64ToF32(
                    "unconditionally before main flow conversions."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnablePadHandling(
+    "iree-flow-enable-pad-handling",
+    llvm::cl::desc("Enable native handling of tensor.pad operations"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     "iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
+    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
+    "iree-flow-enable-fuse-padding-into-linalg-producer-ops",
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
     llvm::cl::init(false));
 
@@ -196,9 +206,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
-  // Pad tensors.
-  passManager.addPass(IREE::Flow::createTensorPadToTensorInsertSlicePass(
-      /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
+  // Transform pad operations into linalg.fill + tensor.insert_slice.
+  // This is a WAR for not having native pad handling.
+  if (!clEnablePadHandling && !clEnableFusePaddingIntoLinalgProducerOps) {
+    passManager.addPass(IREE::Flow::createTensorPadToTensorInsertSlicePass(
+        /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
+  }
 
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
@@ -243,8 +256,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transformations afterwards with a simple region and without bothering
       // producers.
       .addPass([&]() {
-        return createFormDispatchRegionsPass(clEnableFuseMultiUse,
-                                             clDispatchGenerateWorkloadRegion);
+        return createFormDispatchRegionsPass(FormDispatchRegionsOptions{
+            clEnableFuseMultiUse, clDispatchGenerateWorkloadRegion,
+            clEnableFusePaddingIntoLinalgConsumerOps,
+            clEnableFusePaddingIntoLinalgProducerOps});
       })
       // Collapse dimensions of linalg Ops.
       .addPass(createCollapseDimensionsPass)

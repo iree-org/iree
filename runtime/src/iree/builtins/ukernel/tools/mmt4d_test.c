@@ -200,6 +200,8 @@ static void iree_uk_test_mmt4d(
 }
 
 int main(int argc, char** argv) {
+  iree_uk_standard_cpu_features_t* cpu = iree_uk_standard_cpu_features_create();
+
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird M0, N0, K0 to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
@@ -207,15 +209,19 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 9, 6, 3, NULL);
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_cpu_features_list_t* cpu_dotprod =
-      iree_uk_cpu_features_list_create(1, "dotprod");
-  iree_uk_cpu_features_list_t* cpu_i8mm =
-      iree_uk_cpu_features_list_create(1, "i8mm");
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 4, cpu_dotprod);
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8, cpu_i8mm);
-  iree_uk_cpu_features_list_destroy(cpu_dotprod);
-  iree_uk_cpu_features_list_destroy(cpu_i8mm);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 4, cpu->dotprod);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8, cpu->i8mm);
+#elif defined(IREE_UK_ARCH_X86_64)
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 4, 1, NULL);  // SSE
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, cpu->avx2_fma);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 16, 16, 1, cpu->avx512_base);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 4, 2, NULL);  // SSE2
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 2, cpu->avx2_fma);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 16, 16, 2, cpu->avx512_base);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 16, 16, 2, cpu->avx512_vnni);
 #endif  // defined(IREE_UK_ARCH_ARM_64)
+
+  iree_uk_standard_cpu_features_destroy(cpu);
 }

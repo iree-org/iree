@@ -174,6 +174,11 @@ std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 // linalg generic ops.
 std::unique_ptr<Pass> createDecomposeSoftmaxPass();
 
+// Transform dialect version of tile and decompose attention
+SmallVector<Operation *>
+tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
+                          IRRewriter &rewriter);
+
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
 std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
@@ -211,13 +216,6 @@ struct LinalgEnablingOptions {
     return *this;
   }
 };
-
-/// Create a LinalgStrategyTilePass.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
-    StringRef opName = "",
-    const scf::SCFTilingOptions &options = scf::SCFTilingOptions(),
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyDecomposePass.
 // TODO: if/when we need finer control add an `opName` parameter.

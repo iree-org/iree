@@ -33,6 +33,7 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     LLVMipo
+    MLIRBuiltinToLLVMIRTranslation
     MLIRGPUOps
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
