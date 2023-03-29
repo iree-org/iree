@@ -7,7 +7,7 @@
 
 from typing import List, Tuple
 from benchmark_suites.iree import module_execution_configs
-from e2e_test_framework.models import torch_models
+from e2e_test_framework.models import tf_models
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
@@ -32,7 +32,10 @@ class Linux_CUDA_Benchmarks(object):
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
-    models = model_groups.LARGE
+    models = model_groups.LARGE + [
+        tf_models.EFFICIENTNET_V2_S_FP32,
+        tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128
+    ]
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.SM_80_COMPILE_CONFIG,
