@@ -1,9 +1,9 @@
 import argparse
 import re
 
-import tensorflow as tf
-from tensorflow.python import pywrap_mlir
+import iree.compiler.tf
 from pathlib import Path
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-p',
@@ -19,16 +19,6 @@ parser.add_argument('-o',
 args = parser.parse_args()
 
 
-def convert_to_hlo(model_path: str):
-  result = pywrap_mlir.experimental_convert_saved_model_to_mlir(
-      model_path, "", show_debug_info=False)
-
-  pipeline = ["tf-lower-to-mlprogram-and-hlo"]
-  result = pywrap_mlir.experimental_run_pass_pipeline(result,
-                                                      ",".join(pipeline),
-                                                      show_debug_info=False)
-  return result
-
-
 if __name__ == "__main__":
-  Path(args.output_path).write_text(convert_to_hlo(args.saved_model_path))
+  Path(args.output_path).write_text(
+    iree.compiler.tf.get_mlir(args.saved_model_path))

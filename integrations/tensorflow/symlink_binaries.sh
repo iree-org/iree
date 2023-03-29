@@ -27,6 +27,5 @@ function symlink_import_binary() {
   fi
 }
 
-symlink_import_binary tf
 symlink_import_binary tflite
 symlink_import_binary xla
