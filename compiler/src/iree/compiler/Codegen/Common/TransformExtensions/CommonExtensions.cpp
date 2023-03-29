@@ -398,11 +398,9 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     return listener.check(
         loc, mlir::emitDefiniteFailure(target, "greedy patterns failed"));
   }
-  LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(listenerResult)) {
-    return listener.check(loc, mlir::emitDefiniteFailure(
-                                   target, "pattern listener tracker fail"));
-  }
+
+  auto diag = listener.check(loc);
+  if (!diag.succeeded()) return diag;
 
   if (getLicm()) {
     target->walk([&](func::FuncOp funcOp) {
@@ -433,8 +431,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
       result =
           eliminateCommonSubexpressions(funcOp, /*domInfo=*/nullptr, &listener);
       if (failed(result)) return WalkResult::interrupt();
-      listenerResult = listener.checkErrorState();
-      if (failed(listenerResult)) return WalkResult::interrupt();
+      if (failed(listener.checkErrorState())) return WalkResult::interrupt();
       return WalkResult::advance();
     });
     if (walkResult.wasInterrupted()) {
@@ -442,8 +439,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
         return mlir::emitDefiniteFailure(lastFuncVisited,
                                          "greedy patterns failed");
       }
-      LogicalResult listenerResult = listener.checkErrorState();
-      if (failed(listenerResult))
+      if (failed(listener.checkErrorState()))
         return mlir::emitDefiniteFailure(lastFuncVisited,
                                          "pattern listener tracker fail");
     }

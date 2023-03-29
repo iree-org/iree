@@ -62,12 +62,17 @@ public:
       return emitDefiniteFailure(loc, "listener failed");
     return DiagnosedSilenceableFailure::success();
   }
+
   DiagnosedSilenceableFailure check(Location loc,
                                     DiagnosedSilenceableFailure &&diag) {
-    LogicalResult listenerState = checkErrorState();
-    if (failed(listenerState)) {
-      (void)diag.checkAndReport();
-      return emitDefiniteFailure(loc, "listener failed");
+    if (failed(checkErrorState())) {
+      auto definite = emitDefiniteFailure(loc, "listener failed");
+      if (diag.isSilenceableFailure()) {
+        definite.attachNote()
+            << "was propagating silenceable error:" << diag.getMessage();
+        (void)diag.silence();
+      }
+      return definite;
     }
     return std::move(diag);
   }
