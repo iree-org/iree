@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::LLVMGPU::Utils
+    iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
   PUBLIC
