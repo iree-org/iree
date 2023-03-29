@@ -1001,8 +1001,9 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
     auto ptrStructType = LLVM::LLVMPointerType::get(context);
     Value one = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
                                                  builder.getIndexAttr(1));
-    paramsPtr = builder.create<LLVM::AllocaOp>(loc, ptrStructType, one,
-                                               /*alignment=*/0);
+    paramsPtr =
+        builder.create<LLVM::AllocaOp>(loc, ptrStructType, structType, one,
+                                       /*alignment=*/0);
     Value structVal = builder.create<LLVM::UndefOp>(loc, structType);
     for (int64_t i = 0, e = args.size(); i < e; ++i) {
       structVal = builder.create<LLVM::InsertValueOp>(loc, structVal, args[i],

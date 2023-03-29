@@ -225,7 +225,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                 executableLoweringPipeline, enableVectorMasking);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
-            addMmt4dTilingExpertPassPipeline(executableLoweringPipeline);
+            addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
+                                             enableMicrokernels);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling:
             addCPUDataTilingPipeline(executableLoweringPipeline);

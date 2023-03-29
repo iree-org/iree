@@ -69,10 +69,6 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
 
-  // Handle tensor-type constants.
-  nestedModulePM.addPass(arith::createConstantBufferizePass());
-  nestedModulePM.addPass(createFoldTensorExtractOpPass());
-
   // Resolve get_buffer_descriptor ops. All structural buffer manipulations
   // must conclude before this point.
   nestedModulePM.addNestedPass<func::FuncOp>(

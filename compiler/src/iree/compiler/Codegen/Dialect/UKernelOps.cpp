@@ -54,6 +54,8 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
     // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
     // backend (obviously), but is enough to unblock while the proper fix lands.
     fnDecl->setAttr("vm.import.module", rewriter.getStringAttr("vmvx"));
+    fnDecl->setAttr("llvm.bareptr", rewriter.getBoolAttr(true));
+    fnDecl->setAttr("hal.import.static", rewriter.getBoolAttr(true));
   } else if (fnDecl.getFunctionType() != functionType) {
     return rewriter.notifyMatchFailure(
         op, llvm::formatv("mismatch in function type computed during lowering "

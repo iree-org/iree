@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -44,7 +45,8 @@ struct BufferizeCopyOnlyDispatchesPass
     this->embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, bufferization::BufferizationDialect,
+    registry.insert<AffineDialect, arith::ArithDialect,
+                    bufferization::BufferizationDialect,
                     IREE::Flow::FlowDialect, linalg::LinalgDialect,
                     memref::MemRefDialect, tensor::TensorDialect>();
   }
@@ -111,6 +113,10 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
                                       deallocationFn, memcpyFn,
                                       this->embedSubspanOffsetIntoMemRefType);
+  // Handled tensor-type constants.
+  bufferizationPipeline.addPass(arith::createConstantBufferizePass());
+  bufferizationPipeline.addPass(createFoldTensorExtractOpPass());
+
   if (failed(runPipeline(bufferizationPipeline, module))) {
     return signalPassFailure();
   }
