@@ -69,7 +69,6 @@ popd > /dev/null
 if [[ "${IREE_TF_BINARIES_OUTPUT_DIR}" != "" ]]; then
   mkdir -p "${IREE_TF_BINARIES_OUTPUT_DIR}"
   cp \
-    "${INTEGRATIONS_DIR}/bazel-bin/iree_tf_compiler/iree-import-tf" \
     "${INTEGRATIONS_DIR}/bazel-bin/iree_tf_compiler/iree-import-tflite" \
     "${INTEGRATIONS_DIR}/bazel-bin/iree_tf_compiler/iree-import-xla" \
     "${IREE_TF_BINARIES_OUTPUT_DIR}"
