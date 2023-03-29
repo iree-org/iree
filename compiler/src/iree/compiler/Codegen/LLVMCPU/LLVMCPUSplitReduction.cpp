@@ -75,16 +75,6 @@ LogicalResult splitReductionPrecondition(Operation *op,
         << "skipped because reduction reordering on FP is not enabled.\n");
     return failure();
   }
-  return success();
-}
-
-/// Converts an inner-reduction into outer reduction + inner-parallel dimension,
-/// followed by simple inner reduction.
-LogicalResult splitReductionImpl(Operation *op, int64_t size,
-                                 RewriterBase &rewriter) {
-  IRRewriter::InsertionGuard g(rewriter);
-  rewriter.setInsertionPointAfter(op);
-  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
 
   SmallVector<unsigned> dims;
   linalgOp.getReductionDims(dims);
@@ -96,9 +86,24 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
     LLVM_DEBUG(
         llvm::dbgs()
         << "innermost dimension of the input operand is not reduction\n");
-    return success();
+    return failure();
   }
 
+  return success();
+}
+
+/// Converts an inner-reduction into outer reduction + inner-parallel dimension,
+/// followed by simple inner reduction.
+LogicalResult splitReductionImpl(Operation *op, int64_t size,
+                                 RewriterBase &rewriter) {
+  return rewriter.notifyMatchFailure(op, "test");
+  IRRewriter::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(op);
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
+
+  AffineMap map =
+      linalgOp.getMatchingIndexingMap(linalgOp.getDpsInputOperand(0));
+  unsigned lastIdx = map.getNumResults() - 1;
   linalg::ControlSplitReductionFn fn = [size, lastIdx](linalg::LinalgOp) {
     return linalg::SplitReductionOptions{size, lastIdx,
                                          /*innerParallel=*/true};
