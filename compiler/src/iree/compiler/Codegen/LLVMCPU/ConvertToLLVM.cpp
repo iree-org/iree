@@ -48,6 +48,8 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -821,12 +823,18 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
-    vector::populateVectorContractLoweringPatterns(patterns);
+    // TODO: doubtful that the "default" does what one want here, it is likely
+    // better to use outerproduct.
+    vector::populateVectorContractLoweringPatterns(
+        patterns, vector::VectorTransformsOptions());
     vector::populateVectorMaskMaterializationPatterns(
         patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
-    vector::populateVectorTransposeLoweringPatterns(patterns);
+    // TODO: doubtful that the "default" does what one want here, it is likely
+    // better to use shuffle.
+    vector::populateVectorTransposeLoweringPatterns(
+        patterns, vector::VectorTransformsOptions());
     populateConvertArmNeon2dToIntrPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {

@@ -25,9 +25,16 @@ transform.sequence failures(propagate) {
     {bufferize_function_boundaries = true}
   %3 = transform.structured.match ops{["func.func"]} in %module_op 
     : (!pdl.operation) -> !pdl.operation
-  transform.vector.lower_vectors %3 multireduction_lowering = "innerreduction"
 
-  // lower_to_llvm is the only remaining op not upstreamed, at the same time we
-  // upstreamed --test-lower-to-llvm.
+
+  %func = transform.structured.match ops{["func.func"]} in %module_op
+    : (!pdl.operation) -> !pdl.operation
+  %func_e_2 = transform.vector.lower_contraction %func
+    lowering_strategy = "outerproduct" 
+      : (!pdl.operation) -> !pdl.operation
+  %func_e_3 = transform.vector.lower_transpose %func_e_2
+    lowering_strategy = "shuffle" 
+      : (!pdl.operation) -> !pdl.operation
+
   lower_to_llvm
 }

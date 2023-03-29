@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -134,10 +136,9 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
     RewritePatternSet vectorContractLoweringPatterns(&getContext());
-    vectorContractLoweringPatterns.insert<
-        vector::ContractionOpToOuterProductOpLowering,
-        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
-        vectorTransformsOptions, context);
+    vector::populateVectorContractLoweringPatterns(
+        vectorContractLoweringPatterns, vectorTransformsOptions, /*benefit=*/1,
+        /*disableOuterProductLowering=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
     if (failed(applyPatternsAndFoldGreedily(

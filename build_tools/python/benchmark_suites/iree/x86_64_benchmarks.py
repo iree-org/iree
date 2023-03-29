@@ -40,26 +40,43 @@ class Linux_x86_64_Benchmarks(object):
       self, device_specs: List[common_definitions.DeviceSpec]
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
-    gen_configs = [
+    # Create benchmarks for small workloads.
+    gen_configs_small = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.CASCADELAKE_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in model_groups.SMALL + model_groups.LARGE
+        for model in model_groups.SMALL
     ]
-
-    default_execution_configs = [
-        module_execution_configs.ELF_LOCAL_SYNC_CONFIG
-    ] + [
-        module_execution_configs.get_elf_local_task_config(thread_num)
-        for thread_num in [1, 4, 8]
+    execution_configs_small = [
+        module_execution_configs.get_elf_local_task_config(1),
+        module_execution_configs.get_elf_local_task_config(8)
     ]
-
-    run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
-        module_generation_configs=gen_configs,
-        module_execution_configs=default_execution_configs,
+    run_configs_small = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        module_generation_configs=gen_configs_small,
+        module_execution_configs=execution_configs_small,
         device_specs=device_specs)
 
-    return (gen_configs, run_configs)
+    # Create benchmarks for large workloads.
+    gen_configs_large = [
+        iree_definitions.ModuleGenerationConfig.build(
+            compile_config=self.CASCADELAKE_COMPILE_CONFIG,
+            imported_model=iree_definitions.ImportedModel.from_model(model))
+        for model in model_groups.LARGE
+    ]
+    # We use higher thread counts for large workloads.
+    execution_configs_large = [
+        module_execution_configs.get_elf_local_task_config(1),
+        module_execution_configs.get_elf_local_task_config(8),
+        # We use (MAX_CORE - 2) here to determine the maximum number of threads to use on a NUMA node.
+        module_execution_configs.get_elf_local_task_config(13),
+    ]
+    run_configs_large = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        module_generation_configs=gen_configs_large,
+        module_execution_configs=execution_configs_large,
+        device_specs=device_specs)
+
+    return (gen_configs_small + gen_configs_large,
+            run_configs_small + run_configs_large)
 
   def _generate_experimental(
       self, device_specs: List[common_definitions.DeviceSpec]

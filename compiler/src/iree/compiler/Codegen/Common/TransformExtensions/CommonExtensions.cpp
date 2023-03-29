@@ -39,6 +39,7 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -85,14 +86,15 @@ static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
 
 // Track temporary allocations that are never read from. If this is the case
 // it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(Operation *parentOp) {
+static void eraseDeadAllocAndStores(RewriterBase &rewriter,
+                                    Operation *parentOp) {
   std::vector<Operation *> opToErase;
   parentOp->walk([&](memref::AllocOp op) {
     if (allUsesAreStores(op, opToErase)) {
       opToErase.push_back(op.getOperation());
     }
   });
-  for (Operation *op : opToErase) op->erase();
+  for (Operation *op : opToErase) rewriter.eraseOp(op);
 }
 
 //===---------------------------------------------------------------------===//
@@ -103,9 +105,12 @@ transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
-  vector::transferOpflowOpt(target);
-  eraseDeadAllocAndStores(target);
-  return DiagnosedSilenceableFailure::success();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  vector::transferOpflowOpt(rewriter, target);
+  eraseDeadAllocAndStores(rewriter, target);
+  return listener.check(target->getLoc());
 }
 
 void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
