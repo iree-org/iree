@@ -95,7 +95,7 @@ class EmitDefaultIREEABIPass
     return flattened;
   }
 
-  llvm::Optional<json::Value> mapTypeToJsonTypeRecord(Type type) {
+  std::optional<json::Value> mapTypeToJsonTypeRecord(Type type) {
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       auto typeValue = mapTypeToJsonTypeRecord(shapedType.getElementType());
       json::Array record({

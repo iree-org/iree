@@ -104,10 +104,18 @@ void iree_uk_benchmark_register(
   iree_string_builder_initialize(iree_allocator_system(), &full_name);
   IREE_CHECK_OK(iree_string_builder_append_cstring(&full_name, name));
   if (cpu_features) {
-    for (int i = 0; i < cpu_features->size; ++i) {
+    const char* cpu_features_name =
+        iree_uk_cpu_features_list_get_name(cpu_features);
+    if (cpu_features_name) {
       IREE_CHECK_OK(iree_string_builder_append_cstring(&full_name, "_"));
-      IREE_CHECK_OK(iree_string_builder_append_cstring(
-          &full_name, cpu_features->entries[i]));
+      IREE_CHECK_OK(
+          iree_string_builder_append_cstring(&full_name, cpu_features_name));
+    } else {
+      for (int i = 0; i < iree_uk_cpu_features_list_size(cpu_features); ++i) {
+        IREE_CHECK_OK(iree_string_builder_append_cstring(&full_name, "_"));
+        IREE_CHECK_OK(iree_string_builder_append_cstring(
+            &full_name, iree_uk_cpu_features_list_entry(cpu_features, i)));
+      }
     }
   }
   iree_benchmark_register(iree_string_builder_view(&full_name), &benchmark_def);

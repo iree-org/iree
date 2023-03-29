@@ -19,7 +19,7 @@ namespace MHLO {
 
 namespace {
 
-inline llvm::Optional<chlo::ComparisonDirection> chloComparisonDirection(
+inline std::optional<chlo::ComparisonDirection> chloComparisonDirection(
     mhlo::ComparisonDirection value) {
   switch (value) {
     case mhlo::ComparisonDirection::EQ:
@@ -39,7 +39,7 @@ inline llvm::Optional<chlo::ComparisonDirection> chloComparisonDirection(
   }
 }
 
-inline llvm::Optional<chlo::ComparisonType> chloComparisonType(
+inline std::optional<chlo::ComparisonType> chloComparisonType(
     mhlo::ComparisonType value) {
   switch (value) {
     case mhlo::ComparisonType::NOTYPE:
@@ -345,7 +345,7 @@ struct ConvertMHLOCompareOp : public OpConversionPattern<CompareOpTy> {
     chlo::ComparisonDirection chloCmpDirection =
         *chloComparisonDirection(adaptor.getComparisonDirection());
 
-    Optional<mhlo::ComparisonType> mhloCmpType = adaptor.getCompareType();
+    std::optional<mhlo::ComparisonType> mhloCmpType = adaptor.getCompareType();
     chlo::ComparisonTypeAttr chloCmpType;
     if (mhloCmpType)
       chloCmpType = chlo::ComparisonTypeAttr::get(

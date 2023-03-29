@@ -89,17 +89,17 @@ hal.executable @dot_dispatch_0 {
 //     CHECK-LABEL: hal.executable public @dot_dispatch_0
 //           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr -> vector<4xf32>
 //           CHECK:   llvm.br
-//   CHECK-COUNT-3:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//   CHECK-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
+//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 // CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr -> vector<4xf32>
 //           CHECK:   llvm.br
-//   CHECK-COUNT-3:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//   CHECK-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
+//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 // CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   CHECK-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-4:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
 
 // -----
 
@@ -167,7 +167,7 @@ hal.executable @dot_dispatch_0 {
 //         CHECK:   llvm.br
 // CHECK-COUNT-8:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //         CHECK:   llvm.br
-// CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+// CHECK-COUNT-2:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
 
 // -----
 
@@ -213,10 +213,10 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL: hal.executable public @conv2d_dispatch_0
 //         CHECK:   hal.executable.variant public @cuda
-// CHECK-COUNT-3:   llvm.load %{{.*}} : !llvm.ptr<f32>
+// CHECK-COUNT-3:   llvm.load %{{.*}} : !llvm.ptr -> f32
 //         CHECK:   lvm.fmul %{{.*}}, %{{.*}}  : f32
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : f32
-//         CHECK:   llvm.store {{.*}} : !llvm.ptr<f32>
+//         CHECK:   llvm.store {{.*}} : f32, !llvm.ptr
 
 // -----
 
@@ -351,7 +351,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //   CHECK-LABEL: hal.executable public @vector_add_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : vector<4xf32
-//         CHECK:   llvm.store %{{.*}} : !llvm.ptr<vector<4xf32>>
+//         CHECK:   llvm.store %{{.*}} : vector<4xf32>, !llvm.ptr
 
 // -----
 
@@ -469,20 +469,20 @@ hal.executable @mma_fused {
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> !llvm.void
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
 //           CHECK:   vvm.barrier0
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 //           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 //           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
 
 
 
@@ -552,17 +552,17 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
+//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
 //   CHECK-COUNT-1:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> !llvm.void
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f16, 3>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
 //           CHECK:   vvm.barrier0
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<8xf16>, 3>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<8xf16>
 //           CHECK:   llvm.fadd {{.*}} : vector<8xf16>
-//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
+//           CHECK:   llvm.store {{.*}} : vector<8xf16>, !llvm.ptr
 //           CHECK:   vvm.barrier0
 
 // -----
@@ -632,18 +632,18 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> !llvm.void
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
 //           CHECK:   vvm.barrier0
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
 
 // -----
 
@@ -702,18 +702,18 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//           CHECK:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> !llvm.void
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
 //           CHECK:   vvm.barrier0
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
 
 // -----
 
@@ -807,9 +807,9 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //   CHECK-LABEL: hal.executable public @warp_reduction_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load {{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> f32
 // CHECK-COUNT-3:     nvvm.shfl.sync  bfly
 
 // -----
@@ -869,12 +869,12 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //   CHECK-LABEL: hal.executable public @warp_reduction_broadcast_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-5:     nvvm.shfl.sync  bfly
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load {{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> f32
 // CHECK-COUNT-3:     nvvm.shfl.sync  bfly
 //         CHECK:     llvm.fdiv %{{.*}}, %{{.*}} 
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr
 
 // -----
 
@@ -916,10 +916,10 @@ hal.executable private @shared_mem_alloc {
 //   CHECK-LABEL: hal.executable private @shared_mem_alloc
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} : f32, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load %{{.*}} : !llvm.ptr<f32, 3>
+//         CHECK:     llvm.load %{{.*}} : !llvm.ptr<3> -> f32
 //         CHECK:     nvvm.barrier0
 
 // -----
@@ -965,6 +965,6 @@ hal.executable private @shared_mem_transpose  {
 //   CHECK-LABEL: hal.executable private @shared_mem_transpose
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>>
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>, 3>
+//         CHECK:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr -> vector<4xf32>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0

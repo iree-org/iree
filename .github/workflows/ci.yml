@@ -260,7 +260,7 @@ jobs:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_windows_${{ github.sha }}
 
-  build_test_all_macos:
+  build_test_all_macos_arm64:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on:
@@ -292,6 +292,69 @@ jobs:
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+
+  build_test_all_macos_x86_64:
+    needs: setup
+    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
+    runs-on: macos-12-xl
+    env:
+      BUILD_DIR: build-macos
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Updating git submodules"
+        run: git submodule update --init --jobs 8 --depth 1
+      - name: "Setting up Python"
+        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - name: "Installing Python packages"
+        run: pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Installing requirements"
+        # We need coreutils for `realpath` used in scripts.
+        # We need bash because the default one on macOS is fairly old and lacks
+        # features we use in scripts.
+        run: brew install ninja ccache coreutils bash
+      # Attempt to restore from cache unconditionally.
+      # Note: this will first try to grab a cache entry for this exact commit
+      #       then it will fall back to the latest for any commit.
+      - name: "Fetching cache (CMake/ccache)"
+        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache_all_macos_${{ github.sha }}
+          restore-keys: ccache_all_macos
+      # Finally: build and run tests.
+      - name: "Building IREE"
+        env:
+          IREE_READ_REMOTE_CCACHE: 0
+          IREE_WRITE_REMOTE_CCACHE: 0
+          IREE_READ_LOCAL_CCACHE: 1
+          IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          # Cache size and compression level settings are a delicate balance.
+          # * A full build cache is around 2-5GB depending on compression level
+          # * Upload/download is slow (double compression may or may not help)
+          # * We have a limit of 10GB across all cached files per repository
+          # * Cache misses are quite costly:
+          #   * 99% cache hits -> ~5 minutes to build
+          #   * 20% cache hits -> ~15-20 minutes to build
+          CCACHE_MAXSIZE: 4G
+          CCACHE_COMPRESSLEVEL: 5
+        run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: "Testing IREE"
+        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+      # Write cache (if configured to) after all other steps are finished.
+      - name: "Saving cache (CMake/ccache)"
+        if: needs.setup.outputs.write-caches == '1'
+        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache_all_macos_${{ github.sha }}
 
   build_test_all_bazel:
     needs: setup
@@ -860,13 +923,15 @@ jobs:
         target:
           - platform: "linux"
             arch: "x86_64"
-            docker_image: "gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8"
+            docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd"
             # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
           - platform: "linux"
             arch: "riscv_64"
             docker_image: "gcr.io/iree-oss/riscv@sha256:000cc1bfe46666f2f42f82fb487c744cf3b1edb05d3c9810b049652428f38bb5"
             build_script: "./build_tools/cmake/build_riscv.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
@@ -903,14 +968,38 @@ jobs:
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
+      - name: "Downloading pre-built tracy capture tool"
+        id: download-tracy-capture
+        env:
+          TRACY_CAPTURE_GCS_ARTIFACT: ${{ matrix.target.tracy_capture }}
+          TRACY_CAPTURE: ${{ env.BUILD_TOOLS_DIR }}/build-traced/tracy-capture
+        run: |
+          gcloud storage cp "${TRACY_CAPTURE_GCS_ARTIFACT}" "${TRACY_CAPTURE}"
+          chmod +x "${TRACY_CAPTURE}"
+          echo "tracy-capture=${TRACY_CAPTURE}" >> "${GITHUB_OUTPUT}"
       - name: "Creating the benchmark tools archive"
+        # Here we pack a tracy-capture binary (~7MB) into each benchmark tools
+        # archive. This could be wasteful because multiple benchmark tools
+        # archives might pack the same tracy-capture binary. But it simplifies
+        # the process to fetch required tools to run benchmarks and we only have
+        # a few versions of the benchmark tools archives.
+        # Detailed reason: The generated benchmark matrix fetches the benchmark
+        # tools archive based on the target device. However, there is a scenario
+        # that the tracy-capture is running on a different host. E.g. Mobile
+        # benchmarks have the benchmark tool forwarding the data from the phones
+        # to the tracy-capture running on Linux host. Embedding the host of
+        # tracy-capture will overloads the benchmark matrix and puts too much
+        # unrelated machine setup in it. So we simply pack everything needed
+        # into each benchmark tools archive.
         id: archive
         env:
-          BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools.tar
+          TRACY_CAPTURE: ${{ steps.download-tracy-capture.outputs.tracy-capture }}
+          BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM }}-${{ env.ARCH }}-benchmark-tools.tar
         run: |
           tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
             "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
-            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt
+            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt \
+            "${TRACY_CAPTURE}"
           echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading the benchmark tools archive"
         id: upload
@@ -1341,7 +1430,8 @@ jobs:
       # Basic
       - build_all
       - build_test_all_windows
-      - build_test_all_macos
+      - build_test_all_macos_arm64
+      - build_test_all_macos_x86_64
       - build_test_all_bazel
       - test_all
       - test_gpu
@@ -1359,6 +1449,7 @@ jobs:
       - test_build_benchmark_suites
 
       # Configurations
+      - python_release_packages
       - asan
       - tsan
       - small_runtime

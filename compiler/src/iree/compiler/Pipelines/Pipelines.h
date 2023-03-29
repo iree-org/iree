@@ -16,6 +16,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+class PipelineExtensions;
+
 // Hooks for injecting behavior into the IREEVM pipeline. Since these are not
 // derived from CLI options, we maintain them as a separate struct.
 struct IREEVMPipelineHooks {
@@ -26,6 +28,9 @@ struct IREEVMPipelineHooks {
   // the constant evaluator, which needs to recursively invoke these
   // pipelines.
   std::function<void(OpPassManager &)> buildConstEvalPassPipelineCallback;
+
+  // Applies pipeline extensions to the built pipeline if not nullptr.
+  PipelineExtensions *pipelineExtensions = nullptr;
 };
 
 enum class IREEVMPipelinePhase {

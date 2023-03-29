@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
   int version = ireeCompilerGetAPIVersion();
   printf("Version: %d\n", version);
 
-  ireeCompilerGlobalInitialize(true);
+  ireeCompilerGlobalInitialize();
   printf("Initialized\n");
 
   // Session.

@@ -30,7 +30,7 @@ HALTypeConverter::HALTypeConverter(
   // Tensors become buffers by default.
   // Shapes and types are carried independently or folded away entirely - all
   // we need at the HAL level is a blob of bytes.
-  addConversion([=](TensorType type) -> Optional<Type> {
+  addConversion([=](TensorType type) -> std::optional<Type> {
     // HAL only should be concerned with numeric values.
     if (HALTypeConverter::shouldConvertToBufferView(type)) {
       return IREE::HAL::BufferViewType::get(type.getContext());

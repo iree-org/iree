@@ -271,13 +271,13 @@ IREE::LinalgExt::MaterializeEncodingInfo chooseEncodingInfoForMatmul(
   return encodingInfo;
 }
 
-Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
+std::optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
   auto encodingAttr = tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
   if (!encodingAttr) return std::nullopt;
   return encodingAttr.getEncoding().getValue();
 }
 
-Optional<MatmulType> getMatmulType(TensorEncoding encoding) {
+std::optional<MatmulType> getMatmulType(TensorEncoding encoding) {
   switch (encoding) {
     case TensorEncoding::MATMUL_F32F32F32_LHS:
     case TensorEncoding::MATMUL_F32F32F32_RHS:
@@ -292,7 +292,7 @@ Optional<MatmulType> getMatmulType(TensorEncoding encoding) {
   }
 }
 
-Optional<MatmulOperandRole> getMatmulOperandRole(TensorEncoding encoding) {
+std::optional<MatmulOperandRole> getMatmulOperandRole(TensorEncoding encoding) {
   switch (encoding) {
     case TensorEncoding::MATMUL_F32F32F32_LHS:
     case TensorEncoding::MATMUL_I8I8I32_LHS:
@@ -334,7 +334,7 @@ void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
 FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {
-  Optional<TensorEncoding> encoding = getEncoding(tensorType);
+  std::optional<TensorEncoding> encoding = getEncoding(tensorType);
   if (!encoding) return failure();
   auto matmulType = getMatmulType(*encoding);
   auto matmulOperandRole = getMatmulOperandRole(*encoding);

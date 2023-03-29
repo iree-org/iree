@@ -352,11 +352,6 @@ def main(args):
                                             benchmark_grace_time=1.0,
                                             verbose=args.verbose)
 
-  if args.continue_from_directory:
-    # Merge in previous benchmarks and captures.
-    benchmark_driver.add_previous_benchmarks_and_captures(
-        args.continue_from_directory)
-
   if args.pin_cpu_freq:
     set_cpu_frequency_scaling_governor("performance")
     atexit.register(set_cpu_frequency_scaling_governor, "schedutil")

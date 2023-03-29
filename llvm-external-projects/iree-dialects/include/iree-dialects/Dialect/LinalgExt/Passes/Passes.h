@@ -39,11 +39,11 @@ struct LinalgTransformationFilter {
 
   explicit LinalgTransformationFilter(
       ArrayRef<StringAttr> matchDisjunction = {},
-      Optional<StringAttr> replacement = std::nullopt);
+      std::optional<StringAttr> replacement = std::nullopt);
 
   explicit LinalgTransformationFilter(
       const FilterFunction &f, ArrayRef<StringAttr> matchDisjunction = {},
-      Optional<StringAttr> replacement = std::nullopt);
+      std::optional<StringAttr> replacement = std::nullopt);
 
   LinalgTransformationFilter(LinalgTransformationFilter &&) = default;
   LinalgTransformationFilter(const LinalgTransformationFilter &) = default;
@@ -78,7 +78,7 @@ struct LinalgTransformationFilter {
 private:
   SmallVector<FilterFunction> filters;
   SmallVector<StringAttr> matchDisjunction;
-  Optional<StringAttr> replacement;
+  std::optional<StringAttr> replacement;
   /// When set to true, if the attribute is not set, it will be treated as
   /// a match. Default is false.
   bool matchByDefault;
@@ -174,6 +174,11 @@ std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 // linalg generic ops.
 std::unique_ptr<Pass> createDecomposeSoftmaxPass();
 
+// Transform dialect version of tile and decompose attention
+SmallVector<Operation *>
+tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
+                          IRRewriter &rewriter);
+
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
 std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
@@ -212,13 +217,6 @@ struct LinalgEnablingOptions {
   }
 };
 
-/// Create a LinalgStrategyTileAndFusePass.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgStrategyTileAndFusePass(
-    StringRef opName = "", const scf::SCFTilingOptions &options = {},
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
-
 /// Create a LinalgStrategyTilePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
     StringRef opName = "",
@@ -226,28 +224,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
     const LinalgExt::LinalgTransformationFilter &filter =
         LinalgExt::LinalgTransformationFilter());
 
-/// Create a LinalgStrategyPadPass.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPadPass(
-    StringRef opName = "",
-    const linalg::LinalgPaddingOptions &opt = linalg::LinalgPaddingOptions(),
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
-
 /// Create a LinalgStrategyDecomposePass.
 // TODO: if/when we need finer control add an `opName` parameter.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
-    const LinalgExt::LinalgTransformationFilter &filter =
-        LinalgExt::LinalgTransformationFilter());
-
-/// Create a LinalgStrategyPeelPass.
-using LoopsToPeelComputationFunction = std::function<void(
-    OpBuilder &, Operation *, SmallVectorImpl<scf::ForOp> &)>;
-
-struct LinalgPeelOptions {
-  LoopsToPeelComputationFunction loopsToPeelComputationFunction = nullptr;
-};
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
-    StringRef opName = "", const LinalgPeelOptions &opt = LinalgPeelOptions(),
     const LinalgExt::LinalgTransformationFilter &filter =
         LinalgExt::LinalgTransformationFilter());
 

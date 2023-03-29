@@ -334,20 +334,20 @@ static InstrumentationEntry acquireInstrumentationEntry(Location loc,
 
   Value offsetIndex =
       builder.create<LLVM::ConstantOp>(loc, i64Type, headOffset);
-  Value offsetPtr =
-      builder.create<LLVM::GEPOp>(loc, basePtr.getType(), basePtr, offsetIndex,
-                                  /*inbounds=*/true);
-  Value offsetPtrI64 = builder.create<LLVM::BitcastOp>(
-      loc, LLVM::LLVMPointerType::get(i64Type), offsetPtr);
+  Value offsetPtr = builder.create<LLVM::GEPOp>(
+      loc, basePtr.getType(), LLVM::LLVMPointerType::get(builder.getContext()),
+      basePtr, offsetIndex,
+      /*inbounds=*/true);
   Value rawOffset = builder.create<LLVM::AtomicRMWOp>(
-      loc, LLVM::AtomicBinOp::add, offsetPtrI64, entrySize,
+      loc, LLVM::AtomicBinOp::add, offsetPtr, entrySize,
       LLVM::AtomicOrdering::monotonic);
   Value offsetMask =
       builder.create<LLVM::ConstantOp>(loc, i64Type, ringSize - 1);
   Value wrappedOffset = builder.create<LLVM::AndOp>(loc, rawOffset, offsetMask);
 
-  Value entryPtr = builder.create<LLVM::GEPOp>(loc, basePtr.getType(), basePtr,
-                                               wrappedOffset);
+  Value entryPtr = builder.create<LLVM::GEPOp>(
+      loc, basePtr.getType(), LLVM::LLVMPointerType::get(builder.getContext()),
+      basePtr, wrappedOffset);
 
   return {basePtr, entryPtr, wrappedOffset};
 }
@@ -371,7 +371,8 @@ static InstrumentationEntry appendInstrumentationEntry(
   builder.create<LLVM::StoreOp>(
       loc, entryStruct,
       builder.create<LLVM::BitcastOp>(
-          loc, LLVM::LLVMPointerType::get(entryType), entry.entryPtr),
+          loc, LLVM::LLVMPointerType::get(builder.getContext()),
+          entry.entryPtr),
       /*alignment=*/16);
 
   return entry;
@@ -448,9 +449,9 @@ struct ConvertHALInstrumentWorkgroupOp
   }
 };
 
-static Optional<uint64_t> mapValueType(Type type) {
-  return TypeSwitch<Type, Optional<uint64_t>>(type)
-      .Case<IntegerType>([&](Type type) -> Optional<uint64_t> {
+static std::optional<uint64_t> mapValueType(Type type) {
+  return TypeSwitch<Type, std::optional<uint64_t>>(type)
+      .Case<IntegerType>([&](Type type) -> std::optional<uint64_t> {
         if (type.isUnsignedInteger()) {
           switch (type.getIntOrFloatBitWidth()) {
             case 8:
@@ -478,7 +479,7 @@ static Optional<uint64_t> mapValueType(Type type) {
             return std::nullopt;
         }
       })
-      .Case<FloatType>([&](Type type) -> Optional<uint64_t> {
+      .Case<FloatType>([&](Type type) -> std::optional<uint64_t> {
         if (type.isBF16()) {
           return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_BFLOAT_16;
         }
@@ -493,10 +494,10 @@ static Optional<uint64_t> mapValueType(Type type) {
             return std::nullopt;
         }
       })
-      .Case<IndexType>([&](Type type) -> Optional<uint64_t> {
+      .Case<IndexType>([&](Type type) -> std::optional<uint64_t> {
         return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_64;
       })
-      .Default([&](Type) -> Optional<uint64_t> { return std::nullopt; });
+      .Default([&](Type) -> std::optional<uint64_t> { return std::nullopt; });
 }
 
 struct ConvertHALInstrumentValueOp
@@ -509,7 +510,7 @@ struct ConvertHALInstrumentValueOp
     auto loc = instrumentOp.getLoc();
 
     // Only convert ops we can handle, otherwise warn and discard.
-    Optional<uint64_t> valueType;
+    std::optional<uint64_t> valueType;
     if (operands.getOperand().getType().isa<LLVM::LLVMPointerType>()) {
       valueType = IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_POINTER;
     } else {

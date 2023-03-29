@@ -55,6 +55,7 @@ iree_lit_test_suite(
     "tile_linalg_ops.mlir"
     "vectorize_conv.mlir"
     "vectorize_elementwise_ops.mlir"
+    "vectorize_gather.mlir"
     "vectorize_load_store.mlir"
     "vectorize_matmul.mlir"
     "vectorize_reduction.mlir"

@@ -46,21 +46,21 @@ FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(Operation *op);
 
 /// Returns the StringAttr with the name `stringAttr` in the `targetAttr`, if
 /// found.
-Optional<StringAttr> getConfigStringAttr(
+std::optional<StringAttr> getConfigStringAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr);
 
 /// Returns the IntegerAttr with the name `integerAttr` in the `targetAttr`, if
 /// found.
-Optional<IntegerAttr> getConfigIntegerAttr(
+std::optional<IntegerAttr> getConfigIntegerAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr);
 
 /// Returns the BoolAttr with the name `integerAttr` in the `targetAttr`, if
 /// found.
-Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                     StringRef integerAttr);
+std::optional<BoolAttr> getConfigBoolAttr(
+    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr);
 
 /// Returns the LLVM Target triple associated with the `targetAttr`, if set.
-Optional<llvm::Triple> getTargetTriple(
+std::optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Methods to get target information.
@@ -71,6 +71,10 @@ bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// and interface binding with read-only attribute or from an `arith.constant`
 /// operation.
 bool isReadOnly(Value v);
+
+/// Return the static number of workgroup dispatched if it is known and
+/// constant. Return an empty vector otherwise.
+SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp);
 
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
@@ -112,7 +116,7 @@ struct LoopTilingAndDistributionInfo {
   // The step for the original untiled loop.
   OpFoldResult untiledStep;
   // The tile size used to tile (and not distribute) the original untiled loop.
-  Optional<int64_t> tileSize;
+  std::optional<int64_t> tileSize;
   // The processor dimension this loop is distributed to.
   unsigned processorDistributionDim;
 };
@@ -139,7 +143,7 @@ SmallVector<Operation *> getComputeOps(func::FuncOp funcOp);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.
-Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
+std::optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
     scf::ForOp forOp);
 
 /// Collects information about loops matching tiled+distribute pattern.
@@ -152,7 +156,8 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes);
+    const SmallVector<int64_t> &tileSizes,
+    linalg::DistributionMethod distributionMethod);
 
 //===---------------------------------------------------------------------===//
 // Misc. utility functions.

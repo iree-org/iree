@@ -26,20 +26,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
-/// Pattern to swap a `TilingInterface` op -> `tensor::ExtractSliceOp`.
-struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-
-  FailureOr<Operation *>
-  returningMatchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(sliceOp, rewriter);
-  }
-};
-
 /// Pattern to rewrite a scf::ForallOp to the async dialect.
 struct ForallOpToAsyncRewriter : public OpRewritePattern<scf::ForallOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -219,40 +205,6 @@ public:
 };
 
 ///
-/// Linalg SCF tile and fuse patterns.
-///
-/// `filter` controls LinalgTransformMarker matching and update when specified.
-struct SCFTileAndFusePattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
-  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  SCFTileAndFusePattern(
-      MLIRContext *context,
-      scf::SCFTilingOptions options = scf::SCFTilingOptions(),
-      LinalgTransformationFilter filter = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1)
-      : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        options(std::move(options)), filter(std::move(filter)) {}
-
-  /// Construct a pattern specifically applied to `opName`.
-  SCFTileAndFusePattern(
-      StringRef opName, MLIRContext *context,
-      scf::SCFTilingOptions options = scf::SCFTilingOptions(),
-      LinalgTransformationFilter filter = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1)
-      : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        options(std::move(options)), filter(filter.addOpNameFilter(opName)) {}
-
-  LogicalResult matchAndRewrite(TilingInterface op,
-                                PatternRewriter &rewriter) const override;
-
-private:
-  scf::SCFTilingOptions options;
-
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-};
-
-///
 /// Linalg vectorization patterns.
 ///
 /// `filter` controls LinalgTransformMarker matching and update when specified.
@@ -345,7 +297,7 @@ struct LinalgBasePromotionPattern : public RewritePattern {
     // the op and deleting the previous op. This
     // needs more investigation.
     rewriter.startRootUpdate(op);
-    Optional<linalg::LinalgOp> promotedOp =
+    std::optional<linalg::LinalgOp> promotedOp =
         promoteSubViews(rewriter, op, options);
     if (!promotedOp) {
       rewriter.cancelRootUpdate(op);
@@ -385,102 +337,11 @@ struct LinalgPromotionPattern : public LinalgBasePromotionPattern {
       : LinalgBasePromotionPattern(opName, context, options, f, benefit) {}
 };
 
-/// Wraps upstream Linalg pattern in a filter check + update.
-template <typename Conv2DOp, typename Conv1DOp>
-struct DownscaleSizeOneWindowed2DConvolution final
-    : public OpRewritePattern<Conv2DOp> {
-  DownscaleSizeOneWindowed2DConvolution(MLIRContext *context,
-                                        LinalgTransformationFilter f)
-      : OpRewritePattern<Conv2DOp>(context, /*benefit=*/1),
-        filter(std::move(f)) {}
-
-  LogicalResult matchAndRewrite(Conv2DOp convOp,
-                                PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, convOp)))
-      return failure();
-    linalg::DownscaleSizeOneWindowed2DConvolution<Conv2DOp, Conv1DOp> p(
-        convOp.getContext());
-    auto maybeConv1DOp = p.returningMatchAndRewrite(convOp, rewriter);
-    if (failed(maybeConv1DOp))
-      return failure();
-    filter.replaceLinalgTransformationFilter(rewriter, *maybeConv1DOp);
-    return success();
-  }
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-};
-
-/// Wraps upstream Linalg pattern in a filter check + update.
-struct DownscaleDepthwiseConv2DNhwcHwcOp final
-    : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
-  DownscaleDepthwiseConv2DNhwcHwcOp(MLIRContext *context,
-                                    LinalgTransformationFilter f)
-      : OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>(context,
-                                                           /*benefit=*/1),
-        filter(std::move(f)) {}
-
-  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
-                                PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, convOp)))
-      return failure();
-    linalg::DownscaleDepthwiseConv2DNhwcHwcOp p(convOp.getContext());
-    auto maybeConv1DOp = p.returningMatchAndRewrite(convOp, rewriter);
-    if (failed(maybeConv1DOp))
-      return failure();
-    filter.replaceLinalgTransformationFilter(rewriter, *maybeConv1DOp);
-    return success();
-  }
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-};
-
-/// Wraps upstream Linalg pattern in a filter check + update.
-struct LinalgPaddingPattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
-  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  LinalgPaddingPattern(
-      MLIRContext *context,
-      linalg::LinalgPaddingOptions options = linalg::LinalgPaddingOptions(),
-      LinalgTransformationFilter f = LinalgTransformationFilter())
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(context,
-                                                    /*benefit=*/1),
-        filter(std::move(f)), options(options) {}
-
-  /// Construct a pattern specifically applied to `opName`.
-  LinalgPaddingPattern(
-      StringRef opName, MLIRContext *context,
-      linalg::LinalgPaddingOptions options = linalg::LinalgPaddingOptions(),
-      LinalgTransformationFilter f = LinalgTransformationFilter())
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(context, /*benefit=*/1),
-        filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
-
-  LogicalResult matchAndRewrite(linalg::LinalgOp op,
-                                PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, op)))
-      return failure();
-    linalg::LinalgPaddingPattern p(op.getContext(), options);
-    auto maybeRes = linalg::padAndHoistLinalgOp(rewriter, op, options);
-    if (failed(maybeRes))
-      return failure();
-    filter.replaceLinalgTransformationFilter(rewriter, *maybeRes);
-    return success();
-  }
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-  /// Options to control padding and hoisting.
-  linalg::LinalgPaddingOptions options;
-};
-
 FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
     OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
     ArrayRef<int64_t> tileInterchange,
-    const Optional<linalg::LinalgLoopDistributionOptions> &tileDistribution);
+    const std::optional<linalg::LinalgLoopDistributionOptions>
+        &tileDistribution);
 
 } // namespace LinalgExt
 } // namespace IREE

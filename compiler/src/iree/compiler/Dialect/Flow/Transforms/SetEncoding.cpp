@@ -63,9 +63,9 @@ static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
 
 /// Pads `value` to `padding` if needed. If no padding is specified,
 /// return `value` itself.
-static FailureOr<Value> padIfNeeded(OpBuilder &builder, Location loc,
-                                    Value value,
-                                    Optional<int64_t> padding = std::nullopt) {
+static FailureOr<Value> padIfNeeded(
+    OpBuilder &builder, Location loc, Value value,
+    std::optional<int64_t> padding = std::nullopt) {
   if (!padding) return value;
 
   OpFoldResult paddingOfr = builder.getIndexAttr(padding.value());

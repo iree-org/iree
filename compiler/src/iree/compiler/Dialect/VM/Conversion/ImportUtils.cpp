@@ -118,7 +118,7 @@ size_t getSegmentSpanSize(Type spanType) {
   }
 }
 
-Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
+std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
     ConversionPatternRewriter &rewriter) {
   if (auto intAttr = attrValue.dyn_cast<IntegerAttr>()) {

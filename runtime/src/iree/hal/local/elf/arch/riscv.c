@@ -22,8 +22,8 @@
 // ELF machine type/ABI
 //==============================================================================
 
-bool iree_elf_arch_is_valid(const iree_elf_ehdr_t* ehdr) {
-  return ehdr->e_machine == 0xF3;  // EM_RISCV / 243
+bool iree_elf_machine_is_valid(iree_elf_half_t machine) {
+  return machine == 0xF3;  // EM_RISCV / 243
 }
 
 //==============================================================================

@@ -32,8 +32,8 @@ namespace IREE {
 namespace Flow {
 
 /// Check if any of the use dominates all other uses of the operation.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo &dominanceInfo) {
+static std::optional<OpOperand *> getFusableUse(Operation *op,
+                                                DominanceInfo &dominanceInfo) {
   auto uses = op->getUses();
   for (OpOperand &source : uses) {
     Operation *sourceOp = source.getOwner();
@@ -71,6 +71,15 @@ static bool areFusableOps(MLIRContext *context, Operation *producerOp,
         return false;
       })) {
     return true;
+  }
+
+  // Don't fuse if all of the consumer maps aren't projected permutations.
+  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+    if (!llvm::all_of(
+            linalgConsumerOp.getIndexingMapsArray(),
+            [](AffineMap map) { return map.isProjectedPermutation(); })) {
+      return false;
+    }
   }
 
   // If producer has a single user, always fuse
@@ -158,7 +167,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
       return;
     }
 
-    Optional<OpOperand *> fusableUse = getFusableUse(genericOp, dominanceInfo);
+    std::optional<OpOperand *> fusableUse =
+        getFusableUse(genericOp, dominanceInfo);
     if (!fusableUse) return;
     if (!linalg::areElementwiseOpsFusable(fusableUse.value())) return;
 

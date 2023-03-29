@@ -75,7 +75,7 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
 
  protected:
   virtual std::string getImportFqName(T op) const = 0;
-  virtual Optional<SmallVector<Value>> emitCall(
+  virtual std::optional<SmallVector<Value>> emitCall(
       T op, typename T::Adaptor adaptor, IREE::VM::ImportOp importOp,
       ConversionPatternRewriter &rewriter) const {
     return rewriteToCall(op, adaptor, importOp, typeConverter, rewriter);

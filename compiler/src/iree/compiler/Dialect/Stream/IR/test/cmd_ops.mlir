@@ -46,8 +46,8 @@ func.func @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !str
 
 // CHECK-LABEL: @cmdCollective
 func.func @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<transient>, %arg3: index) -> !stream.timepoint {
-  // CHECK: %[[CHANNEL:.+]] = stream.channel.create
-  %channel = stream.channel.create : !stream.channel
+  // CHECK: %[[CHANNEL:.+]] = stream.channel.default
+  %channel = stream.channel.default : !stream.channel
 
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index

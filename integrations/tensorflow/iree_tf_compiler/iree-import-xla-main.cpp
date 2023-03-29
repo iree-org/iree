@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv);
 
   auto openInputStream =
-      [&]() -> llvm::Optional<
+      [&]() -> std::optional<
                 std::pair<std::istream *, std::unique_ptr<std::ifstream>>> {
     auto fileInputStream = std::make_unique<std::ifstream>();
     std::istream *inputStream;

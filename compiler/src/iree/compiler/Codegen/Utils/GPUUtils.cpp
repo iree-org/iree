@@ -74,7 +74,7 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
   std::array<int64_t, 3> workgroupSize;
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       mlir::iree_compiler::getEntryPoint(funcOp);
-  llvm::Optional<mlir::ArrayAttr> workgroupSizeAttr =
+  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
       exportOp->getWorkgroupSize();
   assert(workgroupSizeAttr.has_value());
   for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
@@ -96,7 +96,7 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
   // For zero dim tensor, consider it's too small to access using all threads.
   if (shape.size() == 0) return false;
   int64_t threadsAvailable = threadCount;
-  for (auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
+  for (const auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
     int64_t numElementPerThread = index == 0 ? vectorSize : 1;
     int64_t numThreads = dim / numElementPerThread;
     if (numThreads == 0) return false;
@@ -116,7 +116,7 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
 
 /// Pick an unrolling order that will allow tensorcore operation to reuse LHS
 /// register. This is needed to get good performance on sm_80 target.
-Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
+std::optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
     vector::ContractionOp contract) {
   SmallVector<int64_t> order;
   // First make reduction the outer dimensions.
@@ -149,10 +149,10 @@ Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
 // GPU workgroup memory
 //===----------------------------------------------------------------------===//
 
-Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
-                                        memref::SubViewOp subview,
-                                        ArrayRef<Value> sizeBounds,
-                                        DataLayout &) {
+std::optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
+                                             memref::SubViewOp subview,
+                                             ArrayRef<Value> sizeBounds,
+                                             DataLayout &) {
   OpBuilder::InsertionGuard guard(builder);
 
   func::FuncOp funcOp = subview->getParentOfType<func::FuncOp>();
@@ -307,10 +307,8 @@ static Value promoteElementToVector(Location loc, OpBuilder &builder,
   return vectorInput;
 }
 
-/// Packs vector of lower precision into a single 32-bit width element.
-/// (i.e <2xf16> -> i32 and <4xi8> -> i32)
-static Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
-                                        Value input) {
+Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
+                                 Value input) {
   LLVM_DEBUG({
     auto vecType = input.getType().cast<VectorType>();
     Type elementType = vecType.getElementType();
@@ -327,10 +325,8 @@ static Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
   return packedInput;
 }
 
-/// Unpack single scalar element into a target vector type.
-/// (i.e i32 -> vector<4xi8> or f32 -> vector<2xf16>)
-static Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
-                            VectorType targetVecType) {
+Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
+                     VectorType targetVecType) {
   LLVM_DEBUG({
     Type packedType = packedInput.getType();
     assert(packedType.isIntOrFloat() && "Only ints and floats are unpackable.");
@@ -558,7 +554,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
   return laneVal;
 }
 
-Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
+std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
   // Currently hardcode the size of wmma operation. When more cases are
   // supported this should be picked based on what the backend supports.
   int64_t m = 16;
@@ -602,7 +598,7 @@ Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
 // getMmaNativeVectorSize
 //===----------------------------------------------------------------------===//
 /// Returns vector::ContractionOp operand's index where the result is used.
-static Optional<int> getVectorContractOpOperandId(
+static std::optional<int> getVectorContractOpOperandId(
     vector::ContractionOp contractOp, OpResult result) {
   if (contractOp.getLhs() == result) return 0;
   if (contractOp.getRhs() == result) return 1;
@@ -613,7 +609,7 @@ static Optional<int> getVectorContractOpOperandId(
 /// Returns vector::ContractionOp operand's index  where the
 /// vector::TransferReadOp is consumed either consumed directly or via
 /// vector::ExtractStridedSliceOp.
-static Optional<int> getVectorContractOpOperandIdForVectorReadOp(
+static std::optional<int> getVectorContractOpOperandIdForVectorReadOp(
     Operation *op) {
   vector::ContractionOp contractOp;
 
@@ -628,7 +624,7 @@ static Optional<int> getVectorContractOpOperandIdForVectorReadOp(
 }
 
 /// Helper function to return native size for MMA.SYNC-based operations.
-Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
+std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   // Shape of native Tensor Core GPU mma.sync operations.
   int64_t mmaShapeM = 16;
   int64_t mmaShapeN = 8;
@@ -669,7 +665,8 @@ Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     auto resultVectorType = readOp.getVector().getType().cast<VectorType>();
     Type resultElementType = resultVectorType.getElementType();
 
-    Optional<int> operandId = getVectorContractOpOperandIdForVectorReadOp(op);
+    std::optional<int> operandId =
+        getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
       op->emitError() << "Cannot determine operandId this "
                          "vector::TransferReadOp is used as in the "

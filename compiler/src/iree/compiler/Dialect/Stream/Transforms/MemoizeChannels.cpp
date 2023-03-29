@@ -48,11 +48,12 @@ class MemoizeChannelsPass : public MemoizeChannelsBase<MemoizeChannelsPass> {
         allDefaultOps;
     for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
       callableOp.walk([&](IREE::Stream::ChannelDefaultOp defaultOp) {
-        // TODO(benvanik): include the group discriminator in here.
         auto affinityAttr = IREE::Stream::AffinityAttr::lookup(defaultOp);
-        auto fullKey = ArrayAttr::get(moduleOp.getContext(), {
-                                                                 affinityAttr,
-                                                             });
+        auto fullKey =
+            ArrayAttr::get(moduleOp.getContext(), {
+                                                      affinityAttr,
+                                                      defaultOp.getGroupAttr(),
+                                                  });
         auto lookup = allDefaultOps.try_emplace(
             fullKey, std::vector<IREE::Stream::ChannelDefaultOp>{});
         if (lookup.second) {
@@ -88,8 +89,10 @@ class MemoizeChannelsPass : public MemoizeChannelsBase<MemoizeChannelsPass> {
           moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
       auto createOp = funcBuilder.create<IREE::Stream::ChannelCreateOp>(
-          fusedLoc, channelType, /*rank=*/Value{}, /*count=*/Value{},
-          affinityAttr);
+          fusedLoc, channelType, /*id=*/Value{},
+          /*group=*/anyDefaultOp.getGroupAttr(),
+          /*rank=*/Value{},
+          /*count=*/Value{}, affinityAttr);
       funcBuilder.create<IREE::Util::GlobalStoreOp>(
           fusedLoc, createOp.getResult(), globalOp.getName());
       funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);

@@ -117,8 +117,8 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       loc, valuesExpandedType, valuesOrig, reassociationIndices);
 
   // Expand input indices shape for parallel processing if they exist
-  Optional<Value> indicesExpanded;
-  if (Optional<Value> inputIndices = topkOp.indices()) {
+  std::optional<Value> indicesExpanded;
+  if (std::optional<Value> inputIndices = topkOp.indices()) {
     // Type inputElementType = inputIndices->getType().cast<ShapedType>();
     Type indicesExpandedType =
         RankedTensorType::get(expandedShape, indicesElementType);

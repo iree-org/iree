@@ -14,8 +14,9 @@
 // ELF machine type/ABI
 //==============================================================================
 
-// Returns true if the reported ELF machine specification is valid.
-bool iree_elf_arch_is_valid(const iree_elf_ehdr_t* ehdr);
+// Returns true if the reported ELF machine specification is valid for the
+// current architecture.
+bool iree_elf_machine_is_valid(iree_elf_half_t machine);
 
 //==============================================================================
 // ELF relocations

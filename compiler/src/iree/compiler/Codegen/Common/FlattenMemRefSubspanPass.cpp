@@ -88,10 +88,10 @@ static bool isRankZeroOrOneMemRef(Type type) {
 struct FlattenMemRefTypeConverter final : public TypeConverter {
   FlattenMemRefTypeConverter() {
     // Allow all other types.
-    addConversion([](Type type) -> Optional<Type> { return type; });
+    addConversion([](Type type) -> std::optional<Type> { return type; });
 
     // Convert n-D MemRef to 1-D MemRef.
-    addConversion([](MemRefType type) -> Optional<Type> {
+    addConversion([](MemRefType type) -> std::optional<Type> {
       int64_t offset;
       SmallVector<int64_t> strides;
       if (failed(getStridesAndOffset(type, strides, offset))) {
@@ -663,7 +663,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
 ///
 /// Note that this should be kept consistent with how the byte offset was
 /// calculated in the subspan ops!
-Optional<int64_t> getNumBytes(Type type) {
+std::optional<int64_t> getNumBytes(Type type) {
   if (type.isIntOrFloat()) return IREE::Util::getRoundedElementByteWidth(type);
   if (auto vectorType = type.dyn_cast<VectorType>()) {
     auto elementBytes = getNumBytes(vectorType.getElementType());
@@ -736,14 +736,15 @@ struct FlattenMemRefSubspanPass
     // uniform buffers and dynamic for storage buffers. This matches how IREE
     // models runtime buffers nicely.
     FlattenMemRefTypeConverter interfaceTypeConverter;
-    interfaceTypeConverter.addConversion([](MemRefType type) -> Optional<Type> {
-      // 0-D MemRef types can be used to represent raw pointers for micro-kernel
-      // ABI purposes. Specially allow it.
-      if (isRankZeroMemRef(type)) return type;
+    interfaceTypeConverter.addConversion(
+        [](MemRefType type) -> std::optional<Type> {
+          // 0-D MemRef types can be used to represent raw pointers for
+          // micro-kernel ABI purposes. Specially allow it.
+          if (isRankZeroMemRef(type)) return type;
 
-      // Fall back to the default conversion flow.
-      return std::nullopt;
-    });
+          // Fall back to the default conversion flow.
+          return std::nullopt;
+        });
     flattenPatterns.add<FlattenBindingSubspan>(interfaceTypeConverter, context);
 
     // Other ops generate MemRef values representing internal allocations (e.g.,
@@ -751,13 +752,14 @@ struct FlattenMemRefSubspanPass
     // kernel. We may not be able to go fully dynamic (e.g., memref::GlobalOp).
     // Still convert everything to 1-D though.
     FlattenMemRefTypeConverter internalTypeConverter;
-    internalTypeConverter.addConversion([](MemRefType type) -> Optional<Type> {
-      // 0-D or 1-D MemRef types are okay.
-      if (isRankZeroOrOneMemRef(type)) return type;
+    internalTypeConverter.addConversion(
+        [](MemRefType type) -> std::optional<Type> {
+          // 0-D or 1-D MemRef types are okay.
+          if (isRankZeroOrOneMemRef(type)) return type;
 
-      // Fall back to the default conversion flow.
-      return std::nullopt;
-    });
+          // Fall back to the default conversion flow.
+          return std::nullopt;
+        });
     flattenPatterns
         .add<FlattenAlloc<memref::AllocaOp>, FlattenAlloc<memref::AllocOp>,
              FlattenGlobal, FlattenGetGlobal, LinearizeLoadIndices,

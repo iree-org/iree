@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -118,7 +119,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::TransposeOp op) {
   return nativeSize;
 }
 
-Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
+std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
@@ -127,7 +128,7 @@ Optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
     }
   }
 
-  return TypeSwitch<Operation *, Optional<SmallVector<int64_t>>>(op)
+  return TypeSwitch<Operation *, std::optional<SmallVector<int64_t>>>(op)
       .Case<VectorTransferOpInterface, vector::ContractionOp,
             vector::MultiDimReductionOp, vector::ReductionOp,
             vector::TransposeOp>(
@@ -161,7 +162,9 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
   SPIRVVectorizePass(const SPIRVVectorizePass &pass) = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, vector::VectorDialect>();
+    // vector.gather lowering patterns target scf ops.
+    registry.insert<linalg::LinalgDialect, vector::VectorDialect,
+                    scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -256,6 +259,22 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After lowering multi_reduction ops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    // Similarly for vector.gather ops, whose lowering patterns unroll
+    // internally.
+    {
+      RewritePatternSet patterns(context);
+      vector::populateVectorGatherLoweringPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After lowering gather ops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });

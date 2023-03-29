@@ -32,7 +32,7 @@ class Linux_CUDA_Benchmarks(object):
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
-    models = model_groups.LARGE + [torch_models.MODEL_UNET_2D_FP32_TORCH]
+    models = model_groups.LARGE
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.SM_80_COMPILE_CONFIG,

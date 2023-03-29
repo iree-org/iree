@@ -73,10 +73,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     unspecified order:
       - additional_iree_patterns: fancy patterns we shortcut into the system,
       will need to be sliced out better in the future.
-      - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This 
+      - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This
       must be applied separately from `bubble_expand` patterns because of some
       upstream pattern interference issue atm.
-      - bubble_expand: bubble `expand_shape` down across Linalg ops. This 
+      - bubble_expand: bubble `expand_shape` down across Linalg ops. This
       must be applied separately from `bubble_collapse` patterns because of some
       upstream pattern interference issue atm.
       - bubble_pack_un_pack: bubble `pack` up and `unpack` down across Linalg
@@ -98,11 +98,11 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       extract_slice ops with reassociative reshape ops.
       - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
       case it is the only use of extract.
-      - licm: additionally apply loop-independent code motion and single 
+      - licm: additionally apply loop-independent code motion and single
       iteration loop promotion. This is not a set of patterns per se but is still
-      very convenient to apply it close to canonicalization and other greedy 
+      very convenient to apply it close to canonicalization and other greedy
       pattern applications.
-      - linalg_elementwise_greedy_fusion: add linalg elementwise ops fusion 
+      - linalg_elementwise_greedy_fusion: add linalg elementwise ops fusion
       patterns using a naive default heuristic.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
@@ -111,7 +111,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       behavior on subset-based linalg operations using insert/extract slices.
       - rank_reducing_linalg_via_reshapes: adds patterns that results in rank-reducing
       behavior on subset-based linalg operations using expand/collapse shape ops.
-      - rank_reducing_vector: adds patterns that results in rank-reducing 
+      - rank_reducing_vector: adds patterns that results in rank-reducing
       behavior on subset-based vector operations.
       adopts the upstream version.
       - swapping_patterns: adds patterns that swap operations for a better outcome.
@@ -123,10 +123,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       - tiling_canonicalization: adds specific tiling-related canonicalization
       patterns.
       - unroll_vectors_gpu_mma_sync: adds patterns that unroll vectors to a native tile
-      size for GPUs with mma operations. The size is currently hardcoded but 
+      size for GPUs with mma operations. The size is currently hardcoded but
       should be refactored upstream and made pluggable.
       - unroll_vectors_gpu_wmma: adds patterns that unroll vectors to a native tile
-      size for GPUs with wmma operations. The size is currently hardcoded but 
+      size for GPUs with wmma operations. The size is currently hardcoded but
       should be refactored upstream and made pluggable.
 
 
@@ -140,7 +140,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     capture op handles, the transformation definitely fails.
 
     Otherwise the transformation is successful.
-    
+
     This operation does not consume the target handle and does not produce any
     handle.
   }];
@@ -360,9 +360,9 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
     topLevel tile_to_forall_op.
 
     If the unique topLevel scf.forall operation contained within the
-    FuncOp referred to by the `target` transform handle lowers to workgroup 
+    FuncOp referred to by the `target` transform handle lowers to workgroup
     properly, the transform succeeds.
-    
+
     Otherwise the transform definitely fails.
 
     This transform does not consume its input handle and produces no result.
@@ -389,31 +389,31 @@ def ShareForallOperandsOp : Op<
       TransformEachOpTrait,
       TransformOpInterface]> {
   let description = [{
-    Target a single scf.forall op and shares all uses of the specified 
+    Target a single scf.forall op and shares all uses of the specified
     `share_operands` operand indices.
 
     Sharing can be thought of as the inverse of traditional privatization.
     Privatization consists in determining that a part of memory is only accessed
-    by a single thread to and subsequently slicing out that part into a 
+    by a single thread to and subsequently slicing out that part into a
     thread_private storage that has smaller footprint, better locality and better
     alignment properties.
-    In the case of scf.forall on tensors, tensor values are immutable 
+    In the case of scf.forall on tensors, tensor values are immutable
     and the same tensor value may be passed as `shared_outs` and also captured
     for internal uses.
-    Due to the immutability property, the whole tensor values are private by 
+    Due to the immutability property, the whole tensor values are private by
     construction and result in alloc + copy of the whole tensor on every thread
-    to maintain the original SSA value after bufferizing. 
+    to maintain the original SSA value after bufferizing.
 
     An analysis similar to privatization is needed to ensure that only a private
     slice is needed and that the whole tensor can be shared.
-    This transformation amounts to injecting the result of such an analysis as 
+    This transformation amounts to injecting the result of such an analysis as
     static information in the program.
     The transformation checks that the values captured are `tensor.extract_slice`
     with a matching `tensor.parallel_insert_slice`, to approximate the lack of
-    a cross-thread dependence analysis. 
+    a cross-thread dependence analysis.
     However this can still be unsafe wrt parallelism so use carefully!
 
-    Sharing consists in rewriting all uses of the operands passed as 
+    Sharing consists in rewriting all uses of the operands passed as
     `shared_outs` that are also captured wihtin the `scf.forall` region
     into the matching `shared_outs` bbarg.
 
@@ -424,7 +424,7 @@ def ShareForallOperandsOp : Op<
     #### Return modes
 
     If any of the `share_operands` indices overflow, a definite error is produced.
-    
+
     If a `share_operands` fails a sharing precondition, it is ignored.
     In the future, we should emit a notification.
 

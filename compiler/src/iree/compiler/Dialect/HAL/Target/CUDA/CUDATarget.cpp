@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -30,12 +29,12 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/Internalize.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -43,14 +42,6 @@
 static llvm::cl::opt<bool> dumpPtx(
     "iree-hal-cuda-dump-ptx", llvm::cl::init(false),
     llvm::cl::desc("Dump ptx to the debug stream."));
-
-// TODO: remove this workaround altogether once we decide not to support
-// CUDA 11.3
-static llvm::cl::opt<bool> clDisableLoopNounrollWa(
-    "iree-hal-cuda-disable-loop-nounroll-wa",
-    llvm::cl::desc("Disable the workaround for bug in ptxas for CUDA version "
-                   "before 11.4."),
-    llvm::cl::init(true));
 
 static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
@@ -78,14 +69,6 @@ static std::string translateModuleToISA(llvm::Module &module,
     llvm::raw_string_ostream stream(targetISA);
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
-    // Workaround for CUDA driver bug
-    // (https://bugs.llvm.org/show_bug.cgi?id=48771), we mark all the loops with
-    // the no unroll metadata. This bug is fixed in cuda 11.4 but since we still
-    // run on older driver we need to keep it.
-    // TODO(thomasraoux): Remove it once we stop supporting older drivers.
-    if (!clDisableLoopNounrollWa) {
-      codegenPasses.add(llvm::createSetNoUnrollPass());
-    }
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
                                       llvm::CGFT_AssemblyFile);
     codegenPasses.run(module);
@@ -157,7 +140,7 @@ static void optimizeModule(llvm::Module &module,
   llvm::PassInstrumentationCallbacks pic;
 
   llvm::StandardInstrumentations si(module.getContext(), false);
-  si.registerCallbacks(pic, &fam);
+  si.registerCallbacks(pic, &mam);
 
   llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
   llvm::ModulePassManager mpm;
@@ -193,6 +176,7 @@ class CUDATargetBackend final : public TargetBackend {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect,
                     IREE::Codegen::IREECodegenDialect>();
+    mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);
   }
@@ -246,7 +230,8 @@ class CUDATargetBackend final : public TargetBackend {
     SmallVector<uint32_t> workgroupLocalMemories;
     for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
       std::array<int32_t, 3> workgroupSize;
-      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+      if (std::optional<ArrayAttr> workgroupSizeAttr =
+              exportOp.getWorkgroupSize()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
           workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
         }

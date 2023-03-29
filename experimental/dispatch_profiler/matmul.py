@@ -90,6 +90,7 @@ class MatmulOperation:
     return 2 * self.M * self.N * self.K
 
 
+##############################################################################
 class MatmulCompilationInfo:
   """Data structure strictly describes the compilation passes and the tiling configurations. 
   For a matrix multiplication operation, compilation passes and tiling configuration 
@@ -154,8 +155,6 @@ class EmitMatmulCompilationInfo:
 
 
 ###############################################################################
-#############       MLIR Emitter for the matmul operation.     ###############
-###############################################################################
 class EmitLinalgMatmulDispatch:
   """Emitters for the `linalg.matmul` dispatch."""
 
@@ -216,40 +215,6 @@ class EmitMhloMatmulOperation:
 
 
 ###############################################################################
-class EmitMatmulSourceMlir:
-  """Emitters for the matmul operation MLIR source files."""
-
-  def __init__(self, operation_path, dispatch_collection):
-    self.operation_path = operation_path
-    self.dispatch_collection = dispatch_collection
-    self.operation = dispatch_collection.operation
-    self.configuration_list = dispatch_collection.configuration_list
-
-    self.operation_filepath = os.path.join(self.operation_path, \
-                                           self.operation.name() + ".mlir")
-
-  def __enter__(self):
-    self.operation_file = open(self.operation_filepath, "w")
-    self.operation_file.write('// Finename: ' + self.operation_filepath)
-
-    # emit all the configuration attribute tags.
-    for configuration in self.configuration_list:
-      self.operation_file.write(EmitMatmulCompilationInfo().emit(configuration))
-
-    return self
-
-  def emit(self):
-    """Emit the matmul func.func for each dispatch (operation + configuration)"""
-    for dispatch in self.dispatch_collection.get_dispatches():
-      print("    Emitting matmul tuning parameters: " +
-            dispatch.configuration.name())
-      self.operation_file.write(EmitLinalgMatmulDispatch().emit(dispatch))
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.operation_file.close()
-
-
-###############################################################################
 class ReferenceMatmulOperation:
   """Reference implementation for the matmul operation in numpy.
       ReferenceMatmulOperation class has the following responsibilities:
@@ -267,7 +232,7 @@ class ReferenceMatmulOperation:
     self.N = matmul_operation.problem_shape[1]
     self.K = matmul_operation.problem_shape[2]
 
-    # dtype for the input and result matrices.
+    # Data type for the input and result matrices.
     self.dtype_lhs = DataTypeNumPyTag[matmul_operation.lhs.datatype]
     self.dtype_rhs = DataTypeNumPyTag[matmul_operation.rhs.datatype]
     self.dtype_result = DataTypeNumPyTag[matmul_operation.result.datatype]
@@ -276,7 +241,7 @@ class ReferenceMatmulOperation:
     self.dist_lhs = dist_lhs
     self.dist_rhs = dist_rhs
 
-    # filename for the lhs, rhs, inital_result, and result matrices.
+    # Filename for the left hand side input tensor.
     self.filename_lhs = "m{problem_m}xk{problem_k}_"\
       "{tensor_description}_{dist}_lhs.npy".format(
       problem_m=self.M,
@@ -284,6 +249,7 @@ class ReferenceMatmulOperation:
       tensor_description=self.matmul_operation.lhs.name(),
       dist=DistributionName[self.dist_lhs])
 
+    # Filename for the right hand side input tensor.
     self.filename_rhs = "k{problem_k}xn{problem_n}_"\
       "{tensor_description}_{dist}_rhs.npy".format(
       problem_k=self.K,
@@ -291,6 +257,7 @@ class ReferenceMatmulOperation:
       tensor_description=self.matmul_operation.rhs.name(),
       dist=DistributionName[self.dist_rhs])
 
+    # Filename for the reference result tensor.
     self.reference_filename_result = "m{problem_m}xn{problem_n}_"\
       "{tensor_description}_reference_result.npy".format(
       problem_m=self.M,
@@ -493,106 +460,155 @@ class MatmulOperationLauncher:
     return runtime_in_ms
 
 
-###############################################################################
-# Free functions to create a list of pre-baked matmul operations along with
-# tuning cofigurations. The functions below seperated based on the target backend
-# and the data type.
-###############################################################################
+##############################################################################
+class MatmulGenerator:
+  """Matmul dispatch generator class.
+  Generates a list of pre-definied matmul operations with resonable tuning cofigurations. 
+  The generator function are seperated based on the target backend and the data type.
+  Please see example `MatmulGenerator._cuda_matmul_tensor_cores_f16` for cuda target 
+  backend and f16 data type."""
 
+  def __init__(self, args):
+    self.args = args
 
-def gpu_matmul_tensor_cores_f16(manifest):
-  """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
-  # Matmul tuning configurations for LLVM GPU TensorCore(F16)
-  tile_descriptions = [
+    self.translation_infos = [
+        #TranslationInfo.LLVMGPUMatmulSimt,  # CUDA Core (SMIT)
+        #TranslationInfo.LLVMGPUMatmulTensorCore, # Tensor Core (WMMA)
+        TranslationInfo.
+        LLVMGPUMatmulTensorCoreMmaSync,  # Tensor Core (MMA.SYNC)
+    ]
 
-      # Test tile that works for both wmma and mma.sync
-      #TileDescription([128, 128, 32], 3, [64, 2, 1]),
+    self.problem_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
+                           [2560, 2560, 2560], [3456, 1024, 2048]]
 
-      # Tiles for performance profiling `mma.sync.[f16/f32].f16.f16.[f16/f32]``
-      #TileDescription([256, 128, 32], 3, [128, 2, 1]), # What should be the workgroup size?
-      TileDescription([128, 256, 32], 3, [128, 2, 1]),
-      TileDescription([128, 128, 64], 4, [64, 2, 1]),
-      TileDescription([128, 128, 32], 5, [64, 2, 1]),
-      TileDescription([128, 64, 32], 5, [64, 2, 1]),
-      TileDescription([64, 64, 64], 5, [64, 2, 1]),
-      TileDescription([64, 64, 32], 10, [64, 2, 1]),
-  ]
+    # List of pre-definied matmul dispatch collections.
+    self.dispatches_collection_list = []
 
-  translation_infos = [  #TranslationInfo.LLVMGPUMatmulTensorCore, 
-      TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync
-  ]
+    # CUDA specific constants.
+    self.cuda_warp_size = 32
+    self.cuda_smem_capacity_in_bytes_sm80 = 192 << 10
 
-  # compilation info configuration list.
-  configuration_list = []
+  def _is_tile_aligned_shape(self, dispatch):
+    """Checks if the given dispatch is valid for CUDA."""
+    problem_shape = dispatch.operation.problem_shape
+    threadblock_shape = dispatch.configuration.tile_description.threadblock_shape
+    if len(problem_shape) != len(threadblock_shape):
+      raise ValueError("Problem shape and threadblock shape must have the "\
+                       "same rank.")
+    is_aligned = all(
+        a % b == 0 for a, b in zip(problem_shape, threadblock_shape))
+    return is_aligned
 
-  for tile_description in tile_descriptions:
-    for translation_info in translation_infos:
-      configuration_list.append(
-          MatmulCompilationInfo(tile_description, translation_info))
+  def _cuda_smem_required_in_bytes(self, dispatch):
+    """Returns size bytes of shared memory required for a given cuda dispatch."""
+    threadblock_shape = dispatch.configuration.tile_description.threadblock_shape
+    num_stages = dispatch.configuration.tile_description.stages
+    tile_shape_lhs = threadblock_shape[0] * threadblock_shape[2]
+    tile_shape_rhs = threadblock_shape[2] * threadblock_shape[1]
+    return ((tile_shape_lhs * DataTypeSizeInBits[dispatch.operation.lhs.datatype] + \
+             tile_shape_rhs * DataTypeSizeInBits[dispatch.operation.rhs.datatype]) * num_stages) // 8
 
-  # Matmul problems.
-  problem_shapes = [
-      #[128, 128, 256],
-      #[256, 512, 128],
-      #[1024, 512, 2048],
-      [2560, 2560, 2560],
-      [3456, 1024, 2048]
-  ]
+  def _is_cuda_smem_avialable(self, dispatch):
+    """Checks if the given dispatch is valid for CUDA."""
+    return self._cuda_smem_required_in_bytes(
+        dispatch) <= self.cuda_smem_capacity_in_bytes_sm80
 
-  for problem_shape in problem_shapes:
-    operation = MatmulOperation(
-      problem_shape,\
-      TensorDescription(DataType.f16, LayoutType.RowMajor), \
-      TensorDescription(DataType.f16, LayoutType.RowMajor), \
-      TensorDescription(DataType.f16, LayoutType.RowMajor))
+  def _cuda_supported_configuration_list(self, operation, configuration_list):
+    """Returns a list of supported configurations for CUDA."""
+    supported_configuration_list = []
+    for configuration in configuration_list:
+      dispatch = Dispatch(operation, configuration)
+      if not self._is_tile_aligned_shape(dispatch):
+        print(f"Warning: {dispatch.name()} is not aligned is being skipped.")
+        continue
+      if not self._is_cuda_smem_avialable(dispatch):
+        print(f"Warning: {dispatch.name()} requires {self._cuda_smem_required_in_bytes(dispatch)} "\
+              f"bytes of shared memory, which is larger than the SM80 capacity "\
+              f"{self.cuda_smem_capacity_in_bytes_sm80} bytes.")
+        continue
 
-    manifest.append_dispatch_collection(DispatchCollection(\
-      operation, configuration_list))
+      # If all checks pass, add the configuration to the supported list.
+      supported_configuration_list.append(configuration)
 
+    return supported_configuration_list
 
-################################################################################
-def gpu_matmul_tensor_cores_f32(mainfest):
-  """Appends a list of matmul dispatches for GPU TensorCore F32 data type."""
-  # Matmul tuning configurations for LLVM GPU TensorCore(F32)
-  tile_descriptions = [
-      TileDescription([128, 256, 16], 3, [128, 2, 1]),
-      #TileDescription([256, 128, 16], 3, [64, 4, 1]), # This tile does not iree-compile.
-      TileDescription([128, 128, 16], 5, [64, 2, 1]),
-      TileDescription([128, 128, 32], 3, [64, 2, 1]),
-      #TileDescription([128, 128, 32], 4, [64, 2, 1]),
-      #TileDescription([64, 64, 64], 3, [64, 2, 1]),
-  ]
+  def _cuda_matmul_tensor_cores_f16(self):
+    """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
 
-  translation_infos = [  #TranslationInfo.LLVMGPUMatmulTensorCore, 
-      TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync
-  ]
+    tile_descriptions = [
+        TileDescription([256, 128, 32], 3, [64, 4, 1]),
+        TileDescription([128, 256, 32], 3, [128, 2, 1]),
+        TileDescription([128, 128, 64], 4, [64, 2, 1]),
+        TileDescription([128, 128, 32], 5, [64, 2, 1]),
+        TileDescription([128, 64, 32], 5, [64, 2, 1]),
+        TileDescription([64, 64, 64], 5, [64, 2, 1]),
+        TileDescription([64, 64, 32], 10, [64, 2, 1]),
+    ]
 
-  # compilation info configuration list.
-  configuration_list = []
+    # Create configuration list from the tile descriptions and translation infos.
+    configuration_list = []
 
-  for tile_description in tile_descriptions:
-    for translation_info in translation_infos:
-      configuration_list.append(
-          MatmulCompilationInfo(tile_description, translation_info))
+    for tile_description in tile_descriptions:
+      for translation_info in self.translation_infos:
+        configuration_list.append(
+            MatmulCompilationInfo(tile_description, translation_info))
 
-  # Matmul problems.
-  problem_shapes = [
-      #[128, 128, 256],
-      [256, 512, 128],
-      #[1024, 512, 2048],
-      #[2560, 2560, 2560],
-      #[3456, 1024, 2048]
-  ]
+    # Create dispatches collection for each problem shape with the configuration list.
+    for problem_shape in self.problem_shapes:
+      operation = MatmulOperation(
+        problem_shape,\
+        TensorDescription(DataType.f16, LayoutType.RowMajor), \
+        TensorDescription(DataType.f16, LayoutType.RowMajor), \
+        TensorDescription(DataType.f16, LayoutType.RowMajor))
 
-  for problem_shape in problem_shapes:
-    operation = MatmulOperation(
-      problem_shape,\
-      TensorDescription(DataType.f32, LayoutType.RowMajor), \
-      TensorDescription(DataType.f32, LayoutType.RowMajor), \
-      TensorDescription(DataType.f32, LayoutType.RowMajor))
+      # Filter out configurations that are not supported by LLVM GPU CUDA backend.
+      supported_configuration_list = self._cuda_supported_configuration_list(
+          operation, configuration_list)
 
-    mainfest.append_dispatch_collection(DispatchCollection(\
-      operation, configuration_list))
+      self.dispatches_collection_list.append(DispatchCollection(\
+        operation, supported_configuration_list))
+
+  ################################################################################
+  def _cuda_matmul_tensor_cores_f32(self):
+    """Appends a list of matmul dispatches for GPU TensorCore F32 data type."""
+
+    tile_descriptions = [
+        TileDescription([128, 256, 16], 3, [128, 2, 1]),
+        TileDescription([256, 128, 16], 3, [64, 4, 1]),
+        TileDescription([128, 128, 16], 5, [64, 2, 1]),
+        TileDescription([128, 128, 32], 3, [64, 2, 1]),
+        TileDescription([128, 128, 32], 4, [64, 2, 1]),
+        TileDescription([64, 64, 64], 3, [64, 2, 1]),
+    ]
+
+    # Create dispatches collection for each problem shape with the configuration list.
+    configuration_list = []
+
+    for tile_description in tile_descriptions:
+      for translation_info in self.translation_infos:
+        configuration_list.append(
+            MatmulCompilationInfo(tile_description, translation_info))
+
+    for problem_shape in self.problem_shapes:
+      operation = MatmulOperation(
+        problem_shape,\
+        TensorDescription(DataType.f32, LayoutType.RowMajor), \
+        TensorDescription(DataType.f32, LayoutType.RowMajor), \
+        TensorDescription(DataType.f32, LayoutType.RowMajor))
+
+      # Filter out configurations that are not supported by LLVM GPU CUDA backend.
+      supported_configuration_list = self._cuda_supported_configuration_list(
+          operation, configuration_list)
+
+      self.dispatches_collection_list.append(DispatchCollection(\
+        operation, supported_configuration_list))
+
+  def generate(self):
+    """Generates a list of matmul operations."""
+    if self.args.device == 'cuda':
+      self._cuda_matmul_tensor_cores_f16()
+      self._cuda_matmul_tensor_cores_f32()
+    return self.dispatches_collection_list
 
 
 ##############################################################################

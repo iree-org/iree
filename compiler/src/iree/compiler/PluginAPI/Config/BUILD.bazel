@@ -1,0 +1,39 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+genrule(
+    name = "StaticLinkedPlugins_inc__generate",
+    outs = ["StaticLinkedPlugins.inc"],
+    # TODO: Should be pulling from a file generated in @iree_plugins which
+    # derives its content from the environment.
+    # For now, just enumerate all in-tree plugins.
+    cmd = (
+        "echo '" +
+        "HANDLE_PLUGIN_ID(example)\n" +
+        "HANDLE_PLUGIN_ID(simple_io_sample)\n" +
+        "' > $@"
+    ),
+)
+
+iree_compiler_cc_library(
+    name = "StaticLinkedPlugins",
+    hdrs = ["StaticLinkedPlugins.inc"],
+    deps = [
+        # TODO: Should depend on a generated target in @iree_plugins which
+        # generates its deps from the environment.
+        # For now, we just hard include all in-tree plugins.
+        "//samples/compiler_plugins/example:registration",
+        "//samples/compiler_plugins/simple_io_sample:registration",
+    ],
+)

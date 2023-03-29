@@ -92,27 +92,16 @@ static LogicalResult verifyLoweringConfiguration(
 static LogicalResult verifyEntryPoint(
     ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
     IREE::HAL::ExecutableExportOp exportOp) {
-  Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
+  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
+      exportOp.getWorkgroupSize();
 
   if (workgroupSizeAttr.has_value()) {
     std::array<int64_t, 3> workgroupSizes;
     for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
       workgroupSizes[index] = attr.cast<IntegerAttr>().getInt();
     }
-
-    switch (translationInfo.getDispatchLoweringPassPipeline()) {
-      case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-        return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                           workgroupSizes,
-                                           verifyGPUMatmulSimtPassPipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
-        return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                           workgroupSizes,
-                                           verifyGPUMatmulTensorCorePipeline);
-        break;
-      default:;
-    }
+    return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                       workgroupSizes, verifyGPUMatmulPipeline);
   }
   return success();
 }
@@ -134,7 +123,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   // is fine.
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
-  Optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
   for (auto &it : exportOps) {
     auto exportOp = it.second;
     if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =

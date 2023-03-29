@@ -112,7 +112,7 @@ Value binaryOperator(OpBuilder builder, Location location, BinaryOperator op,
 }
 
 Value allocateVariable(OpBuilder builder, Location location, Type type,
-                       Optional<StringRef> initializer) {
+                       std::optional<StringRef> initializer) {
   auto ctx = builder.getContext();
   return builder
       .create<emitc::VariableOp>(

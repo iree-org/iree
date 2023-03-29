@@ -17,9 +17,7 @@ def build_linux_wrapper_cmds_for_device_spec(
 
   affinity_mask = None
   for param in device_spec.device_parameters:
-    if param == device_parameters.OCTA_CORES:
-      affinity_mask = "0xFF"
-    else:
+    if param != device_parameters.ALL_CORES:
       raise ValueError(f"Unsupported device parameter: {param}.")
 
   cmds = []

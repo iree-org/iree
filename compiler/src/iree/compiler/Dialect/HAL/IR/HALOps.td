@@ -695,17 +695,17 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
     queue. Collective operations using this channel must only be submitted on
     compatible queues.
 
-    A rank or count of -1 can be used to indicate a default inherited from the
-    environment or device configuration.
+    The group and ID are optional and may be null. A rank or count of -1 can be
+    used to indicate a default inherited from the environment or device
+    configuration.
   }];
 
   let arguments = (ins
     HAL_Device:$device,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    // TODO(benvanik): optional discriminator for groupings.
-    // TODO(benvanik): channel ID as a `Util_BufferType:$id`.
-    // TODO(benvanik): make rank/count optional (but then would need a custom vm
-    // import pattern).
+    I32Attr:$flags,
+    Util_BufferType:$id,
+    Util_BufferType:$group,
     I32:$rank,
     I32:$count
   );
@@ -716,6 +716,9 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
     `affinity` `(` $queue_affinity `)`
+    `flags` `(` $flags `)`
+    `id` `(` $id `)`
+    `group` `(` $group `)`
     `rank` `(` $rank `)`
     `count` `(` $count `)`
     `:` type($result)
@@ -1855,6 +1858,19 @@ def HAL_ExecutableConstantBlockOp :
     // CallableOpInterface:
     ::mlir::Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
+
     // FunctionOpInterface:
     ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
     ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
@@ -2370,7 +2386,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
       "Value":$byte_offset,
       "ValueRange":$dynamic_dims,
       "IntegerAttr":$alignment,
-      CArg<"mlir::Optional<DescriptorFlags>", "llvm::None">:$flags
+      CArg<"std::optional<DescriptorFlags>", "llvm::None">:$flags
     )>,
   ];
 

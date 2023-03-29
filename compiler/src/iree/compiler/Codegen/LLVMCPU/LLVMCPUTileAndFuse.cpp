@@ -15,6 +15,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/IR/Iterators.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -178,10 +179,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     }
 
     // Add more fusion candidates to the worklist.
-    if (auto fusedProducerOp =
-            fusedProducer->tiledAndFusedProducer.getDefiningOp()) {
-      addCandidateSlices(fusedProducerOp, candidates);
-      tiledOps.push_back(fusedProducerOp);
+    for (auto tiledOp : fusedProducer->tiledOps) {
+      addCandidateSlices(tiledOp, candidates);
+      tiledOps.push_back(tiledOp);
     }
   }
 

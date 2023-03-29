@@ -36,7 +36,6 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -156,12 +155,14 @@ struct LowerDispatchWorkgroupCountForDagRootOp
                                           ArrayRef<int64_t> staticLoopRanges,
                                           ArrayRef<int64_t> interchange,
                                           ArrayRef<unsigned> partitionedLoops,
+                                          int32_t maxWorkgroupParallelDims,
                                           PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
         givenTileSizes(tileSizes),
         givenStaticLoopRanges(staticLoopRanges),
         givenInterchange(interchange),
-        partitionedLoops(partitionedLoops) {}
+        partitionedLoops(partitionedLoops),
+        maxWorkgroupParallelDims(maxWorkgroupParallelDims) {}
 
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
@@ -213,7 +214,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
       if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
       Value numTileAlongDim = getValueOrCreateConstantIndexOp(
           rewriter, loc, numTiles[partitionedLoop]);
-      if (numWorkgroups.size() == kNumMaxParallelDims) {
+      if (numWorkgroups.size() == maxWorkgroupParallelDims) {
         // IREE runtime only has 3 ID dimensions. After all the num of tiles are
         // combined into one.
         AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
@@ -225,7 +226,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
       numWorkgroups.push_back(numTileAlongDim);
     }
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    numWorkgroups.resize(kNumMaxParallelDims, one);
+    numWorkgroups.resize(workgroupCountOp.getNumResults(), one);
     rewriter.replaceOp(workgroupCountOp, numWorkgroups);
     return success();
   }
@@ -244,6 +245,9 @@ struct LowerDispatchWorkgroupCountForDagRootOp
 
   /// Loops that are partitioned.
   SmallVector<unsigned> partitionedLoops;
+
+  /// Maximum number of dims to distribute workgroups across.
+  int32_t maxWorkgroupParallelDims;
 };
 
 /// Pattern to lower a `flow.dispatch.workgroup_count_from_set_encoding` op.
@@ -309,6 +313,12 @@ struct LowerDispatchWorkgroupCountFromSetEncodingOp
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
+  TileAndDistributeToWorkgroupsPass(
+      int32_t maxWorkgroupParallelDims,
+      linalg::DistributionMethod distributionMethod) {
+    this->maxWorkgroupParallelDims = maxWorkgroupParallelDims;
+    this->distributionMethod = (int32_t)distributionMethod;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, IREE::HAL::HALDialect,
@@ -326,6 +336,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   ModuleOp innerModule = variantOp.getInnerModule();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> entryPoints =
       getAllEntryPoints(innerModule);
+
+  if (maxWorkgroupParallelDims > kNumMaxParallelDims) {
+    innerModule.emitError(
+        "maxWorkgroupParallelDims set to more than allowed MaxParallelDims");
+  }
 
   for (func::FuncOp funcOp : innerModule.getOps<func::FuncOp>()) {
     auto exportOp = entryPoints.lookup(funcOp.getName());
@@ -346,8 +361,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     {
       RewritePatternSet patterns(context);
       patterns.insert<LowerDispatchWorkgroupCountForDagRootOp>(
-          context, tileSizes, staticLoopRanges, interchange,
-          partitionableLoops);
+          context, tileSizes, staticLoopRanges, interchange, partitionableLoops,
+          maxWorkgroupParallelDims);
       auto res = funcOp.walk([&](tensor::PackOp packOp) -> WalkResult {
         FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
             getMaterializationInfo(packOp);
@@ -399,10 +414,12 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
           }));
     };
 
+    linalg::DistributionMethod distributionMethodValue =
+        (linalg::DistributionMethod)(distributionMethod.getValue());
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
-            .setDistributionOptions(
-                getIREELinalgLoopDistributionOptions(tileSizes))
+            .setDistributionOptions(getIREELinalgLoopDistributionOptions(
+                tileSizes, distributionMethodValue))
             .setInterchange(llvm::to_vector<4>(
                 llvm::map_range(interchange,
                                 [](int64_t v) -> unsigned {
@@ -411,10 +428,10 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 
-    transform::TrivialPatternRewriter rewriter(context);
+    IRRewriter rewriter(context);
     if (failed(tileAndFuseDispatchUsingSCFForOp(
-            cast<TilingInterface>(computeOps.back()), linalgTilingOptions,
-            rewriter))) {
+            rewriter, cast<TilingInterface>(computeOps.back()),
+            linalgTilingOptions))) {
       funcOp.emitOpError("Tile+Distribute failed");
       return signalPassFailure();
     }
@@ -436,12 +453,14 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     });
 
     {
+      SmallVector<int64_t> staticNumWorkgroup = getStaticNumWorkgroups(funcOp);
       // Apply linalg tiling optimization patterns, which includes folding
       // casting ops into tiled operations.
       RewritePatternSet patterns(context);
       linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
       tensor::populateFoldTensorEmptyPatterns(patterns);
-      populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+      populateFoldAffineMinInDistributedLoopsPatterns(patterns,
+                                                      staticNumWorkgroup);
       context->getOrLoadDialect<tensor::TensorDialect>()
           ->getCanonicalizationPatterns(patterns);
       context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
@@ -471,8 +490,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createTileAndDistributeToWorkgroupsPass() {
-  return std::make_unique<TileAndDistributeToWorkgroupsPass>();
+createTileAndDistributeToWorkgroupsPass(
+    int32_t maxWorkgroupParallelDims,
+    linalg::DistributionMethod distributionMethod) {
+  return std::make_unique<TileAndDistributeToWorkgroupsPass>(
+      maxWorkgroupParallelDims, distributionMethod);
 }
 
 }  // namespace iree_compiler

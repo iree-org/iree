@@ -22,6 +22,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRPass
     iree::compiler::Pipelines::Options
+    iree::compiler::PluginAPI
     iree::compiler::Preprocessing::Common::Transforms
   PUBLIC
 )
