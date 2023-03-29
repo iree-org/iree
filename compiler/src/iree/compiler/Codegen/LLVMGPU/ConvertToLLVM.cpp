@@ -25,25 +25,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-LogicalResult verifyLLVMConversionCompatibility(ModuleOp moduleOp) {
-  LogicalResult compatible = success();
-
-  moduleOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-    auto memrefType = subspanOp.getType().dyn_cast<MemRefType>();
-    if (memrefType) {
-      Type elType = memrefType.getElementType();
-      if (!elType.isa<FloatType, IntegerType>()) {
-        subspanOp.emitError()
-            << "only integer and floating point element types "
-               "are supported at interface boundary";
-        compatible = failure();
-      }
-    }
-  });
-
-  return compatible;
-}
-
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   SymbolTableCollection symbolTableCollection;
   // Collect all the adressOfOps to static shared memory globals.
