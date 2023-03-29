@@ -143,7 +143,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     // is fine.
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
         getAllEntryPoints(moduleOp);
-    Optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
+    std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
     for (auto &it : exportOps) {
       auto exportOp = it.second;
       if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
@@ -225,8 +225,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                 executableLoweringPipeline, enableVectorMasking);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
-            addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
-                                             enableVectorMasking);
+            addMmt4dTilingExpertPassPipeline(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling:
             addCPUDataTilingPipeline(executableLoweringPipeline);

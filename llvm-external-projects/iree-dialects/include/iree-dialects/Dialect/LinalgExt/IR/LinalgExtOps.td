@@ -482,7 +482,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
     Value values() {
       return getInputOperand(0)->get();
     }
-    Optional<Value> indices() {
+    std::optional<Value> indices() {
       if (getNumInputs() < 2) {
         return {};
       } else {
@@ -594,7 +594,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     OpBuilder<(ins "Value":$source, "Value":$output,
       "ArrayRef<int64_t>":$innerDimsPos,
       "ArrayRef<OpFoldResult>":$innerTiles,
-      CArg<"Optional<Value>", "std::nullopt">:$paddingValue,
+      CArg<"std::optional<Value>", "std::nullopt">:$paddingValue,
       CArg<"ArrayRef<int64_t>", "{}">:$outerDimsPerm)>
   ];
 

@@ -21,7 +21,7 @@ namespace mlir::iree_compiler::embed {
 
 namespace {
 /// Return a processable CallSiteLoc from the given location.
-Optional<CallSiteLoc> getCallSiteLoc(Location loc) {
+std::optional<CallSiteLoc> getCallSiteLoc(Location loc) {
   if (auto callLoc = dyn_cast<CallSiteLoc>(loc)) return callLoc;
   if (auto nameLoc = dyn_cast<NameLoc>(loc))
     return getCallSiteLoc(cast<NameLoc>(loc).getChildLoc());
@@ -36,31 +36,31 @@ Optional<CallSiteLoc> getCallSiteLoc(Location loc) {
   return std::nullopt;
 }
 
-Optional<Location> findLocToShow(Location loc) {
+std::optional<Location> findLocToShow(Location loc) {
   // Recurse into the child locations of some of location types.
-  return TypeSwitch<LocationAttr, Optional<Location>>(loc)
-      .Case([&](CallSiteLoc callLoc) -> Optional<Location> {
+  return TypeSwitch<LocationAttr, std::optional<Location>>(loc)
+      .Case([&](CallSiteLoc callLoc) -> std::optional<Location> {
         // We recurse into the callee of a call site, as the caller will be
         // emitted in a different note on the main diagnostic.
         return findLocToShow(callLoc.getCallee());
       })
-      .Case([&](FileLineColLoc) -> Optional<Location> { return loc; })
-      .Case([&](FusedLoc fusedLoc) -> Optional<Location> {
+      .Case([&](FileLineColLoc) -> std::optional<Location> { return loc; })
+      .Case([&](FusedLoc fusedLoc) -> std::optional<Location> {
         // Fused location is unique in that we try to find a sub-location to
         // show, rather than the top-level location itself.
         for (Location childLoc : fusedLoc.getLocations())
-          if (Optional<Location> showableLoc = findLocToShow(childLoc))
+          if (std::optional<Location> showableLoc = findLocToShow(childLoc))
             return showableLoc;
         return std::nullopt;
       })
-      .Case([&](NameLoc nameLoc) -> Optional<Location> {
+      .Case([&](NameLoc nameLoc) -> std::optional<Location> {
         return findLocToShow(nameLoc.getChildLoc());
       })
-      .Case([&](OpaqueLoc opaqueLoc) -> Optional<Location> {
+      .Case([&](OpaqueLoc opaqueLoc) -> std::optional<Location> {
         // OpaqueLoc always falls back to a different source location.
         return findLocToShow(opaqueLoc.getFallbackLocation());
       })
-      .Case([](UnknownLoc) -> Optional<Location> {
+      .Case([](UnknownLoc) -> std::optional<Location> {
         // Prefer not to show unknown locations.
         return std::nullopt;
       });
@@ -104,7 +104,7 @@ LogicalResult FormattingDiagnosticHandler::emit(Diagnostic &diag) {
   // Assemble location fragments.
   SmallVector<std::pair<Location, StringRef>> locationStack;
   auto addLocToStack = [&](Location loc, StringRef locContext) {
-    if (Optional<Location> showableLoc = findLocToShow(loc))
+    if (std::optional<Location> showableLoc = findLocToShow(loc))
       locationStack.emplace_back(*showableLoc, locContext);
   };
 

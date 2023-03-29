@@ -50,7 +50,7 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
 
 /// Pick an unrolling order that will allow tensorcore operation to reuse LHS
 /// register. This is needed to get good performance on sm_80 target.
-Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
+std::optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
     vector::ContractionOp contract);
 
 //===----------------------------------------------------------------------===//
@@ -59,10 +59,10 @@ Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
 
 /// Allocates GPU workgroup memory matching the given `subview`. If there are
 /// dynamic dimensions, the bounds are in `sizeBounds`.
-Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
-                                        memref::SubViewOp subview,
-                                        ArrayRef<Value> sizeBounds,
-                                        DataLayout &);
+std::optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
+                                             memref::SubViewOp subview,
+                                             ArrayRef<Value> sizeBounds,
+                                             DataLayout &);
 
 /// Deallocates GPU workgroup memory behind `buffer`.
 LogicalResult deallocateWorkgroupMemory(OpBuilder &, Value buffer);
@@ -84,10 +84,10 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
 
 /// Return the native size of an operation used in contraction calculation.
 // TODO: Make this take HW specific sizes.
-Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
+std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
 
 /// Helper function to return native size for MMA.SYNC-based operations.
-Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
+std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 
 /// Return true if the given memref has workgroup memory space.
 bool hasSharedMemoryAddressSpace(MemRefType memrefType);

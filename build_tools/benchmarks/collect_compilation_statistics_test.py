@@ -137,6 +137,7 @@ class CollectCompilationStatistics(unittest.TestCase):
         e2e_test_artifacts_dir=root_dir)
 
     compile_info_a = common.benchmark_definition.CompilationInfo(
+        name=gen_config_a.name,
         model_name=model_a.name,
         model_tags=tuple(model_a.tags),
         model_source=model_a.source_type.value,
@@ -146,6 +147,7 @@ class CollectCompilationStatistics(unittest.TestCase):
     module_a_path = iree_artifacts.get_module_dir_path(
         gen_config_a, root_dir) / iree_artifacts.MODULE_FILENAME
     compile_info_b = common.benchmark_definition.CompilationInfo(
+        name=gen_config_b.name,
         model_name=model_a.name,
         model_tags=tuple(model_a.tags),
         model_source=model_a.source_type.value,

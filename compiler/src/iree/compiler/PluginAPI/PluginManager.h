@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_
+#define IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_
+
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -66,20 +69,33 @@ class PluginManager : public PluginRegistrar {
 
   // Calls through to AbstractPluginRegistration::registerDialects for all
   // available plugins.
-  void registerDialects(DialectRegistry &registry);
+  void registerGlobalDialects(DialectRegistry &registry);
 
  private:
   friend class PluginManagerSession;
 };
 
 // Holds activated plugins for an |iree_compiler_session_t|.
-class PluginManagerSession {
+class PluginManagerSession : public PipelineExtensions {
  public:
   PluginManagerSession(PluginManager &pluginManager, OptionsBinder &binder,
                        PluginManagerOptions &options);
 
+  // Initializes all plugins that should be activated by default.
+  LogicalResult initializePlugins();
+
+  // Invokes registerDialects() on all initialized plugins.
+  void registerDialects(DialectRegistry &registry);
+
   // Activates plugins as configured.
   LogicalResult activatePlugins(MLIRContext *context);
+
+  // Forward pipeline extensions.
+  void extendPreprocessingPassPipeline(OpPassManager &passManager) override {
+    for (auto *s : initializedSessions) {
+      s->extendPreprocessingPassPipeline(passManager);
+    }
+  }
 
  private:
   PluginManagerOptions &options;
@@ -87,8 +103,10 @@ class PluginManagerSession {
   // registered plugins so that CLI options can be set properly.
   llvm::StringMap<std::unique_ptr<AbstractPluginSession>> allPluginSessions;
 
-  // Activation state.
-  llvm::SmallVector<AbstractPluginSession *> activatedSessions;
+  // Initialized list of plugins.
+  llvm::SmallVector<AbstractPluginSession *> initializedSessions;
 };
 
 }  // namespace mlir::iree_compiler
+
+#endif  // IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_

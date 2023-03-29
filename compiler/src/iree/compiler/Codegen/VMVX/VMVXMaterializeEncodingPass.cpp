@@ -72,7 +72,7 @@ void VMVXMaterializeEncodingPass::runOnOperation() {
   MaterializeEncodingTypeConverter typeConverter(
       [targetAttr](
           RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
-        Optional<TensorEncoding> encoding = getEncoding(tensorType);
+        std::optional<TensorEncoding> encoding = getEncoding(tensorType);
         if (!encoding) return failure();
 
         auto matmulType = getMatmulType(*encoding);

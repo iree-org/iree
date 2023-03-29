@@ -89,6 +89,7 @@ iree_cc_library(
     "CleanupBufferAllocViewPass.cpp"
     "ConcretizePadResultShape.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
+    "DecomposeAffineOpsPass.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "FixupSubspanWithOffsets.cpp"
     "FlattenMemRefSubspanPass.cpp"
@@ -119,6 +120,7 @@ iree_cc_library(
     IREELinalgExtTransforms
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineTransforms
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
@@ -175,11 +177,14 @@ iree_cc_library(
   NAME
     Common
   HDRS
+    "ExtractAddressComputation.h"
     "GPUPatterns.h"
     "LinalgOpInfo.h"
     "UserConfig.h"
   SRCS
+    "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
+    "ExtractAddressComputation.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUMultiBuffering.cpp"
@@ -201,6 +206,7 @@ iree_cc_library(
     IREELinalgExtPasses
     IREELinalgExtTransforms
     LLVMSupport
+    MLIRAffineAnalysis
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis

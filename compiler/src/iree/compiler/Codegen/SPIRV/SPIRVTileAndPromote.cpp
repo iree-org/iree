@@ -204,7 +204,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       exportOp->getWorkgroupSize().value(),
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
+  std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize) {
     funcOp->emitError("failed to query subgroup size");
     return signalPassFailure();

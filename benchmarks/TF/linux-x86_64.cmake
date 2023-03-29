@@ -77,7 +77,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=1"
+    "--task_topology_max_group_count=1"
 )
 
 # CPU, LLVM, local-task, 4 threads, x86_64, full-inference
@@ -107,7 +107,7 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=4"
+    "--task_topology_max_group_count=4"
 )
 
 # CPU, LLVM, local-task, 8 threads, x86_64, full-inference
@@ -137,5 +137,5 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=8"
+    "--task_topology_max_group_count=8"
 )

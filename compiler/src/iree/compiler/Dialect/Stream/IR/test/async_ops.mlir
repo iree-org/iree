@@ -181,6 +181,16 @@ func.func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.re
 
 // -----
 
+// CHECK-LABEL: @asyncDispatchNoInputs
+func.func @asyncDispatchNoInputs(%arg0: index) -> !stream.resource<*> {
+  %c1 = arith.constant 1 : index
+  // CHECK: = stream.async.dispatch @executable::@dispatch[%c1]() : () -> !stream.resource<*>{%arg0}
+  %0 = stream.async.dispatch @executable::@dispatch[%c1]() : () -> !stream.resource<*>{%arg0}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
 stream.executable private @executable {
   stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index) -> (index, index, index) {
     stream.return %arg0, %arg1, %arg0 : index, index, index

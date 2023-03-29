@@ -1638,12 +1638,15 @@ static iree_status_t iree_vm_bytecode_dispatch(
         bytecode_data =
             module->bytecode_data.data +
             module->function_descriptor_table[function_ordinal].bytecode_offset;
-        regs_i32 = regs.i32;
-        IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
-        regs_ref = regs.ref;
-        IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
-        pc = current_frame->pc;
       }
+
+      // Restore the local dispatch variables that may have changed during the
+      // function call due to stack growth.
+      regs_i32 = regs.i32;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      regs_ref = regs.ref;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+      pc = current_frame->pc;
     });
 
     DISPATCH_OP(CORE, CallVariadic, {
@@ -1672,6 +1675,14 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_call_import_variadic(
           stack, module_state, function_ordinal, regs, segment_size_list,
           src_reg_list, dst_reg_list, &current_frame, &regs));
+
+      // Restore the local dispatch variables that may have changed during the
+      // function call due to stack growth.
+      regs_i32 = regs.i32;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      regs_ref = regs.ref;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+      pc = current_frame->pc;
     });
 
     DISPATCH_OP(CORE, Return, {

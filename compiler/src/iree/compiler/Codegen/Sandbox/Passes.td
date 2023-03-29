@@ -9,64 +9,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
-  let summary = "Pass to tile and fuse linalg operations.";
-  let constructor = "mlir::createLinalgFusePass()";
-  let options = [
-    Option<"anchorFuncOpName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which linalg op within the func is the anchor to latch on.">,
-    Option<"setAnchorOpToRootOp", "set-anchor-op-to-root-op", "bool", /*default=*/"false",
-      "Set anchor op to root op">,
-
-    // Tiling options.
-    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"tileInterchange", "tile-interchange", "int64_t",
-                "Tile loop interchange",
-                "llvm::cl::ZeroOrMore">,
-    Option<"pad", "pad", "bool", /*default=*/"false",
-      "Pad the anchor op operands.">,
-    Option<"padParallelDims", "pad-parallel-dims", "bool", /*default=*/"false",
-      "Pad all the parallel dims for the anchor op operands.">,
-    Option<"padReductionDims", "pad-reduction-dims", "bool", /*default=*/"false",
-      "Pad all the reduction dims for the anchor op operands.">,
-    ListOption<"paddingValues", "padding-values", "std::string",
-               "Operand padding values."
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"paddingDimensions", "padding-dimensions", "int64_t",
-               "Operation iterator dimensions to pad."
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"packPaddings", "pack-paddings", "int64_t",
-               "Operand packing flags.",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"hoistPaddings", "hoist-paddings", "int64_t",
-               "Hoist padding depths.",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"transposePaddings", "transpose-paddings", "std::string",
-               "Transpose paddings.",
-               "llvm::cl::ZeroOrMore">,
-    // Vectorization options.
-    Option<"vectorize", "vectorize", "bool", /*default=*/"false",
-      "Rewrite the linalg op as a vector operation.">,
-    Option<"enableVectorMasking", "enableVectorMasking", "bool", /*default=*/"false",
-      "Enable vector masking during vectorization.">,
-    Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
-      "Rewrite all tensor.pad ops in the function to vector form.">,
-
-    // IREE specific options
-    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">,
-  ];
-  let dependentDialects = [
-    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
-    "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
-    "::mlir::vector::VectorDialect"
-  ];
-}
-
 def LinalgSplitReduction : Pass<"linalg-split-reduction", "func::FuncOp"> {
   let summary = "Pass to splitReduce linalg operations.";
   let constructor = "mlir::createLinalgSplitReductionPass()";
@@ -95,45 +37,12 @@ def LinalgSingleTilingExpert
     Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
       "Which linalg op within the func is the anchor to latch on.">,
 
-    // Tiling options.
-    ListOption<"tileSizes", "tile-sizes", "int64_t", "Tile sizes",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"tileInterchange", "tile-interchange", "int64_t",
-                "Tile loop interchange",
-                "llvm::cl::ZeroOrMore">,
-    Option<"pad", "pad", "bool", /*default=*/"false",
-      "Pad the anchor op operands.">,
-    ListOption<"paddingValues", "padding-values", "std::string",
-               "Operand padding values."
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"packPaddings", "pack-paddings", "int64_t",
-               "Operand packing flags.",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"hoistPaddings", "hoist-paddings", "int64_t",
-               "Hoist padding depths.",
-               "llvm::cl::ZeroOrMore">,
-    ListOption<"transposePaddings", "transpose-paddings", "std::string",
-               "Transpose paddings.",
-               "llvm::cl::ZeroOrMore">,
-
     // Generalization options.
     Option<"generalize", "generalize", "bool", /*default=*/"false",
       "Convert named operations to their generic form.">,
     ListOption<"iteratorInterchange", "iterator-interchange", "int64_t",
                "Interator interchange.",
                "llvm::cl::ZeroOrMore">,
-
-    // Decomposition options.
-    // TODO: atm this is applied to all supported ops. If/when we need finer
-    // control this should be exposed with an opName + filter and a proper
-    // pattern.
-    Option<"decomposeToLowerDimOp", "decompose-to-lower-dim", "bool",
-      /*default=*/"false",
-      "Convert named operations to lower-D named operations.">,
-
-    // Peeling options.
-    Option<"peel", "peel", "bool", /*default=*/"false",
-      "Peel loops enclosing the linalg op.">,
 
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",

@@ -40,7 +40,7 @@ class Android_VMVX_Benchmarks(object):
     ]
     default_execution_configs = [
         benchmark_suites.iree.module_execution_configs.
-        get_vmvx_local_task_config(thread_num=4)
+        get_vmvx_system_scheduling_local_task_config(thread_num=4)
     ]
     big_cores_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,

@@ -210,7 +210,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
   int subgroupSize = 32;
   SubgroupFeature subgroupFeatures = SubgroupFeature::Basic;
-  Optional<int> minSubgroupSize, maxSubgroupSize;
+  std::optional<int> minSubgroupSize, maxSubgroupSize;
 
   bool shaderFloat16 = false, shaderFloat64 = false;
   bool shaderInt8 = false, shaderInt16 = false, shaderInt64 = false;

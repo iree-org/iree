@@ -88,12 +88,14 @@ def MapNestedForallToGpuThreadsOp :
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims);
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims,
+                   DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$warp_dims);
   let results = (outs);
 
   let assemblyFormat = [{
     $target
     `workgroup_dims` `=` $workgroup_dims
+    (`warp_dims` `=` $warp_dims^)?
     attr-dict
     `:` functional-type($target, results)
   }];

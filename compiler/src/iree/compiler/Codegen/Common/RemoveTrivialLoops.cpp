@@ -41,7 +41,7 @@ static unsigned dimToIndex(gpu::Dimension dim) {
 /// If the value is a threadID return the range [0, workgroupSize-1].
 /// If the number of workgroup is known also return the range of workgroupId ad
 /// workgroupCount.
-static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
+static std::optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
     Value processorValue, SmallVectorImpl<Value> & /*dims*/,
     SmallVectorImpl<Value> & /*symbols*/, ArrayRef<int64_t> workgroupCount,
     ArrayRef<int64_t> workgroupSize) {
@@ -98,29 +98,6 @@ static bool isWorkgroupLoop(const LoopTilingAndDistributionInfo &info) {
          });
 }
 
-/// Infer the number of workgroups from exportOp.
-static SmallVector<int64_t> getNumWorkgroup(
-    func::FuncOp funcOp, IREE::HAL::ExecutableExportOp exportOp) {
-  SmallVector<int64_t> result;
-
-  Block *body = exportOp.getWorkgroupCountBody();
-  if (!body) return result;
-
-  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
-  assert(returnOp.getNumOperands() == 3);
-
-  for (unsigned i = 0; i < 3; ++i) {
-    Operation *defOp = returnOp.getOperand(i).getDefiningOp();
-    if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
-      result.push_back(indexOp.value());
-    } else {
-      return SmallVector<int64_t>();
-    }
-  }
-
-  return result;
-}
-
 static LogicalResult removeOneTripTiledLoops(func::FuncOp funcOp,
                                              ArrayRef<int64_t> workgroupSize,
                                              ArrayRef<int64_t> numWorkgroups) {
@@ -146,7 +123,7 @@ class RemoveSingleIterationLoopPass final
     if (failed(exportOp)) return;
 
     SmallVector<int64_t> workgroupSize = getWorkgroupSize(*exportOp);
-    SmallVector<int64_t> numWorkgroups = getNumWorkgroup(funcOp, *exportOp);
+    SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
 
     if (failed(removeOneTripTiledLoops(funcOp, workgroupSize, numWorkgroups))) {
       return signalPassFailure();

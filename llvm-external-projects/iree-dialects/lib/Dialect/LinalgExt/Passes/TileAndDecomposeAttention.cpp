@@ -30,7 +30,8 @@ namespace {
 // to produce a tensor of shape M
 template <typename T>
 static Value computeRowwiseReduction(Value a, Value output, Location loc,
-                                     OpBuilder &builder) {
+                                     OpBuilder &builder,
+                                     SmallVectorImpl<Operation *> &ops) {
   SmallVector<utils::IteratorType> iteratorTypes{
       utils::IteratorType::parallel, utils::IteratorType::reduction};
   AffineMap id = AffineMap::getMultiDimIdentityMap(2, builder.getContext());
@@ -45,78 +46,81 @@ static Value computeRowwiseReduction(Value a, Value output, Location loc,
         Value result = b.create<T>(loc, args[0], args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
+  ops.push_back(genericOp);
   return genericOp.getResult(0);
 }
 
-static std::tuple<Value, Value> computeNewSum(Value oldMax, Value newMax,
-                                              Value oldSum, Value currentSum,
-                                              Value output, Location loc,
-                                              OpBuilder &builder) {
-  SmallVector<utils::IteratorType> iteratorTypes{utils::IteratorType::parallel};
-  auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
-  SmallVector<AffineMap> indexingMaps(6, identityMap);
-  SmallVector<Type> resultTypes(2, currentSum.getType());
+static Value computePartialSoftmax(Value qkTranspose, Value currentMax,
+                                   Location loc, OpBuilder &builder,
+                                   SmallVectorImpl<Operation *> &ops) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  // (d0, d1) -> (d0)
+  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{rowMap, identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, resultTypes, ValueRange{oldMax, newMax, oldSum, currentSum},
-      ValueRange{output, output}, indexingMaps, iteratorTypes,
+      loc, qkTranspose.getType(), ValueRange{currentMax}, qkTranspose,
+      indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value diff = b.create<arith::SubFOp>(loc, args[1], args[0]);
+        Value result = b.create<math::ExpOp>(loc, diff);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  ops.push_back(genericOp);
+  return genericOp.getResult(0);
+}
+
+static Value updateAndScale(Value oldMax, Value newMax, Value oldSum,
+                            Location loc, OpBuilder &builder,
+                            SmallVectorImpl<Operation *> &ops) {
+  SmallVector<utils::IteratorType> iteratorTypes(1,
+                                                 utils::IteratorType::parallel);
+  auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
+  SmallVector<AffineMap> indexingMaps(3, identityMap);
+  SmallVector<Type> resultTypes{oldSum.getType()};
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, resultTypes, ValueRange{oldMax, newMax}, ValueRange{oldSum},
+      indexingMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value diff = b.create<arith::SubFOp>(loc, args[0], args[1]);
         Value weight = b.create<math::ExpOp>(loc, diff);
         Value scaledOldSum = b.create<arith::MulFOp>(loc, weight, args[2]);
-        Value result = b.create<arith::AddFOp>(loc, scaledOldSum, args[3]);
-        b.create<linalg::YieldOp>(loc, ValueRange{result, scaledOldSum});
+        b.create<linalg::YieldOp>(loc, ValueRange{scaledOldSum});
       });
-  return std::make_tuple(genericOp.getResult(0), genericOp.getResult(1));
-}
-
-static Value computePartialSoftmax(Value qkTranspose, Value currentMax,
-                                   Value output, Location loc,
-                                   OpBuilder &builder) {
-  AffineMap identityMap =
-      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
-  AffineExpr d0, d1;
-  bindDims(builder.getContext(), d0, d1);
-  // (d0, d1) -> (d0)
-  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
-  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, identityMap};
-  SmallVector<utils::IteratorType> iteratorTypes(2,
-                                                 utils::IteratorType::parallel);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, qkTranspose.getType(), ValueRange{qkTranspose, currentMax}, output,
-      indexingMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value diff = b.create<arith::SubFOp>(loc, args[0], args[1]);
-        Value result = b.create<math::ExpOp>(loc, diff);
-        b.create<linalg::YieldOp>(loc, result);
-      });
+  ops.push_back(genericOp);
   return genericOp.getResult(0);
 }
 
-static Value scalePartialSoftmax(Value softmax, Value scaledOldSum,
-                                 Value output, Location loc,
-                                 OpBuilder &builder) {
+static Value scalePartialSoftmax(Value softmax, Value newSum, Location loc,
+                                 OpBuilder &builder,
+                                 SmallVectorImpl<Operation *> &ops) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
   bindDims(builder.getContext(), d0, d1);
   // (d0, d1) -> (d0)
   auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
-  SmallVector<AffineMap> indexingMaps{identityMap, rowMap, identityMap};
+  SmallVector<AffineMap> indexingMaps{rowMap, identityMap};
   SmallVector<utils::IteratorType> iteratorTypes(2,
                                                  utils::IteratorType::parallel);
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, softmax.getType(), ValueRange{softmax, scaledOldSum}, output,
-      indexingMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value result = b.create<arith::DivFOp>(loc, args[0], args[1]);
+      loc, softmax.getType(), ValueRange{newSum}, softmax, indexingMaps,
+      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value result = b.create<arith::DivFOp>(loc, args[1], args[0]);
         b.create<linalg::YieldOp>(loc, result);
       });
+  ops.push_back(genericOp);
   return genericOp.getResult(0);
 }
 
 static Value scaleAccumulator(Value accumulator, Value scaledOldSum,
                               Value newSum, Value output, Location loc,
-                              OpBuilder &builder) {
+                              OpBuilder &builder,
+                              SmallVectorImpl<Operation *> &ops) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
@@ -130,31 +134,30 @@ static Value scaleAccumulator(Value accumulator, Value scaledOldSum,
       loc, accumulator.getType(), ValueRange{accumulator, scaledOldSum, newSum},
       output, indexingMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value prod = b.create<arith::DivFOp>(loc, args[1], args[2]);
-        Value result = b.create<arith::MulFOp>(loc, prod, args[0]);
+        Value ratio = b.create<arith::DivFOp>(loc, args[1], args[2]);
+        Value result = b.create<arith::MulFOp>(loc, ratio, args[0]);
         b.create<linalg::YieldOp>(loc, result);
       });
+  ops.push_back(genericOp);
   return genericOp.getResult(0);
 }
 
-static Value computeQKTranspose(Value query, Value key, Value transposedOutput,
-                                Value output, Value zero,
-                                RankedTensorType tensorType, Location loc,
-                                OpBuilder &builder) {
-  SmallVector<int64_t> perm{1, 0};
-  auto transposeOp =
-      builder.create<linalg::TransposeOp>(loc, key, transposedOutput, perm);
-  Value acc =
-      builder.create<linalg::FillOp>(loc, ValueRange{zero}, output).result();
-  auto matmulOp = builder.create<linalg::MatmulOp>(
-      loc, tensorType, ValueRange{query, transposeOp.getResult()[0]}, acc);
+static Value computeQKTranspose(Value query, Value key, Value output,
+                                Value zero, Location loc, OpBuilder &builder,
+                                SmallVectorImpl<Operation *> &ops) {
+  auto fillOp = builder.create<linalg::FillOp>(loc, ValueRange{zero}, output);
+  ops.push_back(fillOp);
+  Value acc = fillOp.result();
+  auto matmulOp = builder.create<linalg::MatmulTransposeBOp>(
+      loc, output.getType(), ValueRange{query, key}, acc);
+  ops.push_back(matmulOp);
   return matmulOp.getResult(0);
 }
 
 static std::tuple<Value, Value, Value, Value>
 extractSlices(Value key, Value value, Value query, Value output,
               ArrayRef<int64_t> queryShape, ArrayRef<Value> ivs,
-              Value sequenceTileLength, Type elementType, Location loc,
+              OpFoldResult sequenceTileLength, Type elementType, Location loc,
               OpBuilder &builder) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
@@ -166,7 +169,7 @@ extractSlices(Value key, Value value, Value query, Value output,
   sizes[2] = headDimension;
   offsets[0] = ivs[0];
   offsets[1] = ivs[1];
-  SmallVector<int64_t> tensorShape{ShapedType::kDynamic, queryShape.back()};
+  SmallVector<int64_t> tensorShape{queryShape[1], queryShape[2]};
   auto tensorType = RankedTensorType::get(tensorShape, elementType);
   Value keySlice = builder.create<tensor::ExtractSliceOp>(
       loc, tensorType, key, offsets, sizes, strides);
@@ -179,14 +182,13 @@ extractSlices(Value key, Value value, Value query, Value output,
       loc, tensorType, query, offsets, sizes, strides);
   Value outputSlice = builder.create<tensor::ExtractSliceOp>(
       loc, tensorType, output, offsets, sizes, strides);
-
   return std::make_tuple(keySlice, valueSlice, querySlice, outputSlice);
 }
 
 static std::tuple<Value, Value, Value>
 insertSlices(Value newResult, Value result, Value newMax, Value max,
              Value newSum, Value sum, ArrayRef<int64_t> queryShape,
-             ArrayRef<Value> ivs, Value sequenceTileLength, Location loc,
+             ArrayRef<Value> ivs, OpFoldResult sequenceTileLength, Location loc,
              OpBuilder &builder) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
@@ -199,14 +201,10 @@ insertSlices(Value newResult, Value result, Value newMax, Value max,
   offsets[0] = ivs[0];
   Value updatedAcc = builder.create<tensor::InsertSliceOp>(
       loc, newResult, result, offsets, sizes, strides);
-  offsets = SmallVector<OpFoldResult>{zero};
-  sizes = SmallVector<OpFoldResult>{sequenceTileLength};
-  strides = SmallVector<OpFoldResult>{one};
-  Value updatedMax = builder.create<tensor::InsertSliceOp>(
-      loc, newMax, max, offsets, sizes, strides);
-  Value updatedSum = builder.create<tensor::InsertSliceOp>(
-      loc, newSum, sum, offsets, sizes, strides);
-  return std::make_tuple(updatedAcc, updatedMax, updatedSum);
+  offsets = SmallVector<OpFoldResult>(queryShape.size() - 1, zero);
+  sizes = SmallVector<OpFoldResult>{one, sequenceTileLength};
+  strides = SmallVector<OpFoldResult>(queryShape.size() - 1, one);
+  return std::make_tuple(updatedAcc, newMax, newSum);
 }
 
 static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
@@ -223,6 +221,156 @@ static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
     ivs.push_back(loop.getInductionVar());
   return loopNest;
 }
+
+static std::tuple<Value, Value, Value>
+createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
+                    Value outputSlice, Value maxSlice, Value sumSlice,
+                    OpFoldResult sequenceTileLength, OpFoldResult headDimension,
+                    Type elementType, SmallVectorImpl<Operation *> &ops,
+                    Location loc, OpBuilder &builder) {
+
+  // Compute matmul(q, transpose(k))
+  Value zero =
+      builder.create<arith::ConstantOp>(loc, builder.getZeroAttr(elementType));
+  SmallVector<OpFoldResult> resultShape{sequenceTileLength, sequenceTileLength};
+  Value emptySquare =
+      builder.create<tensor::EmptyOp>(loc, resultShape, elementType);
+  Value qkTranspose = computeQKTranspose(querySlice, keySlice, emptySquare,
+                                         zero, loc, builder, ops);
+
+  // Compute current statistics
+  Value newMax = computeRowwiseReduction<arith::MaxFOp>(qkTranspose, maxSlice,
+                                                        loc, builder, ops);
+  Value partialSoftmax =
+      computePartialSoftmax(qkTranspose, newMax, loc, builder, ops);
+  Value scaledOldSum =
+      updateAndScale(maxSlice, newMax, sumSlice, loc, builder, ops);
+  Value newSum = computeRowwiseReduction<arith::AddFOp>(
+      partialSoftmax, scaledOldSum, loc, builder, ops);
+  Value softmax =
+      scalePartialSoftmax(partialSoftmax, newSum, loc, builder, ops);
+
+  // Update accumulator
+  Value empty = builder.create<tensor::EmptyOp>(
+      loc, SmallVector<OpFoldResult>{sequenceTileLength, headDimension},
+      elementType);
+  Value scaledAcc = scaleAccumulator(outputSlice, scaledOldSum, newSum, empty,
+                                     loc, builder, ops);
+
+  // Compute matmul(softmax, v)
+  auto matmulOp = builder.create<linalg::MatmulOp>(
+      loc, outputSlice.getType(), ValueRange{softmax, valueSlice}, scaledAcc);
+  ops.push_back(matmulOp);
+  Value result = matmulOp.getResult(0);
+  return std::make_tuple(result, newMax, newSum);
+}
+
+} // namespace
+
+SmallVector<Operation *>
+tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
+                          IRRewriter &rewriter) {
+  SmallVector<Operation *> ops;
+  Location loc = attnOp.getLoc();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(attnOp);
+
+  Value query = attnOp.getQuery();
+  ShapedType queryType = attnOp.getQueryType();
+  Type elementType = queryType.getElementType();
+  ArrayRef<int64_t> queryShape = queryType.getShape();
+  SmallVector<OpFoldResult> queryDimValues =
+      tensor::createDimValues(rewriter, loc, query);
+  OpFoldResult headDimension = queryDimValues[2];
+  OpFoldResult sequenceTileLength = queryDimValues[1];
+  OpFoldResult batchTileLength = queryDimValues[0];
+
+  Value key = attnOp.getKey();
+  Value value = attnOp.getValue();
+  SmallVector<OpFoldResult> keyDimValues =
+      tensor::createDimValues(rewriter, loc, key);
+  OpFoldResult sequenceLength = keyDimValues[1];
+
+  // Construct first loop
+  Value zeroValue = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value oneValue = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  SmallVector<Value> ivs;
+  Value output = attnOp.getOutput();
+  scf::LoopNest firstLoopNest = createLoopNest(
+      ivs, zeroValue, oneValue,
+      getValueOrCreateConstantIndexOp(rewriter, loc, batchTileLength),
+      ValueRange({output}), loc, rewriter);
+  Value iterArg = firstLoopNest.loops.back().getRegionIterArg(0);
+  ops.push_back(firstLoopNest.loops.back());
+
+  OpBuilder::InsertionGuard guardFirstLoop(rewriter);
+  rewriter.setInsertionPointToStart(firstLoopNest.loops.back().getBody());
+
+  // Create max and sum statistics
+  Value zeroF32 = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(elementType));
+  Value largeNegativeF32 = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getFloatAttr(elementType, -1.0e+30));
+  SmallVector<OpFoldResult> dims{sequenceTileLength};
+  Value max = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
+  auto maxFill =
+      rewriter.create<linalg::FillOp>(loc, ValueRange{largeNegativeF32}, max);
+  Value negativeMax = maxFill.result();
+  ops.push_back(maxFill);
+  Value sum = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
+  auto sumFill = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32}, sum);
+  Value zeroSum = sumFill.result();
+  ops.push_back(sumFill);
+
+  // Construct second loop
+  scf::LoopNest secondLoopNest = createLoopNest(
+      ivs, zeroValue,
+      getValueOrCreateConstantIndexOp(rewriter, loc, sequenceTileLength),
+      getValueOrCreateConstantIndexOp(rewriter, loc, sequenceLength),
+      ValueRange({iterArg, negativeMax, zeroSum}), loc, rewriter);
+  ops.push_back(secondLoopNest.loops.back());
+
+  Value iterArgResult = secondLoopNest.loops.back().getRegionIterArg(0);
+  Value iterArgMax = secondLoopNest.loops.back().getRegionIterArg(1);
+  Value iterArgSum = secondLoopNest.loops.back().getRegionIterArg(2);
+
+  OpBuilder::InsertionGuard guardSecondLoop(rewriter);
+  rewriter.setInsertionPointToStart(secondLoopNest.loops.back().getBody());
+
+  // Extract slices
+  auto [keySlice, valueSlice, querySlice, outputSlice] =
+      extractSlices(key, value, query, iterArgResult, queryShape, ivs,
+                    sequenceTileLength, elementType, loc, rewriter);
+
+  // Create body of innermost loop
+  auto [result, newMax, newSum] = createAttentionBody(
+      keySlice, valueSlice, querySlice, outputSlice, iterArgMax, iterArgSum,
+      sequenceTileLength, headDimension, elementType, ops, loc, rewriter);
+
+  // Insert slices
+  auto [updatedAcc, updatedMax, updatedSum] = insertSlices(
+      result, iterArgResult, newMax, iterArgMax, newSum, iterArgSum, queryShape,
+      ivs, sequenceTileLength, loc, rewriter);
+
+  if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
+          secondLoopNest.loops.back().getBody()->getTerminator())) {
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(
+        yieldOp, ValueRange{updatedAcc, updatedMax, updatedSum});
+  }
+
+  if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
+          firstLoopNest.loops.back().getBody()->getTerminator())) {
+    OpBuilder::InsertionGuard yieldGuard(rewriter);
+    rewriter.setInsertionPoint(yieldOp);
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(
+        yieldOp, ValueRange{secondLoopNest.results[0]});
+  }
+
+  attnOp.getResults()[0].replaceAllUsesWith(firstLoopNest.results[0]);
+  return ops;
+}
+
+namespace {
 
 /// This is an implementation of flash attention which
 /// is a tiled and fused implementation of the attention operator.
@@ -254,139 +402,7 @@ static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
 LogicalResult reifyAttentionTransform(func::FuncOp funcOp) {
   IRRewriter rewriter(funcOp.getContext());
   funcOp.walk([&](IREE::LinalgExt::AttentionOp attnOp) {
-    Location loc = attnOp.getLoc();
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(attnOp);
-
-    Value query = attnOp.getQuery();
-    ShapedType queryType = attnOp.getQueryType();
-    Type elementType = queryType.getElementType();
-    ArrayRef<int64_t> queryShape = queryType.getShape();
-    SmallVector<OpFoldResult> queryDimValues =
-        tensor::createDimValues(rewriter, loc, query);
-    Value sequenceTileLength =
-        getValueOrCreateConstantIndexOp(rewriter, loc, queryDimValues[1]);
-    Value batchTileLength =
-        getValueOrCreateConstantIndexOp(rewriter, loc, queryDimValues[0]);
-
-    Value key = attnOp.getKey();
-    Value value = attnOp.getValue();
-    SmallVector<OpFoldResult> keyDimValues =
-        tensor::createDimValues(rewriter, loc, key);
-    Value sequenceLength =
-        getValueOrCreateConstantIndexOp(rewriter, loc, keyDimValues[1]);
-
-    // Construct first loop
-    Value zeroValue = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value oneValue = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    SmallVector<Value> ivs;
-    Value output = attnOp.getOutput();
-    scf::LoopNest firstLoopNest =
-        createLoopNest(ivs, zeroValue, oneValue, batchTileLength,
-                       ValueRange({output}), loc, rewriter);
-    Value iterArg = firstLoopNest.loops.back().getRegionIterArg(0);
-
-    OpBuilder::InsertionGuard guardFirstLoop(rewriter);
-    rewriter.setInsertionPointToStart(firstLoopNest.loops.back().getBody());
-
-    // Create max and sum statistics
-    SmallVector<OpFoldResult> dims{sequenceTileLength};
-    Value zeroF32 = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elementType));
-    Value largeNegativeF32 = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getFloatAttr(elementType, -1e30));
-    Value max = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
-    Value negativeMax =
-        rewriter.create<linalg::FillOp>(loc, ValueRange{largeNegativeF32}, max)
-            .result();
-    Value sum = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
-    Value zeroSum =
-        rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32}, sum).result();
-
-    // Construct second loop
-    scf::LoopNest secondLoopNest = createLoopNest(
-        ivs, zeroValue, sequenceTileLength, sequenceLength,
-        ValueRange({iterArg, negativeMax, zeroSum}), loc, rewriter);
-
-    Value iterArgResult = secondLoopNest.loops.back().getRegionIterArg(0);
-    Value iterArgMax = secondLoopNest.loops.back().getRegionIterArg(1);
-    Value iterArgSum = secondLoopNest.loops.back().getRegionIterArg(2);
-
-    OpBuilder::InsertionGuard guardSecondLoop(rewriter);
-    rewriter.setInsertionPointToStart(secondLoopNest.loops.back().getBody());
-
-    auto [keySlice, valueSlice, querySlice, outputSlice] =
-        extractSlices(key, value, query, iterArgResult, queryShape, ivs,
-                      sequenceTileLength, elementType, loc, rewriter);
-
-    // Compute matmul(q, transpose(k))
-    auto headDimension = rewriter.getIndexAttr(queryShape.back());
-    SmallVector<OpFoldResult> transposedShape{headDimension,
-                                              sequenceTileLength};
-    Value empty =
-        rewriter.create<tensor::EmptyOp>(loc, transposedShape, elementType);
-    SmallVector<OpFoldResult> resultShape{sequenceTileLength,
-                                          sequenceTileLength};
-    Value emptySquare =
-        rewriter.create<tensor::EmptyOp>(loc, resultShape, elementType);
-    auto tensorType = RankedTensorType::get(
-        SmallVector<int64_t>(2, ShapedType::kDynamic), elementType);
-    Value qkTranspose =
-        computeQKTranspose(querySlice, keySlice, empty, emptySquare, zeroF32,
-                           tensorType, loc, rewriter);
-
-    empty = rewriter.create<tensor::EmptyOp>(
-        loc, SmallVector<OpFoldResult>{sequenceTileLength}, elementType);
-
-    // Compute current statistics
-    Value newMax = computeRowwiseReduction<arith::MaxFOp>(
-        qkTranspose, iterArgMax, loc, rewriter);
-    Value partialSoftmax =
-        computePartialSoftmax(qkTranspose, newMax, emptySquare, loc, rewriter);
-    Value currentSum = computeRowwiseReduction<arith::AddFOp>(
-        partialSoftmax, zeroSum, loc, rewriter);
-
-    auto [newSum, scaledOldSum] = computeNewSum(
-        iterArgMax, newMax, iterArgSum, currentSum, empty, loc, rewriter);
-
-    // Scale partial softmax
-    Value softmax =
-        scalePartialSoftmax(partialSoftmax, newSum, emptySquare, loc, rewriter);
-
-    // Update accumulator
-    empty = rewriter.create<tensor::EmptyOp>(
-        loc, SmallVector<OpFoldResult>{sequenceLength, headDimension},
-        elementType);
-    Value scaledAcc = scaleAccumulator(outputSlice, scaledOldSum, newSum, empty,
-                                       loc, rewriter);
-
-    // Compute matmul(softmax, v)
-    Value result = rewriter
-                       .create<linalg::MatmulOp>(
-                           loc, outputSlice.getType(),
-                           ValueRange{softmax, valueSlice}, scaledAcc)
-                       .getResult(0);
-
-    // Insert slices
-    auto [updatedAcc, updatedMax, updatedSum] = insertSlices(
-        result, iterArgResult, newMax, iterArgMax, newSum, iterArgSum,
-        queryShape, ivs, sequenceTileLength, loc, rewriter);
-
-    if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
-            secondLoopNest.loops.back().getBody()->getTerminator())) {
-      rewriter.replaceOpWithNewOp<scf::YieldOp>(
-          yieldOp, ValueRange{updatedAcc, updatedMax, updatedSum});
-    }
-
-    if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
-            firstLoopNest.loops.back().getBody()->getTerminator())) {
-      OpBuilder::InsertionGuard yieldGuard(rewriter);
-      rewriter.setInsertionPoint(yieldOp);
-      rewriter.replaceOpWithNewOp<scf::YieldOp>(
-          yieldOp, ValueRange{secondLoopNest.results[0]});
-    }
-
-    attnOp.getResults()[0].replaceAllUsesWith(firstLoopNest.results[0]);
+    tileAndDecomposeAttention(attnOp, rewriter);
     return WalkResult::advance();
   });
   return success();

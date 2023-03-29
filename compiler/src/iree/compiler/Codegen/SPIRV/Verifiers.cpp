@@ -53,7 +53,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   LLVM_DEBUG(llvm::dbgs() << "target environment: " << targetEnvAttr << "\n");
 
   auto funcOp = op->getParentOfType<func::FuncOp>();
-  const Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
+  const std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize) return funcOp->emitError("failed to query subgroup size");
   const int maxSharedMemory = limits.getMaxComputeSharedMemorySize();
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
@@ -188,7 +188,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   LLVM_DEBUG(llvm::dbgs() << "target environment: " << targetEnvAttr << "\n");
 
   auto funcOp = op->getParentOfType<func::FuncOp>();
-  const Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
+  const std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize) return funcOp->emitError("failed to query subgroup size");
   const int maxSharedMemory = limits.getMaxComputeSharedMemorySize();
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();

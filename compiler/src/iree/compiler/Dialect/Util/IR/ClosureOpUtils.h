@@ -47,7 +47,7 @@ struct ClosureOptimizationOptions {
   // Maximum size in bytes of constant values to inline into the closure.
   // When 0 no constants will be inlined; when None all constants will be
   // inlined.
-  Optional<int64_t> maxInlinedConstantBytes = {256};
+  std::optional<int64_t> maxInlinedConstantBytes = {256};
 };
 
 // Optimizes closure |closureOp| to remove duplicate operands and unused

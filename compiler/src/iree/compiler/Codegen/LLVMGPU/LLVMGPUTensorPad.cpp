@@ -28,7 +28,7 @@ static FailureOr<SmallVector<int64_t>> getPaddedShapeFromTensorLoad(
   SmallVector<int64_t> paddedShape(origShape.begin(), origShape.end());
   for (const auto &[index, size] :
        llvm::enumerate(tensorLoad.getMixedSizes())) {
-    if (Optional<int64_t> cst = getConstantIntValue(size)) {
+    if (std::optional<int64_t> cst = getConstantIntValue(size)) {
       paddedShape[index] = cst.value();
     } else {
       FailureOr<int64_t> upperBound =

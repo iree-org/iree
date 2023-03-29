@@ -95,7 +95,9 @@ static void addBufferizePasses(OpPassManager &passManager) {
 
 static void tileAndDistributeToWorkgroup(
     OpPassManager &pm, bool useWARForCooperativeMatrixCodegen = false) {
-  pm.addPass(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createTileAndDistributeToWorkgroupsPass(
+      kNumMaxParallelDims,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters));
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -122,20 +124,17 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
+
+  nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createWorkgroupSpecializationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
   // Distribute linalg onto threads within the workgroup.
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
@@ -160,13 +159,12 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+
+  nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createWorkgroupSpecializationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTensorAlloc());
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
@@ -340,13 +338,12 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
 void addGPUTransposePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+
+  nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createWorkgroupSpecializationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
@@ -374,8 +371,6 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   // May or may not need to reduce shared mememory conflicts
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
@@ -386,8 +381,6 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRematerializeParallelOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
@@ -424,14 +417,16 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
 void addGPUPackUnPackPasses(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+
+  nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createWorkgroupSpecializationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createDecomposePackUnPackOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createVectorizePackUnPackOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -457,6 +452,28 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+}
+
+// Sub pipeline to make the address computation more explicit and
+// optimize them.
+// The idea here is to be less dependent on what the backend is able to
+// do by heavy lifting most of the work while we still have the
+// information about loops.
+// Note: This needs to run before SCF -> CF.
+static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
+  pm.addPass(createExtractAddressComputationGPUPass());
+  pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  pm.addPass(memref::createExpandStridedMetadataPass());
+  // Hoist loop invariant variables to give decompose affine pass the right loop
+  // dependencies.
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  // Decompose the `affine.apply`s.
+  pm.addPass(createDecomposeAffineOpsPass());
+  // Get rid of the redundant computations.
+  pm.addPass(createCSEPass());
+  // Hoist the resulting decompositions.
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(createLowerAffinePass());
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
@@ -485,6 +502,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createFoldTensorExtractOpPass());
 
   pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorLoweringPass());
+
+  // THIS NEEDS TO RUN BEFORE SCF ->CF ON
+  addLowerAndOptimzeAddressComputation(pm);
+  // THIS NEEDS TO RUN BEFORE SCF ->CF OFF
 
   // SCF -> STD
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());

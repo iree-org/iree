@@ -15,7 +15,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-llvm::Optional<std::string> compileSPIRVToWGSL(
+std::optional<std::string> compileSPIRVToWGSL(
     llvm::ArrayRef<uint32_t> spvBinary) {
   // TODO(scotttodd): reroute to MLIR diagnostics?
   auto diagPrinter = tint::diag::Printer::create(stderr, true);

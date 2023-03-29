@@ -130,6 +130,6 @@ class IreeBenchmarkCommand(BenchmarkCommand):
   def generate_benchmark_command(self) -> list[str]:
     command = super().generate_benchmark_command()
     command.append("--device=" + self.driver)
-    command.append("--task_topology_group_count=" + str(self.num_threads))
+    command.append("--task_topology_max_group_count=" + str(self.num_threads))
     command.append("--benchmark_repetitions=" + str(self.num_runs))
     return command

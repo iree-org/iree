@@ -144,10 +144,11 @@ Value broadcastScalar(OpBuilder &builder, Location loc, Value scalarValue,
   return broadcast(builder, loc, scalarValue, resultExtents, isExpansion);
 }
 
-Optional<Extent> computeBinaryResultExtent(OpBuilder &builder, Location loc,
-                                           Extent &lhsDim, Extent &rhsDim,
-                                           bool &isLhsExpansion,
-                                           bool &isRhsExpansion) {
+std::optional<Extent> computeBinaryResultExtent(OpBuilder &builder,
+                                                Location loc, Extent &lhsDim,
+                                                Extent &rhsDim,
+                                                bool &isLhsExpansion,
+                                                bool &isRhsExpansion) {
   if (lhsDim.isStatic() && rhsDim.isStatic()) {
     // Both are static. Just check.
     if (lhsDim.getStatic() != rhsDim.getStatic() &&
@@ -214,11 +215,12 @@ Optional<Extent> computeBinaryResultExtent(OpBuilder &builder, Location loc,
   return Extent(lhsExtentValue);
 }
 
-Optional<Extent> computeTernaryResultExtent(OpBuilder &builder, Location loc,
-                                            Extent &aValue, Extent &bValue,
-                                            Extent &cValue, bool &isAExpansion,
-                                            bool &isBExpansion,
-                                            bool &isCExpansion) {
+std::optional<Extent> computeTernaryResultExtent(OpBuilder &builder,
+                                                 Location loc, Extent &aValue,
+                                                 Extent &bValue, Extent &cValue,
+                                                 bool &isAExpansion,
+                                                 bool &isBExpansion,
+                                                 bool &isCExpansion) {
   // Collect non unit extents (which includes, implicitly, dynamic dims).
   SmallVector<Extent> nonUnitExtents;
   if (!aValue.isUnitExtent()) nonUnitExtents.push_back(aValue);
@@ -430,7 +432,7 @@ struct CompareBinaryBroadcastingAdaptor : public BinaryBroadcastingAdaptor {
                                    BroadcastValues broadcastValues,
                                    OpBuilder &builder) override {
     chlo::BroadcastCompareOpAdaptor adaptor(operands, op->getAttrDictionary());
-    Optional<chlo::ComparisonType> chloCmpType = adaptor.getCompareType();
+    std::optional<chlo::ComparisonType> chloCmpType = adaptor.getCompareType();
     mhlo::ComparisonTypeAttr mhloCmpType;
     if (chloCmpType)
       mhloCmpType = mhlo::ComparisonTypeAttr::get(

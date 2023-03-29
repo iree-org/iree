@@ -1,11 +1,15 @@
 // RUN: iree-opt --split-input-file --iree-convert-hal-to-vm --canonicalize --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // CHECK-LABEL: @channel_create
-//  CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64, %[[RANK:.+]]: i32, %[[COUNT:.+]]: i32) -> !vm.ref<!hal.channel>
-func.func @channel_create(%device: !hal.device, %affinity: i64, %rank: i32, %count: i32) -> !hal.channel {
-  //      CHECK: %[[CHANNEL:.+]] = vm.call @hal.channel.create(%[[DEVICE]], %[[AFFINITY]], %[[RANK]], %[[COUNT]])
+//  CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64, %[[ID:.+]]: !vm.buffer, %[[GROUP:.+]]: !vm.buffer, %[[RANK:.+]]: i32, %[[COUNT:.+]]: i32) -> !vm.ref<!hal.channel>
+func.func @channel_create(%device: !hal.device, %affinity: i64, %id: !util.buffer, %group: !util.buffer, %rank: i32, %count: i32) -> !hal.channel {
+  // CHECK: %[[FLAGS:.+]] = vm.const.i32.zero
+  // CHECK: %[[CHANNEL:.+]] = vm.call @hal.channel.create(%[[DEVICE]], %[[AFFINITY]], %[[FLAGS]], %[[ID]], %[[GROUP]], %[[RANK]], %[[COUNT]])
   %channel = hal.channel.create device(%device : !hal.device)
                               affinity(%affinity)
+                                 flags(0)
+                                    id(%id)
+                                 group(%group)
                                   rank(%rank)
                                  count(%count) : !hal.channel
   // CHECK: return %[[CHANNEL]]

@@ -34,6 +34,7 @@
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -139,7 +140,7 @@ static void optimizeModule(llvm::Module &module,
   llvm::PassInstrumentationCallbacks pic;
 
   llvm::StandardInstrumentations si(module.getContext(), false);
-  si.registerCallbacks(pic, &fam);
+  si.registerCallbacks(pic, &mam);
 
   llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
   llvm::ModulePassManager mpm;
@@ -175,6 +176,7 @@ class CUDATargetBackend final : public TargetBackend {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect,
                     IREE::Codegen::IREECodegenDialect>();
+    mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);
   }
@@ -228,7 +230,8 @@ class CUDATargetBackend final : public TargetBackend {
     SmallVector<uint32_t> workgroupLocalMemories;
     for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
       std::array<int32_t, 3> workgroupSize;
-      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+      if (std::optional<ArrayAttr> workgroupSizeAttr =
+              exportOp.getWorkgroupSize()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
           workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
         }

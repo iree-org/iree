@@ -13,7 +13,8 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Returns the CPU target features associated with the `targetAttr`, if set.
-Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
+std::optional<StringRef> getCpuFeatures(
+    IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Methods to get target information.
 bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);

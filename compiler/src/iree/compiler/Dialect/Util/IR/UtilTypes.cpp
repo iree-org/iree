@@ -294,7 +294,7 @@ IREE::Util::GlobalOpInterface lookupGlobalOp(
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
-llvm::Optional<unsigned> detail::getTiedResultOperandIndex(
+std::optional<unsigned> detail::getTiedResultOperandIndex(
     Operation *op, unsigned resultIndex) {
   auto storageAttr =
       op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
@@ -313,7 +313,7 @@ llvm::Optional<unsigned> detail::getTiedResultOperandIndex(
 }
 
 void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
-                                       llvm::Optional<unsigned> operandIndex) {
+                                       std::optional<unsigned> operandIndex) {
   auto tiedOp = cast<TiedOpInterface>(op);
   auto resultRange = tiedOp.getTiedResultsIndexAndLength();
   resultIndex -= resultRange.first;
@@ -546,7 +546,7 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
 // IREE::Util::ShapeAware*
 //===----------------------------------------------------------------------===//
 
-Optional<ValueRange> findDynamicDims(Value shapedValue) {
+std::optional<ValueRange> findDynamicDims(Value shapedValue) {
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
   SmallVector<Value> worklist;
@@ -565,8 +565,8 @@ Optional<ValueRange> findDynamicDims(Value shapedValue) {
   return std::nullopt;
 }
 
-Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
-                                     Block::iterator insertionPoint) {
+std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
+                                          Block::iterator insertionPoint) {
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
   auto upwardRange = findDynamicDims(shapedValue);

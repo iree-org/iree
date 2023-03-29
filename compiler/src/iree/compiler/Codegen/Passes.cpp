@@ -76,8 +76,8 @@ LogicalResult verifyLoweringConfiguration(
       return verifyDoubleTilingExpertPassPipelineConfig(op, loweringConfig,
                                                         translationInfo);
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-      return verifyGPUMatmulSimtPassPipeline(op, loweringConfig,
-                                             translationInfo, workgroupSize);
+      return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo,
+                                     workgroupSize);
     default:
       break;
   }

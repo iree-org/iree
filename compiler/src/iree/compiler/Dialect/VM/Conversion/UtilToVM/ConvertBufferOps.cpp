@@ -322,7 +322,7 @@ void populateUtilBufferToVMPatterns(MLIRContext *context,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
   typeConverter.addConversion(
-      [](IREE::Util::BufferType type) -> Optional<Type> {
+      [](IREE::Util::BufferType type) -> std::optional<Type> {
         return IREE::VM::RefType::get(
             IREE::VM::BufferType::get(type.getContext()));
       });

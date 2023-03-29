@@ -664,7 +664,7 @@ ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
 
 ResourceUsageAnalysis::~ResourceUsageAnalysis() = default;
 
-llvm::Optional<ResourceUsageBitfield>
+std::optional<ResourceUsageBitfield>
 ResourceUsageAnalysis::tryLookupResourceUsage(Value value) {
   auto resourceUsage =
       solver.lookupElementFor<ValueResourceUsage>(Position::forValue(value));

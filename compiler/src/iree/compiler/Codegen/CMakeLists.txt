@@ -29,6 +29,8 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     MLIRLinalgTransforms
+    MLIRMemRefDialect
+    MLIRNVGPUDialect
     MLIRPass
     MLIRTransforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect

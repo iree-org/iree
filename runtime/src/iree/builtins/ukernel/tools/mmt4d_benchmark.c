@@ -100,24 +100,33 @@ int main(int argc, char** argv) {
 
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   iree_uk_benchmark_initialize(&argc, argv);
+  iree_uk_standard_cpu_features_t* cpu = iree_uk_standard_cpu_features_create();
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_cpu_features_list_t cpu_dotprod =
-      iree_uk_cpu_features_list_1("dotprod");
-  iree_uk_cpu_features_list_t cpu_i8mm = iree_uk_cpu_features_list_1("i8mm");
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 4,
-                                   &cpu_dotprod);
+                                   cpu->dotprod);
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8,
-                                   &cpu_i8mm);
+                                   cpu->i8mm);
+#elif defined(IREE_UK_ARCH_X86_64)
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1,
+                                   cpu->avx2_fma);
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 16, 16, 1,
+                                   cpu->avx512_base);
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 2,
+                                   cpu->avx2_fma);
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 16, 16, 2,
+                                   cpu->avx512_base);
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 16, 16, 2,
+                                   cpu->avx512_vnni);
 #else  // defined(IREE_UK_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
-
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
+  iree_uk_standard_cpu_features_destroy(cpu);
   iree_uk_benchmark_run_and_cleanup();
 }

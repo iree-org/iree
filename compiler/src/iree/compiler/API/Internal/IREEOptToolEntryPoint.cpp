@@ -8,20 +8,114 @@
 //
 // Based on mlir-opt but registers the passes and dialects we care about.
 
+#include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_passes.h"
 #include "iree/compiler/Tools/init_targets.h"
 #include "iree/compiler/tool_entry_points_api.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/Process.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Debug/Counter.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
+
+using namespace llvm;
+using namespace mlir;
+
+static LogicalResult ireeOptMainFromCL(int argc, char **argv,
+                                       llvm::StringRef toolName,
+                                       DialectRegistry &registry) {
+  static cl::opt<std::string> inputFilename(
+      cl::Positional, cl::desc("<input file>"), cl::init("-"));
+
+  static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
+                                             cl::value_desc("filename"),
+                                             cl::init("-"));
+
+  InitLLVM y(argc, argv);
+
+  // Register any command line options.
+  MlirOptMainConfig::registerCLOptions();
+  registerAsmPrinterCLOptions();
+  registerMLIRContextCLOptions();
+  registerPassManagerCLOptions();
+  registerDefaultTimingManagerCLOptions();
+  tracing::DebugCounter::registerCLOptions();
+  auto &pluginManagerOptions =
+      mlir::iree_compiler::PluginManagerOptions::FromFlags::get();
+
+  // Build the list of dialects as a header for the --help message.
+  std::string helpHeader = (toolName + "\nAvailable Dialects: ").str();
+  {
+    llvm::raw_string_ostream os(helpHeader);
+    interleaveComma(registry.getDialectNames(), os,
+                    [&](auto name) { os << name; });
+  }
+
+  // We support a limited form of the PluginManager, allowing it to perform
+  // global initialization and dialect registration.
+  mlir::iree_compiler::PluginManager pluginManager;
+  if (!pluginManager.loadAvailablePlugins()) {
+    llvm::errs() << "error: Failed to initialize IREE compiler plugins\n";
+    return failure();
+  }
+  pluginManager.initializeCLI();
+
+  // Parse pass names in main to ensure static initialization completed.
+  cl::ParseCommandLineOptions(argc, argv, helpHeader);
+  MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
+
+  // The local binder is meant for overriding session-level options, but for
+  // tools like this it is unused.
+  auto localBinder = mlir::iree_compiler::OptionsBinder::local();
+  pluginManager.globalInitialize();
+  pluginManager.registerPasses();
+  pluginManager.registerGlobalDialects(registry);
+  mlir::iree_compiler::PluginManagerSession pluginSession(
+      pluginManager, localBinder, pluginManagerOptions);
+  if (failed(pluginSession.initializePlugins())) return failure();
+  pluginSession.registerDialects(registry);
+
+  // When reading from stdin and the input is a tty, it is often a user mistake
+  // and the process "appears to be stuck". Print a message to let the user know
+  // about it!
+  if (inputFilename == "-" &&
+      sys::Process::FileDescriptorIsDisplayed(fileno(stdin)))
+    llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to "
+                    "interrupt)\n";
+
+  // Set up the input file.
+  std::string errorMessage;
+  auto file = openInputFile(inputFilename, &errorMessage);
+  if (!file) {
+    llvm::errs() << errorMessage << "\n";
+    return failure();
+  }
+
+  auto output = openOutputFile(outputFilename, &errorMessage);
+  if (!output) {
+    llvm::errs() << errorMessage << "\n";
+    return failure();
+  }
+  if (failed(MlirOptMain(output->os(), std::move(file), registry, config)))
+    return failure();
+
+  // Keep the output file if the invocation of MlirOptMain was successful.
+  output->keep();
+  return success();
+}
 
 int ireeOptRunMain(int argc, char **argv) {
   llvm::setBugReportMsg(
       "Please report issues to https://github.com/openxla/iree/issues and "
       "include the crash backtrace.\n");
-  llvm::InitLLVM y(argc, argv);
 
   mlir::DialectRegistry registry;
   mlir::iree_compiler::registerAllDialects(registry);
@@ -32,9 +126,8 @@ int ireeOptRunMain(int argc, char **argv) {
   // TODO: this should be upstreamed.
   mlir::linalg::transform::registerDropSchedulePass();
 
-  if (failed(MlirOptMain(argc, argv, "IREE modular optimizer driver\n",
-                         registry,
-                         /*preloadDialectsInContext=*/false))) {
+  if (failed(ireeOptMainFromCL(argc, argv, "IREE modular optimizer driver\n",
+                               registry))) {
     return 1;
   }
   return 0;

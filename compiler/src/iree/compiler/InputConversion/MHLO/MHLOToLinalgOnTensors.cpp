@@ -323,8 +323,8 @@ class GenericTypeConvert : public ConversionPattern {
   }
 };
 
-llvm::Optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
-                                     ValueRange inputs, Location loc) {
+std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
+                                    ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
   if (inputs.front().getType().isa<ShapedType>()) {
     return std::nullopt;

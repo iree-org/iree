@@ -68,7 +68,7 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
   return exportOps;
 }
 
-Optional<StringAttr> getConfigStringAttr(
+std::optional<StringAttr> getConfigStringAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr) {
   if (!targetAttr) return std::nullopt;
   auto config = targetAttr.getConfiguration();
@@ -78,7 +78,7 @@ Optional<StringAttr> getConfigStringAttr(
   return attr;
 }
 
-Optional<IntegerAttr> getConfigIntegerAttr(
+std::optional<IntegerAttr> getConfigIntegerAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr) {
   if (!targetAttr) return std::nullopt;
   auto config = targetAttr.getConfiguration();
@@ -88,8 +88,8 @@ Optional<IntegerAttr> getConfigIntegerAttr(
   return attr;
 }
 
-Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                     StringRef integerAttr) {
+std::optional<BoolAttr> getConfigBoolAttr(
+    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr) {
   if (!targetAttr) return std::nullopt;
   auto config = targetAttr.getConfiguration();
   if (!config) return std::nullopt;
@@ -98,7 +98,7 @@ Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
   return attr;
 }
 
-Optional<llvm::Triple> getTargetTriple(
+std::optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto triple = getConfigStringAttr(targetAttr, "target_triple");
   if (!triple) return std::nullopt;
@@ -184,14 +184,14 @@ static SmallVector<Value> getValuesForDimsOrSymbols(
 /// Returns the dimension for any operation that implements processor op
 /// interfaces.
 template <typename T>
-static Optional<unsigned> getDimension(Operation *op) {
+static std::optional<unsigned> getDimension(Operation *op) {
   if (auto tOp = dyn_cast<T>(op)) {
     return tOp.getDimIndex();
   }
   return std::nullopt;
 }
 template <typename T1, typename T2, typename... T3>
-static Optional<unsigned> getDimension(Operation *op) {
+static std::optional<unsigned> getDimension(Operation *op) {
   if (!op) return std::nullopt;
   if (auto dimension = getDimension<T1>(op)) {
     return dimension;
@@ -205,8 +205,8 @@ static Optional<unsigned> getDimension(Operation *op) {
 /// returns the dimension.  If `refDimension` is passed checks if the dimension
 /// matches the given value.
 template <typename... T>
-static Optional<unsigned> checkDimensions(
-    ArrayRef<Value> vals, Optional<unsigned> refDimension = std::nullopt) {
+static std::optional<unsigned> checkDimensions(
+    ArrayRef<Value> vals, std::optional<unsigned> refDimension = std::nullopt) {
   for (auto v : vals) {
     auto currDimension = getDimension<T...>(v.getDefiningOp());
     if (!currDimension) return std::nullopt;
@@ -268,7 +268,7 @@ class LowerBoundExprVisitor
 
   LogicalResult visitMulExpr(AffineBinaryOpExpr expr) {
     SmallVector<Value> vals;
-    Optional<unsigned> dimension;
+    std::optional<unsigned> dimension;
     // workgroupSizeOp may have been folded into a constant expression.
     if (auto wgSize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS()});
@@ -425,7 +425,7 @@ class StepExprVisitor
 }  // namespace
 
 template <typename OpTy>
-static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
+static std::optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
   if (auto op = value.getDefiningOp<OpTy>()) {
     return op.getDimension().getZExtValue();
   }
@@ -445,7 +445,7 @@ static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
 ///     affine_map<(d0)[s0, s1] -> (d0 * s0 * s1)>(%step)[%id, %size]
 ///   scf.for %iv = %offset to %ub step %new_step { ... }
 /// ```
-Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
+std::optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
     scf::ForOp forOp) {
   LoopTilingAndDistributionInfo loopInfo;
   loopInfo.loop = forOp;
@@ -457,13 +457,13 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   if (!lbApplyOp || !stepApplyOp) {
     // Try to see if this is a specical case where we have:
     //   scf.for %iv = %id to %ub step %count
-    Optional<unsigned> idDim;
+    std::optional<unsigned> idDim;
     if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(
             forOp.getLowerBound().getDefiningOp())) {
       idDim = ifx.getDimIndex();
     }
 
-    Optional<unsigned> countDim;
+    std::optional<unsigned> countDim;
     if (auto ifx = dyn_cast_or_null<ProcessorCountInterface>(
             forOp.getStep().getDefiningOp())) {
       countDim = ifx.getDimIndex();
@@ -559,9 +559,10 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 }
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes) {
-  return {[&tileSizes](OpBuilder &builder, Location loc,
-                       ArrayRef<Range> parallelLoopRanges) {
+    const SmallVector<int64_t> &tileSizes,
+    linalg::DistributionMethod distributionMethod) {
+  return {[&tileSizes, distributionMethod](OpBuilder &builder, Location loc,
+                                           ArrayRef<Range> parallelLoopRanges) {
     SmallVector<int64_t> nonZeroTileSizes;
     for (int64_t size : tileSizes) {
       if (size != 0) nonZeroTileSizes.push_back(size);
@@ -593,11 +594,8 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
           dimValue = builder.create<arith::RemUIOp>(loc, splitDim, numTiles);
           splitDim = builder.create<arith::DivUIOp>(loc, splitDim, numTiles);
         }
-        procInfo[numParallelDims - dim - 1] = {
-            dimValue,
-            numTiles,
-            linalg::DistributionMethod::Cyclic,
-        };
+        procInfo[numParallelDims - dim - 1] = {dimValue, numTiles,
+                                               distributionMethod};
         continue;
       }
       procInfo[numParallelDims - dim - 1] = {
@@ -605,7 +603,7 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
                                                                      dim),
           buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(builder,
                                                                         dim),
-          linalg::DistributionMethod::Cyclic};
+          distributionMethod};
     }
     return procInfo;
   }};
@@ -808,6 +806,30 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
     }
     sinkOp->moveBefore(firstUse);
   }
+}
+
+/// Infer the number of workgroups from exportOp.
+SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp) {
+  SmallVector<int64_t> result;
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (failed(exportOp)) return result;
+
+  Block *body = exportOp->getWorkgroupCountBody();
+  if (!body) return result;
+
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  assert(returnOp.getNumOperands() == 3);
+
+  for (unsigned i = 0; i < 3; ++i) {
+    Operation *defOp = returnOp.getOperand(i).getDefiningOp();
+    if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
+      result.push_back(indexOp.value());
+    } else {
+      return SmallVector<int64_t>();
+    }
+  }
+
+  return result;
 }
 
 }  // namespace iree_compiler

@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_PLUGINAPI_CLIENT_H_
+#define IREE_COMPILER_PLUGINAPI_CLIENT_H_
+
 #include <optional>
 #include <string_view>
 
@@ -13,6 +16,7 @@
 namespace mlir {
 class DialectRegistry;
 class MLIRContext;
+class OpPassManager;
 }  // namespace mlir
 
 namespace mlir::iree_compiler {
@@ -27,6 +31,16 @@ using PluginRegistrationFunction = bool (*)(PluginRegistrar *);
 // Used by default if a plugin does not support options.
 struct EmptyPluginOptions {
   static void bindOptions(OptionsBinder &binder) {}
+};
+
+// Entrypoints for extending IREE's pass pipelines at various stages.
+// Override what is needed.
+class PipelineExtensions {
+ public:
+  virtual ~PipelineExtensions();
+
+  // Adds passes to the |buildPreprocessingPassPipeline| pipeline at the end.
+  virtual void extendPreprocessingPassPipeline(OpPassManager &passManager) {}
 };
 
 // Abstract class representing a plugin registration. It is responsible for
@@ -72,7 +86,7 @@ class AbstractPluginRegistration {
   // change behavior. It is safer to customize the context on a per-session
   // basis in a plugin session's activate() method (i.e. if registering
   // interfaces or behavior changes extensions).
-  virtual void registerDialects(DialectRegistry &registry) {}
+  virtual void registerGlobalDialects(DialectRegistry &registry) {}
 
   // Creates an uninitialized session. If the CLI was initialized, then this
   // should also ensure that any command line options were managed properly into
@@ -96,15 +110,24 @@ class AbstractPluginRegistration {
 // Most users will inherit from this class via the PluginSession CRTP helper,
 // which adds some niceties and support for global command line option
 // registration.
-class AbstractPluginSession {
+class AbstractPluginSession : public PipelineExtensions {
  public:
   virtual ~AbstractPluginSession();
+
+  // Called prior to context initialization in order to register dialects.
+  void registerDialects(DialectRegistry &registry) {
+    onRegisterDialects(registry);
+  }
 
   // Called after the session has been fully constructed. If it fails, then
   // it should emit an appropriate diagnostic.
   LogicalResult activate(MLIRContext *context);
 
  protected:
+  // Called from registerDialects() prior to initializing the context and
+  // prior to onActivate().
+  virtual void onRegisterDialects(DialectRegistry &registry) {}
+
   // Called from the activate() method once pre-conditions are verified and the
   // context is set.
   virtual LogicalResult onActivate() { return success(); };
@@ -122,7 +145,7 @@ class PluginSession : public AbstractPluginSession {
   // AbstractPluginRegistration.
   static void globalInitialize() {}
   static void registerPasses() {}
-  static void registerDialects(DialectRegistry &registry) {}
+  static void registerGlobalDialects(DialectRegistry &registry) {}
 
   struct Registration : public AbstractPluginRegistration {
     using AbstractPluginRegistration::AbstractPluginRegistration;
@@ -135,9 +158,9 @@ class PluginSession : public AbstractPluginSession {
       // Actually need to capture the reference, not a copy. So get a pointer.
       globalCLIOptions = &OptionsFromFlags<OptionsTy>::get();
     }
-    void registerDialects(DialectRegistry &registry) override {
+    void registerGlobalDialects(DialectRegistry &registry) override {
       // Forward to the CRTP derived type.
-      DerivedTy::registerDialects(registry);
+      DerivedTy::registerGlobalDialects(registry);
     }
     std::unique_ptr<AbstractPluginSession> createUninitializedSession(
         OptionsBinder &localOptionsBinder) override {
@@ -181,3 +204,5 @@ class PluginRegistrar {
 };
 
 }  // namespace mlir::iree_compiler
+
+#endif  // IREE_COMPILER_PLUGINAPI_CLIENT_H_

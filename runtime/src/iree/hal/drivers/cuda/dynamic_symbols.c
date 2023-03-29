@@ -109,7 +109,7 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
   if (!out_syms->cuda_library) {
     iree_status_t status =
         iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                         "CUDA dynamic symbols are not loaded first.");
+                         "CUDA dynamic symbols are not loaded first");
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, status, "iree_hal_cuda_nccl_dynamic_symbols_initialize");
   }

@@ -21,6 +21,8 @@ class Android_ARMv8_A_Benchmarks(object):
       tflite_models.MOBILESSD_FP32,
       tflite_models.POSENET_FP32,
       tflite_models.MOBILEBERT_FP32,
+  ]
+  MOBILENET_MODELS = [
       tflite_models.MOBILENET_V2,
       tflite_models.MOBILENET_V3SMALL,
   ]
@@ -45,6 +47,19 @@ class Android_ARMv8_A_Benchmarks(object):
           "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
           "--iree-llvmcpu-enable-pad-consumer-fusion"
       ])
+  # TODO(#12788) For these benchmarks fusion results in stack allocations
+  # that are not found to be bounded which results in a compilation error.
+  # For now add a flag to ignore that error.
+  MOBILENET_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D,
+      tags=["experimental-flags", "mmt4d"],
+      compile_targets=[ARMV8_A_CPU_TARGET],
+      extra_flags=[
+          "--iree-flow-enable-data-tiling",
+          "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
+          "--iree-llvmcpu-enable-pad-consumer-fusion",
+          "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
+      ])
   MMT4D_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D_DOTPROD,
       tags=["experimental-flags", "mmt4d", "dotprod"],
@@ -66,21 +81,27 @@ class Android_ARMv8_A_Benchmarks(object):
         module_execution_configs.ELF_LOCAL_SYNC_CONFIG
     ]
     local_task_execution_configs = [
-        module_execution_configs.get_elf_local_task_config(thread_num)
-        for thread_num in [1, 4]
+        module_execution_configs.get_elf_system_scheduling_local_task_config(
+            thread_num) for thread_num in [1, 4]
     ]
 
     default_gen_confings = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in self.NONQUANT_MODELS + self.QUANT_MODELS
+        for model in self.NONQUANT_MODELS + self.MOBILENET_MODELS +
+        self.QUANT_MODELS
     ]
     experimental_gen_confings = [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.MMT4D_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in self.NONQUANT_MODELS
+    ] + [
+        iree_definitions.ModuleGenerationConfig.build(
+            compile_config=self.MOBILENET_COMPILE_CONFIG,
+            imported_model=iree_definitions.ImportedModel.from_model(model))
+        for model in self.MOBILENET_MODELS
     ] + [
         iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.MMT4D_AND_DOTPROD_COMPILE_CONFIG,

@@ -18,15 +18,17 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "attention.mlir",
             "conv_pipeline_test.mlir",
             "convert_to_nvvm.mlir",
-            "convert_to_nvvm_error.mlir",
             "convert_to_rocdl.mlir",
             "create_async_groups.mlir",
             "distribute_to_thread.mlir",
             "distribute_foreach.mlir",
             "elementwise_pipeline.mlir",
+            "extract_address_computation_gpu.mlir",
             "gpu_set_num_workgroups.mlir",
+            "nvvm_extract_address_computation.mlir",
             "nvvm_pipeline_test.mlir",
             "nvvm_mma_sync_pipeline_test.mlir",
             "reduction_pipeline_transform.mlir",

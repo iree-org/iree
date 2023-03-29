@@ -47,7 +47,7 @@ namespace Stream {
 //  stream.async.concurrent ... {
 //    stream.yield
 //  }
-static Optional<IREE::Stream::YieldOp> getYieldIfOnlyOp(Block &block) {
+static std::optional<IREE::Stream::YieldOp> getYieldIfOnlyOp(Block &block) {
   if (block.empty()) return std::nullopt;
   if (&block.front() != &block.back()) return std::nullopt;
   auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.back());
@@ -97,6 +97,8 @@ static Block::iterator findInsertionPointBefore(Operation *earliestOp,
 static LogicalResult sinkOp(Operation *op, Operation *targetOp) {
   auto ip = findInsertionPointBefore(op, targetOp);
   if (ip == Block::iterator(op)) return failure();
+  // If the moveBefore would be a no-op, then there is no work to do.
+  if (ip == std::next(Block::iterator(op))) return failure();
   op->moveBefore(targetOp);
   return success();
 }

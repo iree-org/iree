@@ -31,6 +31,49 @@ IREE_FLAG(bool, cuda_tracing, true,
 
 IREE_FLAG(int32_t, cuda_default_index, 0, "Index of the default CUDA device.");
 
+IREE_FLAG(int32_t, cuda_nccl_default_rank, 0,
+          "Participant rank within the default collective group.");
+IREE_FLAG(int32_t, cuda_nccl_default_count, 0,
+          "Participant count of the default collective group");
+
+// Default implementation of the collective channel provider that just uses the
+// NCCL_COMM_ID environment variable for configuration. Hosting layers would
+// want to use their own implementation to exchange IDs.
+static iree_status_t iree_hal_cuda_nccl_query_group_params(
+    void* self, iree_hal_device_t* device,
+    iree_hal_queue_affinity_t queue_affinity, iree_byte_span_t id_storage,
+    iree_hal_channel_params_t* params) {
+  IREE_ASSERT_EQ(id_storage.data_length, sizeof(iree_hal_cuda_nccl_id_t));
+
+  // Users can either specify a specific rank or allow this device
+  // implementation to decide. This allows us to run the same programs acting as
+  // different ranks by setting flags/environment variables/API options/etc.
+  if (params->rank == IREE_HAL_CHANNEL_RANK_DEFAULT) {
+    params->rank = FLAG_cuda_nccl_default_rank;
+  }
+  if (params->count == IREE_HAL_CHANNEL_COUNT_DEFAULT) {
+    params->count = FLAG_cuda_nccl_default_count;
+  }
+
+  // Let NCCL configure itself and return the ID to use.
+  //
+  // HACK: this may not be correct and should only be used for testing.
+  // TODO(benvanik): a string form we can use and a flag.
+  if (iree_const_byte_span_is_empty(params->id)) {
+    if (!getenv("NCCL_COMM_ID")) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "the NCCL_COMM_ID environment variable must be set "
+          "when using the default NCCL configuration");
+    }
+    iree_hal_cuda_nccl_id_t* id = (iree_hal_cuda_nccl_id_t*)id_storage.data;
+    IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
+    params->id = iree_const_cast_byte_span(id_storage);
+  }
+
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
     const iree_hal_driver_info_t** out_driver_infos) {
@@ -42,46 +85,6 @@ static iree_status_t iree_hal_cuda_driver_factory_enumerate(
   *out_driver_info_count = IREE_ARRAYSIZE(driver_infos);
   *out_driver_infos = driver_infos;
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
-    iree_hal_cuda_device_params_t* params) {
-  params->nccl_default_count = 0;
-  params->nccl_default_rank = 0;
-
-  char* nprocs_str = getenv("IREE_CUDA_NCCL_NPROCS");
-  if (!nprocs_str) {
-    return iree_ok_status();
-  }
-  int32_t nprocs = -1;
-  bool parsed =
-      iree_string_view_atoi_int32(iree_make_cstring_view(nprocs_str), &nprocs);
-  if (!parsed || nprocs <= 0) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_CUDA_NCCL_NPROCS has invalid value '%s'; expected integer > 0",
-        nprocs_str);
-  }
-  params->nccl_default_count = nprocs;
-
-  char* procid_str = getenv("IREE_CUDA_NCCL_PROCID");
-  if (!procid_str) {
-    // Expected PROCID when NPROCS is set.
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_CUDA_NCCL_PROCID must be set when IREE_CUDA_NCCL_NPROCS is set.");
-  }
-  int32_t procid = -1;
-  parsed =
-      iree_string_view_atoi_int32(iree_make_cstring_view(procid_str), &procid);
-  if (!parsed || procid < 0 || procid >= nprocs) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_CUDA_NCCL_PROCID has invalid value '%s'; expected integer >= 0",
-        procid_str);
-  }
-  params->nccl_default_rank = procid;
-  return iree_status_from_code(IREE_STATUS_OK);
 }
 
 static iree_status_t iree_hal_cuda_driver_factory_try_create(
@@ -105,21 +108,22 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
   default_params.stream_tracing = FLAG_cuda_tracing;
 
-  iree_status_t status =
-      iree_hal_cuda_init_nccl_rank_and_count(&default_params);
-
-  if (iree_status_is_ok(status)) {
-    // Note that nccl_default_id can't be initalized until the driver imports
-    // the NCCL symbols from the dynamic library.
-
-    iree_hal_cuda_driver_options_t driver_options;
-    iree_hal_cuda_driver_options_initialize(&driver_options);
-    driver_options.default_device_index = FLAG_cuda_default_index;
-
-    status = iree_hal_cuda_driver_create(driver_name, &default_params,
-                                         &driver_options, host_allocator,
-                                         out_driver);
+  // Only setup channels if we're running collectives. Setting this will require
+  // NCCL to be available at runtime.
+  if (FLAG_cuda_nccl_default_count != 0) {
+    default_params.channel_provider = (iree_hal_channel_provider_t){
+        .self = NULL,
+        .query_group_params = iree_hal_cuda_nccl_query_group_params,
+    };
   }
+
+  iree_hal_cuda_driver_options_t driver_options;
+  iree_hal_cuda_driver_options_initialize(&driver_options);
+  driver_options.default_device_index = FLAG_cuda_default_index;
+
+  iree_status_t status =
+      iree_hal_cuda_driver_create(driver_name, &default_params, &driver_options,
+                                  host_allocator, out_driver);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

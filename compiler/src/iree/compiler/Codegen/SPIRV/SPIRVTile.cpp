@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -109,27 +110,33 @@ static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
 static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
                                                 ArrayRef<int64_t> tileSizes) {
   MLIRContext *context = consumerOp.getContext();
-  OpBuilder builder(context);
-  auto identityLoopOrder =
-      llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
+  IRRewriter rewriter(context);
+  FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+      scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+          rewriter, cast<TilingInterface>(consumerOp.getOperation()),
+          scf::SCFTileAndFuseOptions().setTilingOptions(
+              scf::SCFTilingOptions().setTileSizes(tileSizes)));
 
-  FailureOr<linalg::TileLoopNest> loopNest =
-      IREE::LinalgExt::tileConsumerAndFuseProducers(
-          builder, consumerOp, tileSizes, identityLoopOrder, std::nullopt);
-  if (failed(loopNest)) {
+  if (failed(tileAndFuseResult)) {
     return consumerOp.emitOpError("failed tiling and fusing producers");
   }
 
-  consumerOp->replaceAllUsesWith(loopNest->getRootOpReplacementResults());
+  SmallVector<Value> replacements;
+  replacements.resize(consumerOp->getNumResults());
+  for (const auto &[index, result] :
+       llvm::enumerate(consumerOp->getResults())) {
+    replacements[index] = tileAndFuseResult->replacements.lookup(result);
+  }
+  consumerOp->replaceAllUsesWith(replacements);
 
   // We don't distribute here; instead, it will be done in a later step
   // after bufferization. So add attributes to the tiled loop nest to
   // indicate that they should be distributed to invocations.
-  ArrayRef<scf::ForOp> loops = loopNest->getLoopOps();
+  ArrayRef<scf::ForOp> loops = tileAndFuseResult.value().loops;
   assert(loops.size() <= kNumGPUDims);
   const char *attrName = getSPIRVDistributeAttrName();
   for (int i = loops.size() - 1, dim = 0; i >= 0; --i) {
-    loops[i]->setAttr(attrName, builder.getIndexAttr(dim++));
+    loops[i]->setAttr(attrName, rewriter.getIndexAttr(dim++));
   }
   return success();
 }
@@ -232,25 +239,33 @@ static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
 
   for (linalg::ConvolutionOpInterface convOp : convOps) {
     auto consumerOp = cast<linalg::LinalgOp>(*convOp);
-    OpBuilder builder(funcOp.getContext());
-    auto identityLoopOrder =
-        llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
+    IRRewriter rewriter(funcOp.getContext());
+    FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+        scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+            rewriter, cast<TilingInterface>(consumerOp.getOperation()),
+            scf::SCFTileAndFuseOptions().setTilingOptions(
+                scf::SCFTilingOptions().setTileSizes(tileSizes)));
 
-    FailureOr<linalg::TileLoopNest> loopNest =
-        IREE::LinalgExt::tileConsumerAndFuseProducers(
-            builder, consumerOp, tileSizes, identityLoopOrder, std::nullopt);
-    if (failed(loopNest)) {
+    if (failed(tileAndFuseResult)) {
       return consumerOp.emitOpError("failed tiling and fusing producers");
     }
 
-    consumerOp->replaceAllUsesWith(loopNest->getRootOpReplacementResults());
+    SmallVector<Value> replacements;
+    replacements.resize(consumerOp->getNumResults());
+    for (const auto &[index, result] :
+         llvm::enumerate(consumerOp->getResults())) {
+      replacements[index] = tileAndFuseResult->replacements.lookup(result);
+    }
+    consumerOp->replaceAllUsesWith(replacements);
 
     // Fully unroll the generated loop. This allows us to remove the loop
     // for parallel output window dimension, so it helps future vector
     // transformations.
-    if (!loopNest->getLoopOps().empty()) {
-      assert(loopNest->getLoopOps().size() == 1);
-      scf::ForOp loopOp = loopNest->getLoopOps().front();
+
+    ArrayRef<scf::ForOp> loops = tileAndFuseResult.value().loops;
+    if (!loops.empty()) {
+      assert(loops.size() == 1);
+      scf::ForOp loopOp = loops.front();
       IntegerAttr ub;
       if (!matchPattern(loopOp.getUpperBound(), m_Constant(&ub))) {
         return loopOp.emitOpError("upper bound should be a constant");

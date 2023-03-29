@@ -19,13 +19,13 @@ class RunModuleUtilsTest(unittest.TestCase):
         device_name="test-device",
         architecture=common_definitions.DeviceArchitecture.VMVX_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
-        device_parameters=[device_parameters.OCTA_CORES],
+        device_parameters=[device_parameters.ALL_CORES],
         tags=[])
 
     flags = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
         device_spec)
 
-    self.assertEqual(flags, ["taskset", "0xFF"])
+    self.assertEqual(flags, [])
 
 
 if __name__ == "__main__":

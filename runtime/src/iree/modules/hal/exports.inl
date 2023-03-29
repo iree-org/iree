@@ -43,7 +43,7 @@ EXPORT_FN("buffer_view.encoding_type", iree_hal_module_buffer_view_encoding_type
 EXPORT_FN("buffer_view.rank", iree_hal_module_buffer_view_rank, r, i)
 EXPORT_FN("buffer_view.trace", iree_hal_module_buffer_view_trace, rCrD, v)
 
-EXPORT_FN("channel.create", iree_hal_module_channel_create, rIii, r)
+EXPORT_FN("channel.create", iree_hal_module_channel_create, rIirrii, r)
 EXPORT_FN("channel.rank_and_count", iree_hal_module_channel_rank_and_count, r, ii)
 
 EXPORT_FN("command_buffer.begin_debug_group", iree_hal_module_command_buffer_begin_debug_group, rr, v)
