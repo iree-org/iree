@@ -20,9 +20,28 @@ parser.add_argument('-o',
                     dest='output_path',
                     required=True,
                     help='Path to the mlir file name to output.')
+
+# Deprecated and unused.  Kept in place so callers of the old tool don't break
+# when using the new tool.
+parser.add_argument('--tf-savedmodel-exported-names',
+                    dest='_',
+                    required=False,
+                    help=argparse.SUPPRESS)
+parser.add_argument('--tf-import-type',
+                    dest='_',
+                    required=False,
+                    help=argparse.SUPPRESS)
+parser.add_argument('--output-format',
+                    dest='_',
+                    required=False,
+                    help=argparse.SUPPRESS)
 args = parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
   Path(args.output_path).write_text(
     iree.compiler.tf.get_mlir(args.saved_model_path))
+
+
+if __name__ == "__main__":
+  main()
