@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Download packages
         id: download_packages
-        uses: dawidd6/action-download-artifact@b2abf1705491048a2d7074f7d90513044fd25d39 # v2
+        uses: dawidd6/action-download-artifact@5e780fc7bbd0cac69fc73271ed86edf5dcb72d67 # v2.26.0
         with:
           github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
           workflow: build_package.yml
@@ -35,7 +35,7 @@ jobs:
           ls -R
       - name: Set up python
         id: set_up_python
-        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
         with:
           python-version: "3.8"
       - name: Install python packages
@@ -77,14 +77,14 @@ jobs:
     steps:
       - name: Publish Release
         id: publish_release
-        uses: eregon/publish-release@d6aee8c288e653387d895ee64d559fc0dd63339d # v1.0.3
+        uses: eregon/publish-release@46913fa2b3f7edc7345ae3c17f6d1b093a54916d # v1.0.5
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
 
       - name: Checking out repository
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           # Get all history. Otherwise the latest-snapshot branch can't be
