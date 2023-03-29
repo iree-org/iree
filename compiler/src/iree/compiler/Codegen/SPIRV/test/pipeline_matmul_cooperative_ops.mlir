@@ -64,8 +64,8 @@ hal.executable public @matmul_256x1024x128_div_exp {
           outs(%17 : tensor<256x1024xf16>) {
         ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):
           %28 = arith.divf %arg2, %arg3 : f16
-          // spirv.GL.Exp is not permitted to use cooperative matrix types per the spec.
-          %29 = math.exp %28 : f16
+          // spirv.GL.FAbs is not permitted to use cooperative matrix types per the spec.
+          %29 = math.absf %28 : f16
           linalg.yield %29 : f16
         } -> tensor<256x1024xf16>
         flow.dispatch.tensor.store %27, %4, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : tensor<256x1024xf16> -> !flow.dispatch.tensor<writeonly:tensor<256x1024xf16>>
@@ -189,19 +189,19 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 // -----
@@ -577,8 +577,8 @@ hal.executable public @matmul_256x1024x128_div_exp {
           outs(%17 : tensor<256x1024xf16>) {
         ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):
           %28 = arith.divf %arg2, %arg3 : f16
-          // spirv.GL.Exp is not permitted to use cooperative matrix types per the spec.
-          %29 = math.exp %28 : f16
+          // spirv.GL.FAbs is not permitted to use cooperative matrix types per the spec.
+          %29 = math.absf %28 : f16
           linalg.yield %29 : f16
         } -> tensor<256x1024xf16>
         flow.dispatch.tensor.store %27, %4, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : tensor<256x1024xf16> -> !flow.dispatch.tensor<writeonly:tensor<256x1024xf16>>
@@ -639,13 +639,13 @@ hal.executable public @matmul_256x1024x128_div_exp {
 
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:     spirv.GL.Exp %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.GL.FAbs %{{.+}} : vector<4xf16>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 // -----

@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
@@ -39,75 +40,6 @@ namespace LinalgExt {
 //===----------------------------------------------------------------------===//
 // CodegenStrategy patterns and passes.
 //===----------------------------------------------------------------------===//
-
-FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
-    OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
-    ArrayRef<int64_t> tileInterchange,
-    const std::optional<linalg::LinalgLoopDistributionOptions>
-        &tileDistribution) {
-  assert(tileSizes.size() == tileInterchange.size() &&
-         "expect the number of tile sizes and interchange dims to match");
-  assert(isPermutationVector(tileInterchange) &&
-         "expect tile interchange is a permutation");
-
-  // Create an empty tile loop nest.
-  linalg::TileLoopNest tileLoopNest(consumerOp);
-
-  // Search the number of outer parallel loops to separate them from possible
-  // inner reduction dimensions.
-  auto iterTypes = consumerOp.getIteratorTypesArray();
-  // Make sure to only look at the leading loops for tiling---we will scan this
-  // array to find the first non-parallel loop later and use that for indexing
-  // into the tile sizes.
-  if (iterTypes.size() > tileSizes.size()) {
-    iterTypes.resize(tileSizes.size());
-  }
-  applyPermutationToVector(iterTypes, tileInterchange);
-  auto *it = find_if_not(iterTypes, linalg::isParallelIterator);
-  int64_t split = std::distance(iterTypes.begin(), it);
-
-  // Helper to fuse the producers greedily using a queue of fusion candidates.
-  auto fuseProducersGreedily = [&](ArrayRef<OpOperand *> operands) {
-    SmallVector<OpOperand *> candidates(operands.begin(), operands.end());
-    while (!candidates.empty()) {
-      FailureOr<linalg::LinalgOp> fusedProducer =
-          tileLoopNest.fuseProducer(b, candidates.pop_back_val());
-      if (failed(fusedProducer))
-        continue;
-      candidates.append(fusedProducer->getDpsInputOperands());
-      candidates.append(fusedProducer->getDpsInitOperands());
-    }
-  };
-
-  // Perform tiling and fusion in two steps. We need to respect the loop
-  // interchange here; filter parellel dimensions based on their order *after*
-  // permutation but pass in the original configuration *before* permuation,
-  // given the tiling and interchange happen together.
-  SmallVector<int64_t> outerTileSizes(tileSizes.size(), 0);
-  SmallVector<int64_t> innerTileSizes(tileSizes.size(), 0);
-  for (int64_t i : tileInterchange.take_front(split))
-    outerTileSizes[i] = tileSizes[i];
-  for (int64_t i : tileInterchange.drop_front(split))
-    innerTileSizes[i] = tileSizes[i];
-
-  // Tile the outer parallel loops and fuse the output operands.
-  if (failed(tileLoopNest.tileRootOp(b, outerTileSizes, tileInterchange,
-                                     tileDistribution)))
-    return failure();
-  fuseProducersGreedily(tileLoopNest.getRootOp().getDpsInitOperands());
-
-  // Tile the remaining loops and fuse the input operands.
-  if (failed(tileLoopNest.tileRootOp(b, innerTileSizes, tileInterchange,
-                                     tileDistribution)))
-    return failure();
-  fuseProducersGreedily(tileLoopNest.getRootOp().getDpsInputOperands());
-
-  // Exit if the tile loop nest is empty since all tile sizes are zero.
-  if (tileLoopNest.isEmpty())
-    return failure();
-
-  return tileLoopNest;
-}
 
 /// Peel loops after tiling.
 static void peelTiledLinalgOp(RewriterBase &rewriter,
@@ -328,10 +260,10 @@ struct LinalgStrategyLowerVectorsPass
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     // In a progressive lowering of vectors, this would be the 1st step.
     if (options.contractionLowering) {
-      patterns.add<vector::ContractionOpToOuterProductOpLowering,
-                   vector::ContractionOpToMatmulOpLowering,
-                   vector::ContractionOpLowering>(
-          options.vectorTransformOptions, context);
+      vector::populateVectorContractLoweringPatterns(
+          patterns, options.vectorTransformOptions,
+          /*benefit=*/1,
+          /*disableOuterProductLowering=*/true);
       vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
     }
     // In a progressive lowering of vectors, this would be the 2nd step.
@@ -342,8 +274,8 @@ struct LinalgStrategyLowerVectorsPass
     }
     // In a progressive lowering of vectors, this would be the 3rd step.
     if (options.transferPartialRewrite) {
-      patterns.add<vector::VectorTransferFullPartialRewriter>(
-          context, options.vectorTransformOptions);
+      populateVectorTransferFullPartialPatterns(patterns,
+                                                options.vectorTransformOptions);
     }
     // In a progressive lowering of vectors, this would be the 4th step.
     if (options.transferLowering) {
