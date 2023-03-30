@@ -83,9 +83,9 @@ static iree_status_t iree_uk_benchmark_mmt4d(
   return iree_ok_status();
 }
 
-static void iree_uk_benchmark_register_mmt4d(
-    iree_uk_mmt4d_type_t type, int M0, int N0, int K0,
-    const iree_uk_cpu_features_list_t* cpu_features) {
+static void iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_t type, int M0,
+                                             int N0, int K0,
+                                             const char* cpu_features) {
   char type_str[32];
   iree_uk_type_triple_str(type_str, sizeof type_str, type);
   char name[128];
@@ -100,26 +100,24 @@ int main(int argc, char** argv) {
 
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   iree_uk_benchmark_initialize(&argc, argv);
-  iree_uk_standard_cpu_features_t* cpu = iree_uk_standard_cpu_features_create();
 
 #if defined(IREE_UK_ARCH_ARM_64)
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 4,
-                                   cpu->dotprod);
-  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8,
-                                   cpu->i8mm);
+                                   "dotprod");
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8, "i8mm");
 #elif defined(IREE_UK_ARCH_X86_64)
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1,
-                                   cpu->avx2_fma);
+                                   "avx2_fma");
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 16, 16, 1,
-                                   cpu->avx512_base);
+                                   "avx512_base");
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 2,
-                                   cpu->avx2_fma);
+                                   "avx2_fma");
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 16, 16, 2,
-                                   cpu->avx512_base);
+                                   "avx512_base");
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 16, 16, 2,
-                                   cpu->avx512_vnni);
+                                   "avx512_vnni");
 #else  // defined(IREE_UK_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
@@ -127,6 +125,5 @@ int main(int argc, char** argv) {
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
-  iree_uk_standard_cpu_features_destroy(cpu);
   iree_uk_benchmark_run_and_cleanup();
 }

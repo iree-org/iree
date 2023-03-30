@@ -25,8 +25,7 @@ typedef struct iree_uk_test_t iree_uk_test_t;
 // baseline kernels used when CPU features are unavailable.
 void iree_uk_test(const char* name,
                   void (*test_func)(iree_uk_test_t*, const void*),
-                  const void* params,
-                  const iree_uk_cpu_features_list_t* cpu_features);
+                  const void* params, const char* cpu_features);
 
 // Fail the current test.
 // This is currently always a fatal error: that is generally the most useful

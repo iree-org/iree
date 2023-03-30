@@ -45,46 +45,14 @@ int iree_uk_type_pair_str(char* buf, int buf_length,
 int iree_uk_type_triple_str(char* buf, int buf_length,
                             const iree_uk_type_triple_t triple);
 
-typedef struct iree_uk_cpu_features_list_t iree_uk_cpu_features_list_t;
-
-iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create(int count, ...);
-void iree_uk_cpu_features_list_destroy(iree_uk_cpu_features_list_t* list);
-void iree_uk_cpu_features_list_append(iree_uk_cpu_features_list_t* list,
-                                      int count, ...);
-iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_extend(
-    iree_uk_cpu_features_list_t* list, int count, ...);
-int iree_uk_cpu_features_list_size(const iree_uk_cpu_features_list_t* list);
-const char* iree_uk_cpu_features_list_entry(
-    const iree_uk_cpu_features_list_t* list, int index);
-void iree_uk_cpu_features_list_set_name(iree_uk_cpu_features_list_t* list,
-                                        const char* name);
-const char* iree_uk_cpu_features_list_get_name(
-    const iree_uk_cpu_features_list_t* list);
-
-void iree_uk_make_cpu_data_for_features(
-    const iree_uk_cpu_features_list_t* cpu_features,
-    iree_uk_uint64_t* out_cpu_data_fields);
+void iree_uk_make_cpu_data_for_features(const char* cpu_features,
+                                        iree_uk_uint64_t* out_cpu_data_fields);
 
 void iree_uk_initialize_cpu_once(void);
 
 bool iree_uk_cpu_supports(const iree_uk_uint64_t* cpu_data_fields);
 
 const char* iree_uk_cpu_first_unsupported_feature(
-    const iree_uk_cpu_features_list_t* cpu_features);
-
-typedef struct iree_uk_standard_cpu_features_t {
-#if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_cpu_features_list_t* dotprod;
-  iree_uk_cpu_features_list_t* i8mm;
-#elif defined(IREE_UK_ARCH_X86_64)
-  iree_uk_cpu_features_list_t* avx2_fma;
-  iree_uk_cpu_features_list_t* avx512_base;
-  iree_uk_cpu_features_list_t* avx512_vnni;
-#endif
-} iree_uk_standard_cpu_features_t;
-
-iree_uk_standard_cpu_features_t* iree_uk_standard_cpu_features_create(void);
-void iree_uk_standard_cpu_features_destroy(
-    iree_uk_standard_cpu_features_t* cpu);
+    const iree_uk_uint64_t* cpu_data_fields);
 
 #endif  // IREE_BUILTINS_UKERNEL_TOOLS_UTIL_H_
