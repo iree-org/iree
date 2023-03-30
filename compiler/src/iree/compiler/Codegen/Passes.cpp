@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Passes.h"
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/Sandbox/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -20,7 +19,6 @@ namespace {
 void registerCodegenPasses() {
   // Generated.
   registerPasses();
-  registerSandboxPasses();
 
   static PassPipelineRegistration<> LinalgLLVMPipeline(
       "iree-codegen-linalg-to-llvm-pipeline",

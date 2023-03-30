@@ -10,7 +10,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
-#include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -28,13 +27,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-struct LinalgCPUVectorLoweringPassOptions : LinalgVectorLoweringPassOptions {
-  LinalgCPUVectorLoweringPassOptions() : LinalgVectorLoweringPassOptions() {
-    lowerVectorTransposeTo = "shuffle";
-    lowerVectorMultiReductionTo = "innerreduction";
-  }
-};
 
 /// Command line options used purely for development purposes. Not to be relied
 /// on in any way.

@@ -95,43 +95,4 @@ def TileAndDecomposeAttention :
                     "createTileAndDecomposeAttentionPass()";
 }
 
-//===---------------------------------------------------------------------====//
-// Codegen Strategy passes moved into IREE
-// TODO: Deprecate all this.
-//===---------------------------------------------------------------------====//
-
-def LinalgStrategyEnablePass
-    : Pass<"iree-linalg-strategy-enable-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to enable the application of other "
-    "pattern-based linalg passes.";
-  let constructor = "createLinalgStrategyEnablePass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-  ];
-}
-
-def LinalgStrategyLowerVectorsPass
-    : Pass<"iree-linalg-strategy-lower-vectors-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to lower vector operations.";
-  let constructor = "createLinalgStrategyLowerVectorsPass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-  ];
-}
-
-def LinalgStrategyRemoveMarkersPass
-    : Pass<"iree-linalg-strategy-remove-markers-pass", "func::FuncOp"> {
-  let summary = "Cleanup pass that drops markers.";
-  let constructor = "createLinalgStrategyRemoveMarkersPass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-  ];
-}
-
 #endif  // IREE_DIALECT_LINALGEXT_PASSES
