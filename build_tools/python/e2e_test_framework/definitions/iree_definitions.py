@@ -9,6 +9,7 @@ import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 import pathlib
+import string
 from typing import List, Optional, Sequence
 
 from e2e_test_framework.definitions import common_definitions, utils
@@ -148,7 +149,7 @@ class MLIRDialectType(Enum):
 
 # Placeholder to be replaced with entry function name when outputting the actual
 # flag list.
-IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = r"${ENTRY_FUNCTION_PLACEHOLDER}"
+ENTRY_FUNCTION_PLACEHOLDER = r"${ENTRY_FUNCTION}"
 
 
 @serialization.serializable(type_key="iree_import_configs")
@@ -167,12 +168,12 @@ class ImportConfig(object):
   def materialize_import_flags(self,
                                model: common_definitions.Model) -> List[str]:
     """Materialize flags with dependent values."""
-    return utils.transform_flags(
-        flags=self.import_flags,
-        map_funcs=[
-            lambda value: value.replace(
-                IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER, model.entry_function)
-        ])
+    entry_function = model.entry_function
+    return utils.transform_flags(flags=self.import_flags,
+                                 map_funcs=[
+                                     lambda value: string.Template(value).
+                                     substitute(ENTRY_FUNCTION=entry_function)
+                                 ])
 
 
 DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
@@ -182,7 +183,7 @@ DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v1",
-        f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
+        f"--tf-savedmodel-exported-names={ENTRY_FUNCTION_PLACEHOLDER}"
     ])
 
 DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
@@ -192,7 +193,7 @@ DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v2",
-        f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
+        f"--tf-savedmodel-exported-names={ENTRY_FUNCTION_PLACEHOLDER}"
     ])
 
 DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
@@ -248,9 +249,9 @@ class ImportedModel(object):
                import_config=config)
 
 
-# Placeholder to be replaced with module dir path. The following path segments
-# should be written in the POSIX format.
-MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER = r"${MODULE_DIR}"
+# Placeholder in flags to be replaced with module dir path. The whole path
+# should be written in the POSIX format and starts with the variable.
+MODULE_DIR_PLACEHODLER = r"${MODULE_DIR}"
 
 
 @serialization.serializable(type_key="iree_module_generation_configs",
@@ -275,10 +276,14 @@ class ModuleGenerationConfig(object):
     """Materialize flags with dependent values."""
 
     def _replace_module_dir_placeholder(value: str) -> str:
-      if MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER not in value:
+      """Replaces ${MODULE_DIR} in a POSIX path and returns the
+      platform-dependent path string.
+      """
+      if MODULE_DIR_PLACEHODLER not in value:
         return value
-      if not value.startswith(MODULE_GENERATION_CONFIG_MODULE_DIR_PLACEHODLER):
-        raise ValueError(r"${MODULE_DIR} needs to be the head of flag value.")
+      if not value.startswith(MODULE_DIR_PLACEHODLER):
+        raise ValueError(
+            f"{MODULE_DIR_PLACEHODLER} needs to be the head of flag value.")
       # Properly construct the platform-dependent path from POSIX path string.
       sub_path = pathlib.PurePosixPath(value).parts[1:]
       return str(module_dir_path.joinpath(*sub_path))
@@ -302,7 +307,7 @@ class ModuleGenerationConfig(object):
 
 
 # Placeholder to be replaced with gpu id when outputting the actual flag list.
-E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER = r"${GPU_ID_PLACEHOLDER}"
+GPU_ID_PLACEHOLDER = r"${GPU_ID}"
 
 
 class E2EModelRunTool(Enum):
@@ -336,8 +341,7 @@ class E2EModelRunConfig(object):
     return utils.transform_flags(
         flags=self.run_flags,
         map_funcs=[
-            lambda value: value.replace(E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER,
-                                        gpu_id)
+            lambda value: string.Template(value).substitute(GPU_ID=gpu_id)
         ])
 
   @classmethod
@@ -356,7 +360,7 @@ class E2EModelRunConfig(object):
         imported_model=module_generation_config.imported_model,
         input_data=input_data,
         module_execution_config=module_execution_config,
-        gpu_id=E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER)
+        gpu_id=GPU_ID_PLACEHOLDER)
     return cls(composite_id=composite_id,
                name=name,
                module_generation_config=module_generation_config,
