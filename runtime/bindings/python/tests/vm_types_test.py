@@ -60,7 +60,9 @@ class VmTypesTest(unittest.TestCase):
         (np.uint64, ET.UINT_64),  #
         (np.float16, ET.FLOAT_16),  #
         (np.float32, ET.FLOAT_32),  #
-        (np.float64, ET.FLOAT_64)):
+        (np.float64, ET.FLOAT_64),  #
+        (np.complex64, ET.COMPLEX_64),  #
+        (np.complex128, ET.COMPLEX_128)):
       lst = rt.VmVariantList(5)
       ary1 = np.asarray([1, 2, 3, 4], dtype=dt)
       bv1 = device.allocator.allocate_buffer_copy(
