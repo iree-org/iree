@@ -31,7 +31,7 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "func::FuncOp"> {
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
     Option<"lowerVectorTransposeTo", "lower-vector-transpose-to",
-       "std::string", /*default=*/[{"eltwise"}],
+       "std::string", /*default=*/[{"shuffle"}],
       [{Lower vector.transpose to finer-grained vector ops, options are:\n"
           "\teltwise [default]\n"
           "\tflat_transpose (requires LLVM matrix intrinsics support)\n"
@@ -40,7 +40,7 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "func::FuncOp"> {
       /*default=*/"false",
       "Add specific transpose to avx2 lowering patterns.">,
     Option<"lowerVectorMultiReductionTo", "lower-vector-multi-reduction-to",
-       "std::string", /*default=*/[{"innerparallel"}],
+       "std::string", /*default=*/[{"innerreduction"}],
       [{Lower vector.multi_reduction to finer-grained vector ops, options are:\n"
           "\tinnerparallel [default]\n"
           "\tinnerreduction\n}]>,

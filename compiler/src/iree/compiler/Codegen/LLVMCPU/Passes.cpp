@@ -29,6 +29,13 @@
 namespace mlir {
 namespace iree_compiler {
 
+struct LinalgCPUVectorLoweringPassOptions : LinalgVectorLoweringPassOptions {
+  LinalgCPUVectorLoweringPassOptions() : LinalgVectorLoweringPassOptions() {
+    lowerVectorTransposeTo = "shuffle";
+    lowerVectorMultiReductionTo = "innerreduction";
+  }
+};
+
 /// Command line options used purely for development purposes. Not to be relied
 /// on in any way.
 static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
@@ -76,17 +83,6 @@ static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
 extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName;
 extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag;
 extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag;
-
-//===---------------------------------------------------------------------===//
-// Default Linalg code generation options for CPU backend
-//===---------------------------------------------------------------------===//
-
-struct LinalgCPUVectorLoweringPassOptions : LinalgVectorLoweringPassOptions {
-  LinalgCPUVectorLoweringPassOptions() : LinalgVectorLoweringPassOptions() {
-    lowerVectorTransposeTo = "shuffle";
-    lowerVectorMultiReductionTo = "innerreduction";
-  }
-};
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
@@ -352,12 +348,11 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
-  // Add the vector lowering expert.
   {
-    OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgCPUVectorLoweringPassOptions options;
+    LLVMCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
-    addLowerToVectorTransforms(nestedFuncPassManager, options);
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorLoweringPass(options));
   }
 }
 
@@ -393,12 +388,11 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
-  // Add the vector lowering expert.
   {
-    OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgCPUVectorLoweringPassOptions options;
+    LLVMCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
-    addLowerToVectorTransforms(nestedFuncPassManager, options);
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorLoweringPass(options));
   }
 }
 
@@ -491,13 +485,12 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
-  // Add the vector lowering expert.
   {
-    OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgCPUVectorLoweringPassOptions options;
+    LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
-    addLowerToVectorTransforms(nestedFuncPassManager, options);
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorLoweringPass(options));
   }
 }
 
@@ -553,12 +546,11 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
-  // Add the vector lowering expert.
   {
-    OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
-    LinalgCPUVectorLoweringPassOptions options;
+    LLVMCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "shuffle";
-    addLowerToVectorTransforms(nestedFuncPassManager, options);
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorLoweringPass(options));
   }
 }
 
