@@ -588,8 +588,14 @@ void addCPUDataTilingPipeline(OpPassManager &passManager) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass());
+
+  LLVMCPUVectorizationPassOptions options;
+  options.vectorizePadding = true;
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createVectorizePackUnPackOpsPass());
+      createLLVMCPUVectorizationPass(options));
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
   addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSplitFullPartialTransferPass("linalg-copy"));

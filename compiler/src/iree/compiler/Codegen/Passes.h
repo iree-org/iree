@@ -143,11 +143,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 /// tiling and generalization. See implementation for more details.
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass();
 
-/// Creates a pass to vectorize tensor.pack and tensor.unpack ops. The pass does
-/// tiling, generalization, and kicking in the generic vectorizer. See
-/// implementation for more details.
-std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePackUnPackOpsPass();
-
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
     bool flatten = false);
