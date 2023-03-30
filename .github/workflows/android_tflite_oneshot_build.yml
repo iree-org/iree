@@ -11,7 +11,7 @@ jobs:
     env:
       ANDROID_CONTAINER: "gcr.io/iree-oss/gradle-android@sha256:5dc5d6e2912a9d79535d39dc944a4895e272404b1311fbc1f688a5f9045f76f9"
     steps:
-      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           submodules: true
       - name: Execute Android Build
@@ -21,7 +21,7 @@ jobs:
           -v $PWD:/work \
           "${ANDROID_CONTAINER}" \
           bash -c build_tools/gradle/build_tflite_android_library.sh
-      - uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2
+      - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           path: ./runtime/bindings/tflite/java/build/outputs/aar/*.aar
           retention-days: 1
