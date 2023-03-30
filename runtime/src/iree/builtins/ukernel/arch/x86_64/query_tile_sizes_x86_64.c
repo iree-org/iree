@@ -11,7 +11,7 @@
 static iree_uk_matmul_tile_sizes_t
 iree_uk_query_matmul_tile_sizes_x86_64_f32f32f32(
     const iree_uk_query_tile_sizes_2d_params_t* params) {
-#ifdef IREE_UK_BUILD_X86_64_AVX512_BASE
+#ifdef  XXDISABLEXXX_IREE_UK_BUILD_X86_64_AVX512_BASE
   if (iree_uk_cpu_supports_avx512_base(params->cpu_data)) {
     return (iree_uk_matmul_tile_sizes_t){.M = 16, .K = 1, .N = 16};
   }
