@@ -92,7 +92,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state);
   rewriter.setListener(&listener);
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
@@ -336,7 +336,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state);
   rewriter.setListener(&listener);
   FailureOr<VectorDistributionResult> vectorDistributionResult =
       rewriteScfIfAsWarpExecuteOnLane0(rewriter, loc, target, workgroupSizeX,
@@ -686,7 +686,7 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
 
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state);
   rewriter.setListener(&listener);
   auto diag = DiagnosedSilenceableFailure::success();
   if (getUseWmma()) {
@@ -777,7 +777,7 @@ DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
     transform::TransformState &state) {
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state);
   rewriter.setListener(&listener);
   iree_compiler::createAsyncGroups(rewriter, cast<func::FuncOp>(target),
                                    getUseMmaSync());

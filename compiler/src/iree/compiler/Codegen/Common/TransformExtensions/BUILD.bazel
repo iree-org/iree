@@ -94,6 +94,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:SCFUtils",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorTransformOps",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:Transforms",
