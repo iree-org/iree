@@ -98,7 +98,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       extract_slice ops with reassociative reshape ops.
       - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
       case it is the only use of extract.
-      - licm: additionally apply loop-independent code motion and single
+      - fold_tensor_subsets: adds patterns for folding tensor subset ops into
+      their producer and consumers.
+      - licm: additionally apply loop-independent code motion and single 
       iteration loop promotion. This is not a set of patterns per se but is still
       very convenient to apply it close to canonicalization and other greedy
       pattern applications.
@@ -157,6 +159,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$fold_tensor_empty_extract,
+                       UnitAttr:$fold_tensor_subsets,
                        UnitAttr:$licm,
                        UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,

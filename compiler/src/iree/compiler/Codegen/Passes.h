@@ -329,6 +329,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
 /// Pass to perform peeling on non-distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
 
+/// Pass to perform SplitReduction transformations of `LinalgOp`s.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
+    bool enableReassociateFpReductions = false);
+
 struct LLVMCPUVectorizationPassOptions {
   bool enableVectorMasking = false;
   bool vectorizePadding = false;

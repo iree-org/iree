@@ -49,7 +49,7 @@ cd build-host
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_BENCHMARKS=OFF \
+  -DIREE_BUILD_LEGACY_BENCHMARKS=OFF \
   -DIREE_BUILD_SAMPLES=OFF
 "${CMAKE_BIN}" --build . --target install -- -k 0
 # --------------------------------------------------------------------------- #

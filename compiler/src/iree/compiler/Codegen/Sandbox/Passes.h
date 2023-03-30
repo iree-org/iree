@@ -12,10 +12,6 @@
 
 namespace mlir {
 
-/// Creates a pass to perform SplitReduction transformations of `LinalgOp`s.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgSplitReductionPass(
-    bool enableReassociateFpReductions = false, int64_t size = 0);
-
 /// Struct to control pass options for `LinalgVectorLoweringPass` pass.
 struct LinalgVectorLoweringPassOptions {
   int vectorLoweringStage = 0;

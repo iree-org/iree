@@ -19,7 +19,7 @@
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "runtime/src/iree/builtins/ukernel/exported_bits.h"
 
 namespace mlir {

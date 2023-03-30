@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
@@ -46,7 +46,7 @@ jobs:
           prerelease: true
 
       - name: "Invoke workflow :: Build Native Release Packages"
-        uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7 # v1
+        uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
         with:
           workflow: Build Native Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}

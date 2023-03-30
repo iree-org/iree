@@ -382,6 +382,54 @@ hal.executable private @preset_config_matmul_tensors  {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_partially_pad  {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
+    hal.executable.export @matmul_partially_pad layout(#pipeline_layout)
+    builtin.module {
+      func.func @matmul_partially_pad() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:tensor<16641x16xf32>>
+        %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:tensor<16x8xf32>>
+        %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:tensor<16641x8xf32>>
+        %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [16641, 16], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<16641x16xf32>> -> tensor<16641x16xf32>
+        %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [16, 8], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<16x8xf32>> -> tensor<16x8xf32>
+        %init = tensor.empty() : tensor<16641x8xf32>
+        %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<16641x8xf32>) -> tensor<16641x8xf32>
+        %gemm = linalg.matmul
+            ins(%lhs, %rhs : tensor<16641x16xf32>, tensor<16x8xf32>)
+            outs(%fill : tensor<16641x8xf32>) -> tensor<16641x8xf32>
+        flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [16641, 8], strides = [1, 1]
+            : tensor<16641x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<16641x8xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[129, 8, 0], [8, 8, 0], [0, 0, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
+//      CHECK: hal.executable.export
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: func.func @matmul_partially_pad
+//      CHECK:   linalg.matmul
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
