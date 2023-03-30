@@ -19,8 +19,8 @@ void iree_uk_pack_tile_16x16_x32_x86_64_avx512_base_direct(
   const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr = in_tile_ptr;
   iree_uk_int8_t* IREE_UK_RESTRICT out_ptr = out_tile_ptr;
   for (; outer_size1 > 0; --outer_size1) {
-    iree_uk_copy_8x32xi8_strided_to_strided(out_ptr, in_ptr, 64,
-                                            4 * in_stride0);
+    iree_uk_copy_16x64xi8_strided_to_strided(out_ptr, in_ptr, 64,
+                                             4 * in_stride0);
     out_ptr += 4 * out_stride1;
     in_ptr += 64;
   }
