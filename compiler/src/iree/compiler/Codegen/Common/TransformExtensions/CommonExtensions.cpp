@@ -106,7 +106,7 @@ transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
   IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state);
+  TrackingListener listener(state);
   rewriter.setListener(&listener);
   vector::transferOpflowOpt(rewriter, target);
   eraseDeadAllocAndStores(rewriter, target);
@@ -388,7 +388,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
 
   Location loc = target->getLoc();
-  ErrorCheckingTrackingListener listener(state);
+  TrackingListener listener(state);
   GreedyRewriteConfig config;
   config.listener = &listener;
   // Manually gather list of ops because the other GreedyPatternRewriteDriver
@@ -468,7 +468,7 @@ DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
     transform::TransformState &state) {
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state);
+  TrackingListener listener(state);
   rewriter.setListener(&listener);
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
       rewriter, target);
@@ -762,7 +762,7 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
   Location loc = target->getLoc();
   IRRewriter rewriter(topLevelForallOp->getContext());
   rewriter.setInsertionPoint(topLevelForallOp);
-  ErrorCheckingTrackingListener listener(state);
+  TrackingListener listener(state);
   rewriter.setListener(&listener);
   if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp, exportOp))) {
     return listener.check(loc, mlir::emitDefiniteFailure(
@@ -1233,7 +1233,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 
   Operation *target = payload.front();
   Location loc = target->getLoc();
-  ErrorCheckingTrackingListener listener(state);
+  TrackingListener listener(state);
   //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
   {
     RewritePatternSet patterns(getContext());
@@ -1308,7 +1308,7 @@ transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
     ::mlir::transform::TransformState &state) {
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  ErrorCheckingTrackingListener listener(state);
+  TrackingListener listener(state);
   rewriter.setListener(&listener);
   if (failed(
           eliminateEmptyTensors(rewriter, target, getBufferizationOptions()))) {
