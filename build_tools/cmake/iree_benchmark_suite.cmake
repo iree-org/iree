@@ -173,7 +173,7 @@ endfunction()
 # requirements (e.g., big-core vs. little-core).
 #
 function(iree_benchmark_suite)
-  if(NOT IREE_BUILD_BENCHMARKS)
+  if(NOT IREE_BUILD_LEGACY_BENCHMARKS)
     return()
   endif()
 
@@ -365,7 +365,7 @@ function(iree_benchmark_suite)
       set(_COMPILE_STATS_VMFB_FILE
         "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME_WITH_HASH}-compile-stats.vmfb"
       )
-      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_COMPILATION_TARGET_NAME}")
+      if(IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_COMPILATION_TARGET_NAME}")
         iree_bytecode_module(
           NAME
             "${_COMPILE_STATS_COMPILATION_NAME}"
@@ -398,7 +398,7 @@ function(iree_benchmark_suite)
         add_custom_target("${_FRIENDLY_TARGET_NAME}")
       endif()
       add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_COMPILATION_TARGET_NAME}")
-      if(IREE_ENABLE_COMPILATION_BENCHMARKS)
+      if(IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS)
         add_dependencies("${_FRIENDLY_TARGET_NAME}"
           "${_COMPILE_STATS_COMPILATION_TARGET_NAME}")
       endif()

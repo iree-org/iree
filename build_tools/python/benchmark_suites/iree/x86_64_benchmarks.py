@@ -68,7 +68,8 @@ class Linux_x86_64_Benchmarks(object):
         module_execution_configs.get_elf_local_task_config(1),
         module_execution_configs.get_elf_local_task_config(8),
         # We use (MAX_CORE - 2) here to determine the maximum number of threads to use on a NUMA node.
-        module_execution_configs.get_elf_local_task_config(13),
+        # 13 threads are currently disabled until we switch to using c2-standard-60.
+        # module_execution_configs.get_elf_local_task_config(13),
     ]
     run_configs_large = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=gen_configs_large,

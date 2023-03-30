@@ -132,7 +132,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -210,7 +210,7 @@ jobs:
       # Note: this will first try to grab a cache entry for this exact commit
       #       then it will fall back to the latest for any commit.
       - name: "Fetching cache (CMake/ccache)"
-        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+        uses: actions/cache/restore@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         with:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_windows_${{ github.sha }}
@@ -220,9 +220,9 @@ jobs:
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
-        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
         with:
-          python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
+          python-version: "3.10" # Needs pybind >= 2.10.1 for Python >= 3.11
       - name: "Installing Python packages"
         run: |
           python3 -m venv .venv
@@ -255,7 +255,7 @@ jobs:
       # Write cache (if configured to) after all other steps are finished.
       - name: "Saving cache (CMake/ccache)"
         if: needs.setup.outputs.write-caches == '1'
-        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+        uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         with:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_windows_${{ github.sha }}
@@ -264,7 +264,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on:
-      - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}  # must come first
+      - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }} # must come first
       - runner-group=postsubmit
       - os-family=macOS
     env:
@@ -308,7 +308,7 @@ jobs:
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
-        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
         with:
           python-version: "3.10"
           cache: "pip"
@@ -323,7 +323,7 @@ jobs:
       # Note: this will first try to grab a cache entry for this exact commit
       #       then it will fall back to the latest for any commit.
       - name: "Fetching cache (CMake/ccache)"
-        uses: actions/cache/restore@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+        uses: actions/cache/restore@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         with:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_macos_${{ github.sha }}
@@ -351,7 +351,7 @@ jobs:
       # Write cache (if configured to) after all other steps are finished.
       - name: "Saving cache (CMake/ccache)"
         if: needs.setup.outputs.write-caches == '1'
-        uses: actions/cache/save@58c146cc91c5b9e778e71775dfe9bf1442ad9a12 # v3.2.3
+        uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         with:
           path: ${{ github.workspace }}/.ccache
           key: ccache_all_macos_${{ github.sha }}
@@ -360,7 +360,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -383,7 +383,7 @@ jobs:
     needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -413,7 +413,7 @@ jobs:
     needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
@@ -513,7 +513,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -536,7 +536,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:21f3a22baf094e0bc5ff6598b465d3b6a1b765861959e6412b6cfc395634a1e9 \
             build_tools/cmake/build_tf_binaries.sh
           echo "binaries-dir=${IREE_TF_BINARIES_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
       - name: "Creating archive of binaries"
@@ -560,7 +560,7 @@ jobs:
     needs: [setup, build_all, build_tf_integrations]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -591,7 +591,7 @@ jobs:
       - name: "Running TF integrations tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:21f3a22baf094e0bc5ff6598b465d3b6a1b765861959e6412b6cfc395634a1e9 \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -599,7 +599,7 @@ jobs:
     needs: [setup, build_all, build_tf_integrations]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
@@ -633,7 +633,7 @@ jobs:
             --env IREE_LLVM_CPU_DISABLE=1 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/frontends-nvidia@sha256:a0d8c3d918619c5c5519273e60b976b2ed03cb8000117d86911c41ba27a90988 \
+            gcr.io/iree-oss/frontends-nvidia@sha256:b1f2b1bccf41e551b42113abff52ca568402cacfcfdba1fecee5fba78d2cfa06 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
@@ -642,12 +642,12 @@ jobs:
   ######################## Community Model Coverage ############################
   # Jobs that test IREE behavior on a set of models.
   ##############################################################################
-  # TODO(#11263): Drop this job once the IREE_BUILD_BENCHMARKS is removed.
+  # TODO(#11263): Drop this job once the IREE_BUILD_LEGACY_BENCHMARKS is removed.
   test_build_benchmark_suites:
     needs: [setup, build_all, build_tf_integrations]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -690,7 +690,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -706,9 +706,8 @@ jobs:
           packages: "iree-runtime iree-runtime-instrumented"
           output_dir: "${{ github.workspace }}/bindist"
           # Note when upgrading: Build just one Python version synced to our
-          # minimum. Note that 3.7 is the last with this naming convention.
-          # Look at the script for the full list.
-          override_python_versions: cp37-cp37m
+          # minimum.
+          override_python_versions: cp38-cp38
         run: |
           ./build_tools/python_deploy/build_linux_packages.sh
       # Note that it is just a trade-off decision to have this serialized
@@ -721,9 +720,8 @@ jobs:
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
           # Note when upgrading: Build just one Python version synced to our
-          # minimum. Note that 3.7 is the last with this naming convention.
-          # Look at the script for the full list.
-          override_python_versions: cp37-cp37m
+          # minimum.
+          override_python_versions: cp38-cp38m
         run: |
           ./build_tools/python_deploy/build_linux_packages.sh
 
@@ -731,7 +729,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -759,7 +757,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -811,7 +809,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -843,7 +841,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -872,7 +870,7 @@ jobs:
     needs: setup
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -905,7 +903,7 @@ jobs:
     needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -1014,7 +1012,7 @@ jobs:
     needs: [setup, build_all, build_tf_integrations]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -1082,7 +1080,7 @@ jobs:
     needs: [setup, build_e2e_test_artifacts]
     if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -1169,7 +1167,7 @@ jobs:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
     if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -1261,7 +1259,7 @@ jobs:
     needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -1350,7 +1348,7 @@ jobs:
     needs: [setup, build_all, build_e2e_test_artifacts]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
-      - self-hosted  # must come first
+      - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -1486,7 +1484,7 @@ jobs:
             exit 1
           fi
       - name: Posting to Discord
-        uses: sarisia/actions-status-discord@c193626e5ce172002b8161e116aa897de7ab5383 # v1.10.2
+        uses: sarisia/actions-status-discord@61114b793b460ee85fe38ad3fccc78c7ead38d55 # v1.11.1
         if: failure() && github.ref_name == 'main'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}

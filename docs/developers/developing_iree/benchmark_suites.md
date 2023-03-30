@@ -173,7 +173,18 @@ build_tools/benchmarks/benchmark_helper.py dump-cmds \
   --benchmark_id="<benchmark_id>"
 ```
 
-> TODO(#12215): Dump should also include searchable benchmark names.
+### Get Full List of Benchmarks
+
+The commands below output the full list of execution and compilation benchmarks,
+including the benchmark names and their flags:
+
+```sh
+build_tools/benchmarks/export_benchmark_config.py execution > exec_config.json
+build_tools/benchmarks/export_benchmark_config.py compilation > comp_config.json
+build_tools/benchmarks/benchmark_helper.py dump-cmds \
+  --execution_benchmark_config=exec_config.json \
+  --compilation_benchmark_config=comp_config.json
+```
 
 ## Fetching Benchmark Artifacts from CI
 

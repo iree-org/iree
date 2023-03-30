@@ -31,7 +31,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -39,6 +39,7 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -85,14 +86,15 @@ static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
 
 // Track temporary allocations that are never read from. If this is the case
 // it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(Operation *parentOp) {
+static void eraseDeadAllocAndStores(RewriterBase &rewriter,
+                                    Operation *parentOp) {
   std::vector<Operation *> opToErase;
   parentOp->walk([&](memref::AllocOp op) {
     if (allUsesAreStores(op, opToErase)) {
       opToErase.push_back(op.getOperation());
     }
   });
-  for (Operation *op : opToErase) op->erase();
+  for (Operation *op : opToErase) rewriter.eraseOp(op);
 }
 
 //===---------------------------------------------------------------------===//
@@ -103,9 +105,12 @@ transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
-  vector::transferOpflowOpt(target);
-  eraseDeadAllocAndStores(target);
-  return DiagnosedSilenceableFailure::success();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  vector::transferOpflowOpt(rewriter, target);
+  eraseDeadAllocAndStores(rewriter, target);
+  return listener.check(target->getLoc());
 }
 
 void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
@@ -148,6 +153,7 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
+  ADD_PATTERN(foldTensorSubsets, getFoldTensorSubsetsAttrName)
   ADD_PATTERN(licm, getLicmAttrName)
   ADD_PATTERN(linalgElementwiseGreedyFusion,
               getLinalgElementwiseGreedyFusionAttrName)
@@ -252,6 +258,10 @@ static void addFoldTensorEmptyExtract(RewritePatternSet &patterns) {
 
 static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
+}
+
+static void addFoldTensorSubsetsPatterns(RewritePatternSet &patterns) {
+  tensor::populateFoldTensorSubsetOpPatterns(patterns);
 }
 
 static void addEraseUnnecessaryTensorOperandsPatterns(
@@ -365,6 +375,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
+  if (getFoldTensorSubsets()) addFoldTensorSubsetsPatterns(patterns);
   if (getLinalgElementwiseGreedyFusion())
     linalg::populateElementwiseOpsFusionPatterns(patterns,
                                                  setFusedOpOperandLimit<3>);

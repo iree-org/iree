@@ -516,6 +516,16 @@ def LLVMCPUPeel :
       "mlir::iree_compiler::createLLVMCPUPeelPass()";
 }
 
+def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp"> {
+  let summary = "Pass to splitReduce linalg operations.";
+  let constructor = "mlir::iree_compiler::createLLVMCPUSplitReductionPass()";
+  let options = [
+    Option<"enableFpReductionReordering", "enable-fp-reduction-reordering",
+      "bool", /*default=*/"false",
+      "Flag to enable reduction reordering on floating points.">,
+  ];
+}
+
 def ConvertToLLVM :
     Pass<"iree-convert-to-llvm", "ModuleOp"> {
   let summary =

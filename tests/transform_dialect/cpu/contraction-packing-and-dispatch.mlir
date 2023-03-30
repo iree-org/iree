@@ -64,6 +64,7 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> (!pdl.operation)
 
   transform.structured.pack_greedily %matmul
-      gemm_packed_sizes = [8, 16, 32] gemm_inner_dims_order = [0, 1, 2]
+      matmul_packed_sizes = [8, 16, 32] 
+      matmul_inner_dims_order = [0, 1, 2]
     : (!pdl.operation) -> !transform.op<"linalg.generic">
 }
