@@ -40,6 +40,26 @@ using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 //===----------------------------------------------------------------------===//
 
 namespace {
+struct LinalgVectorLoweringPass
+    : public LinalgVectorLoweringBase<LinalgVectorLoweringPass> {
+  LinalgVectorLoweringPass(int64_t vectorLoweringStage = 0) {
+    this->vectorLoweringStage.setValue(vectorLoweringStage);
+  }
+  LinalgVectorLoweringPass(const LinalgVectorLoweringPass &pass) {}
+  LinalgVectorLoweringPass(const LinalgVectorLoweringPassOptions &options) {
+    this->vectorLoweringStage = options.vectorLoweringStage;
+    this->splitVectorTransfersTo = options.splitVectorTransfersTo;
+    this->lowerVectorTransposeTo = options.lowerVectorTransposeTo;
+    this->lowerVectorTransposeToAVX2 = options.lowerVectorTransposeToAVX2;
+    this->lowerVectorMultiReductionTo = options.lowerVectorMultiReductionTo;
+    this->lowerVectorContractionTo = options.lowerVectorContractionTo;
+    this->unrollVectorTransfers = options.unrollVectorTransfers;
+    this->maxTransferRank = options.maxTransferRank;
+  }
+
+  void runOnOperation() override;
+};
+
 void LinalgVectorLoweringPass::runOnOperation() {
   LLVM_DEBUG(llvm::dbgs() << "\n ---- Stage : " << vectorLoweringStage;);
   vector::VectorTransposeLowering vectorTransposeLowering =
@@ -122,6 +142,7 @@ void LinalgVectorLoweringPass::runOnOperation() {
     return signalPassFailure();
   }
 }
+}  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgVectorLoweringPass(int64_t vectorLoweringStage) {
