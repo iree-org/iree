@@ -63,8 +63,8 @@ cd build-targets/linux-x86_64
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_BUILD_BENCHMARKS=ON \
-  -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON
+  -DIREE_BUILD_LEGACY_BENCHMARKS=ON \
+  -DIREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS=ON
 
 "${CMAKE_BIN}" --build . --target iree-benchmark-import-models -- -k 0
 "${CMAKE_BIN}" --build . --target iree-benchmark-suites-linux-x86_64 -- -k 0
@@ -89,8 +89,8 @@ cd build-targets/linux-riscv
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_BUILD_BENCHMARKS=ON \
-  -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON
+  -DIREE_BUILD_LEGACY_BENCHMARKS=ON \
+  -DIREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS=ON
 
 "${CMAKE_BIN}" --build . --target iree-benchmark-suites-linux-riscv -- -k 0
 # --------------------------------------------------------------------------- #
@@ -114,8 +114,8 @@ cd build-targets/linux-cuda
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_BUILD_BENCHMARKS=ON \
-  -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON
+  -DIREE_BUILD_LEGACY_BENCHMARKS=ON \
+  -DIREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS=ON
 
 "${CMAKE_BIN}" --build . --target iree-benchmark-suites-linux-cuda -- -k 0
 # --------------------------------------------------------------------------- #

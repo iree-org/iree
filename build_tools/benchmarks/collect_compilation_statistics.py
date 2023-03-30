@@ -7,7 +7,7 @@
 """Collect compilation statistics from benchmark suites.
 
 The benchmark suites need to be built with ninja and enable the CMake option
-IREE_ENABLE_COMPILATION_BENCHMARKS.
+IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS.
 """
 
 import pathlib

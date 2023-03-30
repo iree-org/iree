@@ -95,11 +95,11 @@ First you need to have [`iree-import-tflite`](https://openxla.github.io/iree/get
 [`iree-import-tf`](https://openxla.github.io/iree/getting-started/tensorflow/),
 and `requests` in your python environment. Then you can build the target
 `iree-benchmark-suites` to generate the required files. Note that this target
-requires the `IREE_BUILD_BENCHMARKS` CMake option.
+requires the `IREE_BUILD_LEGACY_BENCHMARKS` CMake option.
 
 ```sh
 # Assume your IREE build directory is $IREE_BUILD_DIR and that cmake build was
-# configured with `-DIREE_BUILD_BENCHMARKS=On`.
+# configured with `-DIREE_BUILD_LEGACY_BENCHMARKS=On`.
 
 cmake --build $IREE_BUILD_DIR --target iree-benchmark-suites
 ```
@@ -124,8 +124,9 @@ benchmark results and generate the report. More details can be found
 
 Similar to [running benchmarks locally](#run-benchmark-locally), you need to
 first build the target `iree-benchmark-suites`. But in addition to
-`-DIREE_BUILD_BENCHMARKS=ON`, `-DIREE_ENABLE_COMPILATION_BENCHMARKS=ON` is also
-required. **Note that using [Ninja](https://ninja-build.org/) to build the
+`-DIREE_BUILD_LEGACY_BENCHMARKS=ON`,
+`-DIREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS=ON` is also required.
+**Note that using [Ninja](https://ninja-build.org/) to build the
 project is mandatory**, becuase the tools rely on `.ninja_log` to collect the
 compilation time. For example:
 
@@ -135,8 +136,8 @@ cmake -GNinja -S ${IREE_SOURCE_DIR} -B ${IREE_BUILD_DIR}
    -DCMAKE_C_COMPILER=clang \
    -DCMAKE_CXX_COMPILER=clang++ \
    -DIREE_ENABLE_LLD=ON \
-   -DIREE_BUILD_BENCHMARKS=ON \
-   -DIREE_ENABLE_COMPILATION_BENCHMARKS=ON
+   -DIREE_BUILD_LEGACY_BENCHMARKS=ON \
+   -DIREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS=ON
 ```
 
 Then run the command below to collect the statistics:

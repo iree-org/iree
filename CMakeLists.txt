@@ -87,10 +87,21 @@ option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility sh
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
 # Properties building and controlling benchmark suites.
-option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
-# TODO(pzread): Currently IREE_ENABLE_COMPILATION_BENCHMARKS needs
-# IREE_BUILD_BENCHMARKS. Eventually we will decouple them.
-cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "Builds IREE benchmark suites for compilation statistics." OFF ${IREE_BUILD_BENCHMARKS} OFF)
+# Leave the old name around for a bit so that people can update their configs
+# and previous cached values will automatically carry over.
+# TODO(pzread): Remove this option after 2023-04-13
+option(IREE_BUILD_BENCHMARKS "DEPRECATED alias for IREE_BUILD_LEGACY_BENCHMARKS" OFF)
+option(IREE_BUILD_LEGACY_BENCHMARKS "Builds legacy IREE benchmark suites." "${IREE_BUILD_BENCHMARKS}")
+cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "DEPRECATED alias for IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS" OFF "${IREE_BUILD_BENCHMARKS}" OFF)
+cmake_dependent_option(
+  IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS
+  "Builds legacy IREE benchmark suites for compilation statistics."
+  # Read the value from the old name as fallback so people can update their configs.
+  "${IREE_ENABLE_COMPILATION_BENCHMARKS}"
+  # Only available if IREE_BUILD_LEGACY_BENCHMARKS is set (or by IREE_BUILD_BENCHMARKS transitively).
+  "${IREE_BUILD_LEGACY_BENCHMARKS}"
+  OFF
+)
 
 option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 
@@ -606,7 +617,7 @@ endif()
 # dependencies to them.
 #-------------------------------------------------------------------------------
 
-if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
+if(IREE_BUILD_LEGACY_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
   # Add top-level custom targets to drive generating benchmark suites.
 
   # iree-benchmark-import-models imports benchmark models from their source
@@ -621,7 +632,7 @@ if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
 endif()
 
 # TODO(#11263): This conditional block should be merged with the block above
-# once we remove IREE_BUILD_BENCHMARKS.
+# once we remove IREE_BUILD_LEGACY_BENCHMARKS.
 if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   # iree-e2e-compile-stats-suites compiles the benchmark models with specific
   # flags to collect the compilation statistics.
@@ -845,7 +856,7 @@ endif()
 
 add_subdirectory(build_tools/embed_data/)
 
-if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
+if(IREE_BUILD_LEGACY_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
   find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
   if(IREE_IMPORT_TFLITE_PATH)
     message(STATUS "Found ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
@@ -863,7 +874,7 @@ endif()
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
 add_subdirectory(tests EXCLUDE_FROM_ALL)
 
-if(IREE_BUILD_BENCHMARKS)
+if(IREE_BUILD_LEGACY_BENCHMARKS)
   add_subdirectory(benchmarks)
 endif()
 
