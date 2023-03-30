@@ -70,7 +70,6 @@ def _dump_cmds_of_generation_config(
         model=imported_model.model)
     import_cmd_str = _convert_to_cmd_string(import_cmds)
 
-  # TODO(#12215): Print benchmark name to make them searchable by keywords.
   # Insert a blank line after each command to help read with line wrap.
   return [
       "Compile Module:", compile_cmd_str, "", "Import Model:", import_cmd_str,
@@ -89,7 +88,6 @@ def _dump_cmds_from_run_config(
 
   run_cmds = [run_config.tool.value, f"--module={module_path}"]
   run_cmds += run_config.materialize_run_flags()
-  # TODO(#12215): Include benchmark name to make them searchable by keywords.
   # Insert a blank line after the command to help read with line wrap.
   lines = ["Run Module:", _convert_to_cmd_string(run_cmds), ""]
   lines += _dump_cmds_of_generation_config(gen_config=gen_config,
@@ -116,6 +114,7 @@ def _dump_cmds_handler(e2e_test_artifacts_dir: pathlib.Path,
         lines.append("################")
         lines.append("")
         lines.append(f"Execution Benchmark ID: {run_config.composite_id}")
+        lines.append(f"Name: {run_config}")
         lines.append(f"Target Device: {target_device}")
         lines.append("")
         lines += _dump_cmds_from_run_config(run_config=run_config,
@@ -133,6 +132,7 @@ def _dump_cmds_handler(e2e_test_artifacts_dir: pathlib.Path,
       lines.append("################")
       lines.append("")
       lines.append(f"Compilation Benchmark ID: {gen_config.composite_id}")
+      lines.append(f"Name: {gen_config}")
       lines.append("")
       lines += _dump_cmds_of_generation_config(gen_config=gen_config,
                                                root_path=e2e_test_artifacts_dir)
