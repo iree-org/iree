@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
@@ -240,6 +241,18 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   spirvPM.addPass(spirv::createSPIRVRewriteInsertsPass());
   spirvPM.addPass(spirv::createSPIRVCanonicalizeGLPass());
   spirvPM.addPass(spirv::createSPIRVUpdateVCEPass());
+}
+
+void addSPIRVTransformDialectPasses(OpPassManager &passManager) {
+  // Give control to the transform dialect.
+  passManager.addPass(
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
+
+  // Dropping the schedule is needed:
+  //   1. if we want to embed the transform in the module: we should drop the
+  //      schedule once applied.
+  //   2. if transform.do_not_dce_operands ops are introduced.
+  passManager.addPass(createDropSchedulePass());
 }
 
 //===----------------------------------------------------------------------===//
@@ -520,6 +533,15 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
   // forwarding, shape casting and casting op cancelling.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+}
+
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
+  addSPIRVTransformDialectPasses(pm);
+
+  // Run SPIRVVectorize pass additionally to convert vectors into forms needed
+  // for SPIR-V.
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 
 //===----------------------------------------------------------------------===//

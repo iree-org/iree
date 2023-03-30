@@ -709,6 +709,9 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm);
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVAnnotateWinogradLoopsPass();
 
+/// Pass pipeline to lower IREE HAL executables via transform dialect schedules.
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm);
+
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
