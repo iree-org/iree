@@ -150,6 +150,7 @@ void transform_dialect::ApplyPatternsOp::build(
               getEraseUnnecessaryTensorOperandsAttrName)
   ADD_PATTERN(expandMemrefStridedMetadata,
               getExpandMemrefStridedMetadataAttrName)
+  ADD_PATTERN(extractAddressComputations, getExtractAddressComputationsAttrName)
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
@@ -246,6 +247,10 @@ static void addLowerTransferOpPermutationsPatterns(
 
 static void addLowerVectorMasksPatterns(RewritePatternSet &patterns) {
   vector::populateVectorMaskLoweringPatternsForSideEffectingOps(patterns);
+}
+
+static void addExtractAddressComputationsPatterns(RewritePatternSet &patterns) {
+  memref::populateExtractAddressComputationsPatterns(patterns);
 }
 
 static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
@@ -372,6 +377,8 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getExpandMemrefStridedMetadata())
     memref::populateExpandStridedMetadataPatterns(patterns);
+  if (getExtractAddressComputations())
+    addExtractAddressComputationsPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
