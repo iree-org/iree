@@ -100,6 +100,8 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-flow-enable-data-tiling"
+  LABELS
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -346,6 +348,7 @@ iree_generated_trace_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+    "noriscv"
 )
 
 iree_generated_trace_runner_test(

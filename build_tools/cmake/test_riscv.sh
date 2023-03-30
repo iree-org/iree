@@ -38,6 +38,7 @@ declare -a label_exclude_args=(
   "^vulkan_uses_vk_khr_shader_float16_int8$"
   "^requires-filesystem$"
   "^requires-dtz$"
+  "^noriscv$"
 )
 
 # Excluding mobilebert, fp16, and lowering_config regression
