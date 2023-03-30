@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/ADTExtras.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -65,7 +64,7 @@ static LogicalResult verifyDispatchWorkload(
              << workgroupCount.getNumArguments()
              << " arguments but dispatch provides " << workload.size();
     }
-    for (auto [idx, expectedType, actualType] : enumerate_zip_equal(
+    for (auto [idx, expectedType, actualType] : llvm::enumerate(
              workgroupCount.getArgumentTypes(), workload.getTypes())) {
       if (expectedType != actualType) {
         return op->emitOpError()
