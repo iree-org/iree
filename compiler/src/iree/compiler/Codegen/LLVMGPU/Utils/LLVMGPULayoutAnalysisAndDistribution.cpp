@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stack>
+
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -232,7 +234,7 @@ static MMAType getMMAType(ArrayRef<int64_t> aShape, ArrayRef<int64_t> bShape,
   return MMAType::NONE;
 }
 
-void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
+void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix, Value dMatrix,
                   DenseMap<Value, Layout> &layoutMap) {
   // First determine which variant of MMA this op is most suitable for
   auto aType = aMatrix.getType().cast<ShapedType>();
@@ -261,6 +263,7 @@ void setMMALayout(Value aMatrix, Value bMatrix, Value cMatrix,
   setLayout(aMatrix, MMAMatrixType::AMatrix, "aMatrix");
   setLayout(bMatrix, MMAMatrixType::BMatrix, "bMatrix");
   setLayout(cMatrix, MMAMatrixType::CMatrix, "cMatrix");
+  setLayout(dMatrix, MMAMatrixType::CMatrix, "dMatrix");
 }
 
 void propagateLayoutToReduceBroadcastTranspose(
@@ -327,6 +330,21 @@ checkForReduceBroadcastTranspose(vector::MultiDimReductionOp reductionOp) {
   return std::make_tuple(broadcastOp, transposeOp);
 }
 
+void propagateLayoutToFor(scf::ForOp forOp,
+                          DenseMap<Value, Layout> &layoutMap) {
+  for (auto argIndex : llvm::enumerate(forOp.getRegionIterArgs())) {
+    BlockArgument &arg = argIndex.value();
+    if (!layoutMap.count(arg)) continue;
+    OpOperand &operand = forOp.getOpOperandForRegionIterArg(arg);
+    Value result = forOp.getResult(argIndex.index());
+    Layout newLayout = layoutMap.at(arg);
+    layoutMap.try_emplace(operand.get(), newLayout);
+    layoutMap.try_emplace(result, newLayout);
+    layoutMap.at(operand.get()).debugPrint("for operand");
+    layoutMap.at(result).debugPrint("for result");
+  }
+}
+
 void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
   if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
     auto [broadcastOp, transposeOp] =
@@ -334,13 +352,16 @@ void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
     propagateLayoutToReduceBroadcastTranspose(reductionOp, broadcastOp,
                                               transposeOp, layoutMap);
   }
+  if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+    propagateLayoutToFor(forOp, layoutMap);
+  }
 }
 
 void distributeTransferReads(vector::TransferReadOp readOp,
                              DenseMap<Value, Layout> &layoutMap,
                              DenseMap<Value, Value> &simdToSimtMap,
                              OpBuilder &rewriter,
-                             SmallVectorImpl<Operation *> &ops) {
+                             llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(readOp);
   Value result = readOp.getResult();
@@ -381,13 +402,13 @@ void distributeTransferReads(vector::TransferReadOp readOp,
             Value colIndex = rewriter.create<AffineApplyOp>(
                 loc, colMap,
                 SmallVector<Value>{threadIdX, threadIdY, threadIdZ});
-            if (layout.rank == 1) indices.back() = rowIndex;
-            if (layout.rank == 2) {
-              assert(indices.size() >= 2);
-              indices[indices.size() - 2] = rowIndex;
-              indices[indices.size() - 1] = colIndex;
+            SmallVector<Value> newIndices{indices.begin(), indices.end()};
+            for (size_t s = indices.size() - 2; s <= indices.size() - 1; s++) {
+              Value simtIndex = s == indices.size() - 2 ? rowIndex : colIndex;
+              newIndices[s] =
+                  rewriter.create<arith::AddIOp>(loc, simtIndex, indices[s]);
             }
-            Value el = rewriter.create<memref::LoadOp>(loc, source, indices);
+            Value el = rewriter.create<memref::LoadOp>(loc, source, newIndices);
             auto vectorType = VectorType::get({1}, elementType);
             Value v = rewriter.create<vector::BroadcastOp>(loc, vectorType, el);
             SmallVector<int64_t> offsets{
@@ -401,14 +422,14 @@ void distributeTransferReads(vector::TransferReadOp readOp,
     }
   }
   simdToSimtMap.try_emplace(result, vector);
-  ops.push_back(readOp);
+  ops.insert(readOp);
 }
 
 void distributeContracts(vector::ContractionOp contractOp,
                          DenseMap<Value, Layout> &layoutMap,
                          DenseMap<Value, Value> &simdToSimtMap,
                          OpBuilder &rewriter,
-                         SmallVectorImpl<Operation *> &ops) {
+                         llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(contractOp);
   Value lhs = contractOp.getLhs();
@@ -418,6 +439,13 @@ void distributeContracts(vector::ContractionOp contractOp,
   Value rhs = contractOp.getRhs();
   if (!layoutMap.count(rhs)) return;
   if (!simdToSimtMap.count(rhs)) return;
+  Value acc = contractOp.getAcc();
+  APFloat floatValue(0.0);
+  bool accIsConstant{true};
+  if (!matchPattern(acc, m_ConstantFloat(&floatValue))) {
+    if (!simdToSimtMap.count(acc)) return;
+    accIsConstant = false;
+  }
   Location loc = contractOp.getLoc();
   Value contractResult = contractOp.getResult();
   Layout lhsLayout = layoutMap.at(lhs);
@@ -438,8 +466,14 @@ void distributeContracts(vector::ContractionOp contractOp,
   auto cType = VectorType::get({vecShape[2], vecShape[3]}, elementType);
   for (int i = 0; i < M; i++) {
     for (int j = 0; j < N; j++) {
-      Value cMatrix = rewriter.create<arith::ConstantOp>(
-          loc, cType, rewriter.getZeroAttr(cType));
+      Value cMatrix;
+      if (accIsConstant) {
+        cMatrix = rewriter.create<arith::ConstantOp>(
+            loc, cType, DenseElementsAttr::get(cType, floatValue));
+      } else {
+        cMatrix = rewriter.create<vector::ExtractOp>(
+            loc, simdToSimtMap.at(acc), SmallVector<int64_t>{i, j});
+      }
       for (int k = 0; k < K; k++) {
         Value aMatrix = rewriter.create<vector::ExtractOp>(
             loc, simdToSimtMap.at(lhs), SmallVector<int64_t>{i, k});
@@ -454,14 +488,14 @@ void distributeContracts(vector::ContractionOp contractOp,
     }
   }
   simdToSimtMap.try_emplace(contractResult, result);
-  ops.push_back(contractOp);
+  ops.insert(contractOp);
 }
 
 void distributeTransferWrites(vector::TransferWriteOp writeOp,
                               DenseMap<Value, Layout> &layoutMap,
                               DenseMap<Value, Value> &simdToSimtMap,
                               OpBuilder &rewriter,
-                              SmallVectorImpl<Operation *> &ops) {
+                              llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(writeOp);
   Value vector = writeOp.getVector();
@@ -499,19 +533,19 @@ void distributeTransferWrites(vector::TransferWriteOp writeOp,
             Value colIndex = rewriter.create<AffineApplyOp>(
                 loc, colMap,
                 SmallVector<Value>{threadIdX, threadIdY, threadIdZ});
-            if (layout.rank == 1) indices.back() = rowIndex;
-            if (layout.rank == 2) {
-              assert(indices.size() >= 2);
-              indices[indices.size() - 2] = rowIndex;
-              indices[indices.size() - 1] = colIndex;
+            SmallVector<Value> newIndices{indices.begin(), indices.end()};
+            for (size_t s = indices.size() - 2; s <= indices.size() - 1; s++) {
+              Value simtIndex = s == indices.size() - 2 ? rowIndex : colIndex;
+              newIndices[s] =
+                  rewriter.create<arith::AddIOp>(loc, simtIndex, indices[s]);
             }
-            rewriter.create<memref::StoreOp>(loc, v, source, indices);
+            rewriter.create<memref::StoreOp>(loc, v, source, newIndices);
           }
         }
       }
     }
   }
-  ops.push_back(writeOp);
+  ops.insert(writeOp);
 }
 
 static bool isLaneId(int dimType) {
@@ -575,7 +609,7 @@ void distributeReductionBroadcastTranspose(
     vector::MultiDimReductionOp reductionOp, vector::BroadcastOp broadcastOp,
     vector::TransposeOp transposeOp, DenseMap<Value, Layout> &layoutMap,
     DenseMap<Value, Value> &simdToSimtMap, OpBuilder &rewriter,
-    SmallVectorImpl<Operation *> &ops) {
+    llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(reductionOp);
   Value source = reductionOp.getSource();
@@ -693,13 +727,119 @@ void distributeReductionBroadcastTranspose(
   else
     simdToSimtMap.try_emplace(broadcastOp.getResult(), output);
 
-  ops.push_back(reductionOp);
-  ops.push_back(broadcastOp);
-  if (transposeOp) ops.push_back(transposeOp);
+  ops.insert(reductionOp);
+  ops.insert(broadcastOp);
+  if (transposeOp) ops.insert(transposeOp);
 }
 
-static void eraseOps(SmallVectorImpl<Operation *> &opsToErase,
-                     IRRewriter &rewriter) {
+static void replaceForOpWithNewSignature(
+    RewriterBase &rewriter, scf::ForOp loop, ValueRange newIterOperands,
+    DenseMap<Value, Layout> &layoutMap, DenseMap<Value, Value> &simdToSimtMap) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(loop);
+
+  // Create a new loop before the existing one, with the extra operands.
+  // We will be using dummy values instead of the old operands
+  SmallVector<Value> dummyOperands, newOperands;
+  auto operands = llvm::to_vector<4>(loop.getIterOperands());
+  for (auto operand : operands) {
+    Value zero = rewriter.create<arith::ConstantOp>(
+        loop.getLoc(), rewriter.getZeroAttr(operand.getType()));
+    dummyOperands.push_back(zero);
+    newOperands.push_back(zero);
+  }
+
+  newOperands.append(newIterOperands.begin(), newIterOperands.end());
+  scf::ForOp newLoop = rewriter.create<scf::ForOp>(
+      loop.getLoc(), loop.getLowerBound(), loop.getUpperBound(), loop.getStep(),
+      newOperands);
+  newLoop.getBody()->erase();
+
+  newLoop.getLoopBody().getBlocks().splice(
+      newLoop.getLoopBody().getBlocks().begin(),
+      loop.getLoopBody().getBlocks());
+  for (Value operand : newIterOperands)
+    newLoop.getBody()->addArgument(operand.getType(), operand.getLoc());
+
+  // Replace old results and propagate layouts
+  int numOldResults = loop.getNumResults();
+  for (auto it : llvm::zip(loop.getResults(),
+                           newLoop.getResults().take_front(numOldResults))) {
+    if (layoutMap.count(std::get<0>(it)))
+      layoutMap.try_emplace(std::get<1>(it), layoutMap.at(std::get<0>(it)));
+    rewriter.replaceAllUsesWith(std::get<0>(it), std::get<1>(it));
+  }
+
+  // Propagate layout + mapping from old to new block args and results
+  auto bbArgs = newLoop.getRegionIterArgs();
+  auto results = newLoop.getResults();
+  for (int i = 0; i < numOldResults; i++) {
+    if (layoutMap.count(bbArgs[i]))
+      layoutMap.try_emplace(bbArgs[i + numOldResults], layoutMap.at(bbArgs[i]));
+    simdToSimtMap.try_emplace(bbArgs[i], bbArgs[i + numOldResults]);
+    if (layoutMap.count(results[i]))
+      layoutMap.try_emplace(results[i + numOldResults],
+                            layoutMap.at(results[i]));
+    simdToSimtMap.try_emplace(results[i], results[i + numOldResults]);
+  }
+
+  rewriter.eraseOp(loop);
+  return;
+}
+
+void distributeFor(scf::ForOp forOp, DenseMap<Value, Layout> &layoutMap,
+                   DenseMap<Value, Value> &simdToSimtMap, IRRewriter &rewriter,
+                   llvm::SetVector<Operation *> &ops) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(forOp);
+
+  SmallVector<Value> newOperands;
+  for (const auto &operand : llvm::enumerate(forOp.getIterOperands())) {
+    APFloat floatValue(0.0);
+    if (matchPattern(operand.value(), m_ConstantFloat(&floatValue))) {
+      if (!layoutMap.count(operand.value())) continue;
+      Layout layout = layoutMap.at(operand.value());
+      Type elementType =
+          operand.value().getType().cast<VectorType>().getElementType();
+      auto vType = VectorType::get(
+          {layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
+           layout.shape[DimType::VecIdZ] * layout.shape[DimType::VecIdY],
+           layout.shape[DimType::VecIdX]},
+          elementType);
+      Value acc = rewriter.create<arith::ConstantOp>(
+          forOp.getLoc(), DenseElementsAttr::get(vType, floatValue));
+      simdToSimtMap.try_emplace(operand.value(), acc);
+    }
+    if (!simdToSimtMap.count(operand.value())) {
+      continue;
+    }
+    newOperands.push_back(simdToSimtMap.at(operand.value()));
+  }
+  replaceForOpWithNewSignature(rewriter, forOp, newOperands, layoutMap,
+                               simdToSimtMap);
+}
+
+void distributeYield(scf::YieldOp yieldOp, DenseMap<Value, Layout> &layoutMap,
+                     DenseMap<Value, Value> &simdToSimtMap,
+                     IRRewriter &rewriter, llvm::SetVector<Operation *> &ops) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(yieldOp);
+
+  // Update yield op with additional operand
+  auto loop = cast<scf::ForOp>(yieldOp->getParentOp());
+  auto yieldOperands = llvm::to_vector<4>(yieldOp.getOperands());
+  for (const auto &operand : llvm::enumerate(yieldOp.getOperands())) {
+    if (!simdToSimtMap.count(operand.value())) continue;
+    // Replace the yield of old value with the for op argument to make it easier
+    // to remove the dead code.
+    yieldOperands[operand.index()] = loop.getIterOperands()[operand.index()];
+    yieldOperands.push_back(simdToSimtMap.at(operand.value()));
+  }
+  rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, yieldOperands);
+}
+
+static void eraseOps(llvm::SetVector<Operation *> &opsToErase,
+                     func::FuncOp funcOp, IRRewriter &rewriter) {
   for (int i = opsToErase.size() - 1; i >= 0; i--) {
     assert(opsToErase[i]->getUses().empty());
     rewriter.eraseOp(opsToErase[i]);
@@ -710,24 +850,36 @@ static void eraseOps(SmallVectorImpl<Operation *> &opsToErase,
 
 void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
                                      func::FuncOp funcOp) {
-  // First compute the layouts (set MMA layouts and propagate to rest)
+  // First walk through all the MMA ops and set their layouts
   DenseMap<Value, Layout> layoutMap;
   funcOp.walk([&](Operation *op) {
     if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
       Value lhs = contractOp.getLhs();
       Value rhs = contractOp.getRhs();
+      Value acc = contractOp.getAcc();
       Value result = contractOp.getResult();
-      setMMALayout(lhs, rhs, result, layoutMap);
-    } else {
-      propagateLayout(op, layoutMap);
+      setMMALayout(lhs, rhs, acc, result, layoutMap);
     }
+    return WalkResult::advance();
+  });
+
+  // Next propagate the MMA layouts
+  funcOp.walk([&](Operation *op) {
+    if (auto contractOp = dyn_cast<vector::ContractionOp>(op))
+      return WalkResult::advance();
+    propagateLayout(op, layoutMap);
     return WalkResult::advance();
   });
 
   // Apply SIMD to SIMT conversion
   DenseMap<Value, Value> simdToSimtMap;
-  SmallVector<Operation *> opsToErase;
-  funcOp.walk([&](Operation *op) {
+  llvm::SetVector<Operation *> opsToErase;
+  std::stack<Operation *> opsToTraverse;
+  for (Operation &op : llvm::reverse(funcOp.getBody().front().getOperations()))
+    opsToTraverse.push(&op);
+  while (!opsToTraverse.empty()) {
+    Operation *op = opsToTraverse.top();
+    opsToTraverse.pop();
     if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
       distributeTransferReads(readOp, layoutMap, simdToSimtMap, rewriter,
                               opsToErase);
@@ -747,11 +899,19 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
           reductionOp, broadcastOp, transposeOp, layoutMap, simdToSimtMap,
           rewriter, opsToErase);
     }
-    return WalkResult::advance();
-  });
+    if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+      for (Operation &op :
+           llvm::reverse(forOp.getRegion().front().getOperations()))
+        opsToTraverse.push(&op);
+      distributeFor(forOp, layoutMap, simdToSimtMap, rewriter, opsToErase);
+    }
+    if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
+      distributeYield(yieldOp, layoutMap, simdToSimtMap, rewriter, opsToErase);
+    }
+  }
 
   // Erase old ops
-  eraseOps(opsToErase, rewriter);
+  eraseOps(opsToErase, funcOp, rewriter);
 }
 
 }  // namespace mlir::iree_compiler
