@@ -104,16 +104,23 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   llvm::raw_ostream &output = emitter.ostream();
   std::string moduleName = moduleOp.getName().str();
 
-  output << "struct " << moduleName << "_t {\n";
-  output << "iree_allocator_t allocator;\n";
-  output << "};\n";
-
-  output << "struct " << moduleName << "_state_t {\n";
-
   // Returns |count| or 1 if |count| == 0.
   // Some compilers (MSVC) don't support zero-length struct fields on the
   // interior of structs (just VLA at the tail).
   auto countOrEmpty = [](uint32_t count) { return count ? count : 1; };
+
+  const int64_t numTypes = moduleOp.getOperation()
+                               ->getAttr("vm.num_types")
+                               .cast<IntegerAttr>()
+                               .getInt();
+
+  output << "struct " << moduleName << "_t {\n";
+  output << "iree_allocator_t allocator;\n";
+  output << "const iree_vm_ref_type_descriptor_t* types["
+         << countOrEmpty(numTypes) << "];\n";
+  output << "};\n";
+
+  output << "struct " << moduleName << "_state_t {\n";
 
   auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
   output << "iree_allocator_t allocator;\n";

@@ -46,8 +46,14 @@
     body                                     \
   } typename;
 
+// Get an array element
+#define EMITC_ARRAY_ELEMENT(array, index) (array)[index]
+
 // Get the address of an array element
 #define EMITC_ARRAY_ELEMENT_ADDRESS(array, index) &(array)[index]
+
+// Assign a value to an array at a given index
+#define EMITC_ARRAY_ELEMENT_ASSIGN(array, index, value) (array)[index] = (value)
 
 // Unary operators
 #define EMITC_UNARY(op, arg) (op(arg))

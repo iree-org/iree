@@ -23,3 +23,12 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
     ],
 )
+
+iree_compiler_cc_library(
+    name = "TypeTable",
+    srcs = ["TypeTable.cpp"],
+    hdrs = ["TypeTable.h"],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/VM/IR",
+    ],
+)

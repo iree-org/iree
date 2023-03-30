@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
+#include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/schemas/bytecode_module_def_builder.h"
@@ -60,11 +61,6 @@ static constexpr int kDefaultRodataAlignment = 16;
 // This limit is rather arbitrary - we could support hundreds of MB of embedded
 // data at the risk of tripping the 31-bit FlatBuffer offset values.
 static constexpr int kMaxEmbeddedDataSize = 4 * 1024;
-
-struct TypeDef {
-  Type type;
-  std::string full_name;
-};
 
 // A rodata reference.
 // The archive file is empty if the data is to be embedded in the FlatBuffer.
@@ -129,51 +125,6 @@ static flatbuffers_uint8_vec_ref_t serializeEmbeddedData(
   }
 
   return flatbuffers_uint8_vec_end(fbb);
-}
-
-// Finds all types in the module and builds a type table mapping the index in
-// the vector to the type represented by the type ordinal.
-static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
-  llvm::DenseMap<Type, std::string> typeMap;
-  std::function<void(Type)> tryInsertType;
-  tryInsertType = [&](Type type) {
-    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
-      type = refPtrType.getObjectType();
-    }
-    if (typeMap.count(type)) return;
-    std::string str;
-    llvm::raw_string_ostream sstream(str);
-    type.print(sstream);
-    sstream.flush();
-    typeMap.try_emplace(type, str);
-    if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
-      assert(listType.getElementType());
-      tryInsertType(listType.getElementType());
-    }
-  };
-  for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
-    funcOp.walk([&](Operation *op) {
-      for (auto type : op->getOperandTypes()) tryInsertType(type);
-      for (auto type : op->getResultTypes()) tryInsertType(type);
-    });
-  }
-
-  std::vector<TypeDef> table;
-  table.reserve(typeMap.size());
-  for (const auto &typeString : typeMap) {
-    table.push_back(TypeDef{typeString.first, typeString.second});
-  }
-  llvm::stable_sort(
-      table, +[](const TypeDef &lhs, const TypeDef &rhs) {
-        // Always sort builtins above custom types.
-        if (lhs.full_name[0] != '!' && rhs.full_name[0] == '!') {
-          return true;
-        } else if (lhs.full_name[0] == '!' && rhs.full_name[0] != '!') {
-          return false;
-        }
-        return lhs.full_name.compare(rhs.full_name) < 0;
-      });
-  return table;
 }
 
 // Canonicalizes the module to its final form prior to emission.

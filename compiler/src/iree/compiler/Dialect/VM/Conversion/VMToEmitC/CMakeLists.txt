@@ -43,6 +43,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Analysis
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Utils::CallingConvention
+    iree::compiler::Dialect::VM::Utils::TypeTable
   PUBLIC
 )
 
