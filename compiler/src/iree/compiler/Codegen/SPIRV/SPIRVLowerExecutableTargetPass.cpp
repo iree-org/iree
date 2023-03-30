@@ -28,6 +28,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
 namespace {
 /// Lowers a hal.executable.variant inner module to SPIR-V scalar/native-vector
 /// code. Invokes different compilation pipeline to
@@ -77,8 +79,6 @@ static LogicalResult verifyLoweringConfiguration(
 static LogicalResult verifyEntryPoint(
     ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
     IREE::HAL::ExecutableExportOp exportOp) {
-  using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
-
   if (translationInfo.getDispatchLoweringPassPipeline() ==
       CodeGenPipeline::TransformDialectCodegen) {
     // Transform dialect encodes configuration into the schedule directly.
@@ -160,31 +160,29 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute:
+      case CodeGenPipeline::SPIRVBaseDistribute:
         addSPIRVBaseDistributePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
+      case CodeGenPipeline::SPIRVBaseVectorize:
         addSPIRVBaseVectorizePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVCooperativeMatrixVectorize:
+      case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
         addSPIRVCooperativeMatrixVectorizePassPipeline(
             pipeline, translationInfo.value().getSoftwarePipelineDepth(),
             translationInfo.value().getSoftwarePipelineStoreStage());
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVMatmulPromoteVectorize:
+      case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
         addSPIRVMatmulPromoteVectorizePassPipeline(
             pipeline, translationInfo.value().getSoftwarePipelineDepth(),
             translationInfo.value().getSoftwarePipelineStoreStage());
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce:
+      case CodeGenPipeline::SPIRVSubgroupReduce:
         addSPIRVSubgroupReducePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVWinogradVectorize:
+      case CodeGenPipeline::SPIRVWinogradVectorize:
         addSPIRVWinogradVectorizePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
+      case CodeGenPipeline::TransformDialectCodegen:
         addSPIRVTransformDialectPassPipeline(pipeline);
         break;
       default:
