@@ -536,7 +536,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:21f3a22baf094e0bc5ff6598b465d3b6a1b765861959e6412b6cfc395634a1e9 \
             build_tools/cmake/build_tf_binaries.sh
           echo "binaries-dir=${IREE_TF_BINARIES_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
       - name: "Creating archive of binaries"
@@ -591,7 +591,7 @@ jobs:
       - name: "Running TF integrations tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:b8c41a6ae0bd8b094fcd4ea5998b82d29f62f9e595f7d02f53291ef72ba7d478 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:21f3a22baf094e0bc5ff6598b465d3b6a1b765861959e6412b6cfc395634a1e9 \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -633,7 +633,7 @@ jobs:
             --env IREE_LLVM_CPU_DISABLE=1 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/frontends-nvidia@sha256:a0d8c3d918619c5c5519273e60b976b2ed03cb8000117d86911c41ba27a90988 \
+            gcr.io/iree-oss/frontends-nvidia@sha256:b1f2b1bccf41e551b42113abff52ca568402cacfcfdba1fecee5fba78d2cfa06 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
