@@ -27,12 +27,6 @@ def MaterializeEncoding :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createMaterializeEncodingPass()";
 }
 
-def FoldIntoPackAndUnpackOps :
-    Pass<"iree-linalg-ext-fold-into-pack-unpack-ops", "func::FuncOp"> {
-  let summary = "Test pass to fold operations into pack and unpacl operations";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createFoldIntoPackAndUnpackOps()";
-}
-
 def PadContractionToBlockSize :
     Pass<"iree-linalg-pad-contraction-to-block-size", ""> {
   let summary = "Pads contraction (matmul) ops to next multiple of block size";
