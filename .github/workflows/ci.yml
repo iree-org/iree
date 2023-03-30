@@ -706,9 +706,8 @@ jobs:
           packages: "iree-runtime iree-runtime-instrumented"
           output_dir: "${{ github.workspace }}/bindist"
           # Note when upgrading: Build just one Python version synced to our
-          # minimum. Note that 3.7 is the last with this naming convention.
-          # Look at the script for the full list.
-          override_python_versions: cp37-cp37m
+          # minimum.
+          override_python_versions: cp38-cp38
         run: |
           ./build_tools/python_deploy/build_linux_packages.sh
       # Note that it is just a trade-off decision to have this serialized
@@ -721,9 +720,8 @@ jobs:
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
           # Note when upgrading: Build just one Python version synced to our
-          # minimum. Note that 3.7 is the last with this naming convention.
-          # Look at the script for the full list.
-          override_python_versions: cp37-cp37m
+          # minimum.
+          override_python_versions: cp38-cp38m
         run: |
           ./build_tools/python_deploy/build_linux_packages.sh
 
