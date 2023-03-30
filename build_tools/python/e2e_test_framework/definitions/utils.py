@@ -10,48 +10,41 @@ from typing import Callable, List, Sequence
 MAX_SUBSTITUTION_ITERATIONS = 10
 
 
-def materialize_flags(flags: Sequence[str],
-                      map_funcs: Sequence[Callable[[str], str]]) -> List[str]:
-  """Call map functions to materialize flag values.
+def transform_flags(flags: Sequence[str],
+                    map_funcs: Sequence[Callable[[str], str]]) -> List[str]:
+  """Call map functions to transform flag values, e.g., replace placeholders
+  that were unknown when the flag was constructed.
 
-  It parses and extracts the flag value from both keyword and positional flags.
-  Each flag value is proccessed by the map functions until reaching the fixed
-  point, then replaced the original flag value.
+  It parses and extracts the flag values from both keyword and positional flags,
+  transforms them, and returns the updated flags with transformed values.
+
+  Each flag value is transformed only once by each map function in order.
   
   Args:
     flags: list of flags.
     map_funcs: list of map functions to map flag value.
   Returns:
-    List of materialized flags.
+    List of transformed flags.
   """
 
-  materialized_flags = []
+  transformed_flags = []
   for flag in flags:
     if flag.startswith("-"):
       # Keyword argument
-      value_pos = flag.find("=") + 1
+      split_pos = flag.find("=")
       # Do nothing if there is no flag value.
-      if value_pos == 0:
-        materialized_flags.append(flag)
+      if split_pos == -1:
+        transformed_flags.append(flag)
         continue
+      value_pos = split_pos + 1
     else:
       # Positional argument
       value_pos = 0
 
-    prev_value = flag[value_pos:]
-    # Iteratively replace until reaching the fixed point.
-    new_value = prev_value
-    iterations = 0
-    while True:
-      for map_func in map_funcs:
-        new_value = map_func(new_value)
-      if new_value == prev_value:
-        break
-      iterations += 1
-      if iterations > MAX_SUBSTITUTION_ITERATIONS:
-        raise ValueError(f"Too many iterations to materialize: {flag}")
-      prev_value = new_value
+    new_value = flag[value_pos:]
+    for map_func in map_funcs:
+      new_value = map_func(new_value)
 
-    materialized_flags.append(flag[:value_pos] + new_value)
+    transformed_flags.append(flag[:value_pos] + new_value)
 
-  return materialized_flags
+  return transformed_flags
