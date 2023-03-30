@@ -6,7 +6,7 @@
 
 # An image for cross-compiling IREE towards Android.
 
-FROM gcr.io/iree-oss/base@sha256:dcae1cb774c62680ffb9ed870a255181a428aacf5eb2387676146e055bc3b9e8
+FROM gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb
 ARG NDK_VERSION=r25b
 WORKDIR /install-ndk
 
