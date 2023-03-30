@@ -41,6 +41,7 @@
 /benchmarks/ @GMNGeoffrey @antiagainst @pzread
 /build_tools/ @GMNGeoffrey @ScottTodd @pzread
 /build_tools/benchmarks/ @GMNGeoffrey @antiagainst @pzread
+/build_tools/python/ @GMNGeoffrey @pzread
 /build_tools/python_deploy/ @stellaraccident
 /build_tools/scripts/ @GMNGeoffrey @ScottTodd
 /build_tools/third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
