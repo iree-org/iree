@@ -135,7 +135,8 @@ static unsigned isMemRefVectorizable(Value value,
   auto memrefType = value.getType().dyn_cast<MemRefType>();
 
   // Require scalar element type
-  if (!memrefType || memrefType.getElementType().isa<VectorType>()) {
+  if (!memrefType || (!memrefType.getElementType().isa<IntegerType>() &&
+                      !memrefType.getElementType().isa<FloatType>())) {
     LLVM_DEBUG(llvm::dbgs() << "failed: not (scalar) memref\n");
     return 0;
   }
