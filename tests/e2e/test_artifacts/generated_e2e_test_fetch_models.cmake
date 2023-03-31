@@ -257,3 +257,23 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/model_cbc5e400-7c93-4844-aca8-bce8f1bf9948-batch-64_BertLargePTBatch64.mlir"
   UNPACK
 )
+
+iree_fetch_artifact(
+  NAME
+    "model-fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-1"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/RESNET50/batch_1/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-1_Resnet50PTBatch1.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-8"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/RESNET50/batch_8/linalg.mlir"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-8_Resnet50PTBatch8.mlir"
+  UNPACK
+)
