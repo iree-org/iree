@@ -88,6 +88,8 @@ class Linux_x86_64_Benchmarks(object):
         tf_models.RESNET50_TF_FP32,
         # Disabled due to https://github.com/openxla/iree/issues/12772.
         torch_models.EFFICIENTNET_V2_S_FP32_TORCH,
+        # Disabled due to https://github.com/openxla/iree/issues/12772.
+        torch_models.EFFICIENTNET_B7_FP32_TORCH,
     ]
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(
