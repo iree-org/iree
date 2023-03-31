@@ -65,8 +65,8 @@ static std::string getLinalgOpLoopRanges(linalg::LinalgOp op) {
   return outputString;
 }
 
-static std::string operandTypeToString(OpOperand *opOperand) {
-  auto operandType = opOperand->get().getType();
+static std::string operandTypeToString(Value operandValue) {
+  auto operandType = operandValue.getType();
   std::string outputString;
   llvm::raw_string_ostream sstream(outputString);
   if (auto shapedType = dyn_cast<ShapedType>(operandType)) {
@@ -84,20 +84,12 @@ static std::string getLinalgDataTypes(linalg::LinalgOp op) {
   bool allTokensSame = true;
   SmallVector<std::string, 4> datatypeTokens;
 
-  for (OpOperand *opOperand : op.getDpsInputOperands()) {
-    datatypeTokens.push_back(operandTypeToString(opOperand));
+  for (Value operandValue : op->getOperands()) {
+    datatypeTokens.push_back(operandTypeToString(operandValue));
     if (firstToken.empty()) {
-      firstToken = operandTypeToString(opOperand);
+      firstToken = operandTypeToString(operandValue);
     } else if (allTokensSame) {
-      allTokensSame = firstToken == operandTypeToString(opOperand);
-    }
-  }
-  for (OpOperand *opOperand : op.getDpsInitOperands()) {
-    datatypeTokens.push_back(operandTypeToString(opOperand));
-    if (firstToken.empty()) {
-      firstToken = operandTypeToString(opOperand);
-    } else if (allTokensSame) {
-      allTokensSame = firstToken == operandTypeToString(opOperand);
+      allTokensSame = firstToken == operandTypeToString(operandValue);
     }
   }
 
