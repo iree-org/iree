@@ -52,3 +52,14 @@ MODEL_UNET_2D_FP32_TORCH = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_UNET_MODEL/linalg.mlir",
     entry_function="forward",
     input_types=["1x4x64x64xf32", "1x77x768xf32"])
+
+# Converted from https://pytorch.org/vision/stable/models/generated/torchvision.models.efficientnet_v2_s.html#torchvision.models.efficientnet_v2_s
+EFFICIENTNET_V2_S_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_EFFICIENTNET_V2_S_FP32_TORCH,
+    name="EfficientNetV2SPT",
+    tags=["fp32", "cnn", "depthwise-conv"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_V2_S/batch_1/linalg.mlir",
+    entry_function="forward",
+    input_types=["1x3x384x384xf32"])
