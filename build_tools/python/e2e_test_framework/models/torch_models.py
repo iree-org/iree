@@ -74,3 +74,94 @@ EFFICIENTNET_B7_FP32_TORCH = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir",
     entry_function="forward",
     input_types=["1x3x600x600xf32"])
+
+# Converted from https://huggingface.co/docs/transformers/v4.27.2/en/model_doc/bert#transformers.BertModel
+BERT_LARGE_1X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_1X384_FP32_TORCH,
+    name="BertLargePTBatch1",
+    tags=["fp32", "transformer", "seqlen384", "batch-1"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_1/linalg.mlir",
+    entry_function="forward",
+    input_types=["1x384xi64", "1x384xi64"])
+
+BERT_LARGE_8X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_8X384_FP32_TORCH,
+    name="BertLargePTBatch8",
+    tags=["fp32", "transformer", "seqlen384", "batch-8"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_8/linalg.mlir",
+    entry_function="forward",
+    input_types=["8x384xi64", "8x384xi64"])
+
+BERT_LARGE_16X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_16X384_FP32_TORCH,
+    name="BertLargePTBatch16",
+    tags=["fp32", "transformer", "seqlen384", "batch-16"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_16/linalg.mlir",
+    entry_function="forward",
+    input_types=["16x384xi64", "16x384xi64"])
+
+BERT_LARGE_32X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_32X384_FP32_TORCH,
+    name="BertLargePTBatch32",
+    tags=["fp32", "transformer", "seqlen384", "batch-32"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_32/linalg.mlir",
+    entry_function="forward",
+    input_types=["32x384xi64", "32x384xi64"])
+
+BERT_LARGE_64X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_64X384_FP32_TORCH,
+    name="BertLargePTBatch64",
+    tags=["fp32", "transformer", "seqlen384", "batch-64"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_64/linalg.mlir",
+    entry_function="forward",
+    input_types=["64x384xi64", "64x384xi64"])
+
+BERT_LARGE_128X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_128X384_FP32_TORCH,
+    name="BertLargePTBatch128",
+    tags=["fp32", "transformer", "seqlen384", "batch-128"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_128/linalg.mlir",
+    entry_function="forward",
+    input_types=["128x384xi64", "128x384xi64"])
+
+BERT_LARGE_256X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_256X384_FP32_TORCH,
+    name="BertLargePTBatch256",
+    tags=["fp32", "transformer", "seqlen384", "batch-256"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_256/linalg.mlir",
+    entry_function="forward",
+    input_types=["256x384xi64", "256x384xi64"])
+
+BERT_LARGE_512X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_512X384_FP32_TORCH,
+    name="BertLargePTBatch512",
+    tags=["fp32", "transformer", "seqlen384", "batch-512"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_512/linalg.mlir",
+    entry_function="forward",
+    input_types=["512x384xi64", "512x384xi64"])
+
+BERT_LARGE_1024X384_FP32_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_BERT_LARGE_1024X384_FP32_TORCH,
+    name="BertLargePTBatch1024",
+    tags=["fp32", "transformer", "seqlen384", "batch-1024"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/BERT_LARGE/batch_1024/linalg.mlir",
+    entry_function="forward",
+    input_types=["1024x384xi64", "1024x384xi64"])
