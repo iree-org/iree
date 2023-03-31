@@ -279,14 +279,15 @@ class ModuleGenerationConfig(object):
       """Replaces ${MODULE_DIR} in a POSIX path and returns the
       platform-dependent path string.
       """
-      if MODULE_DIR_PLACEHODLER not in value:
+      parts = pathlib.PurePosixPath(value).parts
+      if MODULE_DIR_PLACEHOLDER not in parts:
         return value
-      if not value.startswith(MODULE_DIR_PLACEHODLER):
+      if parts[0] != MODULE_DIR_PLACEHODLER:
         raise ValueError(
-            f"{MODULE_DIR_PLACEHODLER} needs to be the head of flag value.")
-      # Properly construct the platform-dependent path from POSIX path string.
-      sub_path = pathlib.PurePosixPath(value).parts[1:]
-      return str(module_dir_path.joinpath(*sub_path))
+            f"'{MODULE_DIR_PLACEHODLER}' needs to be the head of flag value"
+            f" if present, but got '{value}'.")
+      # Properly construct the platform-dependent path.
+      return str(module_dir_path.joinpath(*parts[1:]))
 
     return utils.transform_flags(flags=self.compile_flags,
                                  map_funcs=[_replace_module_dir_placeholder])
