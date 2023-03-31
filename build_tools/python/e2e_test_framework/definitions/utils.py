@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Utils that help construct definitions."""
 
-from typing import Callable, List, Sequence
+import string
+from typing import Any, Callable, List, Sequence
 
 MAX_SUBSTITUTION_ITERATIONS = 10
 
@@ -40,3 +41,11 @@ def transform_flags(flags: Sequence[str],
     transformed_flags.append(f"{keyword}{separator}{value}")
 
   return transformed_flags
+
+
+def substitute_flag_vars(flags: Sequence[str], **mapping: Any) -> List[str]:
+  """Sugar of transform_flags to substitute variables in string.Template format.
+  """
+  return transform_flags(
+      flags=flags,
+      map_funcs=[lambda value: string.Template(value).substitute(mapping)])

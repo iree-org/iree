@@ -9,7 +9,6 @@ import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 import pathlib
-import string
 from typing import List, Optional, Sequence
 
 from e2e_test_framework.definitions import common_definitions, utils
@@ -168,12 +167,8 @@ class ImportConfig(object):
   def materialize_import_flags(self,
                                model: common_definitions.Model) -> List[str]:
     """Materialize flags with dependent values."""
-    entry_function = model.entry_function
-    return utils.transform_flags(flags=self.import_flags,
-                                 map_funcs=[
-                                     lambda value: string.Template(value).
-                                     substitute(ENTRY_FUNCTION=entry_function)
-                                 ])
+    return utils.substitute_flag_vars(flags=self.import_flags,
+                                      ENTRY_FUNCTION=model.entry_function)
 
 
 DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
@@ -339,11 +334,7 @@ class E2EModelRunConfig(object):
 
   def materialize_run_flags(self, gpu_id: str = "0"):
     """Materialize flags with dependent values."""
-    return utils.transform_flags(
-        flags=self.run_flags,
-        map_funcs=[
-            lambda value: string.Template(value).substitute(GPU_ID=gpu_id)
-        ])
+    return utils.substitute_flag_vars(flags=self.run_flags, GPU_ID=gpu_id)
 
   @classmethod
   def build(cls, module_generation_config: ModuleGenerationConfig,

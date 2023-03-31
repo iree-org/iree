@@ -2619,6 +2619,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2SPT_module_b5078b9d2031b69ec5ce9b775c8701cef73add8ebfb786d9189ca3fb6474cf73/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNetV2SPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2680,6 +2682,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_63a2a9acdb2dafb66a49487fd7eecb79e49d870ec9b9ef17a1e8e9d50fe5c9ba/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNetB7PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -3269,6 +3273,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_3c94ab45ad76bd8b2083729b65340b987da3247c854faf7d06431cb05a3b0a23/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNetB7PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC

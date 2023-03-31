@@ -26,6 +26,28 @@ class UtilsTest(unittest.TestCase):
         flags,
         ["val_a val_b", "--key=val_a", "--no-value-key", "--filter=x=val_a"])
 
+  def test_substitute_flag_vars(self):
+    raw_flags = [
+        r"${HOLDER_A}",
+        r"--key=${HOLDER_B}",
+    ]
+
+    flags = utils.substitute_flag_vars(flags=raw_flags,
+                                       HOLDER_A=1,
+                                       HOLDER_B="b")
+
+    self.assertEquals(flags, ["1", "--key=b"])
+
+  def test_substitute_flag_vars_missing_variable(self):
+    raw_flags = [
+        r"${HOLDER_A}",
+        r"--key=${HOLDER_B}",
+    ]
+
+    self.assertRaises(
+        KeyError,
+        lambda: utils.substitute_flag_vars(flags=raw_flags, HOLDER_A=1))
+
 
 if __name__ == "__main__":
   unittest.main()
