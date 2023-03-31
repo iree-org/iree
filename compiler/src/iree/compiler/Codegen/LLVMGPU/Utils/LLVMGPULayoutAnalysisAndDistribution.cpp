@@ -440,12 +440,7 @@ void distributeContracts(vector::ContractionOp contractOp,
   if (!layoutMap.count(rhs)) return;
   if (!simdToSimtMap.count(rhs)) return;
   Value acc = contractOp.getAcc();
-  APFloat floatValue(0.0);
-  bool accIsConstant{true};
-  if (!matchPattern(acc, m_ConstantFloat(&floatValue))) {
-    if (!simdToSimtMap.count(acc)) return;
-    accIsConstant = false;
-  }
+  if (!simdToSimtMap.count(acc)) return;
   Location loc = contractOp.getLoc();
   Value contractResult = contractOp.getResult();
   Layout lhsLayout = layoutMap.at(lhs);
@@ -463,17 +458,10 @@ void distributeContracts(vector::ContractionOp contractOp,
   int canonicalN = resultLayout.canonicalShape[1];
   int K = lhsLayout.shape[DimType::Batch1];
   int canonicalK = lhsLayout.canonicalShape[1];
-  auto cType = VectorType::get({vecShape[2], vecShape[3]}, elementType);
   for (int i = 0; i < M; i++) {
     for (int j = 0; j < N; j++) {
-      Value cMatrix;
-      if (accIsConstant) {
-        cMatrix = rewriter.create<arith::ConstantOp>(
-            loc, cType, DenseElementsAttr::get(cType, floatValue));
-      } else {
-        cMatrix = rewriter.create<vector::ExtractOp>(
-            loc, simdToSimtMap.at(acc), SmallVector<int64_t>{i, j});
-      }
+      Value cMatrix = rewriter.create<vector::ExtractOp>(
+          loc, simdToSimtMap.at(acc), SmallVector<int64_t>{i, j});
       for (int k = 0; k < K; k++) {
         Value aMatrix = rewriter.create<vector::ExtractOp>(
             loc, simdToSimtMap.at(lhs), SmallVector<int64_t>{i, k});
@@ -740,9 +728,15 @@ static void replaceForOpWithNewSignature(
 
   // Create a new loop before the existing one, with the extra operands.
   // We will be using dummy values instead of the old operands
+  // only for those operands that are being distributed
   SmallVector<Value> dummyOperands, newOperands;
   auto operands = llvm::to_vector<4>(loop.getIterOperands());
   for (auto operand : operands) {
+    if (!layoutMap.count(operand)) {
+      dummyOperands.push_back(operand);
+      newOperands.push_back(operand);
+      continue;
+    }
     Value zero = rewriter.create<arith::ConstantOp>(
         loop.getLoc(), rewriter.getZeroAttr(operand.getType()));
     dummyOperands.push_back(zero);
@@ -795,21 +789,6 @@ void distributeFor(scf::ForOp forOp, DenseMap<Value, Layout> &layoutMap,
 
   SmallVector<Value> newOperands;
   for (const auto &operand : llvm::enumerate(forOp.getIterOperands())) {
-    APFloat floatValue(0.0);
-    if (matchPattern(operand.value(), m_ConstantFloat(&floatValue))) {
-      if (!layoutMap.count(operand.value())) continue;
-      Layout layout = layoutMap.at(operand.value());
-      Type elementType =
-          operand.value().getType().cast<VectorType>().getElementType();
-      auto vType = VectorType::get(
-          {layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
-           layout.shape[DimType::VecIdZ] * layout.shape[DimType::VecIdY],
-           layout.shape[DimType::VecIdX]},
-          elementType);
-      Value acc = rewriter.create<arith::ConstantOp>(
-          forOp.getLoc(), DenseElementsAttr::get(vType, floatValue));
-      simdToSimtMap.try_emplace(operand.value(), acc);
-    }
     if (!simdToSimtMap.count(operand.value())) {
       continue;
     }
@@ -838,11 +817,48 @@ void distributeYield(scf::YieldOp yieldOp, DenseMap<Value, Layout> &layoutMap,
   rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, yieldOperands);
 }
 
+void distributeConstants(arith::ConstantOp constantOp,
+                         DenseMap<Value, Layout> &layoutMap,
+                         DenseMap<Value, Value> &simdToSimtMap,
+                         IRRewriter &rewriter,
+                         llvm::SetVector<Operation *> &ops) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(constantOp);
+  Value constant = constantOp.getResult();
+  if (!layoutMap.count(constant)) return;
+  auto attr = constantOp.getValue().cast<DenseElementsAttr>();
+  // Only handle splat values for now
+  if (!attr.isSplat()) return;
+  Layout layout = layoutMap.at(constant);
+  Type elementType = constant.getType().cast<VectorType>().getElementType();
+  auto vType = VectorType::get(
+      {layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
+       layout.shape[DimType::VecIdZ] * layout.shape[DimType::VecIdY],
+       layout.shape[DimType::VecIdX]},
+      elementType);
+  Value result = rewriter.create<arith::ConstantOp>(
+      constantOp.getLoc(), vType,
+      DenseElementsAttr::get(vType, attr.getSplatValue<APFloat>()));
+  simdToSimtMap.try_emplace(constant, result);
+}
+
 static void eraseOps(llvm::SetVector<Operation *> &opsToErase,
-                     func::FuncOp funcOp, IRRewriter &rewriter) {
+                     IRRewriter &rewriter) {
   for (int i = opsToErase.size() - 1; i >= 0; i--) {
     assert(opsToErase[i]->getUses().empty());
     rewriter.eraseOp(opsToErase[i]);
+  }
+}
+
+static void collectOperations(Operation *rootOp,
+                              SmallVectorImpl<Operation *> &opsToTraverse) {
+  for (Region &region : rootOp->getRegions()) {
+    for (Block &block : region.getBlocks()) {
+      for (Operation &op : block.getOperations()) {
+        opsToTraverse.push_back(&op);
+        collectOperations(&op, opsToTraverse);
+      }
+    }
   }
 }
 
@@ -874,12 +890,10 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
   // Apply SIMD to SIMT conversion
   DenseMap<Value, Value> simdToSimtMap;
   llvm::SetVector<Operation *> opsToErase;
-  std::stack<Operation *> opsToTraverse;
-  for (Operation &op : llvm::reverse(funcOp.getBody().front().getOperations()))
-    opsToTraverse.push(&op);
-  while (!opsToTraverse.empty()) {
-    Operation *op = opsToTraverse.top();
-    opsToTraverse.pop();
+  SmallVector<Operation *> opsToTraverse;
+  collectOperations(funcOp, opsToTraverse);
+
+  for (Operation *op : opsToTraverse) {
     if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
       distributeTransferReads(readOp, layoutMap, simdToSimtMap, rewriter,
                               opsToErase);
@@ -900,18 +914,19 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
           rewriter, opsToErase);
     }
     if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-      for (Operation &op :
-           llvm::reverse(forOp.getRegion().front().getOperations()))
-        opsToTraverse.push(&op);
       distributeFor(forOp, layoutMap, simdToSimtMap, rewriter, opsToErase);
     }
     if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
       distributeYield(yieldOp, layoutMap, simdToSimtMap, rewriter, opsToErase);
     }
+    if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
+      distributeConstants(constantOp, layoutMap, simdToSimtMap, rewriter,
+                          opsToErase);
+    }
   }
 
   // Erase old ops
-  eraseOps(opsToErase, funcOp, rewriter);
+  eraseOps(opsToErase, rewriter);
 }
 
 }  // namespace mlir::iree_compiler
