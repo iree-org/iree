@@ -42,11 +42,13 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
   if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
 
-  if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth())
+  if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
     return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
+  }
 
-  if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth())
+  if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
     return builder.create<arith::ExtFOp>(loc, type, inputs[0]);
+  }
 
   return nullptr;
 };
@@ -58,16 +60,20 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
   if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
   bool isUnsigned = eTy.isUnsignedInteger();
 
-  if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth())
+  int64_t inBitwidth = inputETy.getIntOrFloatBitWidth();
+  int64_t outBitwidth = eTy.getIntOrFloatBitWidth();
+
+  if (inBitwidth > outBitwidth) {
     return builder.create<arith::TruncIOp>(loc, type, inputs[0]);
+  }
 
-  if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth() &&
-      isUnsigned)
+  if (inBitwidth < outBitwidth && isUnsigned) {
     return builder.create<arith::ExtUIOp>(loc, type, inputs[0]);
+  }
 
-  if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth() &&
-      !isUnsigned)
+  if (inBitwidth < outBitwidth && !isUnsigned) {
     return builder.create<arith::ExtSIOp>(loc, type, inputs[0]);
+  }
 
   return nullptr;
 };
