@@ -146,159 +146,70 @@ int iree_uk_type_triple_str(char* buf, int buf_length,
   return snprintf(buf, buf_length, "%s%s%s", type0_buf, type1_buf, type2_buf);
 }
 
-// Just a vector of pointers to literal strings, used to hold CPU feature names.
-struct iree_uk_cpu_features_list_t {
-  // Number of string pointers.
-  int size;
-  // Number of string pointers that we have already allocated room for.
-  int capacity;
-  // Buffer of string pointers.
-  const char** entries;
-  // Optional: if not NULL, gives a shorthand name to this CPU features list.
-  const char* name;
-};
-
-static iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_empty(
-    void) {
-  iree_uk_cpu_features_list_t* list =
-      malloc(sizeof(iree_uk_cpu_features_list_t));
-  memset(list, 0, sizeof *list);
-  return list;
-}
-
-void iree_uk_cpu_features_list_destroy(iree_uk_cpu_features_list_t* list) {
-  free(list->entries);
-  free(list);
-}
-
-static void iree_uk_cpu_features_list_append_one(
-    iree_uk_cpu_features_list_t* list, const char* entry) {
-  if (list->capacity == 0) {
-    // TODO: Generalize if needed. Currently naive growth to fixed capacity.
-    list->capacity = 64;
-    IREE_UK_ASSERT(!list->entries);
-    list->entries = malloc(list->capacity * sizeof list->entries[0]);
+void iree_uk_make_cpu_data_for_features(const char* cpu_features,
+                                        iree_uk_uint64_t* out_cpu_data_fields) {
+  // The caller should have checked for NULL prior to calling this function.
+  IREE_UK_ASSERT(cpu_features != NULL);
+  const size_t data_fields_byte_size =
+      IREE_CPU_DATA_FIELD_COUNT * sizeof(out_cpu_data_fields[0]);
+  memset(out_cpu_data_fields, 0, data_fields_byte_size);
+  // Empty string means architecture baseline. No bits set.
+  if (!strcmp(cpu_features, "")) return;
+  // Special case: when the name is "host", the list is required to be empty and
+  // we detect capabilities of the host CPU.
+  if (!strcmp(cpu_features, "host")) {
+    memcpy(out_cpu_data_fields, iree_cpu_data_fields(), data_fields_byte_size);
+    return;
   }
-  IREE_UK_ASSERT(list->size < list->capacity);
-  list->entries[list->size++] = entry;
-}
-
-static void iree_uk_cpu_features_list_append_va(
-    iree_uk_cpu_features_list_t* list, int count, va_list args) {
-  for (int i = 0; i < count; ++i) {
-    iree_uk_cpu_features_list_append_one(list, va_arg(args, const char*));
+  // Named feature sets.
+#if defined(IREE_UK_ARCH_X86_64)
+  iree_uk_uint64_t avx2_fma =
+      IREE_CPU_DATA0_X86_64_AVX2 | IREE_CPU_DATA0_X86_64_FMA;
+  iree_uk_uint64_t avx512_base =
+      avx2_fma | IREE_CPU_DATA0_X86_64_AVX512F |
+      IREE_CPU_DATA0_X86_64_AVX512BW | IREE_CPU_DATA0_X86_64_AVX512DQ |
+      IREE_CPU_DATA0_X86_64_AVX512VL | IREE_CPU_DATA0_X86_64_AVX512CD;
+  iree_uk_uint64_t avx512_vnni = avx512_base | IREE_CPU_DATA0_X86_64_AVX512VNNI;
+  if (!strcmp(cpu_features, "avx2_fma")) {
+    out_cpu_data_fields[0] = avx2_fma;
+    return;
   }
-}
-
-iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create(int count, ...) {
-  iree_uk_cpu_features_list_t* list = iree_uk_cpu_features_list_create_empty();
-  va_list args;
-  va_start(args, count);
-  iree_uk_cpu_features_list_append_va(list, count, args);
-  va_end(args);
-  return list;
-}
-
-void iree_uk_cpu_features_list_append(iree_uk_cpu_features_list_t* list,
-                                      int count, ...) {
-  va_list args;
-  va_start(args, count);
-  iree_uk_cpu_features_list_append_va(list, count, args);
-  va_end(args);
-}
-
-iree_uk_cpu_features_list_t* iree_uk_cpu_features_list_create_extend(
-    iree_uk_cpu_features_list_t* list, int count, ...) {
-  iree_uk_cpu_features_list_t* newlist =
-      iree_uk_cpu_features_list_create_empty();
-  for (int i = 0; i < list->size; ++i) {
-    iree_uk_cpu_features_list_append_one(newlist, list->entries[i]);
+  if (!strcmp(cpu_features, "avx512_base")) {
+    out_cpu_data_fields[0] = avx512_base;
+    return;
   }
-  va_list args;
-  va_start(args, count);
-  iree_uk_cpu_features_list_append_va(newlist, count, args);
-  va_end(args);
-  return newlist;
-}
-
-int iree_uk_cpu_features_list_size(const iree_uk_cpu_features_list_t* list) {
-  return list->size;
-};
-
-const char* iree_uk_cpu_features_list_entry(
-    const iree_uk_cpu_features_list_t* list, int index) {
-  IREE_UK_ASSERT(index < list->size);
-  return list->entries[index];
-}
-
-void iree_uk_cpu_features_list_set_name(iree_uk_cpu_features_list_t* list,
-                                        const char* name) {
-  list->name = name;
-}
-
-const char* iree_uk_cpu_features_list_get_name(
-    const iree_uk_cpu_features_list_t* list) {
-  return list->name;
-}
-
-iree_uk_standard_cpu_features_t* iree_uk_standard_cpu_features_create(void) {
-  iree_uk_standard_cpu_features_t* cpu =
-      malloc(sizeof(iree_uk_standard_cpu_features_t));
-  memset(cpu, 0, sizeof *cpu);
-#if defined(IREE_UK_ARCH_ARM_64)
-  cpu->dotprod = iree_uk_cpu_features_list_create(1, "dotprod");
-  cpu->i8mm = iree_uk_cpu_features_list_create(1, "i8mm");
-#elif defined(IREE_UK_ARCH_X86_64)
-  cpu->avx2_fma = iree_uk_cpu_features_list_create(3, "avx", "avx2", "fma");
-  iree_uk_cpu_features_list_set_name(cpu->avx2_fma, "avx2_fma");
-  cpu->avx512_base = iree_uk_cpu_features_list_create_extend(
-      cpu->avx2_fma, 5, "avx512f", "avx512bw", "avx512dq", "avx512vl",
-      "avx512cd");
-  iree_uk_cpu_features_list_set_name(cpu->avx512_base, "avx512_base");
-  cpu->avx512_vnni = iree_uk_cpu_features_list_create_extend(cpu->avx512_base,
-                                                             1, "avx512vnni");
-  iree_uk_cpu_features_list_set_name(cpu->avx512_vnni, "avx512_vnni");
-#endif
-  return cpu;
-}
-
-void iree_uk_standard_cpu_features_destroy(
-    iree_uk_standard_cpu_features_t* cpu) {
-#if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_cpu_features_list_destroy(cpu->dotprod);
-  iree_uk_cpu_features_list_destroy(cpu->i8mm);
-#elif defined(IREE_UK_ARCH_X86_64)
-  iree_uk_cpu_features_list_destroy(cpu->avx2_fma);
-  iree_uk_cpu_features_list_destroy(cpu->avx512_base);
-  iree_uk_cpu_features_list_destroy(cpu->avx512_vnni);
-#endif
-  free(cpu);
-}
-
-void iree_uk_make_cpu_data_for_features(
-    const iree_uk_cpu_features_list_t* cpu_features,
-    iree_uk_uint64_t* out_cpu_data_fields) {
-  // Bit-field tracking which features exist, to diagnose misspelled features.
-  uint64_t cpu_features_found = 0;
+  if (!strcmp(cpu_features, "avx512_vnni")) {
+    out_cpu_data_fields[0] = avx512_vnni;
+    return;
+  }
+#endif  // defined(IREE_UK_ARCH_X86_64)
+  // Fall back to interpreting cpu_features as a comma-separated list of LLVM
+  // feature names. TODO: actually support multiple comma-separated values. For
+  // now this only supports a single feature, so use cases that require multiple
+  // features currently go through one of the above named feature sets (feel
+  // free to add more).
+  if (strchr(cpu_features, ',')) {
+    fprintf(stderr,
+            "TODO: multiple comma-separated values currently unimplemented in "
+            "cpu_features \"%s\"\n",
+            cpu_features);
+    iree_abort();
+  }
+  bool cpu_feature_found = 0;
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
   if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \
-    for (int i = 0; i < cpu_features->size; ++i) {                            \
-      if (!strcmp(cpu_features->entries[i], llvm_name)) {                     \
-        out_cpu_data_fields[field_index] |= (1ull << bit_pos);                \
-        cpu_features_found |= (1ull << i);                                    \
-        break;                                                                \
-      }                                                                       \
+    if (!strcmp(cpu_features, llvm_name)) {                                   \
+      out_cpu_data_fields[field_index] |= (1ull << bit_pos);                  \
+      cpu_feature_found = true;                                               \
     }                                                                         \
   }
 #include "iree/schemas/cpu_feature_bits.inl"
 #undef IREE_CPU_FEATURE_BIT
   // Diagnose unknown (e.g. misspelled) features.
-  for (int i = 0; i < cpu_features->size; ++i) {
-    if (!(cpu_features_found & (1ull << i))) {
-      fprintf(stderr, "CPU feature '%s' unknown on %s\n",
-              cpu_features->entries[i], IREE_ARCH);
-      iree_abort();
-    }
+  if (!cpu_feature_found) {
+    fprintf(stderr, "CPU feature \"%s\" unknown on %s\n", cpu_features,
+            IREE_ARCH);
+    iree_abort();
   }
 }
 
@@ -318,13 +229,34 @@ bool iree_uk_cpu_supports(const iree_uk_uint64_t* cpu_data_fields) {
   return true;
 }
 
+static const char* iree_uk_cpu_feature_name(int feature_field_index,
+                                            int feature_bit_pos) {
+  IREE_UK_ASSERT(feature_field_index >= 0 &&
+                 feature_field_index < IREE_CPU_DATA_FIELD_COUNT);
+  IREE_UK_ASSERT(feature_bit_pos >= 0 && feature_bit_pos < 64);
+#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
+  if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \
+    if (field_index == feature_field_index && bit_pos == feature_bit_pos) {   \
+      return llvm_name;                                                       \
+    }                                                                         \
+  }
+#include "iree/schemas/cpu_feature_bits.inl"
+#undef IREE_CPU_FEATURE_BIT
+  IREE_UK_ASSERT(false && "Unknown CPU feature bit");
+  return NULL;
+}
+
 const char* iree_uk_cpu_first_unsupported_feature(
-    const iree_uk_cpu_features_list_t* cpu_features) {
-  for (int i = 0; i < cpu_features->size; ++i) {
-    int64_t supported = 0;
-    IREE_CHECK_OK(iree_cpu_lookup_data_by_key(IREE_SV(cpu_features->entries[i]),
-                                              &supported));
-    if (!supported) return cpu_features->entries[i];
+    const iree_uk_uint64_t* cpu_data_fields) {
+  for (int i = 0; i < IREE_CPU_DATA_FIELD_COUNT; ++i) {
+    iree_uk_uint64_t unsupported_features_in_field =
+        cpu_data_fields[i] & ~iree_cpu_data_field(i);
+    for (int bit_pos = 0; bit_pos < 64; ++bit_pos) {
+      iree_uk_uint64_t bit = 1ull << bit_pos;
+      if (unsupported_features_in_field & bit) {
+        return iree_uk_cpu_feature_name(i, bit_pos);
+      }
+    }
   }
   IREE_UK_ASSERT(false &&
                  "This function should only be called if there is an "
