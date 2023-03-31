@@ -251,7 +251,7 @@ class ImportedModel(object):
 
 # Placeholder in flags to be replaced with module dir path. The whole path
 # should be written in the POSIX format and starts with the variable.
-MODULE_DIR_PLACEHODLER = r"${MODULE_DIR}"
+MODULE_DIR_PLACEHOLDER = r"${MODULE_DIR}"
 
 
 @serialization.serializable(type_key="iree_module_generation_configs",
@@ -282,9 +282,9 @@ class ModuleGenerationConfig(object):
       parts = pathlib.PurePosixPath(value).parts
       if MODULE_DIR_PLACEHOLDER not in parts:
         return value
-      if parts[0] != MODULE_DIR_PLACEHODLER:
+      if parts[0] != MODULE_DIR_PLACEHOLDER:
         raise ValueError(
-            f"'{MODULE_DIR_PLACEHODLER}' needs to be the head of flag value"
+            f"'{MODULE_DIR_PLACEHOLDER}' needs to be the head of flag value"
             f" if present, but got '{value}'.")
       # Properly construct the platform-dependent path.
       return str(module_dir_path.joinpath(*parts[1:]))

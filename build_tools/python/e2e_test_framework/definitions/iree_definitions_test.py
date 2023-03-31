@@ -144,7 +144,9 @@ class ModuleGenerationConfigTest(unittest.TestCase):
         extra_flags=[r"--test=prefix/${MODULE_DIR}/test.json"])
     gen_config = iree_definitions.ModuleGenerationConfig.build(
         imported_model=imported_model, compile_config=compile_config)
-    expected_error = r"^\${MODULE_DIR} needs to be the head of flag value.$"
+    expected_error = (
+        r"^'\${MODULE_DIR}' needs to be the head of flag value if present,"
+        r" but got 'prefix/\${MODULE_DIR}/test.json'.$")
 
     self.assertRaisesRegex(
         ValueError, expected_error, lambda: gen_config.

@@ -31,7 +31,7 @@ def transform_flags(flags: Sequence[str],
   for flag in flags:
     keyword, separator, value = ("", "", flag)
     if flag.startswith("-"):
-      keyword, separator, value = flag.partition("=")    
+      keyword, separator, value = flag.partition("=")
 
     if value:
       for map_func in map_funcs:
