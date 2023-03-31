@@ -207,9 +207,10 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
-  options = ImportOptions(**kwargs)
-  if options.import_only:
-    raise Exception("Import only called!")
+  with TempFileSaver.implicit() as tfs:
+    options = ImportOptions(**kwargs)
+    if options.import_only:
+      raise Exception("Import only called!")
 
   with tempfile.NamedTemporaryFile(mode="w") as temp_file:
     # Generate MLIR
