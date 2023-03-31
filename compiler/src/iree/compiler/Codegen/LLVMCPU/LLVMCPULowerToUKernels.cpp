@@ -63,16 +63,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
                                        "unable to match micro kernel to op");
   }
 
-  std::string fnName = "";
-  switch (matmulType.value()) {
-    case MatmulType::I8I8I32:
-      fnName = "vmvx.matmul.i8i8i32";
-      break;
-    case MatmulType::F32F32F32:
-      fnName = "vmvx.matmul.f32f32f32";
-      break;
-  }
-
   // check if the result has to be accumulated into a buffer.
   bool accumulate = !isInitializedToZero(out);
   if (!accumulate) {
