@@ -411,54 +411,59 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
 namespace {
 
 py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
-  // See: https://docs.python.org/3/c-api/arg.html#numbers
-  // TODO: Handle dtypes that do not map to a code (i.e. fp16).
-  const char* dtype_code;
+  // See:
+  //   * https://numpy.org/doc/stable/reference/arrays.dtypes.html
+  //   * https://docs.python.org/3/c-api/arg.html#numbers
+  //
+  // Single letter codes can be ambiguous across platforms, so prefer explicit
+  // bit depth values, ("Type strings: Any string in numpy.sctypeDict.keys()").
+  // See https://github.com/pybind/pybind11/issues/1908
+  const char* dtype_string;
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
-      dtype_code = "?";
+      dtype_string = "?";
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      dtype_code = "b";
+      dtype_string = "int8";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      dtype_code = "B";
+      dtype_string = "uint8";
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      dtype_code = "h";
+      dtype_string = "int16";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      dtype_code = "H";
+      dtype_string = "uint16";
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      dtype_code = "i";
+      dtype_string = "int32";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      dtype_code = "I";
+      dtype_string = "uint32";
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      dtype_code = "l";
+      dtype_string = "int64";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      dtype_code = "L";
+      dtype_string = "uint64";
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      dtype_code = "e";
+      dtype_string = "float16";
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      dtype_code = "f";
+      dtype_string = "float32";
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      dtype_code = "d";
+      dtype_string = "float64";
       break;
     default:
       throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
   }
-  return py::dtype(dtype_code);
+  return py::dtype(dtype_string);
 }
 
 }  // namespace
