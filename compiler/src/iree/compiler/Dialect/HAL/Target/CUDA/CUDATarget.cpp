@@ -193,29 +193,25 @@ static FailureOr<std::string> compileWithPtxas(StringRef ptxasCompiler,
 // Attempt compiling the PtxImage with ptxas compiler. If the compilation fails
 // for some reason return and pack the generated PtxImage code in the
 // executable, let the runtime compile.
-static StringRef produceGpuImage(std::string &ptxImage) {
+static std::string produceGpuImage(std::string &ptxImage) {
   if (!clUsePtxas) return ptxImage;
 
   std::string message;
   FailureOr<std::string> ptxasCompiler = findPtxasCompiler(&message);
 
-  Optional<StringRef> gpuImage;
   if (succeeded(ptxasCompiler)) {
     FailureOr<std::string> maybeCubinImage =
         compileWithPtxas(ptxasCompiler.value(), clTargetChip, clUsePtxasParams,
                          ptxImage, &message);
-    if (succeeded(maybeCubinImage)) gpuImage = maybeCubinImage.value();
+    if (succeeded(maybeCubinImage)) return maybeCubinImage.value();
   }
 
-  if (!gpuImage.has_value()) {
-    llvm::WithColor::warning()
-        << "Compilation with `ptxas` failed, the generated ptx will be "
-           "packaged into the executable and compiled at runtime. \n Error : "
-        << message << " \n";
-    gpuImage = ptxImage;
-  }
+  llvm::WithColor::warning()
+      << "Compilation with `ptxas` failed, the generated ptx will be "
+         "packaged into the executable and compiled at runtime. \n Error : "
+      << message << " \n";
 
-  return gpuImage.value();
+  return ptxImage;
 }
 
 static void dumpBitcodeToPath(StringRef path, StringRef baseName,
@@ -549,14 +545,14 @@ class CUDATargetBackend final : public TargetBackend {
                      variantOp.getName(), ".ptx", ptxImage);
     }
 
-    StringRef gpuImage = produceGpuImage(ptxImage);
+    std::string gpuImage = produceGpuImage(ptxImage);
 
     FlatbufferBuilder builder;
     iree_CUDAExecutableDef_start_as_root(builder);
 
     auto gpuImageRef = flatbuffers_uint8_vec_create(
-        builder, reinterpret_cast<const uint8_t *>(gpuImage.str().c_str()),
-        gpuImage.str().size());
+        builder, reinterpret_cast<const uint8_t *>(gpuImage.c_str()),
+        gpuImage.size());
     iree_CUDABlockSizeDef_vec_start(builder);
     for (const auto &workgroupSize : workgroupSizes) {
       iree_CUDABlockSizeDef_vec_push_create(builder, workgroupSize[0],
