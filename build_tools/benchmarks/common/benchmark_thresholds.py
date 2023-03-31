@@ -53,8 +53,8 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(
         re.compile(r"^MobileSSD.*little-core.*LLVM-CPU.* @ Pixel-6"), 20,
         ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*LLVM-CPU.* @ Pixel-6"),
-                       20, ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*LLVM-CPU.* @ Pixel"),
+                       15, ThresholdUnit.PERCENTAGE),
 
     # Fluctuating benchmarks on X86_64 CPUs.
     BenchmarkThreshold(re.compile(r"^BertForMaskedLMTF.*x86_64"), 10,
