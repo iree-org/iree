@@ -8,6 +8,8 @@
 
 #if defined(IREE_UK_ARCH_ARM_64)
 #include "iree/builtins/ukernel/arch/arm_64/query_tile_sizes_arm_64.h"
+#elif defined(IREE_UK_ARCH_X86_64)
+#include "iree/builtins/ukernel/arch/x86_64/query_tile_sizes_x86_64.h"
 #endif
 
 static bool iree_uk_query_tile_sizes_operation_is_matmul(
@@ -45,6 +47,8 @@ static bool iree_uk_query_matmul_tile_sizes_arch(
     iree_uk_matmul_tile_sizes_t* out_matmul_tile_sizes) {
 #if defined(IREE_UK_ARCH_ARM_64)
   return iree_uk_query_matmul_tile_sizes_arm_64(params, out_matmul_tile_sizes);
+#elif defined(IREE_UK_ARCH_X86_64)
+  return iree_uk_query_matmul_tile_sizes_x86_64(params, out_matmul_tile_sizes);
 #endif
   return false;
 }

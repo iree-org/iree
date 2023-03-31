@@ -214,8 +214,12 @@ int main(int argc, char** argv) {
 #elif defined(IREE_UK_ARCH_X86_64)
   iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, cpu->avx2_fma);
   iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 2, cpu->avx2_fma);
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 8, cpu->avx2_fma);
+  iree_uk_test_pack(iree_uk_pack_type_i32i32, 8, 8, cpu->avx2_fma);
   iree_uk_test_pack(iree_uk_pack_type_f32f32, 16, 1, cpu->avx512_base);
   iree_uk_test_pack(iree_uk_pack_type_i8i8, 16, 2, cpu->avx512_base);
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 16, 16, cpu->avx512_base);
+  iree_uk_test_pack(iree_uk_pack_type_i32i32, 16, 16, cpu->avx512_base);
   // avx512_vnni uses the same tile size and same pack code as avx512_base.
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
