@@ -20,6 +20,7 @@ set(LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-llvmcpu-target-cpu=cascadelake"
   "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+  "--iree-flow-fuse-multi-use"
 )
 
 # CPU, LLVM, local-sync, x86_64, full-inference

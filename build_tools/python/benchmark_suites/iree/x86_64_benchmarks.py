@@ -26,14 +26,16 @@ class Linux_x86_64_Benchmarks(object):
   CASCADELAKE_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE,
       tags=["default-flags"],
-      compile_targets=[CASCADELAKE_CPU_TARGET])
+      compile_targets=[CASCADELAKE_CPU_TARGET],
+      extra_flags=["--iree-flow-fuse-multi-use"])
   CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_FUSE_PADDING,
       tags=["experimental-flags", "fuse-padding"],
       compile_targets=[CASCADELAKE_CPU_TARGET],
       extra_flags=[
           "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-          "--iree-llvmcpu-enable-pad-consumer-fusion"
+          "--iree-llvmcpu-enable-pad-consumer-fusion",
+          "--iree-flow-fuse-multi-use"
       ])
 
   def _generate_default(

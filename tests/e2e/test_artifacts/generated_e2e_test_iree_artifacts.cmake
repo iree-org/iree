@@ -207,6 +207,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -224,6 +225,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -241,6 +243,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileBertSquad_fp16(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -258,6 +261,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -275,6 +279,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -292,6 +297,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileNetV1_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -309,6 +315,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -326,6 +333,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -343,6 +351,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -360,6 +369,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -377,6 +387,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -394,6 +405,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -411,6 +423,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "EfficientNetV2STF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -428,6 +441,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MiniLML12H384Uncased(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -445,6 +459,7 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "EfficientNetV2SPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -462,6 +477,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "BertForMaskedLMTF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -479,6 +495,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "BertLargeTF(tf_v1) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -496,6 +513,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "Resnet50TF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -513,6 +531,7 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "ClipTextSeqLen64PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -530,6 +549,7 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "Unet2dPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -547,6 +567,7 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "EfficientNetB7PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
@@ -566,6 +587,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "DeepLabV3_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -585,6 +607,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -604,6 +627,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileBertSquad_fp16(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -623,6 +647,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -642,6 +667,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -661,6 +687,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileNetV1_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -680,6 +707,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -699,6 +727,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -718,6 +747,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -737,6 +767,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -756,6 +787,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -775,6 +807,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -794,6 +827,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "EfficientNetV2STF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -813,6 +847,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "MiniLML12H384Uncased(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -832,6 +867,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "BertForMaskedLMTF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -851,6 +887,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "BertLargeTF(tf_v1) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -870,6 +907,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "ClipTextSeqLen64PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -889,6 +927,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
   FRIENDLY_NAME
     "Unet2dPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
@@ -2395,6 +2434,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2414,6 +2454,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2433,6 +2474,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2452,6 +2494,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2471,6 +2514,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2490,6 +2534,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2509,6 +2554,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2528,6 +2574,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2547,6 +2594,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2566,6 +2614,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2585,6 +2634,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2604,6 +2654,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2623,6 +2674,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2642,6 +2694,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2661,6 +2714,7 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2680,6 +2734,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2699,6 +2754,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2718,6 +2774,7 @@ iree_bytecode_module(
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2737,6 +2794,7 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2756,6 +2814,7 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2775,6 +2834,7 @@ iree_bytecode_module(
     "--iree-input-type=none"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2796,6 +2856,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2817,6 +2878,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2838,6 +2900,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2859,6 +2922,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2880,6 +2944,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2901,6 +2966,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2922,6 +2988,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2943,6 +3010,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2964,6 +3032,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -2985,6 +3054,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -3006,6 +3076,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -3027,6 +3098,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -3048,6 +3120,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -3069,6 +3142,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -3090,6 +3164,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -3111,6 +3186,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -3132,6 +3208,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
@@ -3153,6 +3230,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
+    "--iree-flow-fuse-multi-use"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
   FRIENDLY_NAME
