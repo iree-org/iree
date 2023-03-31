@@ -38,4 +38,18 @@ LARGE = [
     torch_models.EFFICIENTNET_B7_FP32_TORCH,
 ]
 
-ALL = SMALL + LARGE
+# BERT-Large in various batch sizes.
+BERT_LARGE_TORCH_BATCHES = [
+    torch_models.BERT_LARGE_1X384_FP32_TORCH,
+    torch_models.BERT_LARGE_8X384_FP32_TORCH,
+    torch_models.BERT_LARGE_16X384_FP32_TORCH,
+    torch_models.BERT_LARGE_32X384_FP32_TORCH,
+    torch_models.BERT_LARGE_64X384_FP32_TORCH,
+    # Disabled due to https://github.com/openxla/iree/issues/12774.
+    #torch_models.BERT_LARGE_128X384_FP32_TORCH,
+    #torch_models.BERT_LARGE_256X384_FP32_TORCH,
+    #torch_models.BERT_LARGE_512X384_FP32_TORCH,
+    #torch_models.BERT_LARGE_1024X384_FP32_TORCH,
+]
+
+ALL = SMALL + LARGE + BERT_LARGE_TORCH_BATCHES
