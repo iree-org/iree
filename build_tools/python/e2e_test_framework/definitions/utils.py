@@ -29,22 +29,14 @@ def transform_flags(flags: Sequence[str],
 
   transformed_flags = []
   for flag in flags:
+    keyword, separator, value = ("", "", flag)
     if flag.startswith("-"):
-      # Keyword argument
-      split_pos = flag.find("=")
-      # Do nothing if there is no flag value.
-      if split_pos == -1:
-        transformed_flags.append(flag)
-        continue
-      value_pos = split_pos + 1
-    else:
-      # Positional argument
-      value_pos = 0
+      keyword, separator, value = flag.partition("=")    
 
-    new_value = flag[value_pos:]
-    for map_func in map_funcs:
-      new_value = map_func(new_value)
+    if value:
+      for map_func in map_funcs:
+        value = map_func(value)
 
-    transformed_flags.append(flag[:value_pos] + new_value)
+    transformed_flags.append(f"{keyword}{separator}{value}")
 
   return transformed_flags
