@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <stack>
-
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -720,26 +718,27 @@ void distributeReductionBroadcastTranspose(
   if (transposeOp) ops.insert(transposeOp);
 }
 
-static void replaceForOpWithNewSignature(
-    RewriterBase &rewriter, scf::ForOp loop, ValueRange newIterOperands,
-    DenseMap<Value, Layout> &layoutMap, DenseMap<Value, Value> &simdToSimtMap) {
+static void replaceForOpWithNewSignature(RewriterBase &rewriter,
+                                         scf::ForOp loop,
+                                         ValueRange newIterOperands,
+                                         DenseMap<Value, Layout> &layoutMap,
+                                         DenseMap<Value, Value> &simdToSimtMap,
+                                         llvm::SetVector<Operation *> &ops) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(loop);
 
   // Create a new loop before the existing one, with the extra operands.
   // We will be using dummy values instead of the old operands
   // only for those operands that are being distributed
-  SmallVector<Value> dummyOperands, newOperands;
+  SmallVector<Value> newOperands;
   auto operands = llvm::to_vector<4>(loop.getIterOperands());
   for (auto operand : operands) {
     if (!layoutMap.count(operand)) {
-      dummyOperands.push_back(operand);
       newOperands.push_back(operand);
       continue;
     }
     Value zero = rewriter.create<arith::ConstantOp>(
         loop.getLoc(), rewriter.getZeroAttr(operand.getType()));
-    dummyOperands.push_back(zero);
     newOperands.push_back(zero);
   }
 
@@ -777,7 +776,7 @@ static void replaceForOpWithNewSignature(
     simdToSimtMap.try_emplace(results[i], results[i + numOldResults]);
   }
 
-  rewriter.eraseOp(loop);
+  ops.insert(loop);
   return;
 }
 
@@ -795,7 +794,7 @@ void distributeFor(scf::ForOp forOp, DenseMap<Value, Layout> &layoutMap,
     newOperands.push_back(simdToSimtMap.at(operand.value()));
   }
   replaceForOpWithNewSignature(rewriter, forOp, newOperands, layoutMap,
-                               simdToSimtMap);
+                               simdToSimtMap, ops);
 }
 
 void distributeYield(scf::YieldOp yieldOp, DenseMap<Value, Layout> &layoutMap,
@@ -814,7 +813,8 @@ void distributeYield(scf::YieldOp yieldOp, DenseMap<Value, Layout> &layoutMap,
     yieldOperands[operand.index()] = loop.getIterOperands()[operand.index()];
     yieldOperands.push_back(simdToSimtMap.at(operand.value()));
   }
-  rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, yieldOperands);
+  rewriter.create<scf::YieldOp>(yieldOp.getLoc(), yieldOperands);
+  ops.insert(yieldOp);
 }
 
 void distributeConstants(arith::ConstantOp constantOp,
