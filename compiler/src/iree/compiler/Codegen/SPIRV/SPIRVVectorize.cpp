@@ -145,8 +145,6 @@ LogicalResult detectI8ToI32Matmul(vector::ContractionOp contract) {
   if (!mayExtI8ToI32(contract.getLhs()) || !mayExtI8ToI32(contract.getRhs()))
     return failure();
 
-  AffineExpr m, n, k;
-  bindDims(contract.getContext(), m, n, k);
   ArrayRef<Attribute> iteratorTypes = contract.getIteratorTypes().getValue();
   if (iteratorTypes.size() != 3) return failure();
 
