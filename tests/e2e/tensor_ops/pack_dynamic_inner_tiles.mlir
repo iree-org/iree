@@ -12,7 +12,10 @@ func.func private @generate_2D_source(%height : index, %width : index) -> tensor
       %linearized_i32 = arith.index_cast %linearized : index to i32
       linalg.yield %linearized_i32 : i32
   } -> tensor<?x?xi32>
-  return %source : tensor<?x?xi32>
+  // This blocks the fusion for inputs and testing ops.
+  %0 = util.optimization_barrier %source : tensor<?x?xi32>
+  %1 = flow.tensor.tie_shape %0 : tensor<?x?xi32>{%height, %width}
+  return %1 : tensor<?x?xi32>
 }
 
 func.func @fully_dynamic_pack_simple() {
