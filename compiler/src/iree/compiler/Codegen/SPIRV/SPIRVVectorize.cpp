@@ -35,8 +35,10 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -87,41 +89,42 @@ SmallVector<int64_t> getNativeVectorShapeImpl(VectorTransferOpInterface op) {
 }
 
 Operation *stripElementBitPatternPreservingParents(Value op) {
-  while (Operation *parent = op.getDefiningOp()) {
-    if (!parent) break;
+  while (Operation *parentOp = op.getDefiningOp()) {
+    Value source =
+        TypeSwitch<Operation *, Value>(parentOp)
+            .Case<vector::BroadcastOp>([](vector::BroadcastOp broadcast) {
+              return broadcast.getVector();
+            })
+            .Case<vector::ExtractOp, vector::ExtractElementOp,
+                  vector::ExtractStridedSliceOp>(
+                [](auto extract) { return extract.getVector(); })
+            .Case<vector::InsertOp, vector::InsertElementOp,
+                  vector::InsertStridedSliceOp>(
+                [](auto insert) { return insert.getSource(); })
+            .Case<vector::TransposeOp>([](vector::TransposeOp transpose) {
+              return transpose.getVector();
+            })
+            .Default([](Operation *) { return nullptr; });
 
-    if (auto broadcast = dyn_cast<vector::BroadcastOp>(parent)) {
-      op = broadcast.getVector();
-      continue;
-    }
-    if (auto extract = dyn_cast<vector::ExtractOp>(parent)) {
-      op = extract.getVector();
-      continue;
-    }
-    if (auto extract = dyn_cast<vector::ExtractStridedSliceOp>(parent)) {
-      op = extract.getVector();
-      continue;
-    }
-    if (auto extract = dyn_cast<vector::ExtractElementOp>(parent)) {
-      op = extract.getVector();
-      continue;
-    }
-    if (auto transpose = dyn_cast<vector::TransposeOp>(parent)) {
-      op = transpose.getVector();
-      continue;
-    }
-
-    break;
+    if (!source) break;
+    op = source;
   }
 
   return op.getDefiningOp();
 }
 
-bool isExt8To32(Value op) {
+/// Returns true when |op| has the i32 element type that is likely to be result
+/// of a zero/sign extension from i8.
+bool mayExtI8ToI32(Value op) {
   if (!getElementTypeOrSelf(op.getType()).isInteger(32)) return false;
 
   // Look through vector operations created by vector unrolling patterns,
-  // hoping to find a zero/sign extension op.
+  // hoping to find a zero/sign extension op. Note that we do not need to find
+  // the exact definition for |op| as the final extension will be matched by
+  // other patterns -- we only need a good enough proxy to know that one is
+  // likely to be found after canonicalization.
+  // TODO(#12543): Implement integer narrowing patterns to be able to tell for
+  // sure.
   Operation *def = stripElementBitPatternPreservingParents(op);
   Type inTy;
 
@@ -136,11 +139,12 @@ bool isExt8To32(Value op) {
   return inTy.isInteger(8);
 }
 
-/// Succeeds when |contract| is an i8 -> i32 matmul.
+/// Succeeds when |contract| is a i32 matmul whose LHS and RHS operands may be
+/// result of zero/sign extension of i8 inputs.
 LogicalResult detectI8ToI32Matmul(vector::ContractionOp contract) {
   if (contract.getKind() != vector::CombiningKind::ADD) return failure();
 
-  if (!isExt8To32(contract.getLhs()) || !isExt8To32(contract.getRhs()))
+  if (!mayExtI8ToI32(contract.getLhs()) || !mayExtI8ToI32(contract.getRhs()))
     return failure();
 
   AffineExpr m, n, k;

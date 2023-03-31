@@ -300,3 +300,25 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
 // CHECK-NEXT:    %[[W2:.+]]     = vector.transfer_write %{{.+}}, %[[W1]][%[[IDX2]], %[[IDX0]]]
 // CHECK-NEXT:    %[[W3:.+]]     = vector.transfer_write %{{.+}}, %[[W2]][%[[IDX3]], %[[IDX0]]]
 // CHECK-NEXT:    return %[[W3]] : tensor<4x4xi32>
+
+// -----
+
+// Check that emit SPIR-V integer dot product instructions when supported by
+// the target env. We expect the matmul to follow the inner product lowering.
+
+func.func @matmul_4x16x4_i8_to_i32_dot_prod(%lhs: tensor<4x16xi8>, %rhs : tensor<16x4xi8>) -> tensor<4x4xi32> attributes {
+  spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
+                                         [DotProduct, DotProductInputAll, DotProductInput4x8Bit],
+                                         [SPV_KHR_integer_dot_product]>,
+                                       #spirv.resource_limits<>> } {
+  %c0 = arith.constant 0 : i32
+  %i0 = arith.constant 0 : index
+  %init = tensor.empty() : tensor<4x4xi32>
+  %CC = linalg.fill ins(%c0 : i32) outs(%init : tensor<4x4xi32>) -> tensor<4x4xi32>
+  %D = linalg.matmul ins(%lhs, %rhs: tensor<4x16xi8>, tensor<16x4xi8>)
+                     outs(%CC: tensor<4x4xi32>) -> tensor<4x4xi32>
+  return %D : tensor<4x4xi32>
+}
+
+// CHECK-LABEL: func.func @matmul_4x16x4_i8_to_i32
+// CHECK-COUNT-64:          spirv.SDotAccSat
