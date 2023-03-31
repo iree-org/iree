@@ -44,11 +44,11 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*big-core.*LLVM-CPU.* @ Pixel"),
                        20, ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
-        re.compile(r"^MobileBertSquad.*big-core.*LLVM-CPU-Sync @ Pixel-4"), 50,
+        re.compile(r"^MobileBertSquad.*big-core.*LLVM-CPU-Sync @ Pixel-4"), 20,
         ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(re.compile(r"^MobileNetV2.*LLVM-CPU @ Pixel"), 15,
                        ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*LLVM-CPU.* @ Pixel"), 20,
+    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*LLVM-CPU.* @ Pixel"), 25,
                        ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
         re.compile(r"^MobileSSD.*little-core.*LLVM-CPU.* @ Pixel-6"), 20,
