@@ -115,71 +115,6 @@ class ImportOptions(CompilerOptions):
     self.import_type = ImportType.parse(self.import_type)
 
 
-def build_import_command_line(input_path: str, tfs: TempFileSaver,
-                              options: ImportOptions) -> List[str]:
-  """Builds a command line for invoking the import stage.
-
-  Args:
-    input_path: The input path.
-    tfs: TempFileSaver.
-    options: Import options.
-  Returns:
-    List of strings of command line.
-  """
-  tf_import = find_tool(_TF_IMPORT_TOOL)
-  cl = [
-      tf_import,
-      input_path,
-      f"--tf-import-type={options.import_type.value}",
-      f"--tf-savedmodel-exported-names={','.join(options.exported_names)}",
-      f"--tf-savedmodel-tags={','.join(options.saved_model_tags)}",
-  ]
-
-  if options.import_only and options.output_file:
-    # Import stage directly outputs.
-    output_file = tfs.alloc_optional("tf-output.mlir",
-                                     export_as=options.output_file)
-    cl.append(f"-o={output_file}")
-    cl.append(f"--output-format=mlir-ir")
-
-  # MLIR flags.
-  if options.output_mlir_debuginfo:
-    cl.append("--mlir-print-debuginfo")
-  if options.output_generic_mlir:
-    cl.append("--mlir-print-op-generic")
-
-  # Save temps flags.
-  save_tf_input = tfs.alloc_optional("tf-input.mlir",
-                                     export_as=options.save_temp_tf_input)
-  if save_tf_input:
-    cl.append(f"--save-temp-tf-input={save_tf_input}")
-  save_mid_level_input = tfs.alloc_optional(
-      "tf-mid-level-input.mlir", export_as=options.save_temp_mid_level_input)
-  if save_mid_level_input:
-    cl.append(f"--save-temp-mid-level-input={save_mid_level_input}")
-  save_iree_input = tfs.alloc_optional("tf-iree-input.mlir",
-                                       export_as=options.save_temp_iree_input)
-  if save_iree_input:
-    cl.append(f"--save-temp-iree-input={save_iree_input}")
-
-  if options.use_tosa:
-    cl.append(f"--use-tosa")
-
-  # Crash reproducer (locally qualified).
-  requested_crash_reproducer_path = options.crash_reproducer_path
-  if requested_crash_reproducer_path:
-    requested_crash_reproducer_path = (requested_crash_reproducer_path +
-                                       ".import-tf")
-  crash_reproducer_path = tfs.alloc_optional(
-      "tf-reproducer.mlir", export_as=requested_crash_reproducer_path)
-  if crash_reproducer_path:
-    cl.append(f"--mlir-pass-pipeline-crash-reproducer={crash_reproducer_path}")
-
-  # Extra args.
-  cl.extend(options.import_extra_args)
-  return cl
-
-
 def get_mlir(saved_model_dir, exported_names=None):
   from tensorflow.python import pywrap_mlir
 
@@ -207,15 +142,9 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
-  with TempFileSaver.implicit() as tfs:
-    options = ImportOptions(**kwargs)
-    import_cl = build_import_command_line(saved_model_dir, tfs, options)
-    if options.import_only:
-      # One stage tool pipeline.
-      result = invoke_immediate(import_cl)
-      if options.output_file:
-        return None
-      return result
+  # XXX: Remove if passes on github
+  if options.import_only:
+    raise Exception("Import only called!")
 
   with tempfile.NamedTemporaryFile(mode="w") as temp_file:
     # Generate MLIR
