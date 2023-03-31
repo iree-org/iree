@@ -18,12 +18,15 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -31,8 +34,10 @@
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
@@ -81,17 +86,106 @@ SmallVector<int64_t> getNativeVectorShapeImpl(VectorTransferOpInterface op) {
   return nativeSize;
 }
 
-SmallVector<int64_t> getNativeVectorShapeImpl(vector::ContractionOp op) {
-  // Find the contract output's innermost dimension. It is guaranteed to be a
-  // parallel dimension due to contract definition. Unroll it with compute
-  // size.
-  AffineMap resultMap = op.getIndexingMapsArray().back();
-  unsigned lastParallelDim =
-      resultMap.getDimPosition(resultMap.getNumResults() - 1);
-  SmallVector<int64_t> nativeSize(op.getIteratorTypes().size(), 1);
+Operation *stripElementBitPatternPreservingParents(Value op) {
+  while (Operation *parentOp = op.getDefiningOp()) {
+    Value source =
+        TypeSwitch<Operation *, Value>(parentOp)
+            .Case<vector::BroadcastOp>([](vector::BroadcastOp broadcast) {
+              return broadcast.getVector();
+            })
+            .Case<vector::ExtractOp, vector::ExtractElementOp,
+                  vector::ExtractStridedSliceOp>(
+                [](auto extract) { return extract.getVector(); })
+            .Case<vector::InsertOp, vector::InsertElementOp,
+                  vector::InsertStridedSliceOp>(
+                [](auto insert) { return insert.getSource(); })
+            .Case<vector::TransposeOp>([](vector::TransposeOp transpose) {
+              return transpose.getVector();
+            })
+            .Default([](Operation *) { return nullptr; });
+
+    if (!source) break;
+    op = source;
+  }
+
+  return op.getDefiningOp();
+}
+
+/// Returns true when |op| has the i32 element type that is likely to be result
+/// of a zero/sign extension from i8.
+bool mayExtI8ToI32(Value op) {
+  if (!getElementTypeOrSelf(op.getType()).isInteger(32)) return false;
+
+  // Look through vector operations created by vector unrolling patterns,
+  // hoping to find a zero/sign extension op. Note that we do not need to find
+  // the exact definition for |op| as the final extension will be matched by
+  // other patterns -- we only need a good enough proxy to know that one is
+  // likely to be found after canonicalization.
+  // TODO(#12543): Implement integer narrowing patterns to be able to tell for
+  // sure.
+  Operation *def = stripElementBitPatternPreservingParents(op);
+  Type inTy;
+
+  if (auto ext = dyn_cast_or_null<arith::ExtSIOp>(def)) {
+    inTy = getElementTypeOrSelf(ext.getIn().getType());
+  } else if (auto ext = dyn_cast_or_null<arith::ExtUIOp>(def)) {
+    inTy = getElementTypeOrSelf(ext.getIn().getType());
+  } else {
+    return false;
+  }
+
+  return inTy.isInteger(8);
+}
+
+/// Succeeds when |contract| is a i32 matmul whose LHS and RHS operands may be
+/// result of zero/sign extension of i8 inputs.
+LogicalResult detectI8ToI32Matmul(vector::ContractionOp contract) {
+  if (contract.getKind() != vector::CombiningKind::ADD) return failure();
+
+  if (!mayExtI8ToI32(contract.getLhs()) || !mayExtI8ToI32(contract.getRhs()))
+    return failure();
+
+  ArrayRef<Attribute> iteratorTypes = contract.getIteratorTypes().getValue();
+  if (iteratorTypes.size() != 3) return failure();
+
+  return success(vector::isParallelIterator(iteratorTypes[0]) &&
+                 vector::isParallelIterator(iteratorTypes[1]) &&
+                 vector::isReductionIterator(iteratorTypes[2]));
+}
+
+/// Returns the index of the reduction dimension.
+unsigned getReductionDim(vector::ContractionOp contract) {
+  AffineMap resultMap = contract.getIndexingMapsArray().back();
+  ArrayRef<Attribute> iteratorTypes = contract.getIteratorTypes().getValue();
+  for (auto [idx, it] : llvm::enumerate(iteratorTypes)) {
+    if (vector::isReductionIterator(it)) {
+      return idx;
+    }
+  }
+
+  // Return the last index as a fallback.
+  return resultMap.getNumDims() - 1;
+}
+
+unsigned getInnermostParallelDim(vector::ContractionOp contract) {
+  AffineMap resultMap = contract.getIndexingMapsArray().back();
+  return resultMap.getDimPosition(resultMap.getNumResults() - 1);
+}
+
+SmallVector<int64_t> getNativeVectorShapeImpl(vector::ContractionOp op,
+                                              bool targetSupportsDotProd) {
+  // Find the contract dimension to unroll. This depends on whether we use the
+  // outer product or inner product lowering. Outer product is the default
+  // strategy.
+  bool lowerToInnerProd =
+      targetSupportsDotProd && succeeded(detectI8ToI32Matmul(op));
+  unsigned unrollDim =
+      lowerToInnerProd ? getReductionDim(op) : getInnermostParallelDim(op);
+  auto iteratorTypes = op.getIteratorTypes().getValue();
+  SmallVector<int64_t> nativeSize(iteratorTypes.size(), 1);
   SmallVector<int64_t, 4> bounds;
   op.getIterationBounds(bounds);
-  nativeSize[lastParallelDim] = getComputeVectorSize(bounds[lastParallelDim]);
+  nativeSize[unrollDim] = getComputeVectorSize(bounds[unrollDim]);
   return nativeSize;
 }
 
@@ -120,7 +214,8 @@ SmallVector<int64_t> getNativeVectorShapeImpl(vector::TransposeOp op) {
   return nativeSize;
 }
 
-std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
+std::optional<SmallVector<int64_t>> getNativeVectorShape(
+    Operation *op, bool targetSupportsDotProd) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
@@ -130,10 +225,12 @@ std::optional<SmallVector<int64_t>> getNativeVectorShape(Operation *op) {
   }
 
   return TypeSwitch<Operation *, std::optional<SmallVector<int64_t>>>(op)
-      .Case<VectorTransferOpInterface, vector::ContractionOp,
-            vector::MultiDimReductionOp, vector::ReductionOp,
-            vector::TransposeOp>(
+      .Case<VectorTransferOpInterface, vector::MultiDimReductionOp,
+            vector::ReductionOp, vector::TransposeOp>(
           [](auto typedOp) { return getNativeVectorShapeImpl(typedOp); })
+      .Case<vector::ContractionOp>([=](auto contract) {
+        return getNativeVectorShapeImpl(contract, targetSupportsDotProd);
+      })
       .Default([](Operation *) { return std::nullopt; });
 }
 
@@ -150,10 +247,35 @@ void populateVectorizationPatterns(RewritePatternSet &patterns) {
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.
-void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
-  auto options =
-      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorShape);
+void populateVectorUnrollPatterns(RewritePatternSet &patterns,
+                                  bool targetSupportsDotProd) {
+  auto options = vector::UnrollVectorOptions().setNativeShapeFn(
+      [=](auto op) { return getNativeVectorShape(op, targetSupportsDotProd); });
   vector::populateVectorUnrollPatterns(patterns, options);
+}
+
+/// Returns true when the target environment support integer dot product ops.
+bool supportsIntegerDotProductOps(func::FuncOp fn) {
+  spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(fn);
+  if (!targetEnvAttr) {
+    // Alternatively, check if the function op itself has a target env
+    // attribute. This may be preferred in tests.
+    targetEnvAttr =
+        fn->getAttrOfType<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
+    if (!targetEnvAttr) return false;
+  }
+
+  spirv::TargetEnv targetEnv(targetEnvAttr);
+  if (!targetEnv.allows(spirv::Extension::SPV_KHR_integer_dot_product))
+    return false;
+
+  // Query all the dot prod capabilities except for the packed one -- none of
+  // the vectorization patterns need it.
+  if (!targetEnv.allows(spirv::Capability::DotProduct)) return false;
+  if (!targetEnv.allows(spirv::Capability::DotProductInput4x8Bit)) return false;
+  if (!targetEnv.allows(spirv::Capability::DotProductInputAll)) return false;
+
+  return true;
 }
 
 /// Vectorizes Linalg ops on buffer semantics.
@@ -171,6 +293,8 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
+
+    bool emitIntegerDotProdOps = supportsIntegerDotProductOps(funcOp);
 
     // First apply vectorization to generate vectors of the original tensor
     // shape.
@@ -280,11 +404,28 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // Prepare for SPIR-V integer dot product lowering.
+    if (emitIntegerDotProdOps) {
+      RewritePatternSet patterns(context);
+      vector::populateVectorContractCanonicalizeMatmulToMMT(
+          patterns, detectI8ToI32Matmul);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "--- After prepare for SPIR-V dot product lowering ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
+
     // Then unroll vectors to native vector size. We try to use 128-bit
     // vectors for memory access and 4/2/1 vector sizes for computation.
     {
       RewritePatternSet patterns(context);
-      populateVectorUnrollPatterns(patterns);
+      populateVectorUnrollPatterns(patterns, emitIntegerDotProdOps);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -381,6 +522,21 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+
+    // Lower vector reduction to SPIR-V integer dot product.
+    if (emitIntegerDotProdOps) {
+      RewritePatternSet patterns(context);
+      populateVectorReductionToSPIRVDotProductPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After lowering to SPIR-V dot product ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
 
     // Next perform hoisting. This would analyze transfer read/write ops into
     // tensors and hoist them out of loop nests. So after it we have
