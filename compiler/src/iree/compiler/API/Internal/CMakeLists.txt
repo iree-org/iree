@@ -115,10 +115,6 @@ if(IREE_LLD_TARGET)
   # Use generator expressions to conditionally include LLD targets, providing
   # a compiler definition if not available.
   macro(_add_dependent_lld_target target not_definition)
-    target_link_libraries(
-      iree_compiler_API_Internal_LLDToolEntryPoint
-      $<TARGET_NAME_IF_EXISTS:${target}>
-    )
     list(APPEND _lld_deps
       $<TARGET_NAME_IF_EXISTS:${target}>)
     list(APPEND _lld_copts
