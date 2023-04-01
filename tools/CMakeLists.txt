@@ -4,6 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Special case package namespace for tools/ -> "" (empty string)
+# For example, tools/iree-compile -> iree-compile (no namespace)
+set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
 # Tools IREE provides for compiling, executing, and benchmarking programs, as
 # well as other utilities.
 #
@@ -21,7 +25,12 @@
 # Write some important CMake options to a file for convenient use from scripts.
 configure_file(build_config_template.txt.in build_config.txt)
 
+# For sub-directories, we want targets fully qualified relative to the
+# root. But after, we want those in *this* directory to be unqualified
+# (i.e. 'iree-compile').
+set(IREE_PACKAGE_ROOT_PREFIX "iree/tools/")
 iree_add_all_subdirs()
+set(IREE_PACKAGE_ROOT_PREFIX "")
 
 # TODO(scotttodd): Should this be checking IREE_BUILD_COMPILER?
 #   Maybe we should disallow setting both at the same time, since it's

@@ -101,7 +101,7 @@ function(iree_c_module)
       "${_TESTONLY_ARG}"
     DEPS
       # Include paths and options for the runtime sources.
-      iree::runtime::src::defs
+      iree::defs
   )
 
   if(_RULE_NO_RUNTIME)

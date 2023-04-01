@@ -62,7 +62,8 @@ EDIT_BLOCKING_PATTERN = re.compile(
     r"bazel[\s_]*to[\s_]*cmake[\s_]*:?[\s_]*do[\s_]*not[\s_]*edit",
     flags=re.IGNORECASE)
 
-PRESERVE_TAG = "### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###"
+PRESERVE_ABOVE_TAG = "### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_ABOVE_THIS_LINE ###"
+PRESERVE_BELOW_TAG = "### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###"
 REPO_CFG_FILE = ".bazel_to_cmake.cfg.py"
 REPO_CFG_MODULE_NAME = "bazel_to_cmake_repo_config"
 
@@ -229,26 +230,34 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
   ] + ["#" * 80])
 
   old_lines = []
-  preserved_footer_lines = ["\n" + PRESERVE_TAG + "\n"]
+  possible_preserved_header_lines = []
+  preserved_footer_lines = ["\n" + PRESERVE_BELOW_TAG + "\n"]
 
   # Read CMakeLists.txt and check if it has the auto-generated header.
+  found_preserve_below_tag = False
+  found_preserve_above_tag = False
   if os.path.isfile(cmakelists_file_path):
     found_autogeneration_tag = False
-    found_preserve_tag = False
     with open(cmakelists_file_path) as f:
       old_lines = f.readlines()
 
     for line in old_lines:
+      if not found_preserve_above_tag:
+        possible_preserved_header_lines.append(line)
       if not found_autogeneration_tag and autogeneration_tag in line:
         found_autogeneration_tag = True
-      if not found_preserve_tag and PRESERVE_TAG in line:
-        found_preserve_tag = True
-      elif found_preserve_tag:
+      if not found_preserve_below_tag and PRESERVE_BELOW_TAG in line:
+        found_preserve_below_tag = True
+      elif not found_preserve_above_tag and PRESERVE_ABOVE_TAG in line:
+        found_preserve_above_tag = True
+      elif found_preserve_below_tag:
         preserved_footer_lines.append(line)
     if not found_autogeneration_tag:
       if verbosity >= 1:
         log(f"Skipped. Did not find autogeneration line.", indent=2)
       return Status.SKIPPED
+  preserved_header = ("".join(possible_preserved_header_lines)
+                      if found_preserve_above_tag else "")
   preserved_footer = "".join(preserved_footer_lines)
 
   # Read the Bazel BUILD file and interpret it.
@@ -276,7 +285,8 @@ def convert_directory(directory_path, write_files, allow_partial_conversion,
         f"Reason: `{type(e).__name__}: {e}`",
         indent=2)
     return Status.FAILED
-  converted_content = header + converted_build_file + preserved_footer
+  converted_content = (preserved_header + header + converted_build_file +
+                       preserved_footer)
   if write_files:
     with open(cmakelists_file_path, "wt") as cmakelists_file:
       cmakelists_file.write(converted_content)
