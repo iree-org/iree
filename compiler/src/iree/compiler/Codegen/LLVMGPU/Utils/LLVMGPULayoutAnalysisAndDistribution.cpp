@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -343,6 +344,49 @@ void propagateLayoutToFor(scf::ForOp forOp,
   }
 }
 
+static void propagateLayoutsToOthers(SmallVectorImpl<Value> &operands,
+                                     DenseMap<Value, Layout> &layoutMap) {
+  int numOperands = operands.size();
+  // Find an operand with a layout
+  int i;
+  for (i = 0; i < numOperands; i++) {
+    if (layoutMap.count(operands[i])) break;
+  }
+  // Propagate layout to others
+  for (int j = 0; j < numOperands; j++) {
+    if (j == i) continue;
+    if (!layoutMap.count(operands[j])) {
+      layoutMap.try_emplace(operands[j], layoutMap.at(operands[i]));
+      layoutMap.at(operands[j]).debugPrint("binary/unary operand");
+    } else {
+      assert(layoutMap.at(operands[i]) == layoutMap.at(operands[j]));
+    }
+  }
+}
+
+template <typename T>
+void propagateLayoutToBinaryOp(Operation *op,
+                               DenseMap<Value, Layout> &layoutMap) {
+  if (auto binaryOp = dyn_cast<T>(op)) {
+    Value lhs = binaryOp.getLhs();
+    Value rhs = binaryOp.getRhs();
+    Value result = binaryOp.getResult();
+    SmallVector<Value> operands{lhs, rhs, result};
+    propagateLayoutsToOthers(operands, layoutMap);
+  }
+}
+
+template <typename T>
+void propagateLayoutToUnaryOp(Operation *op,
+                              DenseMap<Value, Layout> &layoutMap) {
+  if (auto unaryOp = dyn_cast<T>(op)) {
+    Value operand = unaryOp.getOperand();
+    Value result = unaryOp.getResult();
+    SmallVector<Value> operands{operand, result};
+    propagateLayoutsToOthers(operands, layoutMap);
+  }
+}
+
 void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
   if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
     auto [broadcastOp, transposeOp] =
@@ -353,6 +397,8 @@ void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
   if (auto forOp = dyn_cast<scf::ForOp>(op)) {
     propagateLayoutToFor(forOp, layoutMap);
   }
+  propagateLayoutToBinaryOp<arith::SubFOp>(op, layoutMap);
+  propagateLayoutToUnaryOp<math::ExpOp>(op, layoutMap);
 }
 
 void distributeTransferReads(vector::TransferReadOp readOp,
@@ -842,6 +888,44 @@ void distributeConstants(arith::ConstantOp constantOp,
   simdToSimtMap.try_emplace(constant, result);
 }
 
+template <typename T>
+void distributeBinaryOp(Operation *op, DenseMap<Value, Layout> &layoutMap,
+                        DenseMap<Value, Value> &simdToSimtMap,
+                        IRRewriter &rewriter,
+                        llvm::SetVector<Operation *> &ops) {
+  if (auto binaryOp = dyn_cast<T>(op)) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(binaryOp);
+    Value lhs = binaryOp.getLhs();
+    if (!simdToSimtMap.count(lhs)) return;
+    Value rhs = binaryOp.getRhs();
+    if (!simdToSimtMap.count(rhs)) return;
+    Value newResult = rewriter.create<T>(
+        binaryOp.getLoc(), simdToSimtMap.at(lhs), simdToSimtMap.at(rhs));
+    Value result = binaryOp.getResult();
+    simdToSimtMap.try_emplace(result, newResult);
+    ops.insert(binaryOp);
+  }
+}
+
+template <typename T>
+void distributeUnaryOp(Operation *op, DenseMap<Value, Layout> &layoutMap,
+                       DenseMap<Value, Value> &simdToSimtMap,
+                       IRRewriter &rewriter,
+                       llvm::SetVector<Operation *> &ops) {
+  if (auto unaryOp = dyn_cast<T>(op)) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(unaryOp);
+    Value operand = unaryOp.getOperand();
+    if (!simdToSimtMap.count(operand)) return;
+    Value newResult =
+        rewriter.create<T>(unaryOp.getLoc(), simdToSimtMap.at(operand));
+    Value result = unaryOp.getResult();
+    simdToSimtMap.try_emplace(result, newResult);
+    ops.insert(unaryOp);
+  }
+}
+
 static void eraseOps(llvm::SetVector<Operation *> &opsToErase,
                      IRRewriter &rewriter) {
   for (int i = opsToErase.size() - 1; i >= 0; i--) {
@@ -923,6 +1007,10 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
       distributeConstants(constantOp, layoutMap, simdToSimtMap, rewriter,
                           opsToErase);
     }
+    distributeBinaryOp<arith::SubFOp>(op, layoutMap, simdToSimtMap, rewriter,
+                                      opsToErase);
+    distributeUnaryOp<math::ExpOp>(op, layoutMap, simdToSimtMap, rewriter,
+                                   opsToErase);
   }
 
   // Erase old ops

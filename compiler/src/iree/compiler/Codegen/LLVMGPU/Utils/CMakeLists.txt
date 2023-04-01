@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRGPUOps
     MLIRIR
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRNVGPUDialect
     MLIRVectorDialect
