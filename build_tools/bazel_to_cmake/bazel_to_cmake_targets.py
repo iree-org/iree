@@ -58,6 +58,7 @@ class TargetConverter:
         "@llvm-project//llvm:FileCheck": ["FileCheck"],
         "@llvm-project//llvm:not": ["not"],
         "@llvm-project//llvm:llvm-link": ["${IREE_LLVM_LINK_TARGET}"],
+        "@llvm-project//llvm:NVPTXUtilsAndDesc": ["LLVMNVPTXDesc",],
 
         # MLIR
         "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
