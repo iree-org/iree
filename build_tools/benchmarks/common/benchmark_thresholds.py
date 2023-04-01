@@ -78,6 +78,8 @@ BENCHMARK_THRESHOLDS = [
                        ThresholdUnit.VALUE_NS),
     BenchmarkThreshold(re.compile(r"^MobileNetV3Small_fp32.*x86_64"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
+    BenchmarkThreshold(re.compile(r"^PersonDetect_int8.*x86_64"), 5 * 10**5,
+                       ThresholdUnit.VALUE_NS),
     BenchmarkThreshold(re.compile(r"^PoseNet_fp32.*x86_64"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
 
