@@ -110,8 +110,7 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
       // Non-degenerate cases.
       {1, 1},
       {3, 2},
-      {7, 8},
-      {31, 33},
+      {9, 33},
   };
   typedef enum {
     pad_none,
@@ -132,12 +131,8 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
           params.in_size0 = in_size0;
           params.in_size1 = in_size1;
           if (pad == pad_a_lot) {
-            // Makes the test expensive, and covers a corner case that shouldn't
-            // require large sizes. Try to be economical.
-            if (params.in_size0 <= 8 && params.in_size1 <= 8) {
-              params.in_size0 += 64;
-              params.in_size1 += 64;
-            }
+            params.in_size0 += 16;
+            params.in_size1 += 16;
           }
           iree_uk_ssize_t tile_size0 = params.in_size2;
           iree_uk_ssize_t tile_size1 = params.in_size3;

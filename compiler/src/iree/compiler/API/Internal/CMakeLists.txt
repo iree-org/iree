@@ -86,23 +86,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    LLDToolEntryPoint
-  SRCS
-    "LLDToolEntryPoint.cpp"
-  DEPS
-    LLVMSupport
-    LLVMTargetParser
-    iree::compiler::bindings::c::headers
-    lldCOFF
-    lldCommon
-    lldELF
-    lldMachO
-    lldWasm
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     MLIRInterop
   SRCS
     "MLIRInterop.cpp"
@@ -124,3 +107,39 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+set(_lld_copts)
+set(_lld_deps)
+
+if(IREE_LLD_TARGET)
+  # Use generator expressions to conditionally include LLD targets, providing
+  # a compiler definition if not available.
+  macro(_add_dependent_lld_target target not_definition)
+    list(APPEND _lld_deps
+      $<TARGET_NAME_IF_EXISTS:${target}>)
+    list(APPEND _lld_copts
+      $<IF:$<TARGET_EXISTS:${target}>,,-D${not_definition}>)
+  endmacro()
+  list(APPEND _lld_deps lldCommon)
+  _add_dependent_lld_target(lldCOFF IREE_COMPILER_LLD_COFF_DISABLED)
+  _add_dependent_lld_target(lldELF IREE_COMPILER_LLD_ELF_DISABLED)
+  _add_dependent_lld_target(lldMachO IREE_COMPILER_LLD_MACHO_DISABLED)
+  _add_dependent_lld_target(lldWasm IREE_COMPILER_LLD_WASM_DISABLED)
+else()
+  list(APPEND _lld_copts -DIREE_COMPILER_LLD_DISABLED)
+endif()
+
+iree_cc_library(
+  NAME
+    LLDToolEntryPoint
+  SRCS
+    "LLDToolEntryPoint.cpp"
+  COPTS
+    ${_lld_copts}
+  DEPS
+    LLVMSupport
+    LLVMTargetParser
+    iree::compiler::bindings::c::headers
+    ${_lld_deps}
+  PUBLIC
+)
