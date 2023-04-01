@@ -11,19 +11,6 @@ set(IREE_PACKAGE_ROOT_PREFIX "")
 # which provides common includes and copts for the tree.
 set(IREE_IMPLICIT_DEFS_CC_DEPS iree::compiler::defs)
 
-# iree_cc_library(
-#   NAME
-#     defs
-#   INCLUDES
-#     ${CMAKE_CURRENT_SOURCE_DIR}
-#     ${CMAKE_CURRENT_BINARY_DIR}
-#   PUBLIC
-# )
-
-# # Configures all iree_cc_* targets to take this implicit dep,
-# # which provides common includes and copts for the tree.
-# set(IREE_IMPLICIT_DEFS_CC_DEPS iree::compiler::src::defs)
-
 # Force enable BUILD_SHARED_LIBS for the compiler if instructed.
 set(_IREE_ORIG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 if(IREE_COMPILER_BUILD_SHARED_LIBS)
