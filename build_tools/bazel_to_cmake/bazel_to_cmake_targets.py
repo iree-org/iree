@@ -229,7 +229,8 @@ class TargetConverter:
     # Pass through package-relative targets
     #   :target_name
     #   file_name.txt
-    if target.startswith(":") or (":" not in target and not target.startswith("/")):
+    if target.startswith(":") or (":" not in target and
+                                  not target.startswith("/")):
       return [self._convert_to_cmake_path(target)]
 
     return self._convert_unmatched_target(target)
