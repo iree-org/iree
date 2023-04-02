@@ -1,0 +1,117 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Sets up a github workflow.
+# It is designed to be called from a parent workflow.
+# The concurrency of this workflow is controlled by the caller's job.
+
+name: Setup
+
+on:
+  workflow_call:
+    outputs:
+      should-run:
+        description: |
+          Whether CI should run.
+        value: ${{ jobs.setup.outputs.should-run }}
+      is-pr:
+        description: |
+          Whether the workflow has been triggered by a pull request.
+        value: ${{ jobs.setup.outputs.is-pr }}
+      runner-env:
+        description: |
+          The runner environment to use.
+        value: ${{ jobs.setup.outputs.runner-env }}
+      runner-group:
+        description: |
+          The runner group to use.
+        value: ${{ jobs.setup.outputs.runner-group }}
+      write-caches:
+        description: |
+          Whether to write to caches.
+        value: ${{ jobs.setup.outputs.write-caches }}
+      benchmark-presets:
+        description: |
+          A comma-separated string of benchmarks to run.
+        value: ${{ jobs.setup.outputs.benchmark-presets }}
+
+
+env:
+  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # instead of the outputs of setup because it contains the run attempt and we
+  # want that to be the current attempt, not whatever attempt the setup step
+  # last ran in. It therefore can't be passed in via inputs because the env
+  # context isn't available there.
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+
+jobs:
+  setup:
+    runs-on: ubuntu-20.04
+    env:
+      # The commit being checked out is the merge commit for the PR. Its first
+      # parent will be the tip of main.
+      BASE_REF: HEAD^
+    outputs:
+      should-run: ${{ steps.configure.outputs.should-run }}
+      is-pr: ${{ steps.configure.outputs.is-pr }}
+      runner-env: ${{ steps.configure.outputs.runner-env }}
+      runner-group: ${{ steps.configure.outputs.runner-group }}
+      write-caches: ${{ steps.configure.outputs.write-caches }}
+      benchmark-presets: ${{ steps.configure.outputs.benchmark-presets }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          # We need the parent commit to do a diff
+          fetch-depth: 2
+      - name: "Fetching PR description"
+        # We fetch the latest pull request data (description, labels, ...) from
+        # API instead of using stale one from pull_request event. This makes it
+        # possible to update the trailers, labels on the pull request and re-run
+        # the workflow to make them take effect.
+        # This is majorly for triggering benchmarks without pushing new commits.
+        # See https://github.com/openxla/iree/issues/10042#issuecomment-1449250094
+        # for more details.
+        id: fetch-pr
+        if: github.event_name == 'pull_request'
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          PR_JSON: pull_request.json
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > "${PR_JSON}"
+          # It requires delimiter to pass multiline strings through
+          # GITHUB_OUTPUT. Since these are already escaped JSON strings, pass
+          # the JSON strings and later use fromJSON to decode them.
+          echo "pr-title=$(jq '.title' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
+          echo "pr-body=$(jq '.body' ${PR_JSON})" >> "${GITHUB_OUTPUT}"
+          # Use --compact-output to avoid multiline JSON.
+          echo "pr-labels=$(jq --compact-output '.labels | map(.name)' \
+            ${PR_JSON})" >> "${GITHUB_OUTPUT}"
+      - name: "Configuring CI options"
+        id: configure
+        env:
+          PR_TITLE: ${{ fromJSON(steps.fetch-pr.outputs.pr-title || '""') }}
+          PR_BODY: ${{ fromJSON(steps.fetch-pr.outputs.pr-body || '""') }}
+          PR_LABELS: ${{ steps.fetch-pr.outputs.pr-labels || '[]' }}
+          ORIGINAL_PR_TITLE: ${{ github.event.pull_request.title }}
+          ORIGINAL_PR_BODY: ${{ github.event.pull_request.body }}
+          ORIGINAL_PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          # Just informative logging. There should only be two commits in the
+          # history here, but limiting the depth helps when copying from a local
+          # repo instead of using checkout, e.g. with
+          # https://github.com/nektos/act where there will be more.
+          git log --oneline --graph --max-count=3
+
+          ./build_tools/github_actions/configure_ci.py
+
+      - name: "Show benchmark presets"
+        env:
+          BENCHMARK_PRESETS: ${{ steps.configure.outputs.benchmark-presets }}
+        run: |
+          echo ":stopwatch: Enabled benchmarks: \`${BENCHMARK_PRESETS}\`" \
+            >> "${GITHUB_STEP_SUMMARY}"

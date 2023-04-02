@@ -158,15 +158,15 @@ iree_import_tf_model(
 
 iree_import_tf_model(
   TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f"
+    "${PACKAGE_NAME}_iree-imported-model-b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635"
   SOURCE
-    "${ROOT_ARTIFACTS_DIR}/model_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF"
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-1_Resnet50TFBatch1"
   IMPORT_FLAGS
     "--output-format=mlir-bytecode"
     "--tf-import-type=savedmodel_v2"
     "--tf-savedmodel-exported-names=forward"
   OUTPUT_MLIR_FILE
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635.mlir"
 )
 
 iree_import_tf_model(
@@ -193,6 +193,58 @@ iree_import_tf_model(
     "--tf-savedmodel-exported-names=serving_default"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_2494ed4b5c065c4a78b03d46161d4c9cccef27edf9568170c7dd2158281fe697.mlir"
+)
+
+iree_import_tf_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-830d6f2775a6d19551826e6aa0bb4822feef6c5908023c81c8b02ef29fdb7a41"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-8_Resnet50TFBatch8"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v2"
+    "--tf-savedmodel-exported-names=forward"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_830d6f2775a6d19551826e6aa0bb4822feef6c5908023c81c8b02ef29fdb7a41.mlir"
+)
+
+iree_import_tf_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-de3ec8610ae583fef77e064e7e93ca0c71ab93c471458e6538fa0f722ce64d25"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-64_Resnet50TFBatch64"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v2"
+    "--tf-savedmodel-exported-names=forward"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_de3ec8610ae583fef77e064e7e93ca0c71ab93c471458e6538fa0f722ce64d25.mlir"
+)
+
+iree_import_tf_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-4ddc42daca54a45b7c253bb2eb9020408caff7af1eeac74e66824690358fb618"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-128_Resnet50TFBatch128"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v2"
+    "--tf-savedmodel-exported-names=forward"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_4ddc42daca54a45b7c253bb2eb9020408caff7af1eeac74e66824690358fb618.mlir"
+)
+
+iree_import_tf_model(
+  TARGET_NAME
+    "${PACKAGE_NAME}_iree-imported-model-96010ccd86d78b4f59d4cb1ed29d9077700cb3690bdacbd89792cd0645d5975b"
+  SOURCE
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-256_Resnet50TFBatch256"
+  IMPORT_FLAGS
+    "--output-format=mlir-bytecode"
+    "--tf-import-type=savedmodel_v2"
+    "--tf-savedmodel-exported-names=forward"
+  OUTPUT_MLIR_FILE
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_96010ccd86d78b4f59d4cb1ed29d9077700cb3690bdacbd89792cd0645d5975b.mlir"
 )
 
 iree_bytecode_module(
@@ -435,18 +487,18 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-7a0add4835462bc66025022cdb6e87569da79cf103825a809863b8bd57a49055"
+    "iree-module-10a9a8a00ac0f36f45b5e35a032ca177b68621e3137dc57b9d6e08225301441b"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_module_7a0add4835462bc66025022cdb6e87569da79cf103825a809863b8bd57a49055/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_10a9a8a00ac0f36f45b5e35a032ca177b68621e3137dc57b9d6e08225301441b/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
   FRIENDLY_NAME
-    "Resnet50TF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+    "Resnet50TFBatch1(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -927,22 +979,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-fd81a89e9f8773bae142040775c7e3c4774f96b64f07f8d9f66b00191864ff40"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_module_fd81a89e9f8773bae142040775c7e3c4774f96b64f07f8d9f66b00191864ff40/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME
-    "Resnet50TF(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-bdd904cc5614ebf77609c7802a2dfc09f139aee2a247a247d10d320de72b0e28"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_a3a701aaac95a47e7e0c1875793fbe88c976864cac611ccdf7d373d43d670225.mlir"
@@ -1018,6 +1054,86 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
     "EfficientNetB7PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-58f67edb580a13aa98d3fd05ad31f207d62462c9de990825656b19d2fbacda3c"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_58f67edb580a13aa98d3fd05ad31f207d62462c9de990825656b19d2fbacda3c/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  FRIENDLY_NAME
+    "Resnet50TFBatch1(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-1655ee92ee23748886eef280d7d6f96c8a227fae7d6d78abd3466ce8614f16ba"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_830d6f2775a6d19551826e6aa0bb4822feef6c5908023c81c8b02ef29fdb7a41.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_module_1655ee92ee23748886eef280d7d6f96c8a227fae7d6d78abd3466ce8614f16ba/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  FRIENDLY_NAME
+    "Resnet50TFBatch8(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-496bdea78d06c9c32d8deae84b088b0eb34f6d1982ac790e2580a50dec4281ae"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_de3ec8610ae583fef77e064e7e93ca0c71ab93c471458e6538fa0f722ce64d25.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_module_496bdea78d06c9c32d8deae84b088b0eb34f6d1982ac790e2580a50dec4281ae/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  FRIENDLY_NAME
+    "Resnet50TFBatch64(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-5aa3c57b33d354d5ebfe51626e2dac78485a548aa9bf2fba7a3e7a248f8b909e"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_4ddc42daca54a45b7c253bb2eb9020408caff7af1eeac74e66824690358fb618.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_module_5aa3c57b33d354d5ebfe51626e2dac78485a548aa9bf2fba7a3e7a248f8b909e/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  FRIENDLY_NAME
+    "Resnet50TFBatch128(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-a52ef9f5a8c064a4cbf52ea82b694d2c0bb9a0dd43d3576131335ab5453b62a4"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_96010ccd86d78b4f59d4cb1ed29d9077700cb3690bdacbd89792cd0645d5975b.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_module_a52ef9f5a8c064a4cbf52ea82b694d2c0bb9a0dd43d3576131335ab5453b62a4/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  FRIENDLY_NAME
+    "Resnet50TFBatch256(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -2598,11 +2714,11 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-846b19afd4c14b3e71d59087c5a2987edd65753d39db432961ce915688d457ac"
+    "iree-module-ee88f7648c08cb775827b3afa89a2aaccd34eff697306c2b35598ba7e4c78df8"
   SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f.mlir"
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635.mlir"
   MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_module_846b19afd4c14b3e71d59087c5a2987edd65753d39db432961ce915688d457ac/module.vmfb"
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_ee88f7648c08cb775827b3afa89a2aaccd34eff697306c2b35598ba7e4c78df8/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
@@ -2611,9 +2727,9 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_module_846b19afd4c14b3e71d59087c5a2987edd65753d39db432961ce915688d457ac/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_ee88f7648c08cb775827b3afa89a2aaccd34eff697306c2b35598ba7e4c78df8/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50TF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+    "Resnet50TFBatch1(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3202,26 +3318,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-f770b1916e0b7a9a0b4aa9480791d21a46a352002ac1e38dfcea49ec0b63ed4e"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_module_f770b1916e0b7a9a0b4aa9480791d21a46a352002ac1e38dfcea49ec0b63ed4e/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_module_f770b1916e0b7a9a0b4aa9480791d21a46a352002ac1e38dfcea49ec0b63ed4e/scheduling_stats.json"
-  FRIENDLY_NAME
-    "Resnet50TF(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-8b19868be1c797cb585551c871c4171e78817e0efc49d30d91b9d722be283de9"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_a3a701aaac95a47e7e0c1875793fbe88c976864cac611ccdf7d373d43d670225.mlir"
@@ -3317,6 +3413,106 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_3c94ab45ad76bd8b2083729b65340b987da3247c854faf7d06431cb05a3b0a23/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNetB7PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-2fe6a4ac93d74732ebabbd87e84e6ec56d2aeb9f6a94f5b595f74f947498c579"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_2fe6a4ac93d74732ebabbd87e84e6ec56d2aeb9f6a94f5b595f74f947498c579/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_2fe6a4ac93d74732ebabbd87e84e6ec56d2aeb9f6a94f5b595f74f947498c579/scheduling_stats.json"
+  FRIENDLY_NAME
+    "Resnet50TFBatch1(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-32dfb79e574ef282dd352a156620d44d545dda0f49ea1ac27394028d2ced46a8"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_830d6f2775a6d19551826e6aa0bb4822feef6c5908023c81c8b02ef29fdb7a41.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_module_32dfb79e574ef282dd352a156620d44d545dda0f49ea1ac27394028d2ced46a8/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_module_32dfb79e574ef282dd352a156620d44d545dda0f49ea1ac27394028d2ced46a8/scheduling_stats.json"
+  FRIENDLY_NAME
+    "Resnet50TFBatch8(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-3421bd5d457a3ed62e7aa74559afb7199105c1f60b65090a247ee3e6d9aec69c"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_de3ec8610ae583fef77e064e7e93ca0c71ab93c471458e6538fa0f722ce64d25.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_module_3421bd5d457a3ed62e7aa74559afb7199105c1f60b65090a247ee3e6d9aec69c/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_module_3421bd5d457a3ed62e7aa74559afb7199105c1f60b65090a247ee3e6d9aec69c/scheduling_stats.json"
+  FRIENDLY_NAME
+    "Resnet50TFBatch64(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-5663bccd89aa0616691d5b804b337c8989a2ca94c1bf2673d41dbbab9e511f20"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_4ddc42daca54a45b7c253bb2eb9020408caff7af1eeac74e66824690358fb618.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_module_5663bccd89aa0616691d5b804b337c8989a2ca94c1bf2673d41dbbab9e511f20/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_module_5663bccd89aa0616691d5b804b337c8989a2ca94c1bf2673d41dbbab9e511f20/scheduling_stats.json"
+  FRIENDLY_NAME
+    "Resnet50TFBatch128(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-353a915204b8eb401d0caac543588920cfab76f826463394cc1e99546cab13bb"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_96010ccd86d78b4f59d4cb1ed29d9077700cb3690bdacbd89792cd0645d5975b.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_module_353a915204b8eb401d0caac543588920cfab76f826463394cc1e99546cab13bb/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_module_353a915204b8eb401d0caac543588920cfab76f826463394cc1e99546cab13bb/scheduling_stats.json"
+  FRIENDLY_NAME
+    "Resnet50TFBatch256(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4908,7 +5104,7 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-3bda9f3a5eb6a0fd3adc80187495d7ab840e409f379c70e3fd687934fafdd3b6
   ${PACKAGE_NAME}_iree-imported-model-213fe9a8738a01f2b02b6f0614a40a31c83a2603ca3e3ae0aeab8090fedbe3a0
   ${PACKAGE_NAME}_iree-imported-model-d4a10c6d3e8a11d808baf398822ea8b61be07673517ff9be30fbe199b7fdd960
-  ${PACKAGE_NAME}_iree-imported-model-a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f
+  ${PACKAGE_NAME}_iree-imported-model-b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635
   ${PACKAGE_NAME}_model-cc474102-7d2f-4ec1-92ae-84e83ba0f390
   ${PACKAGE_NAME}_iree-imported-model-a3a701aaac95a47e7e0c1875793fbe88c976864cac611ccdf7d373d43d670225
   ${PACKAGE_NAME}_iree-imported-model-2494ed4b5c065c4a78b03d46161d4c9cccef27edf9568170c7dd2158281fe697
@@ -4923,6 +5119,10 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_model-fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-8
   ${PACKAGE_NAME}_model-9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8
   ${PACKAGE_NAME}_model-340553d1-e6fe-41b6-b2c7-687c74ccec56
+  ${PACKAGE_NAME}_iree-imported-model-830d6f2775a6d19551826e6aa0bb4822feef6c5908023c81c8b02ef29fdb7a41
+  ${PACKAGE_NAME}_iree-imported-model-de3ec8610ae583fef77e064e7e93ca0c71ab93c471458e6538fa0f722ce64d25
+  ${PACKAGE_NAME}_iree-imported-model-4ddc42daca54a45b7c253bb2eb9020408caff7af1eeac74e66824690358fb618
+  ${PACKAGE_NAME}_iree-imported-model-96010ccd86d78b4f59d4cb1ed29d9077700cb3690bdacbd89792cd0645d5975b
 )
 
 add_dependencies(iree-benchmark-suites
@@ -4940,7 +5140,7 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-78154d58dddac432100d656b22fa9bcb45e4207a9ea2bc371bf089a68bad397a
   ${PACKAGE_NAME}_iree-module-c8949024e2472bec7b18c4e3757412715c248273005ca6f8d5769656ed425a84
   ${PACKAGE_NAME}_iree-module-a30b64a3d7850881ee9db94e8f75c661af3f76f48d10b3342a6912e1c8879252
-  ${PACKAGE_NAME}_iree-module-7a0add4835462bc66025022cdb6e87569da79cf103825a809863b8bd57a49055
+  ${PACKAGE_NAME}_iree-module-10a9a8a00ac0f36f45b5e35a032ca177b68621e3137dc57b9d6e08225301441b
   ${PACKAGE_NAME}_iree-module-047e75c462648b5fe1133f4ffbc3d1c7bdda154081d3eaa3be0b5445725b272b
   ${PACKAGE_NAME}_iree-module-1c7402f88ba881ec6abb39204faa4b5fedb2ffff4a6066555fcff0c7c4b74732
   ${PACKAGE_NAME}_iree-module-9c849d0ccfc89c0bca0740949572db8735832012a43c4c9f15c3a8ef0d9cca04
@@ -4968,12 +5168,16 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-39556c12d84502be71243197b99b0f8c22949093c561c55c01ca906812a86288
   ${PACKAGE_NAME}_iree-module-04ca0a5077b7dd5ace66d803c9b822dff3428b24e7620a61995aff0907af9533
   ${PACKAGE_NAME}_iree-module-deafafd0926321a4b8e4dc73ed4a30b2ed9317d26488246461415be2ee857eb1
-  ${PACKAGE_NAME}_iree-module-fd81a89e9f8773bae142040775c7e3c4774f96b64f07f8d9f66b00191864ff40
   ${PACKAGE_NAME}_iree-module-bdd904cc5614ebf77609c7802a2dfc09f139aee2a247a247d10d320de72b0e28
   ${PACKAGE_NAME}_iree-module-45565cae821666fd34bca97be2e4cce3bd61e71308785728737d89acbb9bc9d2
   ${PACKAGE_NAME}_iree-module-c4b43b31944dbd567e48efacfdb33f707eb248538cf70fa7dcf1085c6c7dbd3f
   ${PACKAGE_NAME}_iree-module-c8ec2db5ee884e0af17814e61b13d7f7f1f2d4f7028e8c1920d0d968c27de2bb
   ${PACKAGE_NAME}_iree-module-9470c46965ea67794da45496454c82eade29b5a519d8037b1314738621e02260
+  ${PACKAGE_NAME}_iree-module-58f67edb580a13aa98d3fd05ad31f207d62462c9de990825656b19d2fbacda3c
+  ${PACKAGE_NAME}_iree-module-1655ee92ee23748886eef280d7d6f96c8a227fae7d6d78abd3466ce8614f16ba
+  ${PACKAGE_NAME}_iree-module-496bdea78d06c9c32d8deae84b088b0eb34f6d1982ac790e2580a50dec4281ae
+  ${PACKAGE_NAME}_iree-module-5aa3c57b33d354d5ebfe51626e2dac78485a548aa9bf2fba7a3e7a248f8b909e
+  ${PACKAGE_NAME}_iree-module-a52ef9f5a8c064a4cbf52ea82b694d2c0bb9a0dd43d3576131335ab5453b62a4
   ${PACKAGE_NAME}_iree-module-68f0eb37bb72d0d6605ecdf42691c64125960e122844b0beeae350871a445b1c
   ${PACKAGE_NAME}_iree-module-a7a1553d0739151f06bbc00a3ef8b67b0606463eab4b6607069aa94ea0bfd92f
   ${PACKAGE_NAME}_iree-module-e80d71ed8e86c0756226b2323e27e2c7c0fff8eddde59ba69e9222d36ee3eef6
@@ -5064,7 +5268,7 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-78511a42a50f705b944437a040e1ee3bb5b2595a3b1d4db788586fe48f9a2453
   ${PACKAGE_NAME}_iree-module-01d35de2a55b9800e05151455eace0bf4493337ac1210fcc4904d630b075599a
   ${PACKAGE_NAME}_iree-module-2957930127e9b01e90ccddb7290e1c4b4abf6373cc36929809040e2c144d3fd7
-  ${PACKAGE_NAME}_iree-module-846b19afd4c14b3e71d59087c5a2987edd65753d39db432961ce915688d457ac
+  ${PACKAGE_NAME}_iree-module-ee88f7648c08cb775827b3afa89a2aaccd34eff697306c2b35598ba7e4c78df8
   ${PACKAGE_NAME}_iree-module-b5078b9d2031b69ec5ce9b775c8701cef73add8ebfb786d9189ca3fb6474cf73
   ${PACKAGE_NAME}_iree-module-ddd1657bc5433ccca5c8ce562f581626457a793670958cd8b4016c426191a9c4
   ${PACKAGE_NAME}_iree-module-8ee3c7b136703472b53bc8a19d8d28945aca93953612ccc65e55cd1b3dfda6c8
@@ -5092,12 +5296,16 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-3b0ae1403ef444d812f0c7b37fda7311e2cc4ea407850ee7b91e6984b9c86100
   ${PACKAGE_NAME}_iree-module-25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509
   ${PACKAGE_NAME}_iree-module-65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b
-  ${PACKAGE_NAME}_iree-module-f770b1916e0b7a9a0b4aa9480791d21a46a352002ac1e38dfcea49ec0b63ed4e
   ${PACKAGE_NAME}_iree-module-8b19868be1c797cb585551c871c4171e78817e0efc49d30d91b9d722be283de9
   ${PACKAGE_NAME}_iree-module-c2085883b1f5c767f37508ab998a4bcd17d169fe6a5197d28e4dca8772c90253
   ${PACKAGE_NAME}_iree-module-88b6b5f712cd2f40d07a136e7f911c05b976c390e07f104c970292dee9a77e9a
   ${PACKAGE_NAME}_iree-module-925cdb19f2aa31a1907c81b5a9e179d91280c77b08a039c1cbf146f71683dde9
   ${PACKAGE_NAME}_iree-module-3c94ab45ad76bd8b2083729b65340b987da3247c854faf7d06431cb05a3b0a23
+  ${PACKAGE_NAME}_iree-module-2fe6a4ac93d74732ebabbd87e84e6ec56d2aeb9f6a94f5b595f74f947498c579
+  ${PACKAGE_NAME}_iree-module-32dfb79e574ef282dd352a156620d44d545dda0f49ea1ac27394028d2ced46a8
+  ${PACKAGE_NAME}_iree-module-3421bd5d457a3ed62e7aa74559afb7199105c1f60b65090a247ee3e6d9aec69c
+  ${PACKAGE_NAME}_iree-module-5663bccd89aa0616691d5b804b337c8989a2ca94c1bf2673d41dbbab9e511f20
+  ${PACKAGE_NAME}_iree-module-353a915204b8eb401d0caac543588920cfab76f826463394cc1e99546cab13bb
   ${PACKAGE_NAME}_iree-module-16b5b80aaf1271b5ad782570340cc0c7c1c97e10b7e6c6cc6e5f3ede8393cb6c
   ${PACKAGE_NAME}_iree-module-65fa033050b916e8143d44b5081ee45db3b1946a5d77de223328a7fe92a1cc66
   ${PACKAGE_NAME}_iree-module-16ef56b6869d10b17e983fec62e9f48e6bb87e9a348ab52a0b2faabca2b03578
