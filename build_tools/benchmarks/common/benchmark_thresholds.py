@@ -46,7 +46,7 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(
         re.compile(r"^MobileBertSquad.*big-core.*LLVM-CPU-Sync @ Pixel-4"), 20,
         ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileNetV2.*LLVM-CPU @ Pixel"), 15,
+    BenchmarkThreshold(re.compile(r"^MobileNetV2.*LLVM-CPU.* @ Pixel"), 15,
                        ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*LLVM-CPU.* @ Pixel"), 25,
                        ThresholdUnit.PERCENTAGE),
@@ -58,6 +58,8 @@ BENCHMARK_THRESHOLDS = [
 
     # Fluctuating benchmarks on X86_64 CPUs.
     BenchmarkThreshold(re.compile(r"^BertForMaskedLMTF.*x86_64"), 10,
+                       ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^BertLargeTF.*x86_64"), 10,
                        ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(re.compile(r"^MobileBertSquad_fp32.*x86_64"), 10,
                        ThresholdUnit.PERCENTAGE),
