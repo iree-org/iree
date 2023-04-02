@@ -141,12 +141,17 @@ def setup_environment():
   # Dynamically load the config file as a module.
   orig_dont_write_bytecode = sys.dont_write_bytecode
   sys.dont_write_bytecode = True  # Don't generate __pycache__ dir
-  spec = importlib.util.spec_from_file_location(
-      REPO_CFG_MODULE_NAME, os.path.join(repo_root, REPO_CFG_FILE))
-  repo_cfg = importlib.util.module_from_spec(spec)
-  sys.modules[REPO_CFG_MODULE_NAME] = repo_cfg
-  spec.loader.exec_module(repo_cfg)
-  sys.dont_write_bytecode = orig_dont_write_bytecode
+  repo_cfg_path = os.path.join(repo_root, REPO_CFG_FILE)
+  spec = importlib.util.spec_from_file_location(REPO_CFG_MODULE_NAME,
+                                                repo_cfg_path)
+  if spec and spec.loader:
+    repo_cfg = importlib.util.module_from_spec(spec)
+    sys.modules[REPO_CFG_MODULE_NAME] = repo_cfg
+    spec.loader.exec_module(repo_cfg)
+    sys.dont_write_bytecode = orig_dont_write_bytecode
+  else:
+    print(f"INTERNAL ERROR: Could not evaluate {repo_cfg_path} as module")
+    sys.exit(1)
 
 
 def repo_relpath(path):
