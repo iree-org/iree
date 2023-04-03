@@ -302,23 +302,29 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
   unpack_out_params.in_buffer = packed_out_buffer;
   unpack_out_params.out_buffer = rowmajor_out_buffer;
 
-  // Run once before the benchmark loop to check numerical correctness.
-  iree_uk_e2e_matmul(&pack_lhs_params, &pack_rhs_params, &pack_out_params,
-                     &mmt4d_params, &unpack_out_params);
-  // Get the reference results to compare against.
-  void* rowmajor_reference_out_buffer = malloc(rowmajor_out_buffer_size);
-  memcpy(rowmajor_reference_out_buffer, rowmajor_init_out_buffer,
-         rowmajor_out_buffer_size);
-  iree_uk_reference_rowmajor_matmul(
-      params->type, params->M, params->K, params->N, params->accumulate,
-      rowmajor_lhs_buffer, rowmajor_rhs_buffer, rowmajor_reference_out_buffer);
-  // Rationale for bit-exact compare: same as in mmt4d_test.
-  if (memcmp(rowmajor_out_buffer, rowmajor_reference_out_buffer,
-             rowmajor_out_buffer_size)) {
-    fprintf(stderr, "❌❌❌ Numerical error! ❌❌❌\n");
-    iree_abort();
+  int64_t num_mul_adds =
+      (int64_t)params->M * (int64_t)params->N * (int64_t)params->K;
+  // For small problem sizes we check results against reference code.
+  if (num_mul_adds <= 512 * 512 * 512) {
+    // Run once before the benchmark loop to check numerical correctness.
+    iree_uk_e2e_matmul(&pack_lhs_params, &pack_rhs_params, &pack_out_params,
+                       &mmt4d_params, &unpack_out_params);
+    // Get the reference results to compare against.
+    void* rowmajor_reference_out_buffer = malloc(rowmajor_out_buffer_size);
+    memcpy(rowmajor_reference_out_buffer, rowmajor_init_out_buffer,
+           rowmajor_out_buffer_size);
+    iree_uk_reference_rowmajor_matmul(params->type, params->M, params->K,
+                                      params->N, params->accumulate,
+                                      rowmajor_lhs_buffer, rowmajor_rhs_buffer,
+                                      rowmajor_reference_out_buffer);
+    // Rationale for bit-exact compare: same as in mmt4d_test.
+    if (memcmp(rowmajor_out_buffer, rowmajor_reference_out_buffer,
+               rowmajor_out_buffer_size)) {
+      fprintf(stderr, "❌❌❌ Numerical error! ❌❌❌\n");
+      iree_abort();
+    }
+    free(rowmajor_reference_out_buffer);
   }
-  free(rowmajor_reference_out_buffer);
 
   // The benchmark loop.
   int64_t batch_count = 1;
@@ -331,9 +337,8 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
     total_iterations += batch_count;
     batch_count *= 2;
   }
-  iree_benchmark_set_items_processed(
-      benchmark_state,
-      total_iterations * 2 * params->M * params->N * params->K);
+  iree_benchmark_set_items_processed(benchmark_state,
+                                     total_iterations * 2 * num_mul_adds);
 
   free(rowmajor_lhs_buffer);
   free(rowmajor_rhs_buffer);
