@@ -1407,7 +1407,8 @@ static LogicalResult adjustWorkgroupCountComputeRegionForImg2Col(
     workloadDims.push_back(result.cast<AffineDimExpr>().getPosition());
   }
   workloadDims.push_back(workload.size());
-  auto dimCollapseMapping = collapseOp.getReassociationIndices();
+  SmallVector<ReassociationIndices> dimCollapseMapping =
+      collapseOp.getReassociationIndices();
 
   // Adjust the workgroup count computation. This happens by taking the product
   // of workloads corresponding to groups of collapsed dims. For example,
@@ -1424,7 +1425,7 @@ static LogicalResult adjustWorkgroupCountComputeRegionForImg2Col(
     // If there is a single index we can just push the corresponding workload
     // arg.
     if (indices.size() == 1) {
-      auto index = indices[0];
+      int64_t index = indices[0];
       pushRange(newWorkload, workloadDims[index], workloadDims[index + 1]);
       continue;
     }
@@ -1448,7 +1449,7 @@ static LogicalResult adjustWorkgroupCountComputeRegionForImg2Col(
     // Make+push the collapsed workload value, followed by all values
     // until the next dim affected by the collapse_shape op.
     auto m = AffineMap::get(0, indices.size(), product);
-    auto collapsedIndex =
+    Value collapsedIndex =
         makeComposedAffineApply(rewriter, loc, m, originalSizes);
     newWorkload.push_back(collapsedIndex);
     newWorkload.append(skipped);
@@ -1489,8 +1490,8 @@ transform_dialect::ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp::applyToOne(
           });
   if (failed(maybeTransformed)) return emitDefaultSilenceableFailure(target);
 
-  auto im2col = maybeTransformed->first;
-  auto convReplacement = maybeTransformed->second;
+  Operation *im2col = maybeTransformed->first;
+  Operation *convReplacement = maybeTransformed->second;
 
   // Push handles for the im2col operation and the operation that replaces the
   // original convolution.
