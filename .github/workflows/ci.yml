@@ -686,10 +686,13 @@ jobs:
         run: pip show iree-tools-tf
         if: always()
       - name: "DEBUG: Did pip put a symlink in bin?"
-        run: find /usr/local/bin/
+        run: find /usr/bin/
         if: always()
       - name: "DEBUG: What's in here?"
-        run: find $(python3 -m site --user-base)/bin
+        run: find $(python3 -m site --user-base)
+        if: always()
+      - name: "DEBUG: okay, let's just search everywhere"
+        run: find / | grep iree-import-tf
         if: always()
       - name: "Building benchmarks"
         id: build
