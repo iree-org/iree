@@ -1078,6 +1078,13 @@ using mlir::bufferization::BufferizationOptions;
 using mlir::bufferization::OneShotAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
 
+void transform_dialect::IREEBufferizeOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
 void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
                                                OperationState &result,
                                                Value target, bool targetGpu,
