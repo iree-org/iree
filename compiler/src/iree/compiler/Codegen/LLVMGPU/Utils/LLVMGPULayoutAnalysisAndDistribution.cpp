@@ -344,8 +344,8 @@ void propagateLayoutToFor(scf::ForOp forOp,
   }
 }
 
-static void propagateLayoutsToOthers(SmallVectorImpl<Value> &operands,
-                                     DenseMap<Value, Layout> &layoutMap) {
+static void propagateLayoutToOthers(SmallVectorImpl<Value> &operands,
+                                    DenseMap<Value, Layout> &layoutMap) {
   int numOperands = operands.size();
   // Find an operand with a layout
   int i;
@@ -364,27 +364,13 @@ static void propagateLayoutsToOthers(SmallVectorImpl<Value> &operands,
   }
 }
 
-template <typename T>
-void propagateLayoutToBinaryOp(Operation *op,
-                               DenseMap<Value, Layout> &layoutMap) {
-  if (auto binaryOp = dyn_cast<T>(op)) {
-    Value lhs = binaryOp.getLhs();
-    Value rhs = binaryOp.getRhs();
-    Value result = binaryOp.getResult();
-    SmallVector<Value> operands{lhs, rhs, result};
-    propagateLayoutsToOthers(operands, layoutMap);
-  }
-}
-
-template <typename T>
-void propagateLayoutToUnaryOp(Operation *op,
-                              DenseMap<Value, Layout> &layoutMap) {
-  if (auto unaryOp = dyn_cast<T>(op)) {
-    Value operand = unaryOp.getOperand();
-    Value result = unaryOp.getResult();
-    SmallVector<Value> operands{operand, result};
-    propagateLayoutsToOthers(operands, layoutMap);
-  }
+void propagateLayoutToElementwiseOp(Operation *op,
+                                    DenseMap<Value, Layout> &layoutMap) {
+  if (!OpTrait::hasElementwiseMappableTraits(op)) return;
+  if (op->getNumResults() != 1) return;
+  auto operands = llvm::to_vector(op->getOperands());
+  operands.push_back(op->getResult(0));
+  propagateLayoutToOthers(operands, layoutMap);
 }
 
 void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
@@ -397,8 +383,7 @@ void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
   if (auto forOp = dyn_cast<scf::ForOp>(op)) {
     propagateLayoutToFor(forOp, layoutMap);
   }
-  propagateLayoutToBinaryOp<arith::SubFOp>(op, layoutMap);
-  propagateLayoutToUnaryOp<math::ExpOp>(op, layoutMap);
+  propagateLayoutToElementwiseOp(op, layoutMap);
 }
 
 void distributeTransferReads(vector::TransferReadOp readOp,
@@ -888,42 +873,25 @@ void distributeConstants(arith::ConstantOp constantOp,
   simdToSimtMap.try_emplace(constant, result);
 }
 
-template <typename T>
-void distributeBinaryOp(Operation *op, DenseMap<Value, Layout> &layoutMap,
-                        DenseMap<Value, Value> &simdToSimtMap,
-                        IRRewriter &rewriter,
-                        llvm::SetVector<Operation *> &ops) {
-  if (auto binaryOp = dyn_cast<T>(op)) {
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(binaryOp);
-    Value lhs = binaryOp.getLhs();
-    if (!simdToSimtMap.count(lhs)) return;
-    Value rhs = binaryOp.getRhs();
-    if (!simdToSimtMap.count(rhs)) return;
-    Value newResult = rewriter.create<T>(
-        binaryOp.getLoc(), simdToSimtMap.at(lhs), simdToSimtMap.at(rhs));
-    Value result = binaryOp.getResult();
-    simdToSimtMap.try_emplace(result, newResult);
-    ops.insert(binaryOp);
-  }
-}
-
-template <typename T>
-void distributeUnaryOp(Operation *op, DenseMap<Value, Layout> &layoutMap,
-                       DenseMap<Value, Value> &simdToSimtMap,
-                       IRRewriter &rewriter,
-                       llvm::SetVector<Operation *> &ops) {
-  if (auto unaryOp = dyn_cast<T>(op)) {
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(unaryOp);
-    Value operand = unaryOp.getOperand();
+void distributeElementwise(Operation *op, DenseMap<Value, Layout> &layoutMap,
+                           DenseMap<Value, Value> &simdToSimtMap,
+                           IRRewriter &rewriter,
+                           llvm::SetVector<Operation *> &ops) {
+  if (!OpTrait::hasElementwiseMappableTraits(op)) return;
+  if (op->getNumResults() != 1) return;
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(op);
+  SmallVector<Value> newOperands;
+  for (auto operand : op->getOperands()) {
     if (!simdToSimtMap.count(operand)) return;
-    Value newResult =
-        rewriter.create<T>(unaryOp.getLoc(), simdToSimtMap.at(operand));
-    Value result = unaryOp.getResult();
-    simdToSimtMap.try_emplace(result, newResult);
-    ops.insert(unaryOp);
+    newOperands.push_back(simdToSimtMap.at(operand));
   }
+  SmallVector<Type> resultTypes{newOperands.front().getType()};
+  Operation *newOp =
+      rewriter.create(op->getLoc(), op->getName().getIdentifier(), newOperands,
+                      resultTypes, op->getAttrs());
+  simdToSimtMap.try_emplace(op->getResult(0), newOp->getResult(0));
+  ops.insert(op);
 }
 
 static void eraseOps(llvm::SetVector<Operation *> &opsToErase,
@@ -1007,10 +975,7 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
       distributeConstants(constantOp, layoutMap, simdToSimtMap, rewriter,
                           opsToErase);
     }
-    distributeBinaryOp<arith::SubFOp>(op, layoutMap, simdToSimtMap, rewriter,
-                                      opsToErase);
-    distributeUnaryOp<math::ExpOp>(op, layoutMap, simdToSimtMap, rewriter,
-                                   opsToErase);
+    distributeElementwise(op, layoutMap, simdToSimtMap, rewriter, opsToErase);
   }
 
   // Erase old ops
