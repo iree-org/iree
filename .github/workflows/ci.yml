@@ -684,6 +684,8 @@ jobs:
         run: pip install ./integrations/tensorflow/python_projects/iree_tf
       - name: "DEBUG: Where is the package?"
         run: pip show iree-tools-tf
+      - name: "DEBUG: Did pip put a symlink in bin?"
+        run: find ~/.local/bin
       - name: "Building benchmarks"
         id: build
         run: |
