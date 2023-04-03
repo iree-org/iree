@@ -47,6 +47,8 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Linker",
         "@llvm-project//llvm:MC",
         "@llvm-project//llvm:NVPTXCodeGen",
+        "@llvm-project//llvm:NVPTXInfo",
+        "@llvm-project//llvm:NVPTXUtilsAndDesc",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",

@@ -5,16 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Utility function to return the platform name in crosscompile.
-# TODO(#12692): stop leaking CMAKE_SYSTEM_PROCESSOR values.
+# List of CMAKE_SYSTEM_NAME values:
+#   https://gitlab.kitware.com/cmake/cmake/-/issues/21489#note_1077167
+# Examples: arm_64-Android arm_32-Linux x86_64-Windows arm_64-iOS riscv_64-Linux
 function(iree_get_platform PLATFORM)
-  if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
-    set(_PLATFORM "android-arm64-v8a")
-  elseif(IREE_ARCH STREQUAL "x86_64")
-    set(_PLATFORM "x86_64")
-  else()
-    set(_PLATFORM "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}")
-  endif()
-  set(${PLATFORM} "${_PLATFORM}" PARENT_SCOPE)
+  set(${PLATFORM} "${IREE_ARCH}-${CMAKE_SYSTEM_NAME}" PARENT_SCOPE)
 endfunction()
 
 # iree_run_module_test()
@@ -34,13 +29,10 @@ endfunction()
 #       containing the same.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   XFAIL_PLATFORMS: List of platforms (all, x86_64, android-arm64-v8a,
-#       riscv64-Linux, riscv32-Linux) for which the test is expected to fail
-#       e.g. due to issues with the upstream llvm backend. The target will be
-#       run, but its pass/fail status will be inverted.
-#   UNSUPPORTED_PLATFORMS: List of platforms (x86_64, android-arm64-v8a,
-#       riscv64-Linux, riscv32-Linux) not supported by the test target. The
-#       target will be skipped entirely.
+#   XFAIL_PLATFORMS: List of platforms (see iree_get_platform) for which the
+#       test is expected to fail. The test pass/fail status is inverted.
+#   UNSUPPORTED_PLATFORMS: List of platforms (see iree_get_platform) for which
+#       the test is skipped entirely.
 #   DEPS: (Optional) List of targets to build the test artifacts.
 #   TIMEOUT: (optional) Test timeout.
 #
@@ -73,8 +65,8 @@ endfunction()
 #   EXPECTED_OUTPUT
 #     "mobilenet_v1_fp32_expected_output.txt"
 #   UNSUPPORTED_PLATFORMS
-#     "android-arm64-v8a"
-#     "riscv32-Linux"
+#     "arm_64-Android"
+#     "riscv_32-Linux"
 # )
 
 function(iree_run_module_test)
@@ -226,10 +218,10 @@ endfunction()
 #       iree-run-module
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   XFAIL_PLATFORMS: List of platforms (all, x86_64, android-arm64-v8a,
-#       riscv64-Linux, riscv32-Linux) for which the test is expected to fail
-#       e.g. due to issues with the upstream llvm backend. The target will be
-#       run, but its pass/fail status will be inverted.
+#   XFAIL_PLATFORMS: List of platforms (see iree_get_platform) for which the
+#       test is expected to fail. The test pass/fail status is inverted.
+#   UNSUPPORTED_PLATFORMS: List of platforms (see iree_get_platform) for which
+#       the test is skipped entirely.
 #   TIMEOUT: (optional) Test timeout.
 #
 # Example:
