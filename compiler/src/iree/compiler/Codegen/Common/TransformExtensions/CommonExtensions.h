@@ -43,6 +43,7 @@ struct ApplyPatternsOpPatterns {
   bool cse = false;
   bool eraseUnnecessaryTensorOperands = false;
   bool expandMemrefStridedMetadata = false;
+  bool extractAddressComputations = false;
   bool foldMemrefAliases = false;
   bool foldReassociativeReshapes = false;
   bool foldTensorEmptyExtract = false;

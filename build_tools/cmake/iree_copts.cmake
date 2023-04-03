@@ -284,6 +284,24 @@ if(IREE_DEV_MODE)
   )
 endif()
 
+#-------------------------------------------------------------------------------
+# Enable frame pointers in IREE_DEV_MODE and in RelWithDebInfo build type ---
+# these are conditions under which the instrumentation/debugging/profiling
+# benefits of frame pointers outweigh the cost.
+#
+# `perf record -g` defaults to relying on frame pointers. There is a non-default
+# option `perf record --call-graph=dwarf`, to rely on debug info instead. It
+# produces inferior results and has a discoverability issue anyway.
+#-------------------------------------------------------------------------------
+
+string(TOUPPER "${CMAKE_BUILD_TYPE}" _UPPERCASE_CMAKE_BUILD_TYPE)
+if (IREE_DEV_MODE OR (_UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "RELWITHDEBINFO"))
+  iree_select_compiler_opts(IREE_DEFAULT_COPTS
+    CLANG_OR_GCC
+      "-fno-omit-frame-pointer"
+  )
+endif()
+
 # Debug information and __FILE__ macros get expanded with full paths by default.
 # This results in binaries that differ based on what directories they are built
 # from and that's annoying.

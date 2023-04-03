@@ -70,6 +70,10 @@ py_binary(
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=large",
     ],
+    tags = [
+        # "--shapes=large" can cause timeouts on riscv emulator.
+        "noriscv",
+    ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
@@ -312,6 +316,8 @@ py_binary(
         "notsan",
         "noubsan",
         "requires-gpu-nvidia",
+        # "--shapes=large" can cause timeouts on riscv emulator.
+        "noriscv",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),

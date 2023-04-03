@@ -38,6 +38,7 @@ declare -a label_exclude_args=(
   "^vulkan_uses_vk_khr_shader_float16_int8$"
   "^requires-filesystem$"
   "^requires-dtz$"
+  "^noriscv$"
 )
 
 # Excluding mobilebert, fp16, and lowering_config regression
@@ -89,6 +90,7 @@ fi
 test_exclude_args+=(
   # TODO(#12703): Enable the test.
   "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_small_llvm-cpu_local-task"
+  "iree/tests/e2e/tensor_ops/check_llvm-cpu_local-task_pack_dynamic_inner_tiles.mlir"
 )
 
 tests_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"

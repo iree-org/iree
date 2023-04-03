@@ -73,7 +73,6 @@ iree_uk_mmt4d_select_tile_func_x86_64_f32f32f32(
   if (params->M0 == 16 && params->N0 == 16 && params->K0 == 1) {
     return iree_uk_mmt4d_select_tile_func_x86_64_f32f32f32_16x16x1(params);
   }
-
   if (params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
     return iree_uk_mmt4d_select_tile_func_x86_64_f32f32f32_8x8x1(params);
   }

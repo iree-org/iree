@@ -134,13 +134,6 @@ void populateMaterializeEncodingPatterns(
 /// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();
 
-/// Patterns to fold operations like `tensor.pad` and `tensor.extract_slice`
-/// into `linalg_ext.pack` and `linalg_ext.unpack` operations respectively.
-void populateFoldIntoPackAndUnpackOpsPatterns(RewritePatternSet &patterns);
-
-/// Pass to apply patterns specified by `populateFoldIntoPackAndUnpackOps`.
-std::unique_ptr<OperationPass<func::FuncOp>> createFoldIntoPackAndUnpackOps();
-
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 
 /// Function signature to control reduction splitting. This returns the split

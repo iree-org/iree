@@ -7,6 +7,7 @@
 
 from e2e_test_framework.models import tf_models, tflite_models, torch_models
 
+# yapf: disable
 # Small models that require less computational resources.
 SMALL = [
     tflite_models.DEEPLABV3_FP32,
@@ -23,7 +24,9 @@ SMALL = [
     tflite_models.POSENET_FP32,
     tf_models.EFFICIENTNET_V2_S_FP32,
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
+    torch_models.EFFICIENTNET_V2_S_FP32_TORCH
 ]
+# yapf: enable
 
 # Large models that require more computational resources.
 LARGE = [
@@ -32,6 +35,34 @@ LARGE = [
     tf_models.RESNET50_TF_FP32,
     torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     torch_models.MODEL_UNET_2D_FP32_TORCH,
+    torch_models.EFFICIENTNET_B7_FP32_TORCH,
 ]
 
-ALL = SMALL + LARGE
+# BERT-Large in various batch sizes.
+BERT_LARGE_TORCH_BATCHES = [
+    torch_models.BERT_LARGE_1X384_FP32_TORCH,
+    torch_models.BERT_LARGE_8X384_FP32_TORCH,
+    torch_models.BERT_LARGE_16X384_FP32_TORCH,
+    torch_models.BERT_LARGE_32X384_FP32_TORCH,
+    torch_models.BERT_LARGE_64X384_FP32_TORCH,
+    # Disabled due to https://github.com/openxla/iree/issues/12774.
+    #torch_models.BERT_LARGE_128X384_FP32_TORCH,
+    #torch_models.BERT_LARGE_256X384_FP32_TORCH,
+    #torch_models.BERT_LARGE_512X384_FP32_TORCH,
+    #torch_models.BERT_LARGE_1024X384_FP32_TORCH,
+]
+
+RESNET50_TORCH_BATCHES = [
+    torch_models.RESNET50_1X3X224X224_FP32_TORCH,
+    torch_models.RESNET50_8X3X224X224_FP32_TORCH,
+    # Disabled due to https://github.com/openxla/iree/issues/12774.
+    #torch_models.RESNET50_16X3X224X224_FP32_TORCH,
+    #torch_models.RESNET50_32X3X224X224_FP32_TORCH,
+    #torch_models.RESNET50_64X3X224X224_FP32_TORCH,
+    #torch_models.RESNET50_128X3X224X224_FP32_TORCH,
+    #torch_models.RESNET50_256X3X224X224_FP32_TORCH,
+    #torch_models.RESNET50_512X3X224X224_FP32_TORCH,
+    #torch_models.RESNET50_1024X3X224X224_FP32_TORCH,
+]
+
+ALL = SMALL + LARGE + BERT_LARGE_TORCH_BATCHES + RESNET50_TORCH_BATCHES
