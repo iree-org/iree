@@ -343,7 +343,11 @@ jobs:
           # * Cache misses are quite costly:
           #   * 99% cache hits -> ~5 minutes to build
           #   * 20% cache hits -> ~15-20 minutes to build
-          CCACHE_MAXSIZE: 4G
+          # Cache restore on Macs is painfully slow and grinds to a complete
+          # halt somewhere around a cache size of 2GB. See
+          # https://github.com/actions/cache/issues/1115. Hopefully this is
+          # still large enough to be somewhat useful.
+          CCACHE_MAXSIZE: 1.5G
           CCACHE_COMPRESSLEVEL: 5
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
