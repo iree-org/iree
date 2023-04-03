@@ -146,11 +146,10 @@ class LLVMCPUVectorizationPass
     : public LLVMCPUVectorizationBase<LLVMCPUVectorizationPass> {
  public:
   using LLVMCPUVectorizationBase::LLVMCPUVectorizationBase;
-  LLVMCPUVectorizationPass(bool enableVectorMasking, bool vectorizePadding,
-                           bool vectorizeGatherAccesses) {
-    this->enableVectorMasking.setValue(enableVectorMasking);
-    this->vectorizePadding.setValue(vectorizePadding);
-    this->vectorizeGatherAccesses.setValue(vectorizeGatherAccesses);
+  LLVMCPUVectorizationPass(const LLVMCPUVectorizationPassOptions &options) {
+    this->enableVectorMasking.setValue(options.enableVectorMasking);
+    this->vectorizePadding.setValue(options.vectorizePadding);
+    this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -225,9 +224,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass() {
 }
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
     const LLVMCPUVectorizationPassOptions &options) {
-  return std::make_unique<LLVMCPUVectorizationPass>(
-      options.enableVectorMasking, options.vectorizePadding,
-      options.vectorizeGatherAccesses);
+  return std::make_unique<LLVMCPUVectorizationPass>(options);
 }
 }  // namespace iree_compiler
 }  // namespace mlir
