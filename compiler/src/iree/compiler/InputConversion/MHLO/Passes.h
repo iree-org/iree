@@ -23,15 +23,11 @@ namespace MHLO {
 void buildMHLOInputConversionPassPipeline(OpPassManager &passManager);
 
 // Performs some cleanup activities on programs that may have originated from
-// an XLA import (or made to interop with it). This involves:
+// an XLA import (or made to interop with it) followed by MHLO input
+// converstion. This involves:
 //   - Convert XLA control flow to SCF
-//   - Convert SCF control flow to CFG
-//   - Flatten tuples in CFG
 //   - Canonicalize
-// It is unfortunate to lose SCF so early in the process but CFG provides a
-// large simplification to tuple heavy programs, and this compromise is taken
-// in the name of compatibility.
-void buildXLACleanupPassPipeline(OpPassManager &passManager);
+void buildXLAInputConversionPassPipeline(OpPassManager &passManager);
 
 void registerMHLOConversionPassPipelines();
 
