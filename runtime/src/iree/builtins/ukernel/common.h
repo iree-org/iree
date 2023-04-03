@@ -481,18 +481,30 @@ static inline int iree_uk_type_size(iree_uk_type_t t) {
 typedef iree_uk_uint16_t iree_uk_type_pair_t;
 typedef iree_uk_uint32_t iree_uk_type_triple_t;
 
-#define IREE_UK_TIE_2_TYPES(B0, B1) ((B0) + ((B1) << 8))
-#define IREE_UK_TIE_3_TYPES(B0, B1, B2) ((B0) + ((B1) << 8) + ((B2) << 16))
+// These need to be macros because they are used to define enum values.
+#define IREE_UK_TIE_2_TYPES(T0, T1) ((T0) + ((T1) << 8))
+#define IREE_UK_TIE_3_TYPES(T0, T1, T2) ((T0) + ((T1) << 8) + ((T2) << 16))
+
+// Convenience macros to build tuples of literal types.
 #define IREE_UK_TIE_2_TYPES_LITERAL(T0, T1) \
   IREE_UK_TIE_2_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1)
 #define IREE_UK_TIE_3_TYPES_LITERAL(T0, T1, T2) \
   IREE_UK_TIE_3_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1, IREE_UK_TYPE_##T2)
 
-#define IREE_UK_UNTIE_TYPE(POS, WORD) (((WORD) >> (8 * (POS))) & 0xFF)
+static inline iree_uk_uint32_t iree_uk_tie_2_types(iree_uk_type_t t0,
+                                                   iree_uk_type_t t1) {
+  return IREE_UK_TIE_2_TYPES(t0, t1);
+}
+
+static inline iree_uk_uint32_t iree_uk_tie_3_types(iree_uk_type_t t0,
+                                                   iree_uk_type_t t1,
+                                                   iree_uk_type_t t2) {
+  return IREE_UK_TIE_3_TYPES(t0, t1, t2);
+}
 
 static inline iree_uk_type_t iree_uk_untie_type(int pos,
                                                 iree_uk_uint32_t word) {
-  return IREE_UK_UNTIE_TYPE(pos, word);
+  return (word >> (8 * pos)) & 0xFF;
 }
 
 //===----------------------------------------------------------------------===//

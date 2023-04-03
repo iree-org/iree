@@ -59,6 +59,7 @@ struct LinalgVectorLoweringPass
 
   void runOnOperation() override;
 };
+}  // namespace
 
 void LinalgVectorLoweringPass::runOnOperation() {
   LLVM_DEBUG(llvm::dbgs() << "\n ---- Stage : " << vectorLoweringStage;);
@@ -142,7 +143,6 @@ void LinalgVectorLoweringPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-}  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgVectorLoweringPass(int64_t vectorLoweringStage) {

@@ -92,6 +92,9 @@ iree_compiler_cc_library(
     srcs = [
         "LLDToolEntryPoint.cpp",
     ],
+    # Special cased on the CMake side since we have to conditionally compile
+    # based on whether lld is enabled.
+    tags = ["skip-bazel_to_cmake"],
     deps = [
         "//compiler/bindings/c:headers",
         "@llvm-project//lld:COFF",

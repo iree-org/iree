@@ -28,6 +28,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
 namespace {
 /// Lowers a hal.executable.variant inner module to SPIR-V scalar/native-vector
 /// code. Invokes different compilation pipeline to
@@ -77,9 +79,14 @@ static LogicalResult verifyLoweringConfiguration(
 static LogicalResult verifyEntryPoint(
     ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
     IREE::HAL::ExecutableExportOp exportOp) {
+  if (translationInfo.getDispatchLoweringPassPipeline() ==
+      CodeGenPipeline::TransformDialectCodegen) {
+    // Transform dialect encodes configuration into the schedule directly.
+    return success();
+  }
+
   std::optional<mlir::ArrayAttr> workgroupSizeAttr =
       exportOp.getWorkgroupSize();
-
   if (!workgroupSizeAttr || workgroupSizeAttr->size() != 3) {
     return moduleOp.emitError(
         "expected workgroup size to have three dimensions for SPIR-V "
@@ -92,24 +99,20 @@ static LogicalResult verifyEntryPoint(
   }
 
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
+    case CodeGenPipeline::SPIRVBaseVectorize:
       return verifyLoweringConfiguration(moduleOp, translationInfo,
                                          workgroupSizes,
                                          verifySPIRVBaseVectorizePassPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        SPIRVMatmulPromoteVectorize:
+    case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
       return verifyLoweringConfiguration(
           moduleOp, translationInfo, workgroupSizes,
           verifySPIRVMatmulPromoteVectorizePassPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        SPIRVCooperativeMatrixVectorize:
+    case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
       return verifyLoweringConfiguration(
           moduleOp, translationInfo, workgroupSizes,
           verifySPIRVCooperativeMatrixVectorizePassPipeline);
+    default:
       break;
-    default:;
   }
   return success();
 }
@@ -157,29 +160,30 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute:
+      case CodeGenPipeline::SPIRVBaseDistribute:
         addSPIRVBaseDistributePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
+      case CodeGenPipeline::SPIRVBaseVectorize:
         addSPIRVBaseVectorizePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVCooperativeMatrixVectorize:
+      case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
         addSPIRVCooperativeMatrixVectorizePassPipeline(
             pipeline, translationInfo.value().getSoftwarePipelineDepth(),
             translationInfo.value().getSoftwarePipelineStoreStage());
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVMatmulPromoteVectorize:
+      case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
         addSPIRVMatmulPromoteVectorizePassPipeline(
             pipeline, translationInfo.value().getSoftwarePipelineDepth(),
             translationInfo.value().getSoftwarePipelineStoreStage());
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce:
+      case CodeGenPipeline::SPIRVSubgroupReduce:
         addSPIRVSubgroupReducePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVWinogradVectorize:
+      case CodeGenPipeline::SPIRVWinogradVectorize:
         addSPIRVWinogradVectorizePassPipeline(pipeline);
+        break;
+      case CodeGenPipeline::TransformDialectCodegen:
+        addSPIRVTransformDialectPassPipeline(pipeline);
         break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");

@@ -336,6 +336,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
 struct LLVMCPUVectorizationPassOptions {
   bool enableVectorMasking = false;
   bool vectorizePadding = false;
+  bool vectorizeGatherAccesses = false;
 };
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
@@ -716,6 +717,9 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm);
 /// Annotates the innermost Winograd loops with the spirv distribute attribute.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVAnnotateWinogradLoopsPass();
+
+/// Pass pipeline to lower IREE HAL executables via transform dialect schedules.
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm);
 
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.

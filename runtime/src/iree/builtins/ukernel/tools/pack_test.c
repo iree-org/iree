@@ -111,8 +111,7 @@ static void iree_uk_test_pack_for_tile_params(iree_uk_test_t* test,
       // Non-degenerate cases.
       {1, 1},
       {3, 2},
-      {7, 8},
-      {31, 33},
+      {9, 33},
   };
   typedef enum {
     pad_none,
@@ -129,12 +128,8 @@ static void iree_uk_test_pack_for_tile_params(iree_uk_test_t* test,
           params.cpu_data = iree_uk_test_cpu_data(test);
           outer_shape_t outer_shape = outer_shapes[i];
           if (pad == pad_a_lot) {
-            // Makes the test expensive, and covers a corner case that shouldn't
-            // require large sizes. Try to be economical.
-            if (outer_shape.size0 <= 8 && outer_shape.size1 <= 8) {
-              outer_shape.size0 += 64;
-              outer_shape.size1 += 64;
-            }
+            outer_shape.size0 += 16;
+            outer_shape.size1 += 16;
           }
           params.out_size0 = outer_shape.size0;
           params.out_size1 = outer_shape.size1;
@@ -177,8 +172,7 @@ static void iree_uk_test_pack_for_tile_params(iree_uk_test_t* test,
 }
 
 static void iree_uk_test_pack(iree_uk_pack_type_t type, int tile_size0,
-                              int tile_size1,
-                              const iree_uk_cpu_features_list_t* cpu_features) {
+                              int tile_size1, const char* cpu_features) {
   iree_uk_pack_params_t params = {
       .type = type, .out_size2 = tile_size0, .out_size3 = tile_size1};
   char types_str[32];
@@ -191,8 +185,6 @@ static void iree_uk_test_pack(iree_uk_pack_type_t type, int tile_size0,
 }
 
 int main(int argc, char** argv) {
-  iree_uk_standard_cpu_features_t* cpu = iree_uk_standard_cpu_features_create();
-
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird tile shapes to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
@@ -212,12 +204,14 @@ int main(int argc, char** argv) {
   // Tile size selected for CPU feature i8mm. Same comment as for dotprod.
   iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 8, NULL);
 #elif defined(IREE_UK_ARCH_X86_64)
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, cpu->avx2_fma);
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 2, cpu->avx2_fma);
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 16, 1, cpu->avx512_base);
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 16, 2, cpu->avx512_base);
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, "avx2_fma");
+  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 2, "avx2_fma");
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 8, "avx2_fma");
+  iree_uk_test_pack(iree_uk_pack_type_i32i32, 8, 8, "avx2_fma");
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 16, 1, "avx512_base");
+  iree_uk_test_pack(iree_uk_pack_type_i8i8, 16, 2, "avx512_base");
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 16, 16, "avx512_base");
+  iree_uk_test_pack(iree_uk_pack_type_i32i32, 16, 16, "avx512_base");
   // avx512_vnni uses the same tile size and same pack code as avx512_base.
 #endif  // defined(IREE_UK_ARCH_ARM_64)
-
-  iree_uk_standard_cpu_features_destroy(cpu);
 }

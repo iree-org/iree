@@ -238,54 +238,6 @@ def VMVX_MatmulOp : VMVX_Op<"matmul"> {
   }];
 }
 
-def VMVX_Mmt4dOp : VMVX_Op<"mmt4d"> {
-  let summary = "mmt4d";
-  let description = [{
-    Tiled matmul mirroring linalg.mmt4d
-  }];
-  let arguments = (ins
-    // Lhs buffer.
-    VMVX_Buffer:$lhs_buffer,
-    VMVX_Index:$lhs_offset,
-    VMVX_Index:$lhs_row_stride,
-    // Rhs buffer.
-    VMVX_Buffer:$rhs_buffer,
-    VMVX_Index:$rhs_offset,
-    VMVX_Index:$rhs_row_stride,
-    // Out buffer.
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
-    VMVX_Index:$out_row_stride,
-
-    // Dimensions.
-    VMVX_Index:$m,
-    VMVX_Index:$n,
-    VMVX_Index:$k,
-
-    // Tile dimensions.
-    VMVX_Index:$tile_m,
-    VMVX_Index:$tile_n,
-    VMVX_Index:$tile_k,
-
-    // Type and flag attributes.
-    VMVX_ElementTypeAttr:$lhs_type,
-    VMVX_ElementTypeAttr:$rhs_type,
-    VMVX_ElementTypeAttr:$out_type,
-    I32Attr:$flags
-  );
-
-  let assemblyFormat = [{
-    `lhs` `` `(` $lhs_buffer `offset` $lhs_offset `row_stride` $lhs_row_stride `:` type($lhs_buffer) `)`
-    `rhs` `` `(` $rhs_buffer `offset` $rhs_offset `row_stride` $rhs_row_stride `:` type($rhs_buffer)`)`
-    `out` `` `(` $out_buffer `offset` $out_offset `row_stride` $out_row_stride `:` type($out_buffer) `)`
-    `mnk` `` `(` $m `,` $n `,` $k `)`
-    `tile_mnk` `` `(` $tile_m `,` $tile_n `,` $tile_k `)`
-    `flags` `` `(` $flags `)`
-    `:` `(` $lhs_type `,` $rhs_type `,` $out_type `)`
-    attr-dict
-  }];
-}
-
 def VMVX_UnpackOp : VMVX_Op<"unpack"> {
   let summary = "unpack";
   let description = [{

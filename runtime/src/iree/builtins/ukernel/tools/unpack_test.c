@@ -110,8 +110,7 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
       // Non-degenerate cases.
       {1, 1},
       {3, 2},
-      {7, 8},
-      {31, 33},
+      {9, 33},
   };
   typedef enum {
     pad_none,
@@ -132,12 +131,8 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
           params.in_size0 = in_size0;
           params.in_size1 = in_size1;
           if (pad == pad_a_lot) {
-            // Makes the test expensive, and covers a corner case that shouldn't
-            // require large sizes. Try to be economical.
-            if (params.in_size0 <= 8 && params.in_size1 <= 8) {
-              params.in_size0 += 64;
-              params.in_size1 += 64;
-            }
+            params.in_size0 += 16;
+            params.in_size1 += 16;
           }
           iree_uk_ssize_t tile_size0 = params.in_size2;
           iree_uk_ssize_t tile_size1 = params.in_size3;
@@ -170,9 +165,8 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
   }
 }
 
-static void iree_uk_test_unpack(
-    iree_uk_unpack_type_t type, int tile_size0, int tile_size1,
-    const iree_uk_cpu_features_list_t* cpu_features) {
+static void iree_uk_test_unpack(iree_uk_unpack_type_t type, int tile_size0,
+                                int tile_size1, const char* cpu_features) {
   iree_uk_unpack_params_t params = {
       .type = type, .in_size2 = tile_size0, .in_size3 = tile_size1};
   char types_str[32];
@@ -185,8 +179,6 @@ static void iree_uk_test_unpack(
 }
 
 int main(int argc, char** argv) {
-  iree_uk_standard_cpu_features_t* cpu = iree_uk_standard_cpu_features_create();
-
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird tile shapes to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
@@ -198,11 +190,9 @@ int main(int argc, char** argv) {
   iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 8, 8, NULL);
   iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 8, 8, NULL);
 #elif defined(IREE_UK_ARCH_X86_64)
-  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 8, 8, cpu->avx2_fma);
-  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 8, 8, cpu->avx2_fma);
-  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 16, 16, cpu->avx512_base);
-  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 16, 16, cpu->avx512_base);
+  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 8, 8, "avx2_fma");
+  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 8, 8, "avx2_fma");
+  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 16, 16, "avx512_base");
+  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 16, 16, "avx512_base");
 #endif  // defined(IREE_UK_ARCH_ARM_64)
-
-  iree_uk_standard_cpu_features_destroy(cpu);
 }

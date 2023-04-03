@@ -156,7 +156,7 @@ class RulesTest(unittest.TestCase):
         runner_args=["--x=0", "--y=1"],
         timeout_secs=10,
         labels=["defaults", "e2e"],
-        xfail_platforms=["arm", "ppc"])
+        xfail_platforms=["arm_64-Android", "riscv_32-Linux"])
 
     self.assertEqual(
         rule,
@@ -180,8 +180,8 @@ class RulesTest(unittest.TestCase):
             "defaults"
             "e2e"
           XFAIL_PLATFORMS
-            "arm"
-            "ppc"
+            "arm_64-Android"
+            "riscv_32-Linux"
         )
         """))
 

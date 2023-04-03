@@ -19,8 +19,7 @@ void iree_uk_benchmark_register(
     const char* name,
     iree_status_t (*benchmark_func)(const iree_benchmark_def_t*,
                                     iree_benchmark_state_t*),
-    const void* params, size_t params_size,
-    const iree_uk_cpu_features_list_t* cpu_features);
+    const void* params, size_t params_size, const char* cpu_features);
 void iree_uk_benchmark_run_and_cleanup(void);
 
 // Like malloc, but any buffers allocated through this are freed by

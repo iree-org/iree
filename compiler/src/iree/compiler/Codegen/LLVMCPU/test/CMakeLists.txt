@@ -51,6 +51,7 @@ iree_lit_test_suite(
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"
     "vector_masking.mlir"
+    "vectorize_nd_extract.mlir"
     "verify_linalg_transform_legality.mlir"
   TOOLS
     FileCheck

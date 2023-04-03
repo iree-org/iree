@@ -146,41 +146,6 @@ private:
   linalg::LinalgTilingOptions options;
 };
 
-///
-/// Linalg SCF tiling pattern.
-///
-/// Apply the `tiling` transformation as a pattern.
-/// `filter` controls LinalgTransformMarker matching and update when specified.
-/// See `tiling` for more details.
-struct SCFTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
-  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  SCFTilingPattern(MLIRContext *context, scf::SCFTilingOptions options,
-                   LinalgTransformationFilter f = LinalgTransformationFilter(),
-                   PatternBenefit benefit = 1);
-
-  /// Construct a pattern specifically applied to `opName`.
-  SCFTilingPattern(StringRef opName, MLIRContext *context,
-                   scf::SCFTilingOptions options,
-                   LinalgTransformationFilter f = LinalgTransformationFilter(),
-                   PatternBenefit benefit = 1);
-
-  /// `matchAndRewrite` implementation that returns the significant transformed
-  /// pieces of IR.
-  LogicalResult returningMatchAndRewrite(TilingInterface op,
-                                         PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(TilingInterface op,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(op, rewriter);
-  }
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-  /// Options to control tiling;
-  scf::SCFTilingOptions options;
-};
-
 template <typename... OpTypes>
 class TilingPatterns;
 

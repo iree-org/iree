@@ -49,12 +49,18 @@ class VmTypesTest(unittest.TestCase):
   def test_variant_list_buffers(self):
     device = rt.get_device("local-sync")
     ET = rt.HalElementType
-    for dt, et in ((np.int8, ET.SINT_8), (np.int16, ET.SINT_16),
-                   (np.int32, ET.SINT_32), (np.int64, ET.SINT_64),
-                   (np.uint8, ET.UINT_8), (np.uint16, ET.UINT_16),
-                   (np.uint32, ET.UINT_32), (np.uint64, ET.UINT_64),
-                   (np.float32, ET.FLOAT_32), (np.float64, ET.FLOAT_64)):
-      # TODO: Unimplemented: (np.float16, ET.FLOAT_16)
+    for dt, et in (
+        (np.int8, ET.SINT_8),  #
+        (np.int16, ET.SINT_16),  #
+        (np.int32, ET.SINT_32),  #
+        (np.int64, ET.SINT_64),  #
+        (np.uint8, ET.UINT_8),  #
+        (np.uint16, ET.UINT_16),  #
+        (np.uint32, ET.UINT_32),  #
+        (np.uint64, ET.UINT_64),  #
+        (np.float16, ET.FLOAT_16),  #
+        (np.float32, ET.FLOAT_32),  #
+        (np.float64, ET.FLOAT_64)):
       lst = rt.VmVariantList(5)
       ary1 = np.asarray([1, 2, 3, 4], dtype=dt)
       bv1 = device.allocator.allocate_buffer_copy(
@@ -65,7 +71,6 @@ class VmTypesTest(unittest.TestCase):
       lst.push_ref(bv1)
       ary2 = rt.DeviceArray(device,
                             lst.get_as_object(0, rt.HalBufferView),
-                            override_dtype=dt,
                             implicit_host_transfer=True)
       np.testing.assert_array_equal(ary1, ary2)
       with self.assertRaises(IndexError):

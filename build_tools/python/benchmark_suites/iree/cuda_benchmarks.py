@@ -32,9 +32,10 @@ class Linux_CUDA_Benchmarks(object):
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
-    models = model_groups.LARGE + [
+    models = model_groups.LARGE + model_groups.BERT_LARGE_TORCH_BATCHES + model_groups.RESNET50_TORCH_BATCHES + [
         tf_models.EFFICIENTNET_V2_S_FP32,
-        tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128
+        tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
+        tf_models.T5_LARGE_FP32_SEQLEN512_TF,
     ]
     gen_configs = [
         iree_definitions.ModuleGenerationConfig.build(

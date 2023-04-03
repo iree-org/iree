@@ -146,9 +146,11 @@ class LLVMCPUVectorizationPass
     : public LLVMCPUVectorizationBase<LLVMCPUVectorizationPass> {
  public:
   using LLVMCPUVectorizationBase::LLVMCPUVectorizationBase;
-  LLVMCPUVectorizationPass(bool enableVectorMasking, bool vectorizePadding) {
+  LLVMCPUVectorizationPass(bool enableVectorMasking, bool vectorizePadding,
+                           bool vectorizeGatherAccesses) {
     this->enableVectorMasking.setValue(enableVectorMasking);
     this->vectorizePadding.setValue(vectorizePadding);
+    this->vectorizeGatherAccesses.setValue(vectorizeGatherAccesses);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -175,7 +177,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
     if (enableVectorMasking) {
       vectorSizes.append(getVectorSizes(linalgOp, canonicalVectorShape));
     }
-    (void)linalg::vectorize(rewriter, linalgOp, vectorSizes);
+    (void)linalg::vectorize(rewriter, linalgOp, vectorSizes,
+                            vectorizeGatherAccesses);
   };
 
   // TODO: Move this down the pipeline once we have the ODM-based masking
@@ -222,8 +225,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass() {
 }
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
     const LLVMCPUVectorizationPassOptions &options) {
-  return std::make_unique<LLVMCPUVectorizationPass>(options.enableVectorMasking,
-                                                    options.vectorizePadding);
+  return std::make_unique<LLVMCPUVectorizationPass>(
+      options.enableVectorMasking, options.vectorizePadding,
+      options.vectorizeGatherAccesses);
 }
 }  // namespace iree_compiler
 }  // namespace mlir

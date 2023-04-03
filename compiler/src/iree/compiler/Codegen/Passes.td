@@ -535,6 +535,8 @@ def LLVMCPUVectorization :
       "Enable vector masking during vectorization.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
       "Rewrite all tensor.pad ops in the function to vector form.">,
+    Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
+      "Enable vectorizaiton of operations that may generate vector.gather operations.">,
   ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUVectorizationPass()";
