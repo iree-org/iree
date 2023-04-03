@@ -54,6 +54,7 @@ iree_lit_test_suite(
             "tile_reduction.mlir",
             "transform_buffer_opt.mlir",
             "transform_dialect_apply_pattern_op.mlir",
+            "transform_im2col_workgroup.mlir",
             "transform_ops_invalid.mlir",
             "transpose_canonicalization.mlir",
             "type_propagation.mlir",

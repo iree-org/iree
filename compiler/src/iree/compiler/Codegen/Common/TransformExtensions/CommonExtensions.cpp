@@ -1367,5 +1367,177 @@ void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
+//===---------------------------------------------------------------------===//
+// ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp
+//===---------------------------------------------------------------------===//
+
+// Rewrite the workgroup count compute region based on the specified collapsed
+// dimensions on the output tensor. Only the dims that are expected to be tiled
+// and distributed are adjusted, thus considering only the output is sufficient.
+// TODO: This should be deprecated once workgroup count computation is
+// refactored based on slices.
+static LogicalResult adjustWorkgroupCountComputeRegionForImg2Col(
+    transform::TransformState &state, RewriterBase &rewriter, Location loc,
+    HAL::ExecutableExportOp exportOp, AffineMap outputMap,
+    tensor::CollapseShapeOp collapseOp) {
+  Region &r = exportOp.getWorkgroupCount();
+  if (!r.hasOneBlock()) {
+    return rewriter.notifyMatchFailure(exportOp,
+                                       "expected export op to have a workgroup "
+                                       "count region with a single block");
+  }
+  auto workgroupCountOps =
+      r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
+  if (!llvm::hasSingleElement(workgroupCountOps)) {
+    return rewriter.notifyMatchFailure(
+        exportOp,
+        "expected region to have a single "
+        "flow.dispatch.workgroup_count_from_dag_root op");
+  }
+  auto workgroupCountOp = *workgroupCountOps.begin();
+  auto workload = workgroupCountOp.getOperands();
+
+  // Extend the vector with workload values in range [l, r).
+  auto pushRange = [&](SmallVector<Value> &vec, int l, int r) {
+    for (; l < r; l++) vec.push_back(workload[l]);
+  };
+
+  SmallVector<unsigned> workloadDims;
+  for (AffineExpr result : outputMap.getResults()) {
+    workloadDims.push_back(result.cast<AffineDimExpr>().getPosition());
+  }
+  workloadDims.push_back(workload.size());
+  SmallVector<ReassociationIndices> dimCollapseMapping =
+      collapseOp.getReassociationIndices();
+
+  // Adjust the workgroup count computation. This happens by taking the product
+  // of workloads corresponding to groups of collapsed dims. For example,
+  //    workload = [w1, w2, w3, w4, w5, w6, w7, w8]
+  //    dimCollapseMapping = [[0], [1, 2], [3]]
+  //    workloadDims = [1, 3, 4, 5, (8)]
+  // will collapse to
+  //    newWorkload = [w1, w2, w3, w4 * w5, w6, w7, w8]
+  SmallVector<Value> newWorkload;
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+  loc = workgroupCountOp.getLoc();
+  for (auto indices : dimCollapseMapping) {
+    // If there is a single index we can just push the corresponding workload
+    // arg.
+    if (indices.size() == 1) {
+      int64_t index = indices[0];
+      pushRange(newWorkload, workloadDims[index], workloadDims[index + 1]);
+      continue;
+    }
+
+    assert(indices.size());
+    SmallVector<AffineExpr> syms(indices.size());
+    bindSymbolsList(rewriter.getContext(), MutableArrayRef<AffineExpr>{syms});
+    SmallVector<Value> originalSizes;
+    AffineExpr product = syms[0];
+    SmallVector<Value> skipped;
+    for (auto [enIndex, dimIndex] : llvm::enumerate(indices)) {
+      originalSizes.push_back(workload[workloadDims[dimIndex]]);
+      if (enIndex > 0) {
+        // Push any skipped workload values.
+        pushRange(skipped, workloadDims[dimIndex - 1] + 1,
+                  workloadDims[dimIndex]);
+        product = product * syms[enIndex];
+      }
+    }
+
+    // Make+push the collapsed workload value, followed by all values
+    // until the next dim affected by the collapse_shape op.
+    auto m = AffineMap::get(0, indices.size(), product);
+    Value collapsedIndex =
+        makeComposedAffineApply(rewriter, loc, m, originalSizes);
+    newWorkload.push_back(collapsedIndex);
+    newWorkload.append(skipped);
+    pushRange(newWorkload, workloadDims[indices.back()] + 1,
+              workloadDims[indices.back() + 1]);
+  }
+
+  rewriter.replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
+      workgroupCountOp, newWorkload);
+  return success();
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp::applyToOne(
+    linalg::LinalgOp target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  auto funcOp = target->getParentOfType<func::FuncOp>();
+
+  // Get the output map for the target operation before rewriting.
+  AffineMap outputMap = target.getIndexingMapsArray().back();
+
+  IRRewriter rewriter(target->getContext());
+  rewriter.setInsertionPoint(target);
+  // TODO: Extend this to other convolution cases by handling cases beyond
+  // collapse -> matmul -> expand from the patterns for 2D convolutions handled
+  // here.
+  auto maybeTransformed =
+      TypeSwitch<Operation *, FailureOr<std::pair<Operation *, Operation *>>>(
+          target)
+          .Case([&](linalg::Conv2DNhwcHwcfOp op) {
+            return rewriteInIm2Col(rewriter, op);
+          })
+          .Case([&](linalg::Conv2DNchwFchwOp op) {
+            return rewriteInIm2Col(rewriter, op);
+          })
+          .Default([&](Operation *op) {
+            return rewriter.notifyMatchFailure(op, "not supported");
+          });
+  if (failed(maybeTransformed)) return emitDefaultSilenceableFailure(target);
+
+  Operation *im2col = maybeTransformed->first;
+  Operation *convReplacement = maybeTransformed->second;
+
+  // Push handles for the im2col operation and the operation that replaces the
+  // original convolution.
+  results.push_back(im2col);
+  // Handle to the operation that replaces the original convolution.
+  results.push_back(convReplacement);
+
+  // If there is no export region, no adjustment needed.
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (failed(exportOp)) return DiagnosedSilenceableFailure::success();
+
+  // The result of the im2col pattern is expected to be an expand on the matmul
+  // output.
+  auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(convReplacement);
+  if (!expandShapeOp)
+    return mlir::emitDefiniteFailure(target,
+                                     "im2col matmul output not expanded");
+
+  auto matmulOp = expandShapeOp.getSrc().getDefiningOp<linalg::LinalgOp>();
+  if (!matmulOp || !isaContractionOpInterface(matmulOp))
+    return mlir::emitDefiniteFailure(target, "im2col matmul not found");
+
+  // If there is no collapse then the workgroup count compute region doesn't
+  // need to be updated.
+  auto outputCollapse = matmulOp.getDpsInitOperand(0)
+                            ->get()
+                            .getDefiningOp<tensor::CollapseShapeOp>();
+  if (!outputCollapse) return DiagnosedSilenceableFailure::success();
+
+  /// Lower the workgroup count region in keeping with the way dispatch
+  /// regions are created by default in IREEs compilation flow.
+  if (failed(adjustWorkgroupCountComputeRegionForImg2Col(
+          state, rewriter, getLoc(), exportOp.value(), outputMap,
+          outputCollapse))) {
+    return mlir::emitDefiniteFailure(convReplacement,
+                                     "failed to adjust workgroup count region");
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp::build(
+    OpBuilder &builder, OperationState &result, Value target) {
+  result.addOperands(target);
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes({pdl::OperationType::get(ctx), pdl::OperationType::get(ctx)});
+}
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.cpp.inc"
