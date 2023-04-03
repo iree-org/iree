@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -307,12 +308,8 @@ static void optimizeModule(llvm::Module &module,
   llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
   llvm::ModulePassManager mpm;
   StringRef nnvmReflectPassName = "nvvm-reflect";
-  StringRef nnvmIntrRangePassName = "nvvm-intr-range";
   if (pb.parsePassPipeline(mpm, nnvmReflectPassName)) {
     llvm::errs() << "Could not parse -" << nnvmReflectPassName << "\n";
-  }
-  if (pb.parsePassPipeline(mpm, nnvmIntrRangePassName)) {
-    llvm::errs() << "Could not parse -" << nnvmIntrRangePassName << "\n";
   }
   pb.registerModuleAnalyses(mam);
   pb.registerCGSCCAnalyses(cgam);
@@ -323,6 +320,9 @@ static void optimizeModule(llvm::Module &module,
   llvm::OptimizationLevel ol = llvm::OptimizationLevel::O2;
 
   mpm.addPass(llvm::VerifierPass());
+  llvm::FunctionPassManager fpm;
+  fpm.addPass(llvm::SetBlockIdsRangePass());
+  mpm.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
   mpm.addPass(llvm::VerifierPass());
 
