@@ -95,7 +95,8 @@ static std::string generate_ukernel_name(std::string LHS, std::string RHS,
     return ukernel.generate_ukernel_name();
   }
   // todo(guray) not supported types
-  assert(true);  
+  assert(true);
+  return "";
 }
 
 /// This is responsible for generating microkernels contracts. The contracts are
@@ -129,7 +130,7 @@ struct uGPUContracts {
     generateVariant(t, t, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 5);
     auto tf = "tf32";
     // Pipeline Stages 3
-    generateVariant(tf, tf  , t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 3);
+    generateVariant(tf, tf, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 3);
     generateVariant(tf, tf, t, {128, 256, 32}, {64, 64}, {16, 8, 8}, 3);
     generateVariant(tf, tf, t, {256, 128, 32}, {64, 64}, {16, 8, 8}, 3);
 
@@ -149,8 +150,25 @@ bool adduCUDAContracts(INT M, INT N, INT K, std::string lhs, std::string result,
   bool found = false;
   // todo(guray) improve here
   for (uGPUKernel kernel : AllContracts.ukernels) {
-    if (kernel.LHS == lhs && kernel.RHS == lhs && kernel.RESULT == result &&
-        M % kernel.ThreadblockShape[0] == 0) {
+    if (kernel.LHS == lhs && kernel.RHS == lhs && kernel.RESULT == result) {
+      // Need biggger tile size
+      if (M < kernel.ThreadblockShape[0] || N < kernel.ThreadblockShape[1] ||
+          K < kernel.ThreadblockShape[2])
+        continue;
+      // Only divisable tiles for now
+      if (M % kernel.ThreadblockShape[0] != 0 ||
+          N % kernel.ThreadblockShape[1] != 0 ||
+          K % kernel.ThreadblockShape[1] != 0)
+        continue;
+      // Warps should cover the tiles
+      if ((kernel.ThreadblockShape[0] * kernel.ThreadblockShape[1]) %
+              (kernel.WarpShape[0] * kernel.WarpShape[1]) !=
+          0)
+        continue;
+
+      // todo(guray) workaround to not add 4 duplicates
+      if (!kernel.has_linalg_fill || !kernel.writeback_to_global) continue;
+
       int nWarp = (kernel.ThreadblockShape[0] * kernel.ThreadblockShape[1]) /
                   (kernel.WarpShape[0] * kernel.WarpShape[1]);
       adder(kernel.ThreadblockShape[0], kernel.ThreadblockShape[1],

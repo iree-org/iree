@@ -4,16 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
+#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/Microkernels/CUDA/uCUDAContract.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -27,10 +28,10 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-lower-to-ukernels"
-llvm::cl::opt<bool> clGPUTF32(
-    "iree-codegen-llvmgpu-tf32",
-    llvm::cl::desc("use tf32 for 10 bit mantissa"),
-    llvm::cl::init(true));
+
+llvm::cl::opt<bool> clGPUTF32("iree-codegen-llvmgpu-tf32",
+                              llvm::cl::desc("use tf32 for 10 bit mantissa"),
+                              llvm::cl::init(false));
 
 namespace mlir {
 
@@ -48,10 +49,8 @@ struct LLVMGPULowerToUKernelsPass
 
 /// Generate microkernel names based on combinedOps
 static std::string generateMicrokernelName(ArrayRef<Operation *> combinedOps,
-                                           StringRef lhsType, 
-                                           StringRef rhsType, 
-                                           StringRef resType, 
-                                           int TILE_M,
+                                           StringRef lhsType, StringRef rhsType,
+                                           StringRef resType, int TILE_M,
                                            int TILE_N, int TILE_K,
                                            int numstages, bool has_fill,
                                            bool writeback_to_global) {
@@ -60,9 +59,11 @@ static std::string generateMicrokernelName(ArrayRef<Operation *> combinedOps,
                                writeback_to_global);
 }
 
-static LogicalResult returnCtypes(Type lhsType, Type rhsType, Type resType, SmallVectorImpl<StringRef> &types, bool hasTf32) {
-  if(lhsType.isF32() && rhsType.isF32() && resType.isF32()) {
-    if(hasTf32 && clGPUTF32) {
+static LogicalResult returnCtypes(Type lhsType, Type rhsType, Type resType,
+                                  SmallVectorImpl<StringRef> &types,
+                                  bool hasTf32) {
+  if (lhsType.isF32() && rhsType.isF32() && resType.isF32()) {
+    if (hasTf32 && clGPUTF32) {
       types.push_back("tf32"); /* lhs */
       types.push_back("tf32"); /* rhs */
     } else {
@@ -98,16 +99,19 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
     Type lhsElementType = lhs.getType().cast<TensorType>().getElementType();
     Type rhsElementType = rhs.getType().cast<TensorType>().getElementType();
     Type resElementType = out.getType().cast<TensorType>().getElementType();
-    
-    
-    FailureOr<TargetInfo> tinfo = mlir::iree_compiler::getTargetInfoFromAnyOp(matmulOp);
+
+    FailureOr<TargetInfo> tinfo =
+        mlir::iree_compiler::getTargetInfoFromAnyOp(matmulOp);
     if (failed(tinfo))
-      return rewriter.notifyMatchFailure(matmulOp, "Could not find target information");     
+      return rewriter.notifyMatchFailure(matmulOp,
+                                         "Could not find target information");
 
     SmallVector<StringRef, 3> strTypes;
-    LogicalResult maybeStrTypes = returnCtypes(lhsElementType, rhsElementType, resElementType, strTypes, tinfo->hasTF32TensorCore);
+    LogicalResult maybeStrTypes =
+        returnCtypes(lhsElementType, rhsElementType, resElementType, strTypes,
+                     tinfo->hasTF32TensorCore);
     if (maybeStrTypes.failed())
-      return rewriter.notifyMatchFailure(matmulOp, "Not supported data type");     
+      return rewriter.notifyMatchFailure(matmulOp, "Not supported data type");
 
     // Step 1. Find out the tile sizes
     SmallVector<int64_t> tiles = getTileSizes(matmulOp, 0);
@@ -146,8 +150,11 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
 
     // Step 5. Generate a name for microkernel
     auto fnName = generateMicrokernelName(
-        combinedOps, strTypes[0], strTypes[1], strTypes[2], tiles[0], tiles[1], tiles[2],
-        stages.value(), hasFill, !hasConsumer);
+        combinedOps, strTypes[0], strTypes[1], strTypes[2], tiles[0], tiles[1],
+        tiles[2], stages.value(), hasFill, !hasConsumer);
+
+    LLVM_DEBUG(
+        { llvm::dbgs() << "Calling Microkernel `" << fnName << "` \n"; });
 
     // Step 6. Allocate shared memory for output
     const int shmemSizeOut = tiles[0] * tiles[1];
@@ -170,13 +177,6 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
       shmemBufferRemaining = shmemBufferOut;
     }
     //  todo(guray) Verify that we have sufficient shared memory here
-
-    llvm::errs() << "Tile size: " << tiles[0] << ", " << tiles[1] << ", "
-                 << tiles[2] << ", stages = " << stages.value()
-                 << " ==> shmem_out:" << shmemSizeOut
-                 << ", shmem_remaining: " << shmemSizeRemaining << ", total = "
-                 << shmemSizeTotal * resElementType.getIntOrFloatBitWidth() / 1024
-                 << "kb\n";
 
     // Step 8. Fill the operands
     SmallVector<Value> ins = {lhs, rhs};

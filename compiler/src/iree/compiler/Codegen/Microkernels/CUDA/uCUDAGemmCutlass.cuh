@@ -12,8 +12,8 @@
 #include "cutlass/gemm/threadblock/default_mma.h"
 #include "cutlass/gemm/threadblock/default_mma_core_sm80.h"
 #include "cutlass/gemm/threadblock/threadblock_swizzle.h"
-#include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
 #include "cutlass/tfloat32.h"
+#include "cutlass/transform/threadblock/predicated_tile_access_iterator.h"
 
 #ifndef DEBUG_CUTLASS
 #include "cutlass/util/debug.h"
@@ -123,13 +123,15 @@ __forceinline__ __device__ void gemm_ukernel(
   // Construct thread-scoped matrix multiply
   ThreadblockMma mma(*shared_storage, tb_thread_id, warp_id, lane_id);
 
-  typename ThreadblockMma::FragmentC accumSrc, accumDest;
+  typename ThreadblockMma::FragmentC accumDest;
   accumDest.clear();
 
   int gemm_k_iterations = (problem_size.k() + ThreadblockMma::Shape::kK - 1) /
                           ThreadblockMma::Shape::kK;
 
   if (!hasLinalgFill) {
+    typename ThreadblockMma::FragmentC accumSrc;
+
     // Set the offset
     iterator_LoadC.add_tile_offset(
         {(tb_tile_offset.m() * ThreadblockMma::WarpCount::kM) +
@@ -157,7 +159,7 @@ __forceinline__ __device__ void gemm_ukernel(
 #endif
 
   if (!writeBack2Global) {
-    /* Store result to shared memory */
+    // todo(guray) Not canonical cutlass way to store result to shared memory.
     int total_elements = accumDest.size();
     ElementC* offset_shmem =
         &GemmSharedStorageBase[tb_thread_id * total_elements];
@@ -205,7 +207,18 @@ __forceinline__ __device__ void gemm_ukernel(
     Epilogue epilogue(*e_shared_storage, tb_thread_id, warp_id, lane_id);
 
     // Execute the epilogue operator to update the destination tensor.
-    epilogue(output_op, iterator_D, accumDest);
+    if (hasLinalgFill) {
+      epilogue(output_op, iterator_D, accumDest);
+    } else {
+      typename Epilogue::OutputTileIterator::Params params_C(
+          cutlass::layout::RowMajor::packed(
+              {problem_size.m(), problem_size.n()}));
+      // Use matrix C as a source
+      typename Epilogue::OutputTileIterator iterator_C(
+          params_C, res, problem_size.mn(), tb_thread_id, threadblock_offset);
+      // Use matrix C as a source
+      epilogue(output_op, iterator_D, accumDest, iterator_C);
+    }
   }
 }
 

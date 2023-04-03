@@ -61,8 +61,8 @@ static llvm::cl::opt<bool> linkUKernelBitcode(
 
 static llvm::cl::opt<bool> linkUKernelDebug(
     "iree-hal-cuda-link-uk-debug", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Links debug version of microkernels that includes line numbers"));
+    llvm::cl::desc("Links debug version of microkernels that includes line "
+                   "numbers. It sets --iree-hal-cuda-link-uk-bitcode=false"));
 
 static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
@@ -313,6 +313,10 @@ static std::string linkUKernelsPTX(std::string ptxImage,
   std::string ukernels_visible_name = ".visible .func " + prefix;
   replaceAll(ptxImage, ukernels_name, ukernels_visible_name);
 
+  if (linkUKernelDebug) {
+    replaceAll(ptxImage, ".target sm_80", ".target sm_80, debug");
+  }
+
   ptxImage.append("//===-------------------------------------------===//\n");
   ptxImage.append("// IREE Microkernels\n");
   ptxImage.append("//===-------------------------------------------===//\n\n");
@@ -383,7 +387,7 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
   }
 
   if (anyRequiredSymbols(module, StringRef(ugpu_kernel_prefix()))) {
-    needPTXLink = !linkUKernelBitcode;
+    needPTXLink = !linkUKernelBitcode || linkUKernelDebug;
     if (linkUKernelBitcode) {
       linkUKernelsBitcode(module, targetMachine);
     }

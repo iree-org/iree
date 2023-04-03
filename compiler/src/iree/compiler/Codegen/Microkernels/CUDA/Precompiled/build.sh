@@ -85,12 +85,13 @@ function make_arch_nvcc_lineinfo_ptx {
       --ptx \
       -ccbin=g++-11 \
       -dc \
+      -G \
       -lineinfo
   
   # Remove these since nvvm also generates
   sed -i 's/.version 7.8//g' $2.ptx
   sed -i 's/.address_size 64//g' $2.ptx
-  sed -i 's/.target sm_80//g' $2.ptx 
+  sed -i 's/.target sm_80, debug//g' $2.ptx 
 
   mv $2.ptx ukernels-cuda-debug-nvptx64-nvidia-cuda-sm_${SM}.ptx
 }

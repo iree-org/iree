@@ -149,14 +149,15 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
 /// operations.
 static IREE::Codegen::DispatchLoweringPassPipeline getTensorCoreConfig(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
-    int64_t N, int64_t K) {
-  // Based on early analysis we found that 128x256x32_3 gives acceptable
-  // performance across many of the large matrix sizes for f16 and fp32. This
-  // needs to be refined into a better startegy based on empircal data but this
-  // gives us a quick solution to achieve performance in the right order of
-  // magnitude for large square like cases.
-  int64_t parallelDim = M * N;
-  static constexpr int64_t kLargDimThreashold = 1536;
+    int64_t N, int64_t K, linalg::LinalgOp op) {
+  // If microkernel flag is enabled, add the tile sizes of the available
+  // microkernels. If there is none, bail out and use iree codegen
+  if (clGPUEnableMicroKernel) {
+    if (ukernelAddTileSizes(tileSizes, op, M, N, K)) {
+      return IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMicroKernel;
+    }
+  }
+
   // Tile sizes are skewed towards small matmul for now. Long term the plan is
   // to not rely on hardcoded configurations.
   if (isFp16) {
@@ -223,6 +224,17 @@ static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
   int64_t smVersion = version.getZExtValue();
   if (smVersion >= 80) info.hasTF32TensorCore = true;
   return info;
+}
+
+FailureOr<TargetInfo> mlir::iree_compiler::getTargetInfoFromAnyOp(
+    Operation *op) {
+  if (auto result = dyn_cast<func::FuncOp>(op)) {
+    return getTargetInfo(result);
+  }
+  if (auto result = op->getParentOfType<func::FuncOp>()) {
+    return getTargetInfo(result);
+  }
+  return failure();
 }
 
 static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
