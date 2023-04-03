@@ -13,6 +13,7 @@
 
 namespace llvm {
 
+/// Pass to set range metadata attached to block id intrinsics.
 struct SetBlockIdsRangePass : PassInfoMixin<SetBlockIdsRangePass> {
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 };
