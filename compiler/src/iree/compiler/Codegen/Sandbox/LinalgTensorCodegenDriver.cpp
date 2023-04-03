@@ -210,6 +210,7 @@ struct LinalgSingleTilingExpertPass
     this->vectorize = options.vectorize;
     this->enableVectorMasking = options.enableVectorMasking;
     this->vectorizePadding = options.vectorizePadding;
+    this->vectorizeGatherAccesses = options.vectorizeGatherAccesses;
     this->tilingLevel = options.tilingLevel;
   }
   LinalgSingleTilingExpertPass(const LinalgSingleTilingExpertPass &pass) {}
@@ -244,6 +245,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   LinalgVectorizationOptions vectorizationOptions;
   vectorizationOptions.setVectorizePadding(vectorizePadding);
+  vectorizationOptions.setVectorizeGatherAccesses(vectorizeGatherAccesses);
   vectorizationOptions.setEnableVectorMasking(enableVectorMasking);
   if (enableVectorMasking) {
     vectorizationOptions.setCanonicalVectorSizes(

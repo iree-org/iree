@@ -342,6 +342,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.enableVectorMasking = enableVectorMasking;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -381,6 +382,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
     options.vectorize = true;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -479,6 +481,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.enableVectorMasking = enableVectorMasking;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -544,6 +547,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     options.vectorize = true;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());

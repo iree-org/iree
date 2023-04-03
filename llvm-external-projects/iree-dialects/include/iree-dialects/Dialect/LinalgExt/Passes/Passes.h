@@ -258,6 +258,14 @@ struct LinalgVectorizationOptions {
     vectorizePadding = vecPad;
     return *this;
   }
+
+  /// Enable vectorization of gather accesses.
+  bool vectorizeGatherAccesses = false;
+
+  LinalgVectorizationOptions &setVectorizeGatherAccesses(bool vecGather) {
+    vectorizeGatherAccesses = vecGather;
+    return *this;
+  }
 };
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(

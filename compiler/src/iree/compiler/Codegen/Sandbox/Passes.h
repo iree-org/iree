@@ -21,6 +21,7 @@ struct LinalgSingleTilingExpertPassOptions {
   bool vectorize = false;
   bool enableVectorMasking = false;
   bool vectorizePadding = false;
+  bool vectorizeGatherAccesses = false;
   int64_t tilingLevel = -1;
 };
 
