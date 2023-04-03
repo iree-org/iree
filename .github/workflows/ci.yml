@@ -673,6 +673,8 @@ jobs:
         run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
+      - name: "DEBUG: see what's in the binaries archive"
+        run: find $(dirname ${TF_BINARIES_ARCHIVE}) -maxdepth 2
       - name: "Building benchmarks"
         id: build
         run: |
