@@ -140,3 +140,16 @@ iree_runtime_cc_test(
         "//runtime/src/iree/builtins/ukernel",
     ],
 )
+
+cc_binary_benchmark(
+    name = "e2e_matmul_benchmark",
+    srcs = ["e2e_matmul_benchmark.c"],
+    deps = [
+        ":benchmark",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/testing:benchmark",
+    ],
+)

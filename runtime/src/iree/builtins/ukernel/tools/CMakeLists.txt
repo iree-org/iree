@@ -159,4 +159,19 @@ iree_cc_test(
     iree::builtins::ukernel
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    e2e_matmul_benchmark
+  SRCS
+    "e2e_matmul_benchmark.c"
+  DEPS
+    ::benchmark
+    ::util
+    iree::base
+    iree::base::internal::flags
+    iree::builtins::ukernel
+    iree::testing::benchmark
+  TESTONLY
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
