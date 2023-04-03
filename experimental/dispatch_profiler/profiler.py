@@ -4,6 +4,7 @@ from library import *
 from matmul import *
 from manifest import *
 from performance_report import *
+from options import add_profiler_arguments
 
 ###############################################################################
 # Map of operation kinds to their dispatch launchers.
@@ -42,60 +43,7 @@ if __name__ == "__main__":
                                     "for IREE-compiled MLIR operations.")
   ###############################################################################
 
-  # General profiler options
-  parser.add_argument("--build-dir", default=".", \
-                      help="IREE top-level build directory is used to generate "\
-                        "operations and npy files.This should be same that used "\
-                        "to call generated.py")
-  parser.add_argument("--operation_kind", default="all", help="Specifies the "\
-                      "operation kinds to generate.", choices=["matmul", "conv2d", "all"])
-  parser.add_argument("--verbose", default='False', \
-                      help='Prints verbose output and commands executed.')
-
-  # Generator-specific options
-  parser.add_argument("--dispatches", default='', help="Comma delimited list to "\
-                      "filter dispatches by name. A dispatch is a combination of "\
-                      "operation and tuning configuration.")
-  parser.add_argument("--mlir-dialect", default='linalg', help="MLIR dialect entry "\
-                      "point at which operation is emitter.",
-                      choices=["linalg", "flow", "all"])
-  # Compilation-specific options
-  parser.add_argument("--device", default="cuda", \
-                      help="Target backend device to benchmark the operation on. "\
-                        "For example, cuda, vulkan, etc.")
-  parser.add_argument("--force-compile", default='False', \
-                      type=str, help="Force re-compilation of the operation even "\
-                      "if .vmfb file is present.")
-  parser.add_argument("--compile-only", default='False', \
-                      type=str, help="Compiles the operation "\
-                        "without running verification and profiling.")
-
-  # Profiling-specific options
-  parser.add_argument("--profiling-enabled", "--benchmark", default='True', \
-                      type=str, help="Benchmark the operation.")
-  parser.add_argument('--batch-size', '--benchmark-dispatch-repeat-count', \
-                      default=100, help="Number of times dispatch is launched "\
-                        "in a loop to amortize the launch overhead.")
-  parser.add_argument("--benchmark-repetitions", default=5,
-                      type=int, help="Number of times benchmark is repeated "\
-                      "and min, max, median, and average runtimes/gflops are "\
-                      "reported.")
-
-  # Verification-specific options
-  parser.add_argument("--verification-enabled", default='True',
-                      type=str, help="Verify the operation against reference numpy "\
-                      "implementation.")
-
-  # Performance reporting options
-  parser.add_argument("--output", default='', \
-                      help="Path to output file for csv readable results.")
-  parser.add_argument("--append", default='false', \
-                      help="If true, result is appended to possibly existing file. "\
-                        "Otherwise, any existing file is overwritten.")
-
-  parser.add_argument("--tags", default='', \
-                      help="Inserts leading columns in output table and uniform "\
-                        "values for each column. Useful for generating pivot tables.")
+  add_profiler_arguments(parser)
 
   # Parse the command line arguments.
   args = parser.parse_args()

@@ -303,10 +303,9 @@ class MatmulOperationLauncher:
     # Variables from top-level argparse.
     self.generated_path = os.path.join(args.build_dir, 'generated',
                                        args.mlir_dialect)
-    self.device = args.device
+    self.args = args
     self.benchmark_dispatch_repeat_count = args.batch_size
     self.batch_size = args.batch_size
-    self.benchmark_repetitions = args.benchmark_repetitions
     self.verbose = False if args.verbose in ['False', 'false', '0'] else True
 
     # Additional paths.
@@ -346,8 +345,8 @@ class MatmulOperationLauncher:
     cmd = [self.iree_compile_path, self.source_mlir_file, "-o", f"{vmfb_file}"]
 
     # Device specific flags.
-    cmd += [f"--iree-hal-target-backends={self.device}"]
-    cmd += [f"--iree-hal-cuda-llvm-target-arch=sm_80"]
+    cmd += [f"--iree-hal-target-backends={self.args.device}"]
+    cmd += [f"--iree-hal-cuda-llvm-target-arch={self.args.cuda_arch}"]
 
     # Misc flags.
     cmd += [
@@ -392,7 +391,7 @@ class MatmulOperationLauncher:
     # Commandline `iree-run-module` for verification.
     cmd = [
         self.iree_run_module_path, f'--module={self.vmfb_verify_file}',
-        f'--device={self.device}'
+        f'--device={self.args.device}'
     ]
 
     # Operation-specific verification command-line.
@@ -430,11 +429,11 @@ class MatmulOperationLauncher:
     # Commandline `iree-benchmark-module` for profiling.
     cmd = [
         self.iree_benchmark_module_path, f'--module={self.vmfb_benchmark_file}',
-        f'--device={self.device}'
+        f'--device={self.args.device}'
     ]
 
     # Profiling specific flags.
-    cmd += [f'--benchmark_repetitions={self.benchmark_repetitions}']
+    cmd += [f'--benchmark_repetitions={self.args.benchmark_repetitions}']
     cmd += [f'--batch_size={self.batch_size}']
 
     # Operation-specific profiling command-line.
