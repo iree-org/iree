@@ -19,8 +19,10 @@ iree_cc_library(
     CUDA
   HDRS
     "CUDATarget.h"
+    "LLVMPasses.h"
   SRCS
     "CUDATarget.cpp"
+    "SetBlockIdsRangePass.cpp"
   DEPS
     LLVMAnalysis
     LLVMBitReader
