@@ -38,7 +38,7 @@ echo "Configuring to build benchmarks"
   -DIREE_BUILD_SAMPLES=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite" \
-  -DIREE_IMPORT_TF_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tf"
+  -DIREE_IMPORT_TF_PATH="iree-import-tf"
 
 echo "Building benchmark artifacts"
 "${CMAKE_BIN}" \
