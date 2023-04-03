@@ -68,12 +68,19 @@ function(iree_cc_binary)
     set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   endif()
 
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "  : iree_cc_binary(${_NAME})")
+  endif()
+
   add_executable(${_NAME} "")
 
   if(NOT "${_PACKAGE_NS}" STREQUAL "")
     # Alias the iree_package_name binary to iree::package::name.
     # This lets us more clearly map to Bazel and makes it possible to
     # disambiguate the underscores in paths vs. the separators.
+    if(_DEBUG_IREE_PACKAGE_NAME)
+      message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
+    endif()
     add_executable(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
 
     # If the binary name matches the package then treat it as a default. For

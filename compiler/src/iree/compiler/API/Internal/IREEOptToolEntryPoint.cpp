@@ -66,6 +66,11 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
     llvm::errs() << "error: Failed to initialize IREE compiler plugins\n";
     return failure();
   }
+  // Initialization that applies to all global plugins must be done prior
+  // to CL parsing.
+  pluginManager.globalInitialize();
+  pluginManager.registerPasses();
+  pluginManager.registerGlobalDialects(registry);
   pluginManager.initializeCLI();
 
   // Parse pass names in main to ensure static initialization completed.
@@ -75,9 +80,6 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   // The local binder is meant for overriding session-level options, but for
   // tools like this it is unused.
   auto localBinder = mlir::iree_compiler::OptionsBinder::local();
-  pluginManager.globalInitialize();
-  pluginManager.registerPasses();
-  pluginManager.registerGlobalDialects(registry);
   mlir::iree_compiler::PluginManagerSession pluginSession(
       pluginManager, localBinder, pluginManagerOptions);
   if (failed(pluginSession.initializePlugins())) return failure();

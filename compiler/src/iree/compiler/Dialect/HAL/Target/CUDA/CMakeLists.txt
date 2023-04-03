@@ -29,6 +29,8 @@ iree_cc_library(
     LLVMLinker
     LLVMMC
     LLVMNVPTXCodeGen
+    LLVMNVPTXDesc
+    LLVMNVPTXInfo
     LLVMPasses
     LLVMSupport
     LLVMTarget
