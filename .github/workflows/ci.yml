@@ -680,8 +680,8 @@ jobs:
         with:
           python-version: "3.10"
           cache: "pip"
-      - name: "Installing iree-import-tf"
-        run: pip install ./integrations/tensorflow/python_projects/iree_tf
+      #- name: "Installing iree-import-tf"
+      #  run: pip install ./integrations/tensorflow/python_projects/iree_tf
       #- name: "DEBUG: Where is the package?"
       #  run: pip show iree-tools-tf
       #  if: always()
