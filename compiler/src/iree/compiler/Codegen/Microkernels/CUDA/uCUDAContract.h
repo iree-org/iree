@@ -117,28 +117,23 @@ struct uGPUContracts {
 
   uGPUContracts() {
     ukernels.clear();
-    auto t = "float";
-    // Pipeline Stages 3
-    generateVariant(t, t, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 3);
-    generateVariant(t, t, t, {128, 256, 32}, {64, 64}, {16, 8, 8}, 3);
-    generateVariant(t, t, t, {256, 128, 32}, {64, 64}, {16, 8, 8}, 3);
 
-    generateVariant(t, t, t, {128, 256, 16}, {64, 64}, {16, 8, 8}, 3);
-    generateVariant(t, t, t, {128, 128, 16}, {64, 64}, {16, 8, 8}, 3);
-    // Pipeline Stages 5
-    generateVariant(t, t, t, {128, 128, 16}, {64, 64}, {16, 8, 8}, 5);
-    generateVariant(t, t, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 5);
-    auto tf = "tf32";
-    // Pipeline Stages 3
-    generateVariant(tf, tf, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 3);
-    generateVariant(tf, tf, t, {128, 256, 32}, {64, 64}, {16, 8, 8}, 3);
-    generateVariant(tf, tf, t, {256, 128, 32}, {64, 64}, {16, 8, 8}, 3);
-
-    generateVariant(tf, tf, t, {128, 256, 16}, {64, 64}, {16, 8, 8}, 3);
-    generateVariant(tf, tf, t, {128, 128, 16}, {64, 64}, {16, 8, 8}, 3);
-    // Pipeline Stages 5
-    generateVariant(tf, tf, t, {128, 128, 16}, {64, 64}, {16, 8, 8}, 5);
-    generateVariant(tf, tf, t, {128, 128, 32}, {64, 64}, {16, 8, 8}, 5);
+    auto generateF32Microkernels = [&](const char* t, const char* OutT) {
+      int stages = 3;
+      generateVariant(t, t, OutT, {64, 64, 32}, {64, 64}, {16, 8, 8}, stages);
+      generateVariant(t, t, OutT, {128, 128, 32}, {64, 64}, {16, 8, 8}, stages);
+      generateVariant(t, t, OutT, {128, 256, 32}, {64, 64}, {16, 8, 8}, stages);
+      generateVariant(t, t, OutT, {256, 128, 32}, {64, 64}, {16, 8, 8}, stages);
+      stages = 4;
+      generateVariant(t, t, OutT, {128, 256, 16}, {64, 64}, {16, 8, 8}, stages);
+      stages = 5;
+      generateVariant(t, t, OutT, {128, 256, 16}, {64, 64}, {16, 8, 8}, stages);
+      generateVariant(t, t, OutT, {128, 128, 16}, {64, 64}, {16, 8, 8}, stages);
+    };
+    // Type float + float
+    generateF32Microkernels("float", "float");
+    // Type tfloat32 + float
+    generateF32Microkernels("tf32", "float");
   }
 };
 
@@ -177,6 +172,21 @@ bool adduCUDAContracts(INT M, INT N, INT K, std::string lhs, std::string result,
     }
   }
   return found;
+}
+
+inline bool existuCUDAKernel(INT Tile_M, INT Tile_N, INT Tile_K, INT stages,
+                             std::string lhs, std::string rhs,
+                             std::string result) {
+  // todo(guray) improve here
+  for (uGPUKernel kernel : AllContracts.ukernels) {
+    if (kernel.LHS == lhs && kernel.RHS == rhs && kernel.RESULT == result &&
+        kernel.ThreadblockShape[0] == Tile_M &&
+        kernel.ThreadblockShape[1] == Tile_N &&
+        kernel.ThreadblockShape[2] == Tile_K && kernel.stages == stages) {
+      return true;
+    }
+  }
+  return false;
 }
 
 #endif  // IREE_COMPILER_CODEGEN_UKERNELS_UGPUCONTRACT_H_

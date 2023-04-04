@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -52,6 +53,7 @@ static LogicalResult getInstructionShape(
       break;
     case IREE::Codegen::DispatchLoweringPassPipeline::
         LLVMGPUMatmulTensorCoreMmaSync:
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMicroKernel:
       // Tensor Core Pipeline / MMA.SYNC
       if (inputElementType.isF16() || inputElementType.isBF16()) {
         instructionShape = {16, 8, 16};
@@ -63,9 +65,26 @@ static LogicalResult getInstructionShape(
       }
       break;
     default:
-      return op->emitError(
-          "Expected matmul SIMT, TensorCore(WMMA), or TensorCore(MMA.SYNC), "
-          "compilation pipeline");
+      return op->emitError()
+             << "Expected one of them : "
+             << IREE::Codegen::stringifyDispatchLoweringPassPipeline(
+                    IREE::Codegen::DispatchLoweringPassPipeline::
+                        LLVMGPUMatmulSimt)
+             << ","
+             << IREE::Codegen::stringifyDispatchLoweringPassPipeline(
+                    IREE::Codegen::DispatchLoweringPassPipeline::
+                        LLVMGPUMatmulTensorCore)
+             << ","
+             << IREE::Codegen::stringifyDispatchLoweringPassPipeline(
+                    IREE::Codegen::DispatchLoweringPassPipeline::
+                        LLVMGPUMatmulTensorCoreMmaSync)
+             << ","
+             << IREE::Codegen::stringifyDispatchLoweringPassPipeline(
+                    IREE::Codegen::DispatchLoweringPassPipeline::
+                        LLVMGPUMicroKernel)
+             << ". But received "
+             << IREE::Codegen::stringifyDispatchLoweringPassPipeline(
+                    pipeline.getValue());
   }
   return success();
 }
@@ -179,13 +198,14 @@ LogicalResult verifyGPUMatmulPipeline(
   // Additional verification Tensor Core pipelines.
   //
 
-  // Verify that x-dim has multiple of kWarpSize threads or has integer units of
-  // warps in x-dim.
+  // Verify that x-dim has multiple of kWarpSize threads or has integer units
+  // of warps in x-dim.
   if (workgroupSize[kDimX] % kWarpSize != 0) {
     return op->emitError("Number of threads in x-dim ")
            << workgroupSize[kDimX] << " is not a multiple of warp size ("
            << kWarpSize
-           << ") or integer units of warps in x-dim with compilation pipeline "
+           << ") or integer units of warps in x-dim with compilation "
+              "pipeline "
            << pipelineName;
   }
 
@@ -197,8 +217,8 @@ LogicalResult verifyGPUMatmulPipeline(
   SmallVector<int64_t> matmulShape{lhsShape[0], rhsShape[1], lhsShape[1]};
 
   // Warp tile shape in number of elements in M, N, and K dim.
-  // Note that num warp in (x, y, z) dim are mapped to problem (M, N, K) dim as:
-  // DimY -> ProblemDimM, DimX -> ProblemDimN, DimZ -> ProblemDimK.
+  // Note that num warp in (x, y, z) dim are mapped to problem (M, N, K) dim
+  // as: DimY -> ProblemDimM, DimX -> ProblemDimN, DimZ -> ProblemDimK.
   SmallVector<int64_t> warpShape{threadBlockShape[kM] / numWarps[kDimY],
                                  threadBlockShape[kN] / numWarps[kDimX],
                                  threadBlockShape[kK] / numWarps[kDimZ]};
@@ -223,7 +243,8 @@ LogicalResult verifyGPUMatmulPipeline(
            << " with compilation pipeline " << pipelineName;
   }
 
-  // Verify that matmul problem shape can be tiled with the thread block shape.
+  // Verify that matmul problem shape can be tiled with the thread block
+  // shape.
   // TODO: This check should be relaxed as we allow unaligned matmul shapes.
   if (matmulShape[kM] % threadBlockShape[kM] != 0 ||
       matmulShape[kN] % threadBlockShape[kN] != 0 ||

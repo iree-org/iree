@@ -40,6 +40,12 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
 
+llvm::cl::opt<bool> clGPUHas48KShmem(
+    "iree-codegen-llvmgpu-48k-shmem",
+    llvm::cl::desc(
+        "MLIR file containing a transform dialect specification to apply"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
@@ -98,33 +104,6 @@ static FailureOr<StringRef> returnCtype(Type type) {
   }
   return failure();
 }
-
-/// Checks the generated CUDA microkernels and fills the tile sizes.
-static bool ukernelAddTileSizes(
-    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, linalg::LinalgOp op,
-    int64_t M, int64_t N, int64_t K) {
-  auto elementTypeA = returnCtype(op.getDpsInputOperand(0)->get().getType());
-  auto elementTypeAccum = returnCtype(op.getDpsInitOperand(0)->get().getType());
-  if (failed(elementTypeA) || failed(elementTypeAccum)) return false;
-
-  auto adder = [&](int64_t tileM, int64_t tileN, int64_t tileK, int64_t nWarps,
-                   int64_t stages) {
-    tileSizes.push_back(TileWorkgroupSizePair(
-<<<<<<< HEAD
-<<<<<<< HEAD
-        {{tileM, tileN, tileK}, {cudaWarpSize * nWarps, 1, 1}, stages}));
-=======
-        {{tileM, tileN, tileK}, {cudaWarpSize, nWarps, 1}, stages}));
->>>>>>> 7f9ae84b5 (use C as accumulator)
-=======
-        {{tileM, tileN, tileK}, {cudaWarpSize * nWarps, 1, 1}, stages}));
->>>>>>> 1e9f79e80 (Use 1 dimensional CTA)
-  };
-
-  return adduCUDAContracts(M, N, K, elementTypeA.value().str(),
-                           elementTypeAccum.value().str(), adder);
-}
-
 }  // namespace
 
 /// Return the best combination of tile size and wg size. It will then used to
@@ -144,22 +123,18 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
 }
 
-/// Returns code generation pipeline that can be tensor core or microkernels.
-/// Fills the best combination of tile size and wg size when using tensorcore
+/// Return the best combination of tile size and wg size when using tensorcore
 /// operations.
-static IREE::Codegen::DispatchLoweringPassPipeline getTensorCoreConfig(
+static void getTensorCoreConfig(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
-    int64_t N, int64_t K, linalg::LinalgOp op) {
-  // If microkernel flag is enabled, add the tile sizes of the available
-  // microkernels. If there is none, bail out and use iree codegen
-  if (clGPUEnableMicroKernel) {
-    if (ukernelAddTileSizes(tileSizes, op, M, N, K)) {
-      return IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMicroKernel;
-    }
-  }
-
-  // Tile sizes are skewed towards small matmul for now. Long term the plan is
-  // to not rely on hardcoded configurations.
+    int64_t N, int64_t K) {
+  // Based on early analysis we found that 128x256x32_3 gives acceptable
+  // performance across many of the large matrix sizes for f16 and fp32. This
+  // needs to be refined into a better startegy based on empircal data but this
+  // gives us a quick solution to achieve performance in the right order of
+  // magnitude for large square like cases.
+  int64_t parallelDim = M * N;
+  static constexpr int64_t kLargDimThreashold = 1536;
   if (isFp16) {
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
       tileSizes.push_back(
@@ -168,15 +143,20 @@ static IREE::Codegen::DispatchLoweringPassPipeline getTensorCoreConfig(
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
-      tileSizes.push_back(
-          TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
+      if (clGPUHas48KShmem) {
+        tileSizes.push_back(
+            TileWorkgroupSizePair({{64, 64, 32}, {32, 1, 1}, 3}));
+      } else {
+        tileSizes.push_back(
+            TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
+      }
     }
+
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
   }
-  return IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
 }
 
 static StringRef getTargetArch(func::FuncOp entryPoint) {
@@ -265,24 +245,62 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
 
 /// Decides which tensorcore operations to use.
 static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
-    bool isF16) {
-  // Currently mma.sync is on by default for fp16 only.
-  IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
-      isF16 ? IREE::Codegen::DispatchLoweringPassPipeline::
-                  LLVMGPUMatmulTensorCoreMmaSync
-            : IREE::Codegen::DispatchLoweringPassPipeline::
-                  LLVMGPUMatmulTensorCore;
-
-  // Override the decision based on cl flags.
-  assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
-  if (clGPUUseMMASync) {
-    codegenPipeline = IREE::Codegen::DispatchLoweringPassPipeline::
-        LLVMGPUMatmulTensorCoreMmaSync;
-  }
-  if (clGPUUseWMMA) {
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isF16,
+    linalg::LinalgOp op, int64_t M, int64_t N, int64_t K) {
+  auto elementTypeA = returnCtype(op.getDpsInputOperand(0)->get().getType());
+  auto elementTypeB = returnCtype(op.getDpsInputOperand(1)->get().getType());
+  auto elementTypeC = returnCtype(op.getDpsInitOperand(0)->get().getType());
+  IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline;
+  // If microkernel flag is enabled, add the tile sizes of the available
+  // microkernels. If there is none, bail out and use iree codegen
+  if (clGPUEnableMicroKernel && succeeded(elementTypeA) &&
+      succeeded(elementTypeB) && succeeded(elementTypeC) &&
+      existuCUDAKernel(tileSizes[0].tileSize[0], tileSizes[0].tileSize[1],
+                       tileSizes[0].tileSize[2], tileSizes[0].pipelineDepth,
+                       elementTypeA->str(), elementTypeB->str(),
+                       elementTypeC->str())) {
     codegenPipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
-  };
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMicroKernel;
+    // Linearize Threads
+    int totalCtaSize = tileSizes.front().workgroupSize[0] *
+                       tileSizes.front().workgroupSize[1] *
+                       tileSizes.front().workgroupSize[2];
+    tileSizes.front().workgroupSize[0] = totalCtaSize;
+    tileSizes.front().workgroupSize[1] = 1;
+    tileSizes.front().workgroupSize[2] = 1;
+  } else {
+    // Currently mma.sync is on by default for fp16 only.
+    codegenPipeline = isF16 ? IREE::Codegen::DispatchLoweringPassPipeline::
+                                  LLVMGPUMatmulTensorCoreMmaSync
+                            : IREE::Codegen::DispatchLoweringPassPipeline::
+                                  LLVMGPUMatmulTensorCore;
+
+    // Override the decision based on cl flags.
+    assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
+    if (clGPUUseMMASync) {
+      codegenPipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+          LLVMGPUMatmulTensorCoreMmaSync;
+    }
+    if (clGPUUseWMMA) {
+      codegenPipeline =
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+    };
+  }
+
+  LLVM_DEBUG({
+    auto pipelineName =
+        IREE::Codegen::stringifyDispatchLoweringPassPipeline(codegenPipeline);
+    llvm::dbgs() << "For  (A,B = " << elementTypeA << ", C = " << elementTypeC
+                 << ") " << M << "x" << N << "x" << K << " -> ";
+    llvm::dbgs() << "Using [" << pipelineName << "] ";
+    auto tile = tileSizes.front();
+    llvm::dbgs() << " uGPUk = " << tile.tileSize[0] << "x" << tile.tileSize[1]
+                 << "x" << tile.tileSize[2] << ", stages=" << tile.pipelineDepth
+                 << ", CTA = (" << tile.workgroupSize[0] << ", "
+                 << tile.workgroupSize[1] << ", " << tile.workgroupSize[2]
+                 << ") \n";
+  });
+
   return codegenPipeline;
 }
 
@@ -319,6 +337,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             workgroupTileSizes[loopID] = 0;
           }
         }
+
         tileSizes.emplace_back(
             std::move(workgroupTileSizes));  // Workgroup level.
         return setOpConfigAndEntryPointFnTranslation(
@@ -380,7 +399,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
           IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
-              getTensorCorePipeline(TCtileSizeConfig, isFp16, op);
+              getTensorCorePipeline(TCtileSizeConfig, isFp16, op, sizeM, sizeN,
+                                    sizeK);
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,

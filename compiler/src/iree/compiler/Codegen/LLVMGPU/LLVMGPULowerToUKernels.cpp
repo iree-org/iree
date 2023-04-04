@@ -34,9 +34,7 @@ llvm::cl::opt<bool> clGPUTF32("iree-codegen-llvmgpu-tf32",
                               llvm::cl::init(false));
 
 namespace mlir {
-
 namespace iree_compiler {
-
 namespace {
 
 struct LLVMGPULowerToUKernelsPass
@@ -153,9 +151,6 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
         combinedOps, strTypes[0], strTypes[1], strTypes[2], tiles[0], tiles[1],
         tiles[2], stages.value(), hasFill, !hasConsumer);
 
-    LLVM_DEBUG(
-        { llvm::dbgs() << "Calling Microkernel `" << fnName << "` \n"; });
-
     // Step 6. Allocate shared memory for output
     const int shmemSizeOut = tiles[0] * tiles[1];
     Value shmemBufferOut = rewriter.create<bufferization::AllocTensorOp>(
@@ -174,7 +169,8 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
           ValueRange{});
     } else {
       // Just pass something to match the ABI
-      shmemBufferRemaining = shmemBufferOut;
+      shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
+          loc, RankedTensorType::get({0}, resElementType), ValueRange{});
     }
     //  todo(guray) Verify that we have sufficient shared memory here
 
@@ -196,6 +192,12 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
         matmulOp, matmulOp.getResultTypes(), StringRef(fnName), ins, outs,
         others);
 
+    LLVM_DEBUG({
+      llvm::dbgs() << "Calling Microkernel `" << fnName << "`, needs "
+                   << shmemSizeTotal * lhsElementType.getIntOrFloatBitWidth() /
+                          8 / 1024
+                   << " Kb Shared Memory \n";
+    });
     return success();
   }
 };
