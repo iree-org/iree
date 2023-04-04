@@ -64,14 +64,3 @@ BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/bert-large-seq384-tf-model.tar.gz",
     entry_function="serving_default",
     input_types=["1x384xi32", "1x384xi32", "1x384xi32"])
-
-# Model derived from https://huggingface.co/docs/transformers/model_doc/t5#transformers.TFT5Model.
-T5_LARGE_FP32_SEQLEN512_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_FP32_SEQLEN512_TF,
-    name="T5LargeTF",
-    tags=["fp32", "seqlen512", "tensorflow"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V1,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680491395/T5_LARGE/batch_1/tf-model.tar.gz",
-    entry_function="serving_default",
-    input_types=["1x512xi32", "1x512xi32"])
