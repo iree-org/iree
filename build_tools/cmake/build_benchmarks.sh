@@ -27,6 +27,7 @@ IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/
 source build_tools/cmake/setup_build.sh
 
 # Install iree-import-tf
+pip install compiler/
 pip install integrations/tensorflow/python_projects/iree_tf
 
 # DEBUG: Where was it installed?
