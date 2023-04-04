@@ -526,6 +526,22 @@ def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp">
   ];
 }
 
+def LLVMCPUVectorization :
+    Pass<"iree-llvmcpu-vectorization", "func::FuncOp"> {
+  let summary = "Pass to perform vectorization on tensor/linalg ops.";
+  let constructor = "mlir::createLinalgVectorizationExpertPass()";
+  let options = [
+    Option<"enableVectorMasking", "enable-vector-masking", "bool",/*default=*/"false",
+      "Enable vector masking during vectorization.">,
+    Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
+      "Rewrite all tensor.pad ops in the function to vector form.">,
+    Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
+      "Enable vectorizaiton of operations that may generate vector.gather operations.">,
+  ];
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUVectorizationPass()";
+}
+
 def ConvertToLLVM :
     Pass<"iree-convert-to-llvm", "ModuleOp"> {
   let summary =

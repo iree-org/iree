@@ -333,6 +333,15 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
     bool enableReassociateFpReductions = false);
 
+struct LLVMCPUVectorizationPassOptions {
+  bool enableVectorMasking = false;
+  bool vectorizePadding = false;
+  bool vectorizeGatherAccesses = false;
+};
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
+    const LLVMCPUVectorizationPassOptions &options);
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
     bool reassociateFpReordering = false);

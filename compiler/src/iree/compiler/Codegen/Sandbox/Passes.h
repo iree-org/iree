@@ -12,25 +12,6 @@
 
 namespace mlir {
 
-/// Struct to control pass options for `LinalgSingleTilingExpert` pass.
-struct LinalgSingleTilingExpertPassOptions {
-  std::string anchorFuncOpName = "";
-  std::string anchorOpName = "";
-  bool generalize = false;
-  SmallVector<int64_t> iteratorInterchange = {};
-  bool vectorize = false;
-  bool enableVectorMasking = false;
-  bool vectorizePadding = false;
-  bool vectorizeGatherAccesses = false;
-  int64_t tilingLevel = -1;
-};
-
-/// Creates a pass to drive one level tiling + vectorization of `LinalgOp`s.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgSingleTilingExpertPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgSingleTilingExpertPass(
-    const LinalgSingleTilingExpertPassOptions &passOptions);
-
 /// Struct to control pass options for `LinalgVectorLoweringPass` pass.
 struct LinalgVectorLoweringPassOptions {
   int vectorLoweringStage = 0;
@@ -65,12 +46,6 @@ void addLowerToVectorTransforms(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 namespace iree_compiler {
-/// Creates a pass to drive one level tiling + vectorization of `LinalgOp`s with
-/// additional parameters that allow controlling the value of the pass options
-/// when building the pipeline.
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgSingleTilingExpertPass(
-    int64_t tilingLevel, bool vectorize);
-
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
