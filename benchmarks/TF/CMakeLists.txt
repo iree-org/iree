@@ -106,5 +106,5 @@
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################
-include(linux-x86_64.cmake)
-include(linux-cuda.cmake)
+#include(linux-x86_64.cmake)
+#include(linux-cuda.cmake)
