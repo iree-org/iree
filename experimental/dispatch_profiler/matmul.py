@@ -361,11 +361,13 @@ class MatmulOperationLauncher:
     # Base iree-compile commandline
     cmd = [self.iree_compile_path, self.source_mlir_file, "-o", f"{vmfb_file}"]
 
-    # Device specific flags.
+    # General compilation options
     cmd += [f"--iree-hal-target-backends={self.args.device}"]
     cmd += [f"--iree-hal-cuda-llvm-target-arch={self.args.cuda_arch}"]
+    if self.args.split_k_slices != "":
+      cmd += [f"--iree-flow-split-matmul-reduction={self.args.split_k_slices}"]
 
-    # Misc flags.
+    # Compilation options for profiling
     cmd += [
         f"--iree-hal-benchmark-dispatch-repeat-count={benchmark_dispatch_repeat_count}"
     ]
@@ -498,8 +500,11 @@ class MatmulGenerator:
         LLVMGPUMatmulTensorCoreMmaSync,  # Tensor Core (MMA.SYNC)
     ]
 
+    self.problem_shapes = [[128, 256, 8192]]
+    """
     self.problem_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
                            [2560, 2560, 2560], [3456, 1024, 2048]]
+    """
 
     # List of pre-definied matmul dispatch collections.
     self.dispatches_collection_list = []

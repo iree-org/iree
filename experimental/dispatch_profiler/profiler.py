@@ -41,11 +41,8 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="IREE Python profiler tool for "\
                                    "verifcation and performance profiling tool "\
                                     "for IREE-compiled MLIR operations.")
-  ###############################################################################
 
   args = parse_profiler_arguments(parser)
-
-  print(args)
   ###############################################################################
 
   # Manifests metadata for a group of accompanying operations and configurations.

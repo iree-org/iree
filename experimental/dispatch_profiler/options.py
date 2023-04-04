@@ -72,6 +72,9 @@ def add_iree_compile_arguments(parser):
                       help="Number of times dispatch is launched in a loop to amortize the "\
                       "launch overhead. This argument is used for iree-compile and iree-benchamrk-module. "\
                       "The value used for iree-compile and iree-benchamrk-module should be the same.")
+  iree_compile_parser.add_argument('--iree-flow-split-matmul-reduction', '--split-k-slices', \
+                      dest="split_k_slices", default="", \
+                      help="Number of slices to split the reduction K-dimension.")
 
 
 def add_verification_arguments(parser):
