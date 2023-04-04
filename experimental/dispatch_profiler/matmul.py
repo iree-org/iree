@@ -366,6 +366,10 @@ class MatmulOperationLauncher:
     cmd += [f"--iree-hal-cuda-llvm-target-arch={self.args.cuda_arch}"]
     if self.args.split_k_slices != "":
       cmd += [f"--iree-flow-split-matmul-reduction={self.args.split_k_slices}"]
+    if self.args.use_mma_sync:
+      cmd += [f"--iree-codegen-llvmgpu-use-mma-sync"]
+    if self.args.use_wmma:
+      cmd += [f"--iree-codegen-llvmgpu-use-wmma"]
 
     # Compilation options for profiling
     cmd += [
