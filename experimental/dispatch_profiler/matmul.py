@@ -102,11 +102,19 @@ class MatmulCompilationInfo:
   compilation info.
   """
 
-  def __init__(self, tile_description, translation_info):
+  def __init__(self,
+               tile_description,
+               translation_info,
+               config_type=CompilationConfigType.Custom):
     self.tile_description = tile_description  # TileDescription
     self.translation_info = translation_info  # TranslationInfo
+    self.config_type = config_type  # CompilationConfigType
 
   def name(self):
+    """Procedurally generated name for the matmul compilation info."""
+    if self.config_type == CompilationConfigType.Default:
+      return "tile_config_default"
+
     return "tile_config_{tbm}x{tbn}_{tbk}x{stages}_{translation_info}".format(
         tbm=self.tile_description.threadblock_shape[0],
         tbn=self.tile_description.threadblock_shape[1],
@@ -130,6 +138,10 @@ class EmitMatmulCompilationInfo:
 """
 
   def emit(self, compilation_info):
+    """Emits the matmul compilation info as a string."""
+    if compilation_info.config_type == CompilationConfigType.Default:
+      return ""
+
     values = {
         'compilation_info_name':
             compilation_info.name(),
@@ -163,14 +175,14 @@ class EmitLinalgMatmulDispatch:
 
     self.linalg_row_row_matmul_template = """
 // Dispatch linalg.matmul row-row layout 
-func.func @${operation_name}_${compilation_trait}(
+func.func @${operation_name}_${compilation_info_name}(
   %lhs: tensor<${problem_m}x${problem_k}x${datatype_lhs}>,
   %rhs: tensor<${problem_k}x${problem_n}x${datatype_rhs}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
 {
   %c0 = arith.constant 0.0 : ${datatype_result}
   %init = tensor.empty() : tensor<${problem_m}x${problem_n}x${datatype_result}>
   %inital_result = linalg.fill ins(%c0 : ${datatype_result}) outs(%init : tensor<${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
-  %result = linalg.matmul {compilation_info = #${compilation_trait}} 
+  %result = linalg.matmul ${compilation_info_attribute} 
                      ins(%lhs, %rhs: tensor<${problem_m}x${problem_k}x${datatype_lhs}>, tensor<${problem_k}x${problem_n}x${datatype_rhs}>)
                      outs(%inital_result: tensor<${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
   return %result : tensor<${problem_m}x${problem_n}x${datatype_result}>
@@ -179,10 +191,18 @@ func.func @${operation_name}_${compilation_trait}(
 
   def emit(self, matmul_dispatch):
     """Emit the matmul operation in the MLIR dialect for a single compilation info"""
-    matmul_operation = matmul_dispatch.operation.name()
+    compilation_info_attribute_template = """{compilation_info = #${compilation_info_name}}"""
+    compilation_info_attribute_str = SubstituteTemplate(
+        compilation_info_attribute_template,
+        {'compilation_info_name': matmul_dispatch.configuration.name()})
+    compilation_info_attribute = compilation_info_attribute_str \
+      if matmul_dispatch.configuration.config_type != CompilationConfigType.Default else ""
+
     values = {
         'operation_name':
             matmul_dispatch.operation.name(),
+        'compilation_info_attribute':
+            compilation_info_attribute,
         'problem_m':
             str(matmul_dispatch.operation.problem_shape[0]),
         'problem_n':
@@ -195,7 +215,7 @@ func.func @${operation_name}_${compilation_trait}(
             DataTypeName[matmul_dispatch.operation.rhs.datatype],
         'datatype_result':
             DataTypeName[matmul_dispatch.operation.result.datatype],
-        'compilation_trait':
+        'compilation_info_name':
             matmul_dispatch.configuration.name()
     }
 
@@ -470,6 +490,10 @@ class MatmulGenerator:
   def __init__(self, args):
     self.args = args
 
+    self.default_config = False if args.default_config in [
+        'False', 'false', '0'
+    ] else True
+
     self.translation_infos = [
         #TranslationInfo.LLVMGPUMatmulSimt,  # CUDA Core (SMIT)
         #TranslationInfo.LLVMGPUMatmulTensorCore, # Tensor Core (WMMA)
@@ -564,6 +588,11 @@ class MatmulGenerator:
       supported_configuration_list = self._cuda_supported_configuration_list(
           operation, configuration_list)
 
+      # Add default configuration if requested.
+      if self.default_config:
+        supported_configuration_list.append(
+            MatmulCompilationInfo([], [], CompilationConfigType.Default))
+
       self.dispatches_collection_list.append(DispatchCollection(\
         operation, supported_configuration_list))
 
@@ -598,6 +627,11 @@ class MatmulGenerator:
       # Filter out configurations that are not supported by LLVM GPU CUDA backend.
       supported_configuration_list = self._cuda_supported_configuration_list(
           operation, configuration_list)
+
+      # Add default configuration if requested.
+      if self.default_config:
+        supported_configuration_list.append(
+            MatmulCompilationInfo([], [], CompilationConfigType.Default))
 
       self.dispatches_collection_list.append(DispatchCollection(\
         operation, supported_configuration_list))

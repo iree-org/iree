@@ -35,6 +35,10 @@ def add_typical_arguments(parser):
                       "point at which operation is emitter.",
                       choices=["linalg", "flow", "all"])
 
+  parser.add_argument("--default-config", default='False', help="When true adds a "\
+                      "dispatch without a pre-defined tuning configuration and uses "\
+                      " default configuration from KernelsConfig.cpp.")
+
 
 def add_compilation_arguments(parser):
   """Adds compilation (NOT part of iree-compile) command line arguments to the parser."""
