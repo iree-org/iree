@@ -175,25 +175,16 @@ def parse_profiler_arguments(parser):
   args = parser.parse_args()
 
   # Boolenize the string arguments from command line.
-  # We can use boolean flag and store_true action of from argparse.ArgumentParser, but
-  # we are making a choice to have all string-based arguments for uniformity of
-  # the commandline. All boolean arguments are specified as `argument=<true|false>`.
-  args.verbose = False if args.verbose in ['False', 'false', '0'] else True
-  args.default_config = False if args.default_config in ['False', 'false', '0'
-                                                        ] else True
-  args.append = False if args.append in ['False', 'false', '0'] else True
+  # This boolean arguments are specified as `argument=<true|false>` as it makes
+  # it easier to read and convey the meaning.
   args.verification_enabled = False if args.verification_enabled in [
       'False', 'false', '0'
   ] else True
   args.profiling_enabled = False if args.profiling_enabled in [
       'False', 'false', '0'
   ] else True
-  args.force_compile = False if args.force_compile in ['False', 'false', '0'
-                                                      ] else True
-  args.compile_only = False if args.compile_only in ['False', 'false', '0'
-                                                    ] else True
 
-  # Overrite verification and profiling if compile_only is set.
+  # Overwrite verification and profiling if compile_only is set.
   if args.compile_only:
     args.verification_enabled = False
     args.profiling_enabled = False
