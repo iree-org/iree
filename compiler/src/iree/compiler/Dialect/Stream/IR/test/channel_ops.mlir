@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @channel_default
 func.func @channel_default() {
-  // CHECK: %channel = stream.channel.default on(#hal.affinity.queue<[0, 1]>) : !stream.channel
+  // CHECK: %channel_default = stream.channel.default on(#hal.affinity.queue<[0, 1]>) : !stream.channel
   %channel = stream.channel.default on(#hal.affinity.queue<[0, 1]>) : !stream.channel
   return
 }

@@ -3337,6 +3337,44 @@ def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
   }];
 }
 
+def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  Stream_AffinityOp,
+]> {
+  let summary = [{splits the input channel with groups}];
+  let description = [{
+    Partitions the input channel with the groups info and returns a
+    new channel for the group the current rank belongs to.
+
+    Each value in the groups represents a rank in the input channel and
+    all ranks must be specified in the groups. Each group is specified
+    with parentheses and comma separated. Each rank specified in a group
+    is also comma separated. Groups can have a different sizes but cannot
+    be empty. Here are some examples with 4 ranks:
+
+    "(0,1),(2,3)" - Two groups with size 2 each
+    "(0),(1,2,3)" - Two groups with size 1 and 3, respectively
+    "(0),(1),(2),(3)" - Four groups with size 1 each
+  }];
+
+  let arguments = (ins
+    OptionalAttr<Stream_AffinityAttr>:$affinity,
+    StrAttr:$groups,
+    Stream_Channel:$channel
+  );
+  let results = (outs
+    Stream_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    `groups` `(` $groups `)`
+    $channel
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
 def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,

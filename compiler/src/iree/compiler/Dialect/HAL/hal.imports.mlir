@@ -184,6 +184,16 @@ vm.import private @channel.rank_and_count(
 ) -> (i32, i32)
 attributes {nosideeffects}
 
+// Creates a new channel for collective communication by splitting the input
+// channel with groups.
+vm.import private @channel.split(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64,
+  %group : !vm.buffer,
+  %channel : !vm.ref<!hal.channel>
+) -> !vm.ref<!hal.channel>
+attributes {nosideeffects}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//

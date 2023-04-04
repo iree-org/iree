@@ -36,6 +36,21 @@ IREE_API_EXPORT iree_status_t iree_hal_channel_create(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_channel_split(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    iree_string_view_t groups, iree_hal_channel_t* in_channel,
+    iree_hal_channel_t** out_channel) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_channel);
+  *out_channel = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_channel_split)(
+          device, queue_affinity, groups, in_channel, out_channel);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT void iree_hal_channel_query_rank_and_count(
     const iree_hal_channel_t* channel, int32_t* out_rank, int32_t* out_count) {
   IREE_ASSERT_ARGUMENT(channel);

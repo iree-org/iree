@@ -48,6 +48,10 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
     iree_hal_cuda_tracing_context_t* tracing_context,
     const iree_hal_collective_batch_t* batch, CUstream stream);
 
+void iree_hal_cuda_nccl_channel_query_rank_and_count(
+    const iree_hal_channel_t* base_channel, int32_t* out_rank,
+    int32_t* out_count);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

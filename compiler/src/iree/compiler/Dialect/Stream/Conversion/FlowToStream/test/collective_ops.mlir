@@ -39,6 +39,21 @@ func.func @all_reduce_sum(%arg0: !hal.buffer_view) -> !hal.buffer_view attribute
 
 //-----
 
+// CHECK-LABEL: @all_reduce_sum_with_groups
+func.func @all_reduce_sum_with_groups() -> !hal.buffer_view attributes {iree.abi.stub} {
+  // CHECK: [[CHANNEL_DEFAULT:%.+]] = stream.channel.default : !stream.channel
+  // CHECK: stream.channel.split groups("(0),(1)") [[CHANNEL_DEFAULT]] : !stream.channel
+  %cst = arith.constant dense<[[0, 1, 2, 3], [4, 5, 6, 7]]> : tensor<2x4xi32>
+  %channel_default = flow.channel.default : !flow.channel
+  %channel_split = flow.channel.split groups("(0),(1)") %channel_default : !flow.channel
+  %0 = flow.tensor.empty : tensor<2x4xi32>
+  %1 = flow.collective.all_reduce sum, ui32, %0, %cst, %channel_split : (tensor<2x4xi32>, tensor<2x4xi32>, !flow.channel) -> %0 as tensor<2x4xi32>
+  %2 = hal.tensor.export %1 : tensor<2x4xi32> -> !hal.buffer_view
+  return %2 : !hal.buffer_view
+}
+
+//-----
+
 // CHECK-LABEL: @allgather
 func.func @allgather(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
   // CHECK: stream.channel.default

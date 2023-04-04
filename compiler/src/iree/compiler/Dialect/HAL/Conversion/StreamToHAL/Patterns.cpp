@@ -1305,6 +1305,34 @@ struct ChannelCreateOpPattern
   }
 };
 
+struct ChannelSplitOpPattern
+    : public StreamConversionPattern<IREE::Stream::ChannelSplitOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::ChannelSplitOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(op, rewriter);
+    Value groups =
+        adaptor.getGroupsAttr()
+            ? rewriter
+                  .create<IREE::Util::BufferConstantOp>(
+                      op.getLoc(),
+                      /*name=*/StringAttr{}, /*value=*/adaptor.getGroupsAttr(),
+                      /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
+                  .getResult()
+            : rewriter
+                  .create<IREE::Util::NullOp>(
+                      op.getLoc(), rewriter.getType<IREE::Util::BufferType>())
+                  .getResult();
+
+    rewriter.replaceOpWithNewOp<IREE::HAL::ChannelSplitOp>(
+        op, rewriter.getType<IREE::HAL::ChannelType>(), device, queueAffinity,
+        groups, adaptor.getChannel());
+    return success();
+  }
+};
+
 struct ChannelRankOpPattern
     : public StreamConversionPattern<IREE::Stream::ChannelRankOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -1414,8 +1442,9 @@ void populateStreamToHALPatterns(MLIRContext *context,
                   TimepointExportOpPattern, TimepointChainExternalOpPattern,
                   TimepointJoinOpPattern, TimepointBarrierOpPattern,
                   TimepointAwaitOpPattern>(mapping, typeConverter, context);
-  patterns.insert<ChannelCreateOpPattern, ChannelRankOpPattern,
-                  ChannelCountOpPattern>(mapping, typeConverter, context);
+  patterns.insert<ChannelCreateOpPattern, ChannelSplitOpPattern,
+                  ChannelRankOpPattern, ChannelCountOpPattern>(
+      mapping, typeConverter, context);
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }
 

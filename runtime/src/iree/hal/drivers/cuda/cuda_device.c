@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/cuda/cuda_device.h"
 
+#include <ctype.h>
+#include <iree/base/string_view.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -368,7 +370,6 @@ static iree_status_t iree_hal_cuda_device_create_channel(
   }
 
   if (iree_hal_cuda_nccl_id_is_empty(&id)) {
-    // TODO: maybe this is ok? a localhost alias or something?
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "no default NCCL ID specified (all zeros)");
   }
@@ -378,6 +379,150 @@ static iree_status_t iree_hal_cuda_device_create_channel(
   // implementation only supports one device we pass in the only one we have.
   return iree_hal_cuda_nccl_channel_create(
       &device->context_wrapper, &id, params.rank, params.count, out_channel);
+}
+
+static bool iree_hal_cuda_parse_group_info(iree_string_view_t groups,
+                                           int32_t rank, int32_t* out_group,
+                                           int32_t* out_rank,
+                                           int32_t* out_count) {
+  int32_t group = -1;
+  int32_t index = 0;
+  int32_t count = 0;
+  const char* str = groups.data;
+
+  for (iree_host_size_t i = 0; i < groups.size; ++i) {
+    if (str[i] == '(') {  // group start
+      group++;
+      index = 0;
+      ++i;  // Consume '('.
+
+      count = 1;
+
+      // Get the group size: the number of ',' + 1.
+      iree_host_size_t j = i;
+      for (; j < groups.size; ++j) {
+        if (str[j] == ')') {
+          break;
+        }
+        if (str[j] == ',') {
+          count++;
+        }
+      }
+      if (j == groups.size) {
+        return false;
+      }
+
+      for (;;) {
+        // Parse a number.
+        iree_host_size_t num_start = i;
+        while ((i < groups.size) && (str[i] != ',') && (str[i] != ')')) {
+          if (!isdigit(str[i])) {
+            return false;
+          }
+          ++i;
+        }
+        iree_host_size_t num_end = i;
+
+        if (num_start == num_end || num_end == groups.size) {
+          return false;
+        }
+
+        iree_string_view_t num_str =
+            iree_string_view_substr(groups, num_start, num_end - num_start);
+        int32_t num = -1;
+        if (!iree_string_view_atoi_int32(num_str, &num)) {
+          return false;
+        }
+
+        if (num == rank) {
+          *out_group = group;
+          *out_rank = index;
+          *out_count = count;
+          return true;
+        }
+
+        if (str[i] == ')') {
+          break;
+        }
+        if (str[i] != ',') {
+          return false;
+        }
+        ++i;  // Consume the number separator, ','.
+
+        // Keep parsing a number.
+      }
+    } else if (str[i] == ',') {  // group separator
+      // It is a group separator. Keep parsing a new group.
+    }
+  }
+  return false;
+}
+
+static iree_status_t iree_hal_cuda_device_create_channel_split(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_string_view_t groups, iree_hal_channel_t* in_channel,
+    iree_hal_channel_t** out_channel) {
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  if (!device->context_wrapper.syms->nccl_library) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "NCCL not loaded as it was not requested on device "
+                            "creation - collective operations not available");
+  }
+
+  // Today we only allow a single logical device per channel.
+  // We could multiplex channels but it'd be better to surface that to the
+  // compiler so that it can emit the right rank math.
+  int requested_count = iree_math_count_ones_u64(queue_affinity);
+  // TODO(#12206): properly assign affinity in the compiler.
+  if (requested_count != 64 && requested_count != 1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "exactly one participant is allowed in a "
+                            "channel but %d were specified",
+                            requested_count);
+  }
+
+  int32_t rank = 0;
+  int32_t count = 0;
+  iree_hal_cuda_nccl_channel_query_rank_and_count(in_channel, &rank, &count);
+
+  // Find the group and rank in the groups.
+  int32_t group = 0;
+  int32_t rank_in_group = 0;
+  int32_t count_in_group = 0;
+  if (!iree_hal_cuda_parse_group_info(groups, rank, &group, &rank_in_group,
+                                      &count_in_group)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "cannot find rank %d from groups(%s)", rank,
+                            groups.data);
+  }
+
+  iree_hal_cuda_nccl_id_t id;
+  memset(&id, 0, sizeof(id));
+
+  // Create a unique ID if the new rank is a root of a group.
+  if (rank_in_group == 0) {
+    IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id_from_context(
+                             &device->context_wrapper, &id),
+                         "bootstrapping NCCL root for group");
+  }
+
+  IREE_RETURN_IF_ERROR(
+      iree_hal_channel_provider_exchange_id_for_group(
+          device->channel_provider, iree_make_byte_span((void*)&id, sizeof(id)),
+          group, rank_in_group, count_in_group),
+      "exchanging NCCL ID for group");
+
+  if (iree_hal_cuda_nccl_id_is_empty(&id)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no default NCCL ID specified (all zeros)");
+  }
+
+  // TODO: when we support multiple logical devices we'll want to pass in the
+  // context of the device mapped to the queue_affinity. For now since this
+  // implementation only supports one device we pass in the only one we have.
+  return iree_hal_cuda_nccl_channel_create(&device->context_wrapper, &id,
+                                           rank_in_group, count_in_group,
+                                           out_channel);
 }
 
 static iree_status_t iree_hal_cuda_device_create_command_buffer(
@@ -576,6 +721,7 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .trim = iree_hal_cuda_device_trim,
     .query_i64 = iree_hal_cuda_device_query_i64,
     .create_channel = iree_hal_cuda_device_create_channel,
+    .create_channel_split = iree_hal_cuda_device_create_channel_split,
     .create_command_buffer = iree_hal_cuda_device_create_command_buffer,
     .create_descriptor_set_layout =
         iree_hal_cuda_device_create_descriptor_set_layout,

@@ -73,6 +73,13 @@ IREE_API_EXPORT iree_status_t iree_hal_channel_create(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel);
 
+// Creates a channel on |device| for use by all queues defined in
+// |queue_affinity| by splitting the input channel with the groups info.
+IREE_API_EXPORT iree_status_t iree_hal_channel_split(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    iree_string_view_t groups, iree_hal_channel_t* in_channel,
+    iree_hal_channel_t** out_channel);
+
 // Retains the given |channel| for the caller.
 IREE_API_EXPORT void iree_hal_channel_retain(iree_hal_channel_t* channel);
 

@@ -726,6 +726,48 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
   }];
 }
 
+def HAL_ChannelSplitOp : HAL_Op<"channel.split", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{splits the input channel with groups}];
+  let description = [{
+    Partitions the input channel with the groups info and returns a
+    new channel for the group the current rank belongs to.
+
+    Each value in the groups represents a rank in the input channel and
+    all ranks must be specified in the groups. Each group is specified
+    with parentheses and comma separated. Each rank specified in a group
+    is also comma separated. Groups can have a different sizes but cannot
+    be empty. Here are some examples with 4 ranks:
+
+    "(0,1),(2,3)" - Two groups with size 2 each
+    "(0),(1,2,3)" - Two groups with size 1 and 3, respectively
+    "(0),(1),(2),(3)" - Four groups with size 1 each
+
+    Collective operations using this channel must only be submitted on
+    compatible queues.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    Util_BufferType:$groups,
+    HAL_Channel:$channel
+  );
+  let results = (outs
+    HAL_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    `device` `(` $device `:` type($device) `)`
+    `affinity` `(` $queue_affinity `)`
+    `groups` `(` $groups `)`
+    $channel
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
 def HAL_ChannelRankAndCountOp : HAL_PureOp<"channel.rank_and_count", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {

@@ -18,7 +18,7 @@ func.func @replica_id() -> tensor<ui32> {
 func.func @all_reduce_sum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[ALLREDUCE:%.+]] = flow.collective.all_reduce sum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
+  // CHECK: [[ALLREDUCE:%.+]] = flow.collective.all_reduce sum, f32, [[EMPTY]], [[ARG0]], [[CHANNEL]] : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
   // CHECK: return [[ALLREDUCE]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -37,7 +37,7 @@ func.func @all_reduce_sum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 func.func @all_reduce_product(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[OP:%.+]] = flow.collective.all_reduce product, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce product, f32, [[EMPTY]], [[ARG0]], [[CHANNEL]] : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
   // CHECK: return [[OP]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -56,7 +56,7 @@ func.func @all_reduce_product(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 func.func @all_reduce_minimum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[OP:%.+]] = flow.collective.all_reduce minimum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce minimum, f32, [[EMPTY]], [[ARG0]], [[CHANNEL]] : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
   // CHECK: return [[OP]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -75,7 +75,7 @@ func.func @all_reduce_minimum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 func.func @all_reduce_maximum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[OP:%.+]] = flow.collective.all_reduce maximum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce maximum, f32, [[EMPTY]], [[ARG0]], [[CHANNEL]] : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
   // CHECK: return [[OP]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -94,7 +94,7 @@ func.func @all_reduce_maximum(%input : tensor<2304xf32>) -> tensor<2304xf32> {
 func.func @all_reduce_maximum_optional_attrs(%input : tensor<2304xf32>) -> tensor<2304xf32> {
   // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
   // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2304xf32>
-  // CHECK: [[OP:%.+]] = flow.collective.all_reduce maximum, f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce maximum, f32, [[EMPTY]], [[ARG0]], [[CHANNEL]] : (tensor<2304xf32>, tensor<2304xf32>, !flow.channel) -> [[EMPTY]] as tensor<2304xf32>
   // CHECK: return [[OP]] : tensor<2304xf32>
   %out = "mhlo.all_reduce"(%input) ({
     ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
@@ -102,6 +102,25 @@ func.func @all_reduce_maximum_optional_attrs(%input : tensor<2304xf32>) -> tenso
       mhlo.return %mul : tensor<f32>
     }) {replica_groups = dense<[[0, 1, 2, 3, 4, 5, 6, 7]]> : tensor<1x8xi64>} : (tensor<2304xf32>) -> tensor<2304xf32>
   return %out : tensor<2304xf32>
+}
+
+// -----
+// CHECK-LABEL: @all_reduce_sum_with_groups
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<2x4xi32>)
+func.func @all_reduce_sum_with_groups(%input : tensor<2x4xi32>) -> tensor<2x4xi32> {
+  // CHECK: [[CHANNEL_DEFAULT:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[CHANNEL_SPLIT:%.+]] = flow.channel.split groups("(0),(1)") [[CHANNEL_DEFAULT]] : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<2x4xi32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_reduce sum, ui32, [[EMPTY]], [[ARG0]], [[CHANNEL_SPLIT]] : (tensor<2x4xi32>, tensor<2x4xi32>, !flow.channel) -> [[EMPTY]] as tensor<2x4xi32>
+  // CHECK: return [[OP]] : tensor<2x4xi32>
+  %out = "mhlo.all_reduce"(%input) ({
+    ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):
+      %sum = mhlo.add %arg0, %arg1 : tensor<i32>
+      mhlo.return %sum : tensor<i32>
+    }) {channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+        replica_groups = dense<[[0], [1]]> : tensor<2x1xi64>,
+        use_global_device_ids} : (tensor<2x4xi32>) -> tensor<2x4xi32>
+  return %out : tensor<2x4xi32>
 }
 
 // -----

@@ -513,6 +513,11 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       iree_hal_channel_params_t params, iree_hal_channel_t** out_channel);
 
+  iree_status_t(IREE_API_PTR* create_channel_split)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      iree_string_view_t groups, iree_hal_channel_t* in_channel,
+      iree_hal_channel_t** out_channel);
+
   iree_status_t(IREE_API_PTR* create_command_buffer)(
       iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
       iree_hal_command_category_t command_categories,
