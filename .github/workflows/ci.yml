@@ -1420,14 +1420,13 @@ jobs:
       - name: "Extracting target build dir archive"
         run: tar -xf "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR}"
       - name: "Running tests"
-        working-directory: /work
         run: |
           ctest -j 4 \
-            --test-dir="${TARGET_BUILD_DIR}" \
+            --test-dir "${TARGET_BUILD_DIR}" \
             --timeout=900 \
             --output-on-failure \
             --no-tests=error \
-            --label-exclude="vulkan"
+            --label-exclude "vulkan"
 
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
