@@ -30,10 +30,10 @@ source build_tools/cmake/setup_build.sh
 pip install integrations/tensorflow/python_projects/iree_tf
 
 # DEBUG: Where was it installed?
-pip show iree-tools-tf
+#pip show iree-tools-tf
 
 # DEBUG: Where is it in general
-find / 2>/dev/null | grep iree-import-tf
+#find / 2>/dev/null | grep iree-import-tf
 
 echo "Configuring to build benchmarks"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
@@ -47,7 +47,7 @@ echo "Configuring to build benchmarks"
   -DIREE_BUILD_SAMPLES=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite" \
-  -DIREE_IMPORT_TF_PATH="iree-import-tf"
+  -DIREE_IMPORT_TF_PATH="/home/runner/.local/bin/iree-import-tf"
 
 echo "Building benchmark artifacts"
 "${CMAKE_BIN}" \
