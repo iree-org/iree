@@ -32,12 +32,6 @@ pip install tf-nightly
 pip install compiler/
 pip install integrations/tensorflow/python_projects/iree_tf
 
-# DEBUG: Where was it installed?
-#pip show iree-tools-tf
-
-# DEBUG: Where is it in general
-#find / 2>/dev/null | grep iree-import-tf
-
 echo "Configuring to build benchmarks"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
