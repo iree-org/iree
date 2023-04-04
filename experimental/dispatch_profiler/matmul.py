@@ -326,7 +326,6 @@ class MatmulOperationLauncher:
     self.args = args
     self.benchmark_dispatch_repeat_count = args.batch_size
     self.batch_size = args.batch_size
-    self.verbose = False if args.verbose in ['False', 'false', '0'] else True
 
     # Additional paths.
     self.matmul_path = os.path.join(self.generated_path, 'matmul')
@@ -337,8 +336,6 @@ class MatmulOperationLauncher:
     # path to iree-compile tool. (for compiling the input mlir file to vmfb)
     self.iree_compile_path = os.path.join(args.build_dir, 'tools',
                                           'iree-compile')
-    self.force_compile = False if args.force_compile in ['False', 'false', '0'
-                                                        ] else True
 
     # path to iree-benchmark-module tool. (for performance benchmarking and profiling)
     self.iree_benchmark_module_path = os.path.join(args.build_dir, 'tools',
@@ -373,13 +370,13 @@ class MatmulOperationLauncher:
         f"--iree-hal-benchmark-dispatch-repeat-count={benchmark_dispatch_repeat_count}"
     ]
 
-    if not os.path.exists(vmfb_file) or self.force_compile:
+    if not os.path.exists(vmfb_file) or self.args.force_compile:
       print(
           f">> Compilation command for {CompilationModeNames[compilation_mode]} : {' '.join(cmd)}"
       )
       subprocess.check_output(cmd)
 
-    elif self.verbose:
+    elif self.args.verbose:
       print("Skipping compilation of matmul operation: " + vmfb_file +
             " since it already exists.")
 
@@ -422,7 +419,7 @@ class MatmulOperationLauncher:
     cmd.append(f'--expected_output=@{expected_result_npy_file}')
 
     # Print the command if verbose.
-    if self.verbose:
+    if self.args.verbose:
       print(">> Verification command: " + ' '.join(cmd))
 
     # Launch verification.
@@ -436,7 +433,7 @@ class MatmulOperationLauncher:
           cmd_output)
     verification_result = m.group('verification_result')
 
-    if self.verbose or verification_result != "SUCCESS":
+    if self.args.verbose or verification_result != "SUCCESS":
       print(cmd_output)
 
     return verification_result
@@ -462,7 +459,7 @@ class MatmulOperationLauncher:
     cmd += [f'--input={self.operation.rhs_npy_shape()}']
 
     # Print the command if verbose.
-    if self.verbose:
+    if self.args.verbose:
       print(">> Profiling command: " + ' '.join(cmd))
 
     # Launch profiling.

@@ -4,7 +4,7 @@ from library import *
 from matmul import *
 from manifest import *
 from performance_report import *
-from options import add_profiler_arguments
+from options import parse_profiler_arguments
 
 ###############################################################################
 # Map of operation kinds to their dispatch launchers.
@@ -43,24 +43,10 @@ if __name__ == "__main__":
                                     "for IREE-compiled MLIR operations.")
   ###############################################################################
 
-  add_profiler_arguments(parser)
+  args = parse_profiler_arguments(parser)
 
-  # Parse the command line arguments.
-  args = parser.parse_args()
+  print(args)
   ###############################################################################
-
-  # Boolenize the string arguments from command line.
-  verification_enabled = False if args.verification_enabled in [
-      'False', 'false', '0'
-  ] else True
-  profiling_enabled = False if args.profiling_enabled in [
-      'False', 'false', '0'
-  ] else True
-  compile_only = False if args.compile_only in ['False', 'false', '0'] else True
-  # Overrite verification and profiling if compile_only is set.
-  if compile_only:
-    verification_enabled = False
-    profiling_enabled = False
 
   # Manifests metadata for a group of accompanying operations and configurations.
   manifest = Manifest(args)
@@ -83,23 +69,23 @@ if __name__ == "__main__":
       for configuration in operation_collection.configuration_list:
 
         # Compile the operation dispatches for verification and profiling.
-        if compile_only:
+        if args.compile_only:
           operation_launcher.compile(CompilationMode.Verify)
           operation_launcher.compile(CompilationMode.Profile)
 
         else:
           # Initialize verification and profiling results.
-          verification_result = 'Not verified' if not verification_enabled else 'Failed'
+          verification_result = 'Not verified' if not args.verification_enabled else 'Failed'
           runtime = -1.0
 
           # Launch the operation dispatches for verification and profiling.
-          if verification_enabled:
+          if args.verification_enabled:
             verification_result = operation_launcher.verify(configuration)
-          if profiling_enabled:
+          if args.profiling_enabled:
             runtime = operation_launcher.profile(configuration)
 
           # Save and print the performance result.
-          if verification_enabled or profiling_enabled:
+          if args.verification_enabled or args.profiling_enabled:
             # Create and print a performance result.
             result = PerformanceResult(operation_collection.operation,
                                        configuration, verification_result,
