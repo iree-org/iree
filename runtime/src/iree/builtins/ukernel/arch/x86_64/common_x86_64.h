@@ -93,6 +93,22 @@ static inline void iree_uk_avx512_storeu_4x128_to_16x16xi32(
                                      vec512);
 }
 
+static inline __m512 iree_uk_avx512_loadu_4x128_from_16x16xf32(const float* src,
+                                                               int i0, int j0,
+                                                               int i1, int j1,
+                                                               int i2, int j2,
+                                                               int i3, int j3) {
+  return _mm512_castsi512_ps(iree_uk_avx512_loadu_4x128_from_16x16xi32(
+      (const iree_uk_int32_t*)src, i0, j0, i1, j1, i2, j2, i3, j3));
+}
+
+static inline void iree_uk_avx512_storeu_4x128_to_16x16xf32(
+    float* dst, int i0, int j0, int i1, int j1, int i2, int j2, int i3, int j3,
+    __m512 vec512) {
+  return iree_uk_avx512_storeu_4x128_to_16x16xi32(
+      (float*)dst, i0, j0, i1, j1, i2, j2, i3, j3, _mm512_castps_si512(vec512));
+}
+
 static inline void iree_uk_copy_8x32xi8_strided_to_strided(
     iree_uk_int8_t* IREE_UK_RESTRICT out_ptr,
     const iree_uk_int8_t* IREE_UK_RESTRICT in_ptr, iree_uk_ssize_t out_stride,
