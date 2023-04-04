@@ -17,8 +17,7 @@ IREE_UK_ATTRIBUTE_NOINLINE static void iree_memcpy_noinline(
 }
 
 typedef struct iree_uk_benchmark_memcpy_user_data_t {
-  int64_t working_set_size;
-  int64_t batch_min_traversal_size;
+  int64_t buffer_size;
 } iree_uk_benchmark_memcpy_user_data_t;
 
 static iree_status_t iree_uk_benchmark_memcpy(
@@ -27,39 +26,27 @@ static iree_status_t iree_uk_benchmark_memcpy(
   const iree_uk_benchmark_memcpy_user_data_t* user_data =
       benchmark_def->user_data;
 
-  int64_t total_iterations = 0;
-  int64_t batch_count =
-      (user_data->batch_min_traversal_size + user_data->working_set_size - 1) /
-      user_data->working_set_size;
-  iree_uk_ssize_t buffer_size = user_data->working_set_size / 2;
+  iree_uk_ssize_t buffer_size = user_data->buffer_size;
   uint8_t* in_buffer = malloc(buffer_size);
   uint8_t* out_buffer = malloc(buffer_size);
   for (iree_uk_ssize_t i = 0; i < buffer_size; ++i) in_buffer[i] = (i & 0xFF);
-  while (iree_benchmark_keep_running(benchmark_state,
-                                     /*batch_count=*/batch_count)) {
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
     for (int i = 0; i < batch_count; ++i) {
       iree_memcpy_noinline(out_buffer, in_buffer, buffer_size);
     }
-    total_iterations += batch_count;
   }
-  // Report bytes per second, so that can be easily compared to known memory
-  // system performance metrics (e.g. RAM bandwidth, to tell whether this is
-  // memory-bound).
-  iree_benchmark_set_items_processed(benchmark_state,
-                                     total_iterations * buffer_size);
   assert(!memcmp(in_buffer, out_buffer, buffer_size));
   free(in_buffer);
   free(out_buffer);
   return iree_ok_status();
 }
 
-void iree_uk_benchmark_register_memcpy(int64_t working_set_size,
-                                       int64_t batch_min_traversal_size) {
+void iree_uk_benchmark_register_memcpy(int64_t working_set_size) {
   iree_uk_benchmark_memcpy_user_data_t* user_data =
       iree_uk_benchmark_static_alloc(
           sizeof(iree_uk_benchmark_memcpy_user_data_t));
-  user_data->working_set_size = working_set_size;
-  user_data->batch_min_traversal_size = batch_min_traversal_size;
+  user_data->buffer_size = working_set_size / 2;
 
   const iree_benchmark_def_t memcpy_benchmark_def = {
       .flags = IREE_BENCHMARK_FLAG_USE_REAL_TIME,
@@ -68,6 +55,7 @@ void iree_uk_benchmark_register_memcpy(int64_t working_set_size,
       .iteration_count = 0,
       .run = iree_uk_benchmark_memcpy,
       .user_data = user_data,
+      .bytes_per_iteration = user_data->buffer_size,
   };
   char name[128];
   snprintf(name, sizeof name, "memcpy_wss_%" PRIi64, working_set_size);

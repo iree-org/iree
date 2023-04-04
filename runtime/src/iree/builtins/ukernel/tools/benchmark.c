@@ -74,7 +74,8 @@ void iree_uk_benchmark_register(
     const char* name,
     iree_status_t (*benchmark_func)(const iree_benchmark_def_t*,
                                     iree_benchmark_state_t*),
-    const void* params, size_t params_size, const char* cpu_features) {
+    const void* params, size_t params_size, const char* cpu_features,
+    const iree_uk_benchmark_options_t* options) {
   // Does this benchmark require an optional CPU feature?
   iree_uk_uint64_t cpu_data_local[IREE_CPU_DATA_FIELD_COUNT] = {0};
   if (cpu_features) {
@@ -98,6 +99,8 @@ void iree_uk_benchmark_register(
       .iteration_count = 0,
       .run = benchmark_func,
       .user_data = user_data,
+      .items_per_iteration = options ? options->items_per_iteration : 0,
+      .bytes_per_iteration = options ? options->bytes_per_iteration : 0,
   };
   iree_string_builder_t full_name;
   iree_string_builder_initialize(iree_allocator_system(), &full_name);

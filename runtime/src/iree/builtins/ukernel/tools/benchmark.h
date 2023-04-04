@@ -13,13 +13,19 @@
 // Struct for passing around benchmark user data
 typedef struct iree_uk_benchmark_user_data_t iree_uk_benchmark_user_data_t;
 
+typedef struct iree_uk_benchmark_options_t {
+  int64_t items_per_iteration;
+  int64_t bytes_per_iteration;
+} iree_uk_benchmark_options_t;
+
 // High level init/register/run/cleanup entry points. Used in main().
 void iree_uk_benchmark_initialize(int* argc, char** argv);
 void iree_uk_benchmark_register(
     const char* name,
     iree_status_t (*benchmark_func)(const iree_benchmark_def_t*,
                                     iree_benchmark_state_t*),
-    const void* params, size_t params_size, const char* cpu_features);
+    const void* params, size_t params_size, const char* cpu_features,
+    const iree_uk_benchmark_options_t* options);
 void iree_uk_benchmark_run_and_cleanup(void);
 
 // Like malloc, but any buffers allocated through this are freed by

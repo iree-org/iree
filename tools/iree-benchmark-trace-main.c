@@ -203,25 +203,27 @@ static iree_status_t iree_replay_benchmark_run_file(
   }
 
   // Call the functions within the trace in order.
-  while (iree_benchmark_keep_running(benchmark_state,
-                                     /*batch_count=*/1)) {
-    // Pause timing that was started automatically. We'll resume/pause around
-    // each call.
-    // TODO(benvanik): see if we can tell benchmark to start paused?
-    iree_benchmark_pause_timing(benchmark_state);
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
+    for (int64_t i = 0; i < batch_count; ++i) {
+      // Pause timing that was started automatically. We'll resume/pause around
+      // each call.
+      // TODO(benvanik): see if we can tell benchmark to start paused?
+      iree_benchmark_pause_timing(benchmark_state);
 
-    // Clear replay state.
-    iree_trace_replay_reset(&replay);
+      // Clear replay state.
+      iree_trace_replay_reset(&replay);
 
-    // Run all events in the document from start to end.
-    IREE_RETURN_IF_ERROR(
-        iree_replay_benchmark_run_documents(&replay, file, benchmark_state));
+      // Run all events in the document from start to end.
+      IREE_RETURN_IF_ERROR(
+          iree_replay_benchmark_run_documents(&replay, file, benchmark_state));
 
-    // Reset file back to the start.
-    fseek(file, 0, SEEK_SET);
+      // Reset file back to the start.
+      fseek(file, 0, SEEK_SET);
 
-    // Resume before looping because keep_running requires it.
-    iree_benchmark_resume_timing(benchmark_state);
+      // Resume before looping because keep_running requires it.
+      iree_benchmark_resume_timing(benchmark_state);
+    }
   }
 
   iree_trace_replay_deinitialize(&replay);

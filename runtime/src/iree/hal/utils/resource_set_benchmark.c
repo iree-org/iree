@@ -77,11 +77,14 @@ static iree_status_t iree_hal_resource_set_benchmark_lifecycle_n(
   }
 
   // Create/insert/delete lifecycle.
-  while (iree_benchmark_keep_running(benchmark_state, /*batch_count=*/1)) {
-    iree_hal_resource_set_t* set = NULL;
-    IREE_CHECK_OK(iree_hal_resource_set_allocate(&block_pool, &set));
-    IREE_CHECK_OK(iree_hal_resource_set_insert(set, count, resources));
-    iree_hal_resource_set_free(set);
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
+    for (int64_t i = 0; i < batch_count; ++i) {
+      iree_hal_resource_set_t* set = NULL;
+      IREE_CHECK_OK(iree_hal_resource_set_allocate(&block_pool, &set));
+      IREE_CHECK_OK(iree_hal_resource_set_insert(set, count, resources));
+      iree_hal_resource_set_free(set);
+    }
   }
 
   // Cleanup.
@@ -126,8 +129,11 @@ static iree_status_t iree_hal_resource_set_benchmark_insert_n(
   }
 
   // Insert the resources. After the first iteration these should all be hits.
-  while (iree_benchmark_keep_running(benchmark_state, /*batch_count=*/1)) {
-    IREE_CHECK_OK(iree_hal_resource_set_insert(set, count, resources));
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
+    for (int64_t i = 0; i < batch_count; ++i) {
+      IREE_CHECK_OK(iree_hal_resource_set_insert(set, count, resources));
+    }
   }
 
   // Cleanup.
@@ -181,10 +187,10 @@ static iree_status_t iree_hal_resource_set_benchmark_randomized_n(
   iree_prng_xoroshiro128_state_t prng = {0};
   iree_prng_xoroshiro128_initialize(123ull, &prng);
 
-  // Insert N random resources into the set. To hide some of the overhead we do
-  // multiple insertions in each loop.
-  while (iree_benchmark_keep_running(benchmark_state, /*batch_count=*/256)) {
-    for (uint32_t i = 0; i < 256; ++i) {
+  // Insert N random resources into the set.
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
+    for (int64_t i = 0; i < batch_count; ++i) {
       uint32_t resource_idx =
           iree_prng_xoroshiro128plus_next_uint32(&prng) % count;
       iree_hal_resource_t* resource = resources[resource_idx];

@@ -9,15 +9,12 @@
 #include "iree/builtins/device/device.h"
 #include "iree/testing/benchmark.h"
 
-// Example flag; not really useful:
-IREE_FLAG(int32_t, batch_count, 64, "Ops to run per benchmark iteration.");
-
 static iree_status_t iree_h2f_ieee_benchmark(
     const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
-  while (iree_benchmark_keep_running(benchmark_state,
-                                     /*batch_count=*/FLAG_batch_count)) {
-    for (int i = 0; i < FLAG_batch_count; ++i) {
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
+    for (int i = 0; i < batch_count; ++i) {
       // TODO(benvanik): iree_do_not_optimize barrier.
       iree_h2f_ieee(0x3400 + i);
     }
@@ -28,9 +25,9 @@ static iree_status_t iree_h2f_ieee_benchmark(
 static iree_status_t iree_f2h_ieee_benchmark(
     const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
-  while (iree_benchmark_keep_running(benchmark_state,
-                                     /*batch_count=*/FLAG_batch_count)) {
-    for (int i = 0; i < FLAG_batch_count; ++i) {
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
+    for (int i = 0; i < batch_count; ++i) {
       // TODO(benvanik): iree_do_not_optimize barrier.
       iree_f2h_ieee(0.25f + i);
     }

@@ -238,20 +238,14 @@ static iree_status_t iree_hal_executable_library_run(
   // we are testing the memory access patterns: if we just ran the same single
   // tile processing the same exact region of memory over and over we are not
   // testing cache effects.
-  int64_t dispatch_count = 0;
-  while (iree_benchmark_keep_running(benchmark_state, /*batch_count=*/1)) {
-    IREE_RETURN_IF_ERROR(iree_hal_local_executable_issue_dispatch_inline(
-        local_executable, FLAG_entry_point, &dispatch_state, 0, local_memory));
-    ++dispatch_count;
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
+    for (int64_t i = 0; i < batch_count; ++i) {
+      IREE_RETURN_IF_ERROR(iree_hal_local_executable_issue_dispatch_inline(
+          local_executable, FLAG_entry_point, &dispatch_state, 0,
+          local_memory));
+    }
   }
-
-  // To get a total time per invocation we set the item count to the total
-  // invocations dispatched. That gives us both total dispatch and single
-  // invocation times in the reporter output.
-  int64_t total_invocations =
-      dispatch_count * dispatch_state.workgroup_count_x *
-      dispatch_state.workgroup_count_y * dispatch_state.workgroup_count_z;
-  iree_benchmark_set_items_processed(benchmark_state, total_invocations);
 
   // Deallocate buffers.
   for (iree_host_size_t i = 0; i < dispatch_params.binding_count; ++i) {
@@ -311,7 +305,8 @@ int main(int argc, char** argv) {
       .minimum_duration_ns = 0,
       .iteration_count = 0,
       .run = iree_hal_executable_library_run,
-  };
+      .items_per_iteration = FLAG_workgroup_count_x * FLAG_workgroup_count_y *
+                             FLAG_workgroup_count_z};
   iree_benchmark_register(iree_make_cstring_view("dispatch"), &benchmark_def);
 
   iree_benchmark_run_specified();

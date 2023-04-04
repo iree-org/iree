@@ -30,10 +30,45 @@ int64_t iree_benchmark_get_range(iree_benchmark_state_t* state,
   return s.range(ordinal);
 }
 
+static int64_t iree_benchmark_next_batch_count(iree_benchmark_state_t* state) {
+  // Are we targeting a specific exact number of iterations?
+  if (state->def_iteration_count) {
+    assert(state->current_iteration_count == 0);
+    return state->def_iteration_count;
+  }
+  // Do we have a specified batch_count value to use?
+  if (state->def_batch_count) {
+    return state->def_batch_count;
+  }
+  // Are we at the start of the benchmark? If so, default to a batch of one,
+  // as we don't know how long each iteration takes (think 4096x4096 matmuls).
+  if (state->current_iteration_count == 0) {
+    return 1;
+  }
+  // Otherwise, adopt an approximate doubling strategy: the new batch count is
+  // as many iterations as were run so far.
+  assert(state->current_iteration_count > 0);
+  return state->current_iteration_count;
+}
+
 bool iree_benchmark_keep_running(iree_benchmark_state_t* state,
-                                 uint64_t batch_count) {
+                                 int64_t* batch_count) {
+  *batch_count = iree_benchmark_next_batch_count(state);
   auto& s = GetBenchmarkState(state);
-  return s.KeepRunningBatch(batch_count);
+  if (s.KeepRunningBatch(*batch_count)) {
+    state->current_iteration_count += *batch_count;
+    return true;
+  }
+  // End of benchmark run. Set user counters.
+  if (state->bytes_per_iteration) {
+    s.SetBytesProcessed(state->bytes_per_iteration *
+                        state->current_iteration_count);
+  }
+  if (state->items_per_iteration) {
+    s.SetItemsProcessed(state->items_per_iteration *
+                        state->current_iteration_count);
+  }
+  return false;
 }
 
 void iree_benchmark_skip(iree_benchmark_state_t* state, const char* message) {
@@ -55,18 +90,6 @@ void iree_benchmark_set_label(iree_benchmark_state_t* state,
                               const char* label) {
   auto& s = GetBenchmarkState(state);
   s.SetLabel(label);
-}
-
-void iree_benchmark_set_bytes_processed(iree_benchmark_state_t* state,
-                                        int64_t bytes) {
-  auto& s = GetBenchmarkState(state);
-  s.SetBytesProcessed(bytes);
-}
-
-void iree_benchmark_set_items_processed(iree_benchmark_state_t* state,
-                                        int64_t items) {
-  auto& s = GetBenchmarkState(state);
-  s.SetItemsProcessed(items);
 }
 
 //===----------------------------------------------------------------------===//
@@ -98,9 +121,13 @@ static void iree_benchmark_run(const char* benchmark_name,
   IREE_TRACE_FRAME_MARK();
 
   iree_benchmark_state_t state;
-  memset(&state, 0, sizeof(state));
+  memset(&state, 0, sizeof state);
   state.impl = &benchmark_state;
   state.host_allocator = iree_allocator_system();
+  state.def_iteration_count = benchmark_def->iteration_count;
+  state.def_batch_count = benchmark_def->batch_count;
+  state.items_per_iteration = benchmark_def->items_per_iteration;
+  state.bytes_per_iteration = benchmark_def->bytes_per_iteration;
 
   iree_status_t status = benchmark_def->run(benchmark_def, &state);
   if (!iree_status_is_ok(status)) {

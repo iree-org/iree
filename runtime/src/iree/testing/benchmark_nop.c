@@ -14,7 +14,7 @@ int64_t iree_benchmark_get_range(iree_benchmark_state_t* state,
 }
 
 bool iree_benchmark_keep_running(iree_benchmark_state_t* state,
-                                 uint64_t batch_count) {
+                                 int64_t* batch_count) {
   return false;
 }
 
@@ -26,12 +26,6 @@ void iree_benchmark_resume_timing(iree_benchmark_state_t* state) {}
 
 void iree_benchmark_set_label(iree_benchmark_state_t* state,
                               const char* label) {}
-
-void iree_benchmark_set_bytes_processed(iree_benchmark_state_t* state,
-                                        int64_t bytes) {}
-
-void iree_benchmark_set_items_processed(iree_benchmark_state_t* state,
-                                        int64_t items) {}
 
 void iree_benchmark_register(iree_string_view_t name,
                              const iree_benchmark_def_t* benchmark_def) {}

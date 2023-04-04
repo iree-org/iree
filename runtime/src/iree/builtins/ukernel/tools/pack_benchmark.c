@@ -13,9 +13,6 @@
 #include "iree/builtins/ukernel/tools/memcpy_benchmark.h"
 #include "iree/builtins/ukernel/tools/util.h"
 
-IREE_FLAG(int64_t, batch_min_traversal_size, 10000000,
-          "Minimum number of bytes to be traversed in each batch.");
-
 IREE_FLAG(
     int64_t, working_set_size, 10000,
     "Number of bytes to be traversed by the benchmark workload (input and "
@@ -34,27 +31,11 @@ static iree_status_t iree_uk_benchmark_pack(
   params.cpu_data = iree_uk_benchmark_cpu_data(user_data);
   iree_uk_type_t in_type = iree_uk_pack_in_type(params.type);
   iree_uk_type_t out_type = iree_uk_pack_out_type(params.type);
-  iree_uk_ssize_t in_type_size = iree_uk_type_size(in_type);
   iree_uk_ssize_t out_type_size = iree_uk_type_size(out_type);
-
-  // The inner dims 2, 3 are given to us as part of the benchmark user_data.
-  // The outer dims 0, 1 are to be determined based on FLAG_working_set_size.
-  iree_uk_ssize_t out_size0 = 1;
-  iree_uk_ssize_t out_size1 = 1;
+  iree_uk_ssize_t out_size0 = params.out_size0;
+  iree_uk_ssize_t out_size1 = params.out_size1;
   iree_uk_ssize_t out_size2 = params.out_size2;
   iree_uk_ssize_t out_size3 = params.out_size3;
-  int target_matrix_size_in_elems =
-      FLAG_working_set_size / (in_type_size + out_type_size);
-  int target_product_of_outer_sizes_0_1 =
-      target_matrix_size_in_elems / (out_size2 * out_size3);
-  while (target_product_of_outer_sizes_0_1 >= 4) {
-    target_product_of_outer_sizes_0_1 /= 4;
-    out_size0 *= 2;
-    out_size1 *= 2;
-  }
-  out_size1 *= target_product_of_outer_sizes_0_1;
-  params.out_size0 = out_size0;
-  params.out_size1 = out_size1;
   if (params.flags & IREE_UK_FLAG_PACK_TRANSPOSE_OUTER) {
     iree_uk_ssize_swap(&out_size0, &out_size1);
   }
@@ -84,26 +65,37 @@ static iree_status_t iree_uk_benchmark_pack(
   params.in_buffer = in_buffer;
   params.out_buffer = out_buffer;
   params.padding_value = padding_value_buffer;
-  int64_t total_iterations = 0;
-  int64_t batch_count =
-      (FLAG_batch_min_traversal_size + FLAG_working_set_size - 1) /
-      FLAG_working_set_size;
-  while (iree_benchmark_keep_running(benchmark_state,
-                                     /*batch_count=*/batch_count)) {
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
     for (int i = 0; i < batch_count; ++i) {
       iree_uk_pack(&params);
     }
-    total_iterations += batch_count;
   }
-  // Report bytes per second, so that can be easily compared to known memory
-  // system performance metrics (e.g. RAM bandwidth, to tell whether this is
-  // memory-bound).
-  iree_benchmark_set_items_processed(benchmark_state,
-                                     total_iterations * out_buffer_size);
   free(in_buffer);
   free(out_buffer);
   free(padding_value_buffer);
   return iree_ok_status();
+}
+
+static void iree_uk_benchmark_pack_get_outer_sizes(
+    iree_uk_pack_type_t type, iree_uk_ssize_t tile_num_elems,
+    iree_uk_ssize_t* out_size0, iree_uk_ssize_t* out_size1) {
+  iree_uk_type_t in_type = iree_uk_pack_in_type(type);
+  iree_uk_type_t out_type = iree_uk_pack_out_type(type);
+  iree_uk_ssize_t in_type_size = iree_uk_type_size(in_type);
+  iree_uk_ssize_t out_type_size = iree_uk_type_size(out_type);
+  *out_size0 = 1;
+  *out_size1 = 1;
+  int target_matrix_size_in_elems =
+      FLAG_working_set_size / (in_type_size + out_type_size);
+  int target_product_of_outer_sizes_0_1 =
+      target_matrix_size_in_elems / tile_num_elems;
+  while (target_product_of_outer_sizes_0_1 >= 4) {
+    target_product_of_outer_sizes_0_1 /= 4;
+    *out_size0 *= 2;
+    *out_size1 *= 2;
+  }
+  *out_size1 *= target_product_of_outer_sizes_0_1;
 }
 
 static void iree_uk_benchmark_register_pack(iree_uk_pack_type_t type,
@@ -111,8 +103,17 @@ static void iree_uk_benchmark_register_pack(iree_uk_pack_type_t type,
                                             const char* cpu_features) {
   char type_str[32];
   iree_uk_type_pair_str(type_str, sizeof type_str, type);
-  iree_uk_pack_params_t params = {
-      .type = type, .out_size2 = tile_size0, .out_size3 = tile_size1};
+  iree_uk_ssize_t out_size0, out_size1;
+  iree_uk_benchmark_pack_get_outer_sizes(type, tile_size0 * tile_size1,
+                                         &out_size0, &out_size1);
+  iree_uk_pack_params_t params = {.type = type,
+                                  .out_size0 = out_size0,
+                                  .out_size1 = out_size1,
+                                  .out_size2 = tile_size0,
+                                  .out_size3 = tile_size1};
+  iree_uk_benchmark_options_t options = {
+      .bytes_per_iteration = iree_uk_type_size(iree_uk_pack_out_type(type)) *
+                             out_size0 * out_size1 * tile_size0 * tile_size1};
   typedef struct pack_variant_t {
     const char* label;
     iree_uk_uint32_t flags;
@@ -131,7 +132,7 @@ static void iree_uk_benchmark_register_pack(iree_uk_pack_type_t type,
              tile_size0, tile_size1, variant.label, FLAG_working_set_size);
     params.flags = variant.flags;
     iree_uk_benchmark_register(name, iree_uk_benchmark_pack, &params,
-                               sizeof params, cpu_features);
+                               sizeof params, cpu_features, &options);
   }
 }
 
@@ -143,8 +144,7 @@ int main(int argc, char** argv) {
 
   // The memcpy benchmark provides a useful comparison point, as pack is fairly
   // close to memory-bound.
-  iree_uk_benchmark_register_memcpy(FLAG_working_set_size,
-                                    FLAG_batch_min_traversal_size);
+  iree_uk_benchmark_register_memcpy(FLAG_working_set_size);
 
 #if defined(IREE_UK_ARCH_ARM_64)
   iree_uk_benchmark_register_pack(iree_uk_pack_type_f32f32, 8, 1, NULL);

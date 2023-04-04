@@ -32,20 +32,38 @@ typedef struct iree_benchmark_state_t {
   // Allocator that can be used for host allocations required during benchmark
   // execution.
   iree_allocator_t host_allocator;
+
+  // Copy of benchmark_def_t->bytes_per_iteration
+  int64_t bytes_per_iteration;
+  // Copy of benchmark_def_t->bytes_per_iteration
+  int64_t items_per_iteration;
+  // Copy of benchmark_def_t->iteration_count. Specific total number of
+  // iterations to run, or zero if unspecified.
+  int64_t def_iteration_count;
+  // Copy of benchmark_def_t->batch_count. Specific number of iterations to run
+  // at a time, or zero if unspecified.
+  int64_t def_batch_count;
+  // Number of iterations run so far.
+  int64_t current_iteration_count;
 } iree_benchmark_state_t;
 
 // Returns a range argument with the given ordial.
 int64_t iree_benchmark_get_range(iree_benchmark_state_t* state,
                                  iree_host_size_t ordinal);
 
-// Returns true while the benchmark should keep running its step loop.
+// Returns true if the benchmark should keep running. In this case, the caller
+// must run the specific number of iterations written out to *batch_count and
+// call this function again.
 //
 // Usage:
-//  while (iree_benchmark_keep_running(state, 1000)) {
-//    // process 1000 elements
+//  int64_t batch_count;
+//  while (iree_benchmark_keep_running(state, &batch_count)) {
+//    for (int64_t i = 0; i < batch_count; ++i) {
+//      process_one_iteration();
+//    }
 //  }
 bool iree_benchmark_keep_running(iree_benchmark_state_t* state,
-                                 uint64_t batch_count);
+                                 int64_t* batch_count);
 
 // Reports that the currently executing benchmark cannot be run.
 // Callers should return after calling as further benchmark-related calls may
@@ -65,18 +83,6 @@ void iree_benchmark_resume_timing(iree_benchmark_state_t* state);
 // Sets a label string that will be displayed alongside the report line from the
 // currently executing benchmark.
 void iree_benchmark_set_label(iree_benchmark_state_t* state, const char* label);
-
-// Adds a 'bytes/s' label with the given value.
-//
-// REQUIRES: must only be called outside of the benchmark step loop.
-void iree_benchmark_set_bytes_processed(iree_benchmark_state_t* state,
-                                        int64_t bytes);
-
-// Adds an `items/s` label with the given value.
-//
-// REQUIRES: must only be called outside of the benchmark step loop.
-void iree_benchmark_set_items_processed(iree_benchmark_state_t* state,
-                                        int64_t items);
 
 //===----------------------------------------------------------------------===//
 // iree_benchmark_def_t
@@ -109,7 +115,17 @@ struct iree_benchmark_def_t {
   // Optional minimum duration the benchmark should run for in nanoseconds.
   iree_duration_t minimum_duration_ns;  // 0 if unspecified to autodetect
   // Optional iteration count the benchmark should run for.
-  uint64_t iteration_count;  // 0 if unspecified to autodetect
+  int64_t iteration_count;  // 0 if unspecified to autodetect
+  // Optional batch count i.e. number of iterations to run at a time.
+  // Default zero meant automatically pick batch counts, maybe using a
+  // doubling strategy.
+  int64_t batch_count;
+  // Optional number of items processed per iteration. If nonzero, will add
+  // a user counter.
+  int64_t items_per_iteration;
+  // Optional number of bytes processed per iteration. If nonzero, will add
+  // a user counter.
+  int64_t bytes_per_iteration;
 
   // TODO(benvanik): add range arguments.
 

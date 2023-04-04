@@ -327,18 +327,13 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
   }
 
   // The benchmark loop.
-  int64_t batch_count = 1;
-  int64_t total_iterations = 0;
-  while (iree_benchmark_keep_running(benchmark_state, batch_count)) {
+  int64_t batch_count;
+  while (iree_benchmark_keep_running(benchmark_state, &batch_count)) {
     for (int i = 0; i < batch_count; ++i) {
       iree_uk_e2e_matmul(&pack_lhs_params, &pack_rhs_params, &pack_out_params,
                          &mmt4d_params, &unpack_out_params);
     }
-    total_iterations += batch_count;
-    batch_count *= 2;
   }
-  iree_benchmark_set_items_processed(benchmark_state,
-                                     total_iterations * 2 * num_mul_adds);
 
   free(rowmajor_lhs_buffer);
   free(rowmajor_rhs_buffer);
@@ -370,8 +365,10 @@ static void iree_uk_benchmark_register_e2e_matmul(const char* type_str, int M,
   iree_uk_mmt4d_type_t type = iree_uk_mmt4d_type_parse(type_str);
   iree_uk_benchmark_e2e_matmul_params_t params = {
       .type = type, .M = M, .K = K, .N = N, .accumulate = accumulate};
+  iree_uk_benchmark_options_t options = {
+      .items_per_iteration = 2 * (int64_t)M * (int64_t)K * (int64_t)N};
   iree_uk_benchmark_register(name, iree_uk_benchmark_e2e_matmul, &params,
-                             sizeof params, cpu_features);
+                             sizeof params, cpu_features, &options);
 }
 
 int main(int argc, char** argv) {
