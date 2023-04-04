@@ -287,13 +287,3 @@ iree_fetch_artifact(
     "${ROOT_ARTIFACTS_DIR}/model_fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-8_Resnet50PTBatch8.mlir"
   UNPACK
 )
-
-iree_fetch_artifact(
-  NAME
-    "model-91e7aeaf-f4f5-4616-b76c-97fb033d8c0d"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680491395/T5_LARGE/batch_1/tf-model.tar.gz"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_91e7aeaf-f4f5-4616-b76c-97fb033d8c0d_T5LargeTF"
-  UNPACK
-)

@@ -195,19 +195,6 @@ iree_import_tf_model(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_a122dabcac56c201a4c98d3474265f15adba14bff88353f421b1a11cadcdea1f.mlir"
 )
 
-iree_import_tf_model(
-  TARGET_NAME
-    "${PACKAGE_NAME}_iree-imported-model-69ac0bc911ee5454da1c6b4b83d65d6b420c521803a49f849d61a820d6be60fa"
-  SOURCE
-    "${ROOT_ARTIFACTS_DIR}/model_91e7aeaf-f4f5-4616-b76c-97fb033d8c0d_T5LargeTF"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
-    "--tf-import-type=savedmodel_v1"
-    "--tf-savedmodel-exported-names=serving_default"
-  OUTPUT_MLIR_FILE
-    "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTF_69ac0bc911ee5454da1c6b4b83d65d6b420c521803a49f849d61a820d6be60fa.mlir"
-)
-
 iree_bytecode_module(
   NAME
     "iree-module-87aead729018ce5f114501cecefb6315086eb2a21ae1b30984b1794f619871c6"
@@ -1160,22 +1147,6 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
     "MiniLML12H384Uncased(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-79341873dffcdc897f66967da3975881e075f14418afa786e023739575a84462"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTF_69ac0bc911ee5454da1c6b4b83d65d6b420c521803a49f849d61a820d6be60fa.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTF_module_79341873dffcdc897f66967da3975881e075f14418afa786e023739575a84462/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME
-    "T5LargeTF(tf_v1) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -3527,24 +3498,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-64b562048622d87bac828c25696f796b9f6800d01dfbbc43e8f46aeb527b1405"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTF_69ac0bc911ee5454da1c6b4b83d65d6b420c521803a49f849d61a820d6be60fa.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTF_module_64b562048622d87bac828c25696f796b9f6800d01dfbbc43e8f46aeb527b1405/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-  FRIENDLY_NAME
-    "T5LargeTF(tf_v1) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-16b5b80aaf1271b5ad782570340cc0c7c1c97e10b7e6c6cc6e5f3ede8393cb6c"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_05c50f54ffea1fce722d07588e7de026ce10324eccc5d83d1eac2c5a9f5d639d.mlir"
@@ -5000,7 +4953,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_model-cbc5e400-7c93-4844-aca8-bce8f1bf9948-batch-64
   ${PACKAGE_NAME}_model-fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-1
   ${PACKAGE_NAME}_model-fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-8
-  ${PACKAGE_NAME}_iree-imported-model-69ac0bc911ee5454da1c6b4b83d65d6b420c521803a49f849d61a820d6be60fa
 )
 
 add_dependencies(iree-benchmark-suites
@@ -5059,7 +5011,6 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-39556c12d84502be71243197b99b0f8c22949093c561c55c01ca906812a86288
   ${PACKAGE_NAME}_iree-module-04ca0a5077b7dd5ace66d803c9b822dff3428b24e7620a61995aff0907af9533
   ${PACKAGE_NAME}_iree-module-deafafd0926321a4b8e4dc73ed4a30b2ed9317d26488246461415be2ee857eb1
-  ${PACKAGE_NAME}_iree-module-79341873dffcdc897f66967da3975881e075f14418afa786e023739575a84462
   ${PACKAGE_NAME}_iree-module-68f0eb37bb72d0d6605ecdf42691c64125960e122844b0beeae350871a445b1c
   ${PACKAGE_NAME}_iree-module-a7a1553d0739151f06bbc00a3ef8b67b0606463eab4b6607069aa94ea0bfd92f
   ${PACKAGE_NAME}_iree-module-e80d71ed8e86c0756226b2323e27e2c7c0fff8eddde59ba69e9222d36ee3eef6
@@ -5191,7 +5142,6 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-3b0ae1403ef444d812f0c7b37fda7311e2cc4ea407850ee7b91e6984b9c86100
   ${PACKAGE_NAME}_iree-module-25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509
   ${PACKAGE_NAME}_iree-module-65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b
-  ${PACKAGE_NAME}_iree-module-64b562048622d87bac828c25696f796b9f6800d01dfbbc43e8f46aeb527b1405
   ${PACKAGE_NAME}_iree-module-16b5b80aaf1271b5ad782570340cc0c7c1c97e10b7e6c6cc6e5f3ede8393cb6c
   ${PACKAGE_NAME}_iree-module-65fa033050b916e8143d44b5081ee45db3b1946a5d77de223328a7fe92a1cc66
   ${PACKAGE_NAME}_iree-module-16ef56b6869d10b17e983fec62e9f48e6bb87e9a348ab52a0b2faabca2b03578
