@@ -184,6 +184,16 @@ iree_status_t iree_hal_cuda_device_create(
   return status;
 }
 
+bool iree_hal_is_cuda_device(iree_hal_device_t* base_device) {
+  return iree_hal_resource_is(base_device, &iree_hal_cuda_device_vtable);
+}
+
+iree_hal_cuda_context_wrapper_t* iree_hal_cuda_device_context_wrapper(
+    iree_hal_device_t* base_device) {
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return &device->context_wrapper;
+}
+
 static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);

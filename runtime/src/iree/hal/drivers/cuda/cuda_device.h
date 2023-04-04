@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/api.h"
+#include "iree/hal/drivers/cuda/context_wrapper.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 
 #ifdef __cplusplus
@@ -22,6 +23,14 @@ iree_status_t iree_hal_cuda_device_create(
     const iree_hal_cuda_device_params_t* params,
     iree_hal_cuda_dynamic_symbols_t* syms, CUdevice device,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
+
+// Returns `true` if `base_device` is an instance of a HAL CUDA device.
+bool iree_hal_is_cuda_device(iree_hal_device_t* base_device);
+
+// Returns a pointer to context wrapper owned by the `base_device`. Undefined
+// if `base_device` is not a HAL CUDA device.
+iree_hal_cuda_context_wrapper_t* iree_hal_cuda_device_context_wrapper(
+    iree_hal_device_t* base_device);
 
 #ifdef __cplusplus
 }  // extern "C"
