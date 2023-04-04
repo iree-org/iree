@@ -419,7 +419,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
             .setDistributionOptions(getIREELinalgLoopDistributionOptions(
-                tileSizes, distributionMethodValue))
+                tileSizes, distributionMethodValue, maxWorkgroupParallelDims))
             .setInterchange(llvm::to_vector<4>(
                 llvm::map_range(interchange,
                                 [](int64_t v) -> unsigned {

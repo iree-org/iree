@@ -96,7 +96,7 @@ static void addBufferizePasses(OpPassManager &passManager) {
 static void tileAndDistributeToWorkgroup(
     OpPassManager &pm, bool useWARForCooperativeMatrixCodegen = false) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass(
-      kNumMaxParallelDims,
+      /*maxWorkgroupParallelDims=*/1,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
