@@ -346,12 +346,13 @@ jobs:
           # halt somewhere around a cache size of 2GB. See
           # https://github.com/actions/cache/issues/1115. Hopefully this is
           # still large enough to be somewhat useful.
-          CCACHE_MAXSIZE: 1.5G
-          CCACHE_COMPRESSLEVEL: 5
+          CCACHE_MAXSIZE: 4G
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       # Write cache (if configured to) after all other steps are finished.
+      - name: "Recompressing cache (CMake/ccache)"
+        run: ccache --recompress 10
       - name: "Saving cache (CMake/ccache)"
         uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         with:
