@@ -23,14 +23,14 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
         with:
           submodules: true
   small_manual_submodules:
     runs-on: windows-2022
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
 
@@ -41,7 +41,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
         with:
           submodules: true
   small_bash_manual_submodules:
@@ -51,7 +51,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
   # ------------------------------------------------------------------------- #
@@ -60,37 +60,37 @@ jobs:
   # Large GitHub-hosted runners (configured at Organization level)
   # https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners
   large:
-    runs-on: managed-windows-cpu
+    runs-on: windows-2022-64core
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
         with:
           submodules: true
   large_manual_submodules:
-    runs-on: managed-windows-cpu
+    runs-on: windows-2022-64core
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
 
   large_bash:
-    runs-on: managed-windows-cpu
+    runs-on: windows-2022-64core
     defaults:
       run:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
         with:
           submodules: true
   large_bash_manual_submodules:
-    runs-on: managed-windows-cpu
+    runs-on: windows-2022-64core
     defaults:
       run:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
