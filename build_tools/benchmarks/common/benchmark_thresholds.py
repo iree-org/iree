@@ -56,18 +56,6 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*LLVM-CPU.* @ Pixel"),
                        15, ThresholdUnit.PERCENTAGE),
 
-    # Fluctuating benchmarks on X86_64 CPUs.
-    BenchmarkThreshold(re.compile(r"^BertForMaskedLMTF.*x86_64"), 10,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^BertLargeTF.*x86_64"), 10,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileBertSquad_fp32.*x86_64"), 10,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileSSD_fp32.*x86_64"), 10,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^Resnet50TF.*x86_64"), 10,
-                       ThresholdUnit.PERCENTAGE),
-
     # Benchmarks that complete <= 10ms on X86_64 CPUs; using percentage is not
     # suitable anymore.
     BenchmarkThreshold(re.compile(r"^DeepLabV3_fp32.*x86_64"), 1 * 10**6,
@@ -97,6 +85,8 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
 
+    # Default threshold for all x86_64 benchmarks: 10%.
+    BenchmarkThreshold(re.compile(r".*x86_64.*"), 10, ThresholdUnit.PERCENTAGE),
     # Default threshold for all benchmarks: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
 ]

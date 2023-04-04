@@ -102,11 +102,19 @@ class MatmulCompilationInfo:
   compilation info.
   """
 
-  def __init__(self, tile_description, translation_info):
+  def __init__(self,
+               tile_description,
+               translation_info,
+               config_type=CompilationConfigType.Custom):
     self.tile_description = tile_description  # TileDescription
     self.translation_info = translation_info  # TranslationInfo
+    self.config_type = config_type  # CompilationConfigType
 
   def name(self):
+    """Procedurally generated name for the matmul compilation info."""
+    if self.config_type == CompilationConfigType.Default:
+      return "tile_config_default"
+
     return "tile_config_{tbm}x{tbn}_{tbk}x{stages}_{translation_info}".format(
         tbm=self.tile_description.threadblock_shape[0],
         tbn=self.tile_description.threadblock_shape[1],
@@ -130,6 +138,10 @@ class EmitMatmulCompilationInfo:
 """
 
   def emit(self, compilation_info):
+    """Emits the matmul compilation info as a string."""
+    if compilation_info.config_type == CompilationConfigType.Default:
+      return ""
+
     values = {
         'compilation_info_name':
             compilation_info.name(),
@@ -163,14 +175,14 @@ class EmitLinalgMatmulDispatch:
 
     self.linalg_row_row_matmul_template = """
 // Dispatch linalg.matmul row-row layout 
-func.func @${operation_name}_${compilation_trait}(
+func.func @${operation_name}_${compilation_info_name}(
   %lhs: tensor<${problem_m}x${problem_k}x${datatype_lhs}>,
   %rhs: tensor<${problem_k}x${problem_n}x${datatype_rhs}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
 {
   %c0 = arith.constant 0.0 : ${datatype_result}
   %init = tensor.empty() : tensor<${problem_m}x${problem_n}x${datatype_result}>
   %inital_result = linalg.fill ins(%c0 : ${datatype_result}) outs(%init : tensor<${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
-  %result = linalg.matmul {compilation_info = #${compilation_trait}} 
+  %result = linalg.matmul ${compilation_info_attribute} 
                      ins(%lhs, %rhs: tensor<${problem_m}x${problem_k}x${datatype_lhs}>, tensor<${problem_k}x${problem_n}x${datatype_rhs}>)
                      outs(%inital_result: tensor<${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
   return %result : tensor<${problem_m}x${problem_n}x${datatype_result}>
@@ -179,10 +191,18 @@ func.func @${operation_name}_${compilation_trait}(
 
   def emit(self, matmul_dispatch):
     """Emit the matmul operation in the MLIR dialect for a single compilation info"""
-    matmul_operation = matmul_dispatch.operation.name()
+    compilation_info_attribute_template = """{compilation_info = #${compilation_info_name}}"""
+    compilation_info_attribute_str = SubstituteTemplate(
+        compilation_info_attribute_template,
+        {'compilation_info_name': matmul_dispatch.configuration.name()})
+    compilation_info_attribute = compilation_info_attribute_str \
+      if matmul_dispatch.configuration.config_type != CompilationConfigType.Default else ""
+
     values = {
         'operation_name':
             matmul_dispatch.operation.name(),
+        'compilation_info_attribute':
+            compilation_info_attribute,
         'problem_m':
             str(matmul_dispatch.operation.problem_shape[0]),
         'problem_n':
@@ -195,7 +215,7 @@ func.func @${operation_name}_${compilation_trait}(
             DataTypeName[matmul_dispatch.operation.rhs.datatype],
         'datatype_result':
             DataTypeName[matmul_dispatch.operation.result.datatype],
-        'compilation_trait':
+        'compilation_info_name':
             matmul_dispatch.configuration.name()
     }
 
@@ -303,11 +323,9 @@ class MatmulOperationLauncher:
     # Variables from top-level argparse.
     self.generated_path = os.path.join(args.build_dir, 'generated',
                                        args.mlir_dialect)
-    self.device = args.device
+    self.args = args
     self.benchmark_dispatch_repeat_count = args.batch_size
     self.batch_size = args.batch_size
-    self.benchmark_repetitions = args.benchmark_repetitions
-    self.verbose = False if args.verbose in ['False', 'false', '0'] else True
 
     # Additional paths.
     self.matmul_path = os.path.join(self.generated_path, 'matmul')
@@ -318,8 +336,6 @@ class MatmulOperationLauncher:
     # path to iree-compile tool. (for compiling the input mlir file to vmfb)
     self.iree_compile_path = os.path.join(args.build_dir, 'tools',
                                           'iree-compile')
-    self.force_compile = False if args.force_compile in ['False', 'false', '0'
-                                                        ] else True
 
     # path to iree-benchmark-module tool. (for performance benchmarking and profiling)
     self.iree_benchmark_module_path = os.path.join(args.build_dir, 'tools',
@@ -345,22 +361,28 @@ class MatmulOperationLauncher:
     # Base iree-compile commandline
     cmd = [self.iree_compile_path, self.source_mlir_file, "-o", f"{vmfb_file}"]
 
-    # Device specific flags.
-    cmd += [f"--iree-hal-target-backends={self.device}"]
-    cmd += [f"--iree-hal-cuda-llvm-target-arch=sm_80"]
+    # General compilation options
+    cmd += [f"--iree-hal-target-backends={self.args.device}"]
+    cmd += [f"--iree-hal-cuda-llvm-target-arch={self.args.cuda_arch}"]
+    if self.args.split_k_slices != "":
+      cmd += [f"--iree-flow-split-matmul-reduction={self.args.split_k_slices}"]
+    if self.args.use_mma_sync:
+      cmd += [f"--iree-codegen-llvmgpu-use-mma-sync"]
+    if self.args.use_wmma:
+      cmd += [f"--iree-codegen-llvmgpu-use-wmma"]
 
-    # Misc flags.
+    # Compilation options for profiling
     cmd += [
         f"--iree-hal-benchmark-dispatch-repeat-count={benchmark_dispatch_repeat_count}"
     ]
 
-    if not os.path.exists(vmfb_file) or self.force_compile:
+    if not os.path.exists(vmfb_file) or self.args.force_compile:
       print(
           f">> Compilation command for {CompilationModeNames[compilation_mode]} : {' '.join(cmd)}"
       )
       subprocess.check_output(cmd)
 
-    elif self.verbose:
+    elif self.args.verbose:
       print("Skipping compilation of matmul operation: " + vmfb_file +
             " since it already exists.")
 
@@ -392,7 +414,7 @@ class MatmulOperationLauncher:
     # Commandline `iree-run-module` for verification.
     cmd = [
         self.iree_run_module_path, f'--module={self.vmfb_verify_file}',
-        f'--device={self.device}'
+        f'--device={self.args.device}'
     ]
 
     # Operation-specific verification command-line.
@@ -403,7 +425,7 @@ class MatmulOperationLauncher:
     cmd.append(f'--expected_output=@{expected_result_npy_file}')
 
     # Print the command if verbose.
-    if self.verbose:
+    if self.args.verbose:
       print(">> Verification command: " + ' '.join(cmd))
 
     # Launch verification.
@@ -417,7 +439,7 @@ class MatmulOperationLauncher:
           cmd_output)
     verification_result = m.group('verification_result')
 
-    if self.verbose or verification_result != "SUCCESS":
+    if self.args.verbose or verification_result != "SUCCESS":
       print(cmd_output)
 
     return verification_result
@@ -430,11 +452,11 @@ class MatmulOperationLauncher:
     # Commandline `iree-benchmark-module` for profiling.
     cmd = [
         self.iree_benchmark_module_path, f'--module={self.vmfb_benchmark_file}',
-        f'--device={self.device}'
+        f'--device={self.args.device}'
     ]
 
     # Profiling specific flags.
-    cmd += [f'--benchmark_repetitions={self.benchmark_repetitions}']
+    cmd += [f'--benchmark_repetitions={self.args.benchmark_repetitions}']
     cmd += [f'--batch_size={self.batch_size}']
 
     # Operation-specific profiling command-line.
@@ -443,7 +465,7 @@ class MatmulOperationLauncher:
     cmd += [f'--input={self.operation.rhs_npy_shape()}']
 
     # Print the command if verbose.
-    if self.verbose:
+    if self.args.verbose:
       print(">> Profiling command: " + ' '.join(cmd))
 
     # Launch profiling.
@@ -471,6 +493,10 @@ class MatmulGenerator:
   def __init__(self, args):
     self.args = args
 
+    self.default_config = False if args.default_config in [
+        'False', 'false', '0'
+    ] else True
+
     self.translation_infos = [
         #TranslationInfo.LLVMGPUMatmulSimt,  # CUDA Core (SMIT)
         #TranslationInfo.LLVMGPUMatmulTensorCore, # Tensor Core (WMMA)
@@ -478,8 +504,11 @@ class MatmulGenerator:
         LLVMGPUMatmulTensorCoreMmaSync,  # Tensor Core (MMA.SYNC)
     ]
 
+    self.problem_shapes = [[128, 256, 8192]]
+    """
     self.problem_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
                            [2560, 2560, 2560], [3456, 1024, 2048]]
+    """
 
     # List of pre-definied matmul dispatch collections.
     self.dispatches_collection_list = []
@@ -565,6 +594,11 @@ class MatmulGenerator:
       supported_configuration_list = self._cuda_supported_configuration_list(
           operation, configuration_list)
 
+      # Add default configuration if requested.
+      if self.default_config:
+        supported_configuration_list.append(
+            MatmulCompilationInfo([], [], CompilationConfigType.Default))
+
       self.dispatches_collection_list.append(DispatchCollection(\
         operation, supported_configuration_list))
 
@@ -599,6 +633,11 @@ class MatmulGenerator:
       # Filter out configurations that are not supported by LLVM GPU CUDA backend.
       supported_configuration_list = self._cuda_supported_configuration_list(
           operation, configuration_list)
+
+      # Add default configuration if requested.
+      if self.default_config:
+        supported_configuration_list.append(
+            MatmulCompilationInfo([], [], CompilationConfigType.Default))
 
       self.dispatches_collection_list.append(DispatchCollection(\
         operation, supported_configuration_list))

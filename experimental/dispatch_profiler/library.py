@@ -83,6 +83,17 @@ CompilationModeNames = {
 }
 
 
+class CompilationConfigType(enum.Enum):
+  Default = auto()
+  Custom = auto()
+
+
+CompilationConfigTypeName = {
+    CompilationConfigType.Default: 'default',
+    CompilationConfigType.Custom: 'custom',
+}
+
+
 # Enumerations for data types and layouts
 ###################################################################################################
 class DataType(enum.Enum):

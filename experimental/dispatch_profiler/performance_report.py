@@ -61,7 +61,6 @@ class PerformanceReport:
 
     # Data members extracted from the args.
     self.output_file_path = args.output
-    self.append = True if args.append in ['True', 'true', '1'] else False
 
     # List of PerformanceResult.
     self.perf_result_vector = []
@@ -74,7 +73,7 @@ class PerformanceReport:
 
     # If the args.output set, open the file and write the header.
     if self.output_file_path != '':
-      open_mode = 'a' if self.append else 'w'
+      open_mode = 'a' if self.args.append else 'w'
       self.csv_file = open(self.output_file_path, open_mode)
 
       # Create and write the header.
