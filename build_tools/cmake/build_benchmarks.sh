@@ -28,6 +28,7 @@ source build_tools/cmake/setup_build.sh
 
 # Install iree-import-tf
 git submodule update --init
+pip install tf-nightly
 pip install compiler/
 pip install integrations/tensorflow/python_projects/iree_tf
 
