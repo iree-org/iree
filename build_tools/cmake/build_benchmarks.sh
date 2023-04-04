@@ -26,6 +26,9 @@ IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/
 
 source build_tools/cmake/setup_build.sh
 
+# Install iree-import-tf
+pip install integrations/tensorflow/python_projects/iree_tf
+
 echo "Configuring to build benchmarks"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
@@ -38,7 +41,7 @@ echo "Configuring to build benchmarks"
   -DIREE_BUILD_SAMPLES=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite" \
-  -DIREE_IMPORT_TF_PATH="/runner-root/actions-runner/_work/_tool/Python/3.10.10/x64/bin/iree-import-tf"
+  -DIREE_IMPORT_TF_PATH="iree-import-tf"
 
 echo "Building benchmark artifacts"
 "${CMAKE_BIN}" \
