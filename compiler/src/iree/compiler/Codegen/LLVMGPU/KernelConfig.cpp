@@ -290,15 +290,16 @@ static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
   LLVM_DEBUG({
     auto pipelineName =
         IREE::Codegen::stringifyDispatchLoweringPassPipeline(codegenPipeline);
-    llvm::dbgs() << "For  (A,B = " << elementTypeA << ", C = " << elementTypeC
+    llvm::dbgs() << "GEMM (A, B = " << elementTypeA << ", C = " << elementTypeC
                  << ") " << M << "x" << N << "x" << K << " -> ";
-    llvm::dbgs() << "Using [" << pipelineName << "] ";
+    llvm::dbgs() << "Using [" << pipelineName << "] Codegen Pipeline";
     auto tile = tileSizes.front();
-    llvm::dbgs() << " uGPUk = " << tile.tileSize[0] << "x" << tile.tileSize[1]
-                 << "x" << tile.tileSize[2] << ", stages=" << tile.pipelineDepth
-                 << ", CTA = (" << tile.workgroupSize[0] << ", "
-                 << tile.workgroupSize[1] << ", " << tile.workgroupSize[2]
-                 << ") \n";
+    llvm::dbgs() << " Tile Sizes = " << tile.tileSize[0] << "x"
+                 << tile.tileSize[1] << "x" << tile.tileSize[2]
+                 << ", Stages = " << tile.pipelineDepth
+                 << ", CTA Size = ( x = " << tile.workgroupSize[0]
+                 << ", y = " << tile.workgroupSize[1]
+                 << ", z = " << tile.workgroupSize[2] << ") \n";
   });
 
   return codegenPipeline;
