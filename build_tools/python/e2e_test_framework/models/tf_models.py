@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines Tensorflow models."""
+<<<<<<< HEAD
 
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
@@ -114,3 +115,5 @@ RESNET50_2048X3X224X224_FP32_TF = common_definitions.Model(
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680486104/RESNET50/batch_2048/tf-model.tar.gz",
     entry_function="forward",
     input_types=["2048x224x224x3xf32"])
+=======
+>>>>>>> 66bedce55 (Retrigger CI.)
