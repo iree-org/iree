@@ -300,8 +300,14 @@ hal.executable private @add_distribute4D {
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> ((s0 ceildiv 64) * (s1 ceildiv 2))>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 2)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 64)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> ((s0 floordiv (s1 ceildiv 64)) * 2)>
+//  CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> ((s0 ceildiv 2) * 2)>
+//  CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 2)>
+//  CHECK-DAG: #[[MAP5:.+]] = affine_map<()[s0, s1] -> ((s0 mod (s1 ceildiv 64)) * 64)>
+//  CHECK-DAG: #[[MAP6:.+]] = affine_map<()[s0] -> ((s0 ceildiv 64) * 64)>
+//  CHECK-DAG: #[[MAP7:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
+//  CHECK-DAG: #[[MAP8:.+]] = affine_map<()[s0] -> (s0 * 64)>
+//  CHECK-DAG: #[[MAP9:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @add_distribute4D
@@ -315,27 +321,44 @@ hal.executable private @add_distribute4D {
 //  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_2]]]
 //  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_3]]]
 //      CHECK:    hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
-//      CHECK: func.func @add_distribute4D()
-//  CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
-//  CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
-//  CHECK-DAG:   %[[D2:.+]] = hal.interface.constant.load[2] : index
-//  CHECK-DAG:   %[[D3:.+]] = hal.interface.constant.load[3] : index
-//  CHECK-DAG:   %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
-//  CHECK-DAG:   %[[IDY:.+]] = hal.interface.workgroup.id[1] : index
-//  CHECK-DAG:   %[[IDZ:.+]] = hal.interface.workgroup.id[2] : index
-//  CHECK-DAG:   %[[NUMT:.+]] = affine.apply #[[MAP]]()[%[[D1]]]
-//  CHECK-DAG:   %[[ID3:.+]] = arith.remui %[[IDZ]], %[[NUMT]] : index
-//  CHECK-DAG:   %[[ID4:.+]] = arith.divui %[[IDZ]], %[[NUMT]] : index
-//  CHECK-DAG:   %[[L4:.+]] = affine.apply #[[MAP2]]()[%[[ID4]]]
-//      CHECK:   scf.for %[[IV0:.+]] = %[[L4]]
-//      CHECK:     %[[L3:.+]] = affine.apply #[[MAP3]]()[%[[ID3]]]
-//      CHECK:     scf.for %[[IV1:.+]] = %[[L3]]
-//      CHECK:       scf.for %[[IV2:.+]] =
-//      CHECK:         scf.for %[[IV3:.+]] =
-//  CHECK-NOT:         scf.for
-//      CHECK:         %[[GENERIC:.+]] = linalg.generic
-//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
-
+//      CHECK:    func.func @add_distribute4D() {
+//  CHECK-DAG:      %[[D0:.*]] = hal.interface.constant.load[0] : index
+//  CHECK-DAG:      %[[D1:.*]] = hal.interface.constant.load[1] : index
+//  CHECK-DAG:      %[[D2:.*]] = hal.interface.constant.load[2] : index
+//  CHECK-DAG:      %[[D3:.*]] = hal.interface.constant.load[3] : index
+//  CHECK-DAG:      %[[D4:.*]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
+//  CHECK-DAG:      %[[D5:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
+//  CHECK-DAG:      %[[D6:.*]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
+//      CHECK:      %[[WORKGROUP_ID_X:.*]] = hal.interface.workgroup.id[0] : index
+//      CHECK:      %[[WORKGROUP_COUNT_X:.*]] = hal.interface.workgroup.count[0] : index
+//      CHECK:      %[[WORKGROUP_ID_Y:.*]] = hal.interface.workgroup.id[1] : index
+//      CHECK:      %[[WORKGROUP_COUNT_Y:.*]] = hal.interface.workgroup.count[1] : index
+//      CHECK:      %[[WORKGROUP_ID_Z:.*]] = hal.interface.workgroup.id[2] : index
+//  CHECK-DAG:      %[[D7:.*]] = affine.apply #map2(){{\[}}%[[WORKGROUP_ID_Z]], %[[D1]]]
+//  CHECK-DAG:      %[[D8:.*]] = affine.apply #map3(){{\[}}%[[D0]]]
+//      CHECK:      scf.for %[[ARG0:.*]] = %[[D7]] to %[[D0]] step %[[D8]] {
+//  CHECK-DAG:        %[[D9:.*]] = affine.min #map4(%[[ARG0]]){{\[}}%[[D0]]]
+//  CHECK-DAG:        %[[D10:.*]] = affine.apply #map5(){{\[}}%[[WORKGROUP_ID_Z]], %[[D1]]]
+//  CHECK-DAG:        %[[D11:.*]] = affine.apply #map6(){{\[}}%[[D1]]]
+//      CHECK:        scf.for %[[ARG1:.*]] = %[[D10]] to %[[D1]] step %[[D11]] {
+//  CHECK-DAG:          %[[D12:.*]] = affine.min #map7(%[[ARG1]]){{\[}}%[[D1]]]
+//  CHECK-DAG:          %[[D13:.*]] = affine.apply #map8(){{\[}}%[[WORKGROUP_ID_Y]]]
+//  CHECK-DAG:          %[[D14:.*]] = affine.apply #map8(){{\[}}%[[WORKGROUP_COUNT_Y]]]
+//      CHECK:          scf.for %[[ARG2:.*]] = %[[D13]] to %[[D2]] step %[[D14]] {
+//  CHECK-DAG:            %[[D15:.*]] = affine.min #map7(%[[ARG2]]){{\[}}%[[D2]]]
+//  CHECK-DAG:            %[[D16:.*]] = affine.apply #map8(){{\[}}%[[WORKGROUP_ID_X]]]
+//  CHECK-DAG:            %[[D17:.*]] = affine.apply #map8(){{\[}}%[[WORKGROUP_COUNT_X]]]
+//      CHECK:            scf.for %[[ARG3:.*]] = %[[D16]] to %[[D3]] step %[[D17]] {
+//      CHECK:              %[[D18:.*]] = affine.min #map7(%[[ARG3]]){{\[}}%[[D3]]]
+//      CHECK:              %[[D19:.*]] = flow.dispatch.tensor.load %[[D4]], offsets = {{\[}}%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]], sizes = {{\[}}%[[D9]], %[[D12]], %[[D15]], %[[D18]]], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]} -> tensor<?x?x?x?xf32>
+//      CHECK:              %[[D20:.*]] = flow.dispatch.tensor.load %[[D5]], offsets = {{\[}}%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]], sizes = {{\[}}%[[D9]], %[[D12]], %[[D15]], %[[D18]]], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]} -> tensor<?x?x?x?xf32>
+//      CHECK:              %[[D21:.*]] = tensor.empty(%[[D9]], %[[D12]], %[[D15]], %[[D18]]) : tensor<?x?x?x?xf32>
+//      CHECK:              %[[D22:.*]] = linalg.generic {indexing_maps = [#map9, #map9, #map9], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[D19]], %[[D20]] : tensor<?x?x?x?xf32>, tensor<?x?x?x?xf32>) outs(%[[D21]] : tensor<?x?x?x?xf32>) attrs =  {lowering_config = #config} {
+//      CHECK:              ^bb0(%[[IN:.*]]: f32, %[[IN_0:.*]]: f32, %[[OUT:.*]]: f32):
+//      CHECK:                %[[D23:.*]] = arith.addf %[[IN]], %[[IN_0]] : f32
+//      CHECK:                linalg.yield %[[D23]] : f32
+//      CHECK:              } -> tensor<?x?x?x?xf32>
+//      CHECK:              flow.dispatch.tensor.store %[[D22:.*]], %[[D6]], offsets = {{\[}}%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]], sizes = {{\[}}%[[D9]], %[[D12]], %[[D15]], %[[D18]]], strides = [1, 1, 1, 1] : tensor<?x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
 
 // -----
 
@@ -1867,7 +1890,7 @@ hal.executable private @tile_multiuse_producer {
 //   CHECK-DAG:         flow.dispatch.tensor.store %[[GENERIC0]], %[[RESULT_BINDING2]], offsets = [%[[IV0]], %[[IV1]]]
 
 // -----
- 
+
 hal.executable private @no_tile {
   hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {}> {
     hal.executable.export public @no_tile ordinal(0) layout(#hal.pipeline.layout<

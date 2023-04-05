@@ -289,7 +289,8 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
 
 /// Performs optimizations on |module| (including LTO-style whole-program ones).
 static void optimizeModule(llvm::Module &module,
-                           llvm::TargetMachine &targetMachine) {
+                           llvm::TargetMachine &targetMachine,
+                           const std::array<int32_t, 3> &maxWorkgroupSize) {
   llvm::LoopAnalysisManager lam;
   llvm::FunctionAnalysisManager fam;
   llvm::CGSCCAnalysisManager cgam;
@@ -321,7 +322,7 @@ static void optimizeModule(llvm::Module &module,
 
   mpm.addPass(llvm::VerifierPass());
   llvm::FunctionPassManager fpm;
-  fpm.addPass(llvm::SetBlockIdsRangePass());
+  fpm.addPass(llvm::SetBlockIdsRangePass(maxWorkgroupSize));
   mpm.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
   mpm.addPass(llvm::VerifierPass());
@@ -523,8 +524,15 @@ class CUDATargetBackend final : public TargetBackend {
                           variantOp.getName(), ".linked.bc", *llvmModule);
       }
 
+      std::array<int32_t, 3> maxWorkgroupSize = {1, 1, 1};
+      for (int64_t i = 0, e = workgroupSizes.size(); i < e; i++) {
+        for (int64_t j = 0; j < maxWorkgroupSize.size(); j++) {
+          maxWorkgroupSize[j] =
+              std::max(maxWorkgroupSize[j], workgroupSizes[i][j]);
+        }
+      }
       // Run LTO-style full optimization on the linked modules.
-      optimizeModule(*llvmModule, *targetMachine);
+      optimizeModule(*llvmModule, *targetMachine, maxWorkgroupSize);
 
       // Dump bitcode post-linking and optimization.
       if (!options.dumpIntermediatesPath.empty()) {

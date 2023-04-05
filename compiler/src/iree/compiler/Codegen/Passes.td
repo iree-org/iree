@@ -302,14 +302,6 @@ def DecomposePackUnPackOps :
   let constructor = "mlir::iree_compiler::createDecomposePackUnPackOpsPass()";
 }
 
-def VectorizePackUnPackOps :
-    Pass<"iree-codegen-vectorize-pack-unpack-ops", "func::FuncOp"> {
-  let summary = "Vectorize ops that are created after decomposition of "
-                "pack/unpack ops";
-  let constructor =
-      "mlir::iree_compiler::createVectorizePackUnPackOpsPass()";
-}
-
 def PolynomialApproximationPass :
     Pass<"iree-codegen-polynomial-approximation", ""> {
   let summary = "Convert math operations to their polynomial approximation";

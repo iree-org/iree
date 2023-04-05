@@ -1097,6 +1097,23 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 // Everything Default Configuration
 //===----------------------------------------------------------------------===//
 
+/// Returns a small tiling factor for the given reduction `dimSize`.
+/// Returns 0 to avoid tiling.
+static int getReductionTilingFactor(int64_t dimSize) {
+  if (dimSize % 4 == 0) return 4;
+
+  // Try to find the smallest prime factor as the tiling factor. As a trade off
+  // between generated code size and compilation time, only look at prime
+  // numbers less than 50 right now.
+  static constexpr std::array<int, 15> primeNumbers = {
+      2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47};
+  for (int n : primeNumbers) {
+    if (dimSize % n == 0) return n;
+  }
+
+  return 1;  // Otherwise just tile with size 1.
+}
+
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op,
                                         bool allowVectorization = true) {
@@ -1294,17 +1311,15 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   tileSizes.push_back(threadTileSizes);
 
   if (vectorizable) {
-    // Try to tile all reductions by size 4 if possible. This gives us a chance
-    // to perform vector4 load if an input has its innnermost dimension being
-    // reduction. It also avoids generating too many instructions when unrolling
-    // vector later. Similarly, also try to tile other untiled parallel
-    // dimensions by 4 to avoid instruction bloat.
+    // Try to tile all reductions by some small factor, preferrably 4, when
+    // possible. This gives us a chance to perform vector4 load if an input has
+    // its innnermost dimension being reduction. It also avoids generating too
+    // many instructions when unrolling vector later.
     SmallVector<int64_t> loopTileSizes(linalgOp.getNumLoops(), 0);
     for (const auto &[i, iter] :
          llvm::enumerate(linalgOp.getIteratorTypesArray())) {
-      if (loopBounds[i] % 4 != 0) continue;
       if (linalg::isReductionIterator(iter) || workgroupTileSizes[i] == 0) {
-        loopTileSizes[i] = 4;
+        loopTileSizes[i] = getReductionTilingFactor(loopBounds[i]);
       }
     }
     if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
