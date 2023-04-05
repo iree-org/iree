@@ -50,3 +50,31 @@ iree_compiler_register_plugin(
   TARGET
     ::registration
 )
+
+iree_pyext_module(
+  NAME
+    PyExt
+  MODULE_NAME _split_mlir
+  SRCS
+    "OperationListImpl.h"
+    "SplitMlirPyExt.cpp"
+  DEPS
+    MLIRFuncDialect
+    MLIRIR
+    MLIRAsmParser
+    iree::compiler::Tools::init_passes_and_dialects
+)
+
+iree_py_library(
+  NAME
+    split_mlir_py
+  SRCS
+    "__init__.py"
+    "_split_mlir.pyi"
+    "execution.py"
+    "iree_execution.py"
+    "types.py"
+  DEPS
+    MLIRPythonModules
+    ::PyExt
+)
