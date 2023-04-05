@@ -120,6 +120,7 @@ static void applyFastSlowPathConversion(func::FuncOp funcOp) {
   // All of these ops have been cloned to both regions. Erease them now.
   for (Operation *op : llvm::reverse(cloneOps)) rewriter.eraseOp(op);
 }
+
 namespace {
 
 struct SPIRVCreateFastSlowPathPass final
@@ -132,17 +133,15 @@ struct SPIRVCreateFastSlowPathPass final
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
 
-    { applyFastSlowPathConversion(funcOp); }
+    applyFastSlowPathConversion(funcOp);
 
     // Canonicalize the generated scf.if ops. We might have trivially dead
     // branches, in which the sizes might be incorrect due to eliding the
     // tensor.pad op.
-    {
-      RewritePatternSet patterns(context);
-      scf::IfOp::getCanonicalizationPatterns(patterns, context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
+    RewritePatternSet patterns(context);
+    scf::IfOp::getCanonicalizationPatterns(patterns, context);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
     }
   }
 };

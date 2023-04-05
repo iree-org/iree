@@ -110,15 +110,15 @@ hal.executable private @nhwc_nhwc_depthwise_conv_static_shape_f32 {
         %4 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_count_y]
         %5 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
         %6 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
-        %7 = flow.dispatch.tensor.load %2, offsets = [0, %workgroup_id_z, %%3, %5], sizes = [1, 1, 8, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x56x56x96xf32>> -> tensor<1x1x8x32xf32>
+        %7 = flow.dispatch.tensor.load %2, offsets = [0, %workgroup_id_z, %3, %5], sizes = [1, 1, 8, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x56x56x96xf32>> -> tensor<1x1x8x32xf32>
         %8 = affine.apply affine_map<(d0) -> (d0 * 2)>(%workgroup_id_z)
-        %9 = affine.apply affine_map<(d0) -> (d0 * 2)>(%%3)
+        %9 = affine.apply affine_map<(d0) -> (d0 * 2)>(%3)
         %10 = flow.dispatch.tensor.load %0, offsets = [0, %8, %9, %5], sizes = [1, 3, 17, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x113x113x96xf32>> -> tensor<1x3x17x32xf32>
         %11 = flow.dispatch.tensor.load %1, offsets = [0, 0, %5], sizes = [3, 3, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x96xf32>> -> tensor<3x3x32xf32>
         %12 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x1x8x32xf32>) -> tensor<1x1x8x32xf32>
         %13 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                 ins(%10, %11 : tensor<1x3x17x32xf32>, tensor<3x3x32xf32>) outs(%12 : tensor<1x1x8x32xf32>) -> tensor<1x1x8x32xf32>
-        flow.dispatch.tensor.store %13, %2, offsets = [0, %workgroup_id_z, %%3, %5], sizes = [1, 1, 8, 32], strides = [1, 1, 1, 1] : tensor<1x1x8x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x56x56x96xf32>>
+        flow.dispatch.tensor.store %13, %2, offsets = [0, %workgroup_id_z, %3, %5], sizes = [1, 1, 8, 32], strides = [1, 1, 1, 1] : tensor<1x1x8x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x56x56x96xf32>>
         return
       }
     }
@@ -162,7 +162,14 @@ hal.executable private @low_padded_conv {
     hal.executable.export @low_padded_conv layout(#pipeline_layout) attributes {
       workgroup_size = [8: index, 2: index, 1: index],
       translation_info = #translation
+    } {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index):
+      %c1 = arith.constant 1 : index
+      %c28 = arith.constant 28 : index
+      %c112 = arith.constant 112 : index
+      hal.return %c1, %c28, %c112 : index, index, index
     }
+
     builtin.module {
       func.func @low_padded_conv() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -227,9 +234,6 @@ hal.executable private @low_padded_conv {
 
 // CHECK-LABEL: func.func @low_padded_conv()
 
-// Loop nest for workgroup tiling and distribution
-// CHECK-COUNT-3: scf.for
-
 // Switch between fast and slow path
 //         CHECK: scf.if
 
@@ -276,7 +280,14 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
     hal.executable.export @low_high_padded_nhwc_depthwise_conv layout(#pipeline_layout) attributes {
       workgroup_size = [8: index, 2: index, 1: index],
       translation_info = #translation
+    } {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index):
+      %c1 = arith.constant 1 : index
+      %c28 = arith.constant 28 : index
+      %c112 = arith.constant 112 : index
+      hal.return %c1, %c28, %c112 : index, index, index
     }
+
     builtin.module {
       func.func @low_high_padded_nhwc_depthwise_conv() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -349,9 +360,6 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
 }
 
 // CHECK-LABEL: func.func @low_high_padded_nhwc_depthwise_conv()
-
-// Loop nest for workgroup tiling and distribution
-// CHECK-COUNT-3: scf.for
 
 // Switch between fast and slow path
 //         CHECK: scf.if
