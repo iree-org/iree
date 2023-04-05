@@ -10,6 +10,19 @@
 
 iree_add_all_subdirs()
 
+iree_cc_test(
+  NAME
+    api-test-binary
+  SRCS
+    "api-test-main.c"
+  DEPS
+    IREELLVMIncludeSetup
+    iree::base
+    iree::compiler::API::Impl
+    iree::compiler::API::MLIRInteropHeaders
+    iree::compiler::bindings::c::headers
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # Move to bin/ directory and systematically name more appropriately.
