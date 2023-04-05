@@ -15,7 +15,12 @@ namespace llvm {
 
 /// Pass to set range metadata attached to block id intrinsics.
 struct SetBlockIdsRangePass : PassInfoMixin<SetBlockIdsRangePass> {
+  SetBlockIdsRangePass(const std::array<int32_t, 3> &maxWorkgroupSize)
+      : maxWorkgroupSize(maxWorkgroupSize) {}
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+
+ private:
+  std::array<int32_t, 3> maxWorkgroupSize;
 };
 
 }  // namespace llvm
