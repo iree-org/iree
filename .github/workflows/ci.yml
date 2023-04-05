@@ -298,6 +298,8 @@ jobs:
     runs-on: macos-12-xl
     env:
       BUILD_DIR: build-macos
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_GH_CACHE_KEY: ccache_all_macos
     defaults:
       run:
         shell: bash
@@ -310,7 +312,6 @@ jobs:
         uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
         with:
           python-version: "3.10"
-          cache: "pip"
       - name: "Installing Python packages"
         run: pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "Installing requirements"
@@ -324,9 +325,9 @@ jobs:
       - name: "Fetching cache (CMake/ccache)"
         uses: actions/cache/restore@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache_all_macos_${{ github.sha }}
-          restore-keys: ccache_all_macos
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ env.CCACHE_GH_CACHE_KEY }}_${{ github.sha }}
+          restore-keys: ${{ env.CCACHE_GH_CACHE_KEY }}
       # Finally: build and run tests.
       - name: "Building IREE"
         env:
@@ -334,18 +335,15 @@ jobs:
           IREE_WRITE_REMOTE_CCACHE: 0
           IREE_READ_LOCAL_CCACHE: 1
           IREE_WRITE_LOCAL_CCACHE: 1 # DO NOT SUBMIT
-          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          CCACHE_DIR:
           # Cache size and compression level settings are a delicate balance.
           # * A full build cache is around 2-5GB depending on compression level
           # * Upload/download is slow (double compression may or may not help)
           # * We have a limit of 10GB across all cached files per repository
-          # * Cache misses are quite costly:
-          #   * 99% cache hits -> ~5 minutes to build
-          #   * 20% cache hits -> ~15-20 minutes to build
-          # Cache restore on Macs is painfully slow and grinds to a complete
-          # halt somewhere around a cache size of 2GB. See
-          # https://github.com/actions/cache/issues/1115. Hopefully this is
-          # still large enough to be somewhat useful.
+          # * Cache misses are quite costly. Cache restore on Macs is painfully
+          #   slow and grinds to a complete halt somewhere around a cache size
+          #   of 2GB. See https://github.com/actions/cache/issues/1115.
+          #   Hopefully this is still large enough to be somewhat useful.
           CCACHE_MAXSIZE: 4G
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
@@ -356,8 +354,8 @@ jobs:
       - name: "Saving cache (CMake/ccache)"
         uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
         with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache_all_macos_${{ github.sha }}
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ env.CCACHE_GH_CACHE_KEY }}_${{ github.sha }}
 
   build_test_all_bazel:
     needs: setup
