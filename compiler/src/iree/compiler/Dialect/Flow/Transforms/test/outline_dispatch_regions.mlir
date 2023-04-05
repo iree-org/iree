@@ -183,7 +183,7 @@ func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
 
 //      CHECK: flow.executable private @main_dispatch_0 {
 // CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_4x8
-//      CHECK: func.func @main_dispatch_0_fill_4x8(
+//      CHECK: func.func @main_dispatch_0_fill_4x8_f32(
 func.func @main() -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
@@ -205,7 +205,7 @@ func.func @main() -> tensor<4x8xf32> {
 
 //      CHECK: flow.executable private @main_dispatch_0 {
 // CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_40
-//      CHECK: func.func @main_dispatch_0_fill_40(
+//      CHECK: func.func @main_dispatch_0_fill_40_f32(
 func.func @main() -> tensor<10xf32> {
   %x = arith.constant 100 : index
   %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<10xf32>) = (
@@ -232,7 +232,7 @@ func.func @main() -> tensor<10xf32> {
 
 //      CHECK: flow.executable private @main_dispatch_0 {
 // CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_DxDxD
-//      CHECK: func.func @main_dispatch_0_fill_DxDxD(
+//      CHECK: func.func @main_dispatch_0_fill_DxDxD_f32(
 func.func @main(%arg0 : index) -> tensor<10xf32> {
   %x = arith.constant 100 : index
   %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<10xf32>) = (
@@ -249,3 +249,35 @@ func.func @main(%arg0 : index) -> tensor<10xf32> {
   }
   return %0 : tensor<10xf32>
 }
+
+// -----
+
+// Dispatch key op with multiple datatypes should be reflected in summary.
+
+//      CHECK: flow.executable private @main_dispatch_0 {
+// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_generic_4x8_i32xf32
+//      CHECK: func.func @main_dispatch_0_generic_4x8_i32xf32(
+func.func @main() -> tensor<4x8xf32> {
+  %x = arith.constant 100 : index
+  %y = arith.constant 50 : index
+  %0 = flow.dispatch.workgroups[%x, %y]() : () -> (tensor<4x8xf32>) = (
+    %ret: !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
+  ) {
+    %a = tensor.empty() : tensor<4x8xi32>
+    %b = tensor.empty() : tensor<4x8xf32>
+    %ans = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel"]}
+        ins(%a : tensor<4x8xi32>) outs(%b : tensor<4x8xf32>) {
+      ^bb0(%b0 : i32, %b1 : f32):
+        %1 = arith.index_cast %b0 : i32 to index
+        %2 = tensor.extract %b[%1, %1] : tensor<4x8xf32>
+        linalg.yield %2 : f32
+      } -> tensor<4x8xf32>
+    flow.dispatch.tensor.store %ans, %ret, offsets = [0, 0], sizes = [4, 8], strides = [1, 1] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
+    flow.return
+  }
+  return %0 : tensor<4x8xf32>
+}
+
+// -----
