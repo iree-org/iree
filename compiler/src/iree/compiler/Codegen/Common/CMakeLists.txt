@@ -99,6 +99,7 @@ iree_cc_library(
     "GPUPipelining.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "IREEComprehensiveBufferizePass.cpp"
+    "IREEExpandStridedMetadata.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LowerUKernelsToCalls.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"

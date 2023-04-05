@@ -207,6 +207,16 @@ def IREEComprehensiveBufferize :
   ];
 }
 
+def IREEExpandStridedMetadata :
+    Pass<"iree-codegen-expand-strided-metadata", ""> {
+  let summary = "Resolve memref.extract_strided_metadata operations";
+  let constructor = "mlir::iree_compiler::createIREEExpandStridedMetadataPass()";
+  let options = [
+    Option<"allowUnresolved", "allow-unresolved", "bool", /*default=*/"false",
+           "Allow unresolved strided metadata op (for testing)">,
+  ];
+}
+
 def LowerUKernelOpsToCalls :
     Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
   let summary = "Lower micro-kernel wrapper ops into function calls";
