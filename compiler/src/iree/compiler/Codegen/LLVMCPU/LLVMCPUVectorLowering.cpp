@@ -14,7 +14,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-lower-vectors"
+#define DEBUG_TYPE "iree-llvmcpu-vector-lowering"
 
 namespace mlir {
 namespace iree_compiler {
@@ -37,6 +37,9 @@ class LLVMCPUVectorLoweringPass
 };
 
 void LLVMCPUVectorLoweringPass::runOnOperation() {
+  MLIRContext *ctx = &getContext();
+  auto funcOp = getOperation();
+
   // Per-function lowering pipeline.
   auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle;
   auto vectorMultiReductionLowering =
@@ -52,7 +55,7 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   // Lower high level vector operations like contract or multidim reduce ops
   // to lower level vector ops.
   {
-    RewritePatternSet patterns(&getContext());
+    RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions,
@@ -63,22 +66,35 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     vector::populateVectorMultiReductionLoweringPatterns(
         patterns, vectorMultiReductionLowering);
     populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After lowering high level vector ops to lower level "
+                    "vector ops ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   {
-    RewritePatternSet patterns(&getContext());
+    RewritePatternSet patterns(ctx);
     vector::populateVectorTransferLoweringPatterns(patterns,
                                                    /*maxTransferRank=*/1);
     auto vectorTransferToSCFOptions =
         VectorTransferToSCFOptions().enableFullUnroll();
     populateVectorToSCFConversionPatterns(patterns, vectorTransferToSCFOptions);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After lowering vector transfers to SCF ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
+  // Lowering for vector.transpose ops.
   {
-    // Lowering for vector.transpose ops.
-    RewritePatternSet patterns(&getContext());
+    RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorTransposeLoweringPatterns(patterns,
                                                     vectorTransformOptions);
@@ -91,8 +107,14 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
       x86vector::avx2::populateSpecializedTransposeLoweringPatterns(
           patterns, avx2LoweringOptions, /*benefit=*/10);
     }
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After lowering vector transpose ops ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 }
 }  // namespace
 
