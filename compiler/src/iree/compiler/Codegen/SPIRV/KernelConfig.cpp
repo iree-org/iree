@@ -1110,7 +1110,8 @@ static int getReductionTilingFactor(int64_t dimSize) {
   for (int i = 0; i < primeNumbers.size(); ++i) {
     if (dimSize % primeNumbers[i] == 0) return primeNumbers[i];
   }
-  return 0;
+
+  return 1;  // Otherwise just tile with size 1.
 }
 
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
