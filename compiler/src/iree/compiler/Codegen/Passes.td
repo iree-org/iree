@@ -553,31 +553,9 @@ def LLVMCPUVectorLowering :
           "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
-    Option<"lowerVectorTransposeTo", "lower-vector-transpose-to",
-       "std::string", /*default=*/[{"shuffle"}],
-      [{Lower vector.transpose to finer-grained vector ops, options are:\n"
-          "\teltwise [default]\n"
-          "\tflat_transpose (requires LLVM matrix intrinsics support)\n"
-          "\tshuffle (lower 2-D transposes to shape_cast + shuffle)\n}]>,
     Option<"lowerVectorTransposeToAVX2", "lower-vector-transpose-to-avx2", "bool",
       /*default=*/"false",
       "Add specific transpose to avx2 lowering patterns.">,
-    Option<"lowerVectorMultiReductionTo", "lower-vector-multi-reduction-to",
-       "std::string", /*default=*/[{"innerreduction"}],
-      [{Lower vector.multi_reduction to finer-grained vector ops, options are:\n"
-          "\tinnerparallel [default]\n"
-          "\tinnerreduction\n}]>,
-    Option<"lowerVectorContractionTo", "lower-vector-contraction-to", "std::string",
-      /*default=*/[{"outerproduct"}],
-      [{Lower vector.contract to finer-grained vector ops, options are:\n"
-          "\touterproduct [default]\n"
-          "\tdot\n"
-          "\tmatrixintrinsics\n}]>,
-    Option<"unrollVectorTransfers", "unroll-vector-transfers", "bool",
-      /*default=*/"true",
-      "Run transformations that lower high-level vectors.">,
-    Option<"maxTransferRank", "max-transfer-rank", "int64_t", /*default=*/"1",
-      "Set the maximum vector load/store rank.">
   ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUVectorLoweringPass()";

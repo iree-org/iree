@@ -10,6 +10,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -25,12 +26,7 @@ class LLVMCPUVectorLoweringPass
   using LLVMCPUVectorLoweringBase::LLVMCPUVectorLoweringBase;
   LLVMCPUVectorLoweringPass(const LLVMCPUVectorLoweringPassOptions &options) {
     this->splitVectorTransfersTo = options.splitVectorTransfersTo;
-    this->lowerVectorTransposeTo = options.lowerVectorTransposeTo;
     this->lowerVectorTransposeToAVX2 = options.lowerVectorTransposeToAVX2;
-    this->lowerVectorMultiReductionTo = options.lowerVectorMultiReductionTo;
-    this->lowerVectorContractionTo = options.lowerVectorContractionTo;
-    this->unrollVectorTransfers = options.unrollVectorTransfers;
-    this->maxTransferRank = options.maxTransferRank;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -41,45 +37,21 @@ class LLVMCPUVectorLoweringPass
 };
 
 void LLVMCPUVectorLoweringPass::runOnOperation() {
+  // Per-function lowering pipeline.
+  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle;
+  auto vectorMultiReductionLowering =
+      vector::VectorMultiReductionLowering::InnerReduction;
+  auto vectorContractLowering = vector::VectorContractLowering::OuterProduct;
+  auto vectorTransferSplit = vector::VectorTransferSplit::None;
+  auto vectorTransformOptions =
+      vector::VectorTransformsOptions()
+          .setVectorTransposeLowering(vectorTransposeLowering)
+          .setVectorTransformsOptions(vectorContractLowering)
+          .setVectorMultiReductionLowering(vectorMultiReductionLowering)
+          .setVectorTransferSplit(vectorTransferSplit);
   // Lower high level vector operations like contract or multidim reduce ops
   // to lower level vector ops.
   {
-    vector::VectorTransposeLowering vectorTransposeLowering =
-        llvm::StringSwitch<vector::VectorTransposeLowering>(
-            lowerVectorTransposeTo.getValue())
-            .Case("eltwise", vector::VectorTransposeLowering::EltWise)
-            .Case("flat_transpose", vector::VectorTransposeLowering::Flat)
-            .Case("shuffle", vector::VectorTransposeLowering::Shuffle)
-            .Default(vector::VectorTransposeLowering::EltWise);
-    vector::VectorMultiReductionLowering vectorMultiReductionLowering =
-        llvm::StringSwitch<vector::VectorMultiReductionLowering>(
-            lowerVectorMultiReductionTo.getValue())
-            .Case("innerreduction",
-                  vector::VectorMultiReductionLowering::InnerReduction)
-            .Default(vector::VectorMultiReductionLowering::InnerParallel);
-    vector::VectorContractLowering vectorContractLowering =
-        llvm::StringSwitch<vector::VectorContractLowering>(
-            lowerVectorContractionTo.getValue())
-            .Case("matrixintrinsics", vector::VectorContractLowering::Matmul)
-            .Case("dot", vector::VectorContractLowering::Dot)
-            .Case("outerproduct", vector::VectorContractLowering::OuterProduct)
-            .Default(vector::VectorContractLowering::OuterProduct);
-    vector::VectorTransferSplit vectorTransferSplit =
-        llvm::StringSwitch<vector::VectorTransferSplit>(
-            splitVectorTransfersTo.getValue())
-            .Case("none", vector::VectorTransferSplit::None)
-            .Case("linalg-copy", vector::VectorTransferSplit::LinalgCopy)
-            .Case("vector-transfers",
-                  vector::VectorTransferSplit::VectorTransfer)
-            .Default(vector::VectorTransferSplit::None);
-
-    // Per-function lowering pipeline.
-    vector::VectorTransformsOptions vectorTransformOptions =
-        vector::VectorTransformsOptions()
-            .setVectorTransposeLowering(vectorTransposeLowering)
-            .setVectorTransformsOptions(vectorContractLowering)
-            .setVectorMultiReductionLowering(vectorMultiReductionLowering)
-            .setVectorTransferSplit(vectorTransferSplit);
     RewritePatternSet patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
@@ -96,11 +68,11 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
 
   {
     RewritePatternSet patterns(&getContext());
-    vector::populateVectorTransferLoweringPatterns(patterns, maxTransferRank);
-    VectorTransferToSCFOptions vectorTransferToSCFOptions =
-        VectorTransferToSCFOptions().enableFullUnroll(unrollVectorTransfers);
-    populateVectorToSCFConversionPatterns(
-        patterns, vectorTransferToSCFOptions.setTargetRank(maxTransferRank));
+    vector::populateVectorTransferLoweringPatterns(patterns,
+                                                   /*maxTransferRank=*/1);
+    auto vectorTransferToSCFOptions =
+        VectorTransferToSCFOptions().enableFullUnroll();
+    populateVectorToSCFConversionPatterns(patterns, vectorTransferToSCFOptions);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 
@@ -114,8 +86,8 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
       auto avx2LoweringOptions =
           x86vector::avx2::LoweringOptions().setTransposeOptions(
               x86vector::avx2::TransposeLoweringOptions()
-                  .lower4x8xf32(lowerVectorTransposeToAVX2)
-                  .lower8x8xf32(lowerVectorTransposeToAVX2));
+                  .lower4x8xf32()
+                  .lower8x8xf32());
       x86vector::avx2::populateSpecializedTransposeLoweringPatterns(
           patterns, avx2LoweringOptions, /*benefit=*/10);
     }
