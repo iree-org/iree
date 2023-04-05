@@ -1105,10 +1105,10 @@ static int getReductionTilingFactor(int64_t dimSize) {
   // Try to find the smallest prime factor as the tiling factor. As a trade off
   // between generated code size and compilation time, only look at prime
   // numbers less than 50 right now.
-  const std::array<int, 15> primeNumbers = {2,  3,  5,  7,  11, 13, 17, 19,
-                                            23, 29, 31, 37, 41, 43, 47};
-  for (int i = 0; i < primeNumbers.size(); ++i) {
-    if (dimSize % primeNumbers[i] == 0) return primeNumbers[i];
+  static constexpr std::array<int, 15> primeNumbers = {
+      2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47};
+  for (int n : primeNumbers) {
+    if (dimSize % n == 0) return n;
   }
 
   return 1;  // Otherwise just tile with size 1.
