@@ -209,9 +209,9 @@ static LogicalResult canonicalizeModule(
   }
 
   PassManager passManager(context);
-  if (failed(mlir::applyPassManagerCLOptions(passManager))) {
-    return moduleOp.emitError() << "Failed to apply pass manager CL options";
-  }
+  // TODO(12938): Handle or investigate failure result.
+  auto logicalRes = mlir::applyPassManagerCLOptions(passManager);
+  (void)logicalRes;
   mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
