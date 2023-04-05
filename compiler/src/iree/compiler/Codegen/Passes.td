@@ -521,7 +521,6 @@ def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp">
 def LLVMCPUVectorization :
     Pass<"iree-llvmcpu-vectorization", "func::FuncOp"> {
   let summary = "Pass to perform vectorization on tensor/linalg ops.";
-  let constructor = "mlir::createLinalgVectorizationExpertPass()";
   let options = [
     Option<"enableVectorMasking", "enable-vector-masking", "bool",/*default=*/"false",
       "Enable vector masking during vectorization.">,
@@ -532,6 +531,26 @@ def LLVMCPUVectorization :
   ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUVectorizationPass()";
+}
+
+def LLVMCPUVectorLowering :
+    Pass<"iree-llvmcpu-lower-vectors", "func::FuncOp"> {
+  let summary = "Pass to lower Vector ops before conversion to LLVM.";
+  let options = [
+    Option<"splitVectorTransfersTo", "split-transfers", "std::string",
+      /*default=*/"",
+      [{Split vector transfers between slow (masked) and fast "
+        "(unmasked) variants. Possible options are:\n"
+          "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
+          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
+          "\tvector-transfers: use extra small unmasked vector.transfers for"
+          " the slow path\n}]>,
+    Option<"lowerVectorTransposeToAVX2", "lower-vector-transpose-to-avx2", "bool",
+      /*default=*/"false",
+      "Add specific transpose to avx2 lowering patterns.">,
+  ];
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUVectorLoweringPass()";
 }
 
 def ConvertToLLVM :

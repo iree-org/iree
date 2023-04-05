@@ -49,7 +49,6 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 using namespace mlir;
-using mlir::iree_compiler::IREE::LinalgExt::LinalgEnablingOptions;
 
 //===----------------------------------------------------------------------===//
 // Additional constraints for PDLMatchOp.
