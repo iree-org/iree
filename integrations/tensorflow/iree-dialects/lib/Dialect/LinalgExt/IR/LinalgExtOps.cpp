@@ -1950,17 +1950,17 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
     ivVec.push_back(loop.getInductionVar());
   }
   // The body of the innermost loops does the actual data movement.
-  builder.create<scf::ForOp>(loc, zero,
-                             getValueOrCreateConstantIndexOp(
-                                 builder, loc, outputShape[0].back()),
-                             one, ValueRange{},
-                             [&](OpBuilder &bodyBuilder, Location bodyLoc,
-                                 Value iv, ValueRange regionIterArgs) {
-                               ivVec.push_back(iv);
-                               generatePackOpScalarImplementationBody(
-                                   *this, bodyBuilder, bodyLoc, ivVec);
-                               bodyBuilder.create<scf::YieldOp>(bodyLoc);
-                             });
+  builder.create<scf::ForOp>(
+      loc, zero,
+      getValueOrCreateConstantIndexOp(builder, loc, outputShape[0].back()), one,
+      ValueRange{},
+      [&](OpBuilder &bodyBuilder, Location bodyLoc, Value iv,
+          ValueRange regionIterArgs) {
+        ivVec.push_back(iv);
+        generatePackOpScalarImplementationBody(*this, bodyBuilder, bodyLoc,
+                                               ivVec);
+        bodyBuilder.create<scf::YieldOp>(bodyLoc);
+      });
   return success();
 }
 
