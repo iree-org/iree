@@ -31,6 +31,7 @@ iree_lit_test_suite(
     "illegal_configuration.mlir"
     "lower_to_ukernel_ops.mlir"
     "materialize_aarch64_launch_configuration.mlir"
+    "materialize_configuration_without_distribution.mlir"
     "materialize_encoding.mlir"
     "materialize_riscv_launch_configuration.mlir"
     "materialize_vmvx_launch_configuration.mlir"
