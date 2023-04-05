@@ -272,7 +272,8 @@ Status PrepareModule(std::string target_backend,
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verify_passes_flag);
   if (failed(mlir::applyPassManagerCLOptions(pass_manager))) {
-    return iree_make_status(IREE_STATUS_INTERNAL, "could not apply CL options");
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "failed to apply pass manager CL options");
   }
   mlir::applyDefaultTimingPassManagerCLOptions(pass_manager);
   BuildDefaultIREEVMTransformPassPipeline(pass_manager);

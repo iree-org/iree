@@ -322,7 +322,7 @@ static LogicalResult canonicalizeModule(
 
   PassManager passManager(context);
   if (failed(mlir::applyPassManagerCLOptions(passManager))) {
-    return failure();
+    return moduleOp.emitError() << "Failed to apply pass manager CL options";
   }
   mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();

@@ -538,9 +538,10 @@ struct Invocation {
 Invocation::Invocation(Session &session)
     : session(session), passManager(&session.context) {
   if (session.globalInit.usesCommandLine) {
-    auto clOptResults = mlir::applyPassManagerCLOptions(passManager);
-    assert(clOptResults.succeeded() && "could not apply CL options");
-    (void)clOptResults;
+    if (failed(mlir::applyPassManagerCLOptions(passManager))) {
+      emitError(UnknownLoc::get(&session.context))
+          << "Failed to apply pass manager CL options";
+    }
     mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   }
   passManager.addInstrumentation(std::make_unique<PassTracing>());
