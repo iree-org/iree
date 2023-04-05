@@ -5,8 +5,24 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines the groups of models."""
 
-from e2e_test_framework.models import tf_models, tflite_models, torch_models
+from e2e_test_framework.models import tflite_models, torch_models
 
+# yapf: disable
+# Small models that require less computational resources.
+SMALL = [
+    tflite_models.DEEPLABV3_FP32,
+    tflite_models.EFFICIENTNET_INT8,
+    tflite_models.MOBILEBERT_FP16,
+    tflite_models.MOBILEBERT_FP32,
+    tflite_models.MOBILEBERT_INT8,
+    tflite_models.MOBILENET_V1,
+    tflite_models.MOBILENET_V2,
+    tflite_models.MOBILENET_V2_INT8,
+    tflite_models.MOBILENET_V3SMALL,
+    tflite_models.MOBILESSD_FP32,
+    tflite_models.PERSON_DETECT_INT8,
+    tflite_models.POSENET_FP32,
+    torch_models.EFFICIENTNET_V2_S_FP32_TORCH
 
 # A list of models with thread configurations.
 # Note `0` represents sync execution.
@@ -27,14 +43,9 @@ x86_64_MODELS_AND_THREADS = [
     (tflite_models.MOBILEBERT_FP16, [1, 8]),
     (tflite_models.MOBILEBERT_FP32, [1, 8]),
     (tflite_models.MOBILEBERT_INT8, [1, 8]),
-    (tf_models.EFFICIENTNET_V2_S_FP32, [1, 8]),
-    (tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, [1, 8]),
-    (tf_models.RESNET50_TF_FP32, [1, 8]),
     (torch_models.EFFICIENTNET_V2_S_FP32_TORCH, [1, 8]),
     # Large models.
     # TODO: These models should be running at 8, 13, 28 threads but we use 8 for now until new hardware becomes available.
-    (tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512, [8]),
-    (tf_models.BERT_LARGE_TF_FP32_SEQLEN384, [8]),
     (torch_models.EFFICIENTNET_B7_FP32_TORCH, [8]),
 ]
 
@@ -53,14 +64,11 @@ x86_64_MODELS_AND_THREADS_EXPERIMENTAL = [
     # Medium models.
     (tflite_models.MOBILEBERT_FP32, [8]),
     (tflite_models.MOBILEBERT_INT8, [8]),
-    (tf_models.EFFICIENTNET_V2_S_FP32, [8]),
-    (tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, [8]),
     # Disabled due to https://github.com/openxla/iree/issues/11174.
     # (tf_models.RESNET50_TF_FP32, [8]),
     # Disabled due to https://github.com/openxla/iree/issues/12772.
     # (torch_models.EFFICIENTNET_V2_S_FP32_TORCH, [8]),
     # Large models.
-    (tf_models.BERT_LARGE_TF_FP32_SEQLEN384, [8]),
     # Disabled due to https://github.com/openxla/iree/issues/12772.
     # (torch_models.EFFICIENTNET_B7_FP32_TORCH, [8]),
 ]
