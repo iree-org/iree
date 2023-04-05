@@ -85,7 +85,9 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
 
-    # Default threshold for all x86_64 benchmarks: 10%.
+    # Default threshold for all ARM64/X86_64 benchmarks: 10%.
+    BenchmarkThreshold(re.compile(r".*CPU-ARM.*"), 10,
+                       ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(re.compile(r".*x86_64.*"), 10, ThresholdUnit.PERCENTAGE),
     # Default threshold for all benchmarks: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
