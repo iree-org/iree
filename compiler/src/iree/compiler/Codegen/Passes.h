@@ -43,13 +43,17 @@ LogicalResult verifyLoweringConfiguration(
 void addIREEPostBufferizationPasses(OpPassManager &passManager);
 
 using bufferization::BufferizationOptions;
+// TODO(#12933): Because of regressions in CUDA backend, there is an
+// option to keep a legacy mode of not representing the offset in the
+// type. Remove once the bug is fixed.
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
+    bool embedSubspanOffsetIntoMemRefType = true);
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -58,8 +62,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 /// Pass to bufferize dispatches that are copying from one interface to
 /// another. This will create a `linalg.generic` op which is a copy that can
 /// then be used by backends to handle appropriately.
-std::unique_ptr<OperationPass<ModuleOp>>
-createBufferizeCopyOnlyDispatchesPass();
+// TODO(#12933): Because of regressions in CUDA backend, there is an
+// option to keep a legacy mode of not representing the offset in the
+// type. Remove once the bug is fixed.
+std::unique_ptr<OperationPass<ModuleOp>> createBufferizeCopyOnlyDispatchesPass(
+    bool embedSubspanOffsetIntoMemRefType = true);
 
 // Decomposes linalg generics on tensors into generics containing no more than
 // one op in the body.
@@ -110,12 +117,16 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 /// is specified, the default allocator generates an `std.alloc` instruction
 /// with the allocated MemRefType having no stride map (i.e. default row-major
 /// striding) and default memory space.
+// TODO(#12933): Because of regressions in CUDA backend, there is an
+// option to keep a legacy mode of not representing the offset in the
+// type. Remove once the bug is fixed.
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
+    bool embedSubspanOffsetIntoMemRefType = true);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();

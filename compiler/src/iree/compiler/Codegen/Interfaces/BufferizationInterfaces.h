@@ -14,6 +14,14 @@
 namespace mlir {
 namespace iree_compiler {
 
+struct IREEOneShotBufferizationOptions
+    : public mlir::bufferization::OneShotBufferizationOptions {
+  // TODO(#12933): Because of regressions in CUDA backend, there is an
+  // option to keep a legacy mode of not representing the offset in the
+  // type. Remove once the bug is fixed.
+  bool embedSubspanOffsetIntoMemRefType = true;
+};
+
 // Register all interfaces needed for bufferization.
 void registerBufferizationInterfaces(DialectRegistry &registry);
 
