@@ -12,7 +12,8 @@
 
 static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
-  IREE_UK_ASSERT(!(params->flags & ~IREE_UK_FLAG_ACCUMULATE));
+  IREE_UK_ASSERT(!(params->flags & ~(IREE_UK_FLAG_ACCUMULATE |
+                                     IREE_UK_FLAG_MMT4D_FRACTAL_EXPERIMENTAL)));
   IREE_UK_ASSERT(params->type == iree_uk_mmt4d_type_f32f32f32 ||
                  params->type == iree_uk_mmt4d_type_i8i8i32);
   // Some implementations may wish to avoid supporting absurdly wide types. For
@@ -31,7 +32,46 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
   IREE_UK_ASSERT(params->M0 * params->N0 *
                      iree_uk_type_size(iree_uk_mmt4d_out_type(params->type)) <=
                  iree_uk_mmt4d_tile_generic_max_bytes);
+  // Fractal traversal currently supports only special cases with power-of-two
+  // shapes.
+  if (params->flags & IREE_UK_FLAG_MMT4D_FRACTAL_EXPERIMENTAL) {
+    IREE_UK_ASSERT(iree_uk_is_po2_u32(params->M));
+    IREE_UK_ASSERT(iree_uk_is_po2_u32(params->N));
+  }
 #endif  // IREE_UK_ENABLE_ASSERTS
+}
+
+static void iree_uk_mmt4d_fractal_z_curve(int index, int* x, int* y) {
+  iree_uk_uint32_t n1 = index;
+  iree_uk_uint32_t n2 = (n1 & 0x99999999u) | ((n1 & 0x44444444u) >> 1) |
+                        ((n1 & 0x22222222u) << 1);
+  iree_uk_uint32_t n4 = (n2 & 0xc3c3c3c3u) | ((n2 & 0x30303030u) >> 2) |
+                        ((n2 & 0x0c0c0c0cu) << 2);
+  iree_uk_uint32_t n8 = (n4 & 0xf00ff00fu) | ((n4 & 0x0f000f00u) >> 4) |
+                        ((n4 & 0x00f000f0u) << 4);
+  iree_uk_uint32_t n16 = (n8 & 0xff0000ffu) | ((n8 & 0x00ff0000u) >> 8) |
+                         ((n8 & 0x0000ff00u) << 8);
+  *x = n16 & 0xffff;
+  *y = n16 >> 16;
+}
+
+static void iree_uk_mmt4d_fractal_u_curve(int index, int* x, int* y) {
+  iree_uk_mmt4d_fractal_z_curve(index, x, y);
+  *x ^= *y;
+}
+
+static void iree_uk_mmt4d_fractal_rectangular(int index,
+                                              int x_rectangularness_log2,
+                                              int y_rectangularness_log2,
+                                              int* x, int* y) {
+  int square_index = index >> (x_rectangularness_log2 + y_rectangularness_log2);
+  int square_x, square_y;
+  iree_uk_mmt4d_fractal_u_curve(square_index, &square_x, &square_y);
+  int rectangular_x = index & ((1 << x_rectangularness_log2) - 1);
+  int rectangular_y =
+      (index >> x_rectangularness_log2) & ((1 << y_rectangularness_log2) - 1);
+  *x = (square_x << x_rectangularness_log2) + rectangular_x;
+  *y = (square_y << y_rectangularness_log2) + rectangular_y;
 }
 
 // General mmt4d implementation, shared among all cases. The idea is that the
@@ -52,22 +92,45 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
   const iree_uk_int16_t lhs_elem_size_log2 = iree_uk_type_size_log2(lhs_type);
   const iree_uk_int16_t rhs_elem_size_log2 = iree_uk_type_size_log2(rhs_type);
   const iree_uk_int16_t out_elem_size_log2 = iree_uk_type_size_log2(out_type);
-  char* out_tile_row = params->out_buffer;
-  const char* lhs_panel = params->lhs_buffer;
   iree_uk_int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
   iree_uk_ssize_t lhs_panel_stride = params->lhs_stride << lhs_elem_size_log2;
   iree_uk_ssize_t rhs_panel_stride = params->rhs_stride << rhs_elem_size_log2;
   iree_uk_ssize_t out_stride = params->out_stride << out_elem_size_log2;
-  for (iree_uk_int32_t i = 0; i < M; ++i) {
-    char* out_tile = out_tile_row;
-    const char* rhs_panel = params->rhs_buffer;
-    for (iree_uk_int32_t j = 0; j < N; ++j) {
+  if (params->flags & IREE_UK_FLAG_MMT4D_FRACTAL_EXPERIMENTAL) {
+    // Validation has already asserted that M, N are powers of two.
+    int M_log2 = iree_uk_po2_log2_u32(M);
+    int N_log2 = iree_uk_po2_log2_u32(N);
+    int square_size_log2 = iree_uk_ssize_min(M_log2, N_log2);
+    int M_rectangularness_log2 = M_log2 - square_size_log2;
+    int N_rectangularness_log2 = N_log2 - square_size_log2;
+    int num_tiles = 1 << (M_log2 + N_log2);
+    for (int tile_index = 0; tile_index < num_tiles; ++tile_index) {
+      int tile_m, tile_n;
+      iree_uk_mmt4d_fractal_rectangular(tile_index, M_rectangularness_log2,
+                                        N_rectangularness_log2, &tile_m,
+                                        &tile_n);
+      const char* lhs_panel =
+          ((const char*)params->lhs_buffer) + tile_m * lhs_panel_stride;
+      const char* rhs_panel =
+          ((const char*)params->rhs_buffer) + tile_n * rhs_panel_stride;
+      char* out_tile = ((char*)params->out_buffer) + tile_m * out_stride +
+                       tile_n * out_tile_size;
       tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
-      out_tile += out_tile_size;
-      rhs_panel += rhs_panel_stride;
     }
-    out_tile_row += out_stride;
-    lhs_panel += lhs_panel_stride;
+  } else {
+    char* out_tile_row = params->out_buffer;
+    const char* lhs_panel = params->lhs_buffer;
+    for (iree_uk_int32_t i = 0; i < M; ++i) {
+      char* out_tile = out_tile_row;
+      const char* rhs_panel = params->rhs_buffer;
+      for (iree_uk_int32_t j = 0; j < N; ++j) {
+        tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
+        out_tile += out_tile_size;
+        rhs_panel += rhs_panel_stride;
+      }
+      out_tile_row += out_stride;
+      lhs_panel += lhs_panel_stride;
+    }
   }
 }
 

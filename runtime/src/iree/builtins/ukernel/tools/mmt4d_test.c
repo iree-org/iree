@@ -145,6 +145,10 @@ static void iree_uk_test_mmt4d_for_shape_params(
   free(rhs_buffer);
 }
 
+static iree_uk_uint32_t iree_uk_round_to_next_po2(iree_uk_uint32_t i) {
+  return 1u << iree_uk_ceil_log2_u32(i);
+}
+
 static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
                                                const void* src_params) {
   typedef struct shape_mnk_t {
@@ -179,23 +183,39 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
     params.M = shape.m;
     params.N = shape.n;
     params.K = shape.k;
+    if (params.flags & IREE_UK_FLAG_MMT4D_FRACTAL_EXPERIMENTAL) {
+      params.M = iree_uk_round_to_next_po2(params.M);
+      params.N = iree_uk_round_to_next_po2(params.N);
+    }
     for (int accumulate = 0; accumulate <= 1; ++accumulate) {
-      params.flags = accumulate ? IREE_UK_FLAG_ACCUMULATE : 0;
+      if (accumulate) {
+        params.flags |= IREE_UK_FLAG_ACCUMULATE;
+      }
       iree_uk_test_mmt4d_for_shape_params(test, &params);
     }
   }
 }
 
-static void iree_uk_test_mmt4d(iree_uk_mmt4d_type_t type, int M0, int N0,
-                               int K0, const char* cpu_features) {
-  iree_uk_mmt4d_params_t params = {.type = type, .M0 = M0, .N0 = N0, .K0 = K0};
+static void iree_uk_test_mmt4d_with_extra_flags(iree_uk_mmt4d_type_t type,
+                                                int M0, int N0, int K0,
+                                                iree_uk_uint32_t extra_flags,
+                                                const char* cpu_features) {
+  iree_uk_mmt4d_params_t params = {
+      .type = type, .M0 = M0, .N0 = N0, .K0 = K0, .flags = extra_flags};
   char types_str[32];
   iree_uk_type_triple_str(types_str, sizeof types_str, type);
   char test_label_str[256];
-  snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%dx%d",
-           types_str, M0, N0, K0);
+  const char* extra_flags_str =
+      (extra_flags & IREE_UK_FLAG_MMT4D_FRACTAL_EXPERIMENTAL) ? " fractal" : "";
+  snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%dx%d%s",
+           types_str, M0, N0, K0, extra_flags_str);
   iree_uk_test(test_label_str, iree_uk_test_mmt4d_for_tile_params, &params,
                cpu_features);
+}
+
+static void iree_uk_test_mmt4d(iree_uk_mmt4d_type_t type, int M0, int N0,
+                               int K0, const char* cpu_features) {
+  iree_uk_test_mmt4d_with_extra_flags(type, M0, N0, K0, 0, cpu_features);
 }
 
 int main(int argc, char** argv) {
@@ -204,6 +224,16 @@ int main(int argc, char** argv) {
   // in a power-of-two assumption
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 3, 5, 7, NULL);
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 9, 6, 3, NULL);
+
+  // Test experimental fractal traversal. Orthogonal to inner tile func so no
+  // need to test that in architecture-specific cases below. Note: currently
+  // requires power-of-two sizes.
+  iree_uk_test_mmt4d_with_extra_flags(iree_uk_mmt4d_type_f32f32f32, 8, 4, 2,
+                                      IREE_UK_FLAG_MMT4D_FRACTAL_EXPERIMENTAL,
+                                      NULL);
+  iree_uk_test_mmt4d_with_extra_flags(iree_uk_mmt4d_type_i8i8i32, 4, 16, 1,
+                                      IREE_UK_FLAG_MMT4D_FRACTAL_EXPERIMENTAL,
+                                      NULL);
 
 #if defined(IREE_UK_ARCH_ARM_64)
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);

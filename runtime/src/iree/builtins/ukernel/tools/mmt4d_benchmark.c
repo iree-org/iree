@@ -26,6 +26,8 @@ IREE_FLAG(
 IREE_FLAG(bool, accumulate, false,
           "Whether the kernel should accumulate into the existing accumulator "
           "tile values, or zero the accumulator tile.");
+IREE_FLAG(bool, fractal_experimental, false,
+          "Enable experimental fractal cache-friendly traversal.");
 
 static iree_status_t iree_uk_benchmark_mmt4d(
     const iree_benchmark_def_t* benchmark_def,
@@ -36,7 +38,9 @@ static iree_status_t iree_uk_benchmark_mmt4d(
   iree_uk_mmt4d_params_t params;
   memcpy(&params, src_params, sizeof params);
   params.cpu_data = iree_uk_benchmark_cpu_data(user_data);
-  params.flags = FLAG_accumulate ? IREE_UK_FLAG_ACCUMULATE : 0;
+  params.flags =
+      (FLAG_accumulate ? IREE_UK_FLAG_ACCUMULATE : 0) |
+      (FLAG_fractal_experimental ? IREE_UK_FLAG_MMT4D_FRACTAL_EXPERIMENTAL : 0);
   params.M = FLAG_m_size;
   params.N = FLAG_n_size;
   params.K = FLAG_k_size;
