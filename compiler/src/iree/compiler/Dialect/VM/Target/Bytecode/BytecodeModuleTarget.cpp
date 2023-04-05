@@ -209,7 +209,9 @@ static LogicalResult canonicalizeModule(
   }
 
   PassManager passManager(context);
-  mlir::applyPassManagerCLOptions(passManager);
+  if (failed(mlir::applyPassManagerCLOptions(passManager))) {
+    return failure();
+  }
   mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
