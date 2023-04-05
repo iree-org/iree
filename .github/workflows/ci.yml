@@ -335,7 +335,6 @@ jobs:
           IREE_WRITE_REMOTE_CCACHE: 0
           IREE_READ_LOCAL_CCACHE: 1
           IREE_WRITE_LOCAL_CCACHE: 1 # DO NOT SUBMIT
-          CCACHE_DIR:
           # Cache size and compression level settings are a delicate balance.
           # * A full build cache is around 2-5GB depending on compression level
           # * Upload/download is slow (double compression may or may not help)
