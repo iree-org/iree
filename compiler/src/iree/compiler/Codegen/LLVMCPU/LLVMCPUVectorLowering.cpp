@@ -6,8 +6,6 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "mlir/Dialect/Affine/LoopUtils.h"
-#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
