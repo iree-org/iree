@@ -20,23 +20,30 @@ def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Indicates that the entire module should be converted
-  to the LLVM dialect. This is expected to be the last transformation in
-  a sequence.}];
+  let description = [{
+    Indicates that the entire targeted module should be converted
+    to the LLVM dialect. This is expected to be the last transformation in
+    a sequence.
+
+    #### Return modes
+
+    This operation consumes the `target` handle and produces the `transformed`
+    handle.
+  }];
 
   let arguments =
-    (ins DefaultValuedAttr<BoolAttr, "false">:$reassociate_fp_reductions,
+    (ins TransformHandleTypeInterface:$target,
+     DefaultValuedAttr<BoolAttr, "false">:$reassociate_fp_reductions,
      DefaultValuedAttr<BoolAttr, "false">:$enable_index_optimizations,
      DefaultValuedAttr<BoolAttr, "false">:$enable_arm_neon,
      DefaultValuedAttr<BoolAttr, "false">:$enable_arm_sve,
      DefaultValuedAttr<BoolAttr, "false">:$enable_amx,
      DefaultValuedAttr<BoolAttr, "false">:$enable_x86vector,
      DefaultValuedAttr<BoolAttr, "false">:$enable_async);
-
-  let assemblyFormat = "attr-dict";
+  let results = (outs TransformHandleTypeInterface:$transformed);
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::transform_ext";
 }
-
 
 def RegisterMatchCallbacksOp :
     Op<Transform_Dialect, "iree.register_match_callbacks",

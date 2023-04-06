@@ -271,7 +271,10 @@ Status PrepareModule(std::string target_backend,
   printf("Compiling for target backend '%s'...\n", target_backend.c_str());
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verify_passes_flag);
-  mlir::applyPassManagerCLOptions(pass_manager);
+  if (failed(mlir::applyPassManagerCLOptions(pass_manager))) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "failed to apply pass manager CL options");
+  }
   mlir::applyDefaultTimingPassManagerCLOptions(pass_manager);
   BuildDefaultIREEVMTransformPassPipeline(pass_manager);
   if (failed(pass_manager.run(mlir_module.get()))) {
