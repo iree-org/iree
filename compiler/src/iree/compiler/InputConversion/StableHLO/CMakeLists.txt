@@ -40,6 +40,8 @@ iree_cc_library(
     StableHLO
   HDRS
     "LegalizeToLinalgUtils.h"
+    "MapStableHLOToScalarOp.h"
+    "Passes.h"
   SRCS
     "LegalizeToLinalgUtils.cpp"
     "Passes.cpp"
@@ -53,22 +55,27 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRArithDialect
+    MLIRBufferizationDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
+    MLIRFuncTransforms
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMLProgramDialect
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRPass
     MLIRReconcileUnrealizedCasts
+    MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRShapeDialect
     MLIRShapeOpsTransforms
     MLIRShapeToStandard
+    MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
