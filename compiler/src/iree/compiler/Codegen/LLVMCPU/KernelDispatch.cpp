@@ -50,8 +50,14 @@ static llvm::cl::opt<int> clNativeVectorSizeInBytes(
 
 static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     "iree-codegen-llvm-number-of-threads",
-    llvm::cl::desc("number of threads that are used at runtime"),
+    llvm::cl::desc("number of threads that are used at runtime if codegen "
+                   "thread distribution is enabled"),
     llvm::cl::init(8));
+
+static llvm::cl::opt<bool> clDisableDistribution(
+    "iree-codegen-llvm-disable-distribution",
+    llvm::cl::desc("disable thread distribution in codegen"),
+    llvm::cl::init(true));
 
 static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
     "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
@@ -358,7 +364,14 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   assert(lbs.size() == ubs.size() && lbs.size() == minTileSizes.size() &&
          lbs.size() == maxTileSizes.size() &&
          "expected all vectors to be of equal size");
+
   size_t numDims = lbs.size();
+  // Set all the distribution tile sizes to zero if thread distribution is
+  // disabled.
+  if (!clDisableDistribution) {
+    return SmallVector<int64_t>(numDims, 0);
+  }
+
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> numWorkgroupsPerDim(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
@@ -1093,6 +1106,12 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
     TilingInterface op) {
   unsigned numLoops = op.getLoopIteratorTypes().size();
+  // Set all the distribution tile sizes to zero if thread distribution is
+  // disabled.
+  if (!clDisableDistribution) {
+    return SmallVector<int64_t>(numLoops, 0);
+  }
+
   auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
                               .getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t> workgroupTileSizes(numLoops, defaultWorkgroupTileSize);
