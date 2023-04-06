@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "llvm/Support/CommandLine.h"
@@ -24,60 +23,6 @@
 namespace mlir {
 namespace iree_compiler {
 namespace {
-
-/// Returns the op that contains lowering config. Checks whether the provided op
-/// contains the lowering config and returns it. Otherwise, tries to find the
-/// lowering config across the function. If there are multiple ops with the same
-/// lowering configs, returns the first one found. Returns failure if there are
-/// multiple op with different lowering config.
-/// TODO(hanchung): Define root op and refactor the method to Utils.
-static FailureOr<Operation *> getRootOp(Operation *op) {
-  // Check for self first.
-  if (iree_compiler::getLoweringConfig(op)) {
-    return op;
-  }
-
-  // Get the function op.
-  auto funcOp = dyn_cast<func::FuncOp>(op);
-  if (!funcOp) {
-    funcOp = op->getParentOfType<func::FuncOp>();
-  }
-
-  assert(funcOp && "Missing funcOp");
-
-  Operation *rootOp = nullptr;
-  mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr rootLoweringConfig;
-  auto result = funcOp.walk([&](Operation *op) -> WalkResult {
-    auto loweringConfig = iree_compiler::getLoweringConfig(op);
-    if (!loweringConfig) {
-      return WalkResult::advance();
-    }
-    if (rootLoweringConfig) {
-      if (rootLoweringConfig != loweringConfig) {
-        return WalkResult::interrupt();
-      }
-    } else {
-      rootOp = op;
-      rootLoweringConfig = loweringConfig;
-    }
-    return WalkResult::advance();
-  });
-
-  if (!rootOp || result.wasInterrupted()) {
-    return failure();
-  }
-  return rootOp;
-}
-
-static FailureOr<SmallVector<int64_t>> getTilingSizesFromConfig(
-    func::FuncOp funcOp, int64_t tilingLevel) {
-  if (tilingLevel == -1) return failure();
-
-  FailureOr<Operation *> rootOp = getRootOp(funcOp);
-  if (failed(rootOp)) return failure();
-
-  return getTileSizes(rootOp.value(), tilingLevel);
-}
 
 /// Starting from `op` walk all operands backwards to find all
 /// potentially fusable operations, i.e. operations that implement
@@ -215,14 +160,16 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   LLVM_DEBUG(llvm::dbgs() << "consumerOp: " << consumerOp << "\n");
   LLVM_DEBUG(llvm::dbgs() << "tilingLevel: " << tilingLevel << "\n");
 
-  auto maybeTilingSizes = getTilingSizesFromConfig(funcOp, tilingLevel);
-  if (failed(maybeTilingSizes)) {
-    LLVM_DEBUG(llvm::dbgs() << "----- failed to get tiling sizes -----\n");
+  FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+      getLoweringConfig(getComputeOps(funcOp));
+  if (failed(maybeLoweringConfig)) {
+    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip TileAndFuse");
     return;
   }
 
   int numLoops = consumerOp.getLoopIteratorTypes().size();
-  SmallVector<int64_t> tilingSizes = maybeTilingSizes.value();
+  SmallVector<int64_t> tilingSizes =
+      maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
   if (numLoops > tilingSizes.size()) {
     tilingSizes.append(numLoops - tilingSizes.size(), 0);
   }

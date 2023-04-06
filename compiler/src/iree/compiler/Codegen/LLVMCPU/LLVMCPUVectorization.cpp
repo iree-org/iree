@@ -29,8 +29,6 @@ namespace {
 /// lowering config across the function. If there are multiple ops with the same
 /// lowering configs, returns the first one found. Returns failure if there are
 /// multiple op with different lowering config.
-/// TODO(hanchung): This is copied from LinalgTensorCodegenDriver.cpp. We should
-/// refactor it to Utils.h.
 static FailureOr<Operation *> getRootOp(Operation *op) {
   // Check for self first.
   if (iree_compiler::getLoweringConfig(op)) {
