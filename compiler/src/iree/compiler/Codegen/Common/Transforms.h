@@ -21,7 +21,8 @@ namespace iree_compiler {
 
 /// Eliminates tensor.empty ops to avoid buffer allocations.
 LogicalResult eliminateEmptyTensors(
-    Operation *op, const bufferization::OneShotBufferizationOptions &options);
+    RewriterBase &rewriter, Operation *op,
+    const bufferization::OneShotBufferizationOptions &options);
 
 /// Bufferizes the given op with One-Shot Bufferize.
 LogicalResult runIREEOneShotBufferize(

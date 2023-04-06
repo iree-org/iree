@@ -90,6 +90,7 @@ iree_cc_library(
     "ConcretizePadResultShape.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DecomposeAffineOpsPass.cpp"
+    "DecomposePackUnPackOps.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "FixupSubspanWithOffsets.cpp"
     "FlattenMemRefSubspanPass.cpp"
@@ -111,7 +112,6 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
     "TypePropagationPass.cpp"
-    "VectorizePackUnPackOps.cpp"
     "VectorizePad.cpp"
     "WorkgroupSpecializationPass.cpp"
   DEPS

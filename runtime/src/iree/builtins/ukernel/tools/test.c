@@ -22,7 +22,7 @@ typedef enum {
 
 struct iree_uk_test_t {
   const char* name;
-  const iree_uk_cpu_features_list_t* cpu_features;
+  const char* cpu_features;
   iree_uk_uint64_t cpu_data[IREE_CPU_DATA_FIELD_COUNT];
   iree_time_t time_start;
   iree_uk_random_engine_t random_engine;
@@ -59,18 +59,7 @@ static void iree_uk_test_log_status(const iree_uk_test_t* test,
                                     iree_uk_test_status_t status) {
   fprintf(stderr, "%s %s", iree_uk_test_status_header(status), test->name);
   if (test->cpu_features) {
-    fprintf(stderr, ", cpu_features:");
-    const char* cpu_features_name =
-        iree_uk_cpu_features_list_get_name(test->cpu_features);
-    if (cpu_features_name) {
-      fprintf(stderr, "%s", cpu_features_name);
-    } else {
-      for (int i = 0; i < iree_uk_cpu_features_list_size(test->cpu_features);
-           ++i) {
-        fprintf(stderr, "%s%s", i ? "," : "",
-                iree_uk_cpu_features_list_entry(test->cpu_features, i));
-      }
-    }
+    fprintf(stderr, ", cpu_features:%s", test->cpu_features);
   }
   if (status != IREE_UK_TEST_STATUS_RUN) {
     fprintf(stderr, " (%" PRIi64 " ms)",
@@ -91,8 +80,7 @@ static void iree_uk_test_log_error(const iree_uk_test_t* test,
 
 void iree_uk_test(const char* name,
                   void (*test_func)(iree_uk_test_t*, const void*),
-                  const void* params,
-                  const iree_uk_cpu_features_list_t* cpu_features) {
+                  const void* params, const char* cpu_features) {
   iree_uk_test_t test = {
       .name = name,
       .cpu_features = cpu_features,
@@ -123,7 +111,7 @@ void iree_uk_test(const char* name,
       skipped = true;
       char msg[128];
       snprintf(msg, sizeof msg, "CPU does not support required feature %s",
-               iree_uk_cpu_first_unsupported_feature(cpu_features));
+               iree_uk_cpu_first_unsupported_feature(test.cpu_data));
       iree_uk_test_log_info(&test, "🦕", msg);
     }
   }

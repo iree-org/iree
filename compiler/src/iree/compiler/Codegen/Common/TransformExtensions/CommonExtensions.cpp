@@ -31,7 +31,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -39,6 +39,7 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
@@ -85,16 +86,15 @@ static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
 
 // Track temporary allocations that are never read from. If this is the case
 // it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(Operation *parentOp) {
+static void eraseDeadAllocAndStores(RewriterBase &rewriter,
+                                    Operation *parentOp) {
   std::vector<Operation *> opToErase;
   parentOp->walk([&](memref::AllocOp op) {
     if (allUsesAreStores(op, opToErase)) {
       opToErase.push_back(op.getOperation());
     }
   });
-  for (Operation *op : opToErase) {
-    op->erase();
-  }
+  for (Operation *op : opToErase) rewriter.eraseOp(op);
 }
 
 //===---------------------------------------------------------------------===//
@@ -105,10 +105,12 @@ transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
-  vector::transferOpflowOpt(target);
-  eraseDeadAllocAndStores(target);
-
-  return DiagnosedSilenceableFailure::success();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  vector::transferOpflowOpt(rewriter, target);
+  eraseDeadAllocAndStores(rewriter, target);
+  return listener.check(target->getLoc());
 }
 
 void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
@@ -148,9 +150,11 @@ void transform_dialect::ApplyPatternsOp::build(
               getEraseUnnecessaryTensorOperandsAttrName)
   ADD_PATTERN(expandMemrefStridedMetadata,
               getExpandMemrefStridedMetadataAttrName)
+  ADD_PATTERN(extractAddressComputations, getExtractAddressComputationsAttrName)
   ADD_PATTERN(foldMemrefAliases, getFoldMemrefAliasesAttrName)
   ADD_PATTERN(foldReassociativeReshapes, getFoldReassociativeReshapesAttrName)
   ADD_PATTERN(foldTensorEmptyExtract, getFoldTensorEmptyExtractAttrName)
+  ADD_PATTERN(foldTensorSubsets, getFoldTensorSubsetsAttrName)
   ADD_PATTERN(licm, getLicmAttrName)
   ADD_PATTERN(linalgElementwiseGreedyFusion,
               getLinalgElementwiseGreedyFusionAttrName)
@@ -245,6 +249,10 @@ static void addLowerVectorMasksPatterns(RewritePatternSet &patterns) {
   vector::populateVectorMaskLoweringPatternsForSideEffectingOps(patterns);
 }
 
+static void addExtractAddressComputationsPatterns(RewritePatternSet &patterns) {
+  memref::populateExtractAddressComputationsPatterns(patterns);
+}
+
 static void addFoldMemrefAliasPatterns(RewritePatternSet &patterns) {
   memref::populateFoldMemRefAliasOpPatterns(patterns);
 }
@@ -255,6 +263,10 @@ static void addFoldTensorEmptyExtract(RewritePatternSet &patterns) {
 
 static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
+}
+
+static void addFoldTensorSubsetsPatterns(RewritePatternSet &patterns) {
+  tensor::populateFoldTensorSubsetOpPatterns(patterns);
 }
 
 static void addEraseUnnecessaryTensorOperandsPatterns(
@@ -365,9 +377,12 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getExpandMemrefStridedMetadata())
     memref::populateExpandStridedMetadataPatterns(patterns);
+  if (getExtractAddressComputations())
+    addExtractAddressComputationsPatterns(patterns);
   if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
   if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
   if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
+  if (getFoldTensorSubsets()) addFoldTensorSubsetsPatterns(patterns);
   if (getLinalgElementwiseGreedyFusion())
     linalg::populateElementwiseOpsFusionPatterns(patterns,
                                                  setFusedOpOperandLimit<3>);
@@ -385,6 +400,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     addUnrollVectorsGpuMmaSyncPatterns(patterns);
   if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
 
+  Location loc = target->getLoc();
   TrackingListener listener(state);
   GreedyRewriteConfig config;
   config.listener = &listener;
@@ -397,11 +413,12 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   LogicalResult result =
       applyOpPatternsAndFold(ops, std::move(patterns), config);
   if (failed(result)) {
-    return mlir::emitDefiniteFailure(target, "greedy patterns failed");
+    return listener.check(
+        loc, mlir::emitDefiniteFailure(target, "greedy patterns failed"));
   }
-  LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(listenerResult))
-    return mlir::emitDefiniteFailure(target, "pattern listener tracker fail");
+
+  auto diag = listener.check(loc);
+  if (!diag.succeeded()) return diag;
 
   if (getLicm()) {
     target->walk([&](func::FuncOp funcOp) {
@@ -432,8 +449,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
       result =
           eliminateCommonSubexpressions(funcOp, /*domInfo=*/nullptr, &listener);
       if (failed(result)) return WalkResult::interrupt();
-      listenerResult = listener.checkErrorState();
-      if (failed(listenerResult)) return WalkResult::interrupt();
+      if (failed(listener.checkErrorState())) return WalkResult::interrupt();
       return WalkResult::advance();
     });
     if (walkResult.wasInterrupted()) {
@@ -441,14 +457,13 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
         return mlir::emitDefiniteFailure(lastFuncVisited,
                                          "greedy patterns failed");
       }
-      LogicalResult listenerResult = listener.checkErrorState();
-      if (failed(listenerResult))
+      if (failed(listener.checkErrorState()))
         return mlir::emitDefiniteFailure(lastFuncVisited,
                                          "pattern listener tracker fail");
     }
   }
 
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 void transform_dialect::ApplyPatternsOp::getEffects(
@@ -462,12 +477,15 @@ void transform_dialect::ApplyPatternsOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
-    func::FuncOp funcOp, transform::ApplyToEachResultList &results,
+    func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  IRRewriter rewriter(funcOp->getContext());
+  Location loc = target->getLoc();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
-      rewriter, funcOp);
-  return DiagnosedSilenceableFailure::success();
+      rewriter, target);
+  return listener.check(loc);
 }
 
 void transform_dialect::HoistStaticAllocOp::getEffects(
@@ -554,7 +572,7 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
 /// operands. Assumes the HAL::ExecutableExportOp is built with an empty
 /// region.
 static LogicalResult populateWorkgroupCountComputingRegion(
-    PatternRewriter &rewriter, scf::ForallOp forallOp,
+    RewriterBase &rewriter, scf::ForallOp forallOp,
     HAL::ExecutableExportOp exportOp) {
   Location loc = forallOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
@@ -587,9 +605,9 @@ static LogicalResult populateWorkgroupCountComputingRegion(
 // Patterns for ForallToWorkgroup rewrite.
 //===---------------------------------------------------------------------===//
 
-LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
-                                       IREE::HAL::ExecutableExportOp exportOp,
-                                       PatternRewriter &rewriter) {
+LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
+                                       scf::ForallOp forallOp,
+                                       IREE::HAL::ExecutableExportOp exportOp) {
   // Step 0. Target-specific verifications. There is no good place to anchor
   // those right now: the ForallOp is target-independent and the
   // transform op does not apply to individual ForallOp.
@@ -754,12 +772,17 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
         target, "could not find a unique topLevel scf.forall");
   }
 
-  SimplePatternRewriter rewriter(topLevelForallOp);
-  if (failed(rewriteForallToWorkgroup(topLevelForallOp, exportOp, rewriter))) {
-    return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
+  Location loc = target->getLoc();
+  IRRewriter rewriter(topLevelForallOp->getContext());
+  rewriter.setInsertionPoint(topLevelForallOp);
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp, exportOp))) {
+    return listener.check(loc, mlir::emitDefiniteFailure(
+                                   target, "rewriteForallToWorkgroup failed"));
   }
 
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 void transform_dialect::ForallToWorkgroupOp::getEffects(
@@ -1221,11 +1244,13 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
+  Operation *target = payload.front();
+  Location loc = target->getLoc();
+  TrackingListener listener(state);
   //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
   {
     RewritePatternSet patterns(getContext());
     patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
-    TrackingListener listener(state);
     GreedyRewriteConfig config;
     config.listener = &listener;
     // Manually gather list of ops because the other GreedyPatternRewriteDriver
@@ -1238,12 +1263,15 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
         applyOpPatternsAndFold(ops, std::move(patterns), config);
     LogicalResult listenerResult = listener.checkErrorState();
     if (failed(result)) {
-      return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                       "greedy pattern application failed");
+      return listener.check(
+          loc, mlir::emitDefiniteFailure(state.getTopLevel(),
+                                         "greedy pattern application failed"));
     }
-    if (failed(listenerResult))
-      return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                       "listener tracking failed");
+    if (failed(listenerResult)) {
+      return listener.check(
+          loc, mlir::emitDefiniteFailure(state.getTopLevel(),
+                                         "listener tracking failed"));
+    }
   }
 
   //   2. Run one-shot-bufferize, without the pass baggage.
@@ -1254,12 +1282,12 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
   if (failed(runIREEOneShotBufferize(state.getTopLevel(), options)))
-    return DiagnosedSilenceableFailure::definiteFailure();
+    return listener.check(loc, emitDefaultDefiniteFailure(target));
 
   // Early exit if test_analysis_only is set.
   if (getTestAnalysisOnly()) {
     results.set(getOperation()->getOpResult(0), payload.front());
-    return DiagnosedSilenceableFailure::success();
+    return listener.check(loc);
   }
 
   //   3. Post-bufferization passes are fine.
@@ -1276,10 +1304,10 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return WalkResult::advance();
   });
   if (res.wasInterrupted())
-    return DiagnosedSilenceableFailure::definiteFailure();
+    return listener.check(loc, emitDefaultDefiniteFailure(target));
 
   results.set(getOperation()->getOpResult(0), payload.front());
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 //===---------------------------------------------------------------------===//
@@ -1291,11 +1319,16 @@ transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
     ::mlir::Operation *target,
     ::mlir::transform::ApplyToEachResultList &results,
     ::mlir::transform::TransformState &state) {
-  if (failed(eliminateEmptyTensors(target, getBufferizationOptions()))) {
+  Location loc = target->getLoc();
+  IRRewriter rewriter(target->getContext());
+  TrackingListener listener(state);
+  rewriter.setListener(&listener);
+  if (failed(
+          eliminateEmptyTensors(rewriter, target, getBufferizationOptions()))) {
     getOperation()->emitError() << "failed to eliminate tensor.empty ops";
-    return DiagnosedSilenceableFailure::definiteFailure();
+    return listener.check(loc, emitDefaultDefiniteFailure(target));
   }
-  return DiagnosedSilenceableFailure::success();
+  return listener.check(loc);
 }
 
 void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
@@ -1332,6 +1365,178 @@ void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp
+//===---------------------------------------------------------------------===//
+
+// Rewrite the workgroup count compute region based on the specified collapsed
+// dimensions on the output tensor. Only the dims that are expected to be tiled
+// and distributed are adjusted, thus considering only the output is sufficient.
+// TODO: This should be deprecated once workgroup count computation is
+// refactored based on slices.
+static LogicalResult adjustWorkgroupCountComputeRegionForImg2Col(
+    transform::TransformState &state, RewriterBase &rewriter, Location loc,
+    HAL::ExecutableExportOp exportOp, AffineMap outputMap,
+    tensor::CollapseShapeOp collapseOp) {
+  Region &r = exportOp.getWorkgroupCount();
+  if (!r.hasOneBlock()) {
+    return rewriter.notifyMatchFailure(exportOp,
+                                       "expected export op to have a workgroup "
+                                       "count region with a single block");
+  }
+  auto workgroupCountOps =
+      r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
+  if (!llvm::hasSingleElement(workgroupCountOps)) {
+    return rewriter.notifyMatchFailure(
+        exportOp,
+        "expected region to have a single "
+        "flow.dispatch.workgroup_count_from_dag_root op");
+  }
+  auto workgroupCountOp = *workgroupCountOps.begin();
+  auto workload = workgroupCountOp.getOperands();
+
+  // Extend the vector with workload values in range [l, r).
+  auto pushRange = [&](SmallVector<Value> &vec, int l, int r) {
+    for (; l < r; l++) vec.push_back(workload[l]);
+  };
+
+  SmallVector<unsigned> workloadDims;
+  for (AffineExpr result : outputMap.getResults()) {
+    workloadDims.push_back(result.cast<AffineDimExpr>().getPosition());
+  }
+  workloadDims.push_back(workload.size());
+  SmallVector<ReassociationIndices> dimCollapseMapping =
+      collapseOp.getReassociationIndices();
+
+  // Adjust the workgroup count computation. This happens by taking the product
+  // of workloads corresponding to groups of collapsed dims. For example,
+  //    workload = [w1, w2, w3, w4, w5, w6, w7, w8]
+  //    dimCollapseMapping = [[0], [1, 2], [3]]
+  //    workloadDims = [1, 3, 4, 5, (8)]
+  // will collapse to
+  //    newWorkload = [w1, w2, w3, w4 * w5, w6, w7, w8]
+  SmallVector<Value> newWorkload;
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+  loc = workgroupCountOp.getLoc();
+  for (auto indices : dimCollapseMapping) {
+    // If there is a single index we can just push the corresponding workload
+    // arg.
+    if (indices.size() == 1) {
+      int64_t index = indices[0];
+      pushRange(newWorkload, workloadDims[index], workloadDims[index + 1]);
+      continue;
+    }
+
+    assert(indices.size());
+    SmallVector<AffineExpr> syms(indices.size());
+    bindSymbolsList(rewriter.getContext(), MutableArrayRef<AffineExpr>{syms});
+    SmallVector<Value> originalSizes;
+    AffineExpr product = syms[0];
+    SmallVector<Value> skipped;
+    for (auto [enIndex, dimIndex] : llvm::enumerate(indices)) {
+      originalSizes.push_back(workload[workloadDims[dimIndex]]);
+      if (enIndex > 0) {
+        // Push any skipped workload values.
+        pushRange(skipped, workloadDims[dimIndex - 1] + 1,
+                  workloadDims[dimIndex]);
+        product = product * syms[enIndex];
+      }
+    }
+
+    // Make+push the collapsed workload value, followed by all values
+    // until the next dim affected by the collapse_shape op.
+    auto m = AffineMap::get(0, indices.size(), product);
+    Value collapsedIndex =
+        makeComposedAffineApply(rewriter, loc, m, originalSizes);
+    newWorkload.push_back(collapsedIndex);
+    newWorkload.append(skipped);
+    pushRange(newWorkload, workloadDims[indices.back()] + 1,
+              workloadDims[indices.back() + 1]);
+  }
+
+  rewriter.replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
+      workgroupCountOp, newWorkload);
+  return success();
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp::applyToOne(
+    linalg::LinalgOp target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  auto funcOp = target->getParentOfType<func::FuncOp>();
+
+  // Get the output map for the target operation before rewriting.
+  AffineMap outputMap = target.getIndexingMapsArray().back();
+
+  IRRewriter rewriter(target->getContext());
+  rewriter.setInsertionPoint(target);
+  // TODO: Extend this to other convolution cases by handling cases beyond
+  // collapse -> matmul -> expand from the patterns for 2D convolutions handled
+  // here.
+  auto maybeTransformed =
+      TypeSwitch<Operation *, FailureOr<std::pair<Operation *, Operation *>>>(
+          target)
+          .Case([&](linalg::Conv2DNhwcHwcfOp op) {
+            return rewriteInIm2Col(rewriter, op);
+          })
+          .Case([&](linalg::Conv2DNchwFchwOp op) {
+            return rewriteInIm2Col(rewriter, op);
+          })
+          .Default([&](Operation *op) {
+            return rewriter.notifyMatchFailure(op, "not supported");
+          });
+  if (failed(maybeTransformed)) return emitDefaultSilenceableFailure(target);
+
+  Operation *im2col = maybeTransformed->first;
+  Operation *convReplacement = maybeTransformed->second;
+
+  // Push handles for the im2col operation and the operation that replaces the
+  // original convolution.
+  results.push_back(im2col);
+  // Handle to the operation that replaces the original convolution.
+  results.push_back(convReplacement);
+
+  // If there is no export region, no adjustment needed.
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (failed(exportOp)) return DiagnosedSilenceableFailure::success();
+
+  // The result of the im2col pattern is expected to be an expand on the matmul
+  // output.
+  auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(convReplacement);
+  if (!expandShapeOp)
+    return mlir::emitDefiniteFailure(target,
+                                     "im2col matmul output not expanded");
+
+  auto matmulOp = expandShapeOp.getSrc().getDefiningOp<linalg::LinalgOp>();
+  if (!matmulOp || !isaContractionOpInterface(matmulOp))
+    return mlir::emitDefiniteFailure(target, "im2col matmul not found");
+
+  // If there is no collapse then the workgroup count compute region doesn't
+  // need to be updated.
+  auto outputCollapse = matmulOp.getDpsInitOperand(0)
+                            ->get()
+                            .getDefiningOp<tensor::CollapseShapeOp>();
+  if (!outputCollapse) return DiagnosedSilenceableFailure::success();
+
+  /// Lower the workgroup count region in keeping with the way dispatch
+  /// regions are created by default in IREEs compilation flow.
+  if (failed(adjustWorkgroupCountComputeRegionForImg2Col(
+          state, rewriter, getLoc(), exportOp.value(), outputMap,
+          outputCollapse))) {
+    return mlir::emitDefiniteFailure(convReplacement,
+                                     "failed to adjust workgroup count region");
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp::build(
+    OpBuilder &builder, OperationState &result, Value target) {
+  result.addOperands(target);
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes({pdl::OperationType::get(ctx), pdl::OperationType::get(ctx)});
 }
 
 #define GET_OP_CLASSES

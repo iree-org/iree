@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "llvm/Support/Debug.h"
@@ -12,8 +11,9 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
@@ -32,17 +32,6 @@ struct DecomposePackUnPackOpsPass
     registry
         .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
                 scf::SCFDialect, tensor::TensorDialect>();
-  }
-
-  void runOnOperation() override;
-};
-
-struct VectorizePackUnPackOpsPass
-    : public VectorizePackUnPackOpsBase<VectorizePackUnPackOpsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, func::FuncDialect,
-                    arith::ArithDialect, scf::SCFDialect, tensor::TensorDialect,
-                    vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -138,29 +127,9 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   });
 }
 
-void VectorizePackUnPackOpsPass::runOnOperation() {
-  MLIRContext *ctx = &getContext();
-
-  // Kick in generic vectorizer.
-  RewritePatternSet patterns(ctx);
-  patterns.add<IREE::LinalgExt::LinalgVectorizationPattern>(ctx);
-  linalg::populatePadOpVectorizationPatterns(patterns);
-  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
-  vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
-  // TODO(hanchung): Capture the failure after the vectorization pattern
-  // rewrite converges.
-  (void)(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)));
-}
-
 std::unique_ptr<OperationPass<func::FuncOp>>
 createDecomposePackUnPackOpsPass() {
   return std::make_unique<DecomposePackUnPackOpsPass>();
-}
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-createVectorizePackUnPackOpsPass() {
-  return std::make_unique<VectorizePackUnPackOpsPass>();
 }
 
 }  // namespace iree_compiler

@@ -31,7 +31,7 @@ static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
   if (elementType.getIntOrFloatBitWidth() == 16) {
     threadMNK = {2, 8, 8};
   } else if (elementType.isInteger(8)) {
-    threadMNK = {4, 4, 4};
+    threadMNK = {4, 4, 16};
   } else {
     threadMNK = {6, 4, 4};
   }

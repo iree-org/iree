@@ -302,14 +302,6 @@ def DecomposePackUnPackOps :
   let constructor = "mlir::iree_compiler::createDecomposePackUnPackOpsPass()";
 }
 
-def VectorizePackUnPackOps :
-    Pass<"iree-codegen-vectorize-pack-unpack-ops", "func::FuncOp"> {
-  let summary = "Vectorize ops that are created after decomposition of "
-                "pack/unpack ops";
-  let constructor =
-      "mlir::iree_compiler::createVectorizePackUnPackOpsPass()";
-}
-
 def PolynomialApproximationPass :
     Pass<"iree-codegen-polynomial-approximation", ""> {
   let summary = "Convert math operations to their polynomial approximation";
@@ -480,6 +472,17 @@ def VerifyLinalgTransformLegality :
   let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
 }
 
+def LLVMCPUTile :
+    Pass<"iree-llvmcpu-tile", "func::FuncOp"> {
+  let summary = "Pass to tile TilingInterface operations.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTilePass()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
+}
+
 def LLVMCPUTileAndFuse :
     Pass<"iree-llvmcpu-tile-and-fuse", "func::FuncOp"> {
   let summary = "Pass to tile and fuse TilingInterface operations.";
@@ -503,6 +506,51 @@ def LLVMCPUPeel :
   let summary = "Pass to perform peeling on non-distributed loops.";
   let constructor =
       "mlir::iree_compiler::createLLVMCPUPeelPass()";
+}
+
+def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp"> {
+  let summary = "Pass to splitReduce linalg operations.";
+  let constructor = "mlir::iree_compiler::createLLVMCPUSplitReductionPass()";
+  let options = [
+    Option<"enableFpReductionReordering", "enable-fp-reduction-reordering",
+      "bool", /*default=*/"false",
+      "Flag to enable reduction reordering on floating points.">,
+  ];
+}
+
+def LLVMCPUVectorization :
+    Pass<"iree-llvmcpu-vectorization", "func::FuncOp"> {
+  let summary = "Pass to perform vectorization on tensor/linalg ops.";
+  let options = [
+    Option<"enableVectorMasking", "enable-vector-masking", "bool",/*default=*/"false",
+      "Enable vector masking during vectorization.">,
+    Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
+      "Rewrite all tensor.pad ops in the function to vector form.">,
+    Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
+      "Enable vectorizaiton of operations that may generate vector.gather operations.">,
+  ];
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUVectorizationPass()";
+}
+
+def LLVMCPUVectorLowering :
+    Pass<"iree-llvmcpu-lower-vectors", "func::FuncOp"> {
+  let summary = "Pass to lower Vector ops before conversion to LLVM.";
+  let options = [
+    Option<"splitVectorTransfersTo", "split-transfers", "std::string",
+      /*default=*/"",
+      [{Split vector transfers between slow (masked) and fast "
+        "(unmasked) variants. Possible options are:\n"
+          "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
+          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
+          "\tvector-transfers: use extra small unmasked vector.transfers for"
+          " the slow path\n}]>,
+    Option<"lowerVectorTransposeToAVX2", "lower-vector-transpose-to-avx2", "bool",
+      /*default=*/"false",
+      "Add specific transpose to avx2 lowering patterns.">,
+  ];
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUVectorLoweringPass()";
 }
 
 def ConvertToLLVM :

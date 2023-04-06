@@ -25,7 +25,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
 
 **Pre-requisites:**
 
-* A relatively recent Python3 installation >=3.7 (we aim to support
+* A relatively recent Python3 installation >=3.8 (we aim to support
   [non-eol Python versions](https://endoflife.date/python)).
 
 **CMake Variables:**

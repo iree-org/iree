@@ -58,6 +58,7 @@ class TargetConverter:
         "@llvm-project//llvm:FileCheck": ["FileCheck"],
         "@llvm-project//llvm:not": ["not"],
         "@llvm-project//llvm:llvm-link": ["${IREE_LLVM_LINK_TARGET}"],
+        "@llvm-project//llvm:NVPTXUtilsAndDesc": ["LLVMNVPTXDesc",],
 
         # MLIR
         "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
@@ -212,6 +213,7 @@ class TargetConverter:
     Raises:
       KeyError: No conversion was found for the target.
     """
+    iree_core_repo = self._repo_alias("@iree_core")
     if target in self._explicit_target_mapping:
       return self._explicit_target_mapping[target]
     if target.startswith("@llvm-project//llvm"):
@@ -220,9 +222,21 @@ class TargetConverter:
       return self._convert_mlir_target(target)
     if target.startswith("@iree_cuda//"):
       return self._convert_iree_cuda_target(target)
+    if target.startswith(f"{iree_core_repo}//"):
+      return self._convert_iree_core_target(target)
     if target.startswith("@"):
       raise KeyError(f"No conversion found for target '{target}'")
 
+    # Pass through package-relative targets
+    #   :target_name
+    #   file_name.txt
+    if target.startswith(":") or (":" not in target and
+                                  not target.startswith("/")):
+      return [self._convert_to_cmake_path(target)]
+
+    return self._convert_unmatched_target(target)
+
+  def _convert_iree_core_target(self, target):
     iree_core_repo = self._repo_alias("@iree_core")
     if target.startswith(
         f"{iree_core_repo}//llvm-external-projects/iree-dialects"):
@@ -250,12 +264,6 @@ class TargetConverter:
     m = re.match(f"^{iree_core_repo}//tools[/|:](.+)", target)
     if m:
       return [self._convert_to_cmake_path(m.group(1))]
-
-    # Pass through package-relative targets
-    #   :target_name
-    #   file_name.txt
-    if target.startswith(":") or ":" not in target:
-      return [self._convert_to_cmake_path(target)]
 
     return self._convert_unmatched_target(target)
 

@@ -560,9 +560,11 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     const SmallVector<int64_t> &tileSizes,
-    linalg::DistributionMethod distributionMethod) {
-  return {[&tileSizes, distributionMethod](OpBuilder &builder, Location loc,
-                                           ArrayRef<Range> parallelLoopRanges) {
+    linalg::DistributionMethod distributionMethod,
+    int32_t maxWorkgroupParallelDims) {
+  return {[&tileSizes, distributionMethod, maxWorkgroupParallelDims](
+              OpBuilder &builder, Location loc,
+              ArrayRef<Range> parallelLoopRanges) {
     SmallVector<int64_t> nonZeroTileSizes;
     for (int64_t size : tileSizes) {
       if (size != 0) nonZeroTileSizes.push_back(size);
@@ -572,11 +574,11 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
     Value splitDim;
     for (size_t dim = 0; dim < numParallelDims; ++dim) {
-      if (numParallelDims > kNumMaxParallelDims &&
-          dim >= kNumMaxParallelDims - 1) {
+      if (numParallelDims > maxWorkgroupParallelDims &&
+          dim >= maxWorkgroupParallelDims - 1) {
         if (!splitDim) {
           splitDim = buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
-              builder, 2);
+              builder, maxWorkgroupParallelDims - 1);
         }
         Value size = getValueOrCreateConstantIndexOp(
             builder, loc, parallelLoopRanges[numParallelDims - dim - 1].size);
@@ -591,8 +593,10 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
         if (dim == numParallelDims - 1)
           dimValue = splitDim;
         else {
-          dimValue = builder.create<arith::RemUIOp>(loc, splitDim, numTiles);
-          splitDim = builder.create<arith::DivUIOp>(loc, splitDim, numTiles);
+          dimValue = makeComposedAffineApply(builder, loc, (d0 % d1),
+                                             {splitDim, numTiles});
+          splitDim = makeComposedAffineApply(builder, loc, (d0).floorDiv(d1),
+                                             {splitDim, numTiles});
         }
         procInfo[numParallelDims - dim - 1] = {dimValue, numTiles,
                                                distributionMethod};

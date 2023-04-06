@@ -92,13 +92,17 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       - expand_memref_strided_metadata: adds patterns that expand memref
       operations into extract_strided_metadata operations and a materialization
       of their effect on the metadata (sizes, offset, strides).
+      - extract_address_computations: adds patterns for anchoring subview 
+      accessing operations at [0, ... 0].
       - fold_memref_aliases: adds patterns for folding ops such as
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
       - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
       case it is the only use of extract.
-      - licm: additionally apply loop-independent code motion and single
+      - fold_tensor_subsets: adds patterns for folding tensor subset ops into
+      their producer and consumers.
+      - licm: additionally apply loop-independent code motion and single 
       iteration loop promotion. This is not a set of patterns per se but is still
       very convenient to apply it close to canonicalization and other greedy
       pattern applications.
@@ -154,9 +158,11 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$cse,
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$expand_memref_strided_metadata,
+                       UnitAttr:$extract_address_computations,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$fold_tensor_empty_extract,
+                       UnitAttr:$fold_tensor_subsets,
                        UnitAttr:$licm,
                        UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,
@@ -517,6 +523,43 @@ def TileToForallAndWorkgroupCountRegionOp :
 
     ::llvm::SmallVector<::mlir::OpFoldResult> getMixedNumThreads();
     ::llvm::SmallVector<::mlir::OpFoldResult> getMixedTileSizes();
+  }];
+}
+
+def ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp : Op<Transform_Dialect,
+    "iree.convert_conv2d_to_img2col_and_adjust_workgroup_count_region",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
+  let description = [{
+    Wrapper around `structured.convert_conv2d_to_img2col` for use within IREE.
+
+    In addition to converting the conv2d to img2col, updates the
+    `workgroup_count` region of the export op corresponding to the
+    parent `func.func` of the target to match the changes to the problem
+    shape introduced by the conversion to img2col.
+    Please see the doc of `structured.convert_conv2d_to_img2col` for full
+    description of op semantics.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$img2col_tensor,
+                      TransformHandleTypeInterface:$transformed);
+
+  let assemblyFormat =
+    "$target attr-dict `:` functional-type($target, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::linalg::LinalgOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 

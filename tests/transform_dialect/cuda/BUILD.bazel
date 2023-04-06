@@ -27,6 +27,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = [
         "mma.mlir",
+        "mma_elemwise_layout_analysis.mlir",
         "mma_reduction_layout_analysis.mlir",
         "mma_using_layout_analysis.mlir",
         "reduction.mlir",
@@ -44,6 +45,7 @@ iree_lit_test_suite(
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.
     data = [
+        "mma_elemwise_layout_analysis_codegen_spec.mlir",
         "mma_reduction_layout_analysis_codegen_spec.mlir",
         "mma_reduction_layout_analysis_dispatch_spec.mlir",
         "mma_using_layout_analysis_codegen_spec.mlir",

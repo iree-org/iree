@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_PASSES_H_
 
 #include <memory>
+#include <string>
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -142,11 +143,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 /// Creates a pass to decompose tensor.pack and tensor.unpack ops. The pass does
 /// tiling and generalization. See implementation for more details.
 std::unique_ptr<OperationPass<func::FuncOp>> createDecomposePackUnPackOpsPass();
-
-/// Creates a pass to vectorize tensor.pack and tensor.unpack ops. The pass does
-/// tiling, generalization, and kicking in the generic vectorizer. See
-/// implementation for more details.
-std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePackUnPackOpsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
@@ -314,6 +310,10 @@ void populateConcretizePadResultShapePatterns(
 std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyLinalgTransformLegalityPass();
 
+/// Pass to tile TilingInterface ops with given tilingLevel.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTilePass(
+    int64_t tilingLevel = -1);
+
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTileAndFusePass(
     int64_t tilingLevel = -1);
@@ -325,6 +325,28 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
 
 /// Pass to perform peeling on non-distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
+
+/// Pass to perform SplitReduction transformations of `LinalgOp`s.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
+    bool enableReassociateFpReductions = false);
+
+struct LLVMCPUVectorizationPassOptions {
+  bool enableVectorMasking = false;
+  bool vectorizePadding = false;
+  bool vectorizeGatherAccesses = false;
+};
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
+    const LLVMCPUVectorizationPassOptions &options);
+
+// Pass to lower Vector ops before conversion to LLVM.
+struct LLVMCPUVectorLoweringPassOptions {
+  std::string splitVectorTransfersTo = "";
+  bool lowerVectorTransposeToAVX2 = false;
+};
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
+    const LLVMCPUVectorLoweringPassOptions &options);
 
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
@@ -437,8 +459,7 @@ void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
-                                      bool enableVectorMasking);
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
@@ -702,6 +723,9 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm);
 /// Annotates the innermost Winograd loops with the spirv distribute attribute.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVAnnotateWinogradLoopsPass();
+
+/// Pass pipeline to lower IREE HAL executables via transform dialect schedules.
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm);
 
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.

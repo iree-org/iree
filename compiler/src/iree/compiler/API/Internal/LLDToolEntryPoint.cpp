@@ -9,6 +9,16 @@
 // duplicate the flavor parsing and invoke the backend directly similar to
 // what the lldMain() does.
 
+#ifdef IREE_COMPILER_LLD_DISABLED
+#include <stdio.h>
+
+#include "iree/compiler/tool_entry_points_api.h"
+
+int ireeCompilerRunLldMain(int argc, char **argv) {
+  fprintf(stderr, "IREE was not built with support for LLD\n");
+  return 1;
+}
+#else
 #include <cstdlib>
 #include <vector>
 
@@ -82,17 +92,34 @@ int ireeCompilerRunLldMain(int argc, char **argv) {
   std::vector<const char *> args(argv, argv + argc);
   switch (parseFlavor(args)) {
     case Gnu:
+#ifndef IREE_COMPILER_LLD_ELF_DISABLED
       return !elf::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
+#else
+      die("lld is not compiled with ELF support");
+#endif
     case WinLink:
+#ifndef IREE_COMPILER_LLD_COFF_DISABLED
       return !coff::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
+#else
+      die("lld is not compiled with COFF support");
+#endif
     case Darwin:
+#ifndef IREE_COMPILER_LLD_MACHO_DISABLED
       return !macho::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
+#else
+      die("lld is not compiled with MachO support");
+#endif
     case Wasm:
+#ifndef IREE_COMPILER_LLD_WASM_DISABLED
       return !lld::wasm::link(args, stdoutOS, stderrOS, exitEarly,
                               disableOutput);
+#else
+      die("lld is not compiled with WASM support");
+#endif
     default:
       die("lld is a generic driver.\n"
           "Invoke ld.lld (Unix), ld64.lld (macOS), lld-link (Windows), wasm-ld"
           " (WebAssembly) instead");
   }
 }
+#endif  // IREE_COMPILER_LLD_DISABLED

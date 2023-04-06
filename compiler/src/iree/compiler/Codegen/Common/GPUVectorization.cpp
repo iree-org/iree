@@ -13,8 +13,9 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -57,14 +58,14 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns,
 
   IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
-                        linalg::Conv1DNwcWcfOp,
-                        linalg::Conv1DNcwFcwOp>::insert(patterns,
-                                                        vectorizationOptions,
-                                                        f);
+                        linalg::Conv1DNwcWcfOp, linalg::Conv1DNcwFcwOp,
+                        linalg::TransposeOp>::insert(patterns,
+                                                     vectorizationOptions, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<LinalgVectorizationPattern>(
       ctx, vectorizationOptions,
       f.addOpFilter<linalg::ContractionOpInterface>());
+  linalg::populatePadOpVectorizationPatterns(patterns);
 }
 
 namespace {

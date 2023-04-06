@@ -102,9 +102,9 @@ static iree_status_t iree_uk_benchmark_unpack(
   return iree_ok_status();
 }
 
-static void iree_uk_benchmark_register_unpack(
-    iree_uk_unpack_type_t type, int tile_size0, int tile_size1,
-    const iree_uk_cpu_features_list_t* cpu_features) {
+static void iree_uk_benchmark_register_unpack(iree_uk_unpack_type_t type,
+                                              int tile_size0, int tile_size1,
+                                              const char* cpu_features) {
   char type_str[32];
   iree_uk_type_pair_str(type_str, sizeof type_str, type);
   iree_uk_unpack_params_t params = {
@@ -137,7 +137,6 @@ int main(int argc, char** argv) {
 
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   iree_uk_benchmark_initialize(&argc, argv);
-  iree_uk_standard_cpu_features_t* cpu = iree_uk_standard_cpu_features_create();
 
   // The memcpy benchmark provides a useful comparison point, as pack is fairly
   // close to memory-bound.
@@ -149,13 +148,13 @@ int main(int argc, char** argv) {
   iree_uk_benchmark_register_unpack(iree_uk_unpack_type_i32i32, 8, 8, NULL);
 #elif defined(IREE_UK_ARCH_X86_64)
   iree_uk_benchmark_register_unpack(iree_uk_unpack_type_f32f32, 8, 8,
-                                    cpu->avx2_fma);
+                                    "avx2_fma");
   iree_uk_benchmark_register_unpack(iree_uk_unpack_type_i32i32, 8, 8,
-                                    cpu->avx2_fma);
+                                    "avx2_fma");
   iree_uk_benchmark_register_unpack(iree_uk_unpack_type_f32f32, 16, 16,
-                                    cpu->avx512_base);
+                                    "avx512_base");
   iree_uk_benchmark_register_unpack(iree_uk_unpack_type_i32i32, 16, 16,
-                                    cpu->avx512_base);
+                                    "avx512_base");
 #else   // defined(IREE_UK_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
@@ -163,6 +162,5 @@ int main(int argc, char** argv) {
   iree_uk_benchmark_register_unpack(iree_uk_unpack_type_i32i32, 8, 8, NULL);
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
-  iree_uk_standard_cpu_features_destroy(cpu);
   iree_uk_benchmark_run_and_cleanup();
 }

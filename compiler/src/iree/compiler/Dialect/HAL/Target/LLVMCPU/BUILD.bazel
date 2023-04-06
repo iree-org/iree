@@ -65,6 +65,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:X86CodeGen",
         "@llvm-project//llvm:config",
         "@llvm-project//mlir:ArmNeonDialect",
+        "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:PDLDialect",

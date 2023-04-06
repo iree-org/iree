@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
@@ -36,7 +37,7 @@ struct SplitFullPartialTransferPass
             .Case("vector-transfers",
                   vector::VectorTransferSplit::VectorTransfer)
             .Default(vector::VectorTransferSplit::None));
-    patterns.add<vector::VectorTransferFullPartialRewriter>(ctx, options);
+    populateVectorTransferFullPartialPatterns(patterns, options);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

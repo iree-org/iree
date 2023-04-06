@@ -27,12 +27,6 @@ def MaterializeEncoding :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createMaterializeEncodingPass()";
 }
 
-def FoldIntoPackAndUnpackOps :
-    Pass<"iree-linalg-ext-fold-into-pack-unpack-ops", "func::FuncOp"> {
-  let summary = "Test pass to fold operations into pack and unpacl operations";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createFoldIntoPackAndUnpackOps()";
-}
-
 def PadContractionToBlockSize :
     Pass<"iree-linalg-pad-contraction-to-block-size", ""> {
   let summary = "Pads contraction (matmul) ops to next multiple of block size";
@@ -99,73 +93,6 @@ def TileAndDecomposeAttention :
       "Tiles and decomposes attention op into a sequence of linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
                     "createTileAndDecomposeAttentionPass()";
-}
-
-//===---------------------------------------------------------------------====//
-// Codegen Strategy passes moved into IREE
-// TODO: Deprecate all this.
-//===---------------------------------------------------------------------====//
-
-def LinalgStrategyTilePass
-    : Pass<"iree-linalg-strategy-tile-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to apply pattern-based linalg tiling.";
-  let constructor = "createLinalgStrategyTilePass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which linalg op within the func is the anchor to latch on.">,
-  ];
-}
-
-def LinalgStrategyVectorizePass
-    : Pass<"iree-linalg-strategy-vectorize-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to apply pattern-based linalg vectorization.";
-  let constructor = "createLinalgStrategyVectorizePass()";
-  let dependentDialects = ["linalg::LinalgDialect", "vector::VectorDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-    Option<"anchorOpName", "anchor-op", "std::string", /*default=*/"",
-      "Which linalg op within the func is the anchor to latch on.">,
-    Option<"vectorizePadding", "vectorize-padding", "bool", "false",
-      "Enable vectorization of padding ops.">,
-  ];
-}
-
-def LinalgStrategyEnablePass
-    : Pass<"iree-linalg-strategy-enable-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to enable the application of other "
-    "pattern-based linalg passes.";
-  let constructor = "createLinalgStrategyEnablePass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-  ];
-}
-
-def LinalgStrategyLowerVectorsPass
-    : Pass<"iree-linalg-strategy-lower-vectors-pass", "func::FuncOp"> {
-  let summary = "Configurable pass to lower vector operations.";
-  let constructor = "createLinalgStrategyLowerVectorsPass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-  ];
-}
-
-def LinalgStrategyRemoveMarkersPass
-    : Pass<"iree-linalg-strategy-remove-markers-pass", "func::FuncOp"> {
-  let summary = "Cleanup pass that drops markers.";
-  let constructor = "createLinalgStrategyRemoveMarkersPass()";
-  let dependentDialects = ["linalg::LinalgDialect"];
-  let options = [
-    Option<"anchorFuncName", "anchor-func", "std::string", /*default=*/"",
-      "Which func op is the anchor to latch on.">,
-  ];
 }
 
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

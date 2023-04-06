@@ -385,3 +385,15 @@ func.func @scalarize_vector_load_op(%i: index) -> vector<4xi32> {
 // CHECK: %[[LD3:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[IDX3]]] : memref<10x10xi32>
 // CHECK: %[[INSERT3:.+]] = vector.insert %[[LD3]], %[[INSERT2]] [3] : i32 into vector<4xi32>
 // CHECK: return %[[INSERT3]]
+
+// -----
+
+// Test that the memref is not vectorized if the element type is a complex type.
+
+// CHECK-LABEL: func.func @complex_memref
+func.func @complex_memref(%x: index, %y: index) -> complex<f32> {
+  // CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x32xcomplex<f32>>
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x32xcomplex<f32>>
+  %1 = memref.load %0[%x, %y] : memref<8x32xcomplex<f32>>
+  return %1: complex<f32>
+}

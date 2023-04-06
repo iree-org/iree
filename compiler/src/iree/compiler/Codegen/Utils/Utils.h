@@ -157,7 +157,8 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     const SmallVector<int64_t> &tileSizes,
-    linalg::DistributionMethod distributionMethod);
+    linalg::DistributionMethod distributionMethod,
+    int32_t maxWorkgroupParallelDims = kNumMaxParallelDims);
 
 //===---------------------------------------------------------------------===//
 // Misc. utility functions.

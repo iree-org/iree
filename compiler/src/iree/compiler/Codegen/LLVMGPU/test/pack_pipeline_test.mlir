@@ -31,8 +31,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //     CHECK-NOT:    vector.transfer_write
 //     CHECK-NOT:    vector.transfer_read
 //         CHECK:    scf.for
-//         CHECK:      scf.for
-//         CHECK:        vector.transfer_read
-//         CHECK:        vector.transpose
-//         CHECK:        vector.transfer_write
+//         CHECK:      vector.transfer_read
+//         CHECK:      vector.transpose
+//         CHECK:      vector.transfer_write
 
