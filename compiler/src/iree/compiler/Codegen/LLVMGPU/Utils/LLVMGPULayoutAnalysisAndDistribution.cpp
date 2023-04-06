@@ -110,12 +110,12 @@ static std::array<Dimension, 3> getMMADimensions(MMAType mmaType,
                    {DimType::VecIdY, 2}}};
         case MMAMatrixType::BMatrix:
           if (dim == 0)
-            return {{{DimType::VecIdX, 2},
-                     {DimType::LaneIdX, 4},
-                     {DimType::VecIdY, 2}}};
-          return {{{DimType::LaneIdY, 8},
-                   {DimType::LaneIdZ, 1},
-                   {DimType::VecIdZ, 1}}};
+            return {{{DimType::LaneIdY, 8},
+                     {DimType::LaneIdZ, 1},
+                     {DimType::VecIdZ, 1}}};
+          return {{{DimType::VecIdX, 2},
+                   {DimType::LaneIdX, 4},
+                   {DimType::VecIdY, 2}}};
         case MMAMatrixType::CMatrix:
           if (dim == 0)
             return {{{DimType::LaneIdY, 8},
@@ -139,6 +139,7 @@ static std::array<int, 2> getMMACanonicalShape(MMAType mmaType,
         case MMAMatrixType::AMatrix:
           return {16, 16};
         case MMAMatrixType::BMatrix:
+          return {8, 16};
         case MMAMatrixType::CMatrix:
           return {16, 8};
       }
@@ -920,12 +921,28 @@ static void collectOperations(Operation *rootOp,
 
 }  // namespace
 
+static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
+  // Set up the parallel/reduction structure in right form.
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  AffineExpr m, n, k;
+  bindDims(contractOp.getContext(), m, n, k);
+  auto iteratorTypes = contractOp.getIteratorTypes().getValue();
+  if (!(vector::isParallelIterator(iteratorTypes[0]) &&
+        vector::isParallelIterator(iteratorTypes[1]) &&
+        vector::isReductionIterator(iteratorTypes[2])))
+    return false;
+  SmallVector<AffineMap, 4> maps = contractOp.getIndexingMapsArray();
+  return maps == infer({{m, k}, {n, k}, {m, n}});
+}
+
 void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
                                      func::FuncOp funcOp) {
   // First walk through all the MMA ops and set their layouts
   DenseMap<Value, Layout> layoutMap;
   funcOp.walk([&](Operation *op) {
     if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
+      if (!isMatmulTransposeB(contractOp)) return WalkResult::advance();
       Value lhs = contractOp.getLhs();
       Value rhs = contractOp.getRhs();
       Value acc = contractOp.getAcc();
