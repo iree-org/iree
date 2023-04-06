@@ -1305,6 +1305,44 @@ struct ChannelCreateOpPattern
   }
 };
 
+struct ChannelDefaultOpPattern
+    : public StreamConversionPattern<IREE::Stream::ChannelDefaultOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::ChannelDefaultOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(op, rewriter);
+    Value neg1I32;
+    auto getDefault = [&]() {
+      if (!neg1I32) {
+        neg1I32 = rewriter.create<arith::ConstantIntOp>(op.getLoc(), -1, 32);
+      }
+      return neg1I32;
+    };
+    Value id = rewriter.create<IREE::Util::NullOp>(
+        op.getLoc(), rewriter.getType<IREE::Util::BufferType>());
+    Value group =
+        adaptor.getGroupAttr()
+            ? rewriter
+                  .create<IREE::Util::BufferConstantOp>(
+                      op.getLoc(),
+                      /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
+                      /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
+                  .getResult()
+            : rewriter
+                  .create<IREE::Util::NullOp>(
+                      op.getLoc(), rewriter.getType<IREE::Util::BufferType>())
+                  .getResult();
+    Value rank = getDefault();
+    Value count = getDefault();
+    rewriter.replaceOpWithNewOp<IREE::HAL::ChannelCreateOp>(
+        op, rewriter.getType<IREE::HAL::ChannelType>(), device, queueAffinity,
+        /*flags=*/rewriter.getI32IntegerAttr(0), id, group, rank, count);
+    return success();
+  }
+};
+
 struct ChannelSplitOpPattern
     : public StreamConversionPattern<IREE::Stream::ChannelSplitOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -1442,9 +1480,9 @@ void populateStreamToHALPatterns(MLIRContext *context,
                   TimepointExportOpPattern, TimepointChainExternalOpPattern,
                   TimepointJoinOpPattern, TimepointBarrierOpPattern,
                   TimepointAwaitOpPattern>(mapping, typeConverter, context);
-  patterns.insert<ChannelCreateOpPattern, ChannelSplitOpPattern,
-                  ChannelRankOpPattern, ChannelCountOpPattern>(
-      mapping, typeConverter, context);
+  patterns.insert<ChannelCreateOpPattern, ChannelDefaultOpPattern,
+                  ChannelSplitOpPattern, ChannelRankOpPattern,
+                  ChannelCountOpPattern>(mapping, typeConverter, context);
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }
 
