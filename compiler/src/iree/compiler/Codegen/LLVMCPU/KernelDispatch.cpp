@@ -71,12 +71,12 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
+static llvm::cl::opt<bool> clDisableDistribution(
+    "iree-llvmcpu-disable-distribution", llvm::cl::desc("Disable distribution"),
+    llvm::cl::init(false));
+
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
-
-static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-llvmcpu-disable-distribution",
-    llvm::cl::desc("Disable distribution"), llvm::cl::init(false));
 
 static llvm::cl::opt<bool> enableVectorPadding(
     "iree-codegen-enable-vector-padding",
@@ -1971,8 +1971,8 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
                                                tileSizesList, pipeline);
 }
 
-static void adjustConfigToDisableDistribution(
-    func::FuncOp entryPointFn, Operation *rootOp) {
+static void adjustConfigToDisableDistribution(func::FuncOp entryPointFn,
+                                              Operation *rootOp) {
   // The transform dialect codegen has differnet logics and codegen flow. Ignore
   // the adjustment for it.
   auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
