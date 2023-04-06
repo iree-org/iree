@@ -80,6 +80,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTransforms
+    MLIRVectorDialect
     StablehloBroadcastUtils
     StablehloOps
     iree::compiler::InputConversion::Common
