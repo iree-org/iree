@@ -71,10 +71,6 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-llvmcpu-disable-distribution", llvm::cl::desc("Disable distribution"),
-    llvm::cl::init(false));
-
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
 
@@ -1971,20 +1967,6 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
                                                tileSizesList, pipeline);
 }
 
-static void adjustConfigToDisableDistribution(func::FuncOp entryPointFn,
-                                              Operation *rootOp) {
-  // The transform dialect codegen has differnet logics and codegen flow. Ignore
-  // the adjustment for it.
-  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
-  if (pipeline == DispatchLoweringPassPipeline::TransformDialectCodegen) {
-    return;
-  }
-  TileSizesListType tileSizesList = getLoweringConfig(rootOp).getTileSizeVals();
-  for (auto &val : tileSizesList[0]) val = 0;
-  (void)setOpConfigAndEntryPointFnTranslation(entryPointFn, rootOp,
-                                              tileSizesList, pipeline);
-}
-
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult setTranslationInfoAndRootConfig(
     func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
@@ -2042,10 +2024,6 @@ static LogicalResult setTranslationInfoAndRootConfig(
 
   if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
     return failure();
-  }
-
-  if (clDisableDistribution) {
-    adjustConfigToDisableDistribution(entryPointFn, rootOperation);
   }
 
   return success();
