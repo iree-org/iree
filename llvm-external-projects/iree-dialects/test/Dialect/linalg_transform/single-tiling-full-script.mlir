@@ -23,18 +23,18 @@ transform.sequence failures(propagate) {
   transform.structured.vectorize %2 { vectorize_padding }
   transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
     {bufferize_function_boundaries = true}
-  %3 = transform.structured.match ops{["func.func"]} in %module_op 
+  %3 = transform.structured.match ops{["func.func"]} in %module_op
     : (!pdl.operation) -> !pdl.operation
 
 
   %func = transform.structured.match ops{["func.func"]} in %module_op
     : (!pdl.operation) -> !pdl.operation
   %func_e_2 = transform.vector.lower_contraction %func
-    lowering_strategy = "outerproduct" 
+    lowering_strategy = "outerproduct"
       : (!pdl.operation) -> !pdl.operation
   %func_e_3 = transform.vector.lower_transpose %func_e_2
-    lowering_strategy = "shuffle" 
+    lowering_strategy = "shuffle"
       : (!pdl.operation) -> !pdl.operation
 
-  lower_to_llvm
+  lower_to_llvm %module_op : (!pdl.operation) -> !pdl.operation
 }
