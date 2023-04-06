@@ -686,18 +686,15 @@ def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
 // !hal.channel / iree_hal_channel_t
 //===----------------------------------------------------------------------===//
 
-def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
+def HAL_ChannelDefaultOp : HAL_Op<"channel.default", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
-  let summary = [{creates a new channel for collective communication}];
+  let summary = [{returns a default collective communication channel}];
   let description = [{
-    Returns a new channel with the given rank associated with the given device
-    queue. Collective operations using this channel must only be submitted on
-    compatible queues.
+    Returns a channel initialized using the runtime environment for the
+    particular affinity.
 
-    The group and ID are optional and may be null. A rank or count of -1 can be
-    used to indicate a default inherited from the environment or device
-    configuration.
+    The group and ID are optional and may be null.
   }];
 
   let arguments = (ins
@@ -705,9 +702,7 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
     HAL_DeviceQueueAffinity:$queue_affinity,
     I32Attr:$flags,
     Util_BufferType:$id,
-    Util_BufferType:$group,
-    I32:$rank,
-    I32:$count
+    Util_BufferType:$group
   );
   let results = (outs
     HAL_Channel:$result
@@ -719,8 +714,6 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
     `flags` `(` $flags `)`
     `id` `(` $id `)`
     `group` `(` $group `)`
-    `rank` `(` $rank `)`
-    `count` `(` $count `)`
     `:` type($result)
     attr-dict-with-keyword
   }];

@@ -22,7 +22,7 @@
 
 IREE_HAL_API_RETAIN_RELEASE(channel);
 
-IREE_API_EXPORT iree_status_t iree_hal_channel_create(
+IREE_API_EXPORT iree_status_t iree_hal_channel_create_default(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
   IREE_ASSERT_ARGUMENT(device);
@@ -30,7 +30,7 @@ IREE_API_EXPORT iree_status_t iree_hal_channel_create(
   *out_channel = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
-      IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_channel)(
+      IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_channel_default)(
           device, queue_affinity, params, out_channel);
   IREE_TRACE_ZONE_END(z0);
   return status;

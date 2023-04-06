@@ -7,8 +7,7 @@ func.func @channel_create() -> !stream.channel {
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant 3
   // CHECK-DAG: %[[ID:.+]] = util.null : !util.buffer
   // CHECK-DAG: %[[GROUP:.+]] = util.buffer.constant : !util.buffer = "group"
-  // CHECK-DAG: %[[DEFAULT:.+]] = arith.constant -1
-  // CHECK: %[[CHANNEL:.+]] = hal.channel.create device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) rank(%[[DEFAULT]]) count(%[[DEFAULT]]) : !hal.channel
+  // CHECK: %[[CHANNEL:.+]] = hal.channel.default device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) : !hal.channel
   %channel = stream.channel.default on(#hal.affinity.queue<[0, 1]>) group("group") : !stream.channel
   // CHECK: return %[[CHANNEL]]
   return %channel : !stream.channel
@@ -23,8 +22,7 @@ func.func @channel_default() -> !stream.channel {
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant 3
   // CHECK-DAG: %[[ID:.+]] = util.null : !util.buffer
   // CHECK-DAG: %[[GROUP:.+]] = util.buffer.constant : !util.buffer = "group"
-  // CHECK-DAG: %[[DEFAULT:.+]] = arith.constant -1
-  // CHECK: %[[CHANNEL:.+]] = hal.channel.create device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) rank(%[[DEFAULT]]) count(%[[DEFAULT]]) : !hal.channel
+  // CHECK: %[[CHANNEL:.+]] = hal.channel.default device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) : !hal.channel
   %channel = stream.channel.default on(#hal.affinity.queue<[0, 1]>) group("group") : !stream.channel
   // CHECK: return %[[CHANNEL]]
   return %channel : !stream.channel
@@ -63,14 +61,13 @@ func.func @channel_create_split() -> !stream.channel {
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant 3
   // CHECK-DAG: %[[ID:.+]] = util.null : !util.buffer
   // CHECK-DAG: %[[GROUP:.+]] = util.null : !util.buffer
-  // CHECK-DAG: %[[DEFAULT:.+]] = arith.constant -1
-  // CHECK: %[[CHANNEL:.+]] = hal.channel.create device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) rank(%[[DEFAULT]]) count(%[[DEFAULT]]) : !hal.channel
+  // CHECK: %[[CHANNEL:.+]] = hal.channel.default device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) : !hal.channel
   // CHECK-DAG: %[[DEVICE_0:.+]] = hal.ex.shared_device : !hal.device
-  // CHECK-DAG: %[[DEFAULT_0:.+]] = arith.constant -1
+  // CHECK-DAG: %[[AFFINITY_0:.+]] = arith.constant 3
   // CHECK-DAG: %[[GROUPS:.+]] = util.buffer.constant : !util.buffer = "(0),(1)"
-  // CHECK: %[[CHANNEL_SPLIT:.+]] = hal.channel.split device(%[[DEVICE_0]] : !hal.device) affinity(%[[DEFAULT_0]]) groups(%[[GROUPS]]) %[[CHANNEL]] : !hal.channel
+  // CHECK: %[[CHANNEL_SPLIT:.+]] = hal.channel.split device(%[[DEVICE_0]] : !hal.device) affinity(%[[AFFINITY_0]]) groups(%[[GROUPS]]) %[[CHANNEL]] : !hal.channel
   %channel_default = stream.channel.default on(#hal.affinity.queue<[0, 1]>) : !stream.channel
-  %channel_split = stream.channel.split groups("(0),(1)") %channel_default : !stream.channel
+  %channel_split = stream.channel.split on(#hal.affinity.queue<[0, 1]>) groups("(0),(1)") %channel_default : !stream.channel
 
   // CHECK: return %[[CHANNEL_SPLIT]]
   return %channel_split : !stream.channel

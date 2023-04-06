@@ -166,15 +166,13 @@ vm.import private @buffer_view.trace(
 // iree_hal_channel_t
 //===----------------------------------------------------------------------===//
 
-// Creates a new channel for collective communication.
-vm.import private @channel.create(
+// Creates a default channel for collective communication.
+vm.import private @channel.default(
   %device : !vm.ref<!hal.device>,
   %queue_affinity : i64,
   %flags : i32,
   %id : !vm.buffer,
-  %group : !vm.buffer,
-  %rank : i32,
-  %count : i32
+  %group : !vm.buffer
 ) -> !vm.ref<!hal.channel>
 attributes {nosideeffects}
 

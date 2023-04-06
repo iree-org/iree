@@ -419,10 +419,10 @@ void BufferViewBufferOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.channel.create
+// hal.channel.default
 //===----------------------------------------------------------------------===//
 
-void ChannelCreateOp::getAsmResultNames(
+void ChannelDefaultOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "channel");
 }

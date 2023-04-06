@@ -1,23 +1,19 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
-// CHECK-LABEL: @channel_create
-//  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64, %[[ID:.+]]: !util.buffer, %[[GROUP:.+]]: !util.buffer, %[[RANK:.+]]: i32, %[[COUNT:.+]]: i32)
-func.func @channel_create(%device: !hal.device, %affinity: i64, %id: !util.buffer, %group: !util.buffer, %rank: i32, %count: i32) {
-  //      CHECK: %channel = hal.channel.create
+// CHECK-LABEL: @channel_default
+//  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64, %[[ID:.+]]: !util.buffer, %[[GROUP:.+]]: !util.buffer)
+func.func @channel_default(%device: !hal.device, %affinity: i64, %id: !util.buffer, %group: !util.buffer) {
+  //      CHECK: %channel = hal.channel.default
   // CHECK-SAME:   device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:   affinity(%[[AFFINITY]])
   // CHECK-SAME:   flags(0)
   // CHECK-SAME:   id(%[[ID]])
-  // CHECK-SAME:   group(%[[GROUP]])
-  // CHECK-SAME:   rank(%[[RANK]])
-  // CHECK-SAME:   count(%[[COUNT]]) : !hal.channel
-  %channel = hal.channel.create device(%device : !hal.device)
-                              affinity(%affinity)
-                                 flags(0)
-                                    id(%id)
-                                 group(%group)
-                                  rank(%rank)
-                                 count(%count) : !hal.channel
+  // CHECK-SAME:   group(%[[GROUP]]) : !hal.channel
+  %channel = hal.channel.default device(%device : !hal.device)
+                               affinity(%affinity)
+                                  flags(0)
+                                     id(%id)
+                                  group(%group) : !hal.channel
   return
 }
 

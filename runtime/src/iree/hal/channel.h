@@ -69,7 +69,7 @@ typedef struct iree_hal_channel_t iree_hal_channel_t;
 // |queue_affinity|. |params| may specify the channel parameters or leave its
 // fields as default to indicate that the value should be sourced from the
 // environment.
-IREE_API_EXPORT iree_status_t iree_hal_channel_create(
+IREE_API_EXPORT iree_status_t iree_hal_channel_create_default(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel);
 

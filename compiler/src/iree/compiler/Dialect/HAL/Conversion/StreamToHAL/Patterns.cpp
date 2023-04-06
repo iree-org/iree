@@ -1261,13 +1261,6 @@ struct ChannelDefaultOpPattern
       ConversionPatternRewriter &rewriter) const override {
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(op, rewriter);
-    Value neg1I32;
-    auto getDefault = [&]() {
-      if (!neg1I32) {
-        neg1I32 = rewriter.create<arith::ConstantIntOp>(op.getLoc(), -1, 32);
-      }
-      return neg1I32;
-    };
     Value id = rewriter.create<IREE::Util::NullOp>(
         op.getLoc(), rewriter.getType<IREE::Util::BufferType>());
     Value group =
@@ -1282,11 +1275,9 @@ struct ChannelDefaultOpPattern
                   .create<IREE::Util::NullOp>(
                       op.getLoc(), rewriter.getType<IREE::Util::BufferType>())
                   .getResult();
-    Value rank = getDefault();
-    Value count = getDefault();
-    rewriter.replaceOpWithNewOp<IREE::HAL::ChannelCreateOp>(
+    rewriter.replaceOpWithNewOp<IREE::HAL::ChannelDefaultOp>(
         op, rewriter.getType<IREE::HAL::ChannelType>(), device, queueAffinity,
-        /*flags=*/rewriter.getI32IntegerAttr(0), id, group, rank, count);
+        /*flags=*/rewriter.getI32IntegerAttr(0), id, group);
     return success();
   }
 };

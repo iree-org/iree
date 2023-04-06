@@ -270,7 +270,7 @@ static iree_host_size_t iree_hal_task_device_select_queue(
   return queue_affinity % device->queue_count;
 }
 
-static iree_status_t iree_hal_task_device_create_channel(
+static iree_status_t iree_hal_task_device_create_channel_default(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -460,7 +460,7 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .replace_channel_provider = iree_hal_task_replace_channel_provider,
     .trim = iree_hal_task_device_trim,
     .query_i64 = iree_hal_task_device_query_i64,
-    .create_channel = iree_hal_task_device_create_channel,
+    .create_channel_default = iree_hal_task_device_create_channel_default,
     .create_channel_split = iree_hal_task_device_create_channel_split,
     .create_command_buffer = iree_hal_task_device_create_command_buffer,
     .create_descriptor_set_layout =
