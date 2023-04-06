@@ -36,79 +36,42 @@ class Linux_x86_64_Benchmarks(object):
           "--iree-llvmcpu-enable-pad-consumer-fusion"
       ])
 
-  def _generate_default(
-      self, device_specs: List[common_definitions.DeviceSpec]
+  def _generate(
+      self, model_group_and_threads: List[common_definitions.Model],
+      compile_config: iree_definitions.CompileConfig,
+      device_specs: List[common_definitions.DeviceSpec]
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
-    # Create benchmarks for small workloads.
-    gen_configs_small = [
-        iree_definitions.ModuleGenerationConfig.build(
-            compile_config=self.CASCADELAKE_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in model_groups.SMALL
-    ]
-    execution_configs_small = [
-        module_execution_configs.get_elf_local_task_config(1),
-        module_execution_configs.get_elf_local_task_config(8)
-    ]
-    run_configs_small = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
-        module_generation_configs=gen_configs_small,
-        module_execution_configs=execution_configs_small,
-        device_specs=device_specs)
+    gen_configs_all = []
+    run_configs_all = []
 
-    # Create benchmarks for large workloads.
-    gen_configs_large = [
-        iree_definitions.ModuleGenerationConfig.build(
-            compile_config=self.CASCADELAKE_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in model_groups.LARGE
-    ]
-    # We use higher thread counts for large workloads.
-    execution_configs_large = [
-        module_execution_configs.get_elf_local_task_config(1),
-        module_execution_configs.get_elf_local_task_config(8),
-        # We use (MAX_CORE - 2) here to determine the maximum number of threads to use on a NUMA node.
-        # 13 threads are currently disabled until we switch to using c2-standard-60.
-        # module_execution_configs.get_elf_local_task_config(13),
-    ]
-    run_configs_large = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
-        module_generation_configs=gen_configs_large,
-        module_execution_configs=execution_configs_large,
-        device_specs=device_specs)
+    # We avoid the full combinatorial explosion of testing all models with all
+    # thread counts and instead test each model with a number of threads
+    # appropriate for its size and configurations we're interested in.
+    for model_config, thread_counts in model_group_and_threads:
+      gen_config = iree_definitions.ModuleGenerationConfig.build(
+          compile_config=compile_config,
+          imported_model=iree_definitions.ImportedModel.from_model(
+              model_config))
 
-    return (gen_configs_small + gen_configs_large,
-            run_configs_small + run_configs_large)
+      execution_configs = []
+      for thread in thread_counts:
+        if thread == 0:
+          execution_configs.append(
+              module_execution_configs.ELF_LOCAL_SYNC_CONFIG)
+        else:
+          execution_configs.append(
+              module_execution_configs.get_elf_local_task_config(thread))
 
-  def _generate_experimental(
-      self, device_specs: List[common_definitions.DeviceSpec]
-  ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
-             List[iree_definitions.E2EModelRunConfig]]:
-    excluded_models_for_experiments = [
-        # Disabled due to https://github.com/openxla/iree/issues/11174.
-        tf_models.RESNET50_TF_FP32,
-        # Disabled due to https://github.com/openxla/iree/issues/12772.
-        torch_models.EFFICIENTNET_V2_S_FP32_TORCH,
-        # Disabled due to https://github.com/openxla/iree/issues/12772.
-        torch_models.EFFICIENTNET_B7_FP32_TORCH,
-    ]
-    gen_configs = [
-        iree_definitions.ModuleGenerationConfig.build(
-            compile_config=self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG,
-            imported_model=iree_definitions.ImportedModel.from_model(model))
-        for model in model_groups.SMALL + model_groups.LARGE
-        if model not in excluded_models_for_experiments
-    ]
-    # We run the fuse padding compiler config under 4 threads only.
-    default_execution_configs = [
-        module_execution_configs.get_elf_local_task_config(4)
-    ]
+      run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+          module_generation_configs=[gen_config],
+          module_execution_configs=execution_configs,
+          device_specs=device_specs)
 
-    run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
-        module_generation_configs=gen_configs,
-        module_execution_configs=default_execution_configs,
-        device_specs=device_specs)
+      gen_configs_all.append(gen_config)
+      run_configs_all.extend(run_configs)
 
-    return (gen_configs, run_configs)
+    return (gen_configs_all, run_configs_all)
 
   def generate(
       self
@@ -120,10 +83,12 @@ class Linux_x86_64_Benchmarks(object):
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
 
-    default_gen_configs, default_run_configs = self._generate_default(
+    default_gen_configs, default_run_configs = self._generate(
+        model_groups.x86_64_MODELS_AND_THREADS, self.CASCADELAKE_COMPILE_CONFIG,
         cascadelake_devices)
-    experimental_gen_configs, experimental_run_configs = self._generate_experimental(
-        cascadelake_devices)
+    experimental_gen_configs, experimental_run_configs = self._generate(
+        model_groups.x86_64_MODELS_AND_THREADS_EXPERIMENTAL,
+        self.CASCADELAKE_FUSE_PADDING_COMPILE_CONFIG, cascadelake_devices)
 
     return (default_gen_configs + experimental_gen_configs,
             default_run_configs + experimental_run_configs)

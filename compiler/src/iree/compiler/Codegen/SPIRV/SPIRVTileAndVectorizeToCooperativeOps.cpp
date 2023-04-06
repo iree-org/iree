@@ -351,7 +351,9 @@ class SPIRVTileToCooperativeOpsPass final
 
       RewritePatternSet canonicalizationPatterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
-      populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
+      SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
+      populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns,
+                                                      numWorkgroups);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(canonicalizationPatterns)))) {
         return signalPassFailure();

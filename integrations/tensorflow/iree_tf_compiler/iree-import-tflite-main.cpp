@@ -164,7 +164,10 @@ int main(int argc, char **argv) {
   // Run transformations.
   PassManager pm(&context, module.get()->getName().getStringRef(),
                  PassManager::Nesting::Implicit);
-  applyPassManagerCLOptions(pm);
+  if (failed(applyPassManagerCLOptions(pm))) {
+    llvm::errs() << "Failed to apply pass manager CL options\n";
+    return 1;
+  }
   applyDefaultTimingPassManagerCLOptions(pm);
   mlir::iree_integrations::TFL::buildTFLImportPassPipeline(pm);
   if (failed(pm.run(*module))) {

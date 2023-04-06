@@ -36,7 +36,8 @@ static bool addRangeMetadata(uint64_t Low, uint64_t High, CallInst *C) {
   return true;
 }
 
-static bool runOnFunction(Function &F) {
+static bool runOnFunction(Function &F,
+                          const std::array<int32_t, 3> &maxWorkgroupSize) {
   bool Changed = false;
   // We could use the number of block dispatched if it is known at compile time
   // however this would prevent re-using kernel re-use. For now just use the API
@@ -50,6 +51,28 @@ static bool runOnFunction(Function &F) {
     Function *Callee = Call->getCalledFunction();
     if (!Callee) continue;
     switch (Callee->getIntrinsicID()) {
+      // Index within block
+      case Intrinsic::nvvm_read_ptx_sreg_tid_x:
+        Changed |= addRangeMetadata(0, maxWorkgroupSize[0], Call);
+        break;
+      case Intrinsic::nvvm_read_ptx_sreg_tid_y:
+        Changed |= addRangeMetadata(0, maxWorkgroupSize[1], Call);
+        break;
+      case Intrinsic::nvvm_read_ptx_sreg_tid_z:
+        Changed |= addRangeMetadata(0, maxWorkgroupSize[2], Call);
+        break;
+
+      // Block size
+      case Intrinsic::nvvm_read_ptx_sreg_ntid_x:
+        Changed |= addRangeMetadata(1, maxWorkgroupSize[0] + 1, Call);
+        break;
+      case Intrinsic::nvvm_read_ptx_sreg_ntid_y:
+        Changed |= addRangeMetadata(1, maxWorkgroupSize[1] + 1, Call);
+        break;
+      case Intrinsic::nvvm_read_ptx_sreg_ntid_z:
+        Changed |= addRangeMetadata(1, maxWorkgroupSize[2] + 1, Call);
+        break;
+
       // Index within grid
       case Intrinsic::nvvm_read_ptx_sreg_ctaid_x:
         Changed |= addRangeMetadata(0, MaxGridSizeX, Call);
@@ -78,6 +101,6 @@ static bool runOnFunction(Function &F) {
 
 PreservedAnalyses SetBlockIdsRangePass::run(Function &F,
                                             FunctionAnalysisManager &AM) {
-  return runOnFunction(F) ? PreservedAnalyses::none()
-                          : PreservedAnalyses::all();
+  return runOnFunction(F, maxWorkgroupSize) ? PreservedAnalyses::none()
+                                            : PreservedAnalyses::all();
 }

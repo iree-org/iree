@@ -135,7 +135,7 @@ class ConcretizePadResultShapePass final
 
     {
       RewritePatternSet patterns(context);
-      populateConcretizePadResultShapePatterns(context, patterns);
+      populateConcretizePadResultShapePatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -157,15 +157,16 @@ createConcretizePadResultShapePass() {
   return std::make_unique<ConcretizePadResultShapePass>();
 }
 
-void populateConcretizePadResultShapePatterns(MLIRContext *context,
-                                              RewritePatternSet &patterns) {
+void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
+                                              ArrayRef<int64_t> numWorkgroups) {
+  MLIRContext *context = patterns.getContext();
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   // Pulling in upstream scf.for and affine.min canonicalization patterns.
   // They work on tiled (but not distributed) loops.
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
   // Pulling in IREE scf.for and affine.min canonicalization patterns.
   // They work on tiled and distributed loops.
-  populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+  populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
   // Pulling in flow.dispatch.tensor.load op canonicalization patterns.
   // Tiling can generate dim ops taking them as operands.
   IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,

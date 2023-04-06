@@ -62,7 +62,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs()
           << "\n--- After folding consumer add ops into contraction op "
              "iteself ---\n";
@@ -119,7 +119,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
                                             std::move(vectorUnrollPatterns)))) {
       return signalPassFailure();
     }
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After vector unrolling ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
@@ -146,7 +146,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After vector specific operatrion lowering ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";

@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_PASSES_H_
 
 #include <memory>
+#include <string>
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -294,10 +295,11 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit = 1);
 
-/// Populates patterns with patterns to concretize tensor.pad op'ss result
-/// shape.
-void populateConcretizePadResultShapePatterns(MLIRContext *context,
-                                              RewritePatternSet &patterns);
+/// Populates patterns with patterns to concretize tensor.pad op's result
+/// shape. `numWorkgroups`, if not empty, will be used as bounds for simplifying
+/// workgroup ID ops.
+void populateConcretizePadResultShapePatterns(
+    RewritePatternSet &patterns, ArrayRef<int64_t> numWorkgroups = {});
 
 //------------------------------------------------------------------------------
 // LLVMCPU
@@ -336,6 +338,15 @@ struct LLVMCPUVectorizationPassOptions {
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
     const LLVMCPUVectorizationPassOptions &options);
+
+// Pass to lower Vector ops before conversion to LLVM.
+struct LLVMCPUVectorLoweringPassOptions {
+  std::string splitVectorTransfersTo = "";
+  bool lowerVectorTransposeToAVX2 = false;
+};
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
+    const LLVMCPUVectorLoweringPassOptions &options);
 
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(

@@ -275,7 +275,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
     RewritePatternSet patterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
-    populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+    SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
+    populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       // TODO(#4759): This does not converge after the max number of iterations.
       // It indicates that some pattern upstream is generating ops even when the

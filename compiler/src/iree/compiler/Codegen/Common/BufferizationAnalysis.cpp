@@ -615,7 +615,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
   if (funcOp.walk<WalkOrder::PreOrder>(bufferMappingFn).wasInterrupted()) {
     return failure();
   }
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+  LLVM_DEBUG({
     llvm::dbgs() << "After First walk ";
     plan.dump();
   });
@@ -631,7 +631,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
       }
     }
   });
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+  LLVM_DEBUG({
     llvm::dbgs() << "After Destructive update walk ";
     plan.dump();
   });
@@ -644,7 +644,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
     return failure();
   }
 
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+  LLVM_DEBUG({
     llvm::dbgs() << "After Store walk ";
     plan.dump();
   });

@@ -82,6 +82,8 @@ BENCHMARK_THRESHOLDS = [
     # suitable anymore.
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
+    BenchmarkThreshold(re.compile(r"^EfficientNet.*int8.*GPU-Mali"), 1 * 10**6,
+                       ThresholdUnit.VALUE_NS),
     BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
 
