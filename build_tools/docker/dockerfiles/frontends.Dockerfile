@@ -15,6 +15,7 @@ COPY integrations/tensorflow/test/requirements.txt ./
 # doesn't appear to be a pip-native way to get the minimum versions, but this
 # hack works for simple files, at least.
 RUN sed -i 's/>=/==/' requirements.txt \
+  && python3 -m pip install --upgrade pip \
   && python3 -m pip install --upgrade -r requirements.txt \
   && rm -rf /pip-install
 

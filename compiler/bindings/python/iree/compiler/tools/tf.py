@@ -102,7 +102,7 @@ class ImportOptions(CompilerOptions):
 
   exported_names: Sequence[str] = ()
   import_only: bool = False
-  import_type: Union[ImportType, str] = ImportType.OBJECT_GRAPH
+  import_type: ImportType = ImportType.OBJECT_GRAPH
   input_type: Union[InputType, str] = InputType.XLA
   saved_model_tags: Set[str] = field(default_factory=set)
   import_extra_args: Sequence[str] = ()
@@ -180,6 +180,23 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
   return cl
 
 
+def get_mlir(saved_model_dir, exported_names=None):
+  from tensorflow.python import pywrap_mlir
+
+  if exported_names is None:
+    exported_names = []
+  result = pywrap_mlir.experimental_convert_saved_model_to_mlir(
+      saved_model_dir,
+      exported_names=",".join(exported_names),
+      show_debug_info=False)
+
+  pipeline = ["tf-lower-to-mlprogram-and-hlo"]
+  result = pywrap_mlir.experimental_run_pass_pipeline(result,
+                                                      ",".join(pipeline),
+                                                      show_debug_info=False)
+  return result
+
+
 def compile_saved_model(saved_model_dir: str, **kwargs):
   """Compiles an on-disk saved model to an IREE binary.
 
@@ -192,13 +209,13 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
   """
   with TempFileSaver.implicit() as tfs:
     options = ImportOptions(**kwargs)
-    import_cl = build_import_command_line(saved_model_dir, tfs, options)
-    if options.import_only:
-      # One stage tool pipeline.
-      result = invoke_immediate(import_cl)
-      if options.output_file:
-        return None
-      return result
+
+  with tempfile.NamedTemporaryFile(mode="w") as temp_file:
+    # Generate MLIR
+    mlir = get_mlir(saved_model_dir, exported_names=options.exported_names)
+    temp_file.write(mlir)
+    temp_file.flush()
+    import_cl = ["cat", temp_file.name]
 
     # Full compilation pipeline.
     compile_cl = build_compile_command_line("-", tfs, options)
