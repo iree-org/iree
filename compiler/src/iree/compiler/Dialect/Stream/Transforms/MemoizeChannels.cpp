@@ -88,13 +88,12 @@ class MemoizeChannelsPass : public MemoizeChannelsBase<MemoizeChannelsPass> {
       auto initializerOp =
           moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
-      auto createOp = funcBuilder.create<IREE::Stream::ChannelCreateOp>(
-          fusedLoc, channelType, /*id=*/Value{},
+      auto defaultOp = funcBuilder.create<IREE::Stream::ChannelDefaultOp>(
+          fusedLoc, channelType,
           /*group=*/anyDefaultOp.getGroupAttr(),
-          /*rank=*/Value{},
-          /*count=*/Value{}, affinityAttr);
+          affinityAttr);
       funcBuilder.create<IREE::Util::GlobalStoreOp>(
-          fusedLoc, createOp.getResult(), globalOp.getName());
+          fusedLoc, defaultOp.getResult(), globalOp.getName());
       funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);
 
       for (auto defaultOp : defaultOps) {

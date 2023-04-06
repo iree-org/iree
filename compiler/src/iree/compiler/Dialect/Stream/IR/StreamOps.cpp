@@ -3110,15 +3110,6 @@ void ChannelSplitOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// stream.channel.create
-//===----------------------------------------------------------------------===//
-
-void ChannelCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "channel");
-}
-
-//===----------------------------------------------------------------------===//
 // stream.channel.rank
 //===----------------------------------------------------------------------===//
 

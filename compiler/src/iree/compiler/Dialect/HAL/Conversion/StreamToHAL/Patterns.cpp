@@ -1253,58 +1253,6 @@ struct TimepointAwaitOpPattern
   }
 };
 
-struct ChannelCreateOpPattern
-    : public StreamConversionPattern<IREE::Stream::ChannelCreateOp> {
-  using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::Stream::ChannelCreateOp createOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto [device, queueAffinity] =
-        lookupDeviceAndQueueAffinityFor(createOp, rewriter);
-    Value neg1I32;
-    auto getDefault = [&]() {
-      if (!neg1I32) {
-        neg1I32 =
-            rewriter.create<arith::ConstantIntOp>(createOp.getLoc(), -1, 32);
-      }
-      return neg1I32;
-    };
-    Value id = adaptor.getId();
-    if (!id) {
-      id = rewriter.create<IREE::Util::NullOp>(
-          createOp.getLoc(), rewriter.getType<IREE::Util::BufferType>());
-    }
-    Value group =
-        adaptor.getGroupAttr()
-            ? rewriter
-                  .create<IREE::Util::BufferConstantOp>(
-                      createOp.getLoc(),
-                      /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
-                      /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
-                  .getResult()
-            : rewriter
-                  .create<IREE::Util::NullOp>(
-                      createOp.getLoc(),
-                      rewriter.getType<IREE::Util::BufferType>())
-                  .getResult();
-    Value rank =
-        adaptor.getRank()
-            ? rewriter.create<arith::IndexCastOp>(
-                  createOp.getLoc(), rewriter.getI32Type(), adaptor.getRank())
-            : getDefault();
-    Value count =
-        adaptor.getRank()
-            ? rewriter.create<arith::IndexCastOp>(
-                  createOp.getLoc(), rewriter.getI32Type(), adaptor.getCount())
-            : getDefault();
-    rewriter.replaceOpWithNewOp<IREE::HAL::ChannelCreateOp>(
-        createOp, rewriter.getType<IREE::HAL::ChannelType>(), device,
-        queueAffinity, /*flags=*/rewriter.getI32IntegerAttr(0), id, group, rank,
-        count);
-    return success();
-  }
-};
-
 struct ChannelDefaultOpPattern
     : public StreamConversionPattern<IREE::Stream::ChannelDefaultOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -1480,9 +1428,9 @@ void populateStreamToHALPatterns(MLIRContext *context,
                   TimepointExportOpPattern, TimepointChainExternalOpPattern,
                   TimepointJoinOpPattern, TimepointBarrierOpPattern,
                   TimepointAwaitOpPattern>(mapping, typeConverter, context);
-  patterns.insert<ChannelCreateOpPattern, ChannelDefaultOpPattern,
-                  ChannelSplitOpPattern, ChannelRankOpPattern,
-                  ChannelCountOpPattern>(mapping, typeConverter, context);
+  patterns.insert<ChannelDefaultOpPattern, ChannelSplitOpPattern,
+                  ChannelRankOpPattern, ChannelCountOpPattern>(
+      mapping, typeConverter, context);
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }
 

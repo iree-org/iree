@@ -3375,44 +3375,6 @@ def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
   }];
 }
 
-def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
-  AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  Stream_AffinityOp,
-]> {
-  let summary = [{creates a new channel for collective communication}];
-  let description = [{
-    Returns a new channel with the given rank associated with the specified
-    affinity. Collective operations using this channel must only be submitted on
-    compatible affinities.
-
-    The group and ID are optional and may be null. The rank and count can be
-    omitted to indicate a default inherited from the environment or device
-    configuration at runtime.
-  }];
-
-  let arguments = (ins
-    Optional<Util_BufferType>:$id,
-    OptionalAttr<StrAttr>:$group,
-    Optional<Index>:$rank,
-    Optional<Index>:$count,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_Channel:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    (`id` `(` $id^ `)`)?
-    (`group` `(` $group^ `)`)?
-    (`rank` `(` $rank^ `)`)?
-    (`count` `(` $count^ `)`)?
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
 def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {

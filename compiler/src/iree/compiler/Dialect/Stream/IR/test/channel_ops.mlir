@@ -9,16 +9,6 @@ func.func @channel_default() {
 
 // -----
 
-// CHECK-LABEL: @channel_create
-//  CHECK-SAME: (%[[RANK:.+]]: index, %[[COUNT:.+]]: index)
-func.func @channel_create(%rank: index, %count: index) {
-  // CHECK: %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) rank(%[[RANK]]) count(%[[COUNT]]) : !stream.channel
-  %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) rank(%rank) count(%count) : !stream.channel
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @channel_rank
 //  CHECK-SAME: (%[[CHANNEL:.+]]: !stream.channel)
 func.func @channel_rank(%channel: !stream.channel) -> index {
