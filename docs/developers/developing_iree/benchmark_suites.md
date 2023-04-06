@@ -2,7 +2,7 @@
 
 > :exclamation: The TensorFlow benchmarks were disabled in
 [#12758](https://github.com/openxla/iree/pull/12758/) in the interest of
-severing the build dependency on TF. It should be possible to re-enable somel /
+severing the build dependency on TF. It should be possible to re-enable some /
 all of the tests with a bit of effort.
 
 **We are in the progress of replacing the legacy benchmark suites. Currently the
