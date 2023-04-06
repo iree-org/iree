@@ -15,6 +15,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/InputConversion/MHLO/ConvertMHLOToFlow.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -215,6 +216,19 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 
     // Pack the results back to mhlo::ComplexOp.
     rewriter.replaceOpWithNewOp<mhlo::ComplexOp>(op, op.getType(), real, imag);
+    return success();
+  }
+};
+
+struct OptimizationBarrierOpConversion
+    : public OpConversionPattern<mhlo::OptimizationBarrierOp> {
+  using OpConversionPattern<mhlo::OptimizationBarrierOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::OptimizationBarrierOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(
+        op, op.getOperands());
     return success();
   }
 };
@@ -462,8 +476,9 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHloToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
-  patterns.insert<ConcatenateOpConversion, FftOpConversion>(
-      typeConverter, context, PatternBenefit(1000));
+  patterns.insert<ConcatenateOpConversion, FftOpConversion,
+                  OptimizationBarrierOpConversion>(typeConverter, context,
+                                                   PatternBenefit(1000));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createMHLOToLinalgOnTensorsPass() {
