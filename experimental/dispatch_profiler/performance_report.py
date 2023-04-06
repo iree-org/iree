@@ -33,7 +33,7 @@ class PerformanceResult:
     print('Bytes         : %d' % self.bytes)
     print('Flops         : %d' % self.flops)
     print('Runtime(ms)   : %s' % runtime)
-    print('GFLOP/s       : %s' % gflops)
+    print('GFLOPs       : %s' % gflops)
 
   def create_dict_entry(self):
     """Returns a dictionary with the performance result."""
@@ -48,7 +48,7 @@ class PerformanceResult:
         'Bytes': self.bytes,
         'Flops': self.flops,
         'Runtime(ms)': runtime,
-        'GFLOP/s': gflops,
+        'GFLOPs': gflops,
     }
 
 
@@ -79,7 +79,7 @@ class PerformanceReport:
       # Create and write the header.
       common_header = ['Provider', 'Operation', 'Configuration']
       performance_header = [
-          'Verification', 'Bytes', 'Flops', 'Runtime(ms)', 'GFLOP/s'
+          'Verification', 'Bytes', 'Flops', 'Runtime(ms)', 'GFLOPs'
       ]
       csv_header = common_header + performance_header
 

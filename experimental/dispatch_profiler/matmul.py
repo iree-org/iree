@@ -66,6 +66,21 @@ class MatmulOperation:
       layoutResult=ShortLayoutTypeName[self.result.layout]
     )
 
+  def csv_headers(self):
+    """Returns the csv headers for the matmul operation."""
+    return ["M", "N", "K", "lhs", "rhs", "result"]
+
+  def create_dict_entry(self):
+    """Returns the dictionary entry for the matmul operation."""
+    return {
+        "M": self.M,
+        "N": self.N,
+        "K": self.K,
+        "lhs": self.lhs.name(),
+        "rhs": self.rhs.name(),
+        "result": self.result.name(),
+    }
+
   def lhs_npy_shape(self):
     """Returns the shape of the lhs numpy array as a string in the format "MxKxDataType"."""
     return f"{self.M}x{self.K}x{DataTypeName[self.lhs.datatype]}"
@@ -109,6 +124,23 @@ class MatmulCompilationInfo:
     self.tile_description = tile_description  # TileDescription
     self.translation_info = translation_info  # TranslationInfo
     self.config_type = config_type  # CompilationConfigType
+
+  def csv_headers(self):
+    """Returns the csv headers for the matmul compilation info."""
+    return ["Core class", "Math instruction"]
+
+  def create_dict_entry(self):
+    """Returns the dictionary entry for the matmul compilation info."""
+    if self.config_type == CompilationConfigType.Default:
+      return {
+          "Core class": "Default",
+          "Math instruction": "Default",
+      }
+
+    return {
+        "Core class": self.translation_info.split('_')[0],
+        "Math instruction": self.translation_info.split('_')[1],
+    }
 
   def name(self):
     """Procedurally generated name for the matmul compilation info."""
@@ -491,11 +523,8 @@ class MatmulGenerator:
   backend and f16 data type."""
 
   def __init__(self, args):
-    self.args = args
 
-    self.default_config = False if args.default_config in [
-        'False', 'false', '0'
-    ] else True
+    self.args = args
 
     self.translation_infos = [
         #TranslationInfo.LLVMGPUMatmulSimt,  # CUDA Core (SMIT)
@@ -509,7 +538,8 @@ class MatmulGenerator:
     self.problem_shapes = [[128, 256, 8192]]
     """
     self.problem_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
-                           [2560, 2560, 2560], [3456, 1024, 2048]]
+        [2560, 2560, 2560], [3456, 1024, 2048]
+    ]
     """
 
     # List of pre-definied matmul dispatch collections.
@@ -597,7 +627,7 @@ class MatmulGenerator:
           operation, configuration_list)
 
       # Add default configuration if requested.
-      if self.default_config:
+      if self.args.default_config:
         supported_configuration_list.append(
             MatmulCompilationInfo([], [], CompilationConfigType.Default))
 
@@ -637,7 +667,7 @@ class MatmulGenerator:
           operation, configuration_list)
 
       # Add default configuration if requested.
-      if self.default_config:
+      if self.args.default_config:
         supported_configuration_list.append(
             MatmulCompilationInfo([], [], CompilationConfigType.Default))
 

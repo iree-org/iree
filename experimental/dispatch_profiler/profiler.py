@@ -40,8 +40,8 @@ if __name__ == "__main__":
   # Parse command line arguments
   ###############################################################################
   parser = argparse.ArgumentParser(description="IREE Python profiler tool for "\
-                                   "verifcation and performance profiling tool "\
-                                    "for IREE-compiled MLIR operations.")
+           "verifcation and performance profiling tool for IREE-compiled "\
+           "MLIR operations.")
 
   args = parse_profiler_arguments(parser)
   ###############################################################################

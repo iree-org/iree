@@ -201,9 +201,9 @@ TranslationInfoTag = {
 }
 
 TranslationInfoName = {
-    TranslationInfo.LLVMGPUMatmulSIMT: "simt",
+    TranslationInfo.LLVMGPUMatmulSIMT: "simt_ffma",
     TranslationInfo.LLVMGPUMatmulTensorCore: "tensorcore_wmma",
-    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "tensorcore_mma_sync",
+    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "tensorcore_mmasync",
 }
 
 
