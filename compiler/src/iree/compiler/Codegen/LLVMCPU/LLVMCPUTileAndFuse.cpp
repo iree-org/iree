@@ -163,8 +163,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
       getLoweringConfig(getComputeOps(funcOp));
   if (failed(maybeLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "can't find lowering_config, skip TileAndFuse");
+    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip TileAndFuse");
     return;
   }
 
