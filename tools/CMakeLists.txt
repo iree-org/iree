@@ -28,7 +28,7 @@ configure_file(build_config_template.txt.in build_config.txt)
 # For sub-directories, we want targets fully qualified relative to the
 # root. But after, we want those in *this* directory to be unqualified
 # (i.e. 'iree-compile').
-set(IREE_PACKAGE_ROOT_PREFIX "iree/tools/")
+set(IREE_PACKAGE_ROOT_PREFIX "iree/tools")
 iree_add_all_subdirs()
 set(IREE_PACKAGE_ROOT_PREFIX "")
 
