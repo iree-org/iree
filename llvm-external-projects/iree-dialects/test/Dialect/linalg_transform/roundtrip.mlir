@@ -23,8 +23,8 @@ transform.sequence failures(propagate) {
   // CHECK: vector.lower_contraction %[[FUNC]] {{.*}}
   %6 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
   transform.vector.lower_contraction %6
-    lowering_strategy = "outerproduct" 
+    lowering_strategy = "outerproduct"
       : (!pdl.operation) -> !pdl.operation
   // CHECK: lower_to_llvm
-  lower_to_llvm
+  lower_to_llvm %arg0 : (!pdl.operation) -> !pdl.operation
 }

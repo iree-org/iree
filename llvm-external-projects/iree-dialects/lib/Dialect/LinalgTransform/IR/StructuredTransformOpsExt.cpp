@@ -519,6 +519,10 @@ using namespace mlir::linalg;
 DiagnosedSilenceableFailure
 transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
                                     mlir::transform::TransformState &state) {
+  ArrayRef<Operation *> payloadOps = state.getPayloadOps(getTarget());
+  if (payloadOps.size() != 1 || !isa<ModuleOp>(payloadOps[0]))
+    return emitSilenceableError() << "expected single module target";
+  ModuleOp moduleOp = cast<ModuleOp>(payloadOps[0]);
 
   //===------------------------------------------------------------------===//
   // BEGIN: Copied from upstream, this needs to be retired once we have a
@@ -584,7 +588,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
   // Convert remaining unrealized_casts (always needed).
   pm.addPass(createReconcileUnrealizedCastsPass());
 
-  if (failed(pm.run(state.getTopLevel())))
+  if (failed(pm.run(moduleOp)))
     return DiagnosedSilenceableFailure::definiteFailure();
 
   //===------------------------------------------------------------------===//
@@ -594,7 +598,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
 
   // Make all arguments noalias for now.
   // FIXME: this is a terrible hack!
-  state.getTopLevel()->walk([](LLVM::LLVMFuncOp funcOp) {
+  moduleOp->walk([](LLVM::LLVMFuncOp funcOp) {
     for (int64_t i = 0; i < funcOp.getNumArguments(); ++i) {
       if (!funcOp.getFunctionType()
                .getParamType(i)
@@ -603,6 +607,8 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
       funcOp.setArgAttr(i, "llvm.noalias", UnitAttr::get(funcOp.getContext()));
     }
   });
+
+  result.set(getTransformed().cast<OpResult>(), payloadOps);
   return DiagnosedSilenceableFailure::success();
 }
 
