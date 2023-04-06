@@ -146,11 +146,6 @@ class MLIRDialectType(Enum):
   MHLO = "mhlo"
 
 
-# Placeholder to be replaced with entry function name when outputting the actual
-# flag list.
-ENTRY_FUNCTION_PLACEHOLDER = r"${ENTRY_FUNCTION}"
-
-
 @serialization.serializable(type_key="iree_import_configs")
 @dataclass(frozen=True)
 class ImportConfig(object):
@@ -178,7 +173,7 @@ DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v1",
-        f"--tf-savedmodel-exported-names={ENTRY_FUNCTION_PLACEHOLDER}"
+        r"--tf-savedmodel-exported-names=${ENTRY_FUNCTION}"
     ])
 
 DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
@@ -188,7 +183,7 @@ DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v2",
-        f"--tf-savedmodel-exported-names={ENTRY_FUNCTION_PLACEHOLDER}"
+        r"--tf-savedmodel-exported-names=${ENTRY_FUNCTION}"
     ])
 
 DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
@@ -244,9 +239,9 @@ class ImportedModel(object):
                import_config=config)
 
 
-# Placeholder in flags to be replaced with module dir path. The whole path
-# should be written in the POSIX format and starts with the variable.
-MODULE_DIR_PLACEHOLDER = r"${MODULE_DIR}"
+# Variable in flags to be replaced with module dir path. The whole path should
+# be written in the POSIX format and starts with the variable.
+MODULE_DIR_VARIABLE = r"${MODULE_DIR}"
 
 
 @serialization.serializable(type_key="iree_module_generation_configs",
@@ -275,11 +270,11 @@ class ModuleGenerationConfig(object):
       platform-dependent path string.
       """
       parts = pathlib.PurePosixPath(value).parts
-      if MODULE_DIR_PLACEHOLDER not in parts:
+      if MODULE_DIR_VARIABLE not in parts:
         return value
-      if parts[0] != MODULE_DIR_PLACEHOLDER:
+      if parts[0] != MODULE_DIR_VARIABLE:
         raise ValueError(
-            f"'{MODULE_DIR_PLACEHOLDER}' needs to be the head of flag value"
+            f"'{MODULE_DIR_VARIABLE}' needs to be the head of flag value"
             f" if present, but got '{value}'.")
       # Properly construct the platform-dependent path.
       return str(module_dir_path.joinpath(*parts[1:]))
@@ -300,10 +295,6 @@ class ModuleGenerationConfig(object):
                imported_model=imported_model,
                compile_config=compile_config,
                compile_flags=compile_flags)
-
-
-# Placeholder to be replaced with gpu id when outputting the actual flag list.
-GPU_ID_PLACEHOLDER = r"${GPU_ID}"
 
 
 class E2EModelRunTool(Enum):
@@ -352,7 +343,7 @@ class E2EModelRunConfig(object):
         imported_model=module_generation_config.imported_model,
         input_data=input_data,
         module_execution_config=module_execution_config,
-        gpu_id=GPU_ID_PLACEHOLDER)
+        gpu_id=r"${GPU_ID}")
     return cls(composite_id=composite_id,
                name=name,
                module_generation_config=module_generation_config,

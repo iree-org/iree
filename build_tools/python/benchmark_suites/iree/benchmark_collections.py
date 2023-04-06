@@ -44,7 +44,8 @@ def generate_benchmarks(
   # For now we simply track compilation statistics of all modules.
   for gen_config in all_gen_configs:
     compile_config = gen_config.compile_config
-    scheduling_stats_path = f"{iree_definitions.MODULE_DIR_PLACEHOLDER}/{iree_artifacts.SCHEDULING_STATS_FILENAME}"
+    # Use POSIX path, see the comment of iree_definitions.MODULE_DIR_VARIABLE.
+    scheduling_stats_path = f"{iree_definitions.MODULE_DIR_VARIABLE}/{iree_artifacts.SCHEDULING_STATS_FILENAME}"
     compile_stats_config = iree_definitions.CompileConfig.build(
         id=compile_config.id + COMPILE_STATS_ID_SUFFIX,
         tags=compile_config.tags + [COMPILE_STATS_TAG],
