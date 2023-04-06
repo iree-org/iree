@@ -54,9 +54,9 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
                    "thread distribution is enabled"),
     llvm::cl::init(8));
 
-static llvm::cl::opt<bool> clEnableDistribution(
-    "iree-codegen-llvm-enable-distribution",
-    llvm::cl::desc("enable thread distribution in codegen"),
+static llvm::cl::opt<bool> clDisableDistribution(
+    "iree-codegen-llvm-disable-distribution",
+    llvm::cl::desc("disable thread distribution in codegen"),
     llvm::cl::init(true));
 
 static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
@@ -368,7 +368,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   size_t numDims = lbs.size();
   // Set all the distribution tile sizes to zero if thread distribution is
   // disabled.
-  if (!clEnableDistribution) {
+  if (!clDisableDistribution) {
     return SmallVector<int64_t>(numDims, 0);
   }
 
@@ -1108,7 +1108,7 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
   unsigned numLoops = op.getLoopIteratorTypes().size();
   // Set all the distribution tile sizes to zero if thread distribution is
   // disabled.
-  if (!clEnableDistribution) {
+  if (!clDisableDistribution) {
     return SmallVector<int64_t>(numLoops, 0);
   }
 
