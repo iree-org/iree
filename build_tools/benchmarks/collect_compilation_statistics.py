@@ -97,9 +97,19 @@ def get_module_component_info(module: BinaryIO,
     size_map = dict(
         (info.filename, info.file_size) for info in module_zipfile.infolist())
 
-  vm_component_bytes = size_map[VM_COMPONENT_NAME]
-  const_component_bytes = size_map[CONST_COMPONENT_NAME]
-  identified_names = {VM_COMPONENT_NAME, CONST_COMPONENT_NAME}
+  identified_names = set()
+  if VM_COMPONENT_NAME in size_map:
+    vm_component_bytes = size_map[VM_COMPONENT_NAME]
+    identified_names.add(VM_COMPONENT_NAME)
+  else:
+    vm_component_bytes = 0
+
+  if CONST_COMPONENT_NAME in size_map:
+    const_component_bytes = size_map[CONST_COMPONENT_NAME]
+    identified_names.add(CONST_COMPONENT_NAME)
+  else:
+    const_component_bytes = 0
+
   total_dispatch_component_bytes = 0
   for filename, size in size_map.items():
     for pattern in DISPATCH_COMPONENT_PATTERNS:

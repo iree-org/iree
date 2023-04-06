@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines the groups of models."""
 
-from e2e_test_framework.models import tflite_models, torch_models, tf_models
+from e2e_test_framework.models import matmul, tflite_models, torch_models, tf_models
 
 # A list of models with thread configurations.
 # Note `0` represents sync execution.
@@ -86,6 +86,18 @@ RESNET50_TORCH_BATCHES = [
     #torch_models.RESNET50_128X3X224X224_FP32_TORCH,
     #torch_models.RESNET50_256X3X224X224_FP32_TORCH,
     #torch_models.RESNET50_2048X3X224X224_FP32_TORCH,
+]
+
+MICRO_MATMUL = [
+    matmul.MATMUL_3456X1024X2048_FP16_MLIR,
+    matmul.MATMUL_3456X1024X2048_FP32_MLIR,
+    matmul.MATMUL_2560X2560X2560_FP16_MLIR,
+    matmul.MATMUL_2560X2560X2560_FP32_MLIR,
+]
+
+MICRO_MATMUL_SPLITK = [
+    matmul.MATMUL_128X256X8192_FP16_MLIR,
+    matmul.MATMUL_128X256X8192_FP32_MLIR,
 ]
 
 RESNET50_TF_BATCHES = [
