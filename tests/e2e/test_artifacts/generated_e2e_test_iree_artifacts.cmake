@@ -2316,6 +2316,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_module_28e38bd436b036babc0fabe98b6e7c68ca3a7088e73dffff2c538adfa7d6af4c/scheduling_stats.json"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2335,6 +2337,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_439f7c958ce1d3200ea96935174cabde8e8fe6917a007f5e238553e9c2aa7625/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2501,6 +2505,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16_module_5a4c96fc279262ad7d7f1d446d0bd3685b2ca42e06b0167df5be5737c9d42901/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp16(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2520,6 +2526,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_module_27bbe62536a23529b4dd0df3d4913ee18344df9b6e2a32fc834fb7d9bc520e24/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2539,6 +2547,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_module_78511a42a50f705b944437a040e1ee3bb5b2595a3b1d4db788586fe48f9a2453/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileBertSquad_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2600,6 +2610,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_module_846b19afd4c14b3e71d59087c5a2987edd65753d39db432961ce915688d457ac/scheduling_stats.json"
   FRIENDLY_NAME
     "Resnet50TF(tf_v2) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
@@ -2705,6 +2717,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_module_9a1d228583ba1e56a19393f6938d16b5d582bb17f89fb5856b8b1c68e34abd45/scheduling_stats.json"
   FRIENDLY_NAME
     "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2726,6 +2740,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_00a22e8ada401de8f20895beff9a153585e585c2d686983e27f9d64fdf7d39a8/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2794,7 +2810,7 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16_module_6e31f637a133e03db37c47d8a920a61306e366362e066f41c0eac0455cc6c77a/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_63d75ff4a9998a86855e0e78ab2d782f52b90b58025584f3f03ec3103a81425b/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2816,6 +2832,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_module_fdce9dd1dfd20592880fce8969f91ac6abe84eca6922b4df4cbffe512abbfcb6/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2837,6 +2855,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_module_4c74339076df00d23baa17dcb3194043e0472da9d09db4e42a23841ff7bf67b0/scheduling_stats.json"
   FRIENDLY_NAME
     "MobileSSD_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2858,6 +2878,8 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-pad-consumer-fusion"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_module_152d0b6211fff7591df3418c549c979a8144fc34280c22a8b2b5ff8ea3d1b46c/scheduling_stats.json"
   FRIENDLY_NAME
     "PoseNet_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
@@ -2992,7 +3014,7 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_23a395a0b9ec63ecaeffe98988633de34fc32c267c35bc2584651d639a15af6e/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch1_module_999f2edcdf9fbc84e0969923f8605e9069810a63849973a5b74488f83d14a2fe/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargePTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3012,7 +3034,7 @@ iree_bytecode_module(
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_eb1a0a23dc0205fd44ae3b5ca385c651de811b10b6d98fa8b0fb9ef54002c728/scheduling_stats.json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch16_module_5176d0f5fa331fa047395186a866870fe4210f637472ef4bb0a3f1ba3a62a749/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargePTBatch16(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3031,6 +3053,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch24_module_e67816e321544bb61b63ed8cd8b7faa8ff7d35cca15832b5fbc117f4693b3e78/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargePTBatch24(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3049,6 +3073,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch32_module_d746ecf3d747f18306b6dea4cb6b9e9dbf987fe7fd4d0b27b39a57a213e75dd9/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargePTBatch32(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3067,6 +3093,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch48_module_439dab16cd6df449fc83eb3e1603fa86ad811e749bcad2c3e3176976c56848e5/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargePTBatch48(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3085,6 +3113,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargePTBatch64_module_815e44d1ac31402e86d0fef72e79474a25dfad3a5c15b8cdd3642e101274342d/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargePTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3103,6 +3133,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50PTBatch1_module_681f456f27dbb79e7d8d0266bf835866d9f29f87eafad7e867ac13c84602742f/scheduling_stats.json"
   FRIENDLY_NAME
     "Resnet50PTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3121,6 +3153,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50PTBatch8_module_3b0ae1403ef444d812f0c7b37fda7311e2cc4ea407850ee7b91e6984b9c86100/scheduling_stats.json"
   FRIENDLY_NAME
     "Resnet50PTBatch8(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3139,6 +3173,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509/scheduling_stats.json"
   FRIENDLY_NAME
     "EfficientNetV2STF(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3157,6 +3193,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b/scheduling_stats.json"
   FRIENDLY_NAME
     "MiniLML12H384Uncased(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
@@ -3175,6 +3213,8 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TF_module_f770b1916e0b7a9a0b4aa9480791d21a46a352002ac1e38dfcea49ec0b63ed4e/scheduling_stats.json"
   FRIENDLY_NAME
     "Resnet50TF(tf_v2) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
