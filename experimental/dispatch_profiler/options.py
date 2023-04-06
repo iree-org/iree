@@ -19,26 +19,22 @@ def add_typical_arguments(parser):
                       help="IREE top-level build directory is used to generate "\
                       "operations and npy files.This should be same that used "\
                       "to call generated.py")
-
   parser.add_argument("--operation-kind","--op-kind", \
                       dest="operation_kind", default="all", \
                       help="Specifies the operation kinds to generate.", \
                       choices=["matmul", "conv2d", "all"])
-
-  parser.add_argument("--verbose", action='store_true', \
-                      help='Prints verbose output and commands executed.')
-
   parser.add_argument("--dispatches", default='',
                       help="Comma delimited list to filter dispatches by name. "\
                       "A dispatch is a combination of operation and tuning "\
                       "configuration.")
-
   parser.add_argument("--mlir-dialect", default='linalg', \
                       help="MLIR dialect entry point at which operation is emitter.",
                       choices=["linalg", "flow", "all"])
 
+  parser.add_argument("--verbose", action='store_true', \
+                      help='Prints verbose output and commands executed.')
   parser.add_argument("--default-config", action='store_true',
-                      help="When true adds a dispatch without a pre-defined "\
+                      help="Adds a dispatch without a pre-defined "\
                       "tuning configuration and uses default configuration "\
                       "from KernelsConfig.cpp.")
 
@@ -98,7 +94,7 @@ def add_verification_arguments(parser):
       'Verification', 'Verification related options.')
 
   verification_parser.add_argument(
-                      "--verification-enabled", "--verify", default='True', \
+                      "--verification-enabled", default='True', \
                       type=str, help="Verify the operation.")
   verification_parser.add_argument(
                      "--verification-providers", default='numpy', \
@@ -130,26 +126,19 @@ def add_performance_report_arguments(parser):
   performance_report_parser.add_argument("--output", default='', \
                       help="Path to output file for csv readable results.")
   performance_report_parser.add_argument("--append", action='store_true', \
-                      help="If true, result is appended to possibly existing file. "\
-                      "Otherwise, any existing file is overwritten.")
-
+                      help="Appends the results to existing file. "\
+                      "o.w., the existing file is overwritten.")
   performance_report_parser.add_argument("--tags", default='', \
-                      help="Inserts leading columns in output table and uniform "\
-                        "values for each column. Useful for generating pivot tables.")
+                      help="Inserts leading columns in output table "\
+                      "and uniform values for each column. Useful for "\
+                      "generating pivot tables.")
 
 
 ###############################################################################
 # Parser all the arguments for a script function:
 # parse_generator_arguments() for generator.py
 # parse_profiler_arguments() for profiler.py
-# Parser all the arguments for a script function:
-# parse_generator_arguments() for generator.py
-# parse_profiler_arguments() for profiler.py
 ###############################################################################
-
-
-def parse_generator_arguments(parser):
-  """Adds and parse all the arguments for the *generator.py* script."""
 
 
 def parse_generator_arguments(parser):
@@ -158,10 +147,6 @@ def parse_generator_arguments(parser):
   add_iree_compile_arguments(parser)
   args = parser.parse_args()
   return args
-
-
-def parse_profiler_arguments(parser):
-  """Adds and parse all the arguments for the *profiler.py* script."""
 
 
 def parse_profiler_arguments(parser):
@@ -175,8 +160,9 @@ def parse_profiler_arguments(parser):
   args = parser.parse_args()
 
   # Boolenize the string arguments from command line.
-  # This boolean arguments are specified as `argument=<true|false>` as it makes
-  # it easier to read and convey the meaning.
+  # The boolean arguments below are specified as `--argument=<true|false>`
+  # For the particular arguments, it makes easier to read and
+  # convey the meaning.
   args.verification_enabled = False if args.verification_enabled in [
       'False', 'false', '0'
   ] else True

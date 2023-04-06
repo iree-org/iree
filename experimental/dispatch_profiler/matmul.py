@@ -532,15 +532,11 @@ class MatmulGenerator:
         TranslationInfo.
         LLVMGPUMatmulTensorCoreMmaSync,  # Tensor Core (MMA.SYNC)
     ]
-
-    self.problem_shapes = [[128, 256, 8192]]
-    """
-    self.problem_shapes = [[128, 256, 8192]]
     """
     self.problem_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
-        [2560, 2560, 2560], [3456, 1024, 2048]
-    ]
+                           [2560, 2560, 2560], [3456, 1024, 2048]]
     """
+    self.problem_shapes = [[128, 256, 8192]]
 
     # List of pre-definied matmul dispatch collections.
     self.dispatches_collection_list = []
