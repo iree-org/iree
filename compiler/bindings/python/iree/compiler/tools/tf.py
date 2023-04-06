@@ -209,9 +209,6 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
   """
   with TempFileSaver.implicit() as tfs:
     options = ImportOptions(**kwargs)
-    # XXX: Delete before merging if tests pass
-    if options.import_only:
-      raise Exception("Import only called!")
 
   with tempfile.NamedTemporaryFile(mode="w") as temp_file:
     # Generate MLIR
