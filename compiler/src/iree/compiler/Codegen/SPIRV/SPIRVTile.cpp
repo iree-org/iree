@@ -218,7 +218,8 @@ static void fusePadIntoConsumer(func::FuncOp funcOp) {
 static void concretizePadShape(func::FuncOp funcOp) {
   MLIRContext *context = funcOp.getContext();
   RewritePatternSet patterns(context);
-  populateConcretizePadResultShapePatterns(context, patterns);
+  SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
+  populateConcretizePadResultShapePatterns(patterns, numWorkgroups);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
   LLVM_DEBUG({

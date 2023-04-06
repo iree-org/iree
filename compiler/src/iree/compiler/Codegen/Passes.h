@@ -295,10 +295,11 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit = 1);
 
-/// Populates patterns with patterns to concretize tensor.pad op'ss result
-/// shape.
-void populateConcretizePadResultShapePatterns(MLIRContext *context,
-                                              RewritePatternSet &patterns);
+/// Populates patterns with patterns to concretize tensor.pad op's result
+/// shape. `numWorkgroups`, if not empty, will be used as bounds for simplifying
+/// workgroup ID ops.
+void populateConcretizePadResultShapePatterns(
+    RewritePatternSet &patterns, ArrayRef<int64_t> numWorkgroups = {});
 
 //------------------------------------------------------------------------------
 // LLVMCPU
