@@ -1,23 +1,13 @@
 set(LIBS
   # Local dialects.
   IREEInputDialect
-  IREELinalgExtDialect
-  IREELinalgExtPasses
-  IREELinalgExtTransformOps
-  IREELinalgExtTransforms
-  IREELinalgTransformDialect
-  IREELinalgTransformDialectPasses
-  IREELinalgTransformTestPasses
-  IREETransformsTestPasses
   # Core dialects.
   MLIRAffineDialect
   MLIRArithDialect
   MLIRAsyncDialect
-  MLIRBufferizationTransformOps
   MLIRControlFlowDialect
   MLIRDialect
   MLIRFuncDialect
-  MLIRIndexToLLVM
   MLIRLinalgDialect
   MLIRLinalgTransformOps
   MLIRMemRefDialect
@@ -30,10 +20,9 @@ set(LIBS
   MLIRSCFTransforms
   MLIRTensorDialect
   MLIRTransforms
-  MLIRVectorTransformOps
 )
 
-add_llvm_executable(iree-dialects-opt
+add_llvm_tool(iree-dialects-opt
   iree-dialects-opt.cpp
 
   DEPENDS
