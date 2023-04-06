@@ -22,7 +22,8 @@ SMALL = [
     tflite_models.MOBILESSD_FP32,
     tflite_models.PERSON_DETECT_INT8,
     tflite_models.POSENET_FP32,
-    torch_models.EFFICIENTNET_V2_S_FP32_TORCH
+    torch_models.EFFICIENTNET_V2_S_FP32_TORCH,
+]
 
 # A list of models with thread configurations.
 # Note `0` represents sync execution.
@@ -98,11 +99,6 @@ RESNET50_TORCH_BATCHES = [
 ]
 
 CUDA_MODELS = BERT_LARGE_TORCH_BATCHES + RESNET50_TORCH_BATCHES + [
-    tf_models.EFFICIENTNET_V2_S_FP32,
-    tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
-    tf_models.RESNET50_TF_FP32,
-    tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512,
-    tf_models.BERT_LARGE_TF_FP32_SEQLEN384,
     torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     torch_models.MODEL_UNET_2D_FP32_TORCH,
     torch_models.EFFICIENTNET_B7_FP32_TORCH,
