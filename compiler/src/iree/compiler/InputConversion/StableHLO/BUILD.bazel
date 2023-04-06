@@ -47,8 +47,8 @@ iree_compiler_cc_library(
     name = "StableHLO",
     srcs = [
         "LegalizeToLinalgUtils.cpp",
-        "StableHLOToLinalg.cpp",
         "Passes.cpp",
+        "StableHLOToLinalg.cpp",
         "TypeConversion.cpp",
     ],
     hdrs = [
