@@ -515,7 +515,7 @@ include(iree_run_module_test)
 # Default any sub-tree which doesn't provide its own package namespacing
 # to derive it relative to this directory and prefixed with iree/.
 set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
-set(IREE_PACKAGE_ROOT_PREFIX "iree/")
+set(IREE_PACKAGE_ROOT_PREFIX "iree")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 

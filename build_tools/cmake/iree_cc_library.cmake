@@ -267,7 +267,7 @@ function(iree_cc_library)
     # it as a default. For example, foo/bar/ library 'bar' would end up as
     # 'foo::bar'.
     iree_package_dir(_PACKAGE_DIR)
-    if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
+    if("${_RULE_NAME}" STREQUAL "${_PACKAGE_DIR}")
       add_library(${_PACKAGE_NS} ALIAS ${_NAME})
     endif()
   endif()
