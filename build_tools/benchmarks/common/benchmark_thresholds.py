@@ -75,6 +75,9 @@ BENCHMARK_THRESHOLDS = [
 
     # Fluctuating benchmarks on mobile GPUs.
     BenchmarkThreshold(
+        re.compile(r"^MobileBertSquad.*int8.*full-inference.*GPU-Mali"), 10,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
         re.compile(r"^MobileNetV3Small.*full-inference.*GPU-Mali"), 2 * 10**6,
         ThresholdUnit.VALUE_NS),
 
