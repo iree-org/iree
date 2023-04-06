@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "contraction-packing.mlir"
     "eltwise_reduction_eltwise.mlir"
     "matmul.mlir"
+    "pack.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
@@ -30,6 +31,7 @@ iree_lit_test_suite(
     attention_codegen_spec.mlir
     matmul_codegen_custom_dispatch_formation_spec.mlir
     matmul_codegen_default_spec.mlir
+    pack_spec.mlir
   LABELS
     "noasan"
     "nomsan"

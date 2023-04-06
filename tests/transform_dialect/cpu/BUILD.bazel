@@ -21,6 +21,7 @@ iree_lit_test_suite(
         "contraction-packing-and-dispatch.mlir",
         "eltwise_reduction_eltwise.mlir",
         "matmul.mlir",
+        "pack.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,
@@ -29,6 +30,7 @@ iree_lit_test_suite(
         "attention_codegen_spec.mlir",
         "matmul_codegen_custom_dispatch_formation_spec.mlir",
         "matmul_codegen_default_spec.mlir",
+        "pack_spec.mlir",
     ],
     tags = [
         "noasan",
