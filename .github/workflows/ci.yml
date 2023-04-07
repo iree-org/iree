@@ -673,8 +673,6 @@ jobs:
         run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
-      - name: "DEBUG: see what's in the binaries archive"
-        run: find $(dirname ${TF_BINARIES_ARCHIVE}) -maxdepth 2
       - name: "Setting up Python"
         uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
         with:
