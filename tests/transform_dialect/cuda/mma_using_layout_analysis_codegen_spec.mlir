@@ -6,7 +6,7 @@ transform.sequence failures(propagate) {
   // Step 1. Find the fill and matmul ops
   // ===========================================================================
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+  %matmul = transform.structured.match ops{["linalg.matmul_transpose_b"]} in %variant_op : (!pdl.operation) -> !pdl.operation
 
   // Step 2. Tile the matmul and fuse the fill
   // ===========================================================================

@@ -2,7 +2,7 @@
 
 transform.sequence failures(propagate){
 ^bb1(%variant_op: !pdl.operation):
-  %ops = transform.structured.match ops{["linalg.fill", "linalg.matmul", "linalg.generic"]}
+  %ops = transform.structured.match ops{["linalg.fill", "linalg.matmul_transpose_b", "linalg.generic"]}
     in %variant_op : (!pdl.operation) -> !pdl.operation
 
   %fill0, %fill1, %matmul, %reduce, %broadcast =
