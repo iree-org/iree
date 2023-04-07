@@ -138,18 +138,6 @@ def ExtractAddressComputationGPU: Pass<"extract-address-computation-gpu"> {
   ];
 }
 
-def FixupSubspanWithOffsets :
-    Pass<"iree-codegen-fixup-subspan-with-offsets", "func::FuncOp"> {
-  let summary = "Fixes up `hal.interface.binding.subspan` ops with offsets";
-  let constructor =
-      "mlir::iree_compiler::createFixupSubspanWithOffsetsPass()";
-  let options = [
-    Option<"keepDeadSubspanOps", "keep-dead-subspan-ops",
-            "bool", /*default=*/"false",
-            "Flag to not remove dead subspan ops (used for testing only)">
-  ];
-}
-
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
@@ -181,6 +169,12 @@ def BufferizeCopyOnlyDispatches :
   let summary =
       "Bufferize dispatches that copy to/from interfaces to convert to a linalg.copy op";
   let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
+  let options = [
+    Option<"embedSubspanOffsetIntoMemRefType",
+           "embed-subspan-offset-into-memref-type", "bool", /*default=*/"true",
+           "Embeds the offset information on subspan ops into the type."
+           "Is a work-around for #12933">,    
+  ];
 }
 
 def EliminateEmptyTensors :
@@ -206,6 +200,10 @@ def IREEComprehensiveBufferize :
     Option<"printConflicts", "print-conflicts", "bool",
             /*default=*/"false",
            "Annotates IR with RaW conflicts. Requires test-analysis-only.">,
+    Option<"embedSubspanOffsetIntoMemRefType",
+           "embed-subspan-offset-into-memref-type", "bool", /*default=*/"true",
+           "Embeds the offset information on subspan ops into the type."
+           "Is a work-around for #12933">,
   ];
 }
 

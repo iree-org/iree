@@ -744,20 +744,16 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
   // Load the base buffer pointer in the appropriate type (f32*, etc).
   Value basePtrValue = loadBindingPtr(forOp, ordinal, builder);
 
-  // Adjust by baseOffset (if needed).
-  if (baseOffsetValue) {
-    auto i8Type = typeConverter->convertType(builder.getI8Type());
-    basePtrValue = builder.create<LLVM::GEPOp>(
-        loc, basePtrValue.getType(), i8Type, basePtrValue, baseOffsetValue);
-  }
-
   // NOTE: if we wanted to check the range was in bounds here would be the
   // place to do it.
 
   // Construct the MemRefDescriptor type based on the information we have.
   // NOTE: we could use the binding length to clamp this/check that the
   // requested range is valid.
-  if (memRefType.hasStaticShape()) {
+  auto [strides, offset] = getStridesAndOffset(memRefType);
+  if (memRefType.hasStaticShape() &&
+      !llvm::any_of(strides, ShapedType::isDynamic) &&
+      !ShapedType::isDynamic(offset)) {
     return MemRefDescriptor::fromStaticShape(builder, loc, *typeConverter,
                                              memRefType, basePtrValue);
   } else {
@@ -769,7 +765,21 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
                                         typeConverter->convertType(memRefType));
     desc.setAllocatedPtr(builder, loc, basePtrValue);
     desc.setAlignedPtr(builder, loc, basePtrValue);
-    desc.setConstantOffset(builder, loc, 0);
+    auto llvmIndexType = typeConverter->convertType(builder.getIndexType());
+    if (ShapedType::isDynamic(offset)) {
+      // The offset in the subspan is byteoffset. It is converted to element
+      // offset here. It is assumed that the byte offset is a multiple of
+      // the element type byte width.
+      int32_t elementWidth =
+          IREE::Util::getRoundedElementByteWidth(memRefType.getElementType());
+      Value elementWidthVal =
+          builder.create<LLVM::ConstantOp>(loc, llvmIndexType, elementWidth);
+      Value elementOffsetVal =
+          builder.create<LLVM::UDivOp>(loc, baseOffsetValue, elementWidthVal);
+      desc.setOffset(builder, loc, elementOffsetVal);
+    } else {
+      desc.setConstantOffset(builder, loc, offset);
+    }
 
     // Update memref descriptor shape. Dynamic dimensions can be mixed with
     // static dimensions, like [128, ?, 128].
@@ -785,12 +795,31 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
     // Compute and update strides. Assume that MemRefs are row-major, that is,
     // following index linearization:
     //   x[i, j, k] = i * x.dim[1] * x.dim[2] + j * x.dim[2] + k
-    desc.setConstantStride(builder, loc, rank - 1, 1);
-    for (int i = rank - 2; i >= 0; --i) {
-      auto stride = desc.stride(builder, loc, i + 1);
-      auto dim = desc.size(builder, loc, i + 1);
-      Value strideVal = builder.create<LLVM::MulOp>(loc, stride, dim);
-      desc.setStride(builder, loc, i, strideVal);
+    if (!strides.empty()) {
+      assert(strides.back() == 1 &&
+             "unexpected non-unit stride for innermost dimension");
+      desc.setConstantStride(builder, loc, rank - 1, 1);
+      OpFoldResult currentStride = builder.getIndexAttr(1);
+      for (int i = rank - 1; i > 0; --i) {
+        if (strides[i - 1] == ShapedType::kDynamic) {
+          auto dim = desc.size(builder, loc, i);
+          Value currentStrideVal;
+          if (std::optional<int64_t> currentStrideInt =
+                  getConstantIntValue(currentStride)) {
+            currentStrideVal = builder.create<LLVM::ConstantOp>(
+                loc, llvmIndexType, currentStrideInt.value());
+          } else {
+            currentStrideVal = currentStride.get<Value>();
+          }
+          currentStride =
+              builder.create<LLVM::MulOp>(loc, currentStrideVal, dim)
+                  .getResult();
+          desc.setStride(builder, loc, i - 1, currentStride.get<Value>());
+        } else {
+          currentStride = builder.getIndexAttr(strides[i - 1]);
+          desc.setConstantStride(builder, loc, i - 1, strides[i - 1]);
+        }
+      }
     }
 
     return desc;

@@ -30,7 +30,6 @@ iree_lit_test_suite(
             "eliminate_empty_tensors.mlir",
             "erase_hal_descriptor_type.mlir",
             "extract_address_computation.mlir",
-            "fixup_subspan_with_offsets.mlir",
             "flatten_memref_subspan.mlir",
             "fold_affine_min_in_distributed_loops.mlir",
             "fold_affine_min_of_block_id.mlir",

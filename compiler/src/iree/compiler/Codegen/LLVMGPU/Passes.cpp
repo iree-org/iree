@@ -77,8 +77,12 @@ static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  // TODO(#12933): Because of regressions in CUDA backend, there is an
+  // option to keep a legacy mode of not representing the offset in the
+  // type. Remove once the bug is fixed.
+  addIREEComprehensiveBufferizePasses(
+      passManager, allocationFn, deallocationFn, memcpyFn,
+      /*embedSubspanOffsetIntoMemRefType=*/false);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
@@ -548,7 +552,11 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
-  pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
+  // TODO(#12933): Because of regressions in CUDA backend, there is an
+  // option to keep a legacy mode of not representing the offset in the
+  // type. Remove once the bug is fixed.
+  pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass(
+      /*embedSubspanOffsetIntoMemRefType=*/false));
   pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createDecomposeSoftmaxPass());
   // Temporary solution to avoid large allocations due to softmax lowering.

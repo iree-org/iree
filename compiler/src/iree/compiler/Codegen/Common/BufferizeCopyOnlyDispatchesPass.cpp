@@ -35,6 +35,14 @@ namespace {
 /// to use the `linalg.generic` operation generated for lowering the dispatch.
 struct BufferizeCopyOnlyDispatchesPass
     : public BufferizeCopyOnlyDispatchesBase<BufferizeCopyOnlyDispatchesPass> {
+  BufferizeCopyOnlyDispatchesPass() = default;
+  BufferizeCopyOnlyDispatchesPass(const BufferizeCopyOnlyDispatchesPass &pass) {
+    this->embedSubspanOffsetIntoMemRefType =
+        pass.embedSubspanOffsetIntoMemRefType;
+  }
+  BufferizeCopyOnlyDispatchesPass(bool embedSubspanOffsetIntoMemRefType) {
+    this->embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, bufferization::BufferizationDialect,
                     IREE::Flow::FlowDialect, linalg::LinalgDialect,
@@ -101,7 +109,8 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   };
 
   addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
-                                      deallocationFn, memcpyFn);
+                                      deallocationFn, memcpyFn,
+                                      this->embedSubspanOffsetIntoMemRefType);
   if (failed(runPipeline(bufferizationPipeline, module))) {
     return signalPassFailure();
   }
@@ -116,9 +125,10 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createBufferizeCopyOnlyDispatchesPass() {
-  return std::make_unique<BufferizeCopyOnlyDispatchesPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createBufferizeCopyOnlyDispatchesPass(
+    bool embedSubspanOffsetIntoMemRefType) {
+  return std::make_unique<BufferizeCopyOnlyDispatchesPass>(
+      embedSubspanOffsetIntoMemRefType);
 }
 
 }  // namespace iree_compiler

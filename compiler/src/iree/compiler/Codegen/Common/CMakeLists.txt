@@ -92,7 +92,6 @@ iree_cc_library(
     "DecomposeAffineOpsPass.cpp"
     "DecomposePackUnPackOps.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
-    "FixupSubspanWithOffsets.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"

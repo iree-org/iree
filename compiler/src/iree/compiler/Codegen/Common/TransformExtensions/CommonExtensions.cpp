@@ -1169,8 +1169,8 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   return success();
 }
 
-static OneShotBufferizationOptions getBufferizationOptions() {
-  OneShotBufferizationOptions options;
+static IREEOneShotBufferizationOptions getBufferizationOptions() {
+  IREEOneShotBufferizationOptions options;
   // options.testAnalysisOnly = testAnalysisOnly;
   // options.printConflicts = printConflicts;
 
@@ -1275,12 +1275,18 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   }
 
   //   2. Run one-shot-bufferize, without the pass baggage.
-  OneShotBufferizationOptions options = getBufferizationOptions();
+  IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
+  if (getTargetGpu()) {
+    // TODO(#12933): Because of regressions in CUDA backend, there is an
+    // option to keep a legacy mode of not representing the offset in the
+    // type. Remove once the bug is fixed.
+    options.embedSubspanOffsetIntoMemRefType = false;
+  }
   if (failed(runIREEOneShotBufferize(state.getTopLevel(), options)))
     return listener.check(loc, emitDefaultDefiniteFailure(target));
 

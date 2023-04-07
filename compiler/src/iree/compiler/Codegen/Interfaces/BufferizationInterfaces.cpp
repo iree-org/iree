@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -45,6 +46,22 @@ namespace iree_compiler {
 // Utility functions.
 //===----------------------------------------------------------------------===//
 
+/// Get strides for row-major oredering of a tensor with the given `shape`.
+static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
+  if (shape.empty()) {
+    return {};
+  }
+  SmallVector<int64_t> strides(shape.size(), ShapedType::kDynamic);
+  strides.back() = 1;
+  for (int i = strides.size() - 1; i > 0; --i) {
+    if (shape[i] == ShapedType::kDynamic) {
+      break;
+    }
+    strides[i - 1] = strides[i] * shape[i];
+  }
+  return strides;
+}
+
 static MemRefType getMemrefTypeForTensor(
     IREE::Flow::DispatchTensorType tensorType,
     MemRefLayoutAttrInterface layout = {}, Attribute memorySpace = {}) {
@@ -54,15 +71,36 @@ static MemRefType getMemrefTypeForTensor(
 
 /// Find the memref version of the given InterfaceBindingSubspanOp. If no such
 /// op exists in the same block (before the given op), create a new op.
+// TODO(#12933): Because of regressions in CUDA backend, there is an
+// option to keep a legacy mode of not representing the offset in the
+// type. Remove once the bug is fixed.
 static Value findOrCreateSubspanBuffer(
-    OpBuilder &b, IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+    RewriterBase &rewriter, IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+    bool embedSubspanOffsetIntoMemRefType) {
   // Ensure that this a tensor subspan op.
   auto shapedType = subspanOp.getResult()
                         .getType()
                         .dyn_cast<IREE::Flow::DispatchTensorType>();
   assert(shapedType && shapedType.hasRank());
 
-  auto memRefType = getMemrefTypeForTensor(shapedType, /*layout=*/{},
+  Value byteOffset = subspanOp.getByteOffset();
+  MemRefLayoutAttrInterface layoutAttr = {};
+  if (embedSubspanOffsetIntoMemRefType && byteOffset &&
+      !matchPattern(byteOffset, m_Zero())) {
+    OpFoldResult elementOffset = convertByteOffsetToElementOffset(
+        rewriter, subspanOp->getLoc(), subspanOp.getByteOffset(),
+        shapedType.getBoundElementType());
+    std::optional<int64_t> elementOffsetInt =
+        getConstantIntValue(elementOffset);
+    if (!elementOffsetInt) {
+      elementOffsetInt = ShapedType::kDynamic;
+    }
+    auto tensorType = shapedType.getBoundType().cast<RankedTensorType>();
+    SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
+    layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
+                                        elementOffsetInt.value(), strides);
+  }
+  auto memRefType = getMemrefTypeForTensor(shapedType, layoutAttr,
                                            subspanOp.getDescriptorTypeAttr());
 
   // Look for an existing op.
@@ -89,16 +127,16 @@ static Value findOrCreateSubspanBuffer(
   }
 
   // None found, create a new op.
-  OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(subspanOp);
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(subspanOp);
   // Just change the result type of the InterfaceBindingSubspanOp.
-  Value buffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
+  Value buffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
       subspanOp->getLoc(), memRefType, subspanOp.getSet(),
       subspanOp.getBinding(), subspanOp.getDescriptorType(),
       subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
       subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-  b.create<memref::AssumeAlignmentOp>(subspanOp->getLoc(), buffer,
-                                      subspanOp.calculateAlignment().value());
+  rewriter.create<memref::AssumeAlignmentOp>(
+      subspanOp->getLoc(), buffer, subspanOp.calculateAlignment().value());
   return buffer;
 }
 
@@ -138,7 +176,11 @@ struct DispatchTensorLoadOpInterface
         loadOp.getSource()
             .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(tensorSubspanOp && "expected that source is a SubspanOp");
-    Value source = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
+    auto ireeOptions =
+        static_cast<const IREEOneShotBufferizationOptions *>(&options);
+    Value source = findOrCreateSubspanBuffer(
+        rewriter, tensorSubspanOp,
+        ireeOptions->embedSubspanOffsetIntoMemRefType);
 
     if (equalTensorShape(
             loadOp.getType(), loadOp.sizes(),
@@ -188,7 +230,11 @@ struct DispatchTensorStoreOpInterface
         storeOp.getTarget()
             .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(tensorSubspanOp && "expected that target is a SubspanOp");
-    Value target = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
+    auto ireeOptions =
+        static_cast<const IREEOneShotBufferizationOptions *>(&options);
+    Value target = findOrCreateSubspanBuffer(
+        rewriter, tensorSubspanOp,
+        ireeOptions->embedSubspanOffsetIntoMemRefType);
 
     if (!equalTensorShape(storeOp.getValue().getType().cast<RankedTensorType>(),
                           storeOp.getSizes(),

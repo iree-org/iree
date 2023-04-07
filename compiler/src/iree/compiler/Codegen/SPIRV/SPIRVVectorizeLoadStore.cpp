@@ -411,8 +411,24 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   if (newShape.back() % ratio != 0) return {};
   newShape.back() = newShape.back() / ratio;
 
-  return MemRefType::get(newShape, vectorType, MemRefLayoutAttrInterface(),
-                         type.getMemorySpace());
+  MemRefLayoutAttrInterface layout = {};
+  if (auto stridedLayout = type.getLayout().dyn_cast<StridedLayoutAttr>()) {
+    auto offset = stridedLayout.getOffset();
+    if (offset != ShapedType::kDynamic) {
+      offset = offset / ratio;
+    }
+
+    auto strides = llvm::to_vector(stridedLayout.getStrides());
+    for (auto [index, stride] : llvm::enumerate(llvm::drop_end(strides))) {
+      if (index == strides.size() - 1 || stride == ShapedType::kDynamic) {
+        continue;
+      }
+      strides[index] = stride / ratio;
+    }
+    layout = StridedLayoutAttr::get(rewriter.getContext(), offset, strides);
+  }
+
+  return MemRefType::get(newShape, vectorType, layout, type.getMemorySpace());
 }
 
 template <typename OpTy>
