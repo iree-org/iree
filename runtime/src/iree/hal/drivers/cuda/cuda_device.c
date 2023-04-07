@@ -184,6 +184,20 @@ iree_status_t iree_hal_cuda_device_create(
   return status;
 }
 
+iree_status_t iree_hal_cuda_device_get_context(iree_hal_device_t* base_device,
+                                               CUcontext* out_context) {
+  IREE_ASSERT_ARGUMENT(out_context);
+
+  if (!iree_hal_resource_is(base_device, &iree_hal_cuda_device_vtable)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "HAL device is not a CUDA device");
+  }
+
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  *out_context = device->context_wrapper.cu_context;
+  return iree_ok_status();
+}
+
 static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
