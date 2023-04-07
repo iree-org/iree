@@ -52,7 +52,10 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
         "x86_64",
     "cuda":
         lambda config: config.target_device_spec.architecture.architecture ==
-        "cuda",
+        "cuda" and "long-running" not in config.tags,
+    "cuda-long":
+        lambda config: config.target_device_spec.architecture.architecture ==
+        "cuda" and "long-running" in config.tags,
     "android-cpu":
         lambda config:
         (config.target_device_spec.architecture.type == common_definitions.

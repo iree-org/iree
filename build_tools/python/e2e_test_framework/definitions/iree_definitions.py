@@ -309,6 +309,7 @@ class E2EModelRunConfig(object):
   """Describes an e2e run."""
   composite_id: str
   name: str
+  tags: List[str]
   module_generation_config: ModuleGenerationConfig
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
@@ -328,11 +329,13 @@ class E2EModelRunConfig(object):
     return utils.substitute_flag_vars(flags=self.run_flags, GPU_ID=gpu_id)
 
   @classmethod
-  def build(cls, module_generation_config: ModuleGenerationConfig,
+  def build(cls,
+            module_generation_config: ModuleGenerationConfig,
             module_execution_config: ModuleExecutionConfig,
             target_device_spec: common_definitions.DeviceSpec,
             input_data: common_definitions.ModelInputData,
-            tool: E2EModelRunTool):
+            tool: E2EModelRunTool,
+            tags: Optional[Sequence[str]] = None):
     composite_id = unique_ids.hash_composite_id([
         module_generation_config.composite_id, module_execution_config.id,
         target_device_spec.id, input_data.id
@@ -344,8 +347,10 @@ class E2EModelRunConfig(object):
         input_data=input_data,
         module_execution_config=module_execution_config,
         gpu_id=r"${GPU_ID}")
+    tags_list = [] if tags is None else list(tags)
     return cls(composite_id=composite_id,
                name=name,
+               tags=tags_list,
                module_generation_config=module_generation_config,
                module_execution_config=module_execution_config,
                target_device_spec=target_device_spec,

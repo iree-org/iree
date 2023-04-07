@@ -140,11 +140,11 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
-    "model-c393b4fa-beb4-45d5-982a-c6328aa05d08"
+    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-1"
   SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/resnet50-tf-model.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680486104/RESNET50/batch_1/tf-model.tar.gz"
   OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_c393b4fa-beb4-45d5-982a-c6328aa05d08_Resnet50TF"
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-1_Resnet50TFBatch1"
   UNPACK
 )
 
@@ -285,5 +285,45 @@ iree_fetch_artifact(
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_UNET_MODEL/linalg.mlir"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_340553d1-e6fe-41b6-b2c7-687c74ccec56_Unet2dPT.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-8"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680486104/RESNET50/batch_8/tf-model.tar.gz"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-8_Resnet50TFBatch8"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-64"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680486104/RESNET50/batch_64/tf-model.tar.gz"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-64_Resnet50TFBatch64"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-128"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680486104/RESNET50/batch_128/tf-model.tar.gz"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-128_Resnet50TFBatch128"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-256"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680486104/RESNET50/batch_256/tf-model.tar.gz"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-256_Resnet50TFBatch256"
   UNPACK
 )

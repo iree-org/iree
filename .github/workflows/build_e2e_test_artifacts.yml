@@ -1,0 +1,131 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Workflow for building E2E test artifacts.
+# It is designed to be called from a parent workflow.
+# The concurrency of this workflow is controlled by the caller's job.
+
+name: Build E2E Test Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      runner-group:
+        required: true
+        type: string
+      runner-env:
+        required: true
+        type: string
+      build-dir:
+        required: true
+        type: string
+      build-dir-archive:
+        required: true
+        type: string
+      build-dir-gcs-artifact:
+        required: true
+        type: string
+      tf-binaries-dir:
+        required: true
+        type: string
+      tf-binaries-archive:
+        required: true
+        type: string
+      tf-binaries-gcs-artifact:
+        required: true
+        type: string
+    outputs:
+      e2e-test-artifacts-dir:
+        description: |
+          Local path that stores compiled test artifacts.
+        value: ${{ jobs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir:
+        description: |
+          GCS path to the uploaded test artifacts.
+        value: ${{ jobs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      e2e-test-artifacts-build-log:
+        description: |
+          Local path that contains the build log.
+        value: ${{ jobs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log }}
+      e2e-test-artifacts-build-log-gcs-artifact:
+        description: |
+          GCS path to the uploaded build log.
+        value: ${{ jobs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+
+env:
+  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # instead of the outputs of setup because it contains the run attempt and we
+  # want that to be the current attempt, not whatever attempt the setup step
+  # last ran in. It therefore can't be passed in via inputs because the env
+  # context isn't available there.
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+
+jobs:
+  build_e2e_test_artifacts:
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ inputs.runner-group }}
+      - environment=${{ inputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      HOST_BUILD_DIR: ${{ inputs.build-dir }}
+      HOST_BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
+      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ inputs.tf-binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ inputs.tf-binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ inputs.tf-binaries-gcs-artifact }}
+    outputs:
+      e2e-test-artifacts-dir: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      e2e-test-artifacts-build-log: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
+      e2e-test-artifacts-build-log-gcs-artifact: ${{ steps.upload.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      - name: "Downloading TF binaries archive"
+        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+      - name: "Building e2e test artifacts"
+        id: build
+        env:
+          BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb \
+            build_tools/cmake/build_e2e_test_artifacts.sh \
+            "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
+          echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
+          echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading e2e test artifacts"
+        id: upload
+        env:
+          E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
+          E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
+          E2E_TEST_ARTIFACTS_BUILD_LOG: ${{ steps.build.outputs.e2e-test-artifacts-build-log }}
+          E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT: ${{ env.GCS_DIR }}/e2e-test-artifacts/ninja_log
+        run: |
+          # Uploads all IREE artifacts and MLIR files (including the imported
+          # MLIR files and MLIR source models).
+          # Not archiving the directory to allow fetching each file as needed
+          # separately.
+          find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
+            -name "iree_*" -o -name "model_*.mlir" | \
+            gcloud storage cp --read-paths-from-stdin -r \
+              "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
+          gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
+              "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}"
+          echo "e2e-test-artifacts-gcs-artifact-dir=${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "e2e-test-artifacts-build-log-gcs-artifact=${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"

@@ -1,0 +1,129 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Executes long-running benchmarks that are expected to take multple hours.
+
+name: Benchmark Long
+
+on:
+  schedule:
+    # Scheduled to run at 09:00 UTC and 21:00 UTC.
+    - cron: '0 09,21 * * *'
+  workflow_dispatch:
+
+env:
+  # This needs to be in env instead of the outputs of setup because it contains
+  # the run attempt and we want that to be the current attempt, not whatever
+  # attempt the setup step last ran in.
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+
+# Jobs are organized into groups and topologically sorted by dependencies
+jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
+  build_all:
+    needs: setup
+    if: fromJson(needs.setup.outputs.should-run)
+    uses: ./.github/workflows/build_all.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      write-caches: ${{ needs.setup.outputs.write-caches }}
+
+  build_tf_integrations:
+    needs: setup
+    if: fromJson(needs.setup.outputs.should-run)
+    uses: ./.github/workflows/build_tf_integrations.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      write-caches: ${{ needs.setup.outputs.write-caches }}
+
+  build_benchmark_tools:
+    needs: [setup, build_all]
+    if: fromJson(needs.setup.outputs.should-run)
+    uses: ./.github/workflows/build_benchmark_tools.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      build-dir: ${{ needs.build_all.outputs.build-dir }}
+      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+
+  build_e2e_test_artifacts:
+    needs: [setup, build_all, build_tf_integrations]
+    if: fromJson(needs.setup.outputs.should-run)
+    uses: ./.github/workflows/build_e2e_test_artifacts.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      build-dir: ${{ needs.build_all.outputs.build-dir }}
+      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      tf-binaries-dir: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      tf-binaries-archive: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      tf-binaries-gcs-artifact: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+
+  compilation_benchmarks:
+    needs: [setup, build_e2e_test_artifacts]
+    if: fromJson(needs.setup.outputs.should-run)
+    uses: ./.github/workflows/benchmark_compilation.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      e2e-test-artifacts-build-log: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log }}
+      e2e-test-artifacts-build-log-gcs-artifact: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
+
+  execution_benchmarks:
+    needs: [setup, build_benchmark_tools, build_e2e_test_artifacts]
+    if: fromJson(needs.setup.outputs.should-run)
+    uses: ./.github/workflows/benchmark_execution.yml
+    with:
+      # env.GCS_DIR is also duplicated in this workflow. See the note there on
+      # why this is.
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
+      e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+      benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+      benchmark-presets: cuda-long
+
+  summary:
+    # Even if you have an explicit if condition, you still need to override
+    # GitHub's default behavior of not running if any dependencies failed.
+    if: always()
+    runs-on: ubuntu-20.04
+    needs:
+      - setup
+      - build_all
+      - build_tf_integrations
+      - build_benchmark_tools
+      - build_e2e_test_artifacts
+      - compilation_benchmarks
+      - execution_benchmarks
+    steps:
+      - name: Getting failed jobs
+        id: failed_jobs
+        run: |
+          echo '${{ toJson(needs) }}'
+          FAILED_JOBS="$(echo '${{ toJson(needs) }}' \
+            | jq --raw-output \
+            'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
+          )"
+          echo "failed-jobs=${FAILED_JOBS}" >> $GITHUB_OUTPUT
+          if [[ "${FAILED_JOBS}" != "" ]]; then
+            echo "The following jobs failed: ${FAILED_JOBS}"
+            exit 1
+          fi
+      - name: Posting to Discord
+        uses: sarisia/actions-status-discord@61114b793b460ee85fe38ad3fccc78c7ead38d55 # v1.11.1
+        if: failure() && github.ref_name == 'main'
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
