@@ -1,0 +1,35 @@
+name: Roll nightly deps
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: roll_deps
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Setting up Python"
+        uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
+        with:
+          python-version: "3.10"
+
+      - name: "Install openxla-dev-tools"
+        run: |
+          pip install git+https://github.com/stellaraccident/openxla-dev-tools.git
+
+      - name: "Check out workspace"
+        run: |
+          openxla-workspace init
+          openxla-workspace checkout --no-submodules openxla-pjrt-plugin
+
+      - name: "Roll dependencies"
+        run: |
+          cd openxla-dev-tools
+          openxla-workspace roll nightly
+
+      - name: "PWD"
+        run: |
+          pwd
+          git status
