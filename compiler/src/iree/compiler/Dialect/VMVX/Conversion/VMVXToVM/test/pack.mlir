@@ -16,12 +16,12 @@ func.func @pack_f32f32(
     ) {
   //  CHECK-DAG: %[[FLAGS:.*]] = vm.const.i32.zero
   //      CHECK: vm.call @vmvx.pack.f32f32(
-  // CHECK-SAME: %arg0, %arg1, %arg2,
-  // CHECK-SAME: %arg3, %arg4, %arg5,
+  // CHECK-SAME: %arg0, %arg1, %arg3, %arg4,
+  // CHECK-SAME: %arg2, %arg5,
   // CHECK-SAME: %arg6, %arg7, %arg8,
   // CHECK-SAME: %arg9, %arg10, %arg11,
   // CHECK-SAME: %arg12,
-  // CHECK-SAME: %[[FLAGS]]) : (!vm.buffer, i64, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, f32, i32) -> ()
+  // CHECK-SAME: %[[FLAGS]]) : (!vm.buffer, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, i64, f32, i32) -> ()
   vmvx.pack in(%arg0 offset %arg1 stride0 %arg2 : !util.buffer)
              out(%arg3 offset %arg4 stride0 %arg5 : !util.buffer)
              in_shape(%arg6, %arg7)
@@ -47,12 +47,12 @@ func.func @pack_i32i32(
     ) {
   //  CHECK-DAG: %[[FLAGS:.*]] = vm.const.i32 65536
   //      CHECK: vm.call @vmvx.pack.i32i32(
-  // CHECK-SAME: %arg0, %arg1, %arg2,
-  // CHECK-SAME: %arg3, %arg4, %arg5,
+  // CHECK-SAME: %arg0, %arg1, %arg3, %arg4,
+  // CHECK-SAME: %arg2, %arg5,
   // CHECK-SAME: %arg6, %arg7, %arg8,
   // CHECK-SAME: %arg9, %arg10, %arg11,
   // CHECK-SAME: %arg12,
-  // CHECK-SAME: %[[FLAGS]]) : (!vm.buffer, i64, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, i32, i32) -> ()
+  // CHECK-SAME: %[[FLAGS]]) : (!vm.buffer, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i32) -> ()
   vmvx.pack in(%arg0 offset %arg1 stride0 %arg2 : !util.buffer)
              out(%arg3 offset %arg4 stride0 %arg5 : !util.buffer)
              in_shape(%arg6, %arg7)
@@ -77,12 +77,12 @@ func.func @pack_i8i8(
     ) {
   //  CHECK-DAG: %[[FLAGS:.*]] = vm.const.i32.zero
   //      CHECK: vm.call @vmvx.pack.i8i8(
-  // CHECK-SAME: %arg0, %arg1, %arg2,
-  // CHECK-SAME: %arg3, %arg4, %arg5,
+  // CHECK-SAME: %arg0, %arg1, %arg3, %arg4,
+  // CHECK-SAME: %arg2, %arg5,
   // CHECK-SAME: %arg6, %arg7, %arg8,
   // CHECK-SAME: %arg9, %arg10, %arg11,
   // CHECK-SAME: %arg12,
-  // CHECK-SAME: %[[FLAGS]]) : (!vm.buffer, i64, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, i32, i32) -> ()
+  // CHECK-SAME: %[[FLAGS]]) : (!vm.buffer, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32, i32) -> ()
   vmvx.pack in(%arg0 offset %arg1 stride0 %arg2 : !util.buffer)
              out(%arg3 offset %arg4 stride0 %arg5 : !util.buffer)
              in_shape(%arg6, %arg7)
