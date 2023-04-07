@@ -20,6 +20,12 @@ TensorFlow TF Compiler Tools
 '''
 
 exe_suffix = ".exe" if platform.system() == "Windows" else ""
+import_tf_path = os.path.join(os.path.dirname(__file__), "iree", "tools", "tf",
+                              f"iree-import-tf{exe_suffix}")
+if not os.access(import_tf_path, os.X_OK):
+  raise RuntimeError(
+      f"Tool not found ({import_tf_path}). Be sure to build "
+      f"//iree_tf_compiler:iree-import-tf and run ./symlink_binaries.sh")
 
 # Setup and get version information.
 THIS_DIR = os.path.realpath(os.path.dirname(__file__))

@@ -29,6 +29,15 @@ class PyTreeModule(tf_test_utils.TestModule):
   def output_nested_pytree(self):
     return {"key_a": (0, 1, 2), "key_b": (0, 1, {"key_c": (0, 1)})}
 
+  @tf_test_utils.tf_function_unit_test(input_signature=[{
+      "key_a": (tf.TensorSpec([]), tf.TensorSpec([]), tf.TensorSpec([])),
+      "key_b": (tf.TensorSpec([]), tf.TensorSpec([]), {
+          "key_c": (tf.TensorSpec([]), tf.TensorSpec([]))
+      })
+  }])
+  def input_nested_pytree(self, input_pytree):
+    return input_pytree
+
 
 class PyTreeTest(tf_test_utils.TracedModuleTestCase):
 

@@ -7,6 +7,7 @@
 
 from typing import List, Tuple
 from benchmark_suites.iree import module_execution_configs
+from e2e_test_framework.models import tf_models
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections

@@ -30,12 +30,6 @@ IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/
 
 source build_tools/cmake/setup_build.sh
 
-# Install iree-import-tf
-git submodule update --init
-pip install tf-nightly
-pip install compiler/
-pip install integrations/tensorflow/python_projects/iree_tf
-
 echo "Configuring to build e2e test artifacts"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
@@ -47,7 +41,7 @@ echo "Configuring to build e2e test artifacts"
   -DIREE_BUILD_SAMPLES=OFF \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite" \
-  -DIREE_IMPORT_TF_PATH="/home/runner/.local/bin/iree-import-tf"
+  -DIREE_IMPORT_TF_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tf"
 
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
