@@ -10,7 +10,6 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/api.h"
-#include "iree/hal/drivers/cuda/context_wrapper.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 
 #ifdef __cplusplus
