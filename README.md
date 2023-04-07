@@ -33,8 +33,6 @@ source .env.sh
 bazel build iree/integrations/pjrt/...
 
 # Run a sample.
-# Note that there can be version incompatibilities between jaxlib nightlies
-pip install -e ../jax
 JAX_PLATFORMS=iree_cpu python test/test_simple.py
 JAX_PLATFORMS=iree_cuda python test/test_simple.py
 ```
