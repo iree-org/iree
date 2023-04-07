@@ -542,7 +542,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_channel_default,  //
   uint32_t flags = args->i2;
   iree_vm_buffer_t* id = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref_or_null(args->r3, &id));
-  iree_vm_buffer_t* group = NULL;
 
   iree_hal_channel_params_t params = {
       .flags = flags,

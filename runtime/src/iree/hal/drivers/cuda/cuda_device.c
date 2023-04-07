@@ -303,11 +303,19 @@ static iree_status_t iree_hal_cuda_device_create_channel_default(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+
   if (!device->context_wrapper.syms->nccl_library) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
         "NCCL runtime library not available; ensure installed and the "
         "shared library is on your PATH/LD_LIBRARY_PATH (nccl.dll/libnccl.so)");
+  }
+
+  if (!device->channel_provider) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "default collective channel ID requested but no channel provider has "
+        "been set on the device to provide it");
   }
 
   // Today we only allow a single logical device per channel.
@@ -322,30 +330,23 @@ static iree_status_t iree_hal_cuda_device_create_channel_default(
                             requested_count);
   }
 
+  int32_t rank = 0;
+  int32_t count = 0;
+
   // Ask the channel provider (if configured) for the default rank and count
   // if the user did not set them.
-  if (device->channel_provider &&
-      (params.rank == IREE_HAL_CHANNEL_RANK_DEFAULT ||
-       params.count == IREE_HAL_CHANNEL_COUNT_DEFAULT)) {
-    IREE_RETURN_IF_ERROR(
-        iree_hal_channel_provider_query_default_rank_and_count(
-            device->channel_provider, &params.rank, &params.count),
-        "querying default collective group rank and count");
-  }
+  IREE_RETURN_IF_ERROR(iree_hal_channel_provider_query_default_rank_and_count(
+                           device->channel_provider, &rank, &count),
+                       "default_rank_and_count");
 
   // An ID is required to initialize NCCL. On the root it'll be the local ID and
   // on all other participants it'll be the root ID.
   iree_hal_cuda_nccl_id_t id;
   memset(&id, 0, sizeof(id));
+
   if (iree_const_byte_span_is_empty(params.id)) {
     // User wants the default ID.
-    if (!device->channel_provider) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "default collective channel ID requested but no channel provider has "
-          "been set on the device to provide it");
-    }
-    if (params.rank == 0) {
+    if (rank == 0) {
       // Bootstrap NCCL to get the root ID.
       IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id_from_context(
                                &device->context_wrapper, &id),
@@ -377,8 +378,8 @@ static iree_status_t iree_hal_cuda_device_create_channel_default(
   // TODO: when we support multiple logical devices we'll want to pass in the
   // context of the device mapped to the queue_affinity. For now since this
   // implementation only supports one device we pass in the only one we have.
-  return iree_hal_cuda_nccl_channel_create(
-      &device->context_wrapper, &id, params.rank, params.count, out_channel);
+  return iree_hal_cuda_nccl_channel_create(&device->context_wrapper, &id, rank,
+                                           count, out_channel);
 }
 
 // TODO(okkwon): add unit tests
@@ -702,7 +703,8 @@ static iree_status_t iree_hal_cuda_device_profiling_begin(
     iree_hal_device_t* device,
     const iree_hal_device_profiling_options_t* options) {
   // Unimplemented (and that's ok).
-  // We could hook in to CUPTI here or use the much simpler cuProfilerStart API.
+  // We could hook in to CUPTI here or use the much simpler cuProfilerStart
+  // API.
   return iree_ok_status();
 }
 

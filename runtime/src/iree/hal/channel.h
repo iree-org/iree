@@ -40,9 +40,6 @@ typedef struct {
   // Equivalent to:
   //   ncclUniqueId
   iree_const_byte_span_t id;
-  // User-defined group key for differentiating multiple channel groups.
-  // Can be treated as opaque.
-  iree_string_view_t group;
 } iree_hal_channel_params_t;
 
 // A collective communication channel representing a single rank.
