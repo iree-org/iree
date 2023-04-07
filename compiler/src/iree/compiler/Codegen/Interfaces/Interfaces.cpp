@@ -17,13 +17,19 @@
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
+#include "mlir/Dialect/Affine/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
+#include "mlir/Dialect/Arith/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
+#include "mlir/Dialect/Linalg/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
+#include "mlir/Dialect/MemRef/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
+#include "mlir/Dialect/SCF/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
+#include "mlir/Dialect/Tensor/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 
 namespace mlir {
@@ -44,11 +50,17 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerTransformDialectLLVMGPUExtension(registry);
   linalg::registerTilingInterfaceExternalModels(registry);
   affine::registerTransformDialectExtension(registry);
+  affine::registerValueBoundsOpInterfaceExternalModels(registry);
+  arith::registerValueBoundsOpInterfaceExternalModels(registry);
   bufferization::registerTransformDialectExtension(registry);
   gpu::registerTransformDialectExtension(registry);
   linalg::registerTransformDialectExtension(registry);
+  linalg::registerValueBoundsOpInterfaceExternalModels(registry);
   memref::registerTransformDialectExtension(registry);
+  memref::registerValueBoundsOpInterfaceExternalModels(registry);
   scf::registerTransformDialectExtension(registry);
+  scf::registerValueBoundsOpInterfaceExternalModels(registry);
+  tensor::registerValueBoundsOpInterfaceExternalModels(registry);
   vector::registerTransformDialectExtension(registry);
 }
 

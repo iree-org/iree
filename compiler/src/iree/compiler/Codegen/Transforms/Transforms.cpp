@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-transforms"
 
@@ -126,7 +127,9 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
       continue;
     }
     Value dynamicSize = dynamicSizes[index++];
-    auto ub = linalg::getConstantUpperBoundForIndex(dynamicSize);
+    auto ub = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::UB, dynamicSize, /*dim=*/std::nullopt,
+        /*stopCondition=*/nullptr, /*closedUB=*/true);
     if (failed(ub)) {
       return std::nullopt;
     }
