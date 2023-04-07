@@ -6,6 +6,8 @@
 
 #include "iree/hal/drivers/cuda/cuda_device.h"
 
+#include <iree/base/assert.h>
+#include <iree/base/status.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -184,14 +186,18 @@ iree_status_t iree_hal_cuda_device_create(
   return status;
 }
 
-bool iree_hal_is_cuda_device(iree_hal_device_t* base_device) {
-  return iree_hal_resource_is(base_device, &iree_hal_cuda_device_vtable);
-}
+iree_status_t iree_hal_cuda_device_get_context(iree_hal_device_t* base_device,
+                                               CUcontext* out_context) {
+  IREE_ASSERT_ARGUMENT(out_context);
 
-iree_hal_cuda_context_wrapper_t* iree_hal_cuda_device_context_wrapper(
-    iree_hal_device_t* base_device) {
+  if (!iree_hal_resource_is(base_device, &iree_hal_cuda_device_vtable)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "HAL device is not a CUDA device");
+  }
+
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  return &device->context_wrapper;
+  *out_context = device->context_wrapper.cu_context;
+  return iree_ok_status();
 }
 
 static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
