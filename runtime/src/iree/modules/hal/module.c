@@ -550,8 +550,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_channel_default,  //
       .flags = flags,
       .id = iree_vm_buffer_const_contents(id),  // may be null
       .group = group_str,                       // may be null
-      .rank = -1,
-      .count = -1,
   };
 
   iree_hal_channel_t* channel = NULL;

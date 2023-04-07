@@ -29,10 +29,6 @@ enum iree_hal_channel_flag_bits_t {
 };
 typedef uint32_t iree_hal_channel_flags_t;
 
-// Specifies that the channel should use environment settings if available.
-#define IREE_HAL_CHANNEL_RANK_DEFAULT ((int32_t)-1)
-#define IREE_HAL_CHANNEL_COUNT_DEFAULT ((int32_t)-1)
-
 // Parameters defining how a channel should be configured.
 typedef struct {
   // Flags controlling channel behavior.
@@ -47,14 +43,6 @@ typedef struct {
   // User-defined group key for differentiating multiple channel groups.
   // Can be treated as opaque.
   iree_string_view_t group;
-  // Rank of the participant within the collective group.
-  // May be IREE_HAL_CHANNEL_RANK_DEFAULT to indicate that the environment
-  // should be used to populate the rank.
-  int32_t rank;
-  // Total number of participants within the collective group.
-  // May be IREE_HAL_CHANNEL_COUNT_DEFAULT to indicate that the environment
-  // should be used to populate the count.
-  int32_t count;
 } iree_hal_channel_params_t;
 
 // A collective communication channel representing a single rank.
