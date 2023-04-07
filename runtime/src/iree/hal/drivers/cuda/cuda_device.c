@@ -381,6 +381,7 @@ static iree_status_t iree_hal_cuda_device_create_channel_default(
       &device->context_wrapper, &id, params.rank, params.count, out_channel);
 }
 
+// TODO(okkwon): add unit tests
 static bool iree_hal_cuda_parse_group_info(iree_string_view_t groups,
                                            int32_t rank, int32_t* out_group,
                                            int32_t* out_rank,
