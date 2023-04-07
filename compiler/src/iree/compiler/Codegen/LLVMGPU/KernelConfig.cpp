@@ -560,6 +560,8 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         vectorSize = 1;
         int64_t id = 0;
         for (int64_t dim : llvm::reverse(shape)) {
+          // Unit loops are already skipped.
+          if (dim == 1) continue;
           if (dim < flatWG) {
             skipInnerTiling++;
             workgroupSize[id] = dim;

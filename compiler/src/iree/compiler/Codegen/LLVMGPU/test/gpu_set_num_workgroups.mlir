@@ -724,3 +724,51 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @inner_unit_dim {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.export @inner_unit_dim layout(#pipeline_layout)
+  builtin.module {
+    func.func @inner_unit_dim() {
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<16384x1xf32>>
+      %3 = tensor.empty() : tensor<16384x1xf32>
+      %4 = flow.dispatch.tensor.load %0, offsets=[0, 0], sizes=[16384, 1], strides=[1, 1] : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>> -> tensor<16384x1xf32>
+      %5 = flow.dispatch.tensor.load %1, offsets=[0, 0], sizes=[16384, 1], strides=[1, 1] : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>> -> tensor<16384x1xf32>
+      %6 = linalg.generic
+      {indexing_maps =
+            [affine_map<(d0, d1) -> (d0, d1)>,
+             affine_map<(d0, d1) -> (d0, d1)>,
+             affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%4, %5 : tensor<16384x1xf32>, tensor<16384x1xf32>) outs(%3 : tensor<16384x1xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
+          %7 = arith.addf %arg0, %arg1 : f32
+          linalg.yield %7 : f32
+        } -> tensor<16384x1xf32>
+        flow.dispatch.tensor.store %6, %2, offsets=[0, 0], sizes=[16384, 1], strides=[1, 1] : tensor<16384x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<16384x1xf32>>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize>
+//      CHECK: hal.executable.export public @inner_unit_dim
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// CHECK-SAME:     workgroup_size = [64 : index, 1 : index, 1 : index]
+//      CHECK: func.func @inner_unit_dim
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
