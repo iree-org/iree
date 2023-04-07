@@ -489,12 +489,7 @@ struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
   using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::AllocOp alloc,
                                 PatternRewriter &rewriter) const override {
-    auto addressSpaceAttr =
-        alloc.getType().getMemorySpace().dyn_cast<gpu::AddressSpaceAttr>();
-    if (!(addressSpaceAttr &&
-          addressSpaceAttr.getValue() !=
-              gpu::GPUDialect::getWorkgroupAddressSpace()) ||
-        alloc.getNumOperands() != 0)
+    if (!iree_compiler::hasSharedMemoryAddressSpace(alloc.getType()))
       return failure();
     auto warpParent = alloc->getParentOfType<vector::WarpExecuteOnLane0Op>();
     if (!warpParent) return failure();

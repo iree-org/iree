@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -133,12 +134,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
 
   LogicalResult matchAndRewrite(memref::AllocOp allocOp,
                                 PatternRewriter &rewriter) const override {
-    auto addressSpace = allocOp.getType()
-                            .getMemorySpace()
-                            .dyn_cast_or_null<gpu::AddressSpaceAttr>();
-    if (!addressSpace ||
-        addressSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace())
-      return failure();
+    if (!hasSharedMemoryAddressSpace(allocOp.getType())) return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
     if (llvm::any_of(shape,
                      [](int64_t dim) { return dim == ShapedType::kDynamic; })) {

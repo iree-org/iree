@@ -37,16 +37,6 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
 }
 
-/// Returns true if the given MemRef is in workgroup memory.
-bool isInWorkgroupMemory(MemRefType memrefType) {
-  auto attribute =
-      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
-  if (attribute &&
-      attribute.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace())
-    return true;
-  return false;
-}
-
 std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
   auto moduleOp = funcOp->getParentOfType<ModuleOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =

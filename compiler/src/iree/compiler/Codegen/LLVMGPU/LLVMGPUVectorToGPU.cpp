@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -22,14 +23,9 @@ namespace iree_compiler {
 static void swizzleSharedMemory(func::FuncOp funcOp) {
   SmallVector<memref::AllocOp> shmAllocOps;
   funcOp->walk([&](memref::AllocOp allocOp) {
-    auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
-    auto addressSpaceAttr =
-        memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
     // Only apply it to shared memory of input operands.
-    if (!addressSpaceAttr ||
-        addressSpaceAttr.getValue() !=
-            gpu::GPUDialect::getWorkgroupAddressSpace() ||
-        memrefType.getRank() < 3) {
+    if (!hasSharedMemoryAddressSpace(allocOp.getType()) ||
+        allocOp.getType().getRank() < 3) {
       return;
     }
     shmAllocOps.push_back(allocOp);

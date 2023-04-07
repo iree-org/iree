@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -44,13 +45,8 @@ struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
 
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {
-    auto addressSpace = op.getMemref()
-                            .getType()
-                            .cast<MemRefType>()
-                            .getMemorySpace()
-                            .dyn_cast_or_null<gpu::AddressSpaceAttr>();
-    if (!addressSpace ||
-        addressSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace())
+    if (!hasSharedMemoryAddressSpace(
+            op.getMemref().getType().cast<MemRefType>()))
       return failure();
     rewriter.eraseOp(op);
     return success();

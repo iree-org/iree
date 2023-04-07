@@ -6,10 +6,10 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -64,12 +64,7 @@ struct GPUReduceBankConflictsPass
     SmallVector<memref::AllocOp> sharedMemAllocs;
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
-      auto addressSpaceAttr = allocOp.getType()
-                                  .getMemorySpace()
-                                  .dyn_cast_or_null<gpu::AddressSpaceAttr>();
-      if (addressSpaceAttr &&
-          addressSpaceAttr.getValue() ==
-              gpu::GPUDialect::getWorkgroupAddressSpace() &&
+      if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
           allocOp.getType().hasStaticShape()) {
         sharedMemAllocs.push_back(allocOp);
       }

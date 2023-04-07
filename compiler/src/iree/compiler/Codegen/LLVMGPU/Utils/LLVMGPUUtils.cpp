@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -105,12 +106,8 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
       return WalkResult::advance();
     }
     Value memrefOperand = getMemrefOperand(writeOp);
-    auto addressSpaceAttr = memrefOperand.getType()
-                                .cast<MemRefType>()
-                                .getMemorySpace()
-                                .dyn_cast_or_null<gpu::AddressSpaceAttr>();
-    if (!addressSpaceAttr || addressSpaceAttr.getValue() !=
-                                 gpu::GPUDialect::getWorkgroupAddressSpace()) {
+    if (!hasSharedMemoryAddressSpace(
+            memrefOperand.getType().cast<MemRefType>())) {
       LLVM_DEBUG(DBGS() << "----address space is not workgroup -> Skip \n");
       return WalkResult::advance();
     }
@@ -152,13 +149,8 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
       if (isa<vector::TransferReadOp, vector::LoadOp>(nextNode)) {
         Operation* readOp = nextNode;
         Value memrefOperand = getMemrefOperand(readOp);
-        auto addressSpaceAttr = memrefOperand.getType()
-                                    .cast<MemRefType>()
-                                    .getMemorySpace()
-                                    .dyn_cast_or_null<gpu::AddressSpaceAttr>();
-        if (!addressSpaceAttr ||
-            addressSpaceAttr.getValue() !=
-                gpu::GPUDialect::getWorkgroupAddressSpace()) {
+        if (!hasSharedMemoryAddressSpace(
+                memrefOperand.getType().cast<MemRefType>())) {
           continue;
         }
       }

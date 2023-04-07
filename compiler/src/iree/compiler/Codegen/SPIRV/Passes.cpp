@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -92,8 +93,8 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   auto fromType = from.getType().cast<MemRefType>();
   auto toType = to.getType().cast<MemRefType>();
 
-  bool needsBarrier =
-      isInWorkgroupMemory(fromType) || isInWorkgroupMemory(toType);
+  bool needsBarrier = hasSharedMemoryAddressSpace(fromType) ||
+                      hasSharedMemoryAddressSpace(toType);
   if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
   Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (needsBarrier) {
