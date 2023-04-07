@@ -15,6 +15,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/InputConversion/MHLO/ConvertMHLOToFlow.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
@@ -354,8 +355,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
     : public ConvertMHLOToLinalgOnTensorsBase<
           ConvertMHLOToLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    mhlo::MhloDialect, shape::ShapeDialect, math::MathDialect,
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect,
+                    linalg::LinalgDialect, mhlo::MhloDialect,
+                    shape::ShapeDialect, math::MathDialect,
                     memref::MemRefDialect, complex::ComplexDialect>();
   }
 
