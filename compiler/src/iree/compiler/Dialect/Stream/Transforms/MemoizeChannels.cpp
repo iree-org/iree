@@ -49,11 +49,7 @@ class MemoizeChannelsPass : public MemoizeChannelsBase<MemoizeChannelsPass> {
     for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
       callableOp.walk([&](IREE::Stream::ChannelDefaultOp defaultOp) {
         auto affinityAttr = IREE::Stream::AffinityAttr::lookup(defaultOp);
-        auto fullKey =
-            ArrayAttr::get(moduleOp.getContext(), {
-                                                      affinityAttr,
-                                                      defaultOp.getGroupAttr(),
-                                                  });
+        auto fullKey = ArrayAttr::get(moduleOp.getContext(), {affinityAttr});
         auto lookup = allDefaultOps.try_emplace(
             fullKey, std::vector<IREE::Stream::ChannelDefaultOp>{});
         if (lookup.second) {
@@ -89,9 +85,7 @@ class MemoizeChannelsPass : public MemoizeChannelsBase<MemoizeChannelsPass> {
           moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
       auto defaultOp = funcBuilder.create<IREE::Stream::ChannelDefaultOp>(
-          fusedLoc, channelType,
-          /*group=*/anyDefaultOp.getGroupAttr(),
-          affinityAttr);
+          fusedLoc, channelType, affinityAttr);
       funcBuilder.create<IREE::Util::GlobalStoreOp>(
           fusedLoc, defaultOp.getResult(), globalOp.getName());
       funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);

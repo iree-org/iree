@@ -245,8 +245,7 @@ struct ReplicaIdOpConversion : public OpConversionPattern<mhlo::ReplicaIdOp> {
       mhlo::ReplicaIdOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
     auto rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
     auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
     auto elemType = resultType.getElementType();
@@ -275,8 +274,7 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
     auto loc = op.getLoc();
 
     // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
 
     // Get the collective element type attribute.
     auto resultType = op.getResult().getType().cast<RankedTensorType>();
@@ -363,8 +361,7 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
     auto loc = op.getLoc();
 
     // Create a default channel.
-    Operation *channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    Operation *channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
 
     // If a group is specified, split the default channel.
     int64_t channelId = 0;
@@ -467,8 +464,7 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
     auto loc = op.getLoc();
 
     // Create a channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
 
     // Get the collective element type attribute.
     auto resultType = op.getResult(0).getType().cast<RankedTensorType>();
@@ -582,8 +578,7 @@ struct ReduceScatterOpConversion
     auto loc = op.getLoc();
 
     // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
 
     // Get the collective element type attribute.
     auto resultType = op.getResult().getType().cast<RankedTensorType>();

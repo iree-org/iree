@@ -533,8 +533,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace,  //
 //===----------------------------------------------------------------------===//
 
 IREE_VM_ABI_EXPORT(iree_hal_module_channel_default,  //
-                   iree_hal_module_state_t,         //
-                   rIirr, r) {
+                   iree_hal_module_state_t,          //
+                   rIir, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_queue_affinity_t queue_affinity =
@@ -543,18 +543,15 @@ IREE_VM_ABI_EXPORT(iree_hal_module_channel_default,  //
   iree_vm_buffer_t* id = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref_or_null(args->r3, &id));
   iree_vm_buffer_t* group = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref_or_null(args->r4, &group));
-  iree_string_view_t group_str = iree_vm_buffer_as_string(group);
 
   iree_hal_channel_params_t params = {
       .flags = flags,
       .id = iree_vm_buffer_const_contents(id),  // may be null
-      .group = group_str,                       // may be null
   };
 
   iree_hal_channel_t* channel = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_channel_create_default(device, queue_affinity, params, &channel));
+  IREE_RETURN_IF_ERROR(iree_hal_channel_create_default(device, queue_affinity,
+                                                       params, &channel));
 
   rets->r0 = iree_hal_channel_move_ref(channel);
   return iree_ok_status();

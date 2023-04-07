@@ -1,15 +1,14 @@
 // RUN: iree-opt --split-input-file --iree-convert-hal-to-vm --canonicalize --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // CHECK-LABEL: @channel_default
-//  CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64, %[[ID:.+]]: !vm.buffer, %[[GROUP:.+]]: !vm.buffer) -> !vm.ref<!hal.channel>
-func.func @channel_default(%device: !hal.device, %affinity: i64, %id: !util.buffer, %group: !util.buffer) -> !hal.channel {
+//  CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64, %[[ID:.+]]: !vm.buffer) -> !vm.ref<!hal.channel>
+func.func @channel_default(%device: !hal.device, %affinity: i64, %id: !util.buffer) -> !hal.channel {
   // CHECK: %[[FLAGS:.+]] = vm.const.i32.zero
-  // CHECK: %[[CHANNEL:.+]] = vm.call @hal.channel.default(%[[DEVICE]], %[[AFFINITY]], %[[FLAGS]], %[[ID]], %[[GROUP]])
+  // CHECK: %[[CHANNEL:.+]] = vm.call @hal.channel.default(%[[DEVICE]], %[[AFFINITY]], %[[FLAGS]], %[[ID]]
   %channel = hal.channel.default device(%device : !hal.device)
                                affinity(%affinity)
                                   flags(0)
-                                     id(%id)
-                                  group(%group) : !hal.channel
+                                     id(%id) : !hal.channel
   // CHECK: return %[[CHANNEL]]
   return %channel : !hal.channel
 }

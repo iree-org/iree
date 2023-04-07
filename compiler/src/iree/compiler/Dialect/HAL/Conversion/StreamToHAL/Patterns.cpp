@@ -1263,21 +1263,9 @@ struct ChannelDefaultOpPattern
         lookupDeviceAndQueueAffinityFor(op, rewriter);
     Value id = rewriter.create<IREE::Util::NullOp>(
         op.getLoc(), rewriter.getType<IREE::Util::BufferType>());
-    Value group =
-        adaptor.getGroupAttr()
-            ? rewriter
-                  .create<IREE::Util::BufferConstantOp>(
-                      op.getLoc(),
-                      /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
-                      /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
-                  .getResult()
-            : rewriter
-                  .create<IREE::Util::NullOp>(
-                      op.getLoc(), rewriter.getType<IREE::Util::BufferType>())
-                  .getResult();
     rewriter.replaceOpWithNewOp<IREE::HAL::ChannelDefaultOp>(
         op, rewriter.getType<IREE::HAL::ChannelType>(), device, queueAffinity,
-        /*flags=*/rewriter.getI32IntegerAttr(0), id, group);
+        /*flags=*/rewriter.getI32IntegerAttr(0), id);
     return success();
   }
 };

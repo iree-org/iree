@@ -171,8 +171,7 @@ vm.import private @channel.default(
   %device : !vm.ref<!hal.device>,
   %queue_affinity : i64,
   %flags : i32,
-  %id : !vm.buffer,
-  %group : !vm.buffer
+  %id : !vm.buffer
 ) -> !vm.ref<!hal.channel>
 attributes {nosideeffects}
 

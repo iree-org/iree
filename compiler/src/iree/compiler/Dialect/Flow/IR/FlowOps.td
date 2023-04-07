@@ -1558,15 +1558,11 @@ def FLOW_ChannelDefaultOp : FLOW_Op<"channel.default", [
     Returns a channel initialized using the runtime environment.
   }];
 
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$group
-  );
   let results = (outs
     FLOW_Channel:$result
   );
 
   let assemblyFormat = [{
-    ($group^)?
     `:` type($result)
     attr-dict-with-keyword
   }];

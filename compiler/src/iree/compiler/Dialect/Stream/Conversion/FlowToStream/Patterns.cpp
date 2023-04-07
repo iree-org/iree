@@ -279,8 +279,8 @@ struct ConvertChannelDefaultOp
       IREE::Flow::ChannelDefaultOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Stream::AffinityAttr affinityAttr;
-    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelDefaultOp>(
-        op, adaptor.getGroupAttr(), affinityAttr);
+    rewriter.replaceOpWithNewOp<IREE::Stream::ChannelDefaultOp>(op,
+                                                                affinityAttr);
     return success();
   }
 };

@@ -701,8 +701,7 @@ def HAL_ChannelDefaultOp : HAL_Op<"channel.default", [
     HAL_Device:$device,
     HAL_DeviceQueueAffinity:$queue_affinity,
     I32Attr:$flags,
-    Util_BufferType:$id,
-    Util_BufferType:$group
+    Util_BufferType:$id
   );
   let results = (outs
     HAL_Channel:$result
@@ -713,7 +712,6 @@ def HAL_ChannelDefaultOp : HAL_Op<"channel.default", [
     `affinity` `(` $queue_affinity `)`
     `flags` `(` $flags `)`
     `id` `(` $id `)`
-    `group` `(` $group `)`
     `:` type($result)
     attr-dict-with-keyword
   }];

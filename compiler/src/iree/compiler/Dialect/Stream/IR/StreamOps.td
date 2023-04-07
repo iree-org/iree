@@ -3322,7 +3322,6 @@ def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
   }];
 
   let arguments = (ins
-    OptionalAttr<StrAttr>:$group,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -3331,7 +3330,6 @@ def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    (`group` `(` $group^ `)`)?
     `:` type($result)
     attr-dict-with-keyword
   }];
