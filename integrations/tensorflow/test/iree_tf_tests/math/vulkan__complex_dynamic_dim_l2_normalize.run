@@ -1,0 +1,2 @@
+# REQUIRES: vulkan
+# RUN: %PYTHON -m iree_tf_tests.math.math_test --target_backends=iree_vulkan --dynamic_dims=true --functions=l2_normalize --artifacts_dir=%t

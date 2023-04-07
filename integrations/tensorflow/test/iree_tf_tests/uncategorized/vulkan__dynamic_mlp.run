@@ -1,0 +1,2 @@
+# REQUIRES: vulkan
+# RUN: %PYTHON -m iree_tf_tests.uncategorized.dynamic_mlp_test --target_backends=iree_vulkan --artifacts_dir=%t
