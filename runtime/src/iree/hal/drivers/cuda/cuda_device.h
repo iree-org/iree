@@ -7,8 +7,6 @@
 #ifndef IREE_HAL_DRIVERS_CUDA_CUDA_DEVICE_H_
 #define IREE_HAL_DRIVERS_CUDA_CUDA_DEVICE_H_
 
-#include <cuda.h>
-
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/api.h"

@@ -6,8 +6,6 @@
 
 #include "iree/hal/drivers/cuda/cuda_device.h"
 
-#include <iree/base/assert.h>
-#include <iree/base/status.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
