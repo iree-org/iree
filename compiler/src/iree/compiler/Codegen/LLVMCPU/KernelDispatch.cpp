@@ -55,7 +55,7 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     llvm::cl::init(8));
 
 static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-codegen-llvm-disable-distribution",
+    "iree-codegen-llvmcpu-disable-distribution",
     llvm::cl::desc("disable thread distribution in codegen"),
     llvm::cl::init(false));
 
