@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -56,19 +57,12 @@ static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
 
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
-  auto fromType = from.getType().cast<MemRefType>();
-  auto toType = to.getType().cast<MemRefType>();
-
   bool needsBarrier = false;
-  if (auto attr =
-          fromType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
-    if (attr.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace())
-      needsBarrier = true;
+  if (hasSharedMemoryAddressSpace(from.getType().cast<MemRefType>())) {
+    needsBarrier = true;
   }
-  if (auto attr =
-          toType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
-    if (attr.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace())
-      needsBarrier = true;
+  if (hasSharedMemoryAddressSpace(to.getType().cast<MemRefType>())) {
+    needsBarrier = true;
   }
   if (needsBarrier) builder.create<gpu::BarrierOp>(loc);
   Operation *copy = builder.create<memref::CopyOp>(loc, from, to);

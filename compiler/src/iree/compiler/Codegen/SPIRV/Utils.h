@@ -32,9 +32,6 @@ std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp);
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
 
-/// Returns true if the given MemRef is in workgroup memory.
-bool isInWorkgroupMemory(MemRefType memrefType);
-
 /// Returns the tile sizes at the given `tilingLevel` for compute ops in
 /// `funcOp`.
 FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
