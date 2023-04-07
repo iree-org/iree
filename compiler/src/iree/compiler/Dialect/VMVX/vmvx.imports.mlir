@@ -23,6 +23,15 @@
 //
 // NOTE: experimental functions that are not yet ready to be parts of the core
 // module must be prefixed with `ex.` like `vmvx.ex.my_test_op`.
+//
+// NOTE: all imports should have their arguments ordered as follows:
+//   - Input buffers come first.
+//   - Output buffers come next.
+//   - All other arguments come after that.
+// This convention allows automatically lowering generic ukernel ops, with
+// separate lists of operands: `ins` tensor/memref operands (lowering to input
+// buffer arguments), `outs` tensor/memref operands (lowering to output buffer
+// arguments) and other operands.
 vm.module @vmvx {
 
 //===----------------------------------------------------------------------===//
@@ -31,242 +40,242 @@ vm.module @vmvx {
 //===----------------------------------------------------------------------===//
 
 vm.import private @add.2d.f32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @add.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @and.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @div.2d.f32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @divs.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @divu.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @mul.2d.f32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @mul.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @or.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @shl.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @shrs.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @shru.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @sub.2d.f32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @sub.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @xor.2d.i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
-
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_strides : tuple<i64, i64>,
-
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
-
   %sizes : tuple<i64, i64>
 )
 
@@ -276,80 +285,104 @@ vm.import private @xor.2d.i32(
 //===----------------------------------------------------------------------===//
 
 vm.import private @abs.2d.f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @ceil.2d.f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @ctlz.2d.i32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @exp.2d.f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @floor.2d.f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @log.2d.f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @neg.2d.f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @rsqrt.2d.f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
@@ -361,40 +394,52 @@ vm.import private @rsqrt.2d.f32(
 // Current max rank is 2d.
 //==============================================================================
 vm.import private @copy.2d.x8(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @copy.2d.x16(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @copy.2d.x32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
 )
 
 vm.import private @copy.2d.x64(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_strides : tuple<i64, i64>,
   %sizes : tuple<i64, i64>
@@ -405,8 +450,11 @@ vm.import private @copy.2d.x64(
 //==============================================================================
 
 vm.import private @fill.2d.x32(
-  %fill_value : i32,
+  // Input buffers (none)
+  // Output buffers
   %out_buffer : !vm.buffer,
+  // Other operands
+  %fill_value : i32,
   %out_offset : i64,
   %out_row_stride : i64,
   %size_m : i64,
@@ -418,13 +466,16 @@ vm.import private @fill.2d.x32(
 //==============================================================================
 
 vm.import private @matmul.f32f32f32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_row_stride : i64,
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_row_stride : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_row_stride : i64,
   %m : i64,
@@ -434,13 +485,16 @@ vm.import private @matmul.f32f32f32(
 )
 
 vm.import private @matmul.i8i8i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_row_stride : i64,
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_row_stride : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_row_stride : i64,
   %m : i64,
@@ -454,13 +508,16 @@ vm.import private @matmul.i8i8i32(
 //==============================================================================
 
 vm.import private @mmt4d.f32f32f32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_row_stride : i64,
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_row_stride : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_row_stride : i64,
   %m : i64,
@@ -473,13 +530,16 @@ vm.import private @mmt4d.f32f32f32(
 )
 
 vm.import private @mmt4d.i8i8i32(
+  // Input buffers
   %lhs_buffer : !vm.buffer,
+  %rhs_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %lhs_offset : i64,
   %lhs_row_stride : i64,
-  %rhs_buffer : !vm.buffer,
   %rhs_offset : i64,
   %rhs_row_stride : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_row_stride : i64,
   %m : i64,
@@ -496,10 +556,13 @@ vm.import private @mmt4d.i8i8i32(
 //==============================================================================
 
 vm.import private @pack.f32f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_stride0 : i64,
   %in_size0 : i64,
@@ -513,10 +576,13 @@ vm.import private @pack.f32f32(
 )
 
 vm.import private @pack.i8i8(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_stride0 : i64,
   %in_size0 : i64,
@@ -530,18 +596,21 @@ vm.import private @pack.i8i8(
 )
 
 vm.import private @pack.i32i32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_stride0 : i64,
   %in_size0 : i64,
   %in_size1 : i64,
-  %in_size2 : i64,
-  %in_size3 : i64,
   %out_size0 : i64,
   %out_size1 : i64,
+  %out_size2 : i64,
+  %out_size3 : i64,
   %padding_value : i32,
   %flags : i32
 )
@@ -551,10 +620,13 @@ vm.import private @pack.i32i32(
 //==============================================================================
 
 vm.import private @unpack.f32f32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_stride0 : i64,
   %in_size0 : i64,
@@ -567,26 +639,32 @@ vm.import private @unpack.f32f32(
 )
 
 vm.import private @unpack.i8i8(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_stride0 : i64,
   %in_size0 : i64,
   %in_size1 : i64,
+  %in_size2 : i64,
+  %in_size3 : i64,
   %out_size0 : i64,
   %out_size1 : i64,
-  %out_size2 : i64,
-  %out_size3 : i64,
   %flags : i32
 )
 
 vm.import private @unpack.i32i32(
+  // Input buffers
   %in_buffer : !vm.buffer,
+  // Output buffers
+  %out_buffer : !vm.buffer,
+  // Other operands
   %in_offset : i64,
   %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
   %out_offset : i64,
   %out_stride0 : i64,
   %in_size0 : i64,
@@ -603,6 +681,9 @@ vm.import private @unpack.i32i32(
 //==============================================================================
 
 vm.import private @query_tile_sizes.2d(
+  // Input buffers (none)
+  // Output buffers (none)
+  // Other operands
   %sizes : tuple<i64, i64>,
   %flags : i32
 ) -> (i64, i64)
