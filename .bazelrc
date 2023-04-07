@@ -8,7 +8,7 @@ import %workspace%/build_tools/bazel/iree_pjrt.bazelrc
 import %workspace%/env.bazelrc
 
 # Import the main IREE bazel configuration.
-import %workspace%/external/iree/build_tools/bazel/iree.bazelrc
-try-import %workspace%/external/iree/configured.bazelrc
+import %workspace%/../iree/build_tools/bazel/iree.bazelrc
+import %workspace%/../iree/configured.bazelrc
 
 try-import %workspace%/user.bazelrc

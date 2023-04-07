@@ -34,17 +34,26 @@ jobs:
         with:
           python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
 
+      - name: Sync and install versions
+        run: |
+          # TODO: https://github.com/openxla/openxla-pjrt-plugin/issues/30
+          sudo apt install -y lld
+          python ./sync_deps.py
+          pip install -r requirements.txt
+
       - name: Setup Bazelisk
         uses: bazelbuild/setup-bazelisk@v2
 
-      - name: "Sync to latest nightly"
+      - name: "Sync and configure"
         run: |
-          python ./build_tools/sync.py nightly
-
-      - name: "Configure bazel"
-        run: |
-          CC=clang CXX=clang++ python ./external/iree/configure_bazel.py
+          python ./configure.py --cc=clang --cxx=clang++ --cuda-sdk-dir=$CUDA_SDK_DIR
 
       - name: "Build CPU plugin"
         run: |
           bazel build iree/integrations/pjrt/cpu/...
+
+      - name: "Test CPU plugin"
+        run: |
+          source .env.sh
+          # TODO: We should be pinning/rolling a jaxlib nightly version.
+          JAX_PLATFORMS=iree_cpu python test/test_simple.py

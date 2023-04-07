@@ -13,38 +13,28 @@ most powerful).
 
 ## Setup options
 
-The below presumes that you have a compatible Jax/Jaxlib installed. Since 
-PJRT plugin support is moving fast, it is rare that released versions are 
+The below presumes that you have a compatible Jax/Jaxlib installed. Since
+PJRT plugin support is moving fast, it is rare that released versions are
 appropriate. See ["Building Jax from Source"](#building-jax-from-source) below.
 
 ### Option 1: Synchronize to a nightly IREE release
 
-This will install compiler binaries from IREE's nightly releases and will then
-sync a local clone of IREE's runtime to the same commit used to build the
-compiler. This is the easiest way to work on pure-runtime/plugin features and
-involves building the least.
-
 ```
-# Run at any time to sync to the then-current nightly.
-python build_tools/sync.py nightly
+python ./sync_deps.py
+pip install -U -r requirements.txt
+python ./configure.py --cc=clang --cxx=clang++ --cuda-sdk-dir=$CUDA_SDK_DIR
 
 # Source environment variables to run interactively.
 # The above generates a .env and .env.sh file with key setup vars.
 source .env.sh
-
-# Replace with actual compiler binaries if multiple.
-CC=clang CXX=clang++ python external/iree/configure_bazel.py
-
-# Configure path to CUDA SDK (for building CUDA plugin).
-# Replace $CUDA_SDK_DIR as appropriate.
-echo "build --action_env IREE_CUDA_DEPS_DIR=$CUDA_SDK_DIR" > user.bazelrc
 
 # Build.
 
 bazel build iree/integrations/pjrt/...
 
 # Run a sample.
-
+# Note that there can be version incompatibilities between jaxlib nightlies
+pip install -e ../jax
 JAX_PLATFORMS=iree_cpu python test/test_simple.py
 JAX_PLATFORMS=iree_cuda python test/test_simple.py
 ```

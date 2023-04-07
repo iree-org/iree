@@ -7,12 +7,12 @@
 
 local_repository(
     name = "xla",
-    path = "external/xla",
+    path = "../xla",
 )
 
 local_repository(
     name = "iree_core",
-    path = "external/iree",
+    path = "../iree",
 )
 
 # Import all of the xla dependencies.
@@ -42,7 +42,7 @@ load("@iree_core//build_tools/bazel:workspace.bzl", "configure_iree_submodule_de
 # TODO: Path hard-coding is... not great. Oh bazel.
 configure_iree_submodule_deps(
     iree_repo_alias = "@iree_core",
-    iree_path = "external/iree",
+    iree_path = "../iree",
 )
 
 configure_iree_cuda_deps()
