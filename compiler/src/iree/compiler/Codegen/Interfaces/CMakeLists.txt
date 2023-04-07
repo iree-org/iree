@@ -24,14 +24,20 @@ iree_cc_library(
     ::UKernelOpInterface
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
+    MLIRAffineDialect
     MLIRAffineTransformOps
+    MLIRArithValueBoundsOpInterfaceImpl
     MLIRBufferizationTransformOps
     MLIRGPUTransformOps
     MLIRIR
+    MLIRLinalgDialect
     MLIRLinalgTransformOps
     MLIRLinalgTransforms
+    MLIRMemRefDialect
     MLIRMemRefTransformOps
+    MLIRSCFDialect
     MLIRSCFTransformOps
+    MLIRTensorDialect
     MLIRVectorTransformOps
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions

@@ -7,7 +7,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "llvm/Support/CommandLine.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -57,7 +57,9 @@ static LogicalResult checkStackAllocationSize(func::FuncOp funcOp) {
       allocaSize *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {
-      auto ub = linalg::getConstantUpperBoundForIndex(operand);
+      auto ub = ValueBoundsConstraintSet::computeConstantBound(
+          presburger::BoundType::UB, operand, /*dim=*/std::nullopt,
+          /*stopCondition=*/nullptr, /*closedUB=*/true);
       if (succeeded(ub)) {
         allocaSize *= ub.value();
         continue;
