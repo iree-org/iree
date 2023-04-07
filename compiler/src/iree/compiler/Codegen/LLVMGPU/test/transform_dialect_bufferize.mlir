@@ -16,11 +16,14 @@ hal.executable private @pad_matmul_static_dispatch_0  {
 
       //      CHECK: memref.alloc() {alignment = 64 : i64} : memref<250x1020xf32, #gpu.address_space<workgroup>>
       // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>)
-      // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>)
+      // CHECK: gpu.barrier
+      // CHECK: linalg.generic
+      // CHECK: gpu.barrier
+      // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32, #gpu.address_space<workgroup>>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>)
       // CHECK-NEXT: bufferization.to_tensor %{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>
       // CHECK-NEXT: memref.dealloc %{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>
-
-      %6 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
+      %p = bufferization.alloc_tensor() copy(%3) : tensor<250x500xf32>
+      %6 = linalg.matmul ins(%p, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
       // Returning a tensor force the allocation that we want to test here: and alloca with memory space "3" for GPU shared memory.
       return %6: tensor<250x1020xf32>
