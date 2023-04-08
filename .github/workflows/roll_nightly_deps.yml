@@ -9,6 +9,10 @@ on:
 concurrency:
   group: roll_deps
 
+permissions:
+  # Allows approval.
+  pull-requests: write
+
 jobs:
   roll_deps:
     runs-on: ubuntu-20.04
@@ -66,6 +70,7 @@ jobs:
             echo "Created pull request $pr"
             gh pr merge $pr --auto --delete-branch --squash
             # Can't approve your own PR, so approve with the github actions bot.
+            echo "Approving PR"
             export GH_TOKEN="$APPROVAL_TOKEN"
             gh pr review $pr -a
           fi
