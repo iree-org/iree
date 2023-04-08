@@ -174,8 +174,12 @@ constexpr auto splat_literal(const T& v) {
 template <typename T>
 struct cconv_map;
 
-template <typename T>
-struct cconv_map {
+template <>
+struct cconv_map<int32_t> {
+  static constexpr const auto conv_chars = literal("i");
+};
+template <>
+struct cconv_map<uint32_t> {
   static constexpr const auto conv_chars = literal("i");
 };
 
@@ -186,6 +190,15 @@ struct cconv_map<int64_t> {
 template <>
 struct cconv_map<uint64_t> {
   static constexpr const auto conv_chars = literal("I");
+};
+
+template <>
+struct cconv_map<float> {
+  static constexpr const auto conv_chars = literal("f");
+};
+template <>
+struct cconv_map<double> {
+  static constexpr const auto conv_chars = literal("F");
 };
 
 template <>
@@ -680,16 +693,19 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
   using dispatch_functor_t = packing::DispatchFunctor<Owner, Result, Params...>;
   return {iree_make_cstring_view(name),
           packing::cconv_storage<Result, sizeof...(Params), Params...>::value(),
-          (void (Owner::*)())fn, &dispatch_functor_t::Call};
+          (void(Owner::*)())fn, &dispatch_functor_t::Call};
 }
 
 template <typename Owner, typename... Params>
 constexpr NativeFunction<Owner> MakeNativeFunction(
     const char* name, Status (Owner::*fn)(Params...)) {
   using dispatch_functor_t = packing::DispatchFunctorVoid<Owner, Params...>;
+  fprintf(
+      stderr,
+      packing::cconv_storage_void<sizeof...(Params), Params...>::value().data);
   return {iree_make_cstring_view(name),
           packing::cconv_storage_void<sizeof...(Params), Params...>::value(),
-          (void (Owner::*)())fn, &dispatch_functor_t::Call};
+          (void(Owner::*)())fn, &dispatch_functor_t::Call};
 }
 
 }  // namespace vm
