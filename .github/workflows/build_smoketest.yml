@@ -6,6 +6,7 @@
 name: Build Smoketest
 
 on:
+  workflow_call:
   workflow_dispatch:
   pull_request:
   push:
