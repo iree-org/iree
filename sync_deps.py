@@ -6,10 +6,14 @@
 ### 'openxla-workspace' dev tool for more full featured setup.
 ### Update with: openxla-workspace pin
 
+# iree: 7faa624fb 2023-04-07 10:54:01 -0700 : Turn the functionality in iree_setup_toolchain.cmake into a macro. (#12955)
+# jax: 891b5b60c 2023-04-07 12:05:26 -0700 : Merge pull request #15458 from jakevdp:fix-debug-exports
+# xla: 66966c7e3 2023-04-07 11:13:43 -0700 : Fix Apple M1 CPU freq detection.
+
 PINNED_VERSIONS = {
-  "iree": "e95f6f37fb38366cd27111b671b642abee1a37c1",
-  "xla": "35ead35c220dca9673c992b1271751e7976e5197",
-  "jax": "053affd173711b64f19ede27a53f17bf528d8374"
+  "iree": "7faa624fb733fdb368bfb41c3469cdd7a3e3f67f",
+  "xla": "66966c7e3c243029ebccc91b3d81aa006df5a645",
+  "jax": "891b5b60c8dfc1973a74e376841135d1d97b73e1"
 }
 
 ORIGINS = {
