@@ -1058,6 +1058,71 @@ transform_dialect::TileToForallAndWorkgroupCountRegionOp::apply(
 }
 
 //===---------------------------------------------------------------------===//
+// ComputeWorkgroupCountRegionOp
+//===---------------------------------------------------------------------===//
+// TODO: Try to find a way to reuse this helpers.
+SmallVector<OpFoldResult>
+transform_dialect::ComputeWorkgroupCountRegionOp::getMixedNumThreads() {
+  Builder b(getContext());
+  return getMixedValues(getStaticNumThreads(), getNumThreads(), b);
+}
+
+SmallVector<OpFoldResult>
+transform_dialect::ComputeWorkgroupCountRegionOp::getMixedTileSizes() {
+  Builder b(getContext());
+  return getMixedValues(getStaticTileSizes(), getTileSizes(), b);
+}
+
+LogicalResult
+transform_dialect::ComputeWorkgroupCountRegionOp::verify() {
+  if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
+    return emitOpError("either num_threads or tile_sizes must be specified");
+  return success();
+}
+
+void transform_dialect::ComputeWorkgroupCountRegionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTileSizes(), effects);
+  transform::onlyReadsHandle(getNumThreads(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::ComputeWorkgroupCountRegionOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  if (targetOps.empty()) {
+    return DiagnosedSilenceableFailure::success();
+  }
+  if (targetOps.size() != 1) {
+    return mlir::emitDefiniteFailure(
+               state.getTopLevel(),
+               "expected single target op in payload, got: ")
+           << targetOps.size();
+  }
+  auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (failed(exportOp)) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "couldn't find export op for func");
+  }
+
+  /// Lower the workgroup count region in keeping with the way dispatch
+  /// regions are created by default in IREEs compilation flow.
+  IRRewriter rewriter(getContext());
+  if (failed(lowerWorkgroupCountComputingRegion(
+          state, rewriter, getLoc(), exportOp.value(), getMixedNumThreads(),
+          getMixedTileSizes(), getMapping()))) {
+    return mlir::emitDefiniteFailure(exportOp.value(),
+                                     "failed to lower workgroup count region");
+  }
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
 // IREEBufferizeOp
 //===---------------------------------------------------------------------===//
 

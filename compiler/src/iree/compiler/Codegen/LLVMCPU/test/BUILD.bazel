@@ -52,6 +52,7 @@ iree_lit_test_suite(
             "tile_and_fuse.mlir",
             "transform_dialect_bufferize.mlir",
             "transform_dialect_iree_tile_to_forall.mlir",
+	    "transform_dialect_iree_compute_workgroup_count_region.mlir",
             "transpose_avx2_lowering.mlir",
             "unfused_fma.mlir",
             "vector_contract_to_arm_asm.mlir",

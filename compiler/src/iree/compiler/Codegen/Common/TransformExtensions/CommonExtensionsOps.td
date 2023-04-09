@@ -526,6 +526,44 @@ def TileToForallAndWorkgroupCountRegionOp :
   }];
 }
 
+def ComputeWorkgroupCountRegionOp :
+    Op<Transform_Dialect, "iree.compute_workgroup_count_region",
+      [AttrSizedOperandSegments,
+       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       TransformOpInterface]> {
+  let description = [{
+    It lowers the `workgroup_count` region of the export op corresponding to the parent
+    `func.func` of the target to return the number of workgroups.
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   Variadic<PDL_Operation>:$num_threads,
+                   Variadic<PDL_Operation>:$tile_sizes,
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_num_threads,
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_tile_sizes,
+                   OptionalAttr<DeviceMappingArrayAttr>:$mapping);
+  let assemblyFormat = [{
+    $target oilist(
+        `num_threads` custom<DynamicIndexList>($num_threads,
+                                               $static_num_threads) |
+         `tile_sizes` custom<DynamicIndexList>($tile_sizes,
+                                               $static_tile_sizes))
+    (`(` `mapping` `=` $mapping^ `)`)? attr-dict
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+
+    ::llvm::SmallVector<::mlir::OpFoldResult> getMixedNumThreads();
+    ::llvm::SmallVector<::mlir::OpFoldResult> getMixedTileSizes();
+  }];
+
+}
+
 def ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp : Op<Transform_Dialect,
     "iree.convert_conv2d_to_img2col_and_adjust_workgroup_count_region",
     [FunctionalStyleTransformOpTrait,
