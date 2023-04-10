@@ -1694,6 +1694,16 @@ void AsyncDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.call
+//===----------------------------------------------------------------------===//
+
+void AsyncCallOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                              MLIRContext *context) {
+  // TODO(benvanik): elide calls to targets that have nosideeffects.
+  // results.insert<ElideUnusedOp<AsyncCallOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.execute
 //===----------------------------------------------------------------------===//
 
@@ -2032,6 +2042,8 @@ void CmdCopyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
+// TODO(benvanik): make this something on the DispatchOpInterface.
+
 // Folds subview ranges into dispatch ranges.
 //
 // Example:
@@ -2061,21 +2073,20 @@ struct FoldSubviewsIntoDispatchOp : public OpRewritePattern<Op> {
     rewriter.startRootUpdate(op);
 
     setInsertionPointToParentExecutionScope(op, rewriter);
-    for (auto it : llvm::enumerate(resourceSubviewOps)) {
-      unsigned resourceIdx = static_cast<unsigned>(it.index());
-      auto subviewOp = it.value();
+    for (auto [resourceIndex, subviewOp] :
+         llvm::enumerate(resourceSubviewOps)) {
       if (!subviewOp) continue;
       auto fusedLoc = rewriter.getFusedLoc({subviewOp.getLoc(), op.getLoc()});
       auto newOffset = rewriter.createOrFold<arith::AddIOp>(
           fusedLoc, subviewOp.getSourceOffset(),
-          op.getResourceOffsets()[resourceIdx]);
+          op.getResourceOffsets()[resourceIndex]);
       op.getResourcesMutable()
-          .slice(resourceIdx, 1)
+          .slice(resourceIndex, 1)
           .assign(subviewOp.getSource());
       op.getResourceSizesMutable()
-          .slice(resourceIdx, 1)
+          .slice(resourceIndex, 1)
           .assign(subviewOp.getSourceSize());
-      op.getResourceOffsetsMutable().slice(resourceIdx, 1).assign(newOffset);
+      op.getResourceOffsetsMutable().slice(resourceIndex, 1).assign(newOffset);
     }
 
     rewriter.finalizeRootUpdate(op);
@@ -2097,6 +2108,65 @@ void CmdCollectiveOp::getCanonicalizationPatterns(RewritePatternSet &results,
 void CmdDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   results.insert<FoldSubviewsIntoDispatchOp<CmdDispatchOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.call
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// TODO(benvanik): make this something on the DispatchOpInterface.
+// This duplicates FoldSubviewsIntoDispatchOp to handle the call op until the
+// interface can be written.
+struct FoldSubviewsIntoCmdCallOp : public OpRewritePattern<CmdCallOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(CmdCallOp op,
+                                PatternRewriter &rewriter) const override {
+    // Original operand index + the subview.
+    SmallVector<std::pair<int, ResourceSubviewOp>> resourceSubviewOps;
+    bool anySubviewOps = false;
+    for (auto [operandIndex, operand] :
+         llvm::enumerate(op.getResourceOperands())) {
+      if (operand.getType().isa<IREE::Stream::ResourceType>()) {
+        auto subviewOp = ResourceSubviewOp::findSubviewOp(operand);
+        if (subviewOp) anySubviewOps = true;
+        resourceSubviewOps.push_back({operandIndex, subviewOp});
+      }
+    }
+    if (!anySubviewOps) return failure();
+    rewriter.startRootUpdate(op);
+
+    setInsertionPointToParentExecutionScope(op, rewriter);
+    for (auto [resourceIndex, resourceSubviewOp] :
+         llvm::enumerate(resourceSubviewOps)) {
+      auto [operandIndex, subviewOp] = resourceSubviewOp;
+      if (!subviewOp) continue;
+      auto fusedLoc = rewriter.getFusedLoc({subviewOp.getLoc(), op.getLoc()});
+      auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, subviewOp.getSourceOffset(),
+          op.getResourceOperandOffsets()[resourceIndex]);
+      op.getResourceOperandsMutable()
+          .slice(operandIndex, 1)
+          .assign(subviewOp.getSource());
+      op.getResourceOperandSizesMutable()
+          .slice(resourceIndex, 1)
+          .assign(subviewOp.getSourceSize());
+      op.getResourceOperandOffsetsMutable()
+          .slice(resourceIndex, 1)
+          .assign(newOffset);
+    }
+
+    rewriter.finalizeRootUpdate(op);
+    return success();
+  }
+};
+
+}  // namespace
+
+void CmdCallOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                            MLIRContext *context) {
+  results.insert<FoldSubviewsIntoCmdCallOp>(context);
 }
 
 //===----------------------------------------------------------------------===//

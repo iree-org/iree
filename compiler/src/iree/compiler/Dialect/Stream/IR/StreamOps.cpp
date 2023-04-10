@@ -19,6 +19,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -1710,6 +1711,192 @@ void AsyncDispatchOp::getAsyncAccessRanges(
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.func
+//===----------------------------------------------------------------------===//
+
+AsyncFuncOp AsyncFuncOp::create(Location location, StringRef name,
+                                FunctionType type,
+                                ArrayRef<int64_t> tiedOperands,
+                                ArrayRef<DictionaryAttr> argAttrs,
+                                ArrayRef<DictionaryAttr> resAttrs) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  AsyncFuncOp::build(builder, state, name, type,
+                     builder.getIndexArrayAttr(tiedOperands), argAttrs,
+                     resAttrs);
+  return cast<AsyncFuncOp>(Operation::create(state));
+}
+
+void AsyncFuncOp::build(OpBuilder &builder, OperationState &state,
+                        StringRef name, FunctionType type,
+                        ArrayAttr tiedOperands,
+                        ArrayRef<DictionaryAttr> argAttrs,
+                        ArrayRef<DictionaryAttr> resAttrs) {
+  state.addAttribute(SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(name));
+  state.addAttribute(SymbolTable::getVisibilityAttrName(),
+                     builder.getStringAttr("private"));
+  state.addAttribute("function_type", TypeAttr::get(type));
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                     tiedOperands);
+  state.addRegion();
+  if (!argAttrs.empty() || !resAttrs.empty()) {
+    assert(type.getNumInputs() == argAttrs.size());
+    assert(type.getNumResults() == resAttrs.size());
+    function_interface_impl::addArgAndResultAttrs(
+        builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
+        builder.getStringAttr("res_attrs"));
+  }
+}
+
+bool AsyncFuncOp::isResultTied(int resultIndex) {
+  auto tiedOperandsAttr = getTiedOperandsAttr();
+  if (!tiedOperandsAttr) return false;
+  auto indexAttr =
+      tiedOperandsAttr.getValue()[resultIndex].dyn_cast_or_null<IntegerAttr>();
+  if (!indexAttr) return false;
+  return indexAttr.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.call
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncCallOp::verify() {
+  AsyncCallOp op = *this;
+
+  if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
+                                op.getResourceOperandSizes())) ||
+      failed(verifyOpValueSizes(op, op.getResults(), op.getResultSizes()))) {
+    return failure();
+  }
+
+  unsigned requiredRangeCount = 0;
+  for (auto value : op.getResourceOperands()) {
+    if (value.getType().isa<IREE::Stream::ResourceType>()) {
+      ++requiredRangeCount;
+    }
+  }
+
+  unsigned presentRangeCount = op.getResourceOperandOffsets().size();
+  if (op.getResourceOperandEnds().size() != presentRangeCount ||
+      op.getResourceOperandLengths().size() != presentRangeCount) {
+    return op->emitOpError() << "mismatch on resource range "
+                                "offsets/ends/lengths; counts must match";
+  }
+  if (presentRangeCount != requiredRangeCount) {
+    return op->emitOpError() << "expects " << requiredRangeCount
+                             << " resource range operand sets but "
+                             << presentRangeCount << " are present";
+  }
+
+  // TODO(benvanik): support non-resource returns.
+  // This would require fixing stream.async.execute and stream.async.concurrent
+  // to be able to return non-resource types as well and adjust partitioning
+  // to set them up as return values. For now we just avoid this.
+  for (auto resultType : op.getResultTypes()) {
+    if (!resultType.isa<IREE::Stream::ResourceType>()) {
+      return op->emitOpError() << "non-resource return values are not yet "
+                                  "supported on async calls";
+    }
+  }
+
+  return success();
+}
+
+LogicalResult AsyncCallOp::verifySymbolUses(
+    SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+  auto calleeOp =
+      symbolTable.lookupNearestSymbolFrom<IREE::Stream::AsyncFuncOp>(
+          op, getCalleeAttr());
+  if (!calleeOp) {
+    return op->emitOpError() << "undefined external call: " << getCallee();
+  }
+
+  // NOTE: we allow the func to have broader lifetimes (`*`) than the calls.
+  auto expectedType = getCalleeType();
+  auto calleeType = calleeOp.getFunctionType();
+  if (calleeType.getNumInputs() != expectedType.getNumInputs() ||
+      calleeType.getNumResults() != expectedType.getNumResults()) {
+    return emitOpError("function type mismatch; expected ")
+           << expectedType << " but callee is " << calleeType;
+  }
+  auto typesCompatible = [](Type actual, Type expected) {
+    if (actual == expected) return true;
+    auto calleeResource = actual.dyn_cast<IREE::Stream::ResourceType>();
+    auto expectedResource = expected.dyn_cast<IREE::Stream::ResourceType>();
+    if (calleeResource && expectedResource) {
+      if (expectedResource.getLifetime() == IREE::Stream::Lifetime::Unknown) {
+        // Allow anything to match with an unknown lifetime.
+        return true;
+      }
+      // Lifetime is specified on the func and the call doesn't match.
+      return false;
+    }
+    return false;
+  };
+  for (auto [calleeArg, expectedArg] :
+       llvm::zip_equal(calleeType.getInputs(), expectedType.getInputs())) {
+    if (!typesCompatible) {
+      return emitOpError("function argument type mismatch; expected ")
+             << expectedArg << " but callee provides " << calleeArg;
+    }
+  }
+  for (auto [calleeResult, expectedResult] :
+       llvm::zip_equal(calleeType.getResults(), expectedType.getResults())) {
+    if (!typesCompatible) {
+      return emitOpError("function result type mismatch; expected ")
+             << expectedResult << " but callee provides " << calleeResult;
+    }
+  }
+
+  return success();
+}
+
+FunctionType AsyncCallOp::getCalleeType() {
+  auto operandTypes = llvm::to_vector(llvm::map_range(
+      getArgOperands(), [](Value arg) { return arg.getType(); }));
+  return FunctionType::get(getContext(), operandTypes, getResultTypes());
+}
+
+std::pair<unsigned, unsigned> AsyncCallOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(0);  // $operands
+}
+
+void AsyncCallOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  unsigned rangeIndex = 0;
+  unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
+  for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
+    if (!operand.getType().isa<IREE::Stream::ResourceType>()) continue;
+    ResourceAccessBitfield access = ResourceAccessBitfield::Read;
+    auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
+    if (!tiedResults.empty()) {
+      access = access | ResourceAccessBitfield::Write;
+    }
+    Value start = getResourceOperandOffsets()[rangeIndex];
+    Value end = getResourceOperandEnds()[rangeIndex];
+    Value length = getResourceOperandLengths()[rangeIndex];
+    ++rangeIndex;
+    ranges.push_back({access, operand, start, end, length});
+    for (auto result : tiedResults) {
+      ranges.push_back({access, result, start, end, length});
+    }
+  }
+  for (auto [i, result, resultSize] :
+       llvm::zip_equal(llvm::seq<unsigned>(0, getResults().size()),
+                       getResults(), getResultSizes())) {
+    if (getTiedResultOperandIndex(i).has_value()) {
+      // Already covered above.
+      continue;
+    }
+    ranges.push_back({ResourceAccessBitfield::Write, result, Value{},
+                      resultSize, resultSize});
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.execute
 //===----------------------------------------------------------------------===//
 
@@ -2310,6 +2497,351 @@ SmallVector<unsigned> CmdDispatchOp::makeResourceToArgMap(
     }
   }
   return map;
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.func
+//===----------------------------------------------------------------------===//
+
+CmdFuncOp CmdFuncOp::create(Location location, StringRef name,
+                            FunctionType type,
+                            ArrayRef<DictionaryAttr> argAttrs,
+                            ArrayRef<DictionaryAttr> resAttrs) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  CmdFuncOp::build(builder, state, name, type, argAttrs, resAttrs);
+  return cast<CmdFuncOp>(Operation::create(state));
+}
+
+void CmdFuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
+                      FunctionType type, ArrayRef<DictionaryAttr> argAttrs,
+                      ArrayRef<DictionaryAttr> resAttrs) {
+  state.addAttribute(SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(name));
+  state.addAttribute(SymbolTable::getVisibilityAttrName(),
+                     builder.getStringAttr("private"));
+  state.addAttribute("function_type", TypeAttr::get(type));
+  state.addRegion();
+  if (!argAttrs.empty() || !resAttrs.empty()) {
+    assert(type.getNumInputs() == argAttrs.size());
+    assert(type.getNumResults() == resAttrs.size());
+    function_interface_impl::addArgAndResultAttrs(
+        builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
+        builder.getStringAttr("res_attrs"));
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// custom<DispatchFunctionSignature>
+//===----------------------------------------------------------------------===//
+// (%arg0: type {some.attr = 54 : index}, %arg1: type) -> (type, %arg1 as type)
+// (%arg0[%arg1 for %arg2]: !stream.resource<*>, ...)
+
+static ParseResult parseDispatchFunctionArgumentList(
+    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::UnresolvedOperand> &args,
+    SmallVectorImpl<Type> &types, ArrayAttr &attrs) {
+  auto indexType = parser.getBuilder().getIndexType();
+  auto emptyDictionaryAttr = parser.getBuilder().getDictionaryAttr({});
+  SmallVector<Attribute> argAttrsVec;
+  do {
+    OpAsmParser::UnresolvedOperand arg;
+    if (failed(parser.parseOperand(arg))) return failure();
+    bool hasOffsetLength = false;
+    OpAsmParser::UnresolvedOperand offsetArg;
+    OpAsmParser::UnresolvedOperand lengthArg;
+    if (succeeded(parser.parseOptionalLSquare())) {
+      // %offset for %length]
+      if (failed(parser.parseOperand(offsetArg)) ||
+          failed(parser.parseKeyword("for")) ||
+          failed(parser.parseOperand(lengthArg)) ||
+          failed(parser.parseRSquare())) {
+        return failure();
+      }
+      hasOffsetLength = true;
+    }
+    Type type;
+    NamedAttrList attrsVec;
+    if (failed(parser.parseColonType(type)) ||
+        failed(parser.parseOptionalAttrDict(attrsVec))) {
+      return failure();
+    }
+    args.push_back(arg);
+    types.push_back(type);
+    argAttrsVec.push_back(parser.getBuilder().getDictionaryAttr(attrsVec));
+    if (hasOffsetLength) {
+      args.push_back(offsetArg);
+      args.push_back(lengthArg);
+      types.push_back(indexType);
+      types.push_back(indexType);
+      argAttrsVec.push_back(emptyDictionaryAttr);
+      argAttrsVec.push_back(emptyDictionaryAttr);
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!argAttrsVec.empty()) {
+    attrs = parser.getBuilder().getArrayAttr(argAttrsVec);
+  }
+  return success();
+}
+
+static ParseResult parseDispatchFunctionResultList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &resultTypes,
+    ArrayAttr &resultAttrs) {
+  SmallVector<Attribute> resultAttrsVec;
+  SmallVector<int64_t, 4> tiedOperandIndices;
+  do {
+    Type type;
+    if (failed(parser.parseType(type))) {
+      return failure();
+    }
+    NamedAttrList attrs;
+    if (failed(parser.parseOptionalAttrDict(attrs))) {
+      return failure();
+    }
+    resultTypes.push_back(type);
+    resultAttrsVec.push_back(parser.getBuilder().getDictionaryAttr(attrs));
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!resultAttrsVec.empty()) {
+    resultAttrs = parser.getBuilder().getArrayAttr(resultAttrsVec);
+  }
+  return success();
+}
+
+static void printDispatchFunctionResultList(OpAsmPrinter &p, Operation *op,
+                                            TypeRange resultTypes,
+                                            ArrayAttr resultAttrs) {
+  for (unsigned i = 0; i < resultTypes.size(); ++i) {
+    auto resultType = resultTypes[i];
+    p.printType(resultType);
+    if (resultAttrs) {
+      auto attrs = resultAttrs.getValue()[i].dyn_cast_or_null<DictionaryAttr>();
+      if (attrs && !attrs.empty()) {
+        p.printOptionalAttrDict(attrs.getValue());
+      }
+    }
+    if (i < resultTypes.size() - 1) p << ", ";
+  }
+}
+
+ParseResult parseDispatchFunctionSignature(OpAsmParser &parser,
+                                           TypeAttr &functionTypeAttr,
+                                           ArrayAttr &argAttrs,
+                                           ArrayAttr &resultAttrs) {
+  SmallVector<OpAsmParser::UnresolvedOperand> args;
+  SmallVector<Type> argTypes;
+  SmallVector<Type> resultTypes;
+  if (failed(parser.parseLParen())) return failure();
+  if (failed(parser.parseOptionalRParen())) {
+    if (failed(parseDispatchFunctionArgumentList(parser, args, argTypes,
+                                                 argAttrs)) ||
+        failed(parser.parseRParen())) {
+      return failure();
+    }
+  }
+  if (succeeded(parser.parseOptionalArrow())) {
+    if (succeeded(parser.parseOptionalLParen())) {
+      if (failed(parseDispatchFunctionResultList(parser, resultTypes,
+                                                 resultAttrs)) ||
+          failed(parser.parseRParen())) {
+        return failure();
+      }
+    } else {
+      if (failed(parseDispatchFunctionResultList(parser, resultTypes,
+                                                 resultAttrs))) {
+        return failure();
+      }
+    }
+  }
+  functionTypeAttr = TypeAttr::get(
+      FunctionType::get(parser.getContext(), argTypes, resultTypes));
+  return success();
+}
+
+void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
+                                    TypeAttr functionTypeAttr,
+                                    ArrayAttr argAttrs, ArrayAttr resultAttrs) {
+  auto functionType = functionTypeAttr.getValue().cast<FunctionType>();
+  p << "(";
+  for (size_t argIndex = 0; argIndex < functionType.getNumInputs();) {
+    if (argIndex) p << ", ";
+    int baseArgIndex = argIndex;
+    auto type = functionType.getInput(baseArgIndex);
+    p << "%arg";
+    p << (baseArgIndex + 0);
+    if (type.isa<IREE::Stream::ResourceType>()) {
+      p << "[%arg" << (baseArgIndex + 1) << " for %arg" << (baseArgIndex + 2)
+        << "]";
+      argIndex += 3;  // <resource, offset, length>
+    } else {
+      argIndex += 1;  // unmodified arg
+    }
+    p << ": ";
+    p.printType(type);
+    if (argAttrs) {
+      auto attrs =
+          argAttrs.getValue()[baseArgIndex].dyn_cast_or_null<DictionaryAttr>();
+      if (attrs && !attrs.empty()) {
+        p.printOptionalAttrDict(attrs.getValue());
+      }
+    }
+  }
+  p << ")";
+  auto resultTypes = functionType.getResults();
+  if (!resultTypes.empty()) {
+    p << " -> ";
+    if (resultTypes.size() != 1) p << "(";
+    printDispatchFunctionResultList(p, op, resultTypes, resultAttrs);
+    if (resultTypes.size() != 1) p << ")";
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.call
+//===----------------------------------------------------------------------===//
+
+LogicalResult CmdCallOp::verify() {
+  CmdCallOp op = *this;
+
+  if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
+                                op.getResourceOperandSizes())) ||
+      failed(verifyOpValueSizes(op, op.getResults(), op.getResultSizes()))) {
+    return failure();
+  }
+
+  unsigned resourceCount = 0;
+  for (auto value : op.getResourceOperands()) {
+    if (value.getType().isa<IREE::Stream::ResourceType>()) {
+      ++resourceCount;
+    }
+  }
+
+  unsigned rangeCount = op.getResourceOperandOffsets().size();
+  if (op.getResourceOperandLengths().size() != rangeCount) {
+    return op->emitOpError() << "mismatch on resource range "
+                                "offsets/lengths; counts must match";
+  }
+  if (rangeCount != resourceCount) {
+    return op->emitOpError()
+           << "expects " << resourceCount << " resource range operand sets but "
+           << rangeCount << " are present";
+  }
+
+  if (op.getResourceOperandAccessesAttr().size() != resourceCount) {
+    return op->emitOpError()
+           << "expects " << resourceCount << " resource access specifiers but "
+           << op.getResourceOperandAccessesAttr().size() << " are present";
+  }
+
+  return success();
+}
+
+LogicalResult CmdCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+  auto calleeOp = symbolTable.lookupNearestSymbolFrom(op, getCalleeAttr());
+  if (!calleeOp) {
+    return op->emitOpError() << "undefined external call: " << getCallee();
+  }
+
+  // TODO(benvanik): verification against the target callee.
+
+  return success();
+}
+
+static ParseResult parseCmdCallOperands(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOperands,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths,
+    ArrayAttr &resourceAccesses) {
+  if (failed(parser.parseLParen())) return failure();
+  // Handle the case of no operands specially.
+  if (succeeded(parser.parseOptionalRParen())) return success();
+  SmallVector<Attribute> accessAttrs;
+  do {
+    StringRef accessStr;
+    if (succeeded(
+            parser.parseOptionalKeyword(&accessStr, {"ro", "rw", "wo"}))) {
+      // A resource operand that'll have an offset/length associated.
+      IREE::Stream::ResourceAccessBitfield accessBits =
+          IREE::Stream::ResourceAccessBitfield::None;
+      if (accessStr == "ro") {
+        accessBits = IREE::Stream::ResourceAccessBitfield::Read;
+      } else if (accessStr == "wo") {
+        accessBits = IREE::Stream::ResourceAccessBitfield::Write;
+      } else if (accessStr == "rw") {
+        accessBits = IREE::Stream::ResourceAccessBitfield::Read |
+                     IREE::Stream::ResourceAccessBitfield::Write;
+      }
+      accessAttrs.push_back(IREE::Stream::ResourceAccessBitfieldAttr::get(
+          parser.getBuilder().getContext(), accessBits));
+      resourceOperands.emplace_back();
+      resourceOffsets.emplace_back();
+      resourceLengths.emplace_back();
+      if (failed(parser.parseOperand(resourceOperands.back())) ||
+          failed(parser.parseLSquare()) ||
+          failed(parser.parseOperand(resourceOffsets.back())) ||
+          failed(parser.parseKeyword("for")) ||
+          failed(parser.parseOperand(resourceLengths.back())) ||
+          failed(parser.parseRSquare())) {
+        return failure();
+      }
+    } else {
+      // Primitive/custom operand.
+      resourceOperands.emplace_back();
+      if (failed(parser.parseOperand(resourceOperands.back()))) {
+        return failure();
+      }
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  resourceAccesses = parser.getBuilder().getArrayAttr(accessAttrs);
+  if (failed(parser.parseRParen())) return failure();
+  return success();
+}
+
+static void printCmdCallOperands(OpAsmPrinter &p, Operation *op,
+                                 ValueRange resourceOperands,
+                                 ValueRange resourceOffsets,
+                                 ValueRange resourceLengths,
+                                 ArrayAttr resourceAccesses) {
+  p << "(";
+  size_t resourceIndex = 0;
+  for (size_t i = 0; i < resourceOperands.size(); ++i) {
+    auto operand = resourceOperands[i];
+    if (operand.getType().isa<IREE::Stream::ResourceType>()) {
+      // Resource type.
+      auto resourceOffset = resourceOffsets[resourceIndex];
+      auto resourceLength = resourceLengths[resourceIndex];
+      auto resourceAccess =
+          resourceAccesses[resourceIndex]
+              .cast<IREE::Stream::ResourceAccessBitfieldAttr>()
+              .getValue();
+      if (bitEnumContainsAll(resourceAccess,
+                             IREE::Stream::ResourceAccessBitfield::Read |
+                                 IREE::Stream::ResourceAccessBitfield::Write)) {
+        p << "rw";
+      } else if (bitEnumContainsAll(
+                     resourceAccess,
+                     IREE::Stream::ResourceAccessBitfield::Read)) {
+        p << "ro";
+      } else if (bitEnumContainsAll(
+                     resourceAccess,
+                     IREE::Stream::ResourceAccessBitfield::Write)) {
+        p << "wo";
+      }
+      p << ' ';
+      p.printOperand(operand);
+      p << "[";
+      p.printOperand(resourceOffset);
+      p << " for ";
+      p.printOperand(resourceLength);
+      p << "]";
+      ++resourceIndex;
+    } else {
+      // Primitive/custom type.
+      p.printOperand(operand);
+    }
+    if (i < resourceOperands.size() - 1) p << ", ";
+  }
+  p << ")";
 }
 
 //===----------------------------------------------------------------------===//

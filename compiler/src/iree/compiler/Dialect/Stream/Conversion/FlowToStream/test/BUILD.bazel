@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "call_ops.mlir",
             "collective_ops.mlir",
             "dispatch_ops.mlir",
             "executable_ops.mlir",

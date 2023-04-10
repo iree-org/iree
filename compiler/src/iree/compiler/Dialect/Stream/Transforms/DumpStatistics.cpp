@@ -113,6 +113,7 @@ struct Statistics {
   size_t copyCount = 0;
   size_t collectiveCount = 0;
   size_t dispatchCount = 0;
+  size_t callCount = 0;
 
   // Executables:
   size_t executableCount = 0;
@@ -157,7 +158,8 @@ struct Statistics {
             .Case<IREE::Stream::CmdCollectiveOp>(
                 [&](auto op) { ++collectiveCount; })
             .Case<IREE::Stream::CmdDispatchOp>(
-                [&](auto op) { ++dispatchCount; });
+                [&](auto op) { ++dispatchCount; })
+            .Case<IREE::Stream::CmdCallOp>([&](auto op) { ++callCount; });
       });
     }
 
@@ -233,6 +235,7 @@ static void prettyPrintStatistics(const UsageInfo &usageInfo,
   os << llvm::formatv("//  DMA Copies: {0}\n", stats.copyCount);
   os << llvm::formatv("// Collectives: {0}\n", stats.collectiveCount);
   os << llvm::formatv("//  Dispatches: {0}\n", stats.dispatchCount);
+  os << llvm::formatv("// Async Calls: {0}\n", stats.callCount);
 
   os << llvm::formatv(
       "// Executables: {0}, {1}% reuse\n", stats.executableCount,
@@ -386,7 +389,7 @@ static void dumpAggregateCSVTable(const UsageInfo &usageInfo,
   Statistics stats;
   stats.analyze(usageInfo);
 
-  os << R"("Constants","Constant Size","Variables","Variable Size","Awaits","Submissions","Transient Size","Fills","Copies","Dispatches","Executables")";
+  os << R"("Constants","Constant Size","Variables","Variable Size","Awaits","Submissions","Transient Size","Fills","Copies","Dispatches","Async Calls","Executables")";
   os << "\n";
 
   // Globals:
@@ -398,9 +401,9 @@ static void dumpAggregateCSVTable(const UsageInfo &usageInfo,
   os << llvm::formatv("{0},", stats.awaitCount);
 
   // Execution:
-  os << llvm::formatv("{0},{1},{2},{3},{4},", stats.submissionCount,
+  os << llvm::formatv("{0},{1},{2},{3},{4},{5},", stats.submissionCount,
                       stats.transientSize, stats.fillCount, stats.copyCount,
-                      stats.dispatchCount);
+                      stats.dispatchCount, stats.callCount);
 
   // Executables:
   os << llvm::formatv("{0}", stats.executableCount);
@@ -520,7 +523,8 @@ static void dumpAggregateJSONStructure(const UsageInfo &usageInfo,
   os << llvm::formatv(kvPair, "transient-memory-size", stats.transientSize);
   os << llvm::formatv(kvPair, "fill-count", stats.fillCount);
   os << llvm::formatv(kvPair, "copy-count", stats.copyCount);
-  os << llvm::formatv(kvPairNoComma, "dispatch-count", stats.dispatchCount);
+  os << llvm::formatv(kvPair, "dispatch-count", stats.dispatchCount);
+  os << llvm::formatv(kvPairNoComma, "call-count", stats.callCount);
   os << "  },\n";
 
   os << "  \"executable\": {\n";

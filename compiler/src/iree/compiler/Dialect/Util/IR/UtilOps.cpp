@@ -493,10 +493,11 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
                            TypeRange operandTypes, ValueRange operandDims,
                            TypeRange resultTypes, ValueRange resultDims,
                            ArrayAttr tiedOperands) {
-  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
   for (unsigned i = 0; i < resultTypes.size(); ++i) {
     auto resultType = resultTypes[i];
-    auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
+    auto tiedOperandIndex =
+        tiedOp ? tiedOp.getTiedResultOperandIndex(i) : std::nullopt;
     bool printType = true;
     if (tiedOperandIndex.has_value()) {
       auto tiedOperand = op->getOperand(tiedOperandIndex.value());
@@ -551,13 +552,19 @@ ParseResult parseShapedFunctionType(
   }
   if (failed(parser.parseArrow())) return failure();
   if (succeeded(parser.parseOptionalLParen())) {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandDims, resultTypes, resultDims,
-                                     tiedOperands)) ||
-        failed(parser.parseRParen())) {
-      return failure();
+    if (succeeded(parser.parseOptionalRParen())) {
+      // Empty list/no results `()`.
+    } else {
+      // One or more result types.
+      if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                       operandDims, resultTypes, resultDims,
+                                       tiedOperands)) ||
+          failed(parser.parseRParen())) {
+        return failure();
+      }
     }
   } else {
+    // Single result with omitted `()`.
     if (failed(parseShapedResultList(parser, operands, operandTypes,
                                      operandDims, resultTypes, resultDims,
                                      tiedOperands))) {
@@ -600,6 +607,180 @@ void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
   printShapedResultList(p, op, operands, operandTypes, operandDims, resultTypes,
                         resultDims, tiedOperands);
   if (resultTypes.size() != 1) p << ")";
+}
+
+//===----------------------------------------------------------------------===//
+// custom<ShapedFunctionSignature>
+//===----------------------------------------------------------------------===//
+// (%arg0: type {some.attr = 54 : index}, %arg1: type) -> (type, %arg1 as type)
+
+static ParseResult parseShapedFunctionArgumentList(
+    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::UnresolvedOperand> &args,
+    SmallVectorImpl<Type> &types, ArrayAttr &attrs) {
+  SmallVector<Attribute> argAttrsVec;
+  do {
+    OpAsmParser::UnresolvedOperand arg;
+    Type type;
+    NamedAttrList attrsVec;
+    if (failed(parser.parseOperand(arg)) ||
+        failed(parser.parseColonType(type)) ||
+        failed(parser.parseOptionalAttrDict(attrsVec))) {
+      return failure();
+    }
+    args.push_back(arg);
+    types.push_back(type);
+    argAttrsVec.push_back(parser.getBuilder().getDictionaryAttr(attrsVec));
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!argAttrsVec.empty()) {
+    attrs = parser.getBuilder().getArrayAttr(argAttrsVec);
+  }
+  return success();
+}
+
+static ParseResult parseShapedFunctionResultList(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> args,
+    TypeRange argTypes, SmallVectorImpl<Type> &resultTypes,
+    ArrayAttr &resultAttrs, ArrayAttr &tiedOperands) {
+  SmallVector<Attribute> resultAttrsVec;
+  SmallVector<int64_t, 4> tiedOperandIndices;
+  do {
+    OpAsmParser::UnresolvedOperand tiedResult;
+    auto res = parser.parseOptionalOperand(tiedResult);
+    Type type;
+    int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+    if (res.has_value() && succeeded(res.value())) {
+      tiedOperandIndex = findTiedOperand(tiedResult, args);
+      if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
+        return parser.emitError(tiedResult.location,
+                                "tied operand not found for result reference ")
+               << tiedResult.name;
+      }
+      if (succeeded(parser.parseOptionalKeyword("as"))) {
+        // Type _may_ differ from the operand.
+        if (failed(parser.parseType(type))) return failure();
+      } else {
+        // Use the operands type.
+        type = argTypes[tiedOperandIndex];
+      }
+    } else if (failed(parser.parseType(type))) {
+      return failure();
+    }
+    NamedAttrList attrs;
+    if (failed(parser.parseOptionalAttrDict(attrs))) {
+      return failure();
+    }
+    resultTypes.push_back(type);
+    resultAttrsVec.push_back(parser.getBuilder().getDictionaryAttr(attrs));
+    tiedOperandIndices.push_back(tiedOperandIndex);
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!resultAttrsVec.empty()) {
+    resultAttrs = parser.getBuilder().getArrayAttr(resultAttrsVec);
+  }
+  if (!tiedOperandIndices.empty()) {
+    tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
+  }
+  return success();
+}
+
+static void printShapedFunctionResultList(OpAsmPrinter &p, Operation *op,
+                                          TypeRange argTypes,
+                                          TypeRange resultTypes,
+                                          ArrayAttr resultAttrs,
+                                          ArrayAttr tiedOperands) {
+  for (unsigned i = 0; i < resultTypes.size(); ++i) {
+    auto resultType = resultTypes[i];
+    auto tiedOperandIndex =
+        IREE::Util::detail::getTiedResultOperandIndex(op, i);
+    bool printType = true;
+    if (tiedOperandIndex.has_value()) {
+      p << "%arg" << tiedOperandIndex.value();
+      if (argTypes[tiedOperandIndex.value()] != resultType) {
+        p << " as ";
+      } else {
+        // Type elided as it matches the operand.
+        printType = false;
+      }
+    }
+    if (printType) {
+      p.printType(resultType);
+    }
+    if (resultAttrs) {
+      auto attrs = resultAttrs.getValue()[i].dyn_cast_or_null<DictionaryAttr>();
+      if (attrs && !attrs.empty()) {
+        p.printOptionalAttrDict(attrs.getValue());
+      }
+    }
+    if (i < resultTypes.size() - 1) p << ", ";
+  }
+}
+
+ParseResult parseShapedFunctionSignature(OpAsmParser &parser,
+                                         TypeAttr &functionTypeAttr,
+                                         ArrayAttr &tiedOperands,
+                                         ArrayAttr &argAttrs,
+                                         ArrayAttr &resultAttrs) {
+  SmallVector<OpAsmParser::UnresolvedOperand> args;
+  SmallVector<Type> argTypes;
+  SmallVector<Type> resultTypes;
+  if (failed(parser.parseLParen())) return failure();
+  if (failed(parser.parseOptionalRParen())) {
+    if (failed(parseShapedFunctionArgumentList(parser, args, argTypes,
+                                               argAttrs)) ||
+        failed(parser.parseRParen())) {
+      return failure();
+    }
+  }
+  if (succeeded(parser.parseOptionalArrow())) {
+    if (succeeded(parser.parseOptionalLParen())) {
+      if (failed(parseShapedFunctionResultList(parser, args, argTypes,
+                                               resultTypes, resultAttrs,
+                                               tiedOperands)) ||
+          failed(parser.parseRParen())) {
+        return failure();
+      }
+    } else {
+      if (failed(parseShapedFunctionResultList(parser, args, argTypes,
+                                               resultTypes, resultAttrs,
+                                               tiedOperands))) {
+        return failure();
+      }
+    }
+  }
+  functionTypeAttr = TypeAttr::get(
+      FunctionType::get(parser.getContext(), argTypes, resultTypes));
+  return success();
+}
+
+void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
+                                  TypeAttr functionTypeAttr,
+                                  ArrayAttr tiedOperands, ArrayAttr argAttrs,
+                                  ArrayAttr resultAttrs) {
+  auto functionType = functionTypeAttr.getValue().cast<FunctionType>();
+  p << "(";
+  int argIndex = 0;
+  llvm::interleaveComma(functionType.getInputs(), p, [&](auto type) {
+    p << "%arg";
+    p << argIndex;
+    p << ": ";
+    p.printType(type);
+    if (argAttrs) {
+      auto attrs =
+          argAttrs.getValue()[argIndex].dyn_cast_or_null<DictionaryAttr>();
+      if (attrs && !attrs.empty()) {
+        p.printOptionalAttrDict(attrs.getValue());
+      }
+    }
+    ++argIndex;
+  });
+  p << ")";
+  auto resultTypes = functionType.getResults();
+  if (!resultTypes.empty()) {
+    p << " -> ";
+    if (resultTypes.size() != 1) p << "(";
+    printShapedFunctionResultList(p, op, functionType.getInputs(), resultTypes,
+                                  resultAttrs, tiedOperands);
+    if (resultTypes.size() != 1) p << ")";
+  }
 }
 
 namespace IREE {

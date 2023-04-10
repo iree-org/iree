@@ -57,6 +57,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     RewritePatternSet patterns(context);
 
     // Pass-through.
+    typeConverter.addConversion([](Type type) { return type; });
     typeConverter.addConversion([](IndexType type) { return type; });
     typeConverter.addConversion([](IntegerType type) { return type; });
     typeConverter.addConversion([](FloatType type) { return type; });
