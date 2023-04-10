@@ -12,7 +12,7 @@ builtin.module {
     %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
     memref.assume_alignment %2, 64 : memref<16x8xf16>
     %3 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
-    %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<8x16xf16>, vector<8x16xf16>
+    %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {permutation_map = affine_map<(d0, d1) -> (d1, d0)>, in_bounds = [true, true]} : memref<8x16xf16>, vector<8x16xf16>
     %5 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %3, %4, %cst : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf16>
     vector.transfer_write %5, %2[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
     return
@@ -93,19 +93,19 @@ builtin.module {
 // CHECK-SAME:     vector<1xf16> into vector<1x1x4x2xf16>
 // CHECK-DAG:    %[[D42:.+]] = affine.apply #[[MAP6]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D43:.+]] = arith.addi %[[D42]], %[[C0]] : index
-// CHECK:        %[[D44:.+]] = memref.load %[[D1]][%[[D43]], %[[D9]]] : memref<8x16xf16>
+// CHECK:        %[[D44:.+]] = memref.load %[[D1]][%[[D9]], %[[D43]]] : memref<8x16xf16>
 // CHECK:        %[[D45:.+]] = vector.broadcast %[[D44]] : f16 to vector<1xf16>
 // CHECK:        %[[D46:.+]] = vector.insert_strided_slice %[[D45]], %[[CST]] {offsets = [0, 0, 0, 0], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x2x2xf16>
-// CHECK:        %[[D47:.+]] = memref.load %[[D1]][%[[D43]], %[[D14]]] : memref<8x16xf16>
+// CHECK:        %[[D47:.+]] = memref.load %[[D1]][%[[D14]], %[[D43]]] : memref<8x16xf16>
 // CHECK:        %[[D48:.+]] = vector.broadcast %[[D47]] : f16 to vector<1xf16>
 // CHECK:        %[[D49:.+]] = vector.insert_strided_slice %[[D48]], %[[D46]] {offsets = [0, 0, 0, 1], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x2x2xf16>
-// CHECK:        %[[D50:.+]] = memref.load %[[D1]][%[[D43]], %[[D19]]] : memref<8x16xf16>
+// CHECK:        %[[D50:.+]] = memref.load %[[D1]][%[[D19]], %[[D43]]] : memref<8x16xf16>
 // CHECK:        %[[D51:.+]] = vector.broadcast %[[D50]] : f16 to vector<1xf16>
 // CHECK:        %[[D52:.+]] = vector.insert_strided_slice %[[D51]], %[[D49]] {offsets = [0, 0, 1, 0], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x2x2xf16>
-// CHECK:        %[[D53:.+]] = memref.load %[[D1]][%[[D43]], %[[D24]]] : memref<8x16xf16>
+// CHECK:        %[[D53:.+]] = memref.load %[[D1]][%[[D24]], %[[D43]]] : memref<8x16xf16>
 // CHECK:        %[[D54:.+]] = vector.broadcast %[[D53]] : f16 to vector<1xf16>
 // CHECK:        %[[D55:.+]] = vector.insert_strided_slice %[[D54]], %[[D52]] {offsets = [0, 0, 1, 1], strides = [1]} :
 // CHECK-SAME:     vector<1xf16> into vector<1x1x2x2xf16>

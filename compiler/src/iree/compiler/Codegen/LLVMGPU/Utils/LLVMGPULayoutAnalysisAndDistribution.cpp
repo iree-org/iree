@@ -387,6 +387,30 @@ static void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
   propagateLayoutToElementwiseOp(op, layoutMap);
 }
 
+/// Get indices of transfer op after distribution.
+static SmallVector<Value> getDistributedIndices(
+    OpBuilder &rewriter, Location loc, Layout &layout,
+    std::array<int, DimType::NumDims> &state, ArrayRef<Value> indices,
+    AffineMap permutationMap, const std::array<Value, 3> &threadIds) {
+  AffineExpr row = layout.computeDim(0, state, rewriter);
+  AffineMap rowMap = AffineMap::get(3, 0, row, rewriter.getContext());
+  std::array<Value, 2> laneOffsets;
+  laneOffsets[0] = rewriter.create<AffineApplyOp>(loc, rowMap, threadIds);
+  AffineExpr col = layout.computeDim(1, state, rewriter);
+  AffineMap colMap = AffineMap::get(3, 0, col, rewriter.getContext());
+  laneOffsets[1] = rewriter.create<AffineApplyOp>(loc, colMap, threadIds);
+  SmallVector<Value> newIndices{indices.begin(), indices.end()};
+  int64_t laneDim = 0;
+  for (AffineExpr expr : permutationMap.getResults()) {
+    auto dimExpr = expr.dyn_cast<AffineDimExpr>();
+    if (!dimExpr) continue;
+    unsigned pos = dimExpr.getPosition();
+    newIndices[pos] = rewriter.create<arith::AddIOp>(
+        loc, laneOffsets[laneDim++], newIndices[pos]);
+  }
+  return newIndices;
+}
+
 static void distributeTransferReads(vector::TransferReadOp readOp,
                                     DenseMap<Value, Layout> &layoutMap,
                                     DenseMap<Value, Value> &simdToSimtMap,
@@ -400,9 +424,10 @@ static void distributeTransferReads(vector::TransferReadOp readOp,
   Location loc = readOp.getLoc();
   SmallVector<Value> indices = readOp.getIndices();
   Type elementType = source.getType().cast<ShapedType>().getElementType();
-  Value threadIdX = rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::x);
-  Value threadIdY = rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::y);
-  Value threadIdZ = rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::z);
+  std::array<Value, 3> threadIds = {
+      rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::x),
+      rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::y),
+      rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::z)};
   Layout layout = layoutMap.at(result);
   auto vecType = VectorType::get(
       {layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
@@ -422,22 +447,9 @@ static void distributeTransferReads(vector::TransferReadOp readOp,
           state[DimType::VecIdY] = j;
           for (int k = 0; k < layout.shape[DimType::VecIdX]; k++) {
             state[DimType::VecIdX] = k;
-            AffineExpr row = layout.computeDim(0, state, rewriter);
-            AffineMap rowMap = AffineMap::get(3, 0, row, rewriter.getContext());
-            Value rowIndex = rewriter.create<AffineApplyOp>(
-                loc, rowMap,
-                SmallVector<Value>{threadIdX, threadIdY, threadIdZ});
-            AffineExpr col = layout.computeDim(1, state, rewriter);
-            AffineMap colMap = AffineMap::get(3, 0, col, rewriter.getContext());
-            Value colIndex = rewriter.create<AffineApplyOp>(
-                loc, colMap,
-                SmallVector<Value>{threadIdX, threadIdY, threadIdZ});
-            SmallVector<Value> newIndices{indices.begin(), indices.end()};
-            for (size_t s = indices.size() - 2; s <= indices.size() - 1; s++) {
-              Value simtIndex = s == indices.size() - 2 ? rowIndex : colIndex;
-              newIndices[s] =
-                  rewriter.create<arith::AddIOp>(loc, simtIndex, indices[s]);
-            }
+            SmallVector<Value> newIndices =
+                getDistributedIndices(rewriter, loc, layout, state, indices,
+                                      readOp.getPermutationMap(), threadIds);
             Value el = rewriter.create<memref::LoadOp>(loc, source, newIndices);
             auto vectorType = VectorType::get({1}, elementType);
             Value v = rewriter.create<vector::BroadcastOp>(loc, vectorType, el);
@@ -520,9 +532,10 @@ static void distributeTransferWrites(vector::TransferWriteOp writeOp,
   Value source = writeOp.getSource();
   Location loc = writeOp.getLoc();
   SmallVector<Value> indices = writeOp.getIndices();
-  Value threadIdX = rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::x);
-  Value threadIdY = rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::y);
-  Value threadIdZ = rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::z);
+  std::array<Value, 3> threadIds = {
+      rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::x),
+      rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::y),
+      rewriter.create<gpu::ThreadIdOp>(loc, gpu::Dimension::z)};
   if (!layoutMap.count(vector)) return;
   if (!simdToSimtMap.count(vector)) return;
   Layout layout = layoutMap.at(vector);
@@ -541,22 +554,9 @@ static void distributeTransferWrites(vector::TransferWriteOp writeOp,
                 loc, simdToSimtMap.at(vector),
                 SmallVector<int64_t>{b0, b1,
                                      j * layout.shape[DimType::VecIdZ] + i, k});
-            AffineExpr row = layout.computeDim(0, state, rewriter);
-            AffineMap rowMap = AffineMap::get(3, 0, row, rewriter.getContext());
-            Value rowIndex = rewriter.create<AffineApplyOp>(
-                loc, rowMap,
-                SmallVector<Value>{threadIdX, threadIdY, threadIdZ});
-            AffineExpr col = layout.computeDim(1, state, rewriter);
-            AffineMap colMap = AffineMap::get(3, 0, col, rewriter.getContext());
-            Value colIndex = rewriter.create<AffineApplyOp>(
-                loc, colMap,
-                SmallVector<Value>{threadIdX, threadIdY, threadIdZ});
-            SmallVector<Value> newIndices{indices.begin(), indices.end()};
-            for (size_t s = indices.size() - 2; s <= indices.size() - 1; s++) {
-              Value simtIndex = s == indices.size() - 2 ? rowIndex : colIndex;
-              newIndices[s] =
-                  rewriter.create<arith::AddIOp>(loc, simtIndex, indices[s]);
-            }
+            SmallVector<Value> newIndices =
+                getDistributedIndices(rewriter, loc, layout, state, indices,
+                                      writeOp.getPermutationMap(), threadIds);
             rewriter.create<memref::StoreOp>(loc, v, source, newIndices);
           }
         }
