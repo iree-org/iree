@@ -11,6 +11,7 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/integrations/pjrt/common/tensor_utils.h"
 
 using iree::vm::retain_ref;
 
@@ -677,27 +678,8 @@ iree_status_t DeviceInstance::HostBufferToDevice(
   iree_device_size_t element_type_byte_size =
       iree_hal_element_dense_byte_count(element_type);
 
-  // Handle strided layouts.
-  bool dense_row_major_layout = true;
-  if (byte_strides && num_dims > 0) {
-    int64_t stride = element_type_byte_size;
-    for (int64_t i = num_dims - 1; i >= 0; --i) {
-      if (byte_strides[i] != stride) {
-        dense_row_major_layout = false;
-        break;
-      }
-      stride *= dims[i];
-    }
-  }
-  if (!dense_row_major_layout) {
-    // TODO: Compile a transpose program and invoke that to load the
-    // array.
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "only dense, row-major layouts currently supported");
-  }
-
-  // Compute dense size.
+  // Handle strided layouts and shape.
+  std::vector<int64_t> perms(num_dims);
   std::array<iree_hal_dim_t, 9> shape;
   if (num_dims > shape.size()) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -705,11 +687,45 @@ iree_status_t DeviceInstance::HostBufferToDevice(
                             (int)shape.size(), (int)num_dims);
   }
 
+  bool has_zero_length = false;
+  for (int i = 0, s = num_dims; i < s; ++i) {
+    has_zero_length |= dims[i] == 0;
+  }
+
+  if (has_zero_length) {
+    // This is a degenerate case.
+    for (int i = 0; i < num_dims; ++i) {
+      perms[i] = i;
+      shape[i] = dims[i];
+    }
+  } else {
+    // Compute the input shape and permutations for the broadcast.
+    iree::pjrt::computeBroadcastArgs(
+        num_dims, element_type_byte_size, byte_strides, dims,
+        reinterpret_cast<int64_t*>(shape.data()), perms.data());
+  }
+
+  // Splatting requires length 1, 2, or 4
+  bool is_splat = element_type_byte_size == 1 || element_type_byte_size == 2 ||
+                  element_type_byte_size == 4;
+  bool is_dense_row_major = true;
+  for (int i = 0, s = num_dims; i < s; ++i) {
+    is_dense_row_major &= (shape[i] == dims[i]) && (perms[i] == i);
+    is_splat &= (byte_strides[i] == 0) || (dims[i] == 1);
+  }
+
+  if (!is_splat && !is_dense_row_major && !has_zero_length) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "only dense, row-major layouts currently supported");
+  }
+
   iree_device_size_t byte_length = element_type_byte_size;
   for (size_t i = 0; i < num_dims; ++i) {
-    shape[i] = dims[i];
     byte_length *= dims[i];
   }
+
+  byte_length = std::max(element_type_byte_size, byte_length);
 
   iree::vm::ref<iree_hal_buffer_t> buffer;
   // There are multiple ways to implement zero-copy/staged transfers and each
@@ -723,6 +739,8 @@ iree_status_t DeviceInstance::HostBufferToDevice(
   bool require_snapshot_now = host_buffer_semantics ==
                               PJRT_HostBufferSemantics_kImmutableOnlyDuringCall;
   bool caller_data_done = false;
+
+  // We only need a staging buffer if we cannot splat the data.
   iree::vm::ref<iree_hal_buffer_t> host_staging_buffer;
   IREE_RETURN_IF_ERROR(AcquireHostStagingBuffer(
       iree_make_const_byte_span(data, byte_length), require_snapshot_now,
@@ -730,7 +748,7 @@ iree_status_t DeviceInstance::HostBufferToDevice(
   if (!caller_data_done) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
-        "Deferred snapshot of host data not yet implemented");
+        "deferred snapshot of host data not yet implemented");
   }
 
   // Allocate on stream. We serialize across 3 timepoints:
@@ -759,25 +777,47 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
   // Queue up the transfer command.
   iree::vm::ref<iree_hal_command_buffer_t> transfer_cb;
-  iree_hal_transfer_command_t transfer_command;
-  memset(&transfer_command, 0, sizeof(transfer_command));
-  transfer_command.type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY;
-  transfer_command.copy.source_buffer = host_staging_buffer.get(),
-  transfer_command.copy.source_offset = 0;
-  transfer_command.copy.target_buffer = buffer.get();
-  transfer_command.copy.target_offset = 0;
-  transfer_command.copy.length = byte_length;
-  IREE_RETURN_IF_ERROR(iree_hal_create_transfer_command_buffer(
-      device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*transfer_count=*/1, &transfer_command, &transfer_cb));
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
-      device(), IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*wait_semaphore_list=*/
-      {1, &transfer_timeline_, &signal_alloca_complete},
-      /*signal_semaphore_list=*/
-      {1, &transfer_timeline_, &signal_copy_complete},
-      /*command_buffer_count=*/1, &transfer_cb));
+  if (is_splat) {
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
+        device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*binding_capacity=*/0, &transfer_cb));
+    IREE_CHECK_OK(iree_hal_command_buffer_begin(transfer_cb.get()));
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_fill_buffer(
+        transfer_cb.get(), buffer.get(), /*target_offset=*/0,
+        /*target_size=*/byte_length, data, element_type_byte_size));
+    IREE_CHECK_OK(iree_hal_command_buffer_end(transfer_cb.get()));
+  } else if (!has_zero_length) {
+    iree_hal_transfer_command_t transfer_command;
+    memset(&transfer_command, 0, sizeof(transfer_command));
+    transfer_command.type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY;
+    transfer_command.copy.source_buffer = host_staging_buffer.get(),
+    transfer_command.copy.source_offset = 0;
+    transfer_command.copy.target_buffer = buffer.get();
+    transfer_command.copy.target_offset = 0;
+    transfer_command.copy.length = byte_length;
+    IREE_RETURN_IF_ERROR(iree_hal_create_transfer_command_buffer(
+        device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*transfer_count=*/1, &transfer_command, &transfer_cb));
+  }
+
+  if (has_zero_length) {
+    IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
+        device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*wait_semaphore_list=*/
+        {1, &transfer_timeline_, &signal_alloca_complete},
+        /*signal_semaphore_list=*/
+        {1, &transfer_timeline_, &signal_copy_complete}));
+  } else {
+    IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
+        device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*wait_semaphore_list=*/
+        {1, &transfer_timeline_, &signal_alloca_complete},
+        /*signal_semaphore_list=*/
+        {1, &transfer_timeline_, &signal_copy_complete},
+        /*command_buffer_count=*/1, &transfer_cb));
+  }
 
   // Wrap in a buffer view and return.
   iree::vm::ref<iree_hal_buffer_view_t> result_buffer_view;

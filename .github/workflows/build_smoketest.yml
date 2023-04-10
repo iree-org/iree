@@ -53,8 +53,13 @@ jobs:
         run: |
           bazel build iree/integrations/pjrt/cpu/...
 
+      - name: "Run Unittests"
+        run: |
+          bazel test iree/integrations/pjrt/common/...
+
       - name: "Test CPU plugin"
         run: |
           source .env.sh
           # TODO: We should be pinning/rolling a jaxlib nightly version.
           JAX_PLATFORMS=iree_cpu python test/test_simple.py
+          JAX_PLATFORMS=iree_cpu python test/test_degenerate.py

@@ -12,6 +12,29 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+cc_library(
+    name = "tensor_utils",
+    srcs = [
+        "tensor_utils.cc",
+    ],
+    hdrs = [
+        "tensor_utils.h",
+    ],
+)
+
+cc_test(
+    name = "tensor_utils_test",
+    srcs = [
+        "tensor_utils_test.cc",
+    ],
+    linkstatic = True,
+    deps = [
+        ":tensor_utils",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ]
+)
+
 iree_pjrt_cc_library(
     name = "impl",
     srcs = [
@@ -26,6 +49,7 @@ iree_pjrt_cc_library(
     deps = [
         ":compiler",
         ":debugging",
+        ":tensor_utils",
         "@iree_core//runtime/src/iree/base",
         "@iree_core//runtime/src/iree/base:tracing",
         "@iree_core//runtime/src/iree/hal",
