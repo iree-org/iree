@@ -312,17 +312,18 @@ struct BinaryEmitter {
         rewriter.create<IREE::VMVX::BinaryOp>(
             loc,
             // Input buffers
-            params.in0Buffer, params.in1Buffer,
+            params.in0Buffer, operands.first.bufferDesc->offset,
+            params.in1Buffer, operands.second.bufferDesc->offset,
             // Output buffers
-            params.outBuffer,
+            params.outBuffer, result.bufferDesc->offset,
             // Other operands
             rewriter.getStringAttr(selection.opcode),
             // LHS
-            operands.first.bufferDesc->offset, params.in0Strides,
+            params.in0Strides,
             // RHS
-            operands.second.bufferDesc->offset, params.in1Strides,
+            params.in1Strides,
             // OUT
-            result.bufferDesc->offset, params.outStrides,
+            params.outStrides,
             // Sizes
             params.sizes,
             // Attributes
@@ -418,15 +419,15 @@ struct UnaryEmitter {
         rewriter.create<IREE::VMVX::UnaryOp>(
             loc,
             // Input buffers
-            params.inBuffer,
+            params.inBuffer, operand.bufferDesc->offset,
             // Output buffers
-            params.outBuffer,
+            params.outBuffer, result.bufferDesc->offset,
             // Other operands
             rewriter.getStringAttr(selection.opcode),
             // IN
-            operand.bufferDesc->offset, params.inStrides,
+            params.inStrides,
             // OUT
-            result.bufferDesc->offset, params.outStrides,
+            params.outStrides,
             // Sizes
             params.sizes,
             // Attributes
@@ -519,14 +520,14 @@ struct CopyEmitter {
 
     rewriter.create<IREE::VMVX::CopyOp>(loc,
                                         // Input buffers
-                                        inBuffer,
+                                        inBuffer, in.bufferDesc->offset,
                                         // Output buffers
-                                        outBuffer,
+                                        outBuffer, out.bufferDesc->offset,
                                         // Other operands
                                         // IN
-                                        in.bufferDesc->offset, inStrides,
+                                        inStrides,
                                         // OUT
-                                        out.bufferDesc->offset, outStrides,
+                                        outStrides,
                                         // Sizes
                                         sizes,
                                         // Element type.
@@ -905,13 +906,13 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
     Value stride = outDesc.strides[0];
     Value outBuffer = outDesc.castToLinear(loc, rewriter);
 
-    rewriter.replaceOpWithNewOp<IREE::VMVX::Fill2DOp>(
-        info.op,
-        // Input buffers (none)
-        // Output buffers
-        outBuffer,
-        // Other operands
-        info.scalar, outDesc.offset, stride, m, n);
+    rewriter.replaceOpWithNewOp<IREE::VMVX::Fill2DOp>(info.op,
+                                                      // Input buffers (none)
+                                                      // Output buffers
+                                                      outBuffer, outDesc.offset,
+                                                      // Other operands
+                                                      info.scalar, stride, m,
+                                                      n);
     return success();
   }
 };
@@ -1040,14 +1041,14 @@ struct LinalgExtPackConversion
     rewriter.replaceOpWithNewOp<IREE::VMVX::PackOp>(
         op,
         // Input buffers
-        inBuffer,
+        inBuffer, inDesc.offset,
         // Output buffers
-        outBuffer,
+        outBuffer, outDesc.offset,
         // Other operands
         // input
-        inDesc.offset, inStride0,
+        inStride0,
         // output
-        outDesc.offset, outStride0,
+        outStride0,
         // input shape
         inSize0, inSize1,
         // output shape
@@ -1176,14 +1177,14 @@ struct LinalgExtUnpackConversion
     rewriter.replaceOpWithNewOp<IREE::VMVX::UnpackOp>(
         op,
         // Input buffers
-        inBuffer,
+        inBuffer, inDesc.offset,
         // Output buffers
-        outBuffer,
+        outBuffer, outDesc.offset,
         // Other operands
         // input
-        inDesc.offset, inStride0,
+        inStride0,
         // output
-        outDesc.offset, outStride0,
+        outStride0,
         // input shape
         inSize0, inSize1, inSize2, inSize3,
         // output shape
@@ -1342,16 +1343,16 @@ struct LinalgContractionConversion
     rewriter.replaceOpWithNewOp<IREE::VMVX::MatmulOp>(
         info.op,
         // Input buffers
-        lhsBuffer, rhsBuffer,
+        lhsBuffer, lhsDesc.offset, rhsBuffer, rhsDesc.offset,
         // Output buffers
-        outBuffer,
+        outBuffer, outDesc.offset,
         // Other operands
         // LHS
-        lhsDesc.offset, lhsDesc.strides[0],
+        lhsDesc.strides[0],
         // RHS
-        rhsDesc.offset, rhsDesc.strides[0],
+        rhsDesc.strides[0],
         // Out
-        outDesc.offset, outDesc.strides[0],
+        outDesc.strides[0],
         // m,n,k
         m, n, k,
         // flags

@@ -14,11 +14,9 @@ func.func @matmul_f32f32f32(
 
   //  CHECK-DAG: %[[FLAGS:.*]] = vm.const.i32 1
   //      CHECK: vm.call @vmvx.matmul.f32f32f32(
-  // CHECK-SAME: %arg0, %arg3, %arg6,
-  // CHECK-SAME: %arg1, %arg2,
-  // CHECK-SAME: %arg4, %arg5,
-  // CHECK-SAME: %arg7, %arg8,
-  // CHECK-SAME: %arg9, %arg10, %arg11, %[[FLAGS]]) : (!vm.buffer, !vm.buffer, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32) -> ()
+  // CHECK-SAME: %arg0, %arg1, %arg3, %arg4, %arg6, %arg7,
+  // CHECK-SAME: %arg2, %arg5, %arg8,
+  // CHECK-SAME: %arg9, %arg10, %arg11, %[[FLAGS]]) : (!vm.buffer, i64, !vm.buffer, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i32) -> ()
   vmvx.matmul lhs(%arg0 offset %arg1 row_stride %arg2 : !util.buffer)
               rhs(%arg3 offset %arg4 row_stride %arg5 : !util.buffer)
               out(%arg6 offset %arg7 row_stride %arg8 : !util.buffer)
@@ -40,11 +38,9 @@ func.func @matmul_i8i8i32(
 
   //  CHECK-DAG: %[[FLAGS:.*]] = vm.const.i32 1
   //      CHECK: vm.call @vmvx.matmul.i8i8i32(
-  // CHECK-SAME: %arg0, %arg3, %arg6,
-  // CHECK-SAME: %arg1, %arg2,
-  // CHECK-SAME: %arg4, %arg5,
-  // CHECK-SAME: %arg7, %arg8,
-  // CHECK-SAME: %arg9, %arg10, %arg11, %[[FLAGS]]) : (!vm.buffer, !vm.buffer, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, i64, i32) -> ()
+  // CHECK-SAME: %arg0, %arg1, %arg3, %arg4, %arg6, %arg7,
+  // CHECK-SAME: %arg2, %arg5, %arg8,
+  // CHECK-SAME: %arg9, %arg10, %arg11, %[[FLAGS]]) : (!vm.buffer, i64, !vm.buffer, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i32) -> ()
   vmvx.matmul lhs(%arg0 offset %arg1 row_stride %arg2 : !util.buffer)
               rhs(%arg3 offset %arg4 row_stride %arg5 : !util.buffer)
               out(%arg6 offset %arg7 row_stride %arg8 : !util.buffer)

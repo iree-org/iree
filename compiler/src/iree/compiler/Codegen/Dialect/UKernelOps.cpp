@@ -90,6 +90,9 @@ static LogicalResult lowerToPointerTypes(MLIRContext *context,
         callOperandTypes.push_back(MemRefType::get(
             ArrayRef<int64_t>{}, memrefType.getElementType(),
             MemRefLayoutAttrInterface{}, memrefType.getMemorySpace()));
+        auto indexType = IndexType::get(context);
+        // Offset
+        callOperandTypes.push_back(indexType);
         return success();
       })
       .Default([&](Type t) { return failure(); });
@@ -108,9 +111,6 @@ static LogicalResult lowerToNonPointerTypes(
         if (memrefType.getRank() == 0) return success();
 
         auto indexType = IndexType::get(context);
-        // Offset
-        callOperandTypes.push_back(indexType);
-
         // Strides.
         callOperandTypes.resize(
             callOperandTypes.size() + memrefType.getRank() - 1, indexType);
@@ -131,6 +131,8 @@ static LogicalResult lowerToPointerOperands(Location loc,
             rewriter.create<memref::ExtractStridedMetadataOp>(loc, operand);
         // Base ptr.
         callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
+        // Offset.
+        callOperands.push_back(extractStridedMetadataOp.getOffset());
         return success();
       })
       .Default([](Type) { return failure(); });
@@ -150,8 +152,6 @@ static LogicalResult lowerToNonPointerOperands(
         if (memrefType.getRank() == 0) {
           return success();
         }
-        // Offset.
-        callOperands.push_back(extractStridedMetadataOp.getOffset());
         // Strides.
         for (auto stride : extractStridedMetadataOp.getStrides().drop_back()) {
           callOperands.push_back(stride);
@@ -259,6 +259,8 @@ static FailureOr<SmallVector<Type>> getFunctionArgTypesForUKernelMmt4D(
     callArgumentTypes.push_back(MemRefType::get(
         /*shape=*/{}, memRefType.getElementType(), MemRefLayoutAttrInterface{},
         memRefType.getMemorySpace()));
+    // offset
+    callArgumentTypes.push_back(indexType);
     return success();
   };
   auto processMemrefTypeOperandNonPointerArgs =
@@ -269,8 +271,6 @@ static FailureOr<SmallVector<Type>> getFunctionArgTypesForUKernelMmt4D(
           llvm::formatv("unable to lower {0} to function call argument types",
                         memRefValue.getType()));
     }
-    // offset
-    callArgumentTypes.push_back(indexType);
     // stride[0]
     callArgumentTypes.push_back(indexType);
     return success();
@@ -306,12 +306,12 @@ static FailureOr<SmallVector<Value>> getFunctionArgValuesForUKernelMmt4D(
         rewriter.create<memref::ExtractStridedMetadataOp>(loc, memRefValue);
     // Base ptr.
     callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
+    // offset.
+    callOperands.push_back(extractStridedMetadataOp.getOffset());
   };
   auto processMemrefTypeOperandNonPointerArgs = [&](Value memRefValue) {
     auto extractStridedMetadataOp =
         rewriter.create<memref::ExtractStridedMetadataOp>(loc, memRefValue);
-    // offset.
-    callOperands.push_back(extractStridedMetadataOp.getOffset());
     // strides.
     callOperands.push_back(extractStridedMetadataOp.getStrides().front());
   };
