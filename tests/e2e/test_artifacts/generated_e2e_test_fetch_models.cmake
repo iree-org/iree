@@ -160,6 +160,26 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
+    "model-39d157ad-f0ec-4a76-963b-d783beaed60f"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/bert-for-masked-lm-seq512-tf-model.tar.gz"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_39d157ad-f0ec-4a76-963b-d783beaed60f_BertForMaskedLMTF"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-8871f602-571c-4eb8-b94d-554cc8ceec5a"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/bert-large-seq384-tf-model.tar.gz"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
     "model-68caa96e-b8bb-48a2-bb08-a3044981a370"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir"
