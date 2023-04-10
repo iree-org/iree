@@ -174,8 +174,12 @@ constexpr auto splat_literal(const T& v) {
 template <typename T>
 struct cconv_map;
 
-template <typename T>
-struct cconv_map {
+template <>
+struct cconv_map<int32_t> {
+  static constexpr const auto conv_chars = literal("i");
+};
+template <>
+struct cconv_map<uint32_t> {
   static constexpr const auto conv_chars = literal("i");
 };
 
@@ -186,6 +190,15 @@ struct cconv_map<int64_t> {
 template <>
 struct cconv_map<uint64_t> {
   static constexpr const auto conv_chars = literal("I");
+};
+
+template <>
+struct cconv_map<float> {
+  static constexpr const auto conv_chars = literal("f");
+};
+template <>
+struct cconv_map<double> {
+  static constexpr const auto conv_chars = literal("F");
 };
 
 template <>
