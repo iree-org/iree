@@ -98,6 +98,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
+        "@llvm-project//mlir:VectorToGPU",
         "@llvm-project//mlir:VectorTransforms",
     ],
 )

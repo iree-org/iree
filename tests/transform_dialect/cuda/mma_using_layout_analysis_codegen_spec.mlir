@@ -6,7 +6,7 @@ transform.sequence failures(propagate) {
   // Step 1. Find the fill and matmul ops
   // ===========================================================================
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %matmul = transform.structured.match ops{["linalg.matmul_transpose_b"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+  %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
 
   // Step 2. Tile the matmul and fuse the fill
   // ===========================================================================
@@ -29,6 +29,11 @@ transform.sequence failures(propagate) {
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!pdl.operation) -> (!pdl.operation)
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!pdl.operation) -> ()
+
+  // Step 5. Pre-process the contract and transfer ops to put it in the right form.
+  // ===========================================================================
+  %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
+  transform.iree.apply_patterns %func_2 {  prepare_vector_to_mma } : (!pdl.operation) -> ()
 
   // Step 6. Post-bufferization vector distribution
   // ===========================================================================

@@ -111,6 +111,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
       - lower_vector_masks: Lower vector.mask ops away.
+      - prepare_vector_to_mma: pre-process vector.contract op to set it in a form
+      that can be mapped to nvgpu.mma operations. 
       - rank_reducing_linalg: adds patterns that results in rank-reducing
       behavior on subset-based linalg operations using insert/extract slices.
       - rank_reducing_linalg_via_reshapes: adds patterns that results in rank-reducing
@@ -167,6 +169,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,
                        UnitAttr:$lower_vector_masks,
+                       UnitAttr:$prepare_vector_to_mma,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_linalg_via_reshapes,
                        UnitAttr:$rank_reducing_vector,

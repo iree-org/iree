@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -161,6 +162,7 @@ void transform_dialect::ApplyPatternsOp::build(
   ADD_PATTERN(lowerTransferOpPermutations,
               getLowerTransferOpPermutationsAttrName)
   ADD_PATTERN(lowerVectorMasks, getLowerVectorMasksAttrName)
+  ADD_PATTERN(prepareVectorToMma, getPrepareVectorToMmaAttrName)
   ADD_PATTERN(rankReducingLinalg, getRankReducingLinalgAttrName)
   ADD_PATTERN(rankReducingLinalgViaReshapes,
               getRankReducingLinalgViaReshapesAttrName)
@@ -272,6 +274,10 @@ static void addFoldTensorSubsetsPatterns(RewritePatternSet &patterns) {
 static void addEraseUnnecessaryTensorOperandsPatterns(
     RewritePatternSet &patterns) {
   linalg::populateEraseUnnecessaryInputsPatterns(patterns);
+}
+
+static void addPrepareVectorToMmaPatterns(RewritePatternSet &patterns) {
+  populatePrepareVectorToMMAPatterns(patterns, /*useNvGpu=*/true);
 }
 
 static void addRankReducingLinalgPatterns(RewritePatternSet &patterns) {
@@ -389,6 +395,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getLowerTransferOpPermutations())
     addLowerTransferOpPermutationsPatterns(patterns);
   if (getLowerVectorMasks()) addLowerVectorMasksPatterns(patterns);
+  if (getPrepareVectorToMma()) addPrepareVectorToMmaPatterns(patterns);
   if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
   if (getRankReducingLinalgViaReshapes())
     addRankReducingLinalgViaReshapesPatterns(patterns);
