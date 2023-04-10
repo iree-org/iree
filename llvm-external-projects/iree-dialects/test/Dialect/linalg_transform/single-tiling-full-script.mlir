@@ -21,13 +21,13 @@ transform.sequence failures(propagate) {
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
   transform.structured.vectorize %2 { vectorize_padding }
-  transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
-    {bufferize_function_boundaries = true}
-  %3 = transform.structured.match ops{["func.func"]} in %module_op
+  %module_op1 = transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
+    {bufferize_function_boundaries = true} : (!pdl.operation) -> !pdl.operation
+  %3 = transform.structured.match ops{["func.func"]} in %module_op1
     : (!pdl.operation) -> !pdl.operation
 
 
-  %func = transform.structured.match ops{["func.func"]} in %module_op
+  %func = transform.structured.match ops{["func.func"]} in %module_op1
     : (!pdl.operation) -> !pdl.operation
   %func_e_2 = transform.vector.lower_contraction %func
     lowering_strategy = "outerproduct"
@@ -36,5 +36,5 @@ transform.sequence failures(propagate) {
     lowering_strategy = "shuffle"
       : (!pdl.operation) -> !pdl.operation
 
-  lower_to_llvm %module_op : (!pdl.operation) -> !pdl.operation
+  lower_to_llvm %module_op1 : (!pdl.operation) -> !pdl.operation
 }
