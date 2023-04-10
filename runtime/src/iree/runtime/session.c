@@ -207,15 +207,21 @@ iree_runtime_session_append_bytecode_module_from_memory(
   IREE_ASSERT_ARGUMENT(session);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // NOTE: we always consume the flatbuffer data even if we fail and need to
+  // make sure all code paths guarantee it has been freed.
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
       iree_runtime_instance_vm_instance(session->instance), flatbuffer_data,
       flatbuffer_allocator, iree_runtime_session_host_allocator(session),
       &module);
   if (iree_status_is_ok(status)) {
+    // Append may fail and we still need to clean up the module.
     status = iree_runtime_session_append_module(session, module);
+    iree_vm_module_release(module);
+  } else {
+    // API requires that we free the flatbuffer data even on failure.
+    iree_allocator_free(flatbuffer_allocator, (void*)flatbuffer_data.data);
   }
-  iree_vm_module_release(module);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -236,14 +242,13 @@ iree_runtime_session_append_bytecode_module_from_file(
                                   iree_runtime_session_host_allocator(session),
                                   &flatbuffer_contents));
 
+  // Create the module from the file contents. The contents are consumed
+  // regardless of whether the module can be loaded or not.
   iree_status_t status =
       iree_runtime_session_append_bytecode_module_from_memory(
           session, flatbuffer_contents->const_buffer,
           iree_file_contents_deallocator(flatbuffer_contents));
 
-  if (!iree_status_is_ok(status)) {
-    iree_file_contents_free(flatbuffer_contents);
-  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -259,14 +264,13 @@ iree_runtime_session_append_bytecode_module_from_stdin(
       z0, iree_stdin_read_contents(iree_runtime_session_host_allocator(session),
                                    &flatbuffer_contents));
 
+  // Create the module from the stream contents. The contents are consumed
+  // regardless of whether the module can be loaded or not.
   iree_status_t status =
       iree_runtime_session_append_bytecode_module_from_memory(
           session, flatbuffer_contents->const_buffer,
           iree_file_contents_deallocator(flatbuffer_contents));
 
-  if (!iree_status_is_ok(status)) {
-    iree_file_contents_free(flatbuffer_contents);
-  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
