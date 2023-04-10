@@ -440,7 +440,11 @@ static bool isTransposedLdMatrix(AffineMap map) {
   return exprX.getPosition() > exprY.getPosition();
 }
 
-/// Emit ldmatrix op code sequence.
+/// Emit nvgpu.ldmatrix code sequence at the given offset.
+/// ldmatrix loads 8 blocks of 8 contiguous 16bits elements. The start address
+/// of each blocks are packed in 8 lanes. Therefore we first calculate the
+/// common base offset for all the lanes and we add the block offsets using
+/// `blockid = flatid %8`
 static Value emitLdMatrix(OpBuilder &rewriter, Location loc, Layout &layout,
                           std::array<int, DimType::NumDims> &state,
                           ArrayRef<Value> indices, AffineMap permutationMap,
