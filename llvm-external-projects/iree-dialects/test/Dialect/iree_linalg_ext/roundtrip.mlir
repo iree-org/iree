@@ -350,6 +350,33 @@ func.func @scatter_update_slice_2D(
 
 // -----
 
+func.func @scatter_update_slice_2D(
+    %original: tensor<4x?xi32>, %indices: tensor<1x1xi32>,
+    %updates: tensor<1x3xi32>) -> tensor<4x?xi32> {
+  %0 = iree_linalg_ext.scatter
+    dimension_map = [0]
+    unique_indices(true)
+    ins(%updates, %indices : tensor<1x3xi32>, tensor<1x1xi32>)
+    outs(%original : tensor<4x?xi32>)  {
+    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+      iree_linalg_ext.yield %arg0 : i32
+    } -> tensor<4x?xi32>
+  return %0 : tensor<4x?xi32>
+}
+// CHECK-LABEL: func.func @scatter_update_slice_2D(
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[UPDATE:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:     dimension_map = [0]
+//  CHECK-SAME:     unique_indices(true)
+//  CHECK-SAME:     ins(%[[UPDATE]], %[[INDICES]]
+//  CHECK-SAME:     outs(%[[ORIGINAL]]
+//       CHECK:     iree_linalg_ext.yield %{{.+}} : i32
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
 func.func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
     -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = arith.constant 1 : index
