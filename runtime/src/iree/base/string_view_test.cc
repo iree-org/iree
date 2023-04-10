@@ -429,6 +429,27 @@ TEST(StringViewTest, SplitReturnOnly) {
   EXPECT_EQ(split_return("axbxc", 'x'), 1);
 }
 
+TEST(StringViewTest, SplitAfter) {
+  auto split =
+      [](const char* value,
+         char split_char) -> std::tuple<intptr_t, std::string, std::string> {
+    iree_string_view_t lhs;
+    iree_string_view_t rhs;
+    intptr_t index = iree_string_view_split_after(iree_make_cstring_view(value),
+                                                  split_char, &lhs, &rhs);
+    return std::make_tuple(index, ToString(lhs), ToString(rhs));
+  };
+  EXPECT_EQ(split("", 'x'), std::make_tuple(-1, "", ""));
+  EXPECT_EQ(split(" ", 'x'), std::make_tuple(-1, " ", ""));
+  EXPECT_EQ(split("x", 'x'), std::make_tuple(1, "x", ""));
+  EXPECT_EQ(split(" x ", 'x'), std::make_tuple(2, " x", " "));
+  EXPECT_EQ(split("axb", 'x'), std::make_tuple(2, "ax", "b"));
+  EXPECT_EQ(split("axxxb", 'x'), std::make_tuple(2, "ax", "xxb"));
+  EXPECT_EQ(split("ax", 'x'), std::make_tuple(2, "ax", ""));
+  EXPECT_EQ(split("xb", 'x'), std::make_tuple(1, "x", "b"));
+  EXPECT_EQ(split("axbxc", 'x'), std::make_tuple(2, "ax", "bxc"));
+}
+
 TEST(StringViewTest, ReplaceChar) {
   auto replace_char = [](const char* value, char old_char, char new_char) {
     std::string value_clone(value);
@@ -634,6 +655,87 @@ TEST(StringViewTest, ParseDeviceSize) {
 TEST(StringViewTest, ParseDeviceSizeInvalid) {
   EXPECT_THAT(ParseDeviceSize(""), StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(ParseDeviceSize("abc"), StatusIs(StatusCode::kInvalidArgument));
+}
+
+TEST(StringViewTest, ParseCollectiveGroups) {
+  auto parse = [](const char* value,
+                  int32_t rank) -> std::tuple<bool, int32_t, int32_t, int32_t> {
+    int32_t group = -1, rank_in_group = -1, count_in_group = -1;
+    bool result = iree_string_view_parse_collective_groups(
+        iree_make_cstring_view(value), rank, &group, &rank_in_group,
+        &count_in_group);
+    return std::make_tuple(result, group, rank_in_group, count_in_group);
+  };
+
+  // groups, rank, group, rank_in_group, count_in_group
+  EXPECT_EQ(parse("(0),(1)", 0), std::make_tuple(true, 0, 0, 1));
+  EXPECT_EQ(parse("(0),(1)", 1), std::make_tuple(true, 1, 0, 1));
+  EXPECT_EQ(parse("(0,1),(2,3)", 0), std::make_tuple(true, 0, 0, 2));
+  EXPECT_EQ(parse("(0,1),(2,3)", 1), std::make_tuple(true, 0, 1, 2));
+  EXPECT_EQ(parse("(0,1),(2,3)", 2), std::make_tuple(true, 1, 0, 2));
+  EXPECT_EQ(parse("(0,1),(2,3)", 3), std::make_tuple(true, 1, 1, 2));
+  EXPECT_EQ(parse("(0),(1,2)", 0), std::make_tuple(true, 0, 0, 1));
+  EXPECT_EQ(parse("(0),(1,2)", 1), std::make_tuple(true, 1, 0, 2));
+  EXPECT_EQ(parse("(0),(1,2)", 2), std::make_tuple(true, 1, 1, 2));
+
+  // The parser returns early when it finds the answer in a group. IOW, It does
+  // not care whether the string for the next group is malformed or not. In a
+  // real situation each process would look for its rank, so it will catch the
+  // error if there is any error in a group.
+  EXPECT_EQ(parse("(0,1)malformed", 0), std::make_tuple(true, 0, 0, 2));
+  EXPECT_EQ(parse("(0,1)malformed", 1), std::make_tuple(true, 0, 1, 2));
+
+  // Test groups with whitespace until the desired rank is found.
+  EXPECT_EQ(parse(" (0),(1)", 1), std::make_tuple(true, 1, 0, 1));
+  EXPECT_EQ(parse("( 0),(1)", 1), std::make_tuple(true, 1, 0, 1));
+  EXPECT_EQ(parse("(0 ),(1)", 1), std::make_tuple(true, 1, 0, 1));
+  EXPECT_EQ(parse("(0) ,(1)", 1), std::make_tuple(true, 1, 0, 1));
+  EXPECT_EQ(parse("(0), (1)", 1), std::make_tuple(true, 1, 0, 1));
+  EXPECT_EQ(parse("(0),( 1)", 1), std::make_tuple(true, 1, 0, 1));
+  EXPECT_EQ(parse(" ( 0 ) , ( 1)", 1), std::make_tuple(true, 1, 0, 1));
+  EXPECT_EQ(parse("  (  0  )  ,  (  1)", 1), std::make_tuple(true, 1, 0, 1));
+
+  // Test malformed.
+  EXPECT_EQ(parse("(0,1,2),(_3,5)", 5), std::make_tuple(false, -1, -1, -1));
+  EXPECT_EQ(parse("(0,1,2)|(3,4,5)", 5), std::make_tuple(false, -1, -1, -1));
+  EXPECT_EQ(parse("[0,1,2),(3.4,5)", 5), std::make_tuple(false, -1, -1, -1));
+}
+
+TEST(StringViewTest, ConsumeFirstChar) {
+  auto consume = [](const char* value,
+                    char c) -> std::tuple<bool, std::string> {
+    iree_string_view_t sv = iree_make_cstring_view(value);
+    bool result = iree_string_view_consume_char(&sv, c);
+    return std::make_tuple(result, ToString(sv));
+  };
+  EXPECT_EQ(consume("(abc)", '('), std::make_tuple(true, "abc)"));
+  EXPECT_EQ(consume("(abc)", 'a'), std::make_tuple(false, "(abc)"));
+  EXPECT_EQ(consume("", 'a'), std::make_tuple(false, ""));
+}
+
+TEST(StringViewTest, ConsumeLastChar) {
+  auto consume = [](const char* value,
+                    char c) -> std::tuple<bool, std::string> {
+    iree_string_view_t sv = iree_make_cstring_view(value);
+    bool result = iree_string_view_consume_rchar(&sv, c);
+    return std::make_tuple(result, ToString(sv));
+  };
+  EXPECT_EQ(consume("(abc)", ')'), std::make_tuple(true, "(abc"));
+  EXPECT_EQ(consume("(abc)", 'c'), std::make_tuple(false, "(abc)"));
+  EXPECT_EQ(consume("", 'a'), std::make_tuple(false, ""));
+}
+
+TEST(StringViewTest, CountChar) {
+  auto count = [](const char* value, char c) -> iree_host_size_t {
+    iree_host_size_t n =
+        iree_string_view_count_char(iree_make_cstring_view(value), c);
+    return n;
+  };
+  EXPECT_EQ(count("", 'x'), 0);
+  EXPECT_EQ(count("a,b", ','), 1);
+  EXPECT_EQ(count("aabbb", 'a'), 2);
+  EXPECT_EQ(count("aabbb", 'b'), 3);
+  EXPECT_EQ(count("aabbb", 'c'), 0);
 }
 
 }  // namespace

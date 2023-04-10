@@ -232,6 +232,33 @@ IREE_API_EXPORT intptr_t iree_string_view_split(iree_string_view_t value,
   return offset;
 }
 
+IREE_API_EXPORT intptr_t iree_string_view_split_after(
+    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
+    iree_string_view_t* out_rhs) {
+  if (!out_lhs || !out_rhs) return -1;
+
+  *out_lhs = iree_string_view_empty();
+  *out_rhs = iree_string_view_empty();
+
+  if (!value.data || !value.size) {
+    return -1;
+  }
+
+  const void* first_ptr = memchr(value.data, split_char, value.size);
+  if (!first_ptr) {
+    *out_lhs = value;
+    return -1;
+  }
+  intptr_t offset = (intptr_t)((const char*)(first_ptr)-value.data) + 1;
+  out_lhs->data = value.data;
+  out_lhs->size = offset;
+  if (offset < value.size) {
+    out_rhs->data = value.data + offset;
+    out_rhs->size = value.size - offset;
+  }
+  return offset;
+}
+
 IREE_API_EXPORT void iree_string_view_replace_char(iree_string_view_t value,
                                                    char old_char,
                                                    char new_char) {
@@ -509,4 +536,130 @@ IREE_API_EXPORT iree_status_t iree_string_view_parse_device_size(
   }
   *out_size = size;
   return iree_ok_status();
+}
+
+IREE_API_EXPORT
+bool iree_string_view_consume_char(iree_string_view_t* value, char c) {
+  if (!value) {
+    return false;
+  }
+  if (value->size == 0) {
+    return false;
+  }
+  if (value->data[0] != c) {
+    return false;
+  }
+  *value = iree_make_string_view(value->data + 1, value->size - 1);
+  return true;
+}
+
+IREE_API_EXPORT
+bool iree_string_view_consume_rchar(iree_string_view_t* value, char c) {
+  if (!value) {
+    return false;
+  }
+  if (value->size == 0) {
+    return false;
+  }
+  if (value->data[value->size - 1] != c) {
+    return false;
+  }
+  *value = iree_make_string_view(value->data, value->size - 1);
+  return true;
+}
+
+IREE_API_EXPORT
+iree_host_size_t iree_string_view_count_char(iree_string_view_t value, char c) {
+  iree_host_size_t count = 0;
+  for (iree_host_size_t i = 0; i < value.size; ++i) {
+    if (value.data[i] == c) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+IREE_API_EXPORT
+bool iree_string_view_parse_collective_groups(iree_string_view_t groups,
+                                              int32_t rank, int32_t* out_group,
+                                              int32_t* out_rank,
+                                              int32_t* out_count) {
+  int32_t group = 0;
+
+  iree_string_view_t curr = groups;
+
+  for (;; ++group) {  // Iteration for group parsing.
+    // Split the groups string, e.g., "(0,1),(2,3)" into "(0,1)" and ",(2,3)".
+    iree_string_view_t next = iree_string_view_empty();
+    if (iree_string_view_split_after(curr, ')', &curr, &next) == -1) {
+      return false;
+    }
+
+    // Parse the current group.
+    curr = iree_string_view_trim(curr);
+
+    // Consume '('.
+    if (!iree_string_view_consume_char(&curr, '(')) {
+      return false;
+    }
+    // Consume ')' at the end.
+    if (!iree_string_view_consume_rchar(&curr, ')')) {
+      return false;
+    }
+
+    iree_host_size_t num_commas = iree_string_view_count_char(curr, ',');
+    int32_t count = num_commas + 1;
+
+    // Parse numbers before comma.
+    for (iree_host_size_t i = 0; i < num_commas; ++i) {
+      // Parse a number.
+      iree_string_view_t num_str = iree_string_view_empty();
+      iree_string_view_t rem_str = iree_string_view_empty();
+      if (iree_string_view_split(curr, ',', &num_str, &rem_str) == -1) {
+        return false;
+      }
+
+      num_str = iree_string_view_trim(num_str);
+      int32_t num = -1;
+      if (!iree_string_view_atoi_int32(num_str, &num)) {
+        return false;
+      }
+      if (num == rank) {
+        *out_group = group;
+        *out_rank = i;
+        *out_count = count;
+        return true;
+      }
+
+      curr = rem_str;
+    }
+
+    iree_string_view_t num_str = iree_string_view_trim(curr);
+    int32_t num = -1;
+    if (!iree_string_view_atoi_int32(num_str, &num)) {
+      return false;
+    }
+
+    if (num == rank) {
+      *out_group = group;
+      *out_rank = num_commas;
+      *out_count = count;
+      return true;
+    }
+
+    // Setup the next group parsing.
+    next = iree_string_view_trim(next);
+    if (iree_string_view_is_empty(next)) {
+      break;
+    }
+
+    // Consume the group separator.
+    if (!iree_string_view_consume_char(&next, ',')) {
+      return false;
+    }
+
+    curr = next;
+  }
+
+  return false;
 }

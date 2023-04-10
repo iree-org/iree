@@ -6,8 +6,6 @@
 
 #include "iree/hal/drivers/cuda/cuda_device.h"
 
-#include <ctype.h>
-#include <iree/base/string_view.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -382,84 +380,6 @@ static iree_status_t iree_hal_cuda_device_create_channel_default(
                                            count, out_channel);
 }
 
-// TODO(okkwon): add unit tests
-static bool iree_hal_cuda_parse_group_info(iree_string_view_t groups,
-                                           int32_t rank, int32_t* out_group,
-                                           int32_t* out_rank,
-                                           int32_t* out_count) {
-  int32_t group = -1;
-  int32_t index = 0;
-  int32_t count = 0;
-  const char* str = groups.data;
-
-  for (iree_host_size_t i = 0; i < groups.size; ++i) {
-    if (str[i] == '(') {  // group start
-      group++;
-      index = 0;
-      ++i;  // Consume '('.
-
-      count = 1;
-
-      // Get the group size: the number of ',' + 1.
-      iree_host_size_t j = i;
-      for (; j < groups.size; ++j) {
-        if (str[j] == ')') {
-          break;
-        }
-        if (str[j] == ',') {
-          count++;
-        }
-      }
-      if (j == groups.size) {
-        return false;
-      }
-
-      for (;;) {
-        // Parse a number.
-        iree_host_size_t num_start = i;
-        while ((i < groups.size) && (str[i] != ',') && (str[i] != ')')) {
-          if (!isdigit(str[i])) {
-            return false;
-          }
-          ++i;
-        }
-        iree_host_size_t num_end = i;
-
-        if (num_start == num_end || num_end == groups.size) {
-          return false;
-        }
-
-        iree_string_view_t num_str =
-            iree_string_view_substr(groups, num_start, num_end - num_start);
-        int32_t num = -1;
-        if (!iree_string_view_atoi_int32(num_str, &num)) {
-          return false;
-        }
-
-        if (num == rank) {
-          *out_group = group;
-          *out_rank = index;
-          *out_count = count;
-          return true;
-        }
-
-        if (str[i] == ')') {
-          break;
-        }
-        if (str[i] != ',') {
-          return false;
-        }
-        ++i;  // Consume the number separator, ','.
-
-        // Keep parsing a number.
-      }
-    } else if (str[i] == ',') {  // group separator
-      // It is a group separator. Keep parsing a new group.
-    }
-  }
-  return false;
-}
-
 static iree_status_t iree_hal_cuda_device_create_channel_split(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_string_view_t groups, iree_hal_channel_t* in_channel,
@@ -491,8 +411,8 @@ static iree_status_t iree_hal_cuda_device_create_channel_split(
   int32_t group = 0;
   int32_t rank_in_group = 0;
   int32_t count_in_group = 0;
-  if (!iree_hal_cuda_parse_group_info(groups, rank, &group, &rank_in_group,
-                                      &count_in_group)) {
+  if (!iree_string_view_parse_collective_groups(
+          groups, rank, &group, &rank_in_group, &count_in_group)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "cannot find rank %d from groups(%s)", rank,
                             groups.data);
