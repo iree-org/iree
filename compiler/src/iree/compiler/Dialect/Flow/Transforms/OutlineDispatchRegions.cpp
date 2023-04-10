@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -47,20 +48,19 @@ static int64_t estimateLinalgOpCost(linalg::LinalgOp op) {
   return cost;
 }
 
-static std::string loopRangeToString(int64_t loopRange) {
-  // Note: normally we'd use '?', but that isn't a valid character for function
-  // names on a variety of targets, so we stick to [a-Z0-9_] characters.
-  return ShapedType::isDynamic(loopRange) ? "D" : llvm::itostr(loopRange);
-}
-
-// Returns a string like "512xDx128" representing a linalg op's loop ranges.
-static std::string getLinalgOpLoopRanges(linalg::LinalgOp op) {
-  auto loopRanges = op.getStaticLoopRanges();
+// Returns a string like "512xDx128" representing loop ranges.
+static std::string loopRangesToString(ArrayRef<int64_t> loopRanges) {
   std::string outputString;
   llvm::raw_string_ostream sstream(outputString);
   llvm::interleave(
       loopRanges,
-      [&](int64_t loopRange) { sstream << loopRangeToString(loopRange); },
+      [&](int64_t loopRange) {
+        // Note: normally we'd use '?', but that isn't a valid character for
+        // function names on a variety of targets, so we stick to [a-Z0-9_]
+        // characters.
+        sstream << (ShapedType::isDynamic(loopRange) ? "D"
+                                                     : llvm::itostr(loopRange));
+      },
       [&] { sstream << "x"; });
   return outputString;
 }
@@ -105,10 +105,19 @@ static std::string getLinalgDataTypes(linalg::LinalgOp op) {
   }
 }
 
+/// Returns the op name without dialect name. E.g., it returns "set_encoding" if
+/// the input operation is iree_linalg_ext.set_encoding.
+static std::string getOpNameWithoutDialectName(Operation *op) {
+  auto opName =
+      op->getName().getStringRef().drop_until([](char c) { return c == '.'; });
+  if (opName.starts_with(".")) opName = opName.drop_front();
+  return opName.str();
+}
+
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   auto opName = op->getName().getStringRef();
   if (!opName.consume_front("linalg.")) return "";
-  std::string opLoopRanges = getLinalgOpLoopRanges(op);
+  std::string opLoopRanges = loopRangesToString(op.getStaticLoopRanges());
   std::string opTypes = opLoopRanges.empty() ? "" : getLinalgDataTypes(op);
   return opName.str() + (opLoopRanges.empty() ? "" : "_" + opLoopRanges) +
          (opTypes.empty() ? "" : "_" + opTypes);
@@ -132,7 +141,8 @@ static std::string summarizeDispatchWorkgroupsOp(
   // used instead.
 
   Operation *bestOp = NULL;
-  int64_t bestEstimatedCost = -1;
+  const int64_t kMinEstimatedCost = -1;
+  int64_t bestEstimatedCost = kMinEstimatedCost;
   regionOp.getBodyRegion().walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
         .Case<linalg::LinalgOp>([&](auto op) {
@@ -143,6 +153,18 @@ static std::string summarizeDispatchWorkgroupsOp(
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
                                   << "', cost: " << bestEstimatedCost << "\n");
         })
+        .Case<IREE::LinalgExt::SetEncodingOp, IREE::LinalgExt::UnsetEncodingOp>(
+            [&](auto op) {
+              // SetEncoding/UnsetEncoding is the bestOp only if there are no
+              // other operations.
+              int64_t estimatedCost = kMinEstimatedCost + 1;
+              if (estimatedCost < bestEstimatedCost) return;
+              bestEstimatedCost = estimatedCost;
+              bestOp = op;
+              LLVM_DEBUG(llvm::dbgs()
+                         << "// new best op: '" << bestOp->getName()
+                         << "', cost: " << bestEstimatedCost << "\n");
+            })
         // TODO(scotttodd): IREE::LinalgExt::LinalgExtOp
         .Default([&](Operation *op) {
           // No cost estimation implemented, skip.
@@ -154,6 +176,21 @@ static std::string summarizeDispatchWorkgroupsOp(
   TypeSwitch<Operation *>(bestOp)
       .Case<linalg::LinalgOp>(
           [&](auto op) { bestSummary = summarizeLinalgOp(op); })
+      .Case<IREE::LinalgExt::SetEncodingOp>([&](auto op) {
+        auto opName = getOpNameWithoutDialectName(op);
+        auto encoding = stringifyEnum(op.getResultTensorEncoding());
+        ArrayRef<int64_t> shape = op.getSourceType().getShape();
+        bestSummary =
+            opName + "_" + encoding.str() + "_" + loopRangesToString(shape);
+        ;
+      })
+      .Case<IREE::LinalgExt::UnsetEncodingOp>([&](auto op) {
+        auto opName = getOpNameWithoutDialectName(op);
+        auto encoding = stringifyEnum(op.getSourceTensorEncoding());
+        ArrayRef<int64_t> shape = op.getResultType().getShape();
+        bestSummary =
+            opName + "_" + encoding.str() + "_" + loopRangesToString(shape);
+      })
       // TODO(scotttodd): IREE::LinalgExt::LinalgExtOp
       .Default([&](Operation *op) {
         // No summarization implemented, default to the op's name.
