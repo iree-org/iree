@@ -824,3 +824,75 @@ builtin.module {
 // CHECK:        memref.store %[[D79]], %[[SUBVIEW]][%[[D30]], %[[D15]]] : memref<16x8xf16, strided<[8, 1], offset: ?>>
 // CHECK:        return
 // CHECK:      }
+
+// -----
+
+builtin.module {
+  func.func @matmul_dispatch_0_matmul_16x8x16_shared() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
+    %cst_0 = arith.constant 0.000000e+00 : f16
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16, #gpu.address_space<workgroup>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16, #gpu.address_space<workgroup>>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
+    memref.assume_alignment %2, 64 : memref<16x8xf16>
+    %3 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16, #gpu.address_space<workgroup>>, vector<16x16xf16>
+    %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {permutation_map = affine_map<(d0, d1) -> (d1, d0)>, in_bounds = [true, true]} : memref<8x16xf16, #gpu.address_space<workgroup>>, vector<8x16xf16>
+    %5 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %3, %4, %cst : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf16>
+    vector.transfer_write %5, %2[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
+    return
+  }
+  transform.sequence failures(propagate) {
+  ^bb1(%variant_op: !pdl.operation):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  }
+}
+
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> ((d0 + d1 * 4) mod 8)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 8)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16 + 8)>
+// CHECK-DAG: #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 8)>
+// CHECK-DAG: #[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 1)>
+    // CHECK: func.func @matmul_dispatch_0_matmul_16x8x16_shared() {
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:   %[[TX:.+]] = gpu.thread_id  x
+// CHECK-DAG:   %[[TY:.+]] = gpu.thread_id  y
+// CHECK-DAG:   %[[VECOFF0:.+]] = affine.apply #[[MAP0]](%[[C0]], %[[C0]], %[[C0]])
+// CHECK-DAG:   %[[VECOFF1:.+]] = affine.apply #[[MAP1]](%[[C0]], %[[C0]], %[[C0]])
+// CHECK-DAG:   %[[LANEID:.+]] = affine.apply #[[MAP2]](%[[TX]], %[[TY]])
+// CHECK-DAG:   %[[LANEOFF0:.+]] = affine.apply #[[MAP0]](%[[C0]], %[[LANEID]], %[[C0]])
+// CHECK-DAG:   %[[LANEOFF1:.+]] = affine.apply #[[MAP1]](%[[C0]], %[[LANEID]], %[[C0]])
+// CHECK-DAG:   %[[OFF0:.+]] = arith.addi %[[VECOFF0]], %[[C0]] : index
+// CHECK-DAG:   %[[OFF1:.+]] = arith.addi %[[LANEOFF0]], %[[OFF0]] : index
+// CHECK-DAG:   %[[OFF2:.+]] = arith.addi %[[VECOFF1]], %[[C0]] : index
+// CHECK-DAG:   %[[OFF3:.+]] = arith.addi %[[LANEOFF1]], %[[OFF2]] : index
+//     CHECK:   %[[LD0:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF1]], %[[OFF3]]] {numTiles = 1 : i32, transpose = false} : memref<16x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V0:.+]] = vector.insert_strided_slice %[[LD0]], %{{.*}} {offsets = [0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x4x2xf16>
+//     CHECK:   %[[VECOFF2:.+]] = affine.apply #[[MAP3]](%[[C0]], %[[C0]], %[[C0]])
+//     CHECK:   %[[OFF4:.+]] = arith.addi %[[VECOFF2]], %[[C0]] : index
+//     CHECK:   %[[OFF5:.+]] = arith.addi %[[LANEOFF1]], %[[OFF4]] : index
+//     CHECK:   %[[LD1:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF1]], %[[OFF5]]] {numTiles = 1 : i32, transpose = false} : memref<16x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V1:.+]] = vector.insert_strided_slice %[[LD1]], %[[V0]] {offsets = [0, 0, 2, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x4x2xf16>
+//     CHECK:   %[[VECOFF3:.+]] = affine.apply #[[MAP4]](%[[C0]], %[[C0]], %[[C0]])
+//     CHECK:   %[[OFF6:.+]] = arith.addi %[[VECOFF3]], %[[C0]] : index
+//     CHECK:   %[[OFF7:.+]] = arith.addi %[[LANEOFF0]], %[[OFF6]] : index
+//     CHECK:   %[[LD2:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF7]], %[[OFF3]]] {numTiles = 1 : i32, transpose = false} : memref<16x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V2:.+]] = vector.insert_strided_slice %[[LD2]], %[[V1]] {offsets = [0, 0, 1, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x4x2xf16>
+//     CHECK:   %[[LD3:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF7]], %[[OFF5]]] {numTiles = 1 : i32, transpose = false} : memref<16x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V3:.+]] = vector.insert_strided_slice %[[LD3]], %[[V2]] {offsets = [0, 0, 3, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x4x2xf16>
+// CHECK-DAG:   %[[VECOFF2:.+]] = affine.apply #[[MAP5]](%[[C0]], %[[C0]], %[[C0]])
+// CHECK-DAG:   %[[LANEOFF2:.+]] = affine.apply #[[MAP5]](%[[C0]], %[[LANEID]], %[[C0]])
+// CHECK-DAG:   %[[OFF8:.+]] = arith.addi %[[VECOFF2]], %[[C0]] : index
+// CHECK-DAG:   %[[OFF9:.+]] = arith.addi %[[LANEOFF1]], %[[OFF8]] : index
+// CHECK-DAG:   %[[OFF10:.+]] = arith.addi %[[LANEOFF2]], %[[OFF2]] : index
+//     CHECK:   %[[LD3:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF10]], %[[OFF9]]] {numTiles = 1 : i32, transpose = true} : memref<8x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V4:.+]] = vector.insert_strided_slice %[[LD3]], %{{.*}} {offsets = [0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x2x2xf16>
+//     CHECK:   %[[OFF11:.+]] = arith.addi %[[LANEOFF2]], %[[OFF4]] : index
+//     CHECK:   %[[LD4:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF11]], %[[OFF9]]] {numTiles = 1 : i32, transpose = true} : memref<8x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V5:.+]] = vector.insert_strided_slice %[[LD4]], %[[V4]] {offsets = [0, 0, 1, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x2x2xf16>
+//     CHECK:   %[[A:.+]] = vector.extract %[[V3]][0, 0] : vector<1x1x4x2xf16>
+//     CHECK:   %[[B:.+]] = vector.extract %[[V5]][0, 0] : vector<1x1x2x2xf16>
+//     CHECK:   nvgpu.mma.sync(%[[A]], %[[B]], %{{.*}}) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
