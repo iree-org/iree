@@ -27,6 +27,11 @@ class MatrixElemTypeId(enum.Enum):
   F32 = "f32"
   F16 = "f16"
 
+@enum.unique
+class GPUSharedMemorySize(enum.Enum):
+  s48k = "48k"    # Pre V100
+  s100k = "100k"  # Some sm_8x models
+  s164k = "164k"  # A100
 
 # Enumerates of the collections of shapes that we can generate tests for.
 # The values are the accepted values for the --shapes= flag.
@@ -45,6 +50,7 @@ class CompilationInfoId(enum.Enum):
   LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
   LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
   LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
+  LLVMGPUMicroKernel = "LLVMGPUMicroKernel"
   SPIRVVectorizeMali = "SPIRVVectorizeMali"
   SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
 
@@ -138,7 +144,11 @@ def get_test_shapes(shapes_id: ShapesId):
         # (see get_test_generators).
     ]
   if shapes_id == ShapesId.GPU_LARGE:
-    return [TestShape(m=256, k=128, n=512)]
+    return [      
+      TestShape(m=256, k=128, n=512),
+      TestShape(m=256, k=256, n=256),
+      TestShape(m=128, k=128, n=128),
+      ]
   raise ValueError(shapes_id)
 
 
@@ -193,10 +203,11 @@ def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
 
 # Returns the list of CompilationInfo's to use for the CompilationInfoId.
 def get_test_compilation_infos(
-    compilation_info_id: CompilationInfoId, lhs_rhs_type: MatrixElemTypeId
-) -> typing.List[typing.Optional[CompilationInfo]]:
+    compilation_info_id: CompilationInfoId, lhs_rhs_type: MatrixElemTypeId, 
+    gpu_shmem_size:GPUSharedMemorySize) -> typing.List[typing.Optional[CompilationInfo]]:
   if compilation_info_id == CompilationInfoId.NONE:
     return [None]
+  default_software_pipeline = 3
   if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt:
     tile_workgroup_size_pairs = [
         TileWorkgroupSizePair([[32, 128, 32]], [32, 8, 1]),
@@ -207,11 +218,33 @@ def get_test_compilation_infos(
         TileWorkgroupSizePair([[16, 64, 4]], [16, 2, 1]),
         TileWorkgroupSizePair([[1, 128, 8]], [32, 1, 1]),
     ]
+  elif compilation_info_id == CompilationInfoId.LLVMGPUMicroKernel:
+    if gpu_shmem_size == GPUSharedMemorySize.s48k:
+      default_software_pipeline = 2
+      tile_workgroup_size_pairs = [
+          TileWorkgroupSizePair([[64, 64, 32]], [32, 1, 1]),
+      ]    
+    elif gpu_shmem_size == GPUSharedMemorySize.s100k:
+      default_software_pipeline = 3
+      tile_workgroup_size_pairs = [
+          TileWorkgroupSizePair([[64, 64, 32]], [32, 1, 1]),
+          TileWorkgroupSizePair([[128, 128, 16]], [32, 4, 1]),
+          TileWorkgroupSizePair([[128, 128, 32]], [32, 4, 1]),
+      ]    
+    elif gpu_shmem_size == GPUSharedMemorySize.s164k:
+      default_software_pipeline = 3
+      tile_workgroup_size_pairs = [
+          TileWorkgroupSizePair([[64, 64, 32]], [32, 1, 1]),
+          TileWorkgroupSizePair([[128, 128, 16]], [32, 4, 1]),
+          TileWorkgroupSizePair([[128, 128, 32]], [32, 4, 1]),
+          TileWorkgroupSizePair([[128, 256, 32]], [32, 8, 1]),
+          TileWorkgroupSizePair([[256, 128, 32]], [32, 8, 1]),
+      ]    
   elif compilation_info_id == CompilationInfoId.SPIRVVectorizeNVIDIA:
     tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(32)
   elif compilation_info_id == CompilationInfoId.SPIRVVectorizeMali:
     tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(4)
-  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCoreMmaSync:
+  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCoreMmaSync: 
     tile_workgroup_size_pairs = []
     ## WarpShape = 2x2
     tile_workgroup_size_pairs.append(
@@ -241,7 +274,7 @@ def get_test_compilation_infos(
                 a for a in reversed(tile_workgroup_size_pair.tile_size[0:2])
             ],
             workgroup_size=tile_workgroup_size_pair.workgroup_size,
-            software_pipeline_depth=3))
+            software_pipeline_depth=default_software_pipeline))
   return compilation_infos
 
 
@@ -496,12 +529,13 @@ def generate_trace(func_name: str, lhs_rhs_type: MatrixElemTypeId,
 
 # Generates all output files' contents as strings.
 def generate(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
-             shapes_id: ShapesId, compilation_info_id: CompilationInfoId):
+             shapes_id: ShapesId, compilation_info_id: CompilationInfoId, 
+             gpu_shmem_size: GPUSharedMemorySize):
   function_definitions = {}
   traces = []
 
   for compilation_info in get_test_compilation_infos(compilation_info_id,
-                                                     lhs_rhs_type):
+                                                     lhs_rhs_type, gpu_shmem_size):
     for shape in get_test_shapes(shapes_id):
       for dynamicity in get_dynamicities(shapes_id):
         function = generate_function(lhs_rhs_type, acc_type, shape, dynamicity,
@@ -544,6 +578,12 @@ def parse_arguments():
                       choices=[i.value for i in CompilationInfoId],
                       help="Collection of compilation info setups to test",
                       default="",
+                      required=False)
+  parser.add_argument("--gpu_shmem_size",
+                      type=str,
+                      choices=[s.value for s in GPUSharedMemorySize],
+                      help="Shared memory size",
+                      default="164k",
                       required=False)
 
   parser.add_argument(
@@ -626,9 +666,10 @@ def main(args):
   lhs_rhs_type = MatrixElemTypeId(args.lhs_rhs_type)
   acc_type = infer_acc_type(lhs_rhs_type)
   shapes_id = ShapesId(args.shapes)
+  gpu_shmem_size = GPUSharedMemorySize(args.gpu_shmem_size)
   compilation_info_id = CompilationInfoId(args.compilation_info)
   (function_definitions, traces) = generate(lhs_rhs_type, acc_type, shapes_id,
-                                            compilation_info_id)
+                                            compilation_info_id, gpu_shmem_size)
 
   write_code_file(function_definitions, args.output_code)
   write_trace_file(traces, args.output_trace, args.module_path,

@@ -226,6 +226,58 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
+    e2e_matmul_direct_f32_gpu_large_LLVMGPUMicrokernel
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUMicrokernel"
+    "--gpu_shmem_size=100k"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_gpu_large_LLVMGPUMicrokernel
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUMicrokernel"
+    "--gpu_shmem_size=164k"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_generated_trace_runner_test(
+  NAME
     e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulTensorCore
   GENERATOR
     "generate_e2e_matmul_tests.py"
