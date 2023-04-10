@@ -38,9 +38,10 @@ fi
 
 if (( IREE_READ_REMOTE_CCACHE == 1 || IREE_READ_LOCAL_CCACHE == 1 )); then
   export IREE_USE_CCACHE=1
-  export CMAKE_C_COMPILER_LAUNCHER=$(which ccache)
-  export CMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)
-  $(which ccache) --zero-stats
+  export CMAKE_C_COMPILER_LAUNCHER="$(which ccache)"
+  export CMAKE_CXX_COMPILER_LAUNCHER="$(which ccache)"
+  ccache --zero-stats
+  ccache --show-stats
 else
   export IREE_USE_CCACHE=0
 fi

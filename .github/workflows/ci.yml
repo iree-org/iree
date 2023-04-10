@@ -99,7 +99,7 @@ jobs:
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
         with:
           python-version: "3.10" # Needs pybind >= 2.10.1 for Python >= 3.11
       - name: "Installing Python packages"
@@ -187,7 +187,7 @@ jobs:
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
         with:
           python-version: "3.10"
           cache: "pip"
@@ -197,43 +197,20 @@ jobs:
         # We need coreutils for `realpath` used in scripts.
         # We need bash because the default one on macOS is fairly old and lacks
         # features we use in scripts.
-        run: brew install ninja ccache coreutils bash
-      # Attempt to restore from cache unconditionally.
-      # Note: this will first try to grab a cache entry for this exact commit
-      #       then it will fall back to the latest for any commit.
-      - name: "Fetching cache (CMake/ccache)"
-        uses: actions/cache/restore@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache_all_macos_${{ github.sha }}
-          restore-keys: ccache_all_macos
+        run: brew install ninja coreutils bash
       # Finally: build and run tests.
       - name: "Building IREE"
         env:
+          # Note: we would love to use caching here but the GitHub Actions cache
+          # is utterly broken. See https://github.com/actions/cache/issues/1115
+          # and https://github.com/openxla/iree/pull/12905
           IREE_READ_REMOTE_CCACHE: 0
           IREE_WRITE_REMOTE_CCACHE: 0
-          IREE_READ_LOCAL_CCACHE: 1
-          IREE_WRITE_LOCAL_CCACHE: ${{ needs.setup.outputs.write-caches }}
-          CCACHE_DIR: ${{ github.workspace }}/.ccache
-          # Cache size and compression level settings are a delicate balance.
-          # * A full build cache is around 2-5GB depending on compression level
-          # * Upload/download is slow (double compression may or may not help)
-          # * We have a limit of 10GB across all cached files per repository
-          # * Cache misses are quite costly:
-          #   * 99% cache hits -> ~5 minutes to build
-          #   * 20% cache hits -> ~15-20 minutes to build
-          CCACHE_MAXSIZE: 4G
-          CCACHE_COMPRESSLEVEL: 5
+          IREE_READ_LOCAL_CCACHE: 0
+          IREE_WRITE_LOCAL_CCACHE: 0
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      # Write cache (if configured to) after all other steps are finished.
-      - name: "Saving cache (CMake/ccache)"
-        if: needs.setup.outputs.write-caches == '1'
-        uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # v3.3.1
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache_all_macos_${{ github.sha }}
 
   build_test_all_bazel:
     needs: setup
