@@ -100,6 +100,12 @@ iree_vm_instance_allocator(iree_vm_instance_t* instance) {
 IREE_API_EXPORT iree_status_t iree_vm_instance_register_type(
     iree_vm_instance_t* instance,
     const iree_vm_ref_type_descriptor_t* descriptor) {
+  if ((((uintptr_t)descriptor) & IREE_VM_REF_TYPE_TAG_BIT_MASK) != 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "type descriptors must be aligned to %d bytes",
+                            (1 << IREE_VM_REF_TYPE_TAG_BITS));
+  }
+
   iree_slim_mutex_lock(&instance->type_mutex);
 
   // Scan to see if there are any existing types registered with this

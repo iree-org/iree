@@ -34,6 +34,10 @@ typedef struct iree_vm_instance_t iree_vm_instance_t;
   (sizeof(uintptr_t) * 8 - IREE_VM_REF_TYPE_TAG_BITS)
 #define IREE_VM_REF_TYPE_PTR_BIT_MASK (~IREE_VM_REF_TYPE_TAG_BIT_MASK)
 
+// (1 << IREE_VM_REF_TYPE_TAG_BITS) hardcoded for MSVC which cannot have
+// expressions in its alignas in older versions.
+#define IREE_VM_REF_TYPE_DESCRIPTOR_ALIGNMENT 8
+
 // Alignment required for the reference counter.
 // Used to pack the offset bits to fit in IREE_VM_REF_TYPE_TAG_BITS.
 #define IREE_VM_REF_COUNTER_ALIGNMENT sizeof(iree_atomic_ref_count_t)
@@ -58,7 +62,8 @@ enum iree_vm_ref_type_bits_t {
 typedef void(IREE_API_PTR* iree_vm_ref_destroy_t)(void* ptr);
 
 // Describes a type for the VM.
-typedef struct iree_vm_ref_type_descriptor_t {
+typedef iree_alignas(IREE_VM_REF_TYPE_DESCRIPTOR_ALIGNMENT) struct
+    iree_vm_ref_type_descriptor_t {
   // Function called when references of this type reach 0 and should be
   // destroyed.
   iree_vm_ref_destroy_t destroy;
