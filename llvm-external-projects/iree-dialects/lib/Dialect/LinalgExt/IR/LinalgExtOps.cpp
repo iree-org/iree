@@ -186,8 +186,9 @@ LogicalResult ScatterOp::verify() {
                                      updateType.getRank()))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) >
-        originalType.getDimSize(originalDim)) {
+    if (!originalType.isDynamicDim(originalDim) &&
+        updateType.getDimSize(updateDim) >
+            originalType.getDimSize(originalDim)) {
       return op->emitOpError("shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim;
     }
@@ -200,8 +201,9 @@ LogicalResult ScatterOp::verify() {
            llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) >
-        originalType.getDimSize(originalDim)) {
+    if (!originalType.isDynamicDim(originalDim) &&
+        updateType.getDimSize(updateDim) >
+            originalType.getDimSize(originalDim)) {
       return op->emitOpError("indexed shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim
              << " " << updateType.getDimSize(updateDim) << " "
