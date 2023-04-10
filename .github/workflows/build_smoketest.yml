@@ -12,20 +12,18 @@ on:
   push:
     branches:
       - main
-  schedule:
-    - cron: "0 17 * * *"
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
   # queued and in-progress runs for the same PR (presubmit) or commit
   # (postsubmit).
-  group: ${{ github.event.number || github.sha }}
+  group: build_smoketest_${{ github.event.number || github.sha }}
   cancel-in-progress: true
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-20.04-64core
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
@@ -33,25 +31,27 @@ jobs:
       - name: "Setting up Python"
         uses: actions/setup-python@75f3110429a8c05be0e1bf360334e4cced2b63fa # v2.3.3
         with:
-          python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
+          python-version: "3.10"
 
       - name: Sync and install versions
         run: |
           # TODO: https://github.com/openxla/openxla-pjrt-plugin/issues/30
           sudo apt install -y lld
-          python ./sync_deps.py
+          # Since only building the runtime, exclude compiler deps (expensive).
+          python ./sync_deps.py --exclude-submodule "iree:third_party/(llvm|mlir-hlo)"
           pip install -r requirements.txt
 
       - name: Setup Bazelisk
         uses: bazelbuild/setup-bazelisk@v2
 
-      - name: "Sync and configure"
+      - name: "Install CUDA and Configure"
         run: |
+          CUDA_SDK_DIR="$(../iree/third_party/nvidia_sdk_download/fetch_cuda_toolkit.py /tmp/cuda_sdk)"
           python ./configure.py --cc=clang --cxx=clang++ --cuda-sdk-dir=$CUDA_SDK_DIR
 
       - name: "Build CPU plugin"
         run: |
-          bazel build iree/integrations/pjrt/cpu/...
+          bazel build :plugins
 
       - name: "Run Unittests"
         run: |

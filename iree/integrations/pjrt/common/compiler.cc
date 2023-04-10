@@ -4,17 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// TODO: Fix me.
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 #include "iree/integrations/pjrt/common/compiler.h"
-
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include <functional>
 #include <iostream>  // TODO: Remove
@@ -28,44 +18,16 @@ namespace iree::pjrt {
 
 namespace {
 
-// Allocating a file descriptor for compiled binary varies on platform.
-class FdAlloc {
- public:
-  FdAlloc() {
-#ifdef __APPLE__
-    // Apple devices do not support memfd_create.
-    strncpy(filename, "/tmp/output.vmfb.XXXXXX", 32);
-    fd = mkstemp(filename);
-    fchmod(fd, 0700);
-#else
-    fd = memfd_create("output.vmfb", 0);
-#endif
-  }
-
-  ~FdAlloc() {
-#ifdef __APPLE__
-    if (fd != -1) {
-      unlink(filename);
-    }
-#endif
-  }
-
-  int getFd() const { return fd; }
-
- private:
-  char filename[32];
-  int fd;
-};
-
 class MMapCompilerOutput : public CompilerOutput {
  public:
-  MMapCompilerOutput(void* data, size_t length)
-      : data_(data), length_(length) {}
-  ~MMapCompilerOutput() { munmap(data_, length_); }
+  MMapCompilerOutput(iree_compiler_output_t* output, void* data, size_t length)
+      : output_(output), data_(data), length_(length) {}
+  ~MMapCompilerOutput() { ireeCompilerOutputDestroy(output_); }
   void* GetData() { return data_; }
   size_t GetDataSize() { return length_; }
 
  private:
+  iree_compiler_output_t* output_;
   void* data_;
   size_t length_;
 };
@@ -167,13 +129,7 @@ class InprocessCompilerJob : public CompilerJob {
       return nullptr;
     }
 
-    FdAlloc fdAlloc;
-    output_fd_ = fdAlloc.getFd();
-    if (output_fd_ == -1) {
-      // TODO: Better error handling.
-      return nullptr;
-    }
-    error = ireeCompilerOutputOpenFD(output_fd_, &output_);
+    error = ireeCompilerOutputOpenMembuffer(&output_);
     if (error) {
       SetError(error);
       return nullptr;
@@ -187,12 +143,20 @@ class InprocessCompilerJob : public CompilerJob {
     }
 
     // Map the data.
-    off_t fsize;
-    fsize = lseek(output_fd_, 0, SEEK_END);
-    void* output_data =
-        mmap(nullptr, fsize, PROT_READ | PROT_EXEC, MAP_SHARED, output_fd_, 0);
+    void* output_data = nullptr;
+    uint64_t size = -1;
+    error = ireeCompilerOutputMapMemory(output_, &output_data, &size);
+    if (error) {
+      SetError(error);
+      return nullptr;
+    }
 
-    return std::make_unique<MMapCompilerOutput>(output_data, fsize);
+    // Transfer the output_ to MMapCompilerOutput since the mapping is only
+    // valid for the life of the output.
+    iree_compiler_output_t* local_output = output_;
+    output_ = nullptr;
+    return std::make_unique<MMapCompilerOutput>(local_output, output_data,
+                                                size);
   }
 
  private:
@@ -214,7 +178,6 @@ class InprocessCompilerJob : public CompilerJob {
 
   // Output.
   iree_compiler_output_t* output_ = nullptr;
-  int output_fd_ = -1;  // Owned by output_.
 };
 
 }  // namespace

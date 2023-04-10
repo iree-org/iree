@@ -68,11 +68,11 @@ def main():
     run(["-c", "advice.detachedHead=false", "checkout", revision], repo_dir)
     if SUBMODULES.get(repo_name):
       print(f"  Initializing submodules for {repo_name}")
-      run(["submodule", "init"], repo_dir)
       cp = run(["submodule", "status"],
                repo_dir,
                silent=True,
                capture_output=True)
+      submodules = []
       for submodule_status_line in cp.stdout.decode().splitlines():
         submodule_status_parts = submodule_status_line.split()
         submodule_path = submodule_status_parts[1]
@@ -83,12 +83,12 @@ def main():
         if exclude_submodule:
           print(f"  Excluding {submodule_path} based on --exclude-submodule")
           continue
+        submodules.append(submodule_path)
 
-        print(f"  Updating submodule {submodule_path}")
-        run([
-            "submodule", "update", "--depth", "1", "--recommend-shallow", "--",
-            submodule_path
-        ], repo_dir)
+      run([
+          "submodule", "update", "--init", "--depth", "1",
+          "--recommend-shallow", "--"
+      ] + submodules, repo_dir)
 
 
 def run(args,
