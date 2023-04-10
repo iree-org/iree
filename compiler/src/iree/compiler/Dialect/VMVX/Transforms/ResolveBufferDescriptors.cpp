@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/PassDetail.h"
@@ -189,9 +187,9 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForGetGlobalOp(
 
 /// Replaces the offsets, sizes and strides based on values provided
 /// by `DescriptorInfo` object.
-template <typename OpTy>
 static void replaceOffsetSizesAndStridesWith(
-    RewriterBase &rewriter, OpTy op, const DescriptorInfo &resultDescriptor) {
+    RewriterBase &rewriter, GetBufferDescriptorOp op,
+    const DescriptorInfo &resultDescriptor) {
   int rank = resultDescriptor.sizes.size();
   assert(rank == resultDescriptor.strides.size() &&
          "expected number of sizes and strides to match");
@@ -220,10 +218,9 @@ static void replaceOffsetSizesAndStridesWith(
 
 namespace {
 
-template <typename OpTy>
-struct FromMemRefSubView : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
-  LogicalResult matchAndRewrite(OpTy op,
+struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto subview = op.getSource().template getDefiningOp<memref::SubViewOp>();
     if (!subview) return failure();
@@ -244,9 +241,9 @@ struct FromMemRefSubView : public OpRewritePattern<OpTy> {
     for (int i = 0; i < sourceRank; i++) {
       sizeStrideTypes.push_back(indexType);
     }
-    auto sourceDesc =
-        rewriter.create<OpTy>(loc, op.getBaseBuffer().getType(), indexType,
-                              sizeStrideTypes, sizeStrideTypes, source);
+    auto sourceDesc = rewriter.create<GetBufferDescriptorOp>(
+        loc, op.getBaseBuffer().getType(), indexType, sizeStrideTypes,
+        sizeStrideTypes, source);
 
     FailureOr<DescriptorInfo> resultDescriptor =
         resolveBufferDescriptorForSubview(
@@ -317,99 +314,9 @@ struct FromHalInterfaceBindingSubspan
   }
 };
 
-struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
-    : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
-                                PatternRewriter &rewriter) const override {
-    auto binding =
-        op.getSource()
-            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!binding) return failure();
-    auto memRefType = binding.getResult().getType().template cast<MemRefType>();
-    if (memRefType.getRank() < 1) return failure();
-
-    auto loc = op.getLoc();
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(binding);
-    FailureOr<DescriptorInfo> resultDescriptor =
-        resolveBufferDescriptorForInterfaceBinding(binding, rewriter, loc);
-    if (failed(resultDescriptor)) {
-      return rewriter.notifyMatchFailure(
-          op, "failed to resolve descriptor with source being binding op");
-    }
-
-    replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
-
-    // For the base buffer of the `hal.interface.binding.subspan` create a 1D
-    // buffer with zero offset. For example, if the
-    // `hal.interface.binding.subspan` is
-    //
-    // ```mlir
-    //  hal.interface.binding.subspan set(0) binding(1) offset(%offset)
-    //      : memref<?x?xf32, strided<[?, 1], offset: 64]>>{%s0, %s1}
-    // ```
-    //
-    // convert it to
-    //
-    // ```mlir
-    //  #map = affine_map<()[s0, s1, s2] -> (s0 + s1 * s2)>
-    //  %linearSize = affine.apply #map()[%offset, %s0, %s1]
-    //  %c0 = arith.constant 0 : index
-    //  hal.interface.binding.subspan set(0) binding(1) offset(%c0)
-    //      : memref<?xf32>{%linearSize}
-    // ```
-    //
-    // Only the base pointer of this subspan is needed, so creating a
-    // subspan with zero offset (with original offset folded into the size)
-    // is realistic representation of what the IR needs.
-    AffineMap mulMap = getMulMap(rewriter.getContext());
-    OpFoldResult linearizedMemrefSize = rewriter.getIndexAttr(1);
-    for (auto size : resultDescriptor->sizes) {
-      linearizedMemrefSize = makeComposedFoldedAffineApply(
-          rewriter, loc, mulMap, {linearizedMemrefSize, size});
-    }
-    AffineMap addMap = getAddMap(rewriter.getContext());
-    linearizedMemrefSize = makeComposedFoldedAffineApply(
-        rewriter, loc, addMap,
-        {linearizedMemrefSize, resultDescriptor->offset});
-
-    SmallVector<int64_t> staticLinearShape;
-    SmallVector<Value> dynamicLinearShape;
-    dispatchIndexOpFoldResult(linearizedMemrefSize, dynamicLinearShape,
-                              staticLinearShape);
-
-    IREE::HAL::InterfaceBindingSubspanOp linearInterfaceBinding;
-    auto newBufferType =
-        MemRefType::get(staticLinearShape, memRefType.getElementType(),
-                        MemRefLayoutAttrInterface(), Attribute());
-
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    linearInterfaceBinding =
-        rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-            loc, newBufferType, binding.getSetAttr(), binding.getBindingAttr(),
-            binding.getDescriptorTypeAttr(), zero, dynamicLinearShape,
-            binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
-    Value basePointer = rewriter.create<IREE::Codegen::GetBasePointerOp>(
-        loc, op.getBaseBuffer().getType(), linearInterfaceBinding);
-    rewriter.replaceAllUsesWith(op.getBaseBuffer(), basePointer);
-
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
-/// Template function to handle replacement of base pointer of buffer
+/// Function to handle replacement of base pointer of buffer
 /// descriptors.
-template <typename OpTy>
-static Value getBaseBufferReplacementForDescriptor(OpTy descriptorOp,
-                                                   RewriterBase &rewriter,
-                                                   Location loc, Value source);
-
-/// Template specialization for `vmvx.get_buffer_descriptor` op to
-/// generate a `builtin.unrealized_conversion_cast`.
-template <>
-Value getBaseBufferReplacementForDescriptor<GetBufferDescriptorOp>(
+static Value getBaseBufferReplacementForDescriptor(
     GetBufferDescriptorOp descriptorOp, RewriterBase &rewriter, Location loc,
     Value source) {
   return rewriter
@@ -418,22 +325,11 @@ Value getBaseBufferReplacementForDescriptor<GetBufferDescriptorOp>(
       .getResult(0);
 }
 
-/// Template specialization for `memref.extract_strided_metadata` op to
-/// generate a `iree_codegen.get_base_address`.
-template <>
-Value getBaseBufferReplacementForDescriptor<memref::ExtractStridedMetadataOp>(
-    memref::ExtractStridedMetadataOp descriptorOp, RewriterBase &rewriter,
-    Location loc, Value source) {
-  return rewriter.create<IREE::Codegen::GetBasePointerOp>(
-      loc, descriptorOp.getBaseBuffer().getType(), source);
-}
-
 // Allocations always return a non-offset memref and are matched by this
 // pattern.
-template <typename OpTy>
-struct FromAllocation : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
-  LogicalResult matchAndRewrite(OpTy op,
+struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto alloca = op.getSource().template getDefiningOp<memref::AllocaOp>();
     if (!alloca) return failure();
@@ -464,10 +360,9 @@ struct FromAllocation : public OpRewritePattern<OpTy> {
 
 // MemRef globals are always static shaped and reference a non-offset
 // buffer.
-template <typename OpTy>
-struct FromGlobal : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
-  LogicalResult matchAndRewrite(OpTy op,
+struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto global = op.getSource().template getDefiningOp<memref::GetGlobalOp>();
     if (!global) return failure();
@@ -506,21 +401,13 @@ class ResolveBufferDescriptorsPass
   ResolveBufferDescriptorsPass() = default;
   ResolveBufferDescriptorsPass(const ResolveBufferDescriptorsPass &) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::Codegen::IREECodegenDialect,
-                    IREE::VMVX::VMVXDialect>();
+    registry.insert<AffineDialect, IREE::VMVX::VMVXDialect>();
   }
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.insert<FromAllocation<GetBufferDescriptorOp>,
-                    FromAllocation<memref::ExtractStridedMetadataOp>,
-                    FromGlobal<GetBufferDescriptorOp>,
-                    FromGlobal<memref::ExtractStridedMetadataOp>,
-                    FromHalInterfaceBindingSubspan,
-                    FromMemRefSubView<GetBufferDescriptorOp>,
-                    FromMemRefSubView<memref::ExtractStridedMetadataOp>,
-                    ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
-        &getContext());
+    patterns.insert<FromAllocation, FromGlobal, FromHalInterfaceBindingSubspan,
+                    FromMemRefSubView>(&getContext());
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
@@ -531,7 +418,7 @@ class ResolveBufferDescriptorsPass
     if (!allowUnresolved) {
       SmallVector<Operation *> remaining;
       getOperation()->walk([&](Operation *op) {
-        if (isa<GetBufferDescriptorOp, memref::ExtractStridedMetadataOp>(op)) {
+        if (isa<GetBufferDescriptorOp>(op)) {
           remaining.push_back(op);
         }
       });

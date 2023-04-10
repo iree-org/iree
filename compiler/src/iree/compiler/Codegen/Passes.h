@@ -109,6 +109,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 /// during bufferization.
 std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 
+/// Pass to resolve `memref.expand_strided_metadata` operations.
+std::unique_ptr<Pass> createIREEExpandStridedMetadataPass();
+
 /// Pass to perform linalg on tensor bufferization. The function passed into
 /// the pass through the `allocationFn` argument is invoked whenever a new
 /// buffer is to be created. The callback will be passed the Values for the

@@ -525,3 +525,31 @@ func.func @store_uniform_buffer(%value : i32, %offset: index, %i0: index, %i1 : 
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(uniform_buffer) offset(%[[C0]]) : memref<?xi32, #hal.descriptor_type<uniform_buffer>>{%[[SIZE]]}
 //       CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP1]]()[%[[OFFSET]], %[[I0]], %[[I1]], %[[I2]]]
 //       CHECK:   memref.store %[[VAL]], %[[SUBSPAN]][%[[INDEX]]] : memref<?xi32, #hal.descriptor_type<uniform_buffer>>
+
+// -----
+
+func.func @reinterpret_cast_lowering_static_zero_offset() -> f32 {
+  %0 = hal.interface.constant.load[0] : index
+  %1 = hal.interface.constant.load[1] : index
+  %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>{%0, %1}
+  %3 = memref.reinterpret_cast %2 to offset: [0], sizes: [], strides: [] : memref<?x?xf32> to memref<f32>
+  %4 = memref.load %3[] : memref<f32>
+  return %4 : f32
+}
+// CHECK-LABEL: func @reinterpret_cast_lowering_static_zero_offset()
+//       CHECK:   memref.reinterpret_cast %{{.+}} to offset: [0], sizes: [], strides: [] : memref<?xf32> to memref<f32>
+
+// -----
+
+func.func @reinterpret_cast_lowering_dynamic_zero_offset() -> f32 {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load[0] : index
+  %1 = hal.interface.constant.load[1] : index
+  %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>{%0, %1}
+  %3 = memref.reinterpret_cast %2 to offset: [%c0], sizes: [], strides: [] : memref<?x?xf32> to memref<f32>
+  %4 = memref.load %3[] : memref<f32>
+  return %4 : f32
+}
+// CHECK-LABEL: func @reinterpret_cast_lowering_dynamic_zero_offset()
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   memref.reinterpret_cast %{{.+}} to offset: [%[[C0]]], sizes: [], strides: [] : memref<?xf32> to memref<f32>
