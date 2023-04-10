@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRLinalgDialect
     MLIRLinalgStructuredOpsIncGenLib
+    MLIRMLProgramDialect
     MLIRTensorDialect
   PUBLIC
 )

@@ -234,14 +234,14 @@ func.func @arith.extsi(%arg0: i32) -> i64 {
 // Check: ml_program is also handled.
 
 // CHECK: global.*i32
-"ml_program.global"() {sym_name = "_vocab$0", sym_visibility = "private", type = tensor<2x2xi64>, value = dense<1> : tensor<2x2xi64>} : () -> ()
+"ml_program.global"() {sym_name = "_v", sym_visibility = "private", type = tensor<2x2xi64>, value = dense<1> : tensor<2x2xi64>} : () -> ()
 func.func @run() -> tensor<2x2xi64> {
-  %0 = "ml_program.global_load"() {global = @_vocab$0} : () -> tensor<2x2xi64>
-  %1 = call @jit__run$main(%0) : (tensor<2x2xi64>) -> tensor<2x2xi64>
+  %0 = "ml_program.global_load"() {global = @_v} : () -> tensor<2x2xi64>
+  %1 = call @f(%0) : (tensor<2x2xi64>) -> tensor<2x2xi64>
   return %1 : tensor<2x2xi64>
 }
 
-func.func private @jit__run$main(%arg0: tensor<2x2xi64> {mhlo.sharding = ""}) -> tensor<2x2xi64> {
+func.func private @f(%arg0: tensor<2x2xi64>) -> tensor<2x2xi64> {
   return %arg0 : tensor<2x2xi64>
 }
 
