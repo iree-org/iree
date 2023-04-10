@@ -243,6 +243,19 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
   return true;
 }
 
+/// Makes Dimension-y primary warp, that means Dimension-x always have threads
+/// that is equal to warp size, a dimension-y corresponds to the warp id. It
+/// reduces arithmatic in microkernel
+static void makeDimYPrimaryWarp(
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
+  for (auto tile : tileSizes) {
+    tile.tileSize[1] =
+        (tile.tileSize[0] * tile.tileSize[1] * tile.tileSize[2]) / cudaWarpSize;
+    tile.tileSize[0] = cudaWarpSize;
+    tile.tileSize[2] = 1;
+  }
+}
+
 /// Decides which tensorcore operations to use.
 static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isF16,
@@ -261,13 +274,7 @@ static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
                        elementTypeC->str())) {
     codegenPipeline =
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMicroKernel;
-    // Linearize Threads
-    int totalCtaSize = tileSizes.front().workgroupSize[0] *
-                       tileSizes.front().workgroupSize[1] *
-                       tileSizes.front().workgroupSize[2];
-    tileSizes.front().workgroupSize[0] = totalCtaSize;
-    tileSizes.front().workgroupSize[1] = 1;
-    tileSizes.front().workgroupSize[2] = 1;
+    makeDimYPrimaryWarp(tileSizes);
   } else {
     // Currently mma.sync is on by default for fp16 only.
     codegenPipeline = isF16 ? IREE::Codegen::DispatchLoweringPassPipeline::

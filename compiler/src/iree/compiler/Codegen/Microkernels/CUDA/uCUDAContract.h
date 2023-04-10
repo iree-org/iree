@@ -119,16 +119,17 @@ struct uGPUContracts {
     ukernels.clear();
 
     auto generateF32Microkernels = [&](const char* t, const char* OutT) {
-      int stages = 3;
-      generateVariant(t, t, OutT, {64, 64, 32}, {64, 64}, {16, 8, 8}, stages);
-      generateVariant(t, t, OutT, {128, 128, 32}, {64, 64}, {16, 8, 8}, stages);
-      generateVariant(t, t, OutT, {128, 256, 32}, {64, 64}, {16, 8, 8}, stages);
-      generateVariant(t, t, OutT, {256, 128, 32}, {64, 64}, {16, 8, 8}, stages);
-      stages = 4;
-      generateVariant(t, t, OutT, {128, 256, 16}, {64, 64}, {16, 8, 8}, stages);
-      stages = 5;
-      generateVariant(t, t, OutT, {128, 256, 16}, {64, 64}, {16, 8, 8}, stages);
-      generateVariant(t, t, OutT, {128, 128, 16}, {64, 64}, {16, 8, 8}, stages);
+      int st = 2;
+      generateVariant(t, t, OutT, {128, 128, 32}, {64, 64}, {16, 8, 8}, st);
+      st = 3;
+      generateVariant(t, t, OutT, {128, 128, 16}, {64, 64}, {16, 8, 8}, st);
+      generateVariant(t, t, OutT, {64, 64, 32}, {64, 64}, {16, 8, 8}, st);
+      generateVariant(t, t, OutT, {128, 128, 32}, {64, 64}, {16, 8, 8}, st);
+      generateVariant(t, t, OutT, {128, 256, 32}, {64, 64}, {16, 8, 8}, st);
+      generateVariant(t, t, OutT, {256, 128, 32}, {64, 64}, {16, 8, 8}, st);
+      st = 5;
+      generateVariant(t, t, OutT, {128, 256, 16}, {64, 64}, {16, 8, 8}, st);
+      generateVariant(t, t, OutT, {128, 128, 16}, {64, 64}, {16, 8, 8}, st);
     };
     // Type float + float
     generateF32Microkernels("float", "float");
@@ -146,7 +147,7 @@ bool adduCUDAContracts(INT M, INT N, INT K, std::string lhs, std::string result,
   // todo(guray) improve here
   for (uGPUKernel kernel : AllContracts.ukernels) {
     if (kernel.LHS == lhs && kernel.RHS == lhs && kernel.RESULT == result) {
-      // Need biggger tile size
+      // Tile size must be bigger than the sizes
       if (M < kernel.ThreadblockShape[0] || N < kernel.ThreadblockShape[1] ||
           K < kernel.ThreadblockShape[2])
         continue;

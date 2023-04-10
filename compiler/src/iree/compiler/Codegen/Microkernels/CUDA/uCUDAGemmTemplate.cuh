@@ -55,15 +55,28 @@ CUDA_ENTRY void TEMPLATE(
     ELEMENT_C* shm_base, ELEMENT_C* shm_aligned, int64_t shm_offset, int64_t shm_start, int64_t shm_dim2, 
     ELEMENT_C* rsh_base, ELEMENT_C* rsh_aligned, int64_t rsh_start, int64_t rsh_dim2, 
     ELEMENT_C initValue) {
+  
+  ELEMENT_A* lhs_begin = &lhs_base[lhs_start];
+  ELEMENT_B* rhs_begin = &rhs_base[rhs_start];
+  ELEMENT_C* res_begin = &res_base[res_start];
+
+#ifdef DEBUG
+  if (threadIdx.x == 0)
+    printf("<<< (%d,%d), %d >>> %p[%lld] %p[%lld] %p[%lld] %p \t --- %p %p %p\n", 
+           blockIdx.x, blockIdx.y, threadIdx.y, 
+           lhs_base, lhs_start, rhs_base, rhs_start, res_base, res_start, shm_base,
+           lhs_begin, rhs_begin, res_begin);
+#endif
+  
   gemm_ukernel<
     ELEMENT_A, ELEMENT_B, ELEMENT_C,
     TILE_M, TILE_N, TILE_K, 
     WARP_M, WARP_N,  
     INST_M, INST_N, INST_K, 
     STAGES, HAS_LINALG_FILL, WRITEBACK_TO_GLOBAL>(
-        lhs_base, lhs_offset, lhs_dim2,
-        rhs_base, rhs_offset, rhs_dim2,
-        res_base, res_offset, res_dim2,
+        lhs_begin, lhs_dim2,
+        rhs_begin, rhs_dim2,
+        res_begin, res_dim2,
         shm_base, initValue);
 }
 /* clang-format on */
