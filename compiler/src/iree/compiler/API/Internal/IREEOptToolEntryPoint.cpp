@@ -29,6 +29,10 @@
 using namespace llvm;
 using namespace mlir;
 
+#if defined(_MSC_VER)
+#define fileno _fileno
+#endif  // _MSC_VER
+
 static LogicalResult ireeOptMainFromCL(int argc, char **argv,
                                        llvm::StringRef toolName,
                                        DialectRegistry &registry) {
