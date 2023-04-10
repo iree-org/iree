@@ -42,7 +42,6 @@ inline void registerMlirPasses() {
   registerLoopCoalescingPass();
   registerLoopInvariantCodeMotionPass();
   registerAffineScalarReplacementPass();
-  registerSCFParallelLoopCollapsingPass();
   registerPrintOpStatsPass();
   registerViewOpGraphPass();
   registerStripDebugInfoPass();

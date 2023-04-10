@@ -908,10 +908,10 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
     auto targetCastOp = updateOp.getTarget().getDefiningOp<tensor::CastOp>();
     auto updateCastOp = updateOp.getUpdate().getDefiningOp<tensor::CastOp>();
     if (!targetCastOp && !updateCastOp) return failure();
-    auto target =
-        (targetCastOp ? targetCastOp.getSource() : updateOp.getTarget());
-    auto update =
-        (updateCastOp ? updateCastOp.getSource() : updateOp.getUpdate());
+    Value target = (targetCastOp ? cast<Value>(targetCastOp.getSource())
+                                 : cast<Value>(updateOp.getTarget()));
+    Value update = (updateCastOp ? cast<Value>(updateCastOp.getSource())
+                                 : cast<Value>(updateOp.getUpdate()));
     auto newOp = rewriter.create<TensorUpdateOp>(
         updateOp.getLoc(), target.getType(), target,
         refreshDimsOnTypeChange(updateOp, updateOp.getTarget().getType(),
