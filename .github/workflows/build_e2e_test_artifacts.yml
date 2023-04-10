@@ -96,6 +96,10 @@ jobs:
         run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
+      - name: "Enlarge disk"
+        run: |
+          sudo mount -o remount,size=200G /runner-root
+          df -h
       - name: "Building e2e test artifacts"
         id: build
         env:
@@ -109,6 +113,8 @@ jobs:
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
+      - name: "After disk size"
+        run: df -h
       - name: "Uploading e2e test artifacts"
         id: upload
         env:
