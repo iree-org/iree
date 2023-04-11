@@ -13,7 +13,7 @@ transform.sequence failures(propagate){
 
   /// This must be used with the custom dispatch region formation
   /// because IREE's does not fuse the 6 ops softmax version even with
-  /// --iree-flow-enable-aggressive-fusion.
+  /// --iree-flow-fuse-multi-use.
   %region_op = transform.iree.wrap_in_dispatch_region %div { generateWorkload = false }
 
   %non_div = transform.merge_handles %input_max_fill, %input_max, %exps_sum_fill, %exps, %exps_sum

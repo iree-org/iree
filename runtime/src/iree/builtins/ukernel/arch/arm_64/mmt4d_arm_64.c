@@ -6,7 +6,6 @@
 
 #include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64.h"
 
-#include "iree/builtins/ukernel/arch/arm_64/config.h"
 #include "iree/schemas/cpu_data.h"
 
 IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f32f32f32_8x8x1_arm_64)

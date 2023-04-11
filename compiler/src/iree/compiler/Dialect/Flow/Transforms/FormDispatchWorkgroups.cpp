@@ -20,7 +20,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Dominance.h"
@@ -54,7 +54,6 @@ createDispatchWorkgroups(mlir::TensorDimTrackingRewriter &rewriter,
   // Clone additional producers and rewrite to DispatchWorkgroupsOp.
   SmallVector<Flow::DispatchWorkgroupsOp> result;
   for (auto regionOp : regionOps) {
-    if (failed(cloneProducersToRegion(rewriter, regionOp))) return failure();
     auto maybeWorkgroupOp =
         rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp, rewriter);
     if (failed(maybeWorkgroupOp)) return failure();
@@ -76,7 +75,7 @@ static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
     mlir::TensorDimTrackingRewriter &rewriter, Operation *op,
     bool generateWorkloadRegion) {
   // Compute workload.
-  Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
+  std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
   if (generateWorkloadRegion) {
     auto maybeBuilder =
         iree_compiler::IREE::Flow::getWorkloadBuilder(rewriter, op);

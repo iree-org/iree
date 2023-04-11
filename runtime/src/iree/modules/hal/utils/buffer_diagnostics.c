@@ -43,7 +43,8 @@ iree_status_t iree_hal_modules_buffer_assert(
   iree_hal_memory_type_t actual_memory_type =
       iree_hal_buffer_memory_type(buffer);
   if (!iree_all_bits_set(actual_memory_type, required_memory_types)) {
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+#if ((IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0) && \
+    IREE_HAL_MODULE_STRING_UTIL_ENABLE
     iree_bitfield_string_temp_t temp0, temp1;
     iree_string_view_t actual_memory_type_str =
         iree_hal_memory_type_format(actual_memory_type, &temp0);
@@ -72,7 +73,8 @@ iree_status_t iree_hal_modules_buffer_assert(
   iree_hal_buffer_usage_t actual_buffer_usage =
       iree_hal_buffer_allowed_usage(buffer);
   if (!iree_all_bits_set(actual_buffer_usage, required_buffer_usage)) {
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+#if ((IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0) && \
+    IREE_HAL_MODULE_STRING_UTIL_ENABLE
     iree_bitfield_string_temp_t temp0, temp1;
     iree_string_view_t allowed_usage_str =
         iree_hal_buffer_usage_format(actual_buffer_usage, &temp0);
@@ -168,7 +170,8 @@ iree_status_t iree_hal_modules_buffer_view_assert(
       iree_hal_buffer_view_element_type(buffer_view);
   if (!iree_hal_element_types_are_compatible(actual_element_type,
                                              expected_element_type)) {
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+#if ((IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0) && \
+    IREE_HAL_MODULE_STRING_UTIL_ENABLE
     char actual_element_type_str[32];
     iree_host_size_t actual_element_type_str_length = 0;
     char expected_element_type_str[32];
@@ -204,9 +207,11 @@ iree_status_t iree_hal_modules_buffer_view_assert(
   if (actual_shape_rank != expected_shape_rank) {
     shape_status = iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "%.*s shape rank mismatch; expected %" PRIhsz " but have %" PRIhsz,
+        "%.*s shape rank mismatch; expected %" PRIhsz "%s but have %" PRIhsz
+        "%s",
         (int)message_str.size, message_str.data, expected_shape_rank,
-        actual_shape_rank);
+        expected_shape_rank == 0 ? " (scalar)" : "", actual_shape_rank,
+        actual_shape_rank == 0 ? " (scalar)" : "");
   }
   if (iree_status_is_ok(shape_status)) {
     for (iree_host_size_t i = 0; i < actual_shape_rank; ++i) {
@@ -222,7 +227,8 @@ iree_status_t iree_hal_modules_buffer_view_assert(
     }
   }
 
-#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+#if ((IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0) && \
+    IREE_HAL_MODULE_STRING_UTIL_ENABLE
   if (!iree_status_is_ok(shape_status)) {
     char actual_shape_str[32];
     iree_host_size_t actual_shape_str_length = 0;
@@ -235,7 +241,7 @@ iree_status_t iree_hal_modules_buffer_view_assert(
         expected_shape_rank, expected_shape_dims, sizeof(expected_shape_str),
         expected_shape_str, &expected_shape_str_length));
     shape_status = iree_status_annotate_f(
-        shape_status, "expected shape %.*s, actual shape %.*s",
+        shape_status, "expected shape `%.*s`, actual shape `%.*s`",
         (int)expected_shape_str_length, expected_shape_str,
         (int)actual_shape_str_length, actual_shape_str);
   }

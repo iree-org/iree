@@ -18,7 +18,7 @@ transform.sequence failures(propagate) {
     ( mapping = [#gpu.block<x>] )
   
   %func = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-  %func_1 = transform.iree.apply_patterns %func { bubble_expand }
+  transform.iree.apply_patterns %func { bubble_expand } : (!pdl.operation) -> ()
 
   // Excessively eager canonicalization results in `fill`s being "fused" due to
   // swapping with `extract_slice`, which confuses the fusion operation below.
@@ -55,7 +55,7 @@ transform.sequence failures(propagate) {
   
   // Step 3. Rank-reduce.
   // ===========================================================================
-  %func_2 = transform.iree.apply_patterns %func_1 {  rank_reducing_linalg, rank_reducing_vector }
+  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
 
   // We don't perform any following transformation (vectorization, bufferizaton,
   // mapping) because this schedule is applied to Linalg-only code without the

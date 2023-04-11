@@ -21,11 +21,11 @@ class Android_Mali_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.VULKAN_SPIRV,
       target_architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
       target_abi=iree_definitions.TargetABI.VULKAN_ANDROID31)
-  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_VALHALL_MALI_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[VALHALL_MALI_GPU_TARGET])
-  FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_VALHALL_MALI_FUSE_PADDING,
       tags=["experimental-flags", "fuse-padding"],
       compile_targets=[VALHALL_MALI_GPU_TARGET],
@@ -38,7 +38,7 @@ class Android_Mali_Benchmarks(object):
   # INTERNAL; VK_ERROR_DEVICE_LOST; vkQueueSubmit; while invoking native function
   # hal.ex.submit_and_wait; while calling import;
   # ```
-  FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.
       IREE_COMPILE_CONFIG_ANDROID_VALHALL_MALI_FUSE_PADDING_REPEATED_KERNEL,
       tags=["experimental-flags", "fuse-padding", "repeated-kernel"],
@@ -107,24 +107,24 @@ class Android_Mali_Benchmarks(object):
       fp16_models: Sequence[common_definitions.Model],
       quant_models: Sequence[common_definitions.Model]
   ) -> List[iree_definitions.ModuleGenerationConfig]:
-    demote_compile_config = iree_definitions.CompileConfig(
+    demote_compile_config = iree_definitions.CompileConfig.build(
         id=compile_config.id + "-demote-f32-to-16",
         tags=compile_config.tags + ["demote-f32-to-f16"],
         compile_targets=compile_config.compile_targets,
         extra_flags=compile_config.extra_flags +
         ["--iree-flow-demote-f32-to-f16"])
     return [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in fp32_models
     ] + [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=demote_compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in fp16_models
     ] + [
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=compile_config,
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in quant_models

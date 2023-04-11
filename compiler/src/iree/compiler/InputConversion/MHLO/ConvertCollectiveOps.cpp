@@ -172,7 +172,8 @@ struct ReplicaIdOpConversion : public OpConversionPattern<mhlo::ReplicaIdOp> {
       mhlo::ReplicaIdOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+        loc, /*group=*/StringAttr{});
     auto rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
     auto resultType = op.getType().cast<RankedTensorType>();  // tensor<ui32>
     auto elemType = resultType.getElementType();
@@ -201,7 +202,8 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
     auto loc = op.getLoc();
 
     // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+        loc, /*group=*/StringAttr{});
 
     // Get the collective element type attribute.
     auto resultType = op.getResult().getType().cast<RankedTensorType>();
@@ -305,7 +307,8 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
     auto loc = op.getLoc();
 
     // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+        loc, /*group=*/StringAttr{});
 
     // Convert mhlo reduction op into flow reduction op.
     auto reductionOpAttr =
@@ -384,7 +387,8 @@ struct ReduceScatterOpConversion
     auto loc = op.getLoc();
 
     // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(loc);
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+        loc, /*group=*/StringAttr{});
 
     // Get the collective element type attribute.
     auto resultType = op.getResult().getType().cast<RankedTensorType>();

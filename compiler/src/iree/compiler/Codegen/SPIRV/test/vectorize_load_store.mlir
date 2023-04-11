@@ -37,7 +37,7 @@ func.func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 
 // -----
 
-// CHECK-LABEL: func.func @resource_copy
+// CHECK-LABEL: func.func @resource_copy()
 //     CHECK: %[[A:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[B:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
@@ -52,6 +52,28 @@ func.func @resource_copy() {
   %v = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf32>, vector<1x4xf32>
   vector.transfer_write %v, %1[%c0, %c0] : vector<1x4xf32>, memref<4096x4096xf32>
   %mat = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x4096xf32>, vector<32x8xf32>
+  vector.transfer_write %mat, %1[%c0, %c0] : vector<32x8xf32>, memref<4096x4096xf32>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @resource_copy_with_offset()
+//     CHECK: %[[A:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%{{.*}}) : memref<2048x4096x1024xvector<4xf32>, strided<[4194304, 1024, 1], offset: ?>>
+//     CHECK: %[[B:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<4096x1024xvector<4xf32>>
+//     CHECK: %[[V:.+]] = memref.load %[[A]][%{{.*}}, %{{.*}}, %{{.*}}] : memref<2048x4096x1024xvector<4xf32>, strided<[4194304, 1024, 1], offset: ?>>
+//     CHECK: memref.store %[[V]], %[[B]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
+//     CHECK: %[[MAT:.+]] = vector.transfer_read %[[A]][%{{.*}}, %{{.*}}, %{{.*}}], %{{.*}} : memref<2048x4096x1024xvector<4xf32>, strided<[4194304, 1024, 1], offset: ?>>, vector<32x8xf32>
+//     CHECK: vector.transfer_write %[[MAT]], %[[B]][%{{.*}}, %{{.*}}] {{.*}} : vector<32x8xf32>, memref<4096x1024xvector<4xf32>>
+func.func @resource_copy_with_offset() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %offset = hal.interface.constant.load[0] : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<2048x4096x4096xf32, strided<[16777216, 4096, 1], offset: ?>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<4096x4096xf32>
+  %v = vector.transfer_read %0[%c0, %c0, %c0], %cst : memref<2048x4096x4096xf32, strided<[16777216, 4096, 1], offset: ?>>, vector<1x4xf32>
+  vector.transfer_write %v, %1[%c0, %c0] : vector<1x4xf32>, memref<4096x4096xf32>
+  %mat = vector.transfer_read %0[%c0, %c0, %c0], %cst : memref<2048x4096x4096xf32, strided<[16777216, 4096, 1], offset: ?>>, vector<32x8xf32>
   vector.transfer_write %mat, %1[%c0, %c0] : vector<32x8xf32>, memref<4096x4096xf32>
   return
 }
@@ -358,3 +380,42 @@ func.func @vectorize_alloc_with_mma_load_store_unaligned_case(%i0: index, %i1: i
 // CHECK-SAME:   leadDimension = 18 : index
 //      CHECK: gpu.subgroup_mma_store_matrix
 // CHECK-SAME:   leadDimension = 18 : index
+
+// -----
+
+// CHECK-LABEL: func.func @scalarize_vector_load_op
+//  CHECK-SAME: (%[[ARG0:.+]]: index)
+func.func @scalarize_vector_load_op(%i: index) -> vector<4xi32> {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<10x10xi32>
+  %1 = vector.load %0[%c0, %i] : memref<10x10xi32>, vector<4xi32>
+  return %1: vector<4xi32>
+}
+
+// CHECK: %[[INIT:.+]] = arith.constant dense<0> : vector<4xi32>
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+// CHECK: %[[LD0:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[ARG0]]] : memref<10x10xi32>
+// CHECK: %[[INSERT0:.+]] = vector.insert %[[LD0]], %[[INIT]] [0] : i32 into vector<4xi32>
+// CHECK: %[[IDX1:.+]] = affine.apply affine_map<()[s0] -> (s0 + 1)>()[%[[ARG0]]]
+// CHECK: %[[LD1:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[IDX1]]] : memref<10x10xi32>
+// CHECK: %[[INSERT1:.+]] = vector.insert %[[LD1]], %[[INSERT0]] [1] : i32 into vector<4xi32>
+// CHECK: %[[IDX2:.+]] = affine.apply affine_map<()[s0] -> (s0 + 2)>()[%[[ARG0]]]
+// CHECK: %[[LD2:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[IDX2]]] : memref<10x10xi32>
+// CHECK: %[[INSERT2:.+]] = vector.insert %[[LD2]], %[[INSERT1]] [2] : i32 into vector<4xi32>
+// CHECK: %[[IDX3:.+]] = affine.apply affine_map<()[s0] -> (s0 + 3)>()[%[[ARG0]]]
+// CHECK: %[[LD3:.+]] = memref.load %[[SUBSPAN]][%[[C0]], %[[IDX3]]] : memref<10x10xi32>
+// CHECK: %[[INSERT3:.+]] = vector.insert %[[LD3]], %[[INSERT2]] [3] : i32 into vector<4xi32>
+// CHECK: return %[[INSERT3]]
+
+// -----
+
+// Test that the memref is not vectorized if the element type is a complex type.
+
+// CHECK-LABEL: func.func @complex_memref
+func.func @complex_memref(%x: index, %y: index) -> complex<f32> {
+  // CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x32xcomplex<f32>>
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x32xcomplex<f32>>
+  %1 = memref.load %0[%x, %y] : memref<8x32xcomplex<f32>>
+  return %1: complex<f32>
+}

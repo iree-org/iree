@@ -48,15 +48,17 @@ void registerMHLOConversionPassPipeline() {
       [](OpPassManager &passManager) {
         buildMHLOInputConversionPassPipeline(passManager);
       });
-  PassPipelineRegistration<> xla("iree-mhlo-xla-cleanup-pipeline",
-                                 "Runs the post-XLA import cleanup pipeline",
-                                 [](OpPassManager &passManager) {
-                                   buildXLACleanupPassPipeline(passManager);
-                                 });
+  PassPipelineRegistration<> xla(
+      "iree-xla-input-transformation-pipeline",
+      "Runs the XLA IREE flow dialect transformation pipeline",
+      [](OpPassManager &passManager) {
+        buildXLAInputConversionPassPipeline(passManager);
+      });
 }
 
 // Prepare HLO for use as an input to the Flow dialect.
-void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
+static void buildMHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
+                                                     bool detuple) {
   passManager.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(
@@ -66,6 +68,7 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
   passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
+  if (detuple) passManager.addPass(createFlattenTuplesInCFGPass());
 
   passManager.addNestedPass<func::FuncOp>(createMHLOToMHLOPreprocessingPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
@@ -119,11 +122,12 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createVerifyCompilerMHLOInputLegality());
 }
 
-void buildXLACleanupPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<func::FuncOp>(
-      mhlo::createLegalizeControlFlowPass());
-  passManager.addPass(createFlattenTuplesInCFGPass());
-  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
+void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
+  buildMHLOInputConversionPassPipelineImpl(passManager, /*detuple=*/false);
+}
+
+void buildXLAInputConversionPassPipeline(OpPassManager &passManager) {
+  buildMHLOInputConversionPassPipelineImpl(passManager, /*detuple=*/true);
 }
 
 namespace {

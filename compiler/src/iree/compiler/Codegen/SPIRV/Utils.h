@@ -27,13 +27,10 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 /// Given a FuncOp, returns the subgroup size to use for CodeGen, by first
 /// querying the hal.executable.export op, and then the SPIR-V target
 /// environment. Returns std::nullopt on failures.
-llvm::Optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp);
+std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp);
 
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
-
-/// Returns true if the given MemRef is in workgroup memory.
-bool isInWorkgroupMemory(MemRefType memrefType);
 
 /// Returns the tile sizes at the given `tilingLevel` for compute ops in
 /// `funcOp`.

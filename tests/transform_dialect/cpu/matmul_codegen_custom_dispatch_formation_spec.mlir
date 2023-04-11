@@ -11,14 +11,14 @@ transform.sequence failures(propagate) {
 
   // Canonicalization/CSE is needed before bufferization otherwise unnecessary
   // allocs will be created.
-  %variant_op_2 = transform.iree.apply_patterns %variant_op 
-    { canonicalization, tiling_canonicalization, cse }
-  %variant_op_3 = transform.iree.bufferize %variant_op_2
+  transform.iree.apply_patterns %variant_op 
+    { canonicalization, tiling_canonicalization, cse } : (!pdl.operation) -> ()
+  %variant_op_3 = transform.iree.bufferize %variant_op : (!pdl.operation) -> (!pdl.operation)
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!pdl.operation) -> !pdl.operation
-  %memref_func_2 = transform.iree.erase_hal_descriptor_type_from_memref %memref_func
-  %memref_func_3 = transform.iree.forall_to_workgroup %memref_func_2
+  transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!pdl.operation) -> ()
+  transform.iree.forall_to_workgroup %memref_func : (!pdl.operation) -> ()
 
   // CSE is needed on the workgroup_count region to pass this particular test.
-  transform.iree.apply_patterns %variant_op_3 { cse }
+  transform.iree.apply_patterns %variant_op_3 { cse } : (!pdl.operation) -> ()
 }

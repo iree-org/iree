@@ -27,9 +27,9 @@ static StringRef getRegionName(Region &region) {
 // Returns the remapped successor operand index if the branch operand is
 // passed to a successor (vs being used by the op itself, such as the cond_br
 // condition).
-static llvm::Optional<unsigned> mapSuccessorOperand(BranchOpInterface branchOp,
-                                                    unsigned successorIdx,
-                                                    unsigned operandIdx) {
+static std::optional<unsigned> mapSuccessorOperand(BranchOpInterface branchOp,
+                                                   unsigned successorIdx,
+                                                   unsigned operandIdx) {
   // I don't know if there's a better way to do this - the interface doesn't
   // help.
   auto operandRange = branchOp.getSuccessorOperands(successorIdx);

@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -42,7 +44,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  Optional<int64_t> numLoops;
+  std::optional<int64_t> numLoops;
   funcOp.walk([&](vector::ContractionOp op) {
     if (numLoops) return signalPassFailure();
     numLoops = op.getIndexingMapsArray()[0].getNumDims();
@@ -60,7 +62,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs()
           << "\n--- After folding consumer add ops into contraction op "
              "iteself ---\n";
@@ -117,7 +119,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
                                             std::move(vectorUnrollPatterns)))) {
       return signalPassFailure();
     }
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After vector unrolling ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
@@ -134,10 +136,9 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
     RewritePatternSet vectorContractLoweringPatterns(&getContext());
-    vectorContractLoweringPatterns.insert<
-        vector::ContractionOpToOuterProductOpLowering,
-        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
-        vectorTransformsOptions, context);
+    vector::populateVectorContractLoweringPatterns(
+        vectorContractLoweringPatterns, vectorTransformsOptions, /*benefit=*/1,
+        /*disableOuterProductLowering=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
     if (failed(applyPatternsAndFoldGreedily(
@@ -145,7 +146,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After vector specific operatrion lowering ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";

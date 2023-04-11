@@ -21,6 +21,32 @@ extern "C" {
 
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREEInput, iree_input);
 
+//===--------------------------------------------------------------------===//
+// IREELinalgExt
+//===--------------------------------------------------------------------===//
+
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREELinalgExt, iree_linalg_ext);
+
+//===--------------------------------------------------------------------===//
+// LinalgTransform
+//===--------------------------------------------------------------------===//
+
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(LinalgTransform, iree_linalg_transform);
+
+/// Register all passes for LinalgTransform.
+MLIR_CAPI_EXPORTED void mlirIREELinalgTransformRegisterPasses();
+
+//===--------------------------------------------------------------------===//
+// TransformDialect
+//===--------------------------------------------------------------------===//
+
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Transform, transform);
+
+MLIR_CAPI_EXPORTED void ireeRegisterTransformExtensions(MlirContext context);
+
+/// Register all passes for the transform dialect.
+MLIR_CAPI_EXPORTED void mlirIREETransformRegisterPasses();
+
 #ifdef __cplusplus
 }
 #endif

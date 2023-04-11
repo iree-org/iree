@@ -7,7 +7,7 @@
 """Collect compilation statistics from benchmark suites.
 
 The benchmark suites need to be built with ninja and enable the CMake option
-IREE_ENABLE_COMPILATION_BENCHMARKS.
+IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS.
 """
 
 import pathlib
@@ -97,9 +97,19 @@ def get_module_component_info(module: BinaryIO,
     size_map = dict(
         (info.filename, info.file_size) for info in module_zipfile.infolist())
 
-  vm_component_bytes = size_map[VM_COMPONENT_NAME]
-  const_component_bytes = size_map[CONST_COMPONENT_NAME]
-  identified_names = {VM_COMPONENT_NAME, CONST_COMPONENT_NAME}
+  identified_names = set()
+  if VM_COMPONENT_NAME in size_map:
+    vm_component_bytes = size_map[VM_COMPONENT_NAME]
+    identified_names.add(VM_COMPONENT_NAME)
+  else:
+    vm_component_bytes = 0
+
+  if CONST_COMPONENT_NAME in size_map:
+    const_component_bytes = size_map[CONST_COMPONENT_NAME]
+    identified_names.add(CONST_COMPONENT_NAME)
+  else:
+    const_component_bytes = 0
+
   total_dispatch_component_bytes = 0
   for filename, size in size_map.items():
     for pattern in DISPATCH_COMPONENT_PATTERNS:
@@ -152,6 +162,7 @@ def get_module_map_from_compilation_benchmark_config(
           (f"{arch.type.value}-{arch.architecture}-{arch.microarchitecture}-"
            f"{compile_target.target_abi.value}"))
     compilation_info = CompilationInfo(
+        name=gen_config.name,
         model_name=model.name,
         model_tags=tuple(model.tags),
         model_source=model.source_type.value,
@@ -186,7 +197,7 @@ def get_module_map_from_benchmark_suite(
       if module_path is None:
         raise RuntimeError(
             f"Can't find the module file in the flagfile: {flag_file_path}")
-      compilation_info = CompilationInfo(
+      compilation_info = CompilationInfo.build_with_legacy_name(
           model_name=benchmark_case.model_name,
           model_tags=tuple(benchmark_case.model_tags),
           model_source=category,

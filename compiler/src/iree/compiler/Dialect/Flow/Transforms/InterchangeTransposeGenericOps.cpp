@@ -37,7 +37,7 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
       return rewriter.notifyMatchFailure(genericOp, "not elementwise");
     }
 
-    Optional<AffineMap> mapForInterchange;
+    std::optional<AffineMap> mapForInterchange;
 
     for (auto operand : genericOp.getDpsInputOperands()) {
       auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();

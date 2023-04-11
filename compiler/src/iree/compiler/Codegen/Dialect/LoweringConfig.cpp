@@ -191,7 +191,7 @@ LogicalResult LoweringConfigAttr::verify(
 CompilationInfoAttr CompilationInfoAttr::get(
     MLIRContext *context, LoweringConfigAttr configAttr,
     TranslationInfoAttr translationInfo, ArrayRef<int64_t> workgroupSize,
-    llvm::Optional<int64_t> subgroupSize) {
+    std::optional<int64_t> subgroupSize) {
   ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
   return get(context, configAttr, translationInfo, workgroupSizeAttr,
              subgroupSize);
@@ -200,7 +200,7 @@ CompilationInfoAttr CompilationInfoAttr::get(
 LogicalResult CompilationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     LoweringConfigAttr loweringConfig, TranslationInfoAttr translationInfo,
-    ArrayAttr workgroupSize, llvm::Optional<int64_t> subgroupSize) {
+    ArrayAttr workgroupSize, std::optional<int64_t> subgroupSize) {
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
@@ -259,14 +259,14 @@ IREE::Codegen::TranslationInfoAttr getTranslationInfo(
 }
 
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
-  if (Optional<ArrayAttr> workgroupSizeAttrList = exportOp.getWorkgroupSize()) {
+  if (std::optional<ArrayAttr> workgroupSizeAttrList =
+          exportOp.getWorkgroupSize()) {
     return getIntegerVals(*workgroupSizeAttrList);
   }
   return {};
 }
 
-llvm::Optional<int64_t> getSubgroupSize(
-    IREE::HAL::ExecutableExportOp exportOp) {
+std::optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
   if (IntegerAttr attr = exportOp.getSubgroupSizeAttr()) {
     return attr.getValue().getSExtValue();
   }
@@ -275,7 +275,7 @@ llvm::Optional<int64_t> getSubgroupSize(
 
 LogicalResult setDispatchConfig(func::FuncOp entryPoint,
                                 ArrayRef<int64_t> workgroupSize,
-                                llvm::Optional<int64_t> subgroupSize) {
+                                std::optional<int64_t> subgroupSize) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
   if (failed(exportOp)) return failure();
   MLIRContext *context = exportOp->getContext();

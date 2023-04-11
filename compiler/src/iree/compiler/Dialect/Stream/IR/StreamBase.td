@@ -227,7 +227,7 @@ def Stream_CollectiveAttr :
   }];
   let parameters = (ins
     AttrParameter<"CollectiveKind", "">:$kind,
-    OptionalParameter<"mlir::Optional<CollectiveReductionOp>">:$reduction,
+    OptionalParameter<"std::optional<CollectiveReductionOp>">:$reduction,
     AttrParameter<"CollectiveElementType", "">:$element_type
   );
   let assemblyFormat = [{

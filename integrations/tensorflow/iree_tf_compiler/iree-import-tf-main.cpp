@@ -250,7 +250,10 @@ int main(int argc, char **argv) {
   {
     PassManager pm(&context, module.get()->getName().getStringRef(),
                    PassManager::Nesting::Implicit);
-    applyPassManagerCLOptions(pm);
+    if (failed(applyPassManagerCLOptions(pm))) {
+      llvm::errs() << "Failed to apply pass manager CL options\n";
+      return 1;
+    }
 
     if (prettifyTfDebugInfo) {
       pm.addPass(iree_integrations::TF::createPrettifyDebugInfoPass());

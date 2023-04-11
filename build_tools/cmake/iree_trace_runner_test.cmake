@@ -28,7 +28,7 @@ include(CMakeParseArguments)
 #       generated IREE module (.vmfb). Mandatory, unlike in iree_check_test,
 #       because trace files (.yaml) reference a specific module file path.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvm-target-cpu-features.
+#       --iree-llvmcpu-target-cpu-features.
 function(iree_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -123,7 +123,7 @@ endfunction()
 #       "driver=${DRIVER}" are added automatically.
 #   TRACE_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvm-target-cpu-features.
+#       --iree-llvmcpu-target-cpu-features.
 function(iree_single_backend_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -277,8 +277,8 @@ endfunction()
 #   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Only used
 #       for drivers that vary based on the target CPU features. For each list
 #       element, a separate test is created, with the list element passed as
-#       argument to --iree-llvm-target-cpu-features. The special value "default"
-#       is interpreted as no --iree-llvm-target-cpu-features flag to work around
+#       argument to --iree-llvmcpu-target-cpu-features. The special value "default"
+#       is interpreted as no --iree-llvmcpu-target-cpu-features flag to work around
 #       corner cases with empty entries in CMake lists.
 function(iree_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)

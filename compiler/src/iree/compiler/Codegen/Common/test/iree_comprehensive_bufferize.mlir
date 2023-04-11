@@ -194,8 +194,8 @@ func.func @elementwise() {
 //      CHECK: func.func @elementwise()
 //  CHECK-DAG:   %[[CST_TENSOR:.+]] = arith.constant dense_resource<__elided__> : tensor<1x10xf32>
 //  CHECK-DAG:   %[[CST_BUF:.+]] = bufferization.to_memref %[[CST_TENSOR]]
-//  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(0) {{.+}} : memref<1x10xf32, #hal.descriptor_type<storage_buffer>>
-//  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(1) {{.+}} : memref<1x10xf32, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(0) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: 128>, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(1) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: 16>, #hal.descriptor_type<storage_buffer>>
 //      CHECK:   scf.for
 //  CHECK-DAG:     %[[SUB_IN1:.+]] = memref.subview %[[IN_BUF]]
 //  CHECK-DAG:     %[[SUB_OUT1:.+]] = memref.subview %[[OUT_BUF]]
@@ -2481,8 +2481,8 @@ module {
 }
 
 // CHECK: func.func @reduction_ew
-// CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c5120) : memref<1001xf32, #hal.descriptor_type<storage_buffer>>
-// CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c5120) : memref<1x1001xf32, #hal.descriptor_type<storage_buffer>>
+// CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c5120) : memref<1001xf32, strided<[1], offset: 1280>, #hal.descriptor_type<storage_buffer>>
+// CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c5120) : memref<1x1001xf32, strided<[1001, 1], offset: 1280>, #hal.descriptor_type<storage_buffer>>
 // CHECK: hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1x1001xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----

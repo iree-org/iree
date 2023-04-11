@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -19,20 +20,12 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Flag defined in Passes.cpp.
-extern llvm::cl::opt<bool> llvmgpuUseMMASync;
-
 static void swizzleSharedMemory(func::FuncOp funcOp) {
   SmallVector<memref::AllocOp> shmAllocOps;
   funcOp->walk([&](memref::AllocOp allocOp) {
-    auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
-    auto addressSpaceAttr =
-        memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
     // Only apply it to shared memory of input operands.
-    if (!addressSpaceAttr ||
-        addressSpaceAttr.getValue() !=
-            gpu::GPUDialect::getWorkgroupAddressSpace() ||
-        memrefType.getRank() < 3) {
+    if (!hasSharedMemoryAddressSpace(allocOp.getType()) ||
+        allocOp.getType().getRank() < 3) {
       return;
     }
     shmAllocOps.push_back(allocOp);
@@ -46,6 +39,8 @@ static void swizzleSharedMemory(func::FuncOp funcOp) {
 namespace {
 struct LLVMGPUVectorToGPUPass
     : public LLVMGPUVectorToGPUBase<LLVMGPUVectorToGPUPass> {
+  LLVMGPUVectorToGPUPass(GPUTensorCoreType tensorCoreType)
+      : tensorCoreType(tensorCoreType) {}
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect, AffineDialect,
                     memref::MemRefDialect>();
@@ -53,6 +48,7 @@ struct LLVMGPUVectorToGPUPass
 
   void runOnOperation() override {
     auto funcOp = getOperation();
+    bool targetMmaSync = tensorCoreType == GPUTensorCoreType::MMA_SYNC;
     RewritePatternSet flatternpatterns(funcOp.getContext());
     populateVectorTransferToGPUMMAPreparationPatterns(flatternpatterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
@@ -62,14 +58,14 @@ struct LLVMGPUVectorToGPUPass
 
     RewritePatternSet patterns(funcOp.getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-    populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
+    populatePrepareVectorToMMAPatterns(patterns, targetMmaSync);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
     }
 
     IRRewriter rewriter(&getContext());
-    if (llvmgpuUseMMASync) {
+    if (targetMmaSync) {
       if (failed(convertVectorToNVVMCompatibleMMASync(rewriter, funcOp))) {
         return signalPassFailure();
       }
@@ -86,17 +82,21 @@ struct LLVMGPUVectorToGPUPass
         return signalPassFailure();
       }
     }
-    createAsyncGroups(funcOp, llvmgpuUseMMASync);
+    createAsyncGroups(rewriter, funcOp, targetMmaSync);
 
-    if (llvmgpuUseMMASync) {
+    if (targetMmaSync) {
       swizzleSharedMemory(funcOp);
     }
   }
+
+ private:
+  GPUTensorCoreType tensorCoreType;
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU() {
-  return std::make_unique<LLVMGPUVectorToGPUPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU(
+    GPUTensorCoreType tensorCoreType) {
+  return std::make_unique<LLVMGPUVectorToGPUPass>(tensorCoreType);
 }
 
 }  // namespace iree_compiler

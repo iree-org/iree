@@ -39,7 +39,7 @@ namespace iree_compiler {
 
 /// Returns the legal element type to use instead of the passed in element type.
 /// If the type is already legal, returns std::nullopt.
-static Optional<Type> getLegalizedElementType(Type elementType) {
+static std::optional<Type> getLegalizedElementType(Type elementType) {
   if (auto intType = elementType.dyn_cast<IntegerType>()) {
     unsigned bitWidth = intType.getWidth();
     unsigned byteAlignedBitWidth =
@@ -69,10 +69,11 @@ static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
 
 /// Legalizes the given type. If the type is already legal, returns
 /// std::nullopt.
-static Optional<Type> getLegalizedType(Type t) {
+static std::optional<Type> getLegalizedType(Type t) {
   if (auto shapedType = t.dyn_cast<RankedTensorType>()) {
     Type elementType = shapedType.getElementType();
-    Optional<Type> legalizedElementType = getLegalizedElementType(elementType);
+    std::optional<Type> legalizedElementType =
+        getLegalizedElementType(elementType);
     if (!legalizedElementType) return std::nullopt;
     return RankedTensorType::get(shapedType.getShape(),
                                  legalizedElementType.value(),
@@ -116,7 +117,7 @@ struct ConstantOpTypeConversion
       return rewriter.notifyMatchFailure(
           constantOp, "expected attribute type to be shaped type");
     }
-    Optional<Type> legalizedElementType =
+    std::optional<Type> legalizedElementType =
         getLegalizedElementType(attrType.getElementType());
     if (!legalizedElementType) {
       return rewriter.notifyMatchFailure(constantOp,
@@ -223,7 +224,7 @@ struct GenericOpTypePropagation
         signatureConverter.addInputs(index, argType);
         continue;
       }
-      Optional<Type> legalizedArgType = getLegalizedElementType(argType);
+      std::optional<Type> legalizedArgType = getLegalizedElementType(argType);
       if (!legalizedArgType) {
         return genericOp.emitOpError("failed to get legalized type for arg ")
                << index;
@@ -268,7 +269,7 @@ struct GenericOpTypePropagation
           modifyYield = true;
           OpOperand *yieldOperand =
               modifiedOp.getMatchingYieldValue(modifiedOpOperand);
-          Optional<Type> legalizedType =
+          std::optional<Type> legalizedType =
               getLegalizedElementType(yieldOperand->get().getType());
           if (!legalizedType) {
             return genericOp.emitOpError(
@@ -298,7 +299,7 @@ struct LinalgFillTypePropagation
       linalg::FillOp fillOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     Value value = adaptor.getInputs().front();
-    Optional<Type> legalizedElementType =
+    std::optional<Type> legalizedElementType =
         getLegalizedElementType(value.getType());
     if (!legalizedElementType) {
       return fillOp.emitOpError("failed to get legalized type for value");
@@ -377,13 +378,13 @@ struct LegalizeResultElementType : public ConversionPattern {
 
     // Move all the regions from the old op to the new op and legalize its
     // signature.
-    for (auto &[index, region] : llvm::enumerate(op->getRegions())) {
+    for (const auto &[index, region] : llvm::enumerate(op->getRegions())) {
       Region &newOpRegion = newOp->getRegion(index);
       rewriter.inlineRegionBefore(region, newOpRegion, newOpRegion.begin());
       TypeConverter::SignatureConversion signatureConverter(
           newOpRegion.getNumArguments());
       bool doSignatureConversion = false;
-      for (auto &[argIndex, arg] :
+      for (const auto &[argIndex, arg] :
            llvm::enumerate(newOpRegion.getArguments())) {
         Type argType = arg.getType();
         Type legalizedType = this->typeConverter->convertType(argType);
@@ -413,7 +414,10 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
         ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
         ForwardSourceType<arith::TruncIOp>, GenericOpTypePropagation,
         LinalgFillTypePropagation, LegalizeResultElementType,
-        NamedOpTypePropagation<linalg::MatmulOp>, TensorExtractTypePropagation>(
+        NamedOpTypePropagation<linalg::BatchMatmulOp>,
+        NamedOpTypePropagation<linalg::MatmulOp>,
+        NamedOpTypePropagation<linalg::MatvecOp>,
+        NamedOpTypePropagation<linalg::DotOp>, TensorExtractTypePropagation>(
         typeConverter, context);
 
     ConversionTarget target(*context);

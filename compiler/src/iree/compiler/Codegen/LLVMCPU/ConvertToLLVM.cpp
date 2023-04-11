@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -44,9 +45,11 @@
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -333,20 +336,20 @@ static InstrumentationEntry acquireInstrumentationEntry(Location loc,
 
   Value offsetIndex =
       builder.create<LLVM::ConstantOp>(loc, i64Type, headOffset);
-  Value offsetPtr =
-      builder.create<LLVM::GEPOp>(loc, basePtr.getType(), basePtr, offsetIndex,
-                                  /*inbounds=*/true);
-  Value offsetPtrI64 = builder.create<LLVM::BitcastOp>(
-      loc, LLVM::LLVMPointerType::get(i64Type), offsetPtr);
+  Value offsetPtr = builder.create<LLVM::GEPOp>(
+      loc, basePtr.getType(), LLVM::LLVMPointerType::get(builder.getContext()),
+      basePtr, offsetIndex,
+      /*inbounds=*/true);
   Value rawOffset = builder.create<LLVM::AtomicRMWOp>(
-      loc, LLVM::AtomicBinOp::add, offsetPtrI64, entrySize,
+      loc, LLVM::AtomicBinOp::add, offsetPtr, entrySize,
       LLVM::AtomicOrdering::monotonic);
   Value offsetMask =
       builder.create<LLVM::ConstantOp>(loc, i64Type, ringSize - 1);
   Value wrappedOffset = builder.create<LLVM::AndOp>(loc, rawOffset, offsetMask);
 
-  Value entryPtr = builder.create<LLVM::GEPOp>(loc, basePtr.getType(), basePtr,
-                                               wrappedOffset);
+  Value entryPtr = builder.create<LLVM::GEPOp>(
+      loc, basePtr.getType(), LLVM::LLVMPointerType::get(builder.getContext()),
+      basePtr, wrappedOffset);
 
   return {basePtr, entryPtr, wrappedOffset};
 }
@@ -370,7 +373,8 @@ static InstrumentationEntry appendInstrumentationEntry(
   builder.create<LLVM::StoreOp>(
       loc, entryStruct,
       builder.create<LLVM::BitcastOp>(
-          loc, LLVM::LLVMPointerType::get(entryType), entry.entryPtr),
+          loc, LLVM::LLVMPointerType::get(builder.getContext()),
+          entry.entryPtr),
       /*alignment=*/16);
 
   return entry;
@@ -447,9 +451,9 @@ struct ConvertHALInstrumentWorkgroupOp
   }
 };
 
-static Optional<uint64_t> mapValueType(Type type) {
-  return TypeSwitch<Type, Optional<uint64_t>>(type)
-      .Case<IntegerType>([&](Type type) -> Optional<uint64_t> {
+static std::optional<uint64_t> mapValueType(Type type) {
+  return TypeSwitch<Type, std::optional<uint64_t>>(type)
+      .Case<IntegerType>([&](Type type) -> std::optional<uint64_t> {
         if (type.isUnsignedInteger()) {
           switch (type.getIntOrFloatBitWidth()) {
             case 8:
@@ -477,7 +481,7 @@ static Optional<uint64_t> mapValueType(Type type) {
             return std::nullopt;
         }
       })
-      .Case<FloatType>([&](Type type) -> Optional<uint64_t> {
+      .Case<FloatType>([&](Type type) -> std::optional<uint64_t> {
         if (type.isBF16()) {
           return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_BFLOAT_16;
         }
@@ -492,10 +496,10 @@ static Optional<uint64_t> mapValueType(Type type) {
             return std::nullopt;
         }
       })
-      .Case<IndexType>([&](Type type) -> Optional<uint64_t> {
+      .Case<IndexType>([&](Type type) -> std::optional<uint64_t> {
         return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_64;
       })
-      .Default([&](Type) -> Optional<uint64_t> { return std::nullopt; });
+      .Default([&](Type) -> std::optional<uint64_t> { return std::nullopt; });
 }
 
 struct ConvertHALInstrumentValueOp
@@ -508,7 +512,7 @@ struct ConvertHALInstrumentValueOp
     auto loc = instrumentOp.getLoc();
 
     // Only convert ops we can handle, otherwise warn and discard.
-    Optional<uint64_t> valueType;
+    std::optional<uint64_t> valueType;
     if (operands.getOperand().getType().isa<LLVM::LLVMPointerType>()) {
       valueType = IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_POINTER;
     } else {
@@ -819,12 +823,18 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
-    vector::populateVectorContractLoweringPatterns(patterns);
+    // TODO: doubtful that the "default" does what one want here, it is likely
+    // better to use outerproduct.
+    vector::populateVectorContractLoweringPatterns(
+        patterns, vector::VectorTransformsOptions());
     vector::populateVectorMaskMaterializationPatterns(
         patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
-    vector::populateVectorTransposeLoweringPatterns(patterns);
+    // TODO: doubtful that the "default" does what one want here, it is likely
+    // better to use shuffle.
+    vector::populateVectorTransposeLoweringPatterns(
+        patterns, vector::VectorTransformsOptions());
     populateConvertArmNeon2dToIntrPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {

@@ -181,6 +181,16 @@ func.func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.re
 
 // -----
 
+// CHECK-LABEL: @asyncDispatchNoInputs
+func.func @asyncDispatchNoInputs(%arg0: index) -> !stream.resource<*> {
+  %c1 = arith.constant 1 : index
+  // CHECK: = stream.async.dispatch @executable::@dispatch[%c1]() : () -> !stream.resource<*>{%arg0}
+  %0 = stream.async.dispatch @executable::@dispatch[%c1]() : () -> !stream.resource<*>{%arg0}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
 stream.executable private @executable {
   stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index) -> (index, index, index) {
     stream.return %arg0, %arg1, %arg0 : index, index, index
@@ -235,6 +245,19 @@ func.func @asyncDispatchNoWorkload(%arg0: !stream.resource<*>, %arg1: index) -> 
   // CHECK: = stream.async.dispatch @executable::@dispatch(%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   %0 = stream.async.dispatch @executable::@dispatch(%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   return %0 : !stream.resource<*>
+}
+
+// -----
+
+stream.async.func private @asyncExtern(%arg0: !stream.resource<*>, %arg1: index) -> %arg0
+
+// CHECK-LABEL: @asyncCall
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[SIZE0:.+]]: index)
+func.func @asyncCall(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: = stream.async.call @asyncExtern(%[[ARG0]][%c0 to %[[SIZE0]] for %[[SIZE0]]], %[[SIZE0]]) : (!stream.resource<*>{%[[SIZE0]]}, index) -> %[[ARG0]]{%[[SIZE0]]}
+  %call = stream.async.call @asyncExtern(%arg0[%c0 to %arg1 for %arg1], %arg1) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  return %call : !stream.resource<*>
 }
 
 // -----

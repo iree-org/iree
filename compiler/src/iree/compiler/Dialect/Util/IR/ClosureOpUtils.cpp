@@ -228,7 +228,7 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
   // Build data structure for unused operand elision.
   SmallVector<unsigned, 4> elidedOperands;
   llvm::SmallMapVector<Value, BlockArgument, 8> argToBlockMap;
-  SmallVector<llvm::Optional<BlockArgument>, 8> blockArgReplacements(
+  SmallVector<std::optional<BlockArgument>, 8> blockArgReplacements(
       entryBlock.getNumArguments());
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto blockArg = entryBlock.getArgument(opArg.index());

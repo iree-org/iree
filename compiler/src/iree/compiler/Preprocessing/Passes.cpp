@@ -15,47 +15,60 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 
-void buildPreprocessingPassPipeline(
-    OpPassManager &passManager,
-    const PreprocessingOptions &preprocessingOptions) {
-  auto pipelineStr = preprocessingOptions.preprocessingPassPipeline;
-  if (pipelineStr.empty()) {
-    return;
-  }
+namespace {
 
+void extendWithTextPipeline(OpPassManager &passManager,
+                            StringRef textPipeline) {
+  StringRef orig = textPipeline;
   // Strip the `builtin.module(...)` that surrounds the pass pipeline
   // description. On failure an assertion is triggered, but in release builds
   // it just will silently return and not raise an error. There is no
   // way to handle the error in caller currently.
-  StringRef text(pipelineStr);
-  size_t pos = text.find_first_of("(");
+  size_t pos = textPipeline.find_first_of("(");
   if (pos == StringRef::npos) {
     llvm::errs() << "ERROR: expected preprocessing pass pipeline string to be "
                     "nested within `builtin.module(..)`; got `"
-                 << pipelineStr << "`\n";
+                 << orig << "`\n";
     return;
   }
-  if (text.substr(0, pos) != "builtin.module") {
+  if (textPipeline.substr(0, pos) != "builtin.module") {
     llvm::errs() << "ERROR: expected preprocessing pass pipeline string to be "
                     "nested within `builtin.module(..)`; got `"
-                 << pipelineStr << "`\n";
+                 << orig << "`\n";
     return;
   }
-  if (text.back() != ')') {
-    llvm::errs() << "ERROR: mismatched parenthesis in pass pipeline `"
-                 << pipelineStr << "`\n";
+  if (textPipeline.back() != ')') {
+    llvm::errs() << "ERROR: mismatched parenthesis in pass pipeline `" << orig
+                 << "`\n";
     return;
   }
-  text = text.substr(pos + 1);
-  if (failed(parsePassPipeline(text.drop_back(), passManager))) {
-    llvm::errs() << "ERROR: mismatched parenthesis in pass pipeline `"
-                 << pipelineStr << "`\n";
+  textPipeline = textPipeline.substr(pos + 1);
+  if (failed(parsePassPipeline(textPipeline.drop_back(), passManager))) {
+    llvm::errs() << "ERROR: mismatched parenthesis in pass pipeline `" << orig
+                 << "`\n";
     return;
   }
   LLVM_DEBUG({
     llvm::dbgs() << "Preprocessing pass pipeline : ";
     passManager.printAsTextualPipeline(llvm::dbgs());
   });
+}
+
+}  // namespace
+
+void buildPreprocessingPassPipeline(
+    OpPassManager &passManager,
+    const PreprocessingOptions &preprocessingOptions,
+    PipelineExtensions *pipelineExtensions) {
+  auto pipelineStr = preprocessingOptions.preprocessingPassPipeline;
+  if (!preprocessingOptions.preprocessingPassPipeline.empty()) {
+    extendWithTextPipeline(passManager,
+                           preprocessingOptions.preprocessingPassPipeline);
+  }
+
+  if (pipelineExtensions) {
+    pipelineExtensions->extendPreprocessingPassPipeline(passManager);
+  }
 }
 
 void registerPreprocessingPasses() { registerCommonPreprocessingPasses(); }

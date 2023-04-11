@@ -488,7 +488,7 @@ struct ScatterImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
                                 PatternRewriter &rewriter) const final {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indices = op.getScatterIndices();
+    Value indices = op.getScatterIndices();
     auto indicesTy = indices.getType().cast<ShapedType>();
 
     // Check indices vector has an implicit dim.

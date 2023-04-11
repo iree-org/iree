@@ -137,14 +137,31 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 //===----------------------------------------------------------------------===//
 
 // Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region
-// is created for each tiled loop nest.
+// is created for each tiled loop nest. This pass only moves the root compute op
+// into the dispatch region, allowing producers to be outside.
+/// This struct is the same struct that is auto-generated from tablegen file for
+/// the pass definition. THis is manually copied from the `Passes.h.inc` file
+/// generated below.
+// TODO(ravishankarm): Move the passes in Flow to use the auto-generated options
+// struct.
+struct FormDispatchRegionsOptions {
+  bool fuseMultiUse = false;
+  bool generateWorkloadRegion = true;
+  bool fusePadWithConsumers = false;
+  bool fusePadWithProducers = false;
+};
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchRegionsPass(bool aggressiveFusion = false,
-                              bool generateWorkloadRegion = true);
+createFormDispatchRegionsPass(FormDispatchRegionsOptions options = {});
 
 // Pass to collapse dimensions of Linalg Ops on tensor ops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCollapseDimensionsPass();
+
+// Pass to clone into dispatch regions producers of values used in the dispatch
+// regions but defined in the above. This prepares the dispatch regions for
+// converting to dispatch workgroups with explicit captures.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCloneProducersIntoDispatchRegionsPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)

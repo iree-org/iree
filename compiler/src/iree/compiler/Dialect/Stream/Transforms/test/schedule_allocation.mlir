@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-stream-schedule-allocation))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-schedule-allocation %s | FileCheck %s
 
 // Tests that async constant ops get extracted into a dedicated constant op
 // outside of the execution region. This allows us to handle them in various
@@ -458,6 +458,36 @@ func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: in
     // CHECK-NEXT:   wo %[[ALLOC_CAPTURE]][%c0{{[_0-9]*}} for %[[SIZE]]] : !stream.resource<transient>{%[[SIZE]]}
     // CHECK-NEXT: }
     %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%capture[%offset to %end for %length], %c4) : (!stream.resource<transient>{%size}, index) -> (%capture{%size}, !stream.resource<transient>{%size})
+    stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[TIMEPOINT]]
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %results#0 : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %results#1 : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// CHECK: stream.cmd.func private @asyncExtern(%arg0[%arg1 for %arg2]: !stream.resource<*>, %arg3: index, %arg4[%arg5 for %arg6]: !stream.resource<*>)
+stream.async.func private @asyncExtern(%arg0: !stream.resource<*>, %arg1: index) -> (%arg0, !stream.resource<*>)
+
+// CHECK-LABEL: @applyAsyncCallOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
+func.func @applyAsyncCallOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %results:2, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
+    // CHECK-NEXT: stream.cmd.call @asyncExtern(rw %[[OPERAND_CAPTURE]][%[[OFFSET]] for %[[LENGTH]]], %c4, wo %[[ALLOC_CAPTURE]][%c0{{[_0-9]*}} for %[[SIZE]]]) :
+    // CHECK-SAME:     (!stream.resource<transient>{%[[SIZE]]}, index, !stream.resource<transient>{%[[SIZE]]}) -> ()
+    %0:2 = stream.async.call @asyncExtern(%capture[%offset to %end for %length], %c4) : (!stream.resource<transient>{%size}, index) -> (%capture{%size}, !stream.resource<transient>{%size})
     stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[TIMEPOINT]]

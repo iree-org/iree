@@ -53,8 +53,7 @@ void buildIREEVMTransformPassPipeline(
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
     case InputDialectOptions::Type::xla:
-      MHLO::buildXLACleanupPassPipeline(passManager);
-      MHLO::buildMHLOInputConversionPassPipeline(passManager);
+      MHLO::buildXLAInputConversionPassPipeline(passManager);
       break;
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
@@ -127,7 +126,8 @@ void buildIREEVMTransformPassPipeline(
       break;
     default:
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Preprocessing");
-      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions);
+      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions,
+                                           hooks.pipelineExtensions);
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Preprocessing");
       if (compileTo == IREEVMPipelinePhase::Preprocessing)
         return;  // early-exit

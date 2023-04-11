@@ -1,0 +1,151 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Workflow for building benchmark tools.
+# It is designed to be called from a parent workflow.
+# The concurrency of this workflow is controlled by the caller's job.
+
+name: Build Benchmark Tools
+
+on:
+  workflow_call:
+    inputs:
+      runner-group:
+        required: true
+        type: string
+      runner-env:
+        required: true
+        type: string
+      build-dir:
+        required: true
+        type: string
+      build-dir-archive:
+        required: true
+        type: string
+      build-dir-gcs-artifact:
+        required: true
+        type: string
+    outputs:
+      benchmark-tools-gcs-artifact-dir:
+        description: |
+          GCS path to benchmark tools archive.
+        value: ${{ jobs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+
+env:
+  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # instead of the outputs of setup because it contains the run attempt and we
+  # want that to be the current attempt, not whatever attempt the setup step
+  # last ran in. It therefore can't be passed in via inputs because the env
+  # context isn't available there.
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+
+jobs:
+  build_benchmark_tools:
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ inputs.runner-group }}
+      - environment=${{ inputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    outputs:
+      # We can't collect all outputs from the matrix jobs due to Github's
+      # limitation (https://github.com/orgs/community/discussions/17245).
+      # Therefore, the output is the GCS directory that stores all benchmark
+      # tools archives. The following jobs need to construct the archive names
+      # by themselves and combine with path of GCS directory here to fetch the
+      # archives.
+      benchmark-tools-gcs-artifact-dir: ${{ steps.upload.outputs.benchmark-tools-gcs-artifact-dir }}
+    strategy:
+      matrix:
+        target:
+          - platform: "linux"
+            arch: "x86_64"
+            docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:3ea6d37221a452058a7f5a5c25b4f8a82625e4b98c9e638ebdf19bb21917e6fd"
+            # Builds tools on the host and assumes the builder is Linux x86_64.
+            build_script: "./build_tools/cmake/build_runtime.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
+          - platform: "linux"
+            arch: "riscv_64"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:2e71c052d11b2526651af16e64816a30d164efcdfe6fb64623fb4737c37c466a"
+            build_script: "./build_tools/cmake/build_riscv.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
+    env:
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCH: ${{ matrix.target.arch }}
+      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
+      BUILD_SCRIPT: ${{ matrix.target.build_script }}
+      BUILD_TOOLS_DIR: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools-dir
+      BUILD_DIR: ${{ inputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting host binaries"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Compiling the benchmark tools"
+        id: build
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "BUILD_PRESET=benchmark" \
+            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
+            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
+      - name: "Compiling the benchmark tools with tracing"
+        id: build-with-tracing
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
+            --env "IREE_TARGET_ARCH=${ARCH}" \
+            --env "BUILD_PRESET=benchmark-with-tracing" \
+            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
+            "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
+      - name: "Downloading pre-built tracy capture tool"
+        id: download-tracy-capture
+        env:
+          TRACY_CAPTURE_GCS_ARTIFACT: ${{ matrix.target.tracy_capture }}
+          TRACY_CAPTURE: ${{ env.BUILD_TOOLS_DIR }}/build-traced/tracy-capture
+        run: |
+          gcloud storage cp "${TRACY_CAPTURE_GCS_ARTIFACT}" "${TRACY_CAPTURE}"
+          chmod +x "${TRACY_CAPTURE}"
+          echo "tracy-capture=${TRACY_CAPTURE}" >> "${GITHUB_OUTPUT}"
+      - name: "Creating the benchmark tools archive"
+        # Here we pack a tracy-capture binary (~7MB) into each benchmark tools
+        # archive. This could be wasteful because multiple benchmark tools
+        # archives might pack the same tracy-capture binary. But it simplifies
+        # the process to fetch required tools to run benchmarks and we only have
+        # a few versions of the benchmark tools archives.
+        # Detailed reason: The generated benchmark matrix fetches the benchmark
+        # tools archive based on the target device. However, there is a scenario
+        # that the tracy-capture is running on a different host. E.g. Mobile
+        # benchmarks have the benchmark tool forwarding the data from the phones
+        # to the tracy-capture running on Linux host. Embedding the host of
+        # tracy-capture will overloads the benchmark matrix and puts too much
+        # unrelated machine setup in it. So we simply pack everything needed
+        # into each benchmark tools archive.
+        id: archive
+        env:
+          TRACY_CAPTURE: ${{ steps.download-tracy-capture.outputs.tracy-capture }}
+          BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM }}-${{ env.ARCH }}-benchmark-tools.tar
+        run: |
+          tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
+            "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
+            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt \
+            "${TRACY_CAPTURE}"
+          echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading the benchmark tools archive"
+        id: upload
+        env:
+          BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/benchmark-tools
+        run: |
+          gcloud storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}/"
+          echo "benchmark-tools-gcs-artifact-dir=${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}" >> "${GITHUB_OUTPUT}"

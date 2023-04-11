@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
@@ -45,57 +46,35 @@ FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(Operation *op);
 
 /// Returns the StringAttr with the name `stringAttr` in the `targetAttr`, if
 /// found.
-Optional<StringAttr> getConfigStringAttr(
+std::optional<StringAttr> getConfigStringAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr);
 
 /// Returns the IntegerAttr with the name `integerAttr` in the `targetAttr`, if
 /// found.
-Optional<IntegerAttr> getConfigIntegerAttr(
+std::optional<IntegerAttr> getConfigIntegerAttr(
     IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr);
 
 /// Returns the BoolAttr with the name `integerAttr` in the `targetAttr`, if
 /// found.
-Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                     StringRef integerAttr);
+std::optional<BoolAttr> getConfigBoolAttr(
+    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr);
 
 /// Returns the LLVM Target triple associated with the `targetAttr`, if set.
-Optional<llvm::Triple> getTargetTriple(
+std::optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableTargetAttr targetAttr);
 
-/// Returns the CPU target features associated with the `targetAttr`, if set.
-Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
-
 /// Methods to get target information.
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if `targetAttr` has `feature` in its CPU features.
-bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
-
-/// Returns true if the 'targetAttr' contains '+avx2' in its cpu features.
-bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if the 'targetAttr' contains '+v' in its cpu features.
-bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if the 'targetAttr' contains '+zve32x' in its cpu features.
-bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if the 'targetAttr' contains '+zve32f' in its cpu features.
-bool hasZve32fFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Returns true if the 'targetAttr' contains '+zve64x' in its cpu features.
-bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`
 /// operation.
 bool isReadOnly(Value v);
+
+/// Return the static number of workgroup dispatched if it is known and
+/// constant. Return an empty vector otherwise.
+SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp);
 
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
@@ -137,7 +116,7 @@ struct LoopTilingAndDistributionInfo {
   // The step for the original untiled loop.
   OpFoldResult untiledStep;
   // The tile size used to tile (and not distribute) the original untiled loop.
-  Optional<int64_t> tileSize;
+  std::optional<int64_t> tileSize;
   // The processor dimension this loop is distributed to.
   unsigned processorDistributionDim;
 };
@@ -157,30 +136,14 @@ struct LoopTilingAndDistributionInfo {
 ///   }
 /// }
 ///
-/// Returns the list of filtered operations in the functions. If there are no
-/// `scf.for` operations in the function return the linalg operations in the
-/// body of the function if it has a single basic block. Return failure in all
-/// other cases.
-using RootOpFilteringFn = std::function<bool(Operation *)>;
-LogicalResult getFilteredOps(
-    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
-    SmallVectorImpl<Operation *> &filteredOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
-
-/// Specialization of `getFilteredOps` for filtering `LinalgOp`s and
-/// `LinagExtOp`s.
-LogicalResult getComputeOps(
-    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
-inline LogicalResult getComputeOps(func::FuncOp funcOp,
-                                   SmallVectorImpl<Operation *> &computeOps) {
-  SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-  return getComputeOps(funcOp, computeOps, tiledLoops);
-}
+/// Returns the list of TilingInterface ops in the functions. If there are no
+/// `scf.for` operations in the function return the TilingInterface operations
+/// in the body of the function if it has a single basic block.
+SmallVector<Operation *> getComputeOps(func::FuncOp funcOp);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.
-Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
+std::optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
     scf::ForOp forOp);
 
 /// Collects information about loops matching tiled+distribute pattern.
@@ -193,14 +156,31 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes);
+    const SmallVector<int64_t> &tileSizes,
+    linalg::DistributionMethod distributionMethod,
+    int32_t maxWorkgroupParallelDims = kNumMaxParallelDims);
 
-/// Replace the uses of memref `oldOp` with the given `val` and for subview uses
-/// propagate the type change. Changing the memref type may require propagating
-/// it through subview ops so we cannot just do a replaceAllUse but need to
-/// propagate the type change and erase old subview ops.
-void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
-                                       OpBuilder &builder);
+//===---------------------------------------------------------------------===//
+// Misc. utility functions.
+//===---------------------------------------------------------------------===//
+
+/// Convert byte offset into offsets in terms of number of elements based
+/// on `elementType`
+OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
+                                              Location loc,
+                                              OpFoldResult byteOffset,
+                                              Type elementType);
+
+/// Replace the uses of memref value `origValue` with the given
+/// `replacementValue`. Some uses of the memref value might require changes to
+/// the operation itself. Create new operations which can carry the change, and
+/// transitively replace their uses.
+void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
+                                       Value origValue, Value replacementValue);
+
+/// Sink given operations as close as possible to their uses.
+void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
+                  DominanceInfo &dominators);
 
 }  // namespace iree_compiler
 }  // namespace mlir

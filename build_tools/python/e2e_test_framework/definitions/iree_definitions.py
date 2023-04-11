@@ -8,10 +8,10 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-import hashlib
-from typing import List, Sequence
+import pathlib
+from typing import List, Optional, Sequence
 
-from e2e_test_framework.definitions import common_definitions
+from e2e_test_framework.definitions import common_definitions, utils
 from e2e_test_framework import serialization, unique_ids
 
 
@@ -60,15 +60,41 @@ class CompileTarget(object):
   target_architecture: common_definitions.DeviceArchitecture
   target_abi: TargetABI
 
+  def __str__(self):
+    return (f"{self.target_architecture}-"
+            f"{self.target_abi.name}-"
+            f"{self.target_backend.name}").lower()
+
 
 @serialization.serializable(type_key="iree_compile_configs")
 @dataclass(frozen=True)
 class CompileConfig(object):
   """Describes the options to build a module."""
   id: str
+  name: str
   tags: List[str]
   compile_targets: List[CompileTarget]
   extra_flags: List[str] = dataclasses.field(default_factory=list)
+
+  def __str__(self):
+    return self.name
+
+  @classmethod
+  def build(cls,
+            id: str,
+            tags: Sequence[str],
+            compile_targets: Sequence[CompileTarget],
+            extra_flags: Optional[Sequence[str]] = None):
+    target_part = ",".join(str(target) for target in compile_targets)
+    tag_part = ",".join(tags)
+    # Format: [<target_name>,...][<tag>,...]
+    name = f"[{target_part}][{tag_part}]"
+    extra_flags = extra_flags or []
+    return cls(id=id,
+               name=name,
+               tags=list(tags),
+               compile_targets=list(compile_targets),
+               extra_flags=list(extra_flags))
 
 
 @serialization.serializable(type_key="iree_module_execution_configs")
@@ -76,10 +102,33 @@ class CompileConfig(object):
 class ModuleExecutionConfig(object):
   """Describes the options to run a module."""
   id: str
+  name: str
   tags: List[str]
   loader: RuntimeLoader
   driver: RuntimeDriver
   extra_flags: List[str] = dataclasses.field(default_factory=list)
+
+  def __str__(self):
+    return self.name
+
+  @classmethod
+  def build(cls,
+            id: str,
+            tags: Sequence[str],
+            loader: RuntimeLoader,
+            driver: RuntimeDriver,
+            extra_flags: Optional[Sequence[str]] = None):
+    runtime_part = f"{driver.name}({loader.name})".lower()
+    tag_part = ",".join(tags)
+    # Format: <driver>(<loader>)[<tag>,...]
+    name = f"{runtime_part}[{tag_part}]"
+    extra_flags = extra_flags or []
+    return cls(id=id,
+               name=name,
+               tags=list(tags),
+               loader=loader,
+               driver=driver,
+               extra_flags=list(extra_flags))
 
 
 class ImportTool(Enum):
@@ -97,55 +146,56 @@ class MLIRDialectType(Enum):
   MHLO = "mhlo"
 
 
-# Placeholder to be replaced with entry function name when outputting the actual
-# flag list.
-IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER = "$ENTRY_FUNCTION_PLACEHOLDER"
-
-
 @serialization.serializable(type_key="iree_import_configs")
 @dataclass(frozen=True)
 class ImportConfig(object):
   """Config to import the model."""
   id: str
+  name: str
   tool: ImportTool
   dialect_type: MLIRDialectType
   import_flags: List[str] = dataclasses.field(default_factory=list)
 
+  def __str__(self):
+    return self.name
+
   def materialize_import_flags(self,
                                model: common_definitions.Model) -> List[str]:
     """Materialize flags with dependent values."""
-    return [
-        flag.replace(IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER,
-                     model.entry_function) for flag in self.import_flags
-    ]
+    return utils.substitute_flag_vars(flags=self.import_flags,
+                                      ENTRY_FUNCTION=model.entry_function)
 
 
 DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
+    name="tf_v1",
     tool=ImportTool.TF_IMPORTER,
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v1",
-        f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
+        r"--tf-savedmodel-exported-names=${ENTRY_FUNCTION}"
     ])
 
 DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
     tool=ImportTool.TF_IMPORTER,
+    name="tf_v2",
     dialect_type=MLIRDialectType.MHLO,
     import_flags=[
         "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v2",
-        f"--tf-savedmodel-exported-names={IMPORT_CONFIG_ENTRY_FUNCTION_PLACEHOLDER}"
+        r"--tf-savedmodel-exported-names=${ENTRY_FUNCTION}"
     ])
 
 DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TFLITE_DEFAULT,
+    name="tflite",
     tool=ImportTool.TFLITE_IMPORTER,
     dialect_type=MLIRDialectType.TOSA,
     import_flags=["--output-format=mlir-bytecode"])
 
 DEFAULT_LINALG_MLIR_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT,
+    name="linalg",
     tool=ImportTool.NONE,
     dialect_type=MLIRDialectType.NONE)
 
@@ -167,19 +217,31 @@ MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {
 class ImportedModel(object):
   """Describes an imported MLIR model."""
   composite_id: str
+  name: str
   model: common_definitions.Model
   import_config: ImportConfig
 
-  @staticmethod
-  def from_model(model: common_definitions.Model):
+  def __str__(self):
+    return self.name
+
+  @classmethod
+  def from_model(cls, model: common_definitions.Model):
     config = MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP.get(model.source_type)
     if config is None:
       raise ValueError(f"Unsupported model source type: {model.source_type}.")
 
     composite_id = unique_ids.hash_composite_id([model.id, config.id])
-    return ImportedModel(composite_id=composite_id,
-                         model=model,
-                         import_config=config)
+    # Format: <model_name>(<import_config_name>)
+    name = f"{model}({config})"
+    return cls(composite_id=composite_id,
+               name=name,
+               model=model,
+               import_config=config)
+
+
+# Variable in flags to be replaced with module dir path. The whole path should
+# be written in the POSIX format and starts with the variable.
+MODULE_DIR_VARIABLE = r"${MODULE_DIR}"
 
 
 @serialization.serializable(type_key="iree_module_generation_configs",
@@ -188,6 +250,7 @@ class ImportedModel(object):
 class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   composite_id: str
+  name: str
   imported_model: ImportedModel
   compile_config: CompileConfig
   # Full list of flags to compile with, derived from sub-components, with
@@ -196,25 +259,47 @@ class ModuleGenerationConfig(object):
   # serialized JSON.
   compile_flags: List[str]
 
-  def materialize_compile_flags(self):
-    """Materialize flags with dependent values."""
-    return self.compile_flags
+  def __str__(self):
+    return self.name
 
-  @staticmethod
-  def with_flag_generation(imported_model: ImportedModel,
-                           compile_config: CompileConfig):
+  def materialize_compile_flags(self, module_dir_path: pathlib.PurePath):
+    """Materialize flags with dependent values."""
+
+    def _replace_module_dir_placeholder(value: str) -> str:
+      """Replaces ${MODULE_DIR} in a POSIX path and returns the
+      platform-dependent path string.
+      """
+      parts = pathlib.PurePosixPath(value).parts
+      if MODULE_DIR_VARIABLE not in parts:
+        return value
+      if parts[0] != MODULE_DIR_VARIABLE:
+        raise ValueError(
+            f"'{MODULE_DIR_VARIABLE}' needs to be the head of flag value"
+            f" if present, but got '{value}'.")
+      # Properly construct the platform-dependent path.
+      return str(module_dir_path.joinpath(*parts[1:]))
+
+    return utils.transform_flags(flags=self.compile_flags,
+                                 map_funcs=[_replace_module_dir_placeholder])
+
+  @classmethod
+  def build(cls, imported_model: ImportedModel, compile_config: CompileConfig):
     composite_id = unique_ids.hash_composite_id(
         [imported_model.composite_id, compile_config.id])
-    return ModuleGenerationConfig(
-        composite_id=composite_id,
-        imported_model=imported_model,
-        compile_config=compile_config,
-        compile_flags=_generate_compile_flags(
-            compile_config, imported_model.import_config.dialect_type))
+    # Format: <imported_model_name> <compile_config_name>
+    name = f"{imported_model} {compile_config}"
+    compile_flags = _generate_compile_flags(
+        compile_config, imported_model.import_config.dialect_type)
+    return cls(composite_id=composite_id,
+               name=name,
+               imported_model=imported_model,
+               compile_config=compile_config,
+               compile_flags=compile_flags)
 
 
-# Placeholder to be replaced with gpu id when outputting the actual flag list.
-E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER = r"${GPU_ID_PLACEHOLDER}"
+class E2EModelRunTool(Enum):
+  """Tool to run a module."""
+  IREE_BENCHMARK_MODULE = "iree-benchmark-module"
 
 
 @serialization.serializable(type_key="iree_e2e_model_run_configs",
@@ -223,6 +308,8 @@ E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER = r"${GPU_ID_PLACEHOLDER}"
 class E2EModelRunConfig(object):
   """Describes an e2e run."""
   composite_id: str
+  name: str
+  tags: List[str]
   module_generation_config: ModuleGenerationConfig
   module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
@@ -232,34 +319,44 @@ class E2EModelRunConfig(object):
   # decouple from the generation code. Also serves as useful information in the
   # serialized JSON.
   run_flags: List[str]
+  tool: E2EModelRunTool
+
+  def __str__(self):
+    return self.name
 
   def materialize_run_flags(self, gpu_id: str = "0"):
     """Materialize flags with dependent values."""
-    return [
-        flag.replace(E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER, gpu_id)
-        for flag in self.run_flags
-    ]
+    return utils.substitute_flag_vars(flags=self.run_flags, GPU_ID=gpu_id)
 
-  @staticmethod
-  def with_flag_generation(module_generation_config: ModuleGenerationConfig,
-                           module_execution_config: ModuleExecutionConfig,
-                           target_device_spec: common_definitions.DeviceSpec,
-                           input_data: common_definitions.ModelInputData):
+  @classmethod
+  def build(cls,
+            module_generation_config: ModuleGenerationConfig,
+            module_execution_config: ModuleExecutionConfig,
+            target_device_spec: common_definitions.DeviceSpec,
+            input_data: common_definitions.ModelInputData,
+            tool: E2EModelRunTool,
+            tags: Optional[Sequence[str]] = None):
     composite_id = unique_ids.hash_composite_id([
         module_generation_config.composite_id, module_execution_config.id,
         target_device_spec.id, input_data.id
     ])
+    # Format: <module_generation_config_name> <module_execution_config_name> with <input_data_name> @ <target_device_spec_name>
+    name = f"{module_generation_config} {module_execution_config} with {input_data} @ {target_device_spec}"
     run_flags = generate_run_flags(
         imported_model=module_generation_config.imported_model,
         input_data=input_data,
         module_execution_config=module_execution_config,
-        gpu_id=E2E_MODEL_RUN_CONFIG_GPU_ID_PLACEHOLDER)
-    return E2EModelRunConfig(composite_id=composite_id,
-                             module_generation_config=module_generation_config,
-                             module_execution_config=module_execution_config,
-                             target_device_spec=target_device_spec,
-                             input_data=input_data,
-                             run_flags=run_flags)
+        gpu_id=r"${GPU_ID}")
+    tags_list = [] if tags is None else list(tags)
+    return cls(composite_id=composite_id,
+               name=name,
+               tags=tags_list,
+               module_generation_config=module_generation_config,
+               module_execution_config=module_execution_config,
+               target_device_spec=target_device_spec,
+               input_data=input_data,
+               run_flags=run_flags,
+               tool=tool)
 
 
 def generate_run_flags(imported_model: ImportedModel,
@@ -322,27 +419,29 @@ def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
 
   if arch_info.architecture == "x86_64":
     flags = [
-        f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
-        f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
+        f"--iree-llvmcpu-target-triple=x86_64-unknown-{target.target_abi.value}",
+        f"--iree-llvmcpu-target-cpu={arch_info.microarchitecture.lower()}"
     ]
   elif arch_info.architecture == "riscv_64":
     flags = [
-        f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
-        "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
-        "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
+        f"--iree-llvmcpu-target-triple=riscv64-pc-{target.target_abi.value}",
+        "--iree-llvmcpu-target-cpu=generic-rv64",
+        "--iree-llvmcpu-target-abi=lp64d",
+        "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v",
         "--riscv-v-fixed-length-vector-lmul-max=8"
     ]
   elif arch_info.architecture == "riscv_32":
     # TODO(llvm-project/60463): Replace 'zve32f' with 'zve32x'.
     flags = [
-        f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
-        "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
-        "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
+        f"--iree-llvmcpu-target-triple=riscv32-pc-{target.target_abi.value}",
+        "--iree-llvmcpu-target-cpu=generic-rv32",
+        "--iree-llvmcpu-target-abi=ilp32",
+        "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
         "--riscv-v-fixed-length-vector-lmul-max=8"
     ]
   elif arch_info.architecture == "armv8.2-a":
     flags = [
-        f"--iree-llvm-target-triple=aarch64-none-{target.target_abi.value}",
+        f"--iree-llvmcpu-target-triple=aarch64-none-{target.target_abi.value}",
     ]
   elif arch_info.architecture == "cuda":
     if target.target_abi != TargetABI.LINUX_GNU:

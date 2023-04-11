@@ -63,7 +63,7 @@ class OrdinalAllocationPass
     SmallVector<SmallVector<IREE::Util::GlobalOpInterface, 4>, 8>
         primitiveGlobalOps(sizeof(int64_t) + 1);
     for (auto &op : getOperation().getBlock().getOperations()) {
-      Optional<int> ordinal = std::nullopt;
+      std::optional<int> ordinal = std::nullopt;
       if (auto funcOp = dyn_cast<FuncOp>(op)) {
         ordinal = nextFuncOrdinal++;
       } else if (isa<ExportOp>(op)) {

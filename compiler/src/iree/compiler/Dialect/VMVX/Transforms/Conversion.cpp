@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/Patterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -32,6 +33,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VMVX {
+
+namespace {
 
 // Runs conversion with registered input dialects.
 class ConversionPass : public ConversionBase<ConversionPass> {
@@ -77,6 +80,8 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
                                  patterns,
                                  IREE::Util::BufferType::get(&getContext()));
+    populateGenericStructuralConversionPatterns(context, conversionTarget,
+                                                typeConverter, patterns);
 
     // Use the default 64-bit lowering for TOSA's ApplyScale operator:
     //   This lowering widens integer types to 64-bit an performs the non-fused
@@ -95,6 +100,8 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     }
   }
 };
+
+}  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();

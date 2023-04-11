@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv);
 
   auto openInputStream =
-      [&]() -> llvm::Optional<
+      [&]() -> std::optional<
                 std::pair<std::istream *, std::unique_ptr<std::ifstream>>> {
     auto fileInputStream = std::make_unique<std::ifstream>();
     std::istream *inputStream;
@@ -298,7 +298,10 @@ int main(int argc, char **argv) {
   // Run passes.
   PassManager pm(&context, module.get()->getName().getStringRef(),
                  PassManager::Nesting::Implicit);
-  applyPassManagerCLOptions(pm);
+  if (failed(applyPassManagerCLOptions(pm))) {
+    llvm::errs() << "Failed to apply pass manager CL options\n";
+    return 1;
+  }
   applyDefaultTimingPassManagerCLOptions(pm);
 
   iree_integrations::MHLO::buildMHLOImportPassPipeline(pm);

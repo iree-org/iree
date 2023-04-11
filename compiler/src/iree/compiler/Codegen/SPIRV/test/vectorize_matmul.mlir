@@ -189,3 +189,136 @@ func.func @matmul_2x8x128_fp16(%a: tensor<2x128xf16>, %b: tensor<128x8xf16>, %x:
 // CHECK:   %[[W0:.+]] = vector.transfer_write %[[ISS1]], %[[Y]][%c0, %c0] {in_bounds = [true]} : vector<8xf16>, tensor<2x8xf16>
 // CHECK:   %[[W1:.+]] = vector.transfer_write %[[ISS3]], %[[W0]][%c1, %c0] {in_bounds = [true]} : vector<8xf16>, tensor<2x8xf16>
 // CHECK:   return %[[W1]]
+
+// -----
+
+// The default i8->i32 matmul codegen uses the outerproduct lowering, as not all
+// SPIR-V targets support integer dot product ops used for efficient innerproduct
+// lowering.
+
+func.func @matmul_4x4x4_i8_to_i32(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -> tensor<4x4xi32> {
+  %c0 = arith.constant 0 : i32
+  %i0 = arith.constant 0 : index
+  %init = tensor.empty() : tensor<4x4xi32>
+  %CC = linalg.fill ins(%c0 : i32) outs(%init : tensor<4x4xi32>) -> tensor<4x4xi32>
+  %D = linalg.matmul ins(%lhs, %rhs: tensor<4x4xi8>, tensor<4x4xi8>)
+                     outs(%CC: tensor<4x4xi32>) -> tensor<4x4xi32>
+  return %D : tensor<4x4xi32>
+}
+
+// CHECK-LABEL: func.func @matmul_4x4x4_i8_to_i32
+// CHECK-SAME:    (%[[LHS:.+]]: tensor<4x4xi8>, %[[RHS:.+]]: tensor<4x4xi8>)
+// CHECK-DAG:     %[[CST0:.+]]   = arith.constant 0 : i8
+// CHECK-DAG:     %[[IDX0:.+]]   = arith.constant 0 : index
+// CHECK-DAG:     %[[IDX1:.+]]   = arith.constant 1 : index
+// CHECK-DAG:     %[[IDX2:.+]]   = arith.constant 2 : index
+// CHECK-DAG:     %[[IDX3:.+]]   = arith.constant 3 : index
+// CHECK:         %[[LHS0:.+]]   = vector.transfer_read %[[LHS]][%[[IDX0]], %[[IDX0]]], %[[CST0]]
+// CHECK-NEXT:    %[[LHS1:.+]]   = vector.transfer_read %[[LHS]][%[[IDX1]], %[[IDX0]]], %[[CST0]]
+// CHECK-NEXT:    %[[LHS2:.+]]   = vector.transfer_read %[[LHS]][%[[IDX2]], %[[IDX0]]], %[[CST0]]
+// CHECK-NEXT:    %[[LHS3:.+]]   = vector.transfer_read %[[LHS]][%[[IDX3]], %[[IDX0]]], %[[CST0]]
+// CHECK:         %[[RHS0:.+]]   = vector.transfer_read %[[RHS]][%[[IDX0]], %[[IDX0]]], %[[CST0]]
+// CHECK-NEXT:    %[[RHS1:.+]]   = vector.transfer_read %[[RHS]][%[[IDX1]], %[[IDX0]]], %[[CST0]]
+// CHECK-NEXT:    %[[RHS2:.+]]   = vector.transfer_read %[[RHS]][%[[IDX2]], %[[IDX0]]], %[[CST0]]
+// CHECK-NEXT:    %[[RHS3:.+]]   = vector.transfer_read %[[RHS]][%[[IDX3]], %[[IDX0]]], %[[CST0]]
+// CHECK:         %[[LHS0E:.+]]  = arith.extsi %[[LHS0]] : vector<4xi8> to vector<4xi32>
+// CHECK-NEXT:    %[[LHS1E:.+]]  = arith.extsi %[[LHS1]] : vector<4xi8> to vector<4xi32>
+// CHECK-NEXT:    %[[LHS2E:.+]]  = arith.extsi %[[LHS2]] : vector<4xi8> to vector<4xi32>
+// CHECK-NEXT:    %[[LHS3E:.+]]  = arith.extsi %[[LHS3]] : vector<4xi8> to vector<4xi32>
+// CHECK:         %[[RHS0E:.+]]  = arith.extsi %[[RHS0]] : vector<4xi8> to vector<4xi32>
+// CHECK-NEXT:    %[[RHS1E:.+]]  = arith.extsi %[[RHS1]] : vector<4xi8> to vector<4xi32>
+// CHECK-NEXT:    %[[RHS2E:.+]]  = arith.extsi %[[RHS2]] : vector<4xi8> to vector<4xi32>
+// CHECK-NEXT:    %[[RHS3E:.+]]  = arith.extsi %[[RHS3]] : vector<4xi8> to vector<4xi32>
+// CHECK:         %[[EXT0:.+]]   = vector.extract %[[LHS0E]][0]
+// CHECK-NEXT:    %[[SPLT:.+]]   = vector.splat %[[EXT0]] : vector<4xi32>
+// CHECK-NEXT:    %[[MUL0:.+]]   = arith.muli %[[SPLT]], %[[RHS0E]]
+// CHECK:         %[[EXT1:.+]]   = vector.extract %[[LHS0E]][1]
+// CHECK-NEXT:    %[[SPLT:.+]]   = vector.splat %[[EXT1]] : vector<4xi32>
+// CHECK-NEXT:    %[[MUL1:.+]]   = arith.muli %[[SPLT]], %[[RHS1E]]
+// CHECK-NEXT:    %[[ADD0:.+]]   = arith.addi %[[MUL1]], %[[MUL0]]
+//
+// CHECK:         %[[W0:.+]]     = vector.transfer_write %{{.+}}, %{{.+}}[%[[IDX0]], %[[IDX0]]]
+// CHECK-NEXT:    %[[W1:.+]]     = vector.transfer_write %{{.+}}, %[[W0]][%[[IDX1]], %[[IDX0]]]
+// CHECK-NEXT:    %[[W2:.+]]     = vector.transfer_write %{{.+}}, %[[W1]][%[[IDX2]], %[[IDX0]]]
+// CHECK-NEXT:    %[[W3:.+]]     = vector.transfer_write %{{.+}}, %[[W2]][%[[IDX3]], %[[IDX0]]]
+// CHECK-NEXT:    return %[[W3]] : tensor<4x4xi32>
+
+// -----
+
+// Check that emit SPIR-V integer dot product instructions when supported by
+// the target env. We expect the matmul to follow the inner product lowering.
+
+func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -> tensor<4x4xi32> attributes {
+  spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
+                                         [DotProduct, DotProductInputAll, DotProductInput4x8Bit],
+                                         [SPV_KHR_integer_dot_product]>,
+                                       #spirv.resource_limits<>> } {
+  %c0 = arith.constant 0 : i32
+  %i0 = arith.constant 0 : index
+  %init = tensor.empty() : tensor<4x4xi32>
+  %CC = linalg.fill ins(%c0 : i32) outs(%init : tensor<4x4xi32>) -> tensor<4x4xi32>
+  %D = linalg.matmul ins(%lhs, %rhs: tensor<4x4xi8>, tensor<4x4xi8>)
+                     outs(%CC: tensor<4x4xi32>) -> tensor<4x4xi32>
+  return %D : tensor<4x4xi32>
+}
+
+// CHECK-LABEL: func.func @matmul_4x4x4_i8_to_i32
+// CHECK-SAME:    (%[[LHS:.+]]: tensor<4x4xi8>, %[[RHS:.+]]: tensor<4x4xi8>)
+// CHECK-DAG:     %[[C0I8:.+]]   = arith.constant 0 : i8
+// CHECK-DAG:     %[[C0I32:.+]]  = arith.constant 0 : i32
+// CHECK-DAG:     %[[V4I8:.+]]   = arith.constant dense<0> : vector<4xi8>
+// CHECK-DAG:     %[[V4I32:.+]]  = arith.constant dense<0> : vector<4xi32>
+// CHECK-DAG:     %[[V1I32:.+]]  = arith.constant dense<0> : vector<1xi32>
+// CHECK-DAG:     %[[IDX0:.+]]   = arith.constant 0 : index
+// CHECK-DAG:     %[[IDX1:.+]]   = arith.constant 1 : index
+// CHECK-DAG:     %[[IDX2:.+]]   = arith.constant 2 : index
+// CHECK-DAG:     %[[IDX3:.+]]   = arith.constant 3 : index
+// CHECK:         %[[LHS0:.+]]   = vector.transfer_read %[[LHS]][%[[IDX0]], %[[IDX0]]], %[[C0I8]]
+// CHECK-NEXT:    %[[LHS1:.+]]   = vector.transfer_read %[[LHS]][%[[IDX1]], %[[IDX0]]], %[[C0I8]]
+// CHECK-NEXT:    %[[LHS2:.+]]   = vector.transfer_read %[[LHS]][%[[IDX2]], %[[IDX0]]], %[[C0I8]]
+// CHECK-NEXT:    %[[LHS3:.+]]   = vector.transfer_read %[[LHS]][%[[IDX3]], %[[IDX0]]], %[[C0I8]]
+// CHECK:         %[[RHS0:.+]]   = vector.transfer_read %[[RHS]][%[[IDX0]], %[[IDX0]]], %[[C0I8]]
+// CHECK-NEXT:    %[[RHS1:.+]]   = vector.transfer_read %[[RHS]][%[[IDX1]], %[[IDX0]]], %[[C0I8]]
+// CHECK-NEXT:    %[[RHS2:.+]]   = vector.transfer_read %[[RHS]][%[[IDX2]], %[[IDX0]]], %[[C0I8]]
+// CHECK-NEXT:    %[[RHS3:.+]]   = vector.transfer_read %[[RHS]][%[[IDX3]], %[[IDX0]]], %[[C0I8]]
+// CHECK:         %[[EXTR0:.+]]  = vector.extract %[[RHS0]][0]
+// CHECK-NEXT:    %[[INS0:.+]]   = vector.insert %[[EXTR0]], %[[V4I8]] [0]
+// CHECK-NEXT:    %[[EXTR1:.+]]  = vector.extract %[[RHS1]][0]
+// CHECK-NEXT:    %[[INS1:.+]]   = vector.insert %[[EXTR1]], %[[INS0]] [1]
+// CHECK-NEXT:    %[[EXTR2:.+]]  = vector.extract %[[RHS2]][0]
+// CHECK-NEXT:    %[[INS2:.+]]   = vector.insert %[[EXTR2]], %[[INS1]] [2]
+// CHECK-NEXT:    %[[EXTR3:.+]]  = vector.extract %[[RHS3]][0]
+// CHECK-NEXT:    %[[COL0:.+]]   = vector.insert %[[EXTR3]], %[[INS2]] [3]
+// CHECK:         %[[DOT0:.+]]   = spirv.SDotAccSat %[[LHS0]], %[[COL0]], %[[C0I32]]
+// CHECK-NEXT:    %[[RES0:.+]]   = vector.insert %[[DOT0]], %[[V1I32]] [0]
+// CHECK-COUNT-15:                 spirv.SDotAccSat
+//
+// CHECK-COUNT-16:                 vector.insert_strided_slice {{.+}} : vector<1xi32> into vector<4xi32>
+//
+// CHECK:         %[[W0:.+]]     = vector.transfer_write %{{.+}}, %{{.+}}[%[[IDX0]], %[[IDX0]]]
+// CHECK-NEXT:    %[[W1:.+]]     = vector.transfer_write %{{.+}}, %[[W0]][%[[IDX1]], %[[IDX0]]]
+// CHECK-NEXT:    %[[W2:.+]]     = vector.transfer_write %{{.+}}, %[[W1]][%[[IDX2]], %[[IDX0]]]
+// CHECK-NEXT:    %[[W3:.+]]     = vector.transfer_write %{{.+}}, %[[W2]][%[[IDX3]], %[[IDX0]]]
+// CHECK-NEXT:    return %[[W3]] : tensor<4x4xi32>
+
+// -----
+
+// Check that emit SPIR-V integer dot product instructions when supported by
+// the target env. We expect the matmul to follow the inner product lowering.
+
+func.func @matmul_4x16x4_i8_to_i32_dot_prod(%lhs: tensor<4x16xi8>, %rhs : tensor<16x4xi8>) -> tensor<4x4xi32> attributes {
+  spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
+                                         [DotProduct, DotProductInputAll, DotProductInput4x8Bit],
+                                         [SPV_KHR_integer_dot_product]>,
+                                       #spirv.resource_limits<>> } {
+  %c0 = arith.constant 0 : i32
+  %i0 = arith.constant 0 : index
+  %init = tensor.empty() : tensor<4x4xi32>
+  %CC = linalg.fill ins(%c0 : i32) outs(%init : tensor<4x4xi32>) -> tensor<4x4xi32>
+  %D = linalg.matmul ins(%lhs, %rhs: tensor<4x16xi8>, tensor<16x4xi8>)
+                     outs(%CC: tensor<4x4xi32>) -> tensor<4x4xi32>
+  return %D : tensor<4x4xi32>
+}
+
+// CHECK-LABEL: func.func @matmul_4x16x4_i8_to_i32
+// CHECK-COUNT-64:          spirv.SDotAccSat

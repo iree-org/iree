@@ -24,7 +24,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -615,7 +615,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
   if (funcOp.walk<WalkOrder::PreOrder>(bufferMappingFn).wasInterrupted()) {
     return failure();
   }
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+  LLVM_DEBUG({
     llvm::dbgs() << "After First walk ";
     plan.dump();
   });
@@ -631,7 +631,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
       }
     }
   });
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+  LLVM_DEBUG({
     llvm::dbgs() << "After Destructive update walk ";
     plan.dump();
   });
@@ -644,7 +644,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
     return failure();
   }
 
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+  LLVM_DEBUG({
     llvm::dbgs() << "After Store walk ";
     plan.dump();
   });

@@ -251,7 +251,7 @@ class GlobalInitializationPass
   std::pair<LogicalResult, Value> createConst(Location loc, Attribute value,
                                               OpBuilder &builder) {
     if (auto integerAttr = value.dyn_cast<IntegerAttr>()) {
-      if (integerAttr.getValue().isNullValue()) {
+      if (integerAttr.getValue().isZero()) {
         // Globals are zero-initialized by default.
         return {success(), {}};
       }

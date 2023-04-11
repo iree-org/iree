@@ -87,10 +87,21 @@ option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility sh
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
 # Properties building and controlling benchmark suites.
-option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
-# TODO(pzread): Currently IREE_ENABLE_COMPILATION_BENCHMARKS needs
-# IREE_BUILD_BENCHMARKS. Eventually we will decouple them.
-cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "Builds IREE benchmark suites for compilation statistics." OFF ${IREE_BUILD_BENCHMARKS} OFF)
+# Leave the old name around for a bit so that people can update their configs
+# and previous cached values will automatically carry over.
+# TODO(pzread): Remove this option after 2023-04-13
+option(IREE_BUILD_BENCHMARKS "DEPRECATED alias for IREE_BUILD_LEGACY_BENCHMARKS" OFF)
+option(IREE_BUILD_LEGACY_BENCHMARKS "Builds legacy IREE benchmark suites." "${IREE_BUILD_BENCHMARKS}")
+cmake_dependent_option(IREE_ENABLE_COMPILATION_BENCHMARKS "DEPRECATED alias for IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS" OFF "${IREE_BUILD_BENCHMARKS}" OFF)
+cmake_dependent_option(
+  IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS
+  "Builds legacy IREE benchmark suites for compilation statistics."
+  # Read the value from the old name as fallback so people can update their configs.
+  "${IREE_ENABLE_COMPILATION_BENCHMARKS}"
+  # Only available if IREE_BUILD_LEGACY_BENCHMARKS is set (or by IREE_BUILD_BENCHMARKS transitively).
+  "${IREE_BUILD_LEGACY_BENCHMARKS}"
+  OFF
+)
 
 option(IREE_BUILD_MICROBENCHMARKS "Builds IREE microbenchmark suites." OFF)
 
@@ -113,6 +124,38 @@ option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for
 # This option is considered experimental and should not be relied on until
 # CI coverage is established.
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
+
+#-------------------------------------------------------------------------------
+# Compiler plugins
+# IREE compiler plugins can be statically built into the compiler by adding
+# directories to IREE_COMPILER_PLUGIN_PATHS. If directories are relative, they
+# are interpreted against the IREE source directory.
+#
+# In addition, certain in-tree plugin directories are included regardless of
+# this variable (possibly based on other flags).
+#
+# A plugin directory must contain an iree_compiler_plugin_group.cmake file that
+# is loaded and must specify:
+#   - any needed add_subdirectory() calls to populate targets.
+#   - iree_compiler_register_plugin() targets (either directly or transitively)
+#     which associates a plugin id with a registration target.
+#
+# All iree_compiler_plugin_group.cmake files are included from the binary
+# directory ${IREE_BINARY_DIR}/compiler/plugins and must create a sub binary
+# directory that is globally unique. It is recommended to prefix with org
+# name or project. The following names are reserved:
+#   - builtin
+#   - samples
+#
+# Example:
+#   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/example samples/example)
+#-------------------------------------------------------------------------------
+
+set(IREE_COMPILER_PLUGIN_PATHS "" CACHE STRING "Paths to external compiler plugins")
+set(IREE_COMPILER_BUILTIN_PLUGIN_PATHS "compiler/plugins")
+if(IREE_BUILD_SAMPLES)
+  list(APPEND IREE_COMPILER_BUILTIN_PLUGIN_PATHS "samples/compiler_plugins")
+endif()
 
 #-------------------------------------------------------------------------------
 # Experimental project flags
@@ -445,6 +488,7 @@ include(iree_copts)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_compiler_plugin)
 include(iree_import_binary)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
@@ -467,6 +511,11 @@ include(iree_hal_cts_test_suite)
 include(iree_static_linker_test)
 include(iree_fetch_artifact)
 include(iree_run_module_test)
+
+# Default any sub-tree which doesn't provide its own package namespacing
+# to derive it relative to this directory and prefixed with iree/.
+set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
+set(IREE_PACKAGE_ROOT_PREFIX "iree")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
@@ -573,7 +622,7 @@ endif()
 # dependencies to them.
 #-------------------------------------------------------------------------------
 
-if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
+if(IREE_BUILD_LEGACY_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
   # Add top-level custom targets to drive generating benchmark suites.
 
   # iree-benchmark-import-models imports benchmark models from their source
@@ -588,7 +637,7 @@ if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
 endif()
 
 # TODO(#11263): This conditional block should be merged with the block above
-# once we remove IREE_BUILD_BENCHMARKS.
+# once we remove IREE_BUILD_LEGACY_BENCHMARKS.
 if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   # iree-e2e-compile-stats-suites compiles the benchmark models with specific
   # flags to collect the compilation statistics.
@@ -812,7 +861,7 @@ endif()
 
 add_subdirectory(build_tools/embed_data/)
 
-if(IREE_BUILD_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
+if(IREE_BUILD_LEGACY_BENCHMARKS OR IREE_BUILD_E2E_TEST_ARTIFACTS)
   find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
   if(IREE_IMPORT_TFLITE_PATH)
     message(STATUS "Found ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
@@ -830,7 +879,7 @@ endif()
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
 add_subdirectory(tests EXCLUDE_FROM_ALL)
 
-if(IREE_BUILD_BENCHMARKS)
+if(IREE_BUILD_LEGACY_BENCHMARKS)
   add_subdirectory(benchmarks)
 endif()
 
@@ -894,7 +943,7 @@ add_subdirectory(build_tools/benchmarks)
 add_subdirectory(build_tools/python)
 
 #-------------------------------------------------------------------------------
-# Samples
+# Optional features
 #-------------------------------------------------------------------------------
 
 # samples/ can depend on anything, so we include it last

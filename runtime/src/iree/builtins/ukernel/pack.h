@@ -52,6 +52,14 @@ typedef void (*iree_uk_pack_tile_func_t)(
     iree_uk_ssize_t /*in_stride0*/, iree_uk_ssize_t /*elem_size*/,
     iree_uk_ssize_t /*tile_size0*/, iree_uk_ssize_t /*tile_size1*/);
 
+// Tile kernel declarations. Prototype matches iree_uk_unpack_tile_func_t.
+#define IREE_UK_PACK_TILE_FUNC_DECL(NAME)                             \
+  void NAME(void* IREE_UK_RESTRICT out_tile_ptr,                      \
+            const void* IREE_UK_RESTRICT in_tile_ptr,                 \
+            iree_uk_ssize_t outer_size1, iree_uk_ssize_t out_stride1, \
+            iree_uk_ssize_t in_stride0, iree_uk_ssize_t elem_size,    \
+            iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1);
+
 // Main entry point.
 IREE_UK_EXPORT void iree_uk_pack(const iree_uk_pack_params_t* params);
 

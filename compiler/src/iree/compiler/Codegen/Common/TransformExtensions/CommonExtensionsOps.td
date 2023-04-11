@@ -31,14 +31,13 @@ def ApplyBufferOptimizationsOp :
     This operation applies a set of memory optimization on the whole region of
     the operand.
 
-    If the transformation is successful it returns the handle to the
-    same payload as its operand to allow for simpler composition.
+    The transformation does not consume the target handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let skipDefaultBuilders = 1;
@@ -74,10 +73,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     unspecified order:
       - additional_iree_patterns: fancy patterns we shortcut into the system,
       will need to be sliced out better in the future.
-      - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This 
+      - bubble_collapse: bubble `collapse_shape` down across Linalg ops. This
       must be applied separately from `bubble_expand` patterns because of some
       upstream pattern interference issue atm.
-      - bubble_expand: bubble `expand_shape` down across Linalg ops. This 
+      - bubble_expand: bubble `expand_shape` down across Linalg ops. This
       must be applied separately from `bubble_collapse` patterns because of some
       upstream pattern interference issue atm.
       - bubble_pack_un_pack: bubble `pack` up and `unpack` down across Linalg
@@ -93,25 +92,32 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       - expand_memref_strided_metadata: adds patterns that expand memref
       operations into extract_strided_metadata operations and a materialization
       of their effect on the metadata (sizes, offset, strides).
+      - extract_address_computations: adds patterns for anchoring subview 
+      accessing operations at [0, ... 0].
       - fold_memref_aliases: adds patterns for folding ops such as
       memref.subview.
       - fold_reassociative_reshapes: adds patterns that fold insert_slice/
       extract_slice ops with reassociative reshape ops.
       - fold_tensor_empty_extract: Fold tensor.empty used by extract_slice in
       case it is the only use of extract.
+      - fold_tensor_subsets: adds patterns for folding tensor subset ops into
+      their producer and consumers.
       - licm: additionally apply loop-independent code motion and single 
       iteration loop promotion. This is not a set of patterns per se but is still
-      very convenient to apply it close to canonicalization and other greedy 
+      very convenient to apply it close to canonicalization and other greedy
       pattern applications.
-      - linalg_elementwise_greedy_fusion: add linalg elementwise ops fusion 
+      - linalg_elementwise_greedy_fusion: add linalg elementwise ops fusion
       patterns using a naive default heuristic.
       - lower_transfer_op_permutations: Lower transfer ops to transfer ops
       with minor identity permutations.
+      - lower_vector_masks: Lower vector.mask ops away.
+      - prepare_vector_to_mma: pre-process vector.contract op to set it in a form
+      that can be mapped to nvgpu.mma operations. 
       - rank_reducing_linalg: adds patterns that results in rank-reducing
       behavior on subset-based linalg operations using insert/extract slices.
       - rank_reducing_linalg_via_reshapes: adds patterns that results in rank-reducing
       behavior on subset-based linalg operations using expand/collapse shape ops.
-      - rank_reducing_vector: adds patterns that results in rank-reducing 
+      - rank_reducing_vector: adds patterns that results in rank-reducing
       behavior on subset-based vector operations.
       adopts the upstream version.
       - swapping_patterns: adds patterns that swap operations for a better outcome.
@@ -123,10 +129,10 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       - tiling_canonicalization: adds specific tiling-related canonicalization
       patterns.
       - unroll_vectors_gpu_mma_sync: adds patterns that unroll vectors to a native tile
-      size for GPUs with mma operations. The size is currently hardcoded but 
+      size for GPUs with mma operations. The size is currently hardcoded but
       should be refactored upstream and made pluggable.
       - unroll_vectors_gpu_wmma: adds patterns that unroll vectors to a native tile
-      size for GPUs with wmma operations. The size is currently hardcoded but 
+      size for GPUs with wmma operations. The size is currently hardcoded but
       should be refactored upstream and made pluggable.
 
 
@@ -139,11 +145,13 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
     If the pattern application fails, or if the underlying listener fails to
     capture op handles, the transformation definitely fails.
 
-    Otherwise the transformation is successful and returns the handle to the
-    same payload as its operand to allow for simpler composition.
+    Otherwise the transformation is successful.
+
+    This operation does not consume the target handle and does not produce any
+    handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                        UnitAttr:$additional_iree_patterns,
                        UnitAttr:$bubble_collapse,
                        UnitAttr:$bubble_expand,
@@ -152,12 +160,16 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$cse,
                        UnitAttr:$erase_unnecessary_tensor_operands,
                        UnitAttr:$expand_memref_strided_metadata,
+                       UnitAttr:$extract_address_computations,
                        UnitAttr:$fold_memref_aliases,
                        UnitAttr:$fold_reassociative_reshapes,
                        UnitAttr:$fold_tensor_empty_extract,
+                       UnitAttr:$fold_tensor_subsets,
                        UnitAttr:$licm,
                        UnitAttr:$linalg_elementwise_greedy_fusion,
                        UnitAttr:$lower_transfer_op_permutations,
+                       UnitAttr:$lower_vector_masks,
+                       UnitAttr:$prepare_vector_to_mma,
                        UnitAttr:$rank_reducing_linalg,
                        UnitAttr:$rank_reducing_linalg_via_reshapes,
                        UnitAttr:$rank_reducing_vector,
@@ -166,9 +178,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$tiling_canonicalization,
                        UnitAttr:$unroll_vectors_gpu_mma_sync,
                        UnitAttr:$unroll_vectors_gpu_wmma);
-  let results = (outs PDL_Operation:$result);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
@@ -186,19 +198,21 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 }
 
 def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
-    [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-     TransformOpInterface, TransformEachOpTrait]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let summary = "Hoist static allocations";
   let description = [{
     Find static allocations and hoist them to the top level.
 
     #### Return modes
-    This operation applies static alloc hoisting the whole region of the operand.
-    It always return success.
+    This transform applies static alloc hoisting the whole region of the operand.
+
+    It does not consume the target handle and always return success.
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs TransformHandleTypeInterface:$result);
+  let results = (outs);
 
   let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -238,14 +252,14 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   }];
 
   let arguments = (
-      ins PDL_Operation:$target,
+      ins TransformHandleTypeInterface:$target,
           UnitAttr:$target_gpu,
           UnitAttr:$test_analysis_only,
           UnitAttr:$print_conflicts
   );
-  let results = (outs PDL_Operation:$result);
+  let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat = "attr-dict $target";
+  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
@@ -258,12 +272,12 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
 
 def IREEEliminateEmptyTensorsOp : Op<
     Transform_Dialect, "iree.eliminate_empty_tensors",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     This is a pre-processing pass for iree.bufferize. It tries to remove
-    tensor.empty ops by replacing them with a suitable destination tensors,
+    tensor.empty ops by replacing them with suitable destination tensors,
     which can reduce the number of allocations when bufferizing.
 
     This transform is not part of iree.bufferize because additional
@@ -272,24 +286,26 @@ def IREEEliminateEmptyTensorsOp : Op<
 
     #### Return modes
 
-    This transform consumes the target handle and produces a result handle.
+    This transform does not consume the target handle and always return success.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$result);
-  let assemblyFormat = "attr-dict $target";
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
+  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
 }
 
 def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
     "iree.erase_hal_descriptor_type_from_memref",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     Erase #hal.descriptor_type from MemRef memory space to ignore all IREE
     memory space planning. This is meant to ease transitioning given that
@@ -303,23 +319,28 @@ def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
 
     If any of the pass on any of the FuncOp fails, the transformation
     definitely fails. Otherwise the transformation succeeds.
+
+    This transform does not consume the target handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$result);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
 
-  let assemblyFormat = "attr-dict $target";
+  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [OpBuilder<(ins "Value":$target)>];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
 }
 
 def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformOpInterface,
-     TransformEachOpTrait]> {
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     Target the whole hal.executable_variant op and rewrite the unique topLevel
     scf.forall to distributed workgroup_id and workgroup_count.
@@ -348,23 +369,19 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
     topLevel tile_to_forall_op.
 
     If the unique topLevel scf.forall operation contained within the
-    FuncOp referred to by the `target` PDLOperation lowers to workgroup properly,
-    the transform succeeds. Otherwise the transform definitely fails.
+    FuncOp referred to by the `target` transform handle lowers to workgroup
+    properly, the transform succeeds.
 
-    The returned handle points to the same FuncOp operand, consuming it and
-    producing a new SSA value to satisfy chaining and linearity of the IR
-    properties.
+    Otherwise the transform definitely fails.
+
+    This transform does not consume its input handle and produces no result.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -381,31 +398,31 @@ def ShareForallOperandsOp : Op<
       TransformEachOpTrait,
       TransformOpInterface]> {
   let description = [{
-    Target a single scf.forall op and shares all uses of the specified 
+    Target a single scf.forall op and shares all uses of the specified
     `share_operands` operand indices.
 
     Sharing can be thought of as the inverse of traditional privatization.
     Privatization consists in determining that a part of memory is only accessed
-    by a single thread to and subsequently slicing out that part into a 
+    by a single thread to and subsequently slicing out that part into a
     thread_private storage that has smaller footprint, better locality and better
     alignment properties.
-    In the case of scf.forall on tensors, tensor values are immutable 
+    In the case of scf.forall on tensors, tensor values are immutable
     and the same tensor value may be passed as `shared_outs` and also captured
     for internal uses.
-    Due to the immutability property, the whole tensor values are private by 
+    Due to the immutability property, the whole tensor values are private by
     construction and result in alloc + copy of the whole tensor on every thread
-    to maintain the original SSA value after bufferizing. 
+    to maintain the original SSA value after bufferizing.
 
     An analysis similar to privatization is needed to ensure that only a private
     slice is needed and that the whole tensor can be shared.
-    This transformation amounts to injecting the result of such an analysis as 
+    This transformation amounts to injecting the result of such an analysis as
     static information in the program.
     The transformation checks that the values captured are `tensor.extract_slice`
     with a matching `tensor.parallel_insert_slice`, to approximate the lack of
-    a cross-thread dependence analysis. 
+    a cross-thread dependence analysis.
     However this can still be unsafe wrt parallelism so use carefully!
 
-    Sharing consists in rewriting all uses of the operands passed as 
+    Sharing consists in rewriting all uses of the operands passed as
     `shared_outs` that are also captured wihtin the `scf.forall` region
     into the matching `shared_outs` bbarg.
 
@@ -416,7 +433,7 @@ def ShareForallOperandsOp : Op<
     #### Return modes
 
     If any of the `share_operands` indices overflow, a definite error is produced.
-    
+
     If a `share_operands` fails a sharing precondition, it is ignored.
     In the future, we should emit a notification.
 
@@ -509,6 +526,43 @@ def TileToForallAndWorkgroupCountRegionOp :
 
     ::llvm::SmallVector<::mlir::OpFoldResult> getMixedNumThreads();
     ::llvm::SmallVector<::mlir::OpFoldResult> getMixedTileSizes();
+  }];
+}
+
+def ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp : Op<Transform_Dialect,
+    "iree.convert_conv2d_to_img2col_and_adjust_workgroup_count_region",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
+  let description = [{
+    Wrapper around `structured.convert_conv2d_to_img2col` for use within IREE.
+
+    In addition to converting the conv2d to img2col, updates the
+    `workgroup_count` region of the export op corresponding to the
+    parent `func.func` of the target to match the changes to the problem
+    shape introduced by the conversion to img2col.
+    Please see the doc of `structured.convert_conv2d_to_img2col` for full
+    description of op semantics.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$img2col_tensor,
+                      TransformHandleTypeInterface:$transformed);
+
+  let assemblyFormat =
+    "$target attr-dict `:` functional-type($target, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::linalg::LinalgOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 

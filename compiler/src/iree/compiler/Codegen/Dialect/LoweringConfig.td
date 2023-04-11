@@ -25,18 +25,18 @@ def CPU_Mmt4dTilingExpert
     : I32EnumAttrCase<"Mmt4dTilingExpert", 5>;
 def CPU_BufferOpsTileAndVectorize
     : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 6>;
-def CPU_TripleTilingExpert : I32EnumAttrCase<"CPUTripleTilingExpert", 7>;
 
 def CPU_DataTiling
-    : I32EnumAttrCase<"CPUDataTiling", 8>;
+    : I32EnumAttrCase<"CPUDataTiling", 7>;
 
-def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 9>;
-def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 10>;
-def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 11>;
-def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
-def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 13>;
-def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
-def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 15>;
+def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 8>;
+def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 9>;
+def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 10>;
+def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 11>;
+def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 12>;
+def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 13>;
+def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 14>;
+def LLVMGPU_MatmulTensorCoreMmaSync : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 15>;
 
 def SPIRV_BaseDistribute
     : I32EnumAttrCase<"SPIRVBaseDistribute", 16>;
@@ -68,10 +68,11 @@ def DispatchLoweringPassPipelineEnum
             CPU_Default, CPU_DoubleTilingExpert, CPU_DoubleTilingPadExpert,
             CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
             CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
-            CPU_TripleTilingExpert, CPU_DataTiling, LLVMGPU_SimpleDistribute,
-            LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+            CPU_DataTiling, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
+            LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
             LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-            LLVMGPU_PackUnPack, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
+            LLVMGPU_PackUnPack, LLVMGPU_MatmulTensorCoreMmaSync,
+            SPIRV_BaseDistribute, SPIRV_BaseVectorize,
             SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
             SPIRV_SubgroupReduce, SPIRV_WinogradVectorize, VMVX_Default,
             // Transform dialect based codegen
@@ -215,7 +216,7 @@ def IREECodegen_CompilationInfoAttr :
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
     DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
         "The workgroup size to use during translation.">:$workgroupSize,
-    OptionalParameter<"llvm::Optional<int64_t>",
+    OptionalParameter<"std::optional<int64_t>",
         "The subgroup size to use during translation.">:$subgroupSize
   );
 
@@ -230,7 +231,7 @@ def IREECodegen_CompilationInfoAttr :
     AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
       "TranslationInfoAttr":$translationInfo,
       "ArrayRef<int64_t>":$workgroupSize,
-      "llvm::Optional<int64_t>":$subgroupSize
+      "std::optional<int64_t>":$subgroupSize
       )>,
   ];
   let extraClassDeclaration = [{

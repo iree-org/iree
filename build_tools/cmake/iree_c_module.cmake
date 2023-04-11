@@ -72,9 +72,9 @@ function(iree_c_module)
   # Check LLVM static library setting. If the static libary output path is set,
   # retrieve the object path and the corresponding header file path.
   if(_RULE_STATIC_LIB_PATH)
-    list(APPEND _ARGS "--iree-llvm-link-embedded=false")
-    list(APPEND _ARGS "--iree-llvm-link-static")
-    list(APPEND _ARGS "--iree-llvm-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
+    list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
+    list(APPEND _ARGS "--iree-llvmcpu-link-static")
+    list(APPEND _ARGS "--iree-llvmcpu-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
 
     string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
     list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
@@ -101,7 +101,7 @@ function(iree_c_module)
       "${_TESTONLY_ARG}"
     DEPS
       # Include paths and options for the runtime sources.
-      iree::runtime::src::defs
+      iree::defs
   )
 
   if(_RULE_NO_RUNTIME)

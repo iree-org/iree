@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
-#include "iree/compiler/Utils/ADTExtras.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
@@ -88,7 +87,7 @@ static SmallVector<Binding> findCorrelatedBindings(
   for (auto dispatchOp : dispatchOps) {
     llvm::EquivalenceClasses<unsigned> ec;
     DenseMap<Value, unsigned> leaders;
-    for (auto [idx, resource, resourceAccessAttr] : enumerate_zip_equal(
+    for (auto [idx, resource, resourceAccessAttr] : llvm::enumerate(
              dispatchOp.getResources(), dispatchOp.getResourceAccesses())) {
       // If the resource is mutable and we were told not to alias mutable
       // bindings we always put the resource into its own class.

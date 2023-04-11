@@ -4,7 +4,7 @@
 // RUN:     --iree-flow-transformation-pipeline  \
 /// This must be used with the custom dispatch region formation
 /// because IREE's does not fuse the 6 ops softmax version even with
-/// --iree-flow-enable-aggressive-fusion.
+/// --iree-flow-fuse-multi-use.
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
@@ -18,7 +18,7 @@
 /// flags leak to the JIT session, which doesn't know what to do with them.
 /// This must be used with the custom dispatch region formation
 /// because IREE's does not fuse the 6 ops softmax version even with
-/// --iree-flow-enable-aggressive-fusion.
+/// --iree-flow-fuse-multi-use.
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
 // RUN: iree-run-module --function=softmax --device=cuda | \

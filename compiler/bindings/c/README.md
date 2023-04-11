@@ -31,5 +31,5 @@ Depending on build configuration, the API is built in the following ways:
   can happen in a variety of cases (i.e. avoiding symbol conflicts, integrating
   across build systems, etc).
 
-See the implementation under `compiler/src/iree/compiler/API2` (TODO: rename
+See the implementation under `compiler/src/iree/compiler/API` (TODO: rename
 to `ApiImpl`).

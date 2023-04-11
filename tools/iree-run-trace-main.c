@@ -124,11 +124,19 @@ static iree_status_t iree_trace_replay_call_after(void* user_data,
 static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
                                          FILE* file,
                                          iree_vm_instance_t* instance) {
+  iree_trace_replay_flags_t replay_flags = IREE_TRACE_REPLAY_FLAG_NONE;
+  if (FLAG_print_statistics) {
+    replay_flags |= IREE_TRACE_REPLAY_FLAG_PRINT_STATISTICS;
+  }
+
+  iree_vm_context_flags_t context_flags = IREE_VM_CONTEXT_FLAG_NONE;
+  if (FLAG_trace_execution) {
+    context_flags |= IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION;
+  }
+
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
-      root_path, instance,
-      FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
-                           : IREE_VM_CONTEXT_FLAG_NONE,
+      root_path, instance, replay_flags, context_flags,
       iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
 
   // Hook into all calls processed during the trace.
@@ -147,7 +155,7 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
-    iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+    iree_trace_replay_deinitialize(&replay);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "yaml_parser_initialize failed");
   }
@@ -206,10 +214,7 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
     }
   }
 
-  iree_trace_replay_deinitialize(
-      &replay, FLAG_print_statistics
-                   ? IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS
-                   : IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+  iree_trace_replay_deinitialize(&replay);
   return status;
 }
 

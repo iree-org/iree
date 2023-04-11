@@ -7,6 +7,7 @@
 
 from typing import List, Tuple
 
+from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 from benchmark_suites.iree import (riscv_benchmarks, x86_64_benchmarks,
                                    adreno_benchmarks, armv8_a_benchmarks,
@@ -43,7 +44,9 @@ def generate_benchmarks(
   # For now we simply track compilation statistics of all modules.
   for gen_config in all_gen_configs:
     compile_config = gen_config.compile_config
-    compile_stats_config = iree_definitions.CompileConfig(
+    # Use POSIX path, see the comment of iree_definitions.MODULE_DIR_VARIABLE.
+    scheduling_stats_path = f"{iree_definitions.MODULE_DIR_VARIABLE}/{iree_artifacts.SCHEDULING_STATS_FILENAME}"
+    compile_stats_config = iree_definitions.CompileConfig.build(
         id=compile_config.id + COMPILE_STATS_ID_SUFFIX,
         tags=compile_config.tags + [COMPILE_STATS_TAG],
         compile_targets=compile_config.compile_targets,
@@ -51,10 +54,13 @@ def generate_benchmarks(
             # Enable zip polyglot to provide component sizes.
             "--iree-vm-emit-polyglot-zip=true",
             # Disable debug symbols to provide correct component sizes.
-            "--iree-llvm-debug-symbols=false"
+            "--iree-llvmcpu-debug-symbols=false",
+            # Dump scheduling statistics
+            "--iree-scheduling-dump-statistics-format=json",
+            f"--iree-scheduling-dump-statistics-file={scheduling_stats_path}"
         ])
     compile_stats_gen_configs.append(
-        iree_definitions.ModuleGenerationConfig.with_flag_generation(
+        iree_definitions.ModuleGenerationConfig.build(
             imported_model=gen_config.imported_model,
             compile_config=compile_stats_config))
   all_gen_configs += compile_stats_gen_configs

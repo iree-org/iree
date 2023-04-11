@@ -191,6 +191,21 @@ void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
                              OperandRange operandDims, TypeRange resultTypes,
                              OperandRange resultDims, ArrayAttr tiedOperands);
 
+//===----------------------------------------------------------------------===//
+// custom<ShapedFunctionSignature>
+//===----------------------------------------------------------------------===//
+// (%arg0: type {some.attr = 54 : index}, %arg1: type) -> (type, %arg1 as type)
+
+ParseResult parseShapedFunctionSignature(OpAsmParser &parser,
+                                         TypeAttr &functionTypeAttr,
+                                         ArrayAttr &tiedOperands,
+                                         ArrayAttr &argAttrs,
+                                         ArrayAttr &resultAttrs);
+void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
+                                  TypeAttr functionTypeAttr,
+                                  ArrayAttr tiedOperands, ArrayAttr argAttrs,
+                                  ArrayAttr resultAttrs);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

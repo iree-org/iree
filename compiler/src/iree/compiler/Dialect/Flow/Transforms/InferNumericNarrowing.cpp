@@ -119,7 +119,7 @@ class InferNumericNarrowingPass
     // Insert the annotation.
     OpBuilder builder(context);
     builder.setInsertionPointAfterValue(probePoint);
-    Optional<std::pair<int64_t, int64_t>> range;
+    std::optional<std::pair<int64_t, int64_t>> range;
     // i0 values cannot parse any values so omit.
     if (type.getWidth() != 0) {
       range = std::make_pair(minValue, maxValue);

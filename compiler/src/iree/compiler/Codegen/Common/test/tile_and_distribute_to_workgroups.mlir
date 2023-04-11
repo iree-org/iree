@@ -1,5 +1,6 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups)), canonicalize, cse)' --split-input-file %s | FileCheck %s
-
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{max-workgroup-parallel-dims=1})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=CHECKW
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{distribution-method=2})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=NO-LOOP
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -299,8 +300,14 @@ hal.executable private @add_distribute4D {
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> ((s0 ceildiv 64) * (s1 ceildiv 2))>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 2)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> (s0 * 64)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> ((s0 floordiv (s1 ceildiv 64)) * 2)>
+//  CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0] -> ((s0 ceildiv 2) * 2)>
+//  CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 2)>
+//  CHECK-DAG: #[[MAP5:.+]] = affine_map<()[s0, s1] -> ((s0 mod (s1 ceildiv 64)) * 64)>
+//  CHECK-DAG: #[[MAP6:.+]] = affine_map<()[s0] -> ((s0 ceildiv 64) * 64)>
+//  CHECK-DAG: #[[MAP7:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
+//  CHECK-DAG: #[[MAP8:.+]] = affine_map<()[s0] -> (s0 * 64)>
+//  CHECK-DAG: #[[MAP9:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @add_distribute4D
@@ -314,27 +321,44 @@ hal.executable private @add_distribute4D {
 //  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_2]]]
 //  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_3]]]
 //      CHECK:    hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
-//      CHECK: func.func @add_distribute4D()
-//  CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
-//  CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
-//  CHECK-DAG:   %[[D2:.+]] = hal.interface.constant.load[2] : index
-//  CHECK-DAG:   %[[D3:.+]] = hal.interface.constant.load[3] : index
-//  CHECK-DAG:   %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
-//  CHECK-DAG:   %[[IDY:.+]] = hal.interface.workgroup.id[1] : index
-//  CHECK-DAG:   %[[IDZ:.+]] = hal.interface.workgroup.id[2] : index
-//  CHECK-DAG:   %[[NUMT:.+]] = affine.apply #[[MAP]]()[%[[D1]]]
-//  CHECK-DAG:   %[[ID3:.+]] = arith.remui %[[IDZ]], %[[NUMT]] : index
-//  CHECK-DAG:   %[[ID4:.+]] = arith.divui %[[IDZ]], %[[NUMT]] : index
-//  CHECK-DAG:   %[[L4:.+]] = affine.apply #[[MAP2]]()[%[[ID4]]]
-//      CHECK:   scf.for %[[IV0:.+]] = %[[L4]]
-//      CHECK:     %[[L3:.+]] = affine.apply #[[MAP3]]()[%[[ID3]]]
-//      CHECK:     scf.for %[[IV1:.+]] = %[[L3]]
-//      CHECK:       scf.for %[[IV2:.+]] =
-//      CHECK:         scf.for %[[IV3:.+]] =
-//  CHECK-NOT:         scf.for
-//      CHECK:         %[[GENERIC:.+]] = linalg.generic
-//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]]]
-
+//      CHECK:    func.func @add_distribute4D() {
+//  CHECK-DAG:      %[[D0:.*]] = hal.interface.constant.load[0] : index
+//  CHECK-DAG:      %[[D1:.*]] = hal.interface.constant.load[1] : index
+//  CHECK-DAG:      %[[D2:.*]] = hal.interface.constant.load[2] : index
+//  CHECK-DAG:      %[[D3:.*]] = hal.interface.constant.load[3] : index
+//  CHECK-DAG:      %[[D4:.*]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
+//  CHECK-DAG:      %[[D5:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
+//  CHECK-DAG:      %[[D6:.*]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
+//      CHECK:      %[[WORKGROUP_ID_X:.*]] = hal.interface.workgroup.id[0] : index
+//      CHECK:      %[[WORKGROUP_COUNT_X:.*]] = hal.interface.workgroup.count[0] : index
+//      CHECK:      %[[WORKGROUP_ID_Y:.*]] = hal.interface.workgroup.id[1] : index
+//      CHECK:      %[[WORKGROUP_COUNT_Y:.*]] = hal.interface.workgroup.count[1] : index
+//      CHECK:      %[[WORKGROUP_ID_Z:.*]] = hal.interface.workgroup.id[2] : index
+//  CHECK-DAG:      %[[D7:.*]] = affine.apply #map2(){{\[}}%[[WORKGROUP_ID_Z]], %[[D1]]]
+//  CHECK-DAG:      %[[D8:.*]] = affine.apply #map3(){{\[}}%[[D0]]]
+//      CHECK:      scf.for %[[ARG0:.*]] = %[[D7]] to %[[D0]] step %[[D8]] {
+//  CHECK-DAG:        %[[D9:.*]] = affine.min #map4(%[[ARG0]]){{\[}}%[[D0]]]
+//  CHECK-DAG:        %[[D10:.*]] = affine.apply #map5(){{\[}}%[[WORKGROUP_ID_Z]], %[[D1]]]
+//  CHECK-DAG:        %[[D11:.*]] = affine.apply #map6(){{\[}}%[[D1]]]
+//      CHECK:        scf.for %[[ARG1:.*]] = %[[D10]] to %[[D1]] step %[[D11]] {
+//  CHECK-DAG:          %[[D12:.*]] = affine.min #map7(%[[ARG1]]){{\[}}%[[D1]]]
+//  CHECK-DAG:          %[[D13:.*]] = affine.apply #map8(){{\[}}%[[WORKGROUP_ID_Y]]]
+//  CHECK-DAG:          %[[D14:.*]] = affine.apply #map8(){{\[}}%[[WORKGROUP_COUNT_Y]]]
+//      CHECK:          scf.for %[[ARG2:.*]] = %[[D13]] to %[[D2]] step %[[D14]] {
+//  CHECK-DAG:            %[[D15:.*]] = affine.min #map7(%[[ARG2]]){{\[}}%[[D2]]]
+//  CHECK-DAG:            %[[D16:.*]] = affine.apply #map8(){{\[}}%[[WORKGROUP_ID_X]]]
+//  CHECK-DAG:            %[[D17:.*]] = affine.apply #map8(){{\[}}%[[WORKGROUP_COUNT_X]]]
+//      CHECK:            scf.for %[[ARG3:.*]] = %[[D16]] to %[[D3]] step %[[D17]] {
+//      CHECK:              %[[D18:.*]] = affine.min #map7(%[[ARG3]]){{\[}}%[[D3]]]
+//      CHECK:              %[[D19:.*]] = flow.dispatch.tensor.load %[[D4]], offsets = {{\[}}%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]], sizes = {{\[}}%[[D9]], %[[D12]], %[[D15]], %[[D18]]], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]} -> tensor<?x?x?x?xf32>
+//      CHECK:              %[[D20:.*]] = flow.dispatch.tensor.load %[[D5]], offsets = {{\[}}%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]], sizes = {{\[}}%[[D9]], %[[D12]], %[[D15]], %[[D18]]], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]} -> tensor<?x?x?x?xf32>
+//      CHECK:              %[[D21:.*]] = tensor.empty(%[[D9]], %[[D12]], %[[D15]], %[[D18]]) : tensor<?x?x?x?xf32>
+//      CHECK:              %[[D22:.*]] = linalg.generic {indexing_maps = [#map9, #map9, #map9], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[D19]], %[[D20]] : tensor<?x?x?x?xf32>, tensor<?x?x?x?xf32>) outs(%[[D21]] : tensor<?x?x?x?xf32>) attrs =  {lowering_config = #config} {
+//      CHECK:              ^bb0(%[[IN:.*]]: f32, %[[IN_0:.*]]: f32, %[[OUT:.*]]: f32):
+//      CHECK:                %[[D23:.*]] = arith.addf %[[IN]], %[[IN_0]] : f32
+//      CHECK:                linalg.yield %[[D23]] : f32
+//      CHECK:              } -> tensor<?x?x?x?xf32>
+//      CHECK:              flow.dispatch.tensor.store %[[D22:.*]], %[[D6]], offsets = {{\[}}%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]], sizes = {{\[}}%[[D9]], %[[D12]], %[[D15]], %[[D18]]], strides = [1, 1, 1, 1] : tensor<?x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
 
 // -----
 
@@ -1056,6 +1080,18 @@ hal.executable private @generic_static {
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       %[[RESULT:.+]] = linalg.generic
 //      CHECK:       flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[IV0]], %[[IV1]]]
+
+//  NO-LOOP-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 16)>
+//  NO-LOOP-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//      NO-LOOP: func.func @generic_static()
+//  NO-LOOP-DAG:   %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
+//  NO-LOOP-DAG:   %[[IDY:.+]] = hal.interface.workgroup.id[1] : index
+//  NO-LOOP-DAG:   %[[OFFX:.+]] = affine.apply #[[MAP1]]()[%[[IDX]]]
+//  NO-LOOP-DAG:   %[[OFFY:.+]] = affine.apply #[[MAP0]]()[%[[IDY]]]
+//  NO-LOOP-NOT:   scf.for
+//      NO-LOOP:   %[[RESULT:.+]] = linalg.generic
+//      NO-LOOP:   -> tensor<16x32xf32>
+//      NO-LOOP:   flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[OFFY]], %[[OFFX]]]
 
 // -----
 
@@ -2278,7 +2314,6 @@ hal.executable private @elem_pack {
         %18 = tensor.pack %16#0 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %17 {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, 64]]>} : tensor<384x512xf32> -> tensor<48x512x8x1xf32>
         flow.dispatch.tensor.store %18, %6, offsets = [0, 0, 0, 0], sizes = [48, 512, 8, 1], strides = [1, 1, 1, 1] : tensor<48x512x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<48x512x8x1xf32>>
         flow.dispatch.tensor.store %16#0, %7, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : tensor<384x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
-        flow.dispatch.tensor.store %16#1, %8, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : tensor<384x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
         return
       }
     }
@@ -2291,4 +2326,80 @@ hal.executable private @elem_pack {
 // CHECK:             %[[PACK:.+]] = tensor.pack
 // CHECK-DAG:         flow.dispatch.tensor.store %[[PACK]], {{.*}} sizes = [8, 64, 8, 1]
 // CHECK-DAG:         flow.dispatch.tensor.store %[[ELEM]]#0, {{.*}} sizes = [64, 64]
-// CHECK-DAG:         flow.dispatch.tensor.store %[[ELEM]]#1, {{.*}} sizes = [64, 64]
+
+// -----
+
+hal.executable private @scatter {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+  hal.executable.export public @scatter ordinal(0)
+  layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
+  attributes {translation_info = #iree_codegen.translation_info<LLVMGPUDistribute>, workgroup_size = [1 : index, 1 : index, 1 : index]} {
+  ^bb0(%arg0: !hal.device, %arg1: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @scatter() {
+      %c228075520 = arith.constant 228075520 : index
+      %c251668480 = arith.constant 251668480 : index
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c228075520) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<5898240xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c251668480) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<5898240x4xi32>>
+      %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x640x48x48xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [5898240], strides = [1] : !flow.dispatch.tensor<readonly:tensor<5898240xf32>> -> tensor<5898240xf32>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [5898240, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<5898240x4xi32>> -> tensor<5898240x4xi32>
+      %5 = tensor.empty() : tensor<1x640x48x48xf32>
+      %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[]]>} ins(%cst : f32) outs(%5 : tensor<1x640x48x48xf32>) -> tensor<1x640x48x48xf32>
+      %7 = iree_linalg_ext.scatter {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[]]>} dimension_map = [0, 1, 2, 3] unique_indices(false) ins(%3, %4 : tensor<5898240xf32>, tensor<5898240x4xi32>) outs(%6 : tensor<1x640x48x48xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32):
+        %8 = arith.addf %arg1, %arg0 : f32
+        iree_linalg_ext.yield %8 : f32
+      } -> tensor<1x640x48x48xf32>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 640, 48, 48], strides = [1, 1, 1, 1] : tensor<1x640x48x48xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x640x48x48xf32>>
+      return
+    }
+  }
+}
+}
+
+// CHECK-LABEL: func.func @scatter
+//       CHECK:   iree_linalg_ext.scatter
+
+// -----
+
+module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}>], legacy_sync}>]} {
+  hal.executable private @collapse_workgroups_dispatch_dispatch_0 {
+    hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+      hal.executable.export public @collapse_workgroups_dispatch_dispatch_0_generic_1024x128x16x64 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+      ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
+        hal.return %x, %y, %z : index, index, index
+      }
+      builtin.module {
+        func.func @collapse_workgroups_dispatch_dispatch_0_generic_1024x128x16x64() {
+          %c0 = arith.constant 0 : index
+          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x16x128x64xf32>>
+          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x128x16x64xf32>>
+          %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1024, 16, 128, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x16x128x64xf32>> -> tensor<1024x16x128x64xf32>
+          %3 = tensor.empty() : tensor<1024x128x16x64xf32>
+          %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<1024x16x128x64xf32>) outs(%3 : tensor<1024x128x16x64xf32>) attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1, 64]]>} {
+          ^bb0(%in: f32, %out: f32):
+            linalg.yield %in : f32
+          } -> tensor<1024x128x16x64xf32>
+          flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [1024, 128, 16, 64], strides = [1, 1, 1, 1] : tensor<1024x128x16x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<1024x128x16x64xf32>>
+          return
+        }
+      }
+    }
+  }
+}
+
+// CHECKW-LABEL:   hal.executable private @collapse_workgroups_dispatch_dispatch_0 {
+// CHECKW:           hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+// CHECKW:             hal.executable.export public @collapse_workgroups_dispatch_dispatch_0_generic_1024x128x16x64 ordinal(0) layout(#pipeline_layout) {
+// CHECKW:             ^bb0(%[[ARG0:.*]]: !hal.device, %[[ARG1:.*]]: index, %[[ARG2:.*]]: index, %[[ARG3:.*]]: index, %[[ARG4:.*]]: index):
+// CHECKW:               %[[C2097152:.*]] = arith.constant 2097152 : index
+// CHECKW:               %[[C1:.*]] = arith.constant 1 : index
+// CHECKW:               hal.return %[[C2097152]], %[[C1]], %[[C1]] : index, index, index
+// CHECKW:             }

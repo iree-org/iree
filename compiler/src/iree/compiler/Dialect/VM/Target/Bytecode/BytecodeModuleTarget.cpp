@@ -76,7 +76,7 @@ struct RodataRef {
   // Total size of the serialized data in bytes.
   uint64_t totalSize = 0;
   // Optional reference to the rodata in the file.
-  Optional<ArchiveWriter::File> archiveFile;
+  std::optional<ArchiveWriter::File> archiveFile;
 };
 
 }  // namespace
@@ -209,7 +209,9 @@ static LogicalResult canonicalizeModule(
   }
 
   PassManager passManager(context);
-  mlir::applyPassManagerCLOptions(passManager);
+  // TODO(12938): Handle or investigate failure result.
+  auto logicalRes = mlir::applyPassManagerCLOptions(passManager);
+  (void)logicalRes;
   mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();

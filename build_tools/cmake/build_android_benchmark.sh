@@ -40,7 +40,6 @@ BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
 "${BAZEL_CMD[@]}" build \
       //iree_tf_compiler:iree-import-tflite \
-      //iree_tf_compiler:iree-import-tf \
       --config=generic_clang \
       --config=remote_cache_bazel_tf_ci
 # So the benchmark build below can find the importer binaries that were built.
@@ -65,7 +64,7 @@ cd build-host
   -DCMAKE_INSTALL_PREFIX=./install \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_BENCHMARKS=ON \
+  -DIREE_BUILD_LEGACY_BENCHMARKS=ON \
   -DIREE_BUILD_MICROBENCHMARKS=ON \
   -DIREE_BUILD_SAMPLES=OFF
 

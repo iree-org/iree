@@ -111,7 +111,6 @@ following command:
     iree-compile \
         --iree-hal-target-backends=cuda \
         --iree-hal-cuda-llvm-target-arch=<...> \
-        --iree-hal-cuda-disable-loop-nounroll-wa \
         --iree-input-type=mhlo \
         iree_input.mlir -o mobilenet-cuda.vmfb
     ```

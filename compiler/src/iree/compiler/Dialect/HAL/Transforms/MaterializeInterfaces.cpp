@@ -174,7 +174,7 @@ static IREE::HAL::PipelineLayoutAttr makePipelineLayoutAttr(
           builder.getContext(), binding.ordinal, binding.type,
           binding.flags != IREE::HAL::DescriptorFlags::None
               ? binding.flags
-              : Optional<IREE::HAL::DescriptorFlags>{}));
+              : std::optional<IREE::HAL::DescriptorFlags>{}));
     }
     setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
         builder.getContext(), setLayout.ordinal, bindingAttrs));

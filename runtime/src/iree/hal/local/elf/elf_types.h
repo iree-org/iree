@@ -77,6 +77,12 @@ enum {
 };
 
 enum {
+  IREE_ELF_ELFOSABI_NONE = 0,          // No extensions or unspecified
+  IREE_ELF_ELFOSABI_LINUX = 3,         // Linux
+  IREE_ELF_ELFOSABI_STANDALONE = 255,  // Standalone
+};
+
+enum {
   IREE_ELF_ET_NONE = 0,  // No file type
   IREE_ELF_ET_REL = 1,   // Relocatable file
   IREE_ELF_ET_EXEC = 2,  // Executable file
