@@ -1059,6 +1059,112 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-44e0517dcee4f94b6f7ea1dd6b5492ee9752b4a7cab27d3e5e5ad38ef23071c6"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_50a7aece-73f9-47f4-a93a-4a1178f45407_matmul_3456x1024x2048_f16t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_3456x1024x2048_f16t_tile_config_default_module_44e0517dcee4f94b6f7ea1dd6b5492ee9752b4a7cab27d3e5e5ad38ef23071c6/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+  FRIENDLY_NAME
+    "matmul_3456x1024x2048_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-c0ea83b865fd0c67a3013086ef2250464e2aecfc615a95170ef46128d2e57208"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_a55afe1c-9410-47a6-b417-04b0d75ee5f4_matmul_3456x1024x2048_f32t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_3456x1024x2048_f32t_tile_config_default_module_c0ea83b865fd0c67a3013086ef2250464e2aecfc615a95170ef46128d2e57208/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+  FRIENDLY_NAME
+    "matmul_3456x1024x2048_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-c91ccf1fb3086a35cffd2e8bed6be929574a9ba626d9f271f577503ad07e3509"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_81cebaaf-e23d-4a32-89dc-9fc7adc37a8f_matmul_2560x2560x2560_f16t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_2560x2560x2560_f16t_tile_config_default_module_c91ccf1fb3086a35cffd2e8bed6be929574a9ba626d9f271f577503ad07e3509/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+  FRIENDLY_NAME
+    "matmul_2560x2560x2560_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-2502249d103b48bf09a1d8d659fc143f1fb6e9479256e3e621061a2d06dcef2f"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_579b77ea-76bd-4eb3-bd85-067c25a89eff_matmul_2560x2560x2560_f32t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_2560x2560x2560_f32t_tile_config_default_module_2502249d103b48bf09a1d8d659fc143f1fb6e9479256e3e621061a2d06dcef2f/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+  FRIENDLY_NAME
+    "matmul_2560x2560x2560_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-e6503d42c202eff85bcddb53e9869017943e756af09bfe2c05ffc27844ac77e9"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_699fd533-02a9-49f0-bf26-1902d8dbb5af_matmul_128x256x8192_f16t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_128x256x8192_f16t_tile_config_default_module_e6503d42c202eff85bcddb53e9869017943e756af09bfe2c05ffc27844ac77e9/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-flow-split-matmul-reduction=4"
+    "--iree-codegen-llvmgpu-use-wmma"
+  FRIENDLY_NAME
+    "matmul_128x256x8192_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,splitk]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-59025e9cf180a4a72de8f609ac9c4e4a3d855a603eedf62d9577e738f1ec12f4"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_a6c2b812-0a71-45e7-9ea5-f3d8529213ef_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_128x256x8192_f32t_tile_config_default_module_59025e9cf180a4a72de8f609ac9c4e4a3d855a603eedf62d9577e738f1ec12f4/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-flow-split-matmul-reduction=4"
+    "--iree-codegen-llvmgpu-use-wmma"
+  FRIENDLY_NAME
+    "matmul_128x256x8192_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,splitk]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-58f67edb580a13aa98d3fd05ad31f207d62462c9de990825656b19d2fbacda3c"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635.mlir"
@@ -3418,6 +3524,136 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-9b4e60a06d92bebe93ee7824e1990d10bce55062bd896d3f15604881c446e528"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_50a7aece-73f9-47f4-a93a-4a1178f45407_matmul_3456x1024x2048_f16t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_3456x1024x2048_f16t_tile_config_default_module_9b4e60a06d92bebe93ee7824e1990d10bce55062bd896d3f15604881c446e528/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_matmul_3456x1024x2048_f16t_tile_config_default_module_9b4e60a06d92bebe93ee7824e1990d10bce55062bd896d3f15604881c446e528/scheduling_stats.json"
+  FRIENDLY_NAME
+    "matmul_3456x1024x2048_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-52ce6f195b382daa71816b068bc1d13541397d6da097276699dbaffa95de35d7"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_a55afe1c-9410-47a6-b417-04b0d75ee5f4_matmul_3456x1024x2048_f32t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_3456x1024x2048_f32t_tile_config_default_module_52ce6f195b382daa71816b068bc1d13541397d6da097276699dbaffa95de35d7/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_matmul_3456x1024x2048_f32t_tile_config_default_module_52ce6f195b382daa71816b068bc1d13541397d6da097276699dbaffa95de35d7/scheduling_stats.json"
+  FRIENDLY_NAME
+    "matmul_3456x1024x2048_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-973d25bc365d73084bfa35f317464f59a9b00f67d732733b4eaa476a418ecd95"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_81cebaaf-e23d-4a32-89dc-9fc7adc37a8f_matmul_2560x2560x2560_f16t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_2560x2560x2560_f16t_tile_config_default_module_973d25bc365d73084bfa35f317464f59a9b00f67d732733b4eaa476a418ecd95/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_matmul_2560x2560x2560_f16t_tile_config_default_module_973d25bc365d73084bfa35f317464f59a9b00f67d732733b4eaa476a418ecd95/scheduling_stats.json"
+  FRIENDLY_NAME
+    "matmul_2560x2560x2560_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-f9df9c8ecc1b369ddc960f07ab7097a9c1dd8587441cbd9cf91e443e2639bf28"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_579b77ea-76bd-4eb3-bd85-067c25a89eff_matmul_2560x2560x2560_f32t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_2560x2560x2560_f32t_tile_config_default_module_f9df9c8ecc1b369ddc960f07ab7097a9c1dd8587441cbd9cf91e443e2639bf28/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_matmul_2560x2560x2560_f32t_tile_config_default_module_f9df9c8ecc1b369ddc960f07ab7097a9c1dd8587441cbd9cf91e443e2639bf28/scheduling_stats.json"
+  FRIENDLY_NAME
+    "matmul_2560x2560x2560_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-371a68ee85e41abf2d2a2847fe6c9f85fdc51f76516d74e3576b9d72670c1a0b"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_699fd533-02a9-49f0-bf26-1902d8dbb5af_matmul_128x256x8192_f16t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_128x256x8192_f16t_tile_config_default_module_371a68ee85e41abf2d2a2847fe6c9f85fdc51f76516d74e3576b9d72670c1a0b/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-flow-split-matmul-reduction=4"
+    "--iree-codegen-llvmgpu-use-wmma"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_matmul_128x256x8192_f16t_tile_config_default_module_371a68ee85e41abf2d2a2847fe6c9f85fdc51f76516d74e3576b9d72670c1a0b/scheduling_stats.json"
+  FRIENDLY_NAME
+    "matmul_128x256x8192_f16t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,splitk,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-1af884e597c283d319b14e8d55156eac66a86045fcb7e521c3f50aa8a6c04126"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_a6c2b812-0a71-45e7-9ea5-f3d8529213ef_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_matmul_128x256x8192_f32t_tile_config_default_module_1af884e597c283d319b14e8d55156eac66a86045fcb7e521c3f50aa8a6c04126/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=none"
+    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-hal-benchmark-dispatch-repeat-count=100"
+    "--iree-flow-split-matmul-reduction=4"
+    "--iree-codegen-llvmgpu-use-wmma"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_matmul_128x256x8192_f32t_tile_config_default_module_1af884e597c283d319b14e8d55156eac66a86045fcb7e521c3f50aa8a6c04126/scheduling_stats.json"
+  FRIENDLY_NAME
+    "matmul_128x256x8192_f32t_tile_config_default(linalg) [cuda-sm_80-linux_gnu-cuda][ukernel,matmul,splitk,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-2fe6a4ac93d74732ebabbd87e84e6ec56d2aeb9f6a94f5b595f74f947498c579"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_b697188baed496a2e596578a28633d58a583aa970264235992ca623861483635.mlir"
@@ -5119,6 +5355,12 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_model-fd05da43-5e37-4fa0-88f8-3ceec1682345-batch-8
   ${PACKAGE_NAME}_model-9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8
   ${PACKAGE_NAME}_model-340553d1-e6fe-41b6-b2c7-687c74ccec56
+  ${PACKAGE_NAME}_model-50a7aece-73f9-47f4-a93a-4a1178f45407
+  ${PACKAGE_NAME}_model-a55afe1c-9410-47a6-b417-04b0d75ee5f4
+  ${PACKAGE_NAME}_model-81cebaaf-e23d-4a32-89dc-9fc7adc37a8f
+  ${PACKAGE_NAME}_model-579b77ea-76bd-4eb3-bd85-067c25a89eff
+  ${PACKAGE_NAME}_model-699fd533-02a9-49f0-bf26-1902d8dbb5af
+  ${PACKAGE_NAME}_model-a6c2b812-0a71-45e7-9ea5-f3d8529213ef
   ${PACKAGE_NAME}_iree-imported-model-830d6f2775a6d19551826e6aa0bb4822feef6c5908023c81c8b02ef29fdb7a41
   ${PACKAGE_NAME}_iree-imported-model-de3ec8610ae583fef77e064e7e93ca0c71ab93c471458e6538fa0f722ce64d25
   ${PACKAGE_NAME}_iree-imported-model-4ddc42daca54a45b7c253bb2eb9020408caff7af1eeac74e66824690358fb618
@@ -5173,6 +5415,12 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-c4b43b31944dbd567e48efacfdb33f707eb248538cf70fa7dcf1085c6c7dbd3f
   ${PACKAGE_NAME}_iree-module-c8ec2db5ee884e0af17814e61b13d7f7f1f2d4f7028e8c1920d0d968c27de2bb
   ${PACKAGE_NAME}_iree-module-9470c46965ea67794da45496454c82eade29b5a519d8037b1314738621e02260
+  ${PACKAGE_NAME}_iree-module-44e0517dcee4f94b6f7ea1dd6b5492ee9752b4a7cab27d3e5e5ad38ef23071c6
+  ${PACKAGE_NAME}_iree-module-c0ea83b865fd0c67a3013086ef2250464e2aecfc615a95170ef46128d2e57208
+  ${PACKAGE_NAME}_iree-module-c91ccf1fb3086a35cffd2e8bed6be929574a9ba626d9f271f577503ad07e3509
+  ${PACKAGE_NAME}_iree-module-2502249d103b48bf09a1d8d659fc143f1fb6e9479256e3e621061a2d06dcef2f
+  ${PACKAGE_NAME}_iree-module-e6503d42c202eff85bcddb53e9869017943e756af09bfe2c05ffc27844ac77e9
+  ${PACKAGE_NAME}_iree-module-59025e9cf180a4a72de8f609ac9c4e4a3d855a603eedf62d9577e738f1ec12f4
   ${PACKAGE_NAME}_iree-module-58f67edb580a13aa98d3fd05ad31f207d62462c9de990825656b19d2fbacda3c
   ${PACKAGE_NAME}_iree-module-1655ee92ee23748886eef280d7d6f96c8a227fae7d6d78abd3466ce8614f16ba
   ${PACKAGE_NAME}_iree-module-496bdea78d06c9c32d8deae84b088b0eb34f6d1982ac790e2580a50dec4281ae
@@ -5301,6 +5549,12 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-88b6b5f712cd2f40d07a136e7f911c05b976c390e07f104c970292dee9a77e9a
   ${PACKAGE_NAME}_iree-module-925cdb19f2aa31a1907c81b5a9e179d91280c77b08a039c1cbf146f71683dde9
   ${PACKAGE_NAME}_iree-module-3c94ab45ad76bd8b2083729b65340b987da3247c854faf7d06431cb05a3b0a23
+  ${PACKAGE_NAME}_iree-module-9b4e60a06d92bebe93ee7824e1990d10bce55062bd896d3f15604881c446e528
+  ${PACKAGE_NAME}_iree-module-52ce6f195b382daa71816b068bc1d13541397d6da097276699dbaffa95de35d7
+  ${PACKAGE_NAME}_iree-module-973d25bc365d73084bfa35f317464f59a9b00f67d732733b4eaa476a418ecd95
+  ${PACKAGE_NAME}_iree-module-f9df9c8ecc1b369ddc960f07ab7097a9c1dd8587441cbd9cf91e443e2639bf28
+  ${PACKAGE_NAME}_iree-module-371a68ee85e41abf2d2a2847fe6c9f85fdc51f76516d74e3576b9d72670c1a0b
+  ${PACKAGE_NAME}_iree-module-1af884e597c283d319b14e8d55156eac66a86045fcb7e521c3f50aa8a6c04126
   ${PACKAGE_NAME}_iree-module-2fe6a4ac93d74732ebabbd87e84e6ec56d2aeb9f6a94f5b595f74f947498c579
   ${PACKAGE_NAME}_iree-module-32dfb79e574ef282dd352a156620d44d545dda0f49ea1ac27394028d2ced46a8
   ${PACKAGE_NAME}_iree-module-3421bd5d457a3ed62e7aa74559afb7199105c1f60b65090a247ee3e6d9aec69c

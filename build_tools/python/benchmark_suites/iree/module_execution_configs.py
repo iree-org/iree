@@ -39,6 +39,13 @@ CUDA_CONFIG = _with_caching_allocator(
     loader=iree_definitions.RuntimeLoader.NONE,
     driver=iree_definitions.RuntimeDriver.CUDA)
 
+CUDA_BATCH_SIZE_100_CONFIG = _with_caching_allocator(
+    id=unique_ids.IREE_MODULE_EXECUTION_CONFIG_CUDA,
+    tags=["full-inference", "default-flags"],
+    loader=iree_definitions.RuntimeLoader.NONE,
+    driver=iree_definitions.RuntimeDriver.CUDA,
+    extra_flags=["--batch_size=100"])
+
 VULKAN_CONFIG = _with_caching_allocator(
     id=unique_ids.IREE_MODULE_EXECUTION_CONFIG_VULKAN,
     tags=["full-inference", "default-flags"],
