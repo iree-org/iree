@@ -233,7 +233,8 @@ func.func @arith.extsi(%arg0: i32) -> i64 {
 
 // Check: ml_program is also handled.
 
-// CHECK: global.*i32
+// CHECK: ml_program.global
+// CHECK-SAME: i32
 "ml_program.global"() {sym_name = "_v", sym_visibility = "private", type = tensor<2x2xi64>, value = dense<1> : tensor<2x2xi64>} : () -> ()
 func.func @run() -> tensor<2x2xi64> {
   %0 = "ml_program.global_load"() {global = @_v} : () -> tensor<2x2xi64>
