@@ -21,7 +21,7 @@ on:
         type: string
       write-caches:
         required: true
-        type: boolean
+        type: string
       is-pr:
         required: true
         type: boolean
