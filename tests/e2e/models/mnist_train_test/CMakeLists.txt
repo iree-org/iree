@@ -31,6 +31,17 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
       "requires-gpu-nvidia"
       "driver=cuda"
   )
+
+  # Mark the CUDA test as WILL_FAIL if it was defined.
+  # TODO(#13007): Thread this through the test rule instead of custom logic.
+  iree_package_path(PKG_PATH)
+  set(CUDA_TEST_NAME ${PKG_PATH}/mnist_train_test_cuda)
+  get_directory_property(TESTS_LIST TESTS)
+  if(${CUDA_TEST_NAME} IN_LIST TESTS_LIST)
+    set_tests_properties(
+      ${CUDA_TEST_NAME}
+      PROPERTIES WILL_FAIL TRUE)
+  endif()
 endif()
 
 if(IREE_TARGET_BACKEND_VULKAN_SPIRV AND IREE_HAL_DRIVER_VULKAN)
