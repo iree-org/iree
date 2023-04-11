@@ -231,7 +231,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
   // We use `vectorSize` as the tile size along IC dimension. If smaller than
   // 4, it will be unrolled into size 1.
-  if (ic && !(*ic % vectorSize == 0 || *ic < 4)) return success();
+  if (ic && !(*ic % vectorSize == 0 || *ic < 4)) return failure();
 
   // The core idea is to distribute the convolution dimensions to the workgroup
   // Z/Y/X dimensions, with each thread in a workgroup handling multiple vector
