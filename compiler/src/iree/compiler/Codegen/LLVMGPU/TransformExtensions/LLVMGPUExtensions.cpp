@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -606,8 +607,16 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   vector::ShapeCastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
   vector::BroadcastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
   vector::ExtractOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
-  if (failed(applyPatternsAndFoldGreedily(target,
-                                          std::move(preProcessingPatterns)))) {
+  TrackingListener listener(state);
+  auto checkErrors = llvm::make_scope_exit([&]() {
+    // The TrackingListener API makes checking for errors mandatory. It is safe
+    // to drop payload ops during this transform, so we can ignore all errors.
+    (void)listener.checkErrorState();
+  });
+  GreedyRewriteConfig config;
+  config.listener = &listener;
+  if (failed(applyPatternsAndFoldGreedily(
+          target, std::move(preProcessingPatterns), config))) {
     return mlir::emitDefiniteFailure(target,
                                      "multi-reduce patterns failed to apply");
   }
@@ -617,7 +626,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
                                           /*benefit=*/2);
   populatePropagateVectorDistribution(target, patterns,
                                       /*benefit=*/1);
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
+  if (failed(
+          applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
     return mlir::emitDefiniteFailure(
         target, "warp distribution patterns failed to apply");
   }
@@ -628,7 +638,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   options.warpSyncronizationFn = warpSyncronizationFn;
   populateWarpExecuteOnLane0ToScf(target, endPatterns, options,
                                   /*benefit=*/0);
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns)))) {
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns),
+                                          config))) {
     return mlir::emitDefiniteFailure(
         target, "warp execute on lane 0 to scf patterns failed to apply");
   }
@@ -667,6 +678,9 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   }
 
   MLIRContext *ctx = target->getContext();
+  TrackingListener listener(state);
+  GreedyRewriteConfig config;
+  config.listener = &listener;
 
   // Unrolling to native vector size must have previously occurred.
   // TODO: Add pattern to propagate the extract through the scf.for
@@ -674,14 +688,14 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   RewritePatternSet patterns(ctx);
   mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
   populatePrepareVectorToMMAPatterns(patterns, getUseMmaSync());
-  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
+  if (failed(
+          applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
     target->emitOpError("vector to mma preparation patterns failed to apply");
     return emitDefaultDefiniteFailure(target);
   }
 
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
   rewriter.setListener(&listener);
   auto diag = DiagnosedSilenceableFailure::success();
   if (getUseWmma()) {
@@ -698,8 +712,8 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   RewritePatternSet f32ToTF32patterns(funcOp.getContext());
   nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                           nvgpu::MmaSyncF32Lowering::TF32);
-  if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                          std::move(f32ToTF32patterns)))) {
+  if (failed(applyPatternsAndFoldGreedily(
+          getOperation(), std::move(f32ToTF32patterns), config))) {
     target->emitOpError("vector to mma F32ToTF32 patterns failed to apply");
     return listener.check(loc, emitDefaultDefiniteFailure(target));
   }
