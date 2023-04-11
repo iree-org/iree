@@ -33,7 +33,7 @@ class PerformanceResult:
     print('Bytes         : %d' % self.bytes)
     print('Flops         : %d' % self.flops)
     print('Runtime(ms)   : %s' % runtime)
-    print('GFLOPs       : %s' % gflops)
+    print('GFLOPs        : %s' % gflops)
 
   def create_dict_entry(self):
     """Returns a dictionary with the performance result."""

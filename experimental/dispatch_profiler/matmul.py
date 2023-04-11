@@ -408,11 +408,17 @@ class MatmulOperationLauncher:
         f"--iree-hal-benchmark-dispatch-repeat-count={benchmark_dispatch_repeat_count}"
     ]
 
+    # Appends print ir options at the end of the command line.
+    if self.args.mlir_print_ir_after_all:
+      cmd += [f"--mlir-print-ir-after-all"]
+
     if not os.path.exists(vmfb_file) or self.args.force_compile:
-      print(
-          f">> Compilation command for {CompilationModeNames[compilation_mode]} : {' '.join(cmd)}"
-      )
-      subprocess.check_output(cmd)
+      print(f">> Compilation command for "
+            f"{CompilationModeNames[compilation_mode]} : {' '.join(cmd)}")
+      #subprocess.check_output(cmd)
+      compile_log_filename = f"{self.operation_path}/iree_compile_logs.mlir"
+      with open(compile_log_filename, "w") as fp:
+        subprocess.run(cmd, stderr=fp)
 
     elif self.args.verbose:
       print("Skipping compilation of matmul operation: " + vmfb_file +
@@ -533,10 +539,12 @@ class MatmulGenerator:
         LLVMGPUMatmulTensorCoreMmaSync,  # Tensor Core (MMA.SYNC)
     ]
     """
-    self.problem_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
-                           [2560, 2560, 2560], [3456, 1024, 2048]]
+    self.problem_shapes = [  #[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
+        [2560, 2560, 2560], [3456, 1024, 2048]
+    ]
     """
-    self.problem_shapes = [[128, 256, 8192]]
+
+    self.problem_shapes = [[128, 128, 768]]
 
     # List of pre-definied matmul dispatch collections.
     self.dispatches_collection_list = []

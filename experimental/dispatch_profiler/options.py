@@ -86,6 +86,10 @@ def add_iree_compile_arguments(parser):
   iree_compile_parser.add_argument('--iree-codegen-llvmgpu-use-wmma', '--use-wmma', \
                       dest="use_wmma", action='store_true', \
                       help="Use wmma instructions.")
+  iree_compile_parser.add_argument('--mlir-print-ir-after-all', '--print-ir-after-all', \
+                      dest="mlir_print_ir_after_all", action='store_true', \
+                      help="Prints IR after all transformations and dumps a "\
+                      "file print_ir_after_*.mlir file.")
 
 
 def add_verification_arguments(parser):
