@@ -226,7 +226,7 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_LLVMGPUMicrokernel
+    e2e_matmul_direct_f32_gpu_large_LLVMGPUMicrokernel_shmem100k
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -252,7 +252,7 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_LLVMGPUMicrokernel
+    e2e_matmul_direct_f32_gpu_large_LLVMGPUMicrokernel_shmem164k
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
