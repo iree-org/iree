@@ -66,29 +66,6 @@ ShapedType getHloOpResultType(Operation* op) {
   return getResultValue(op).getType().cast<ShapedType>();
 }
 
-bool verifyHloOpBufferOrTensorSemantics(Operation* op) {
-  auto verifyType = [&](Value val) -> bool {
-    return val.getType().isa<RankedTensorType>();
-  };
-  if (!llvm::all_of(op->getOperands(), verifyType)) return false;
-  return llvm::all_of(op->getResults(), verifyType);
-}
-
-Value fillTensorWithZeros(OpBuilder& builder, Location loc, Value tensor) {
-  auto type = tensor.getType().cast<ShapedType>();
-  Value zero;
-  // Complex numbers are a special case.
-  if (auto complexType = type.getElementType().dyn_cast<ComplexType>()) {
-    auto zeroElement = builder.getZeroAttr(complexType.getElementType());
-    auto zeroAttr = builder.getArrayAttr({zeroElement, zeroElement});
-    zero = builder.create<complex::ConstantOp>(loc, complexType, zeroAttr);
-  } else {
-    auto zeroAttr = builder.getZeroAttr(type.getElementType());
-    zero = builder.create<arith::ConstantOp>(loc, zeroAttr);
-  }
-  return builder.create<linalg::FillOp>(loc, zero, tensor).result();
-}
-
 SmallVector<int64_t, 4> extract1DVector(DenseIntElementsAttr elements) {
   SmallVector<int64_t, 4> ret;
   for (const APInt& element : elements) {
@@ -524,7 +501,7 @@ class DataMovementOpConverter : public OpConversionPattern<OpTy> {
   LogicalResult matchAndRewrite(
       OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
-    if (!verifyHloOpBufferOrTensorSemantics(op)) return failure();
+    if (failed(verifyHloOpBufferOrTensorSemantics(op))) return failure();
     auto resultType = getHloOpResultType(op);
     resultType = this->typeConverter->convertType(resultType)
                      .template cast<ShapedType>();
@@ -1030,7 +1007,7 @@ class BitcastConvertConverter
   LogicalResult matchAndRewrite(
       stablehlo::BitcastConvertOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
-    if (!verifyHloOpBufferOrTensorSemantics(op)) return failure();
+    if (failed(verifyHloOpBufferOrTensorSemantics(op))) return failure();
 
     auto inputType = adaptor.getOperand().getType().cast<RankedTensorType>();
     auto outputType =
@@ -1233,7 +1210,7 @@ class ReshapeOpConverter : public OpConversionPattern<stablehlo::ReshapeOp> {
   LogicalResult matchAndRewrite(
       stablehlo::ReshapeOp reshapeOp, stablehlo::ReshapeOp::Adaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
-    if (!verifyHloOpBufferOrTensorSemantics(reshapeOp)) return failure();
+    if (failed(verifyHloOpBufferOrTensorSemantics(reshapeOp))) return failure();
     auto operand = adaptor.getOperand();
     auto operandType = operand.getType().cast<ShapedType>();
     auto elemType = operandType.getElementType();
@@ -1712,164 +1689,13 @@ class DynamicUpdateSliceConverter
   }
 };
 
-enum class DotOperationType {
-  kVectorDot = 0,
-  kMatrixVector,
-  kVectorMatrix,
-  kMatrixMatrix,
-  kUnsupported
-};
-
-DotOperationType getDotOperationType(stablehlo::DotOp dotOp) {
-  ArrayRef<int64_t> lhsShape =
-      dotOp.getLhs().getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape =
-      dotOp.getRhs().getType().cast<ShapedType>().getShape();
-  auto shapeMatches = [](int64_t a, int64_t b) {
-    return a == ShapedType::kDynamic || b == ShapedType::kDynamic || a == b;
-  };
-  if (lhsShape.size() == 1 && rhsShape.size() == 1 &&
-      shapeMatches(lhsShape[0], rhsShape[0])) {
-    return DotOperationType::kVectorDot;
-  }
-  if (lhsShape.size() == 2 && rhsShape.size() == 1 &&
-      shapeMatches(lhsShape[1], rhsShape[0])) {
-    return DotOperationType::kMatrixVector;
-  }
-  if (lhsShape.size() == 1 && rhsShape.size() == 2 &&
-      shapeMatches(lhsShape[0], rhsShape[0])) {
-    return DotOperationType::kVectorMatrix;
-  }
-  if (lhsShape.size() == 2 && rhsShape.size() == 2 &&
-      shapeMatches(lhsShape[1], rhsShape[0])) {
-    return DotOperationType::kMatrixMatrix;
-  }
-  return DotOperationType::kUnsupported;
-}
-
-SmallVector<Value, 2> getDotOpEmptyTensorDynSizes(OpBuilder& b, Location loc,
-                                                  Value lhs, Value rhs,
-                                                  DotOperationType type) {
-  SmallVector<Value, 2> dynShape;
-  switch (type) {
-    case DotOperationType::kMatrixMatrix: {
-      if (lhs.getType().cast<ShapedType>().isDynamicDim(0))
-        dynShape.push_back(b.create<tensor::DimOp>(loc, lhs, 0));
-      if (rhs.getType().cast<ShapedType>().isDynamicDim(1))
-        dynShape.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
-      break;
-    }
-    case DotOperationType::kMatrixVector: {
-      if (lhs.getType().cast<ShapedType>().isDynamicDim(0))
-        dynShape.push_back(b.create<tensor::DimOp>(loc, lhs, 0));
-      break;
-    }
-    case DotOperationType::kVectorMatrix: {
-      if (rhs.getType().cast<ShapedType>().isDynamicDim(1))
-        dynShape.push_back(b.create<tensor::DimOp>(loc, rhs, 1));
-      break;
-    }
-    case DotOperationType::kVectorDot:
-    case DotOperationType::kUnsupported:
-      break;
-  }
-  return dynShape;
-}
-
-template <DotOperationType op_type, typename LinalgOp>
-class DotOpConversion : public OpConversionPattern<stablehlo::DotOp> {
- public:
-  using OpConversionPattern<stablehlo::DotOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      stablehlo::DotOp op, stablehlo::DotOp::Adaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
-    if (!verifyHloOpBufferOrTensorSemantics(op)) {
-      return failure();
-    }
-    if (getDotOperationType(op) != op_type) return failure();
-
-    Location loc = op.getLoc();
-    // Convert unsigned to signed. This works because signed and unsigned
-    // integer matmul is the same operation in two's complement.
-    auto outputType =
-        typeConverter->convertType(op.getType()).cast<ShapedType>();
-    SmallVector<Value, 2> dynShape = getDotOpEmptyTensorDynSizes(
-        rewriter, loc, adaptor.getLhs(), adaptor.getRhs(), op_type);
-    auto emptyTensor =
-        sparse_tensor::getSparseTensorEncoding(outputType) == nullptr
-            ? getEmptyTensor(rewriter, loc, outputType, dynShape)
-            : getEmptySparseTensor(rewriter, loc, outputType, dynShape);
-    Value zeroTensor = fillTensorWithZeros(rewriter, loc, emptyTensor);
-    rewriter.replaceOpWithNewOp<LinalgOp>(
-        op, TypeRange{outputType},
-        ValueRange{adaptor.getLhs(), adaptor.getRhs()}, ValueRange{zeroTensor},
-        linalg::getPrunedAttributeList(op));
-    return success();
-  }
-};
-
-class DotGeneralBatchMatMulOpConversion
-    : public OpConversionPattern<stablehlo::DotGeneralOp> {
- public:
-  using OpConversionPattern<stablehlo::DotGeneralOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      stablehlo::DotGeneralOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
-    if (!verifyHloOpBufferOrTensorSemantics(op)) {
-      return failure();
-    }
-    if (op.getType().cast<RankedTensorType>().getRank() != 3) {
-      return rewriter.notifyMatchFailure(op, "expected a batch matmul");
-    }
-
-    stablehlo::DotDimensionNumbersAttr dimNumbers = op.getDotDimensionNumbers();
-    auto lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
-    auto rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
-    auto lhsContractingDims = dimNumbers.getLhsContractingDimensions();
-    auto rhsContractingDims = dimNumbers.getRhsContractingDimensions();
-    if (lhsBatchingDims.size() != 1 || lhsBatchingDims[0] != 0) {
-      return rewriter.notifyMatchFailure(
-          op, "expected lhs batching dimensions exactly {0}");
-    }
-    if (rhsBatchingDims.size() != 1 || rhsBatchingDims[0] != 0) {
-      return rewriter.notifyMatchFailure(
-          op, "expected rhs batching dimensions exactly {0}");
-    }
-    if (lhsContractingDims.size() != 1 || lhsContractingDims[0] != 2) {
-      return rewriter.notifyMatchFailure(
-          op, "expected lhs contracting dimensions exactly {2}");
-    }
-    if (rhsContractingDims.size() != 1 || rhsContractingDims[0] != 1) {
-      return rewriter.notifyMatchFailure(
-          op, "expected rhs contracting dimensions exactly {1}");
-    }
-
-    Location loc = op.getLoc();
-    // Convert unsigned to signed. This works because signed and unsigned
-    // integer matmul is the same operation in two's complement.
-    auto outputType =
-        typeConverter->convertType(op.getType()).cast<ShapedType>();
-    auto emptyTensor =
-        getEmptyTensorFor(rewriter, loc, outputType, op, adaptor.getOperands());
-    Value zeroTensor = fillTensorWithZeros(rewriter, loc, emptyTensor);
-    Operation* linalgOp = rewriter.create<linalg::BatchMatmulOp>(
-        loc, /*resultTensorTypes=*/TypeRange{outputType},
-        /*inputs=*/ValueRange{adaptor.getLhs(), adaptor.getRhs()},
-        /*outputBuffers=*/ValueRange{zeroTensor},
-        linalg::getPrunedAttributeList(op));
-
-    rewriter.replaceOp(op, linalgOp->getResults());
-    return success();
-  }
-};
-
 class MapOpToGenericConverter : public OpConversionPattern<stablehlo::MapOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
       stablehlo::MapOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
-    if (!verifyHloOpBufferOrTensorSemantics(op)) return failure();
+    if (failed(verifyHloOpBufferOrTensorSemantics(op))) return failure();
 
     auto resultType =
         typeConverter->convertType(op.getType()).cast<ShapedType>();
@@ -1916,7 +1742,7 @@ class MapOpToMapConverter : public OpConversionPattern<stablehlo::MapOp> {
   LogicalResult matchAndRewrite(
       stablehlo::MapOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
-    if (!verifyHloOpBufferOrTensorSemantics(op)) return failure();
+    if (failed(verifyHloOpBufferOrTensorSemantics(op))) return failure();
 
     auto resultType =
         typeConverter->convertType(op.getType()).cast<ShapedType>();
@@ -2809,97 +2635,6 @@ struct TorchIndexSelectOpConversion
   }
 };
 
-class DotGeneralOpConversion
-    : public OpConversionPattern<stablehlo::DotGeneralOp> {
- public:
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      stablehlo::DotGeneralOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
-    if (!verifyHloOpBufferOrTensorSemantics(op)) {
-      return failure();
-    }
-
-    // Get various dimension iterator information
-    stablehlo::DotDimensionNumbersAttr dimNumbers = op.getDotDimensionNumbers();
-    auto lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
-    auto rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
-    auto lhsContractingDims = dimNumbers.getLhsContractingDimensions();
-    auto rhsContractingDims = dimNumbers.getRhsContractingDimensions();
-
-    // Get shape information and initialize output
-    assert(lhsContractingDims.size() == rhsContractingDims.size() &&
-           "number of contracting dims must be equal");
-    auto numContracting = lhsContractingDims.size();
-    // Convert unsigned to signed. This works because signed and unsigned
-    // integer matmul is the same operation in two's complement.
-    auto outputType =
-        typeConverter->convertType(op.getType()).cast<ShapedType>();
-    auto targetRank = outputType.getRank();
-    auto totalLoopCount = numContracting + targetRank;
-
-    auto lhsRank = adaptor.getLhs().getType().cast<ShapedType>().getRank();
-    auto lhsExtraDims =
-        lhsRank - lhsBatchingDims.size() - lhsContractingDims.size();
-    auto rhsRank = adaptor.getRhs().getType().cast<ShapedType>().getRank();
-
-    Location loc = op.getLoc();
-    auto emptyTensor =
-        getEmptyTensorFor(rewriter, loc, outputType, op, adaptor.getOperands());
-    Value zeroTensor = fillTensorWithZeros(rewriter, loc, emptyTensor);
-    SmallVector<AffineMap, 3> indexingMaps;
-
-    auto getMap = [&](int64_t rank, ArrayRef<int64_t> batchingDims,
-                      ArrayRef<int64_t> contractingDims, size_t extraDims) {
-      llvm::SmallVector<AffineExpr> indices(rank);
-      for (const auto& i : llvm::enumerate(batchingDims)) {
-        indices[i.value()] = rewriter.getAffineDimExpr(i.index());
-      }
-      for (const auto& i : llvm::enumerate(contractingDims)) {
-        indices[i.value()] = rewriter.getAffineDimExpr(i.index() + targetRank);
-      }
-      for (int i = 0; i < rank; ++i) {
-        if (!indices[i]) {
-          indices[i] = rewriter.getAffineDimExpr(extraDims++);
-        }
-      }
-      indexingMaps.push_back(AffineMap::get(/*dimCount=*/totalLoopCount,
-                                            /*symbolCount=*/0, indices,
-                                            op->getContext()));
-    };
-    getMap(lhsRank, lhsBatchingDims, lhsContractingDims,
-           lhsBatchingDims.size());
-    getMap(rhsRank, rhsBatchingDims, rhsContractingDims,
-           rhsBatchingDims.size() + lhsExtraDims);
-
-    {
-      SmallVector<AffineExpr, 4> dimExprs;
-      dimExprs.reserve(targetRank);
-      for (unsigned i = 0; i < targetRank; ++i)
-        dimExprs.push_back(rewriter.getAffineDimExpr(i));
-      indexingMaps.push_back(AffineMap::get(/*dimCount=*/totalLoopCount,
-                                            /*symbolCount=*/0, dimExprs,
-                                            op.getContext()));
-    }
-
-    Operation* linalgOp = rewriter.create<linalg::GenericOp>(
-        loc, /*resultTensorTypes=*/TypeRange{outputType},
-        /*inputs=*/ValueRange{adaptor.getLhs(), adaptor.getRhs()},
-        /*outputBuffers=*/ValueRange{zeroTensor}, indexingMaps,
-        getParallelAndReductionIterators(
-            /*nLoops=*/totalLoopCount,
-            /*nReduction=*/numContracting),
-        [](OpBuilder& b, Location loc, ValueRange) {
-          ImplicitLocOpBuilder builder(loc, b);
-          linalg::MatmulOp::regionBuilder(builder, *b.getInsertionBlock(), {});
-        },
-        linalg::getPrunedAttributeList(op));
-
-    rewriter.replaceOp(op, linalgOp->getResults());
-    return success();
-  }
-};
-
 class SetDimensionSizeConverter
     : public OpConversionPattern<stablehlo::SetDimensionSizeOp> {
  public:
@@ -3022,19 +2757,10 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
     >(typeConverter, context);
   }
 
-  // Ensure specialized patterns are higher priority than their generic
-  // versions.
-  patterns->add<
-      DotOpConversion<DotOperationType::kMatrixMatrix, linalg::MatmulOp>,
-      DotOpConversion<DotOperationType::kMatrixVector, linalg::MatvecOp>,
-      DotOpConversion<DotOperationType::kVectorMatrix, linalg::VecmatOp>,
-      DotOpConversion<DotOperationType::kVectorDot, linalg::DotOp>,
-      DotGeneralBatchMatMulOpConversion>(typeConverter, context,
-                                         PatternBenefit(2));
-  patterns->add<
-      DotGeneralOpConversion>(typeConverter, context, PatternBenefit(1));
-  linalg::populateEraseUnusedOperandsAndResultsPatterns(*patterns);
   // clang-format on
+  detail::populateStableHloDotProdToLinalgConversionPatterns(
+      context, typeConverter, patterns);
+  linalg::populateEraseUnusedOperandsAndResultsPatterns(*patterns);
 }
 
 std::unique_ptr<TypeConverter> createStableHloToLinalgTypeConverter() {

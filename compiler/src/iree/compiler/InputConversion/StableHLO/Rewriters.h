@@ -21,10 +21,17 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
 // Fine-grained patterns used by the implementation.
 //===----------------------------------------------------------------------===//
 namespace detail {
-/// Populates the patterns that convert from StableHLO to Linalg on tensors.
+/// Populates the patterns that convert from elementwise StableHLO ops to Linalg
+/// on tensors.
 void populatePointwiseStableHloToLinalgConversionPatterns(
     MLIRContext* context, TypeConverter& typeConverter,
     RewritePatternSet* patterns, bool enablePrimitiveOps);
+
+/// Populates the patterns that convert from dot product StableHLO ops to Linalg
+/// on tensors.
+void populateStableHloDotProdToLinalgConversionPatterns(
+    MLIRContext* context, TypeConverter& typeConverter,
+    RewritePatternSet* patterns);
 
 }  // namespace detail
 

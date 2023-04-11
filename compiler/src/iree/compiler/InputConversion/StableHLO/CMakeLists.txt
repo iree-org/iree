@@ -46,6 +46,7 @@ iree_cc_library(
     "LegalizeToLinalgUtils.cpp"
     "Passes.cpp"
     "StableHLOToLinalg.cpp"
+    "StableHLOToLinalgDotProd.cpp"
     "StableHLOToLinalgPointwise.cpp"
     "TypeConversion.cpp"
   DEPS
