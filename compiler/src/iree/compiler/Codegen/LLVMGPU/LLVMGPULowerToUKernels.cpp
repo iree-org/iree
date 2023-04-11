@@ -146,18 +146,28 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
         hasConsumer = false;
     }
 
-    // Step 5. Generate a name for microkernel
+    // Step 5. Check the microkernel exists
+    if (!existuCUDAKernel(tiles[0], tiles[1], tiles[2], stages.value(),
+                          strTypes[0].str(), strTypes[1].str(),
+                          strTypes[2].str())) {
+      llvm::errs() << "Requested microkernel does not exist, maybe forget to "
+                      "pre-compile it. Add a microkernel contract in "
+                      "`uGPUContract.h`\n";
+      return failure();
+    }
+
+    // Step 6. Generate a name for microkernel
     auto fnName = generateMicrokernelName(
         combinedOps, strTypes[0], strTypes[1], strTypes[2], tiles[0], tiles[1],
         tiles[2], stages.value(), hasFill, !hasConsumer);
 
-    // Step 6. Allocate shared memory for output
+    // Step 7. Allocate shared memory for output
     const int shmemSizeOut = tiles[0] * tiles[1];
     Value shmemBufferOut = rewriter.create<bufferization::AllocTensorOp>(
         loc, RankedTensorType::get({tiles[0], tiles[1]}, resElementType),
         ValueRange{});
 
-    // Step 7. Allocate shared memory for inputs. Here we reuse outputs shared
+    // Step 8. Allocate shared memory for inputs. Here we reuse outputs shared
     // memory, so we allocate only the remaining.
     Value shmemBufferRemaining = out;
     const int shmemSizeTotal =
@@ -174,7 +184,7 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
     }
     //  todo(guray) Verify that we have sufficient shared memory here
 
-    // Step 8. Fill the operands
+    // Step 9. Fill the operands
     SmallVector<Value> ins = {lhs, rhs};
     SmallVector<Value> others, outs;
     if (hasConsumer) {
@@ -187,7 +197,7 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
     others.push_back(shmemBufferRemaining);
     others.push_back(fillValue.value());
 
-    // Step 8. Generate the op
+    // Step 10. Generate the op
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
         matmulOp, matmulOp.getResultTypes(), StringRef(fnName), ins, outs,
         others);

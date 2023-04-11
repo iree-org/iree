@@ -124,8 +124,7 @@ static LogicalResult findMicrokernel(
   }
 
   llvm::errs() << "Requested microkernel does not exist, maybe forget to "
-                  "pre-compile it. Add a contract in uGPUContracts struct in "
-                  "uGPUContract.h";
+                  "pre-compile it. Add a contract in `uGPUContract.h`\n";
 
   return failure();
 }
@@ -169,7 +168,7 @@ static void getTensorCoreConfig(
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
-      if (clGPUShmemSizeKb >= 131) {
+      if (clGPUShmemSizeKb >= 131 && clGPUShmemSizeKb <= 164) {
         tileSizes.push_back(
             TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
       } else if (clGPUShmemSizeKb >= 64) {
