@@ -187,7 +187,8 @@ IREE_API_EXPORT void iree_vm_ref_retain(iree_vm_ref_t* ref,
 
 IREE_API_EXPORT iree_status_t iree_vm_ref_retain_checked(
     iree_vm_ref_t* ref, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
-  if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type) {
+  if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type &&
+      type != IREE_VM_REF_TYPE_ANY) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "source ref type mismatch");
   }
@@ -207,7 +208,8 @@ IREE_API_EXPORT void iree_vm_ref_retain_or_move(int is_move, iree_vm_ref_t* ref,
 IREE_API_EXPORT iree_status_t iree_vm_ref_retain_or_move_checked(
     int is_move, iree_vm_ref_t* ref, iree_vm_ref_type_t type,
     iree_vm_ref_t* out_ref) {
-  if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type) {
+  if (ref->type != IREE_VM_REF_TYPE_NULL && ref->type != type &&
+      type != IREE_VM_REF_TYPE_ANY) {
     // Make no changes on failure.
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "source ref type mismatch");
@@ -272,10 +274,11 @@ IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
   *out_ref = temp_ref;
 }
 
-IREE_API_EXPORT bool iree_vm_ref_is_null(iree_vm_ref_t* ref) {
+IREE_API_EXPORT bool iree_vm_ref_is_null(const iree_vm_ref_t* ref) {
   return ref->type == IREE_VM_REF_TYPE_NULL;
 }
 
-IREE_API_EXPORT bool iree_vm_ref_equal(iree_vm_ref_t* lhs, iree_vm_ref_t* rhs) {
+IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
+                                       const iree_vm_ref_t* rhs) {
   return lhs == rhs || memcmp(lhs, rhs, sizeof(*lhs)) == 0;
 }

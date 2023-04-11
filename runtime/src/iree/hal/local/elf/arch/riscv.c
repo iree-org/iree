@@ -22,8 +22,8 @@
 // ELF machine type/ABI
 //==============================================================================
 
-bool iree_elf_arch_is_valid(const iree_elf_ehdr_t* ehdr) {
-  return ehdr->e_machine == 0xF3;  // EM_RISCV / 243
+bool iree_elf_machine_is_valid(iree_elf_half_t machine) {
+  return machine == 0xF3;  // EM_RISCV / 243
 }
 
 //==============================================================================
@@ -48,11 +48,16 @@ static iree_status_t iree_elf_arch_riscv_apply_rela(
     uint32_t type = IREE_ELF_R_TYPE(rela->r_info);
     if (type == 0) continue;
 
-    // TODO(benvanik): support imports by resolving from the import table.
     iree_elf_addr_t sym_addr = 0;
-    if (IREE_ELF_R_SYM(rela->r_info) != 0) {
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "symbol-relative relocations not implemented");
+    uint32_t sym_ordinal = (uint32_t)IREE_ELF_R_SYM(rela->r_info);
+    if (sym_ordinal != 0) {
+      if (sym_ordinal >= state->dynsym_count) {
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "invalid symbol in relocation: %u",
+                                sym_ordinal);
+      }
+      sym_addr = (iree_elf_addr_t)state->vaddr_bias +
+                 state->dynsym[sym_ordinal].st_value;
     }
 
     iree_elf_addr_t instr_ptr =
@@ -86,11 +91,16 @@ static iree_status_t iree_elf_arch_riscv_apply_rela(
     uint32_t type = IREE_ELF_R_TYPE(rela->r_info);
     if (type == 0) continue;
 
-    // TODO(benvanik): support imports by resolving from the import table.
     iree_elf_addr_t sym_addr = 0;
-    if (IREE_ELF_R_SYM(rela->r_info) != 0) {
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "symbol-relative relocations not implemented");
+    uint32_t sym_ordinal = (uint32_t)IREE_ELF_R_SYM(rela->r_info);
+    if (sym_ordinal != 0) {
+      if (sym_ordinal >= state->dynsym_count) {
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "invalid symbol in relocation: %u",
+                                sym_ordinal);
+      }
+      sym_addr = (iree_elf_addr_t)state->vaddr_bias +
+                 state->dynsym[sym_ordinal].st_value;
     }
 
     iree_elf_addr_t instr_ptr =

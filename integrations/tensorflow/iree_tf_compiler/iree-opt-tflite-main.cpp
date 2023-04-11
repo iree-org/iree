@@ -23,6 +23,9 @@
 #include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
 int main(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
   llvm::InitLLVM y(argc, argv);
 
   mlir::DialectRegistry registry;

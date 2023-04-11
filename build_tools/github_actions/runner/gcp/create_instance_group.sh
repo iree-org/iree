@@ -14,32 +14,41 @@
 
 set -euo pipefail
 
-# For now, just change these parameters
-VERSION=7138511883-62g-testing
-REGION=us-west1
-ZONES=us-west1-a,us-west1-b,us-west1-c
-AUTOSCALING=1
-GROUP=presubmit
-TYPE=cpu
+VERSION="${VERSION:-7138511883-62g-testing}"
+REGION="${REGION:-us-west1}"
+ZONES="${ZONES:-us-west1-a,us-west1-b,us-west1-c}"
+AUTOSCALING="${AUTOSCALING:-1}"
+GROUP="${GROUP:-presubmit}"
+TYPE="${TYPE:-cpu}"
+MIG_NAME_PREFIX="${MIG_NAME_PREFIX:-gh-runner}"
+TEMPLATE_NAME_PREFIX="${TEMPLATE_NAME_PREFIX:-gh-runner}"
+DRY_RUN="${DRY_RUN:-0}"
+
 # For GPU groups, these should both be set to the target group size, as
 # autoscaling currently does not work for these.
-MIN_SIZE=3
-MAX_SIZE=3
+MIN_SIZE="${MIN_SIZE:-3}"
+MAX_SIZE="${MAX_SIZE:-3}"
 # Whether this is a testing MIG (i.e. not prod)
-TESTING=1
+TESTING="${TESTING:-1}"
+
+if (( TESTING==0 )) && [[ "${VERSION}" == *testing* ]]; then
+  echo "Creating testing mig because VERSION='${VERSION}' contains 'testing'" >&2
+  TESTING=1
+fi
 
 function create_mig() {
   local runner_group="$1"
   local type="$2"
 
-  local mig_name="github-runner"
+  local mig_name="${MIG_NAME_PREFIX}"
   if (( TESTING == 1 )); then
     mig_name+="-testing"
   fi
   mig_name+="-${runner_group}-${type}-${REGION}"
-  template="github-runner-${runner_group}-${type}-${VERSION}"
+  template="${TEMPLATE_NAME_PREFIX}-${runner_group}-${type}-${VERSION}"
 
-  local -a create_args=(
+  local -a create_cmd=(
+    gcloud beta compute instance-groups managed create
     "${mig_name}"
     --project=iree-oss
     --base-instance-name="${mig_name}"
@@ -51,10 +60,16 @@ function create_mig() {
     --health-check=http-8080-ok
   )
 
-  (set -x; gcloud beta compute instance-groups managed create "${create_args[@]}")
-  echo ""
+  if (( DRY_RUN==1 )); then
+    # Prefix the command with a noop. It will still be printed by set -x
+    create_cmd=(":" "${create_cmd[@]}")
+  fi
 
-  local -a autoscaling_args=(
+  (set -x; "${create_cmd[@]}") >&2
+  echo '' >&2
+
+  local -a autoscaling_cmd=(
+    gcloud beta compute instance-groups managed set-autoscaling
     "${mig_name}"
     --project=iree-oss
     --region="${REGION}"
@@ -65,8 +80,13 @@ function create_mig() {
     --target-cpu-utilization=0.6
   )
 
-  (set -x; gcloud beta compute instance-groups managed set-autoscaling "${autoscaling_args[@]}")
-  echo ""
+  if (( DRY_RUN==1 )); then
+    # Prefix the command with a noop. It will still be printed by set -x
+    autoscaling_cmd=(":" "${autoscaling_cmd[@]}")
+  fi
+
+  (set -x; "${autoscaling_cmd[@]}") >&2
+  echo '' >&2
 }
 
 create_mig "${GROUP}" "${TYPE}"

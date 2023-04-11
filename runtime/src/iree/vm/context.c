@@ -395,6 +395,19 @@ iree_vm_context_flags(const iree_vm_context_t* context) {
   return context->flags;
 }
 
+IREE_API_EXPORT iree_host_size_t
+iree_vm_context_module_count(const iree_vm_context_t* context) {
+  IREE_ASSERT_ARGUMENT(context);
+  return context->list.count;
+}
+
+IREE_API_EXPORT iree_vm_module_t* iree_vm_context_module_at(
+    const iree_vm_context_t* context, iree_host_size_t i) {
+  IREE_ASSERT_ARGUMENT(context);
+  if (i >= context->list.count) return NULL;
+  return context->list.modules[i];
+}
+
 IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
     iree_vm_context_t* context, iree_host_size_t module_count,
     iree_vm_module_t** modules) {

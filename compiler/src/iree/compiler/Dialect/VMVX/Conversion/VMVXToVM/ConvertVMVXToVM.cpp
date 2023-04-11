@@ -75,7 +75,7 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
 
  protected:
   virtual std::string getImportFqName(T op) const = 0;
-  virtual Optional<SmallVector<Value>> emitCall(
+  virtual std::optional<SmallVector<Value>> emitCall(
       T op, typename T::Adaptor adaptor, IREE::VM::ImportOp importOp,
       ConversionPatternRewriter &rewriter) const {
     return rewriteToCall(op, adaptor, importOp, typeConverter, rewriter);
@@ -174,20 +174,6 @@ class MatmulOpConversion : public VMVXImportOpConversion<IREE::VMVX::MatmulOp> {
   }
 };
 
-// Converts the vmvx.mmt4d op to an appropriate typed import.
-class Mmt4dOpConversion : public VMVXImportOpConversion<IREE::VMVX::Mmt4dOp> {
- public:
-  using VMVXImportOpConversion::VMVXImportOpConversion;
-
-  std::string getImportFqName(IREE::VMVX::Mmt4dOp op) const override {
-    std::string name("vmvx.mmt4d.");
-    name.append(getTypedTypeStr(op.getLhsType()));
-    name.append(getTypedTypeStr(op.getRhsType()));
-    name.append(getTypedTypeStr(op.getOutType()));
-    return name;
-  }
-};
-
 // Converts the vmvx.pack op to an appropriate typed import.
 class PackOpConversion : public VMVXImportOpConversion<IREE::VMVX::PackOp> {
  public:
@@ -211,6 +197,17 @@ class UnpackOpConversion : public VMVXImportOpConversion<IREE::VMVX::UnpackOp> {
     name.append(getTypedTypeStr(op.getInType()));
     name.append(getTypedTypeStr(op.getOutType()));
     return name;
+  }
+};
+
+// Converts the vmvx.query_tile_sizes op to its import.
+class QueryTileSizesOpConversion
+    : public VMVXImportOpConversion<IREE::VMVX::QueryTileSizesOp> {
+ public:
+  using VMVXImportOpConversion::VMVXImportOpConversion;
+
+  std::string getImportFqName(IREE::VMVX::QueryTileSizesOp op) const override {
+    return "vmvx.query_tile_sizes.2d";
   }
 };
 
@@ -238,9 +235,9 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns) {
   patterns.insert<BinaryOpConversion, CopyOpConversion, Fill2DOpConversion,
-                  MatmulOpConversion, Mmt4dOpConversion, UnaryOpConversion,
-                  PackOpConversion, UnpackOpConversion>(context, importSymbols,
-                                                        typeConverter);
+                  MatmulOpConversion, UnaryOpConversion, PackOpConversion,
+                  UnpackOpConversion, QueryTileSizesOpConversion>(
+      context, importSymbols, typeConverter);
 }
 
 }  // namespace iree_compiler

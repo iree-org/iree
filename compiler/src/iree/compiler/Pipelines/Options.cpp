@@ -6,6 +6,13 @@
 
 #include "iree/compiler/Pipelines/Options.h"
 
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::BindingOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::InputDialectOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::HighLevelOptimizationOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::SchedulingOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PreprocessingOptions);
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -123,6 +130,18 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                           llvm::cl::desc("File path to write statistics to; or "
                                          "`` for stderr or `-` for stdout."),
                           llvm::cl::cat(category));
+}
+
+void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category(
+      "IREE options for apply custom preprocessing before normal IREE "
+      "compilation flow");
+
+  binder.opt<std::string>(
+      "iree-preprocessing-pass-pipeline", preprocessingPassPipeline,
+      llvm::cl::desc("Textual description of the pass pipeline to run before "
+                     "running normal IREE compilation pipelines"),
+      llvm::cl::cat(category));
 }
 
 }  // namespace iree_compiler

@@ -35,13 +35,43 @@ namespace IREE {
 namespace VM {
 namespace {
 
+// TODO#(11786): The expansions of integer min and max ops were removed in
+// llvm-project@e502f4fc2e25. They are added here for moving integrate forward.
+// We should add native VM ops for supporting them.
+template <typename OpTy, arith::CmpIPredicate pred>
+struct MaxMinIOpConverter : public OpRewritePattern<OpTy> {
+ public:
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpTy op,
+                                PatternRewriter &rewriter) const final {
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    Location loc = op.getLoc();
+    Value cmp = rewriter.create<arith::CmpIOp>(loc, pred, lhs, rhs);
+    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, cmp, lhs, rhs);
+    return success();
+  }
+};
+
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
 template <typename T>
 SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
   moduleOp.walk([&](Operation *op) {
-    auto *dialect = op->getDialect();
+    // Special case for declarations which may reference builtins.
+    // TODO(benvanik): add a linking attribute to the module instead to avoid
+    // the walk. All dialects could then indicate they want certain modules
+    // linked in.
+    Dialect *dialect = nullptr;
+    if (auto moduleAttr = op->getAttrOfType<StringAttr>("vm.import.module")) {
+      // Specified dialect lookup.
+      dialect = op->getContext()->getOrLoadDialect(moduleAttr.getValue());
+    } else {
+      // Generic dialect lookup.
+      dialect = op->getDialect();
+    }
     if (!dialect) return;
     auto *dialectInterface = dialect->getRegisteredInterface<T>();
     if (!dialectInterface) return;
@@ -120,7 +150,7 @@ class ConversionPass
                                    patterns);
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
                              patterns);
-    arith::populateArithExpandOpsPatterns(patterns);
+    arith::populateCeilFloorDivExpandOpsPatterns(patterns);
     populateStandardToVMPatterns(context, typeConverter, patterns);
     populateMathToVMPatterns(context, typeConverter, patterns);
     populateAffineToStdConversionPatterns(patterns);

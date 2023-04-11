@@ -8,7 +8,7 @@ set(TF_MLIR_HLO_SOURCE_DIR
   "${IREE_SOURCE_DIR}/third_party/mlir-hlo/"
 )
 set(TF_MLIR_HLO_BINARY_DIR
-  "${IREE_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir-hlo/"
+  "${IREE_BINARY_DIR}/llvm-external-projects/mlir-hlo"
 )
 
 external_cc_library(

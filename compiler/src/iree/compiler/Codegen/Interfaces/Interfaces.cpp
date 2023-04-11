@@ -17,8 +17,14 @@
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
+#include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
+#include "mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h"
+#include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
+#include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
+#include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
+#include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -36,8 +42,14 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerTransformDialectFlowExtension(registry);
   registerTransformDialectLLVMCPUExtension(registry);
   registerTransformDialectLLVMGPUExtension(registry);
-  linalg::registerTransformDialectExtension(registry);
   linalg::registerTilingInterfaceExternalModels(registry);
+  affine::registerTransformDialectExtension(registry);
+  bufferization::registerTransformDialectExtension(registry);
+  gpu::registerTransformDialectExtension(registry);
+  linalg::registerTransformDialectExtension(registry);
+  memref::registerTransformDialectExtension(registry);
+  scf::registerTransformDialectExtension(registry);
+  vector::registerTransformDialectExtension(registry);
 }
 
 }  // namespace iree_compiler

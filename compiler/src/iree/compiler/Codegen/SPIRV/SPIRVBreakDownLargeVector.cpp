@@ -25,7 +25,7 @@ struct SPIRVBreakDownLargeVectorPass final
     // mismatched vector size for transfer and compute.
     vector::populateVectorExtractStridedSliceToExtractInsertChainPatterns(
         patterns, [](vector::ExtractStridedSliceOp op) {
-          return op.getVectorType().getNumElements() > 4;
+          return op.getSourceVectorType().getNumElements() > 4;
         });
     vector::InsertOp::getCanonicalizationPatterns(patterns, context);
     vector::ExtractOp::getCanonicalizationPatterns(patterns, context);

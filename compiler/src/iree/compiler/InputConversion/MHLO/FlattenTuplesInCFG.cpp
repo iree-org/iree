@@ -13,9 +13,9 @@
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
@@ -64,7 +64,7 @@ void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
 }
 
 bool recursiveUntuple(Value value, Location loc, OpBuilder &builder,
-                      BlockAndValueMapping *mapping,
+                      IRMapping *mapping,
                       llvm::SmallVectorImpl<Value> *newValues) {
   Type type = value.getType();
   // We can return the value as is.
@@ -105,7 +105,7 @@ Value recursiveRetuple(Type oldType, Operation::result_range *values,
 template <typename T>
 bool untupleAndLookupValues(T values, llvm::SmallVectorImpl<Value> *newValues,
                             OpBuilder &builder, Location loc,
-                            BlockAndValueMapping *mapping) {
+                            IRMapping *mapping) {
   for (auto operand : values) {
     auto newValue = mapping->lookupOrNull(operand);
     if (!newValue) {
@@ -119,7 +119,7 @@ bool untupleAndLookupValues(T values, llvm::SmallVectorImpl<Value> *newValues,
 }
 
 bool convertReturnOp(mlir::func::ReturnOp *op, OpBuilder &builder,
-                     BlockAndValueMapping *mapping) {
+                     IRMapping *mapping) {
   llvm::SmallVector<Value, 10> newOperands;
   if (untupleAndLookupValues(op->getOperands(), &newOperands, builder,
                              op->getLoc(), mapping)) {
@@ -131,7 +131,7 @@ bool convertReturnOp(mlir::func::ReturnOp *op, OpBuilder &builder,
 }
 
 bool convertCallOp(func::CallOp *oldOp, OpBuilder &builder,
-                   BlockAndValueMapping *mapping) {
+                   IRMapping *mapping) {
   llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
@@ -156,7 +156,7 @@ bool convertCallOp(func::CallOp *oldOp, OpBuilder &builder,
 }
 
 bool convertIndirectCallOp(func::CallIndirectOp *oldOp, OpBuilder &builder,
-                           BlockAndValueMapping *mapping) {
+                           IRMapping *mapping) {
   llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
@@ -177,7 +177,7 @@ bool convertIndirectCallOp(func::CallIndirectOp *oldOp, OpBuilder &builder,
 }
 
 bool convertBranchOp(cf::BranchOp *oldOp, OpBuilder &builder,
-                     BlockAndValueMapping *mapping) {
+                     IRMapping *mapping) {
   llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
@@ -193,7 +193,7 @@ bool convertBranchOp(cf::BranchOp *oldOp, OpBuilder &builder,
 }
 
 bool convertCondBranchOp(cf::CondBranchOp *oldOp, OpBuilder &builder,
-                         BlockAndValueMapping *mapping) {
+                         IRMapping *mapping) {
   llvm::SmallVector<Value, 4> trueArgs;
   if (untupleAndLookupValues(oldOp->getTrueOperands(), &trueArgs, builder,
                              oldOp->getLoc(), mapping)) {
@@ -216,8 +216,7 @@ bool convertCondBranchOp(cf::CondBranchOp *oldOp, OpBuilder &builder,
   return false;
 }
 
-bool convertOperation(Operation *op, OpBuilder &builder,
-                      BlockAndValueMapping *mapping) {
+bool convertOperation(Operation *op, OpBuilder &builder, IRMapping *mapping) {
   if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
     return convertReturnOp(&returnOp, builder, mapping);
   } else if (auto callOp = dyn_cast<func::CallOp>(op)) {
@@ -236,7 +235,7 @@ bool convertOperation(Operation *op, OpBuilder &builder,
 
 bool convertFunction(func::FuncOp oldFunction, func::FuncOp newFunction) {
   OpBuilder builder(newFunction.getBody());
-  BlockAndValueMapping mapping;
+  IRMapping mapping;
 
   for (auto attr : oldFunction->getAttrs()) {
     if (attr.getName() != oldFunction.getFunctionTypeAttrName()) {

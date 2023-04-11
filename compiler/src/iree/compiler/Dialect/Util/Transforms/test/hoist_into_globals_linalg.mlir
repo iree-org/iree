@@ -34,7 +34,7 @@ module @compute_hoisted {
 
 // -----
 // Verifies that projected permutations (broadcasts) will never be materialized
-// as a leaf. Also verifies that init_tensor operands, which can be considered
+// as a leaf. Also verifies that empty operands, which can be considered
 // const-expr, are not materialized as a leaf.
 // CHECK-LABEL: @broadcast_treated_as_leaf
 #map0 = affine_map<(d0, d1) -> ()>

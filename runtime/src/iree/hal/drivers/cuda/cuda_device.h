@@ -23,6 +23,11 @@ iree_status_t iree_hal_cuda_device_create(
     iree_hal_cuda_dynamic_symbols_t* syms, CUdevice device,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
+// Returns a CUDA context bound to the given `base_device` if it is a HAL CUDA
+// device. Returns error if `base_device` is not a HAL CUDA device.
+iree_status_t iree_hal_cuda_device_get_context(iree_hal_device_t* base_device,
+                                               CUcontext* out_context);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

@@ -54,7 +54,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @call_fn
 vm.module @my_module {
-  vm.import @import_fn(%arg0 : i32) -> i32
+  vm.import private @import_fn(%arg0 : i32) -> i32
   vm.func @call_fn(%arg0 : i32) -> i32 {
     // CHECK: %0 = vm.call @import_fn(%arg0) : (i32) -> i32
     %0 = vm.call @import_fn(%arg0) : (i32) -> i32
@@ -66,7 +66,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @call_variadic_but_not_really
 vm.module @my_module {
-  vm.import @import_fn(%arg0 : i32) -> i32
+  vm.import private @import_fn(%arg0 : i32) -> i32
   vm.func @call_variadic_but_not_really(%arg0 : i32) -> i32 {
     // CHECK: %0 = vm.call.variadic @import_fn(%arg0) : (i32) -> i32
     %0 = vm.call.variadic @import_fn(%arg0) : (i32) -> i32
@@ -78,7 +78,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @call_variadic_empty
 vm.module @my_module {
-  vm.import @import_fn(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer> ...) -> i32
+  vm.import private @import_fn(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer> ...) -> i32
   vm.func @call_variadic_empty(%arg0 : i32) -> i32 {
     // CHECK: %0 = vm.call.variadic @import_fn(%arg0, []) : (i32, !vm.ref<!hal.buffer> ...) -> i32
     %0 = vm.call.variadic @import_fn(%arg0, []) : (i32, !vm.ref<!hal.buffer> ...) -> i32
@@ -90,7 +90,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @call_variadic
 vm.module @my_module {
-  vm.import @import_fn(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer> ...) -> i32
+  vm.import private @import_fn(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer> ...) -> i32
   vm.func @call_variadic(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer>) -> i32 {
     // CHECK: %0 = vm.call.variadic @import_fn(%arg0, [%arg1, %arg1]) : (i32, !vm.ref<!hal.buffer> ...) -> i32
     %0 = vm.call.variadic @import_fn(%arg0, [%arg1, %arg1]) : (i32, !vm.ref<!hal.buffer> ...) -> i32
@@ -102,7 +102,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @call_variadic_multiple
 vm.module @my_module {
-  vm.import @import_fn(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer> ...) -> i32
+  vm.import private @import_fn(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer> ...) -> i32
   vm.func @call_variadic_multiple(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer>) -> i32 {
     // CHECK: %0 = vm.call.variadic @import_fn(%arg0, [%arg1, %arg1], [%arg1]) : (i32, !vm.ref<!hal.buffer> ..., !vm.ref<!hal.buffer> ...) -> i32
     %0 = vm.call.variadic @import_fn(%arg0, [%arg1, %arg1], [%arg1]) : (i32, !vm.ref<!hal.buffer> ..., !vm.ref<!hal.buffer> ...) -> i32
@@ -114,7 +114,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @call_variadic_no_results
 vm.module @my_module {
-  vm.import @import_fn(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer> ...)
+  vm.import private @import_fn(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer> ...)
   vm.func @call_variadic_no_results(%arg0 : i32, %arg1 : !vm.ref<!hal.buffer>) {
     // CHECK: vm.call.variadic @import_fn(%arg0, [%arg1, %arg1], [%arg1]) : (i32, !vm.ref<!hal.buffer> ..., !vm.ref<!hal.buffer> ...)
     vm.call.variadic @import_fn(%arg0, [%arg1, %arg1], [%arg1]) : (i32, !vm.ref<!hal.buffer> ..., !vm.ref<!hal.buffer> ...)
@@ -126,7 +126,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @call_variadic_tuples
 vm.module @my_module {
-  vm.import @import_fn(%arg0 : tuple<i32, i32, i32> ...)
+  vm.import private @import_fn(%arg0 : tuple<i32, i32, i32> ...)
   vm.func @call_variadic_tuples(%arg0 : i32, %arg1 : i32) {
     // CHECK: vm.call.variadic @import_fn([(%arg0, %arg0, %arg0), (%arg1, %arg1, %arg1)]) : (tuple<i32, i32, i32> ...)
     vm.call.variadic @import_fn([(%arg0, %arg0, %arg0), (%arg1, %arg1, %arg1)]) : (tuple<i32, i32, i32> ...)
@@ -227,8 +227,8 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK: vm.import optional @optional_import_fn(%arg0 : i32) -> i32
-  vm.import optional @optional_import_fn(%arg0 : i32) -> i32
+  // CHECK: vm.import private optional @optional_import_fn(%arg0 : i32) -> i32
+  vm.import private optional @optional_import_fn(%arg0 : i32) -> i32
   vm.func @call_fn() -> i32 {
     // CHECK: %has_optional_import_fn = vm.import.resolved @optional_import_fn : i32
     %has_optional_import_fn = vm.import.resolved @optional_import_fn : i32

@@ -27,6 +27,132 @@ IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
 static const char* emoji(bool good) { return good ? "🦄" : "🐞"; }
 
+// Defines the type of a primitive value.
+typedef enum iree_e2e_test_value_type_e {
+  // Not a value type.
+  IREE_E2E_TEST_VALUE_TYPE_NONE = 0,
+  // int8_t.
+  IREE_E2E_TEST_VALUE_TYPE_I8 = 1,
+  // int16_t.
+  IREE_E2E_TEST_VALUE_TYPE_I16 = 2,
+  // int32_t.
+  IREE_E2E_TEST_VALUE_TYPE_I32 = 3,
+  // int64_t.
+  IREE_E2E_TEST_VALUE_TYPE_I64 = 4,
+  // halft_t.
+  IREE_E2E_TEST_VALUE_TYPE_F16 = 5,
+  // float.
+  IREE_E2E_TEST_VALUE_TYPE_F32 = 6,
+  // double.
+  IREE_E2E_TEST_VALUE_TYPE_F64 = 7,
+} iree_e2e_test_value_type_t;
+
+// Maximum size, in bytes, of any value type we can represent.
+#define IREE_E2E_TEST_VALUE_STORAGE_SIZE 8
+
+// A variant value type.
+typedef struct iree_e2e_test_value_t {
+  iree_e2e_test_value_type_t type;
+  union {
+    int8_t i8;
+    int16_t i16;
+    int32_t i32;
+    int64_t i64;
+    float f32;
+    uint16_t f16_u16;
+    double f64;
+    uint8_t value_storage[IREE_E2E_TEST_VALUE_STORAGE_SIZE];  // max size of all
+                                                              // value types
+  };
+} iree_e2e_test_value_t;
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_none() {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_NONE;
+  return result;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_i8(int8_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_I8;
+  result.i8 = value;
+  return result;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_i16(
+    int16_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_I16;
+  result.i16 = value;
+  return result;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_i32(
+    int32_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_I32;
+  result.i32 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline int32_t iree_e2e_test_value_get_i32(
+    iree_e2e_test_value_t* value) {
+  return value->i32;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_i64(
+    int64_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_I64;
+  result.i64 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline int64_t iree_e2e_test_value_get_i64(
+    iree_e2e_test_value_t* value) {
+  return value->i64;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_f16(
+    uint16_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_F16;
+  result.f16_u16 = value;
+  return result;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_f32(float value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_F32;
+  result.f32 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline float iree_e2e_test_value_get_f32(iree_e2e_test_value_t* value) {
+  return value->f32;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline uint16_t iree_e2e_test_value_get_f16(
+    iree_e2e_test_value_t* value) {
+  return value->f16_u16;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_f64(double value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_F64;
+  result.f64 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline double iree_e2e_test_value_get_f64(iree_e2e_test_value_t* value) {
+  return value->f64;
+}
+
 /*****************************************************************************
  *
  * Part 1:
@@ -40,7 +166,7 @@ static iree_status_t get_item_as_buffer_view(
     iree_vm_list_t* list, iree_host_size_t i,
     iree_hal_buffer_view_t** out_value) {
   iree_vm_variant_t variant = iree_vm_variant_empty();
-  IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(list, i, &variant));
+  IREE_RETURN_IF_ERROR(iree_vm_list_get_variant_assign(list, i, &variant));
   if (!iree_vm_variant_is_ref(variant)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "expected list item %zu to be a ref", i);
@@ -1156,7 +1282,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
                                     iree_vm_instance_t* instance) {
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
-      root_path, instance,
+      root_path, instance, IREE_TRACE_REPLAY_FLAG_NONE,
       FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                            : IREE_VM_CONTEXT_FLAG_NONE,
       iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
@@ -1165,14 +1291,14 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
   // file will be used.
   // TODO(#5724): remove this and instead provide a device set on initialize.
   iree_host_size_t device_uri_count = 0;
-  iree_string_view_t* device_uris = NULL;
+  const iree_string_view_t* device_uris = NULL;
   iree_hal_get_devices_flag_list(&device_uri_count, &device_uris);
   iree_trace_replay_set_hal_devices_override(&replay, device_uri_count,
                                              device_uris);
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
-    iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+    iree_trace_replay_deinitialize(&replay);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "yaml_parser_initialize failed");
   }
@@ -1197,7 +1323,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
   }
 
   yaml_parser_delete(&parser);
-  iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+  iree_trace_replay_deinitialize(&replay);
   return status;
 }
 

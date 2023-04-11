@@ -199,17 +199,16 @@ def iree_generated_trace_runner_test(
         timeout: timeout for the generated tests.
         target_cpu_features_variants: list of target cpu features variants.
             Currently unimplemented, so each entry must be either "default" or
-            start with "aarch64:" so as Bazel builds are currently x86-only,
+            start with "arm_64:" so as Bazel builds are currently x86-only,
             we know that it is correct to ignore this.
         **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
 
     for target_cpu_features in target_cpu_features_variants:
-        if not (target_cpu_features == "default" or target_cpu_features.startswith("aarch64:")):
+        if not (target_cpu_features == "default" or target_cpu_features.startswith("arm_64:")):
             fail("Entry %s in target_cpu_features_variants: unimplemented" % target_cpu_features)
 
     tests = []
-    processsed_compiler_flags = [flag.replace("#pass_options_variant#", "") for flag in compiler_flags]
     for backend, driver in target_backends_and_drivers:
         # CUDA backend/driver not supported by Bazel build.
         if backend == "cuda" or driver == "cuda":
@@ -222,7 +221,7 @@ def iree_generated_trace_runner_test(
             driver = driver,
             target_backend = backend,
             generator_args = generator_args,
-            compiler_flags = processsed_compiler_flags,
+            compiler_flags = compiler_flags,
             runner_args = runner_args,
             tags = tags,
             timeout = timeout,

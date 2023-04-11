@@ -8,8 +8,8 @@
 #define IREE_COMPILER_DIALECT_HAL_UTILS_DEVICE_SWITCH_BUILDER_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -182,7 +182,7 @@ class DeviceSwitchRewriter {
           rewriter_.createBlock(&targetRegion, targetRegion.end(), entryTypes);
       rewriter_.setInsertionPointAfter(switchOp);
 
-      BlockAndValueMapping mapper;
+      IRMapping mapper;
 
       Region &sourceRegion = caseOps_[i].getRegion(0);
       // When cloning `sourceRegion` into `targetRegion` remap the captured

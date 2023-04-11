@@ -10,7 +10,6 @@
 #include <functional>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -61,6 +60,11 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Apply patterns to erase unused linalg operands and remove dead code
+// associated.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createEraseUnusedLinalgOperands();
+
 // Expands tensor shape dimensions into SSA values across the program.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
 
@@ -75,10 +79,6 @@ std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 // linalg.matmul
 std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
 
-// Creates a pass to convert linalg convolution ops into linalg.matmul ops
-// using im2col tranformation.
-std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
-
 // Creates a pass to convert dispatch.region ops to dispatch.workgroups ops.
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 
@@ -86,13 +86,6 @@ std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 // tensor.insert_slice.
 std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
     bool skipSingleLinalgOpUses = false);
-
-// Pass to convert a linalg.matmul into linalg.mmt4d given some target ISA
-// information currently passed as pass options.
-std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass();
-std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(
-    CustomKernelsTargetInfo targetInfo);
-std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options);
 
 // Create a pass to detach elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
@@ -144,11 +137,31 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 //===----------------------------------------------------------------------===//
 
 // Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region
-// is created for each tiled loop nest.
+// is created for each tiled loop nest. This pass only moves the root compute op
+// into the dispatch region, allowing producers to be outside.
+/// This struct is the same struct that is auto-generated from tablegen file for
+/// the pass definition. THis is manually copied from the `Passes.h.inc` file
+/// generated below.
+// TODO(ravishankarm): Move the passes in Flow to use the auto-generated options
+// struct.
+struct FormDispatchRegionsOptions {
+  bool fuseMultiUse = false;
+  bool generateWorkloadRegion = true;
+  bool fusePadWithConsumers = false;
+  bool fusePadWithProducers = false;
+};
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchRegionsPass(bool aggressiveFusion = false,
-                              bool generateWorkloadRegion = true,
-                              bool collapse = true);
+createFormDispatchRegionsPass(FormDispatchRegionsOptions options = {});
+
+// Pass to collapse dimensions of Linalg Ops on tensor ops.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCollapseDimensionsPass();
+
+// Pass to clone into dispatch regions producers of values used in the dispatch
+// regions but defined in the above. This prepares the dispatch regions for
+// converting to dispatch workgroups with explicit captures.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCloneProducersIntoDispatchRegionsPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
@@ -165,7 +178,9 @@ createFormDispatchWorkgroupsPass(bool generateWorkloadRegion = true);
 // that is parsed from `transformFileName`.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchWithTransformDialect(
-    llvm::StringRef transformFileName = llvm::StringRef());
+    llvm::StringRef transformFileName = llvm::StringRef(),
+    llvm::StringRef debugPayloadRootTag = llvm::StringRef(),
+    llvm::StringRef debugTransformRootTag = llvm::StringRef());
 
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
@@ -182,14 +197,6 @@ createInjectDispatchTracingPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
 
 //===----------------------------------------------------------------------===//
-// Linalg transforms
-//===----------------------------------------------------------------------===//
-
-// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
-std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(
-    int paddingSize = 4);
-
-//===----------------------------------------------------------------------===//
 // Optimizations
 //===----------------------------------------------------------------------===//
 
@@ -200,6 +207,10 @@ createOutlineLargeConstantsPass();
 // Deduplicates equivalent executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDeduplicateExecutablesPass();
+
+// Create a pass to raise sequence of ops to higher level linalg.ext
+// representation.
+std::unique_ptr<Pass> createRaiseSpecialOps();
 
 // Create a pass to split reduction dimension.
 std::unique_ptr<Pass> createSplitReductionPass();

@@ -36,6 +36,9 @@ enum class OutputFormat {
 };
 
 int main(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
   llvm::InitLLVM y(argc, argv);
 
   static cl::opt<std::string> inputPath(
@@ -159,8 +162,12 @@ int main(int argc, char **argv) {
   }
 
   // Run transformations.
-  PassManager pm(&context, PassManager::Nesting::Implicit);
-  applyPassManagerCLOptions(pm);
+  PassManager pm(&context, module.get()->getName().getStringRef(),
+                 PassManager::Nesting::Implicit);
+  if (failed(applyPassManagerCLOptions(pm))) {
+    llvm::errs() << "Failed to apply pass manager CL options\n";
+    return 1;
+  }
   applyDefaultTimingPassManagerCLOptions(pm);
   mlir::iree_integrations::TFL::buildTFLImportPassPipeline(pm);
   if (failed(pm.run(*module))) {

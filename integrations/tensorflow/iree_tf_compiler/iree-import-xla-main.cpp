@@ -103,6 +103,9 @@ LogicalResult ReadHloTextFormatFromStream(std::istream *in,
 }  // namespace
 
 int main(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
   llvm::InitLLVM y(argc, argv);
 
   static cl::opt<std::string> inputPath(
@@ -144,7 +147,7 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv);
 
   auto openInputStream =
-      [&]() -> llvm::Optional<
+      [&]() -> std::optional<
                 std::pair<std::istream *, std::unique_ptr<std::ifstream>>> {
     auto fileInputStream = std::make_unique<std::ifstream>();
     std::istream *inputStream;
@@ -293,8 +296,12 @@ int main(int argc, char **argv) {
   }
 
   // Run passes.
-  PassManager pm(&context, PassManager::Nesting::Implicit);
-  applyPassManagerCLOptions(pm);
+  PassManager pm(&context, module.get()->getName().getStringRef(),
+                 PassManager::Nesting::Implicit);
+  if (failed(applyPassManagerCLOptions(pm))) {
+    llvm::errs() << "Failed to apply pass manager CL options\n";
+    return 1;
+  }
   applyDefaultTimingPassManagerCLOptions(pm);
 
   iree_integrations::MHLO::buildMHLOImportPassPipeline(pm);

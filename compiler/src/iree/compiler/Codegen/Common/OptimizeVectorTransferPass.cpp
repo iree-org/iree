@@ -12,6 +12,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
@@ -67,11 +68,12 @@ class TransposeUnitDimToShapeCast
 
   LogicalResult matchAndRewrite(vector::TransposeOp op,
                                 PatternRewriter& rewriter) const override {
-    unsigned numNonUnitSrcDim = llvm::count_if(
-        op.getVectorType().getShape(), [](int64_t dim) { return dim != 1; });
+    unsigned numNonUnitSrcDim =
+        llvm::count_if(op.getSourceVectorType().getShape(),
+                       [](int64_t dim) { return dim != 1; });
     if (numNonUnitSrcDim > 1) return failure();
-    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(op, op.getResultType(),
-                                                     op.getVector());
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
+        op, op.getResultVectorType(), op.getVector());
     return success();
   }
 };
@@ -110,7 +112,8 @@ struct OptimizeVectorTransferPass
     // TODO(thomasraoux): Remove it once the fix is merged.
     loopInvariantCodeMotion(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
-    vector::transferOpflowOpt(funcOp);
+    IRRewriter rewriter(funcOp->getContext());
+    vector::transferOpflowOpt(rewriter, funcOp);
 
     // Move bitcast inwards from loop region boundaries to increase chances to
     // cancel them.

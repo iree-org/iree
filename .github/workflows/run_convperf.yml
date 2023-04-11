@@ -38,7 +38,7 @@ jobs:
       runner-group: ${{ steps.configure.outputs.runner-group }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
@@ -74,14 +74,14 @@ jobs:
       GCS_UPLOAD_DIR_NAME: ${{ needs.setup.outputs.artifact-upload-dir }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: "Running convperf for CPU"
         run: |
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/convperf@sha256:9c6a6cf89d4f667246382bcce96f8542f626872d9014184b3a8118750af8f878 \
+            gcr.io/iree-oss/convperf@sha256:8a32b97be7c8817aa12bf669fce4dd1f20d0b01b7aa6f4dbb618e27541d1231d \
           ./build_tools/benchmarks/convperf/build_and_run_convperf.sh "${BUILD_DIR}" "${RESULTS_DIR}" "${IREE_SHA}"
       - name: "Uploading results"
         run: |
-          gcloud alpha storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_UPLOAD_DIR_NAME}/"
-          gcloud alpha storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/latest/"
+          gcloud storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/${GCS_UPLOAD_DIR_NAME}/"
+          gcloud storage cp "${RESULTS_DIR}/**" "${GCS_UPLOAD_PARENT_DIR}/latest/"

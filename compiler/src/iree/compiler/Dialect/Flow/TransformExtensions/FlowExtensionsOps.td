@@ -9,18 +9,17 @@
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
-include "mlir/Dialect/Transform/IR/TransformEffects.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreach_thread_to_flow",
+def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.forall_to_flow",
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Rewrite an scf.foreach_thread to Flow::DispatchWorkgroups.
+    Rewrite an scf.forall to Flow::DispatchWorkgroups.
 
     #### Return modes
 
@@ -46,8 +45,8 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::scf::ForeachThreadOp target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::scf::ForallOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }
@@ -78,7 +77,7 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::iree_compiler::IREE::Flow::DispatchRegionOp target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }
@@ -102,7 +101,7 @@ def WrapInDispatchRegionOp : Op<
     handle (i.e., the `dispatch.region` op).
   }];
 
-  let arguments = (ins PDL_Operation:$target, 
+  let arguments = (ins PDL_Operation:$target,
                        DefaultValuedAttr<BoolAttr, "true">:$generateWorkload);
   let results = (outs PDL_Operation:$transformed);
 
@@ -111,7 +110,7 @@ def WrapInDispatchRegionOp : Op<
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
 }

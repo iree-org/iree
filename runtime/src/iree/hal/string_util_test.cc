@@ -927,13 +927,16 @@ TEST(BufferElementsStringUtilTest, ParseBufferElementsShapedInvalid) {
 }
 
 TEST(BufferElementsStringUtilTest, FormatBufferElements) {
-  EXPECT_THAT(FormatBufferElements<int8_t>({1}, Shape{}), IsOkAndHolds("1"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1}, Shape{1}), IsOkAndHolds("1"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{4}),
+  std::vector<int8_t> buffer = {1};
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{}), IsOkAndHolds("1"));
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{1}),
+              IsOkAndHolds("1"));
+  buffer = {1, 2, 3, 4};
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{4}),
               IsOkAndHolds("1 2 3 4"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{2, 2}),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{2, 2}),
               IsOkAndHolds("[1 2][3 4]"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{4, 1}),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{4, 1}),
               IsOkAndHolds("[1][2][3][4]"));
   EXPECT_THAT(
       FormatBufferElements<int32_t>(std::vector<int32_t>(300, -99),
@@ -963,28 +966,30 @@ TEST(BufferElementsStringUtilTest, FormatBufferElements) {
 }
 
 TEST(BufferElementsStringUtilTest, FormatBufferElementsElided) {
-  EXPECT_THAT(FormatBufferElements<int8_t>({1}, Shape{}, 0),
+  std::vector<int8_t> buffer = {1};
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{}, 0),
               IsOkAndHolds("..."));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1}, Shape{}, 1), IsOkAndHolds("1"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1}, Shape{}, 99123),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{}, 1),
               IsOkAndHolds("1"));
-
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{4}, 0),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{}, 99123),
+              IsOkAndHolds("1"));
+  buffer = {1, 2, 3, 4};
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{4}, 0),
               IsOkAndHolds("..."));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{4}, 1),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{4}, 1),
               IsOkAndHolds("1..."));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{4}, 3),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{4}, 3),
               IsOkAndHolds("1 2 3..."));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{4}, 99123),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{4}, 99123),
               IsOkAndHolds("1 2 3 4"));
 
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{2, 2}, 0),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{2, 2}, 0),
               IsOkAndHolds("[...][...]"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{2, 2}, 1),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{2, 2}, 1),
               IsOkAndHolds("[1...][...]"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{2, 2}, 3),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{2, 2}, 3),
               IsOkAndHolds("[1 2][3...]"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{2, 2}, 99123),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{2, 2}, 99123),
               IsOkAndHolds("[1 2][3 4]"));
 }
 
@@ -1044,13 +1049,16 @@ TEST(BufferViewStringUtilTest, ParseInvalid) {
 }
 
 TEST(BufferViewStringUtilTest, ToString) {
-  EXPECT_THAT(FormatBufferElements<int8_t>({1}, Shape{}), IsOkAndHolds("1"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1}, Shape{1}), IsOkAndHolds("1"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{4}),
+  std::vector<int8_t> buffer = {1};
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{}), IsOkAndHolds("1"));
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{1}),
+              IsOkAndHolds("1"));
+  buffer = {1, 2, 3, 4};
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{4}),
               IsOkAndHolds("1 2 3 4"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{2, 2}),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{2, 2}),
               IsOkAndHolds("[1 2][3 4]"));
-  EXPECT_THAT(FormatBufferElements<int8_t>({1, 2, 3, 4}, Shape{4, 1}),
+  EXPECT_THAT(FormatBufferElements<int8_t>(buffer, Shape{4, 1}),
               IsOkAndHolds("[1][2][3][4]"));
   EXPECT_THAT(
       FormatBufferElements<int32_t>(std::vector<int32_t>(300, -99),

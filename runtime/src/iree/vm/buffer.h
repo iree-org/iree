@@ -93,13 +93,14 @@ IREE_API_EXPORT void iree_vm_buffer_deinitialize(iree_vm_buffer_t* buffer);
 
 // Creates a new zero-initialized buffer of the given byte |length|.
 // The underlying storage buffer may be allocated larger to ensure alignment.
-// The allocated data will be aligned to iree_max_align_t.
+// The allocated data will be aligned to |alignment| or iree_max_align_t if 0.
 //
 // |access| can be used to control who (guest, host, etc) and how (read/write)
 // the buffer may be accessed.
-IREE_API_EXPORT iree_status_t iree_vm_buffer_create(
-    iree_vm_buffer_access_t access, iree_host_size_t length,
-    iree_allocator_t allocator, iree_vm_buffer_t** out_buffer);
+IREE_API_EXPORT iree_status_t
+iree_vm_buffer_create(iree_vm_buffer_access_t access, iree_host_size_t length,
+                      iree_host_size_t alignment, iree_allocator_t allocator,
+                      iree_vm_buffer_t** out_buffer);
 
 // Retains the given |buffer| for the caller.
 IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer);
@@ -108,7 +109,7 @@ IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer);
 IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer);
 
 // Clones a range of bytes in |source| to a new buffer.
-// The allocated data will be aligned to iree_max_align_t.
+// The allocated data will be aligned to |alignment| or iree_max_align_t if 0.
 //
 // |access| can be used to control who (guest, host, etc) and how (read/write)
 // the buffer may be accessed. As this returns a newly allocated buffer the
@@ -116,7 +117,8 @@ IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer);
 IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
     iree_vm_buffer_access_t access, const iree_vm_buffer_t* source_buffer,
     iree_host_size_t source_offset, iree_host_size_t length,
-    iree_allocator_t allocator, iree_vm_buffer_t** out_buffer);
+    iree_host_size_t alignment, iree_allocator_t allocator,
+    iree_vm_buffer_t** out_buffer);
 
 // Returns the user-visible length of the buffer in bytes.
 IREE_API_EXPORT iree_host_size_t
@@ -126,8 +128,16 @@ iree_vm_buffer_length(const iree_vm_buffer_t* buffer);
 // WARNING: this performs no validation of the access allowance on the buffer
 // and the caller is responsible for all range checking. Use with caution and
 // prefer the utility methods instead.
+IREE_API_EXPORT uint8_t* iree_vm_buffer_data(const iree_vm_buffer_t* buffer);
+
+// Returns the contents of the buffer in mutable form.
+// Returns an empty span if the buffer is immutable.
 IREE_API_EXPORT iree_byte_span_t
-iree_vm_buffer_data(const iree_vm_buffer_t* buffer);
+iree_vm_buffer_contents(const iree_vm_buffer_t* buffer);
+
+// Returns the contents of the buffer.
+IREE_API_EXPORT iree_const_byte_span_t
+iree_vm_buffer_const_contents(const iree_vm_buffer_t* buffer);
 
 // Copies a byte range from |source_buffer| to |target_buffer|.
 IREE_API_EXPORT iree_status_t iree_vm_buffer_copy_bytes(
@@ -188,6 +198,61 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
     const void* source_ptr, const iree_vm_buffer_t* target_buffer,
     iree_host_size_t target_offset, iree_host_size_t element_count,
     iree_host_size_t element_length);
+
+// Low-level helper for accessing a typed view of a buffer for read access.
+// The calling function must be safe to return from. Assumes buffer is non-null.
+// Prefer iree_vm_buffer_read_elements for larger reads.
+//
+// Usage (read 4 floats from the buffer):
+//  const float* IREE_RESTRICT buffer_ptr = NULL;
+//  iree_vm_buffer_check_ro(buffer, offset, 4, float, buffer_ptr);
+//  process(buffer_ptr[0], buffer_ptr[1], buffer_ptr[2], buffer_ptr[3]);
+#define iree_vm_buffer_check_ro(buffer, element_offset, element_length,        \
+                                element_type, out_buffer_ptr)                  \
+  {                                                                            \
+    const iree_host_size_t end =                                               \
+        ((element_offset) + (element_length)) * sizeof(element_type);          \
+    if (IREE_UNLIKELY(end > buffer->data.data_length)) {                       \
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                        \
+                              "out-of-bounds access detected (offset=%zu, "    \
+                              "length=%zu, alignment=%zu, buffer length=%zu)", \
+                              (element_offset) * sizeof(element_type),         \
+                              (element_length) * sizeof(element_type),         \
+                              sizeof(element_type), buffer->data.data_length); \
+    }                                                                          \
+    out_buffer_ptr =                                                           \
+        (const element_type*)buffer->data.data + (element_offset);             \
+  }
+
+// Low-level helper for accessing a typed view of a buffer for write access.
+// The calling function must be safe to return from. Assumes buffer is non-null.
+// Prefer iree_vm_buffer_write_elements for larger reads.
+//
+// Usage (write a single float to the buffer):
+//  float* IREE_RESTRICT buffer_ptr = NULL;
+//  iree_vm_buffer_check_rw(buffer, offset, 1, float, buffer_ptr);
+//  buffer_ptr[0] = 1.0f;
+#define iree_vm_buffer_check_rw(buffer, element_offset, element_length,        \
+                                element_type, out_buffer_ptr)                  \
+  {                                                                            \
+    if (IREE_UNLIKELY(!iree_all_bits_set(buffer->access,                       \
+                                         IREE_VM_BUFFER_ACCESS_MUTABLE))) {    \
+      return iree_make_status(                                                 \
+          IREE_STATUS_PERMISSION_DENIED,                                       \
+          "buffer is read-only and cannot be mapped for mutation");            \
+    }                                                                          \
+    const iree_host_size_t end =                                               \
+        ((element_offset) + (element_length)) * sizeof(element_type);          \
+    if (IREE_UNLIKELY(end > buffer->data.data_length)) {                       \
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                        \
+                              "out-of-bounds access detected (offset=%zu, "    \
+                              "length=%zu, alignment=%zu, buffer length=%zu)", \
+                              (element_offset) * sizeof(element_type),         \
+                              (element_length) * sizeof(element_type),         \
+                              sizeof(element_type), buffer->data.data_length); \
+    }                                                                          \
+    out_buffer_ptr = (element_type*)buffer->data.data + (element_offset);      \
+  }
 
 // Returns the a string view referencing the given |value| buffer.
 // The returned view will only be valid for as long as the buffer is live.

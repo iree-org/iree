@@ -39,4 +39,10 @@ def IREECodegen_Dialect : Dialect {
   let useDefaultAttributePrinterParser = 1;
 }
 
+def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
+
+class RankedTensorOrMemRefType<list<Type> allowedTypes, list<int> ranks>
+    : AnyTypeOf<[TensorRankOf<allowedTypes, ranks>,
+        MemRefRankOf<allowedTypes, ranks>]>;
+
 #endif // IREE_CODEGEN_DIALECT_IREECODEGEN_DIALECT

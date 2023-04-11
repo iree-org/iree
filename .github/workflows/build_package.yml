@@ -52,20 +52,26 @@ jobs:
             build-package: py-tf-compiler-tools-pkg
             experimental: false
 
-          # Macos packages.
-          - runs-on: macos-11
+          # MacOS packages.
+          - runs-on:
+              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
+              - os-family=macOS
+              - runner-group=postsubmit
             build-family: macos
             build-package: py-compiler-pkg
             experimental: true
-          - runs-on: macos-11
+          - runs-on:
+              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
+              - os-family=macOS
+              - runner-group=postsubmit
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
     env:
-      MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:b3b096e4b96746c3ae4cc52e880000d91038e79441334a7cfce9914cbbec1312
+      MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:794513562cca263480c0c169c708eec9ff70abfe279d6dc44e115b04488b9ab5
 
     steps:
-      - uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+      - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           path: "main_checkout"
           submodules: true
@@ -74,11 +80,6 @@ jobs:
       ##########################################################################
       # OS specific setup
       ##########################################################################
-      - name: Install MacOS Deps
-        if: "matrix.build-family == 'macos'"
-        shell: bash
-        run: |
-          sudo ./main_checkout/build_tools/python_deploy/install_macos_deps.sh
 
       ##########################################################################
       # Write version_info.json
@@ -140,6 +141,7 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-runtime iree-runtime-instrumented"
           output_dir: "${{ github.workspace }}/bindist"
+          override_python_versions: "3.11"
         run: |
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
@@ -165,12 +167,8 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
+          override_python_versions: "3.11"
         run: |
-          # libzstd on GitHub Action bots is not compatible with MacOS universal.
-          # https://github.com/iree-org/iree/issues/9955
-          sudo rm -rf /usr/local/lib/libzstd*
-          sudo rm -rf /usr/local/lib/cmake/zstd/*
-
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
@@ -189,7 +187,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2
+      - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           # We upload all wheels (which includes deps so that subsequent
           # steps can run without further fetching).
@@ -215,7 +213,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"
-        uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7 # v1
+        uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
         with:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}

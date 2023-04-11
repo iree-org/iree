@@ -34,7 +34,7 @@
 #include IREE_EMITC_HDR
 #else
 #include IREE_MODULE_HDR
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 #endif
 
 

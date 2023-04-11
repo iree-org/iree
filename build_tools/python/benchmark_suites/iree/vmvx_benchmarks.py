@@ -21,7 +21,7 @@ class Android_VMVX_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.VMVX,
       target_architecture=common_definitions.DeviceArchitecture.VMVX_GENERIC,
       target_abi=iree_definitions.TargetABI.VMVX)
-  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig(
+  DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_VMVX_GENERIC_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[VMVX_CPU_TARGET])
@@ -33,14 +33,14 @@ class Android_VMVX_Benchmarks(object):
     """Generates IREE compile and run configs."""
 
     gen_configs = [
-        iree_definitions.ModuleGenerationConfig(
+        iree_definitions.ModuleGenerationConfig.build(
             compile_config=self.DEFAULT_COMPILE_CONFIG,
             imported_model=iree_definitions.ImportedModel.from_model(model)) for
         model in [tflite_models.MOBILENET_V2, tflite_models.MOBILENET_V3SMALL]
     ]
     default_execution_configs = [
         benchmark_suites.iree.module_execution_configs.
-        get_vmvx_local_task_config(thread_num=4)
+        get_vmvx_system_scheduling_local_task_config(thread_num=4)
     ]
     big_cores_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,

@@ -68,7 +68,7 @@ cmake --build ../iree-build/ --target install
 
 The following instruction shows how to build for a RISC-V 64-bit Linux machine.
 For other RISC-V targets, please refer to
-[riscv.toolchain.cmake](https://github.com/iree-org/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
+[riscv.toolchain.cmake](https://github.com/openxla/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
 as a reference of how to set up the cmake configuration.
 
 #### RISC-V 64-bit Linux target
@@ -76,7 +76,7 @@ as a reference of how to set up the cmake configuration.
 ```shell
 cmake -GNinja -B ../iree-build-riscv/ \
   -DCMAKE_TOOLCHAIN_FILE="./build_tools/cmake/riscv.toolchain.cmake" \
-  -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build/install) \
+  -DIREE_HOST_BIN_DIR=$(realpath ../iree-build/install/bin) \
   -DRISCV_CPU=linux-riscv_64 \
   -DIREE_BUILD_COMPILER=OFF \
   -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
@@ -90,7 +90,7 @@ cmake --build ../iree-build-riscv/
 !!! note
     The following instructions are meant for the RISC-V 64-bit Linux
     target. For the bare-metal target, please refer to
-    [simple_embedding](https://github.com/iree-org/iree/blob/main/samples/simple_embedding)
+    [simple_embedding](https://github.com/openxla/iree/blob/main/samples/simple_embedding)
     to see how to build a ML workload for a bare-metal machine.
 
 Set the path to qemu-riscv64 Linux emulator binary in the `QEMU_BIN` environment
@@ -118,9 +118,9 @@ ${QEMU_BIN} \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --device=local-task \
-  --module_file=/tmp/simple_abs_vmvx.vmfb \
-  --entry_function=abs \
-  --function_input=f32=-5
+  --module=/tmp/simple_abs_vmvx.vmfb \
+  --function=abs \
+  --input=f32=-5
 ```
 
 ## Optional configuration
@@ -147,11 +147,11 @@ with the additional command-line flags
 ```shell hl_lines="3 4 5 6 7 8"
 tools/iree-compile \
   --iree-hal-target-backends=llvm-cpu \
-  --iree-llvm-target-triple=riscv64 \
-  --iree-llvm-target-cpu=generic-rv64 \
-  --iree-llvm-target-abi=lp64d \
-  --iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
-  --riscv-v-vector-bits-min=512 --riscv-v-fixed-length-vector-lmul-max=8 \
+  --iree-llvmcpu-target-triple=riscv64 \
+  --iree-llvmcpu-target-cpu=generic-rv64 \
+  --iree-llvmcpu-target-abi=lp64d \
+  --iree-llvmcpu-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
+  --riscv-v-fixed-length-vector-lmul-max=8 \
   iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
@@ -163,7 +163,7 @@ ${QEMU_BIN} \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --device=local-task \
-  --module_file=mobilenet_cpu.vmfb \
-  --entry_function=predict \
-  --function_input="1x224x224x3xf32=0"
+  --module=mobilenet_cpu.vmfb \
+  --function=predict \
+  --input="1x224x224x3xf32=0"
 ```

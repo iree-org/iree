@@ -74,7 +74,7 @@ static inline iree_byte_span_t iree_byte_span_empty() {
   return v;
 }
 
-static bool iree_byte_span_is_empty(iree_byte_span_t span) {
+static inline bool iree_byte_span_is_empty(iree_byte_span_t span) {
   return span.data == NULL || span.data_length == 0;
 }
 
@@ -95,8 +95,13 @@ static inline iree_const_byte_span_t iree_const_byte_span_empty() {
   return v;
 }
 
-static bool iree_const_byte_span_is_empty(iree_const_byte_span_t span) {
+static inline bool iree_const_byte_span_is_empty(iree_const_byte_span_t span) {
   return span.data == NULL || span.data_length == 0;
+}
+
+static inline iree_const_byte_span_t iree_const_cast_byte_span(
+    iree_byte_span_t span) {
+  return iree_make_const_byte_span(span.data, span.data_length);
 }
 
 //===----------------------------------------------------------------------===//
@@ -161,6 +166,12 @@ typedef enum iree_allocator_command_e {
   //   params: unused
   //   inout_ptr: pointer to free
   IREE_ALLOCATOR_COMMAND_FREE,
+
+  // TODO(benvanik): add optional IREE_ALLOCATOR_COMMAND_BIND like mbind:
+  // https://man7.org/linux/man-pages/man2/mbind.2.html
+  // This would take a pointer/length and a NUMA node ID to bind the memory to.
+  // We may want flags for controlling whether this is a new allocation getting
+  // bound or an existing one that is migrating to use MPOL_MF_MOVE.
 } iree_allocator_command_t;
 
 // Parameters for various allocation commands.

@@ -45,6 +45,11 @@ static llvm::cl::opt<bool> clDemoteF32ToF16(
     llvm::cl::desc("Converts all f32 ops and values into f16 counterparts "
                    "unconditionally before main flow conversions."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clPromoteBF16ToF32(
+    "iree-flow-promote-bf16-to-f32",
+    llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts "
+                   "unconditionally before main flow conversions."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clPromoteF16ToF32(
     "iree-flow-promote-f16-to-f32",
     llvm::cl::desc("Converts all f16 ops and values into f32 counterparts "
@@ -56,20 +61,9 @@ static llvm::cl::opt<bool> clDemoteF64ToF32(
                    "unconditionally before main flow conversions."),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clEnableConvToImg2Col(
-    "iree-flow-enable-conv-img2col-transform",
-    llvm::cl::desc("Enable converting convolution ops to img2col form."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnableConvToWinograd(
-    "iree-flow-enable-conv-winograd-transform",
-    llvm::cl::desc("Enable converting convolution ops to winograd form."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
-    "iree-flow-enable-padding-linalg-ops",
-    llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
-                   "flow-padding-size"),
+static llvm::cl::opt<bool> clEnablePadHandling(
+    "iree-flow-enable-pad-handling",
+    llvm::cl::desc("Enable native handling of tensor.pad operations"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
@@ -77,43 +71,22 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<int> clLinalgOpsPaddingSize(
-    "iree-flow-linalg-ops-padding-size",
-    llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
-                   "flow-padding-size"),
-    llvm::cl::init(4));
+static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
+    "iree-flow-enable-fuse-padding-into-linalg-producer-ops",
+    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
+    llvm::cl::init(false));
 
-// TODO(#1159): enable by default or remove this option once it works on
-//              a broader set of programs
-static llvm::cl::opt<bool> clEnableLinalgDetensorize(
-    "iree-flow-enable-linalg-detensorize",
-    llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
-    llvm::cl::init(true));
-
-static llvm::cl::opt<bool> clEnableAggressiveFusion(
-    "iree-flow-enable-aggressive-fusion",
-    llvm::cl::desc(
-        "Enable the aggressive fusion heuristic to fuse multiuse ops and ops "
-        "with reduction loops"),
+static llvm::cl::opt<bool> clEnableFuseMultiUse(
+    "iree-flow-fuse-multi-use", llvm::cl::desc("Fuse multi-use ops"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
     llvm::cl::desc("Generate the workload region"), llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clCollapseDimensions(
-    "iree-flow-form-dispatch-regions-collapse",
-    llvm::cl::desc("Collapse dimensions"), llvm::cl::init(true));
-
 static llvm::cl::opt<bool> clEnableDataTiling(
     "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
     llvm::cl::init(false));
-
-static llvm::cl::opt<std::string> clMmt4dTargetOptions(
-    "iree-flow-mmt4d-target-options",
-    llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
-                   "given architecture"),
-    llvm::cl::init(""));
 
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
@@ -193,26 +166,6 @@ void buildGlobalOptimizationPassPipeline(
 
 }  // namespace
 
-/// Optional pre-processing passes that transform the program for specialist
-/// uses case.
-static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
-  FunctionLikeNest(passManager)
-      .addPredicatedPass(clEnableConvToWinograd,
-                         IREE::LinalgExt::createConvertConv2DToWinogradPass)
-      .addPredicatedPass(clEnableConvToImg2Col,
-                         IREE::Flow::createConvertConv2DToImg2ColPass)
-      .addPredicatedPass(
-          !clMmt4dTargetOptions.empty(),
-          []() {
-            return IREE::Flow::createConvertLinalgMatmulToMmt4DPass(
-                clMmt4dTargetOptions);
-          })
-      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
-        return IREE::Flow::createPadLinalgOpsToIntegerMultiplePass(
-            clLinalgOpsPaddingSize);
-      });
-}
-
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
   // ML frontends have very uneven support for user-controlled types _and_ users
@@ -233,15 +186,18 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   if (clDemoteI64ToI32) {
     passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
   }
+  if (clPromoteBF16ToF32) {
+    passManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
+  }
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
+  passManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
 
-  // Optional pre-processing passes.
-  buildOptionalPreprocessingPassPipeline(passManager);
+  // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
@@ -250,9 +206,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
-  // Pad tensors.
-  passManager.addPass(IREE::Flow::createTensorPadToTensorInsertSlicePass(
-      /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
+  // Transform pad operations into linalg.fill + tensor.insert_slice.
+  // This is a WAR for not having native pad handling.
+  if (!clEnablePadHandling && !clEnableFusePaddingIntoLinalgProducerOps) {
+    passManager.addPass(IREE::Flow::createTensorPadToTensorInsertSlicePass(
+        /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
+  }
 
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
@@ -260,16 +219,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
+      .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Elementwise fusion.
-      .addPass([]() {
-        return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
-      })
-      .addPredicatedPass(clEnableLinalgDetensorize,
-                         mlir::createLinalgDetensorizePass)
+      .addPass(
+          []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse); })
+      .addPass(mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       .addPass(createCollapseDimsPass)
@@ -293,12 +251,24 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
       // Only want use the transform dialect for some dispatch regions and let
-      // the FormDispatchRegions handle the rest.
+      // the FormDispatchRegions handle the rest. This only moves the root
+      // compute op into the dispatch region, so that we can run additional
+      // transformations afterwards with a simple region and without bothering
+      // producers.
       .addPass([&]() {
-        return createFormDispatchRegionsPass(clEnableAggressiveFusion,
-                                             clDispatchGenerateWorkloadRegion,
-                                             clCollapseDimensions);
+        return createFormDispatchRegionsPass(FormDispatchRegionsOptions{
+            clEnableFuseMultiUse, clDispatchGenerateWorkloadRegion,
+            clEnableFusePaddingIntoLinalgConsumerOps,
+            clEnableFusePaddingIntoLinalgProducerOps});
       })
+      // Collapse dimensions of linalg Ops.
+      .addPass(createCollapseDimensionsPass)
+      // Clone all producers into the dispatch region to perpare for being
+      // isolated from above. This enables running additional transformations
+      // afterwards that would need the full dispatch content but don't want to
+      // handle explicit captures as materialized as dispatch workgroup operands
+      // and block arguments.
+      .addPass(createCloneProducersIntoDispatchRegionsPass)
       // Form dispatch region into dispatch workgroups
       .addPass([&]() {
         return createFormDispatchWorkgroupsPass(
@@ -307,10 +277,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(createCSEPass);
+      .addPass(createCSEPass)
 
-  // Initialize any empty tensors to zero.
-  passManager.addPass(createInitializeEmptyTensorsPass(clZeroFillEmptyTensors));
+      // Initialize any empty tensors to zero.
+      .addPass([&]() {
+        return createInitializeEmptyTensorsPass(clZeroFillEmptyTensors);
+      });
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

@@ -38,6 +38,8 @@ static int callback_count = 0;
 IREE_FLAG_CALLBACK(parse_callback, print_callback, &callback_count,
                    test_callback, "Callback!");
 
+IREE_FLAG_LIST(string, test_strings, "repeated");
+
 int main(int argc, char** argv) {
   // Parse flags, updating argc/argv with position arguments.
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
@@ -49,6 +51,14 @@ int main(int argc, char** argv) {
   printf("FLAG[test_float] = %g\n", FLAG_test_float);
   printf("FLAG[test_string] = %s\n", FLAG_test_string);
   printf("FLAG[test_callback] = %d\n", callback_count);
+
+  iree_flag_string_list_t strings = FLAG_test_strings_list();
+  printf("FLAG[test_strings] = %" PRIhsz ": ", strings.count);
+  for (iree_host_size_t i = 0; i < strings.count; ++i) {
+    if (i > 0) printf(", ");
+    printf("%.*s", (int)strings.values[i].size, strings.values[i].data);
+  }
+  printf("\n");
 
   // Report positional arguments:
   for (int i = 0; i < argc; ++i) {

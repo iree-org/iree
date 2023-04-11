@@ -1,0 +1,64 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+package(default_visibility = ["//visibility:public"])
+
+# Flags to enable/disable.
+# These can be passed on the command line as:
+#   --@tracy_client//:runtime_enable
+bool_flag(
+    name = "runtime_enable",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "_runtime_enabled",
+    flag_values = {
+        ":runtime_enable": "True",
+    },
+)
+
+# The 'enable_impl' and 'disable_impl' targets are referenced by aliases
+# based on config settings for different parts of the codebase that can
+# have tracing independently enabled.
+cc_library(
+    name = "enable_impl",
+    hdrs = glob([
+        "public/libbacktrace/*.h",
+        "public/libbacktrace/*.hpp",
+        "public/libbacktrace/*.cpp",
+        "public/tracy/*.h",
+        "public/tracy/*.hpp",
+        "public/*.cpp",
+        "public/common/*.h",
+        "public/common/*.hpp",
+        "public/common/*.cpp",
+        "public/client/*.h",
+        "public/client/*.hpp",
+        "public/client/*.cpp",
+    ]),
+    defines = [
+        "IREE_TRACING_MODE=2",
+    ],
+    includes = [
+        "public",
+    ],
+)
+
+cc_library(
+    name = "disable_impl",
+)
+
+# Conditionally enable for the runtime.
+alias(
+    name = "runtime_impl",
+    actual = select({
+        ":_runtime_enabled": ":enable_impl",
+        "//conditions:default": ":disable_impl",
+    }),
+)

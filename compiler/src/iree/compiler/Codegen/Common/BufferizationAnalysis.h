@@ -52,9 +52,9 @@ class BufferizationPlan {
 
   void insert(Value v) { mappedTensors.insert(getPointer(v)); }
 
-  void unionSets(Value v1, Value v2) {
-    mappedTensors.unionSets(getPointer(v1), getPointer(v2));
-  }
+  /// Union the sets containing `v1` and `v2`. Checks if the union can be
+  /// done and does nothing if union is invalid.
+  void unionSets(Value v1, Value v2);
 
   /// Sets the equivalance class that contains `v` as the set that contains the
   /// result tensor of the dispatch region (i.e. a tensor that is the `value`

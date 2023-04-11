@@ -14,19 +14,24 @@ set -xeEuo pipefail
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 source "${SCRIPT_DIR}/functions.sh"
 
+mkdir /runner-root
+
 RUNNER_TYPE="$(get_attribute github-runner-type)"
-# The CPU machines have 360GB of RAM
-TMPFS_SIZE=100g
+
+# On the CPU machines we use a ramdisk because they have 360GB of RAM, but the
+# GPU machines only have 80GB. We don't use local SSD on the CPU machines
+# because they require a minimum of 16 local SSD if any, which is quite wasteful
+# (increases cost by about 20%).
 if [[ "${RUNNER_TYPE}" == gpu ]]; then
-  # The GPU machines have only 85GB of RAM
-  # TODO(gcmn): Switch to using a local ssd. This is probably too much of the
-  # RAM.
-  TMPFS_SIZE=50g
+  echo "Formatting and mounting local SSD for working directory"
+  mkfs.ext4 -F /dev/nvme0n1
+  # Options suggested from https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable_flush
+  mount --options discard,defaults,nobarrier /dev/nvme0n1 /runner-root
+else
+  echo "Mounting tmpfs for working directory"
+  mount --types tmpfs --options size=100g tmpfs /runner-root
 fi
 
-echo "Creating tmpfs for runner"
-mkdir /runner-root
-mount -t tmpfs -o size="${TMPFS_SIZE}" tmpfs /runner-root
 cp -r "${SCRIPT_DIR}" /runner-root/config
 chown -R runner:runner /runner-root/
 
@@ -38,7 +43,7 @@ RUNNER_ARCHIVE_DIGEST="$(get_attribute github-runner-archive-digest)"
 cd /runner-root
 mkdir actions-runner
 cd actions-runner
-curl --silent --fail --show-error --location \
+nice_curl \
   "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_ARCHIVE}" \
   -o "${RUNNER_ARCHIVE}"
 
@@ -49,22 +54,13 @@ ln -s ../config/runner.env .env
 echo "Registering the runner."
 runuser --user runner /runner-root/config/register.sh
 
-echo "Setting up the deregister service."
-cp /runner-root/config/github-actions-runner-deregister.service /etc/systemd/system/
-
-echo "Setting up the runner service."
-cp /runner-root/config/github-actions-runner-start.service /etc/systemd/system/
-
-echo "Reloading system service files to reflect changes."
+echo "Loading systemd services"
+cp /runner-root/config/systemd/system/* /etc/systemd/system/
 systemctl daemon-reload
 
-echo "Enabling the deregister service."
-systemctl enable github-actions-runner-deregister
+echo "Enabling systemd services."
+find /runner-root/config/systemd/system/ -type f -printf "%f\n" \
+  | xargs systemctl enable
 
-echo "Starting the runner service."
-systemctl start github-actions-runner-start
-
-# The health check server confirms that we've at least made it this far and
-# therefore registering the runner has succeeded.
-echo "Starting health check server"
-/runner-root/config/health_server/health_server.py
+echo "Starting the runner services"
+systemctl start runner-setup.target

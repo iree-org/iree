@@ -77,8 +77,8 @@ def VK_CapabilitiesAttr : VK_Attr<"Capabilities", "caps"> {
     //
     // This corresponds to the `VkPhysicalDeviceSubgroupSizeControlProperties` structure:
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSubgroupSizeControlPropertiesEXT.html
-    OptionalParameter<"::llvm::Optional<int>">:$minSubgroupSize,
-    OptionalParameter<"::llvm::Optional<int>">:$maxSubgroupSize,
+    OptionalParameter<"::std::optional<int>">:$minSubgroupSize,
+    OptionalParameter<"::std::optional<int>">:$maxSubgroupSize,
 
     // VK_KHR_16bit_storage features.
     //
@@ -103,6 +103,13 @@ def VK_CapabilitiesAttr : VK_Attr<"Capabilities", "caps"> {
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderFloat16Int8Features.html
     OptionalParameter<"::mlir::UnitAttr">:$shaderFloat16,
     OptionalParameter<"::mlir::UnitAttr">:$shaderInt8,
+
+    // VK_KHR_shader_integer_dot_product features.
+    //
+    // This corresponds to the `VkPhysicalDeviceShaderIntegerDotProductFeatures`
+    // structure:
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR.html
+    OptionalParameter<"::mlir::UnitAttr">:$shaderIntegerDotProduct,
 
     // VK_KHR_variable_pointers features.
     // This corresponds to the `VkPhysicalDeviceVariablePointersFeatures`

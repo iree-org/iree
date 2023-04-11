@@ -51,7 +51,7 @@ function(iree_bytecode_module)
   endif()
 
   if(_RULE_STATIC_LIB_PATH AND
-     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
+     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR IREE_HOST_BIN_DIR))
     message(SEND_ERROR "Static library only supports llvm-cpu backend")
   endif()
 
@@ -68,8 +68,6 @@ function(iree_bytecode_module)
     set(_MODULE_FILE_NAME "${_RULE_NAME}.vmfb")
   endif()
 
-  iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
-
   set(_ARGS "--output-format=vm-bytecode")
   list(APPEND _ARGS "${_RULE_FLAGS}")
 
@@ -84,30 +82,30 @@ function(iree_bytecode_module)
 
   # If an LLVM CPU backend is enabled, supply the linker tool.
   if(IREE_LLD_TARGET)
-    iree_get_executable_path(_LINKER_TOOL_EXECUTABLE "lld")
-    list(APPEND _ARGS "--iree-llvm-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
-    list(APPEND _ARGS "--iree-llvm-wasm-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
-    # Note: --iree-llvm-system-linker-path is left unspecified.
+    set(_LINKER_TOOL_EXECUTABLE "$<TARGET_FILE:${IREE_LLD_TARGET}>")
+    list(APPEND _ARGS "--iree-llvmcpu-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
+    list(APPEND _ARGS "--iree-llvmcpu-wasm-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
+    # Note: --iree-llvmcpu-system-linker-path is left unspecified.
   endif()
 
   if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
-    list(APPEND _ARGS "--iree-llvm-link-embedded=false")
+    list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
   endif()
 
   # Support testing in TSan build dirs. Unlike other sanitizers, TSan is an
   # ABI break: when the host code is built with TSan, the module must be too,
   # otherwise we get crashes calling module code.
   if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
-    list(APPEND _ARGS "--iree-llvm-sanitize=thread")
+    list(APPEND _ARGS "--iree-llvmcpu-sanitize=thread")
   endif()
 
   set(_OUTPUT_FILES "${_MODULE_FILE_NAME}")
   # Check LLVM static library setting. If the static libary output path is set,
   # retrieve the object path and the corresponding header file path.
   if(_RULE_STATIC_LIB_PATH)
-    list(APPEND _ARGS "--iree-llvm-link-embedded=false")
-    list(APPEND _ARGS "--iree-llvm-link-static")
-    list(APPEND _ARGS "--iree-llvm-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
+    list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
+    list(APPEND _ARGS "--iree-llvmcpu-link-static")
+    list(APPEND _ARGS "--iree-llvmcpu-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
 
     string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
     list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
@@ -124,17 +122,14 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
-  # Depending on the binary instead of the target here given we might not have
-  # a target in this CMake invocation when cross-compiling.
   add_custom_command(
     OUTPUT
       ${_OUTPUT_FILES}
     COMMAND
-      ${_COMPILE_TOOL_EXECUTABLE}
+      ${_COMPILE_TOOL}
       ${_ARGS}
-    # Changes to either the compiler tool or the input sources should rebuild.
     DEPENDS
-      ${_COMPILE_TOOL_EXECUTABLE}
+      ${_COMPILE_TOOL}
       ${_LINKER_TOOL_EXECUTABLE}
       ${_RULE_SRC}
       ${_RULE_DEPENDS}

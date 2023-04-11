@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/VMVX/IR/VMVXBase.td"
 include "iree/compiler/Dialect/VMVX/IR/VMVXInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/OpBase.td"
 
 class VMVX_PureOp<string mnemonic, list<Trait> traits = []> :
     VMVX_Op<mnemonic, !listconcat(traits, [Pure])>;
@@ -71,6 +72,27 @@ def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
   );
   let assemblyFormat = [{
     `set` `(` $set `)` `binding` `(` $binding `)` attr-dict
+  }];
+}
+
+def VMVX_QueryTileSizesOp : VMVX_PureOp<"query_tile_sizes", [Pure]> {
+  let summary = "Returns tile sizes to use to materialize the given encoding, based on runtime CPU capabilities.";
+  let description = [{
+    TODO write me
+  }];
+
+  let arguments = (ins
+    Variadic<VMVX_Index>:$sizes,
+    I32Attr:$flags
+  );
+  let results = (outs
+    Variadic<VMVX_Index>:$tileSizes
+  );
+
+  let assemblyFormat = [{
+    `sizes` `` `(` $sizes `)`
+    `flags` `` `(` $flags `)`
+    `->` type(results) attr-dict
   }];
 }
 
@@ -210,54 +232,6 @@ def VMVX_MatmulOp : VMVX_Op<"matmul"> {
     `rhs` `` `(` $rhs_buffer `offset` $rhs_offset `row_stride` $rhs_row_stride `:` type($rhs_buffer)`)`
     `out` `` `(` $out_buffer `offset` $out_offset `row_stride` $out_row_stride `:` type($out_buffer) `)`
     `mnk` `` `(` $m `,` $n `,` $k `)`
-    `flags` `` `(` $flags `)`
-    `:` `(` $lhs_type `,` $rhs_type `,` $out_type `)`
-    attr-dict
-  }];
-}
-
-def VMVX_Mmt4dOp : VMVX_Op<"mmt4d"> {
-  let summary = "mmt4d";
-  let description = [{
-    Tiled matmul mirroring linalg.mmt4d
-  }];
-  let arguments = (ins
-    // Lhs buffer.
-    VMVX_Buffer:$lhs_buffer,
-    VMVX_Index:$lhs_offset,
-    VMVX_Index:$lhs_row_stride,
-    // Rhs buffer.
-    VMVX_Buffer:$rhs_buffer,
-    VMVX_Index:$rhs_offset,
-    VMVX_Index:$rhs_row_stride,
-    // Out buffer.
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
-    VMVX_Index:$out_row_stride,
-
-    // Dimensions.
-    VMVX_Index:$m,
-    VMVX_Index:$n,
-    VMVX_Index:$k,
-
-    // Tile dimensions.
-    VMVX_Index:$tile_m,
-    VMVX_Index:$tile_n,
-    VMVX_Index:$tile_k,
-
-    // Type and flag attributes.
-    VMVX_ElementTypeAttr:$lhs_type,
-    VMVX_ElementTypeAttr:$rhs_type,
-    VMVX_ElementTypeAttr:$out_type,
-    I32Attr:$flags
-  );
-
-  let assemblyFormat = [{
-    `lhs` `` `(` $lhs_buffer `offset` $lhs_offset `row_stride` $lhs_row_stride `:` type($lhs_buffer) `)`
-    `rhs` `` `(` $rhs_buffer `offset` $rhs_offset `row_stride` $rhs_row_stride `:` type($rhs_buffer)`)`
-    `out` `` `(` $out_buffer `offset` $out_offset `row_stride` $out_row_stride `:` type($out_buffer) `)`
-    `mnk` `` `(` $m `,` $n `,` $k `)`
-    `tile_mnk` `` `(` $tile_m `,` $tile_n `,` $tile_k `)`
     `flags` `` `(` $flags `)`
     `:` `(` $lhs_type `,` $rhs_type `,` $out_type `)`
     attr-dict

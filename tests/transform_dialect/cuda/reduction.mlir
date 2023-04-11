@@ -24,6 +24,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
@@ -31,37 +32,33 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
+// RUN: iree-run-module --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 /// Note: the current --iree-codegen-llvmgpu-enable-transform-dialect-jit only works for exactly this reduction atm.
-// RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="8x64xf32=1" |\
+// RUN: iree-compile %s --iree-hal-target-backends=cuda | \
+// RUN: iree-run-module --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
-  //     CHECK-DAG: %[[F0:.*]] = arith.constant dense<0.000000e+00> : vector<f32>
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x2xf32, 3>
+  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x2xf32, #gpu.address_space<workgroup>>
   //     CHECK-DAG: %[[TIDX:.]] = gpu.thread_id  x
   //     CHECK-DAG: %[[TIDY:.]] = gpu.thread_id  y
-  //     CHECK-DAG: %[[TIDZ:.]] = gpu.thread_id  z
-
-  //         CHECK: %[[ADDED:.*]] = arith.addi %[[TIDZ]], %[[workgroup_id_x]]
+  //     CHECK-DAG: %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
 
   // Distributed reduction: everyone loads then 5 xor + addf expected
-  //         CHECK: vector.transfer_read %{{.*}}[%[[ADDED]], %[[TIDY]], %[[TIDX]]]
+  //         CHECK: vector.transfer_read %{{.*}}[%[[workgroup_id_x]], %[[TIDY]], %[[TIDX]]]
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}
 
   //         CHECK: %[[RES_VEC:.*]] = vector.broadcast %[[RES]] : f32 to vector<f32>
-  //         CHECK: %[[CONDXIS0:.*]] = arith.cmpi eq, %[[TIDX]], %[[C0]] : index
   //         CHECK: scf.if %[[CONDXIS0]]
-  //         CHECK:   vector.transfer_write %[[RES_VEC]], %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]
+  //         CHECK:   vector.transfer_write %[[RES_VEC]], %[[SHMEM_ALLOC]][%[[C0]], %[[TIDY]]]
   //         CHECK: gpu.barrier
 
   // Last part is not distributed atm and is only ran by threadIdx.x == 0 and threadIdx.y == 0.
@@ -73,7 +70,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //         CHECK:   vector.reduction <add>
   //         CHECK:   vector.transfer_write
   //         CHECK: gpu.barrier
-  //         CHECK: memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, 3>
+  //         CHECK: memref.dealloc %[[SHMEM_ALLOC]] : memref<1x2xf32, #gpu.address_space<workgroup>>
 
 
 //      EXEC: result[0]: hal.buffer_view

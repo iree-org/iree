@@ -171,6 +171,16 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // This will only work for default drivers and otherwise users can explicitly
 // specify the provider when creating the executable loaders themselves.
 
+#if !defined(IREE_HAL_VERBOSE_TRACING_ENABLE)
+// Whether to enable additional HAL tracing that is known to have non-trivial
+// overheads (more memory consumption, device concurrency impacts, etc).
+#ifdef NDEBUG
+#define IREE_HAL_VERBOSE_TRACING_ENABLE 0
+#else
+#define IREE_HAL_VERBOSE_TRACING_ENABLE 1
+#endif  // NDEBUG
+#endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
+
 #if !defined(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
 // Power of two byte alignment required on all host heap buffers.
 // Executables are compiled with alignment expectations and the runtime
@@ -215,10 +225,10 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Enables disassembly of vm bytecode functions and stderr dumping of execution.
 // Increases code size quite, lowers VM performance, and is generally unsafe;
 // include only when debugging or running on trusted inputs.
-#ifdef NDEBUG
-#define IREE_VM_EXECUTION_TRACING_ENABLE 0
-#else
+#ifndef NDEBUG
 #define IREE_VM_EXECUTION_TRACING_ENABLE 1
+#else
+#define IREE_VM_EXECUTION_TRACING_ENABLE 0
 #endif  // NDEBUG
 #endif  // !IREE_VM_EXECUTION_TRACING_ENABLE
 
@@ -246,7 +256,14 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // moderate performance improvement (~10-20%) on very heavy VMVX workloads but
 // adds 20-30KB to the binary size.
 #define IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE 0
-#endif  // IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
+#endif  // !IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
+
+#if !defined(IREE_VM_BYTECODE_VERIFICATION_ENABLE)
+// Enables verification ensuring input bytecode is well-formed.
+// This increases binary size but should be left on in all cases where untrusted
+// inputs can be provided. Module metadata is always verified.
+#define IREE_VM_BYTECODE_VERIFICATION_ENABLE 1
+#endif  // !IREE_VM_BYTECODE_VERIFICATION_ENABLE
 
 #if !defined(IREE_VM_EXT_F32_ENABLE)
 // Enables the 32-bit floating-point instruction extension.
@@ -263,6 +280,6 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #if !defined(IREE_VM_UBSAN_CHECKABLE_ENABLE)
 // Exposes VMVX kernels to UBSAN checking, else disable UBSAN checking.
 #define IREE_VM_UBSAN_CHECKABLE_ENABLE 0
-#endif  // IREE_VM_UBSAN_CHECKABLE_ENABLE
+#endif  // !IREE_VM_UBSAN_CHECKABLE_ENABLE
 
 #endif  // IREE_BASE_CONFIG_H_

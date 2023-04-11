@@ -20,12 +20,12 @@ namespace VM {
 // This differs from makeCallingConventionString in that it supports variadic
 // arguments. Ideally we'd combine the two, but we only have this additional
 // metadata on IREE::VM::ImportOp.
-Optional<std::string> makeImportCallingConventionString(
+std::optional<std::string> makeImportCallingConventionString(
     IREE::VM::ImportOp importOp);
 
 // Generates a string encoding the function type for defining the
 // FunctionSignatureDef::calling_convention field for internal/export functions.
-Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp);
+std::optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp);
 
 }  // namespace VM
 }  // namespace IREE

@@ -12,13 +12,14 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "iree/base/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/vm_util_cc.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 namespace iree {
 namespace {
@@ -130,17 +131,18 @@ Status RunModule(const IreeModuleInvocation& invocation) {
           &function),
       "looking up function '%s'", function_name.c_str());
 
-  size_t pos = 0;
-  std::string inputs_str = invocation.inputs;
-  std::vector<std::string> input_views;
-  while ((pos = inputs_str.find('\n')) != std::string::npos) {
-    input_views.push_back(inputs_str.substr(0, pos));
-    inputs_str.erase(0, pos + 1);
+  std::vector<iree_string_view_t> input_views;
+  iree_string_view_t inputs_view =
+      iree_make_string_view(invocation.inputs.data(), invocation.inputs.size());
+  while (!iree_string_view_is_empty(inputs_view)) {
+    iree_string_view_t input_view = iree_string_view_empty();
+    iree_string_view_split(inputs_view, '\n', &input_view, &inputs_view);
+    input_views.push_back(input_view);
   }
   vm::ref<iree_vm_list_t> inputs;
-  IREE_RETURN_IF_ERROR(ParseToVariantList(iree_hal_device_allocator(device),
-                                          input_views, iree_allocator_system(),
-                                          &inputs));
+  IREE_RETURN_IF_ERROR(iree_tooling_parse_to_variant_list(
+      iree_hal_device_allocator(device), input_views.data(), input_views.size(),
+      iree_allocator_system(), &inputs));
 
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
@@ -153,11 +155,16 @@ Status RunModule(const IreeModuleInvocation& invocation) {
                      iree_allocator_system()),
       "invoking function '%s'", function_name.c_str());
 
-  std::string result;
-  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get(), &result),
+  iree_string_builder_t result_str;
+  iree_string_builder_initialize(iree_allocator_system(), &result_str);
+  IREE_RETURN_IF_ERROR(iree_tooling_append_variant_list_lines(
+                           IREE_SV("result"), outputs.get(),
+                           /*max_element_count=*/1024, &result_str),
                        "printing results");
   LOGI("Execution Result:");
-  LOGI("%s", result.c_str());
+  LOGI("%.*s", (int)iree_string_builder_size(&result_str),
+       iree_string_builder_buffer(&result_str));
+  iree_string_builder_deinitialize(&result_str);
 
   inputs.reset();
   outputs.reset();

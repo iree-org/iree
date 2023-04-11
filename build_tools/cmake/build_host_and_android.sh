@@ -49,7 +49,7 @@ cd build-host
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_BENCHMARKS=OFF \
+  -DIREE_BUILD_LEGACY_BENCHMARKS=OFF \
   -DIREE_BUILD_SAMPLES=OFF
 "${CMAKE_BIN}" --build . --target install -- -k 0
 # --------------------------------------------------------------------------- #
@@ -73,7 +73,7 @@ cd build-android
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI="${ANDROID_ABI}" \
   -DANDROID_PLATFORM=android-29 \
-  -DIREE_HOST_BINARY_ROOT="${PWD}/../build-host/install" \
+  -DIREE_HOST_BIN_DIR="${PWD}/../build-host/install/bin" \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
@@ -86,7 +86,3 @@ echo "------------"
 echo "Building test deps for device"
 echo "------------------"
 "$CMAKE_BIN" --build . --target iree-test-deps -- -k 0
-
-echo "Building sample deps for device"
-echo "------------------"
-"$CMAKE_BIN" --build . --target iree-sample-deps -- -k 0

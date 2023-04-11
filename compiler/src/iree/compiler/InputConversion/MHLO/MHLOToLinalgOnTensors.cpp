@@ -15,6 +15,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/InputConversion/MHLO/ConvertMHLOToFlow.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -219,6 +221,19 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   }
 };
 
+struct OptimizationBarrierOpConversion
+    : public OpConversionPattern<mhlo::OptimizationBarrierOp> {
+  using OpConversionPattern<mhlo::OptimizationBarrierOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::OptimizationBarrierOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(
+        op, op.getOperands());
+    return success();
+  }
+};
+
 // We need to convert func ops in order to convert types.
 class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
@@ -323,8 +338,8 @@ class GenericTypeConvert : public ConversionPattern {
   }
 };
 
-llvm::Optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
-                                     ValueRange inputs, Location loc) {
+std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
+                                    ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
   if (inputs.front().getType().isa<ShapedType>()) {
     return std::nullopt;
@@ -340,8 +355,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
     : public ConvertMHLOToLinalgOnTensorsBase<
           ConvertMHLOToLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    mhlo::MhloDialect, shape::ShapeDialect, math::MathDialect,
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect,
+                    linalg::LinalgDialect, mhlo::MhloDialect,
+                    shape::ShapeDialect, math::MathDialect,
                     memref::MemRefDialect, complex::ComplexDialect>();
   }
 
@@ -356,6 +372,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     // TODO: Collapse/rework all of these patterns once the consolidation
     // lands. There is little reason to have these so spread out.
     populateMHLOToFlowPatterns(context, patterns);
+
     chlo::populateDecomposeChloPatterns(context, &patterns);
     populateMHLOBroadcastingToLinalgPatterns(context, *typeConverter, patterns);
     mhlo::populateScalarHloToArithmeticConversionPatterns(
@@ -365,6 +382,8 @@ struct ConvertMHLOToLinalgOnTensorsPass
                                                     patterns);
     populateMHLOComplexToRealPatterns(context, *typeConverter, patterns);
 
+    populateMHLOCollectiveOpsConversionPatterns(context, *typeConverter,
+                                                patterns);
     // TODO(*): expose patterns that do this much better from
     // iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
 
@@ -386,8 +405,13 @@ struct ConvertMHLOToLinalgOnTensorsPass
         context);
     patterns.insert<GenericTypeConvert>(
         ml_program::GlobalStoreOp::getOperationName(), *typeConverter, context);
-
+    // This is needed when converting mhlo::ReplicaIDOp.
+    patterns.insert<GenericTypeConvert>(
+        tensor::FromElementsOp::getOperationName(), *typeConverter, context);
+    patterns.insert<GenericTypeConvert>(
+        arith::IndexCastUIOp::getOperationName(), *typeConverter, context);
     ConversionTarget target(getContext());
+
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
     auto isLegallyTypedOp = [&](Operation *op) -> bool {
       for (Type type : op->getResultTypes()) {
@@ -454,8 +478,9 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHloToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
-  patterns.insert<ConcatenateOpConversion, FftOpConversion>(
-      typeConverter, context, PatternBenefit(1000));
+  patterns.insert<ConcatenateOpConversion, FftOpConversion,
+                  OptimizationBarrierOpConversion>(typeConverter, context,
+                                                   PatternBenefit(1000));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createMHLOToLinalgOnTensorsPass() {

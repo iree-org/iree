@@ -14,25 +14,25 @@ import os
 def parse_arguments():
   """Parses command line arguments."""
   parser = argparse.ArgumentParser()
-  parser.add_argument("--module_file",
+  parser.add_argument("--module",
                       type=str,
                       required=True,
-                      metavar="<module-file>",
+                      metavar="<module>",
                       help="The name of the module file")
   parser.add_argument("--device",
                       type=str,
                       required=True,
                       metavar="<device>",
                       help="The name of the HAL device")
-  parser.add_argument("--entry_function",
+  parser.add_argument("--function",
                       type=str,
                       required=True,
-                      metavar="<entry-function>",
+                      metavar="<function>",
                       help="The name of the entry function")
-  parser.add_argument("--function_inputs",
+  parser.add_argument("--inputs",
                       type=str,
                       required=True,
-                      metavar="<function-inputs>",
+                      metavar="<inputs>",
                       help="A list of comma-separated function inputs")
   parser.add_argument("--additional_args",
                       type=str,
@@ -50,12 +50,10 @@ def parse_arguments():
 
 def main(args):
   lines = [
-      f"--device={args.device}", f"--module_file={args.module_file}",
-      f"--entry_function={args.entry_function}"
+      f"--device={args.device}", f"--module={args.module}",
+      f"--function={args.function}"
   ]
-  lines.extend([
-      ("--function_input=" + e) for e in args.function_inputs.split(",")
-  ])
+  lines.extend([("--input=" + e) for e in args.inputs.split(",")])
   lines.extend(args.additional_args.split(";"))
   content = "\n".join(lines) + "\n"
 

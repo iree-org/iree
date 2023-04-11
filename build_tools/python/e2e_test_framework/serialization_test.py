@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import List, Optional
 import json
 import pathlib
-import collections
 import enum
 import typing
 import unittest
@@ -82,24 +81,19 @@ class SerializationTest(unittest.TestCase):
     self.assertEqual(
         results, {
             "main_obj": [
-                collections.OrderedDict(
-                    b_list=["id_a", "id_b"],
-                    c_obj=collections.OrderedDict(float_val=0.1),
-                    str_val="test1",
-                    enum_val="OPTION_B"),
-                collections.OrderedDict(
-                    b_list=["id_a"],
-                    c_obj=collections.OrderedDict(float_val=0.2),
-                    str_val=None,
-                    enum_val="OPTION_C")
+                dict(b_list=["id_a", "id_b"],
+                     c_obj=dict(float_val=0.1),
+                     str_val="test1",
+                     enum_val="OPTION_B"),
+                dict(b_list=["id_a"],
+                     c_obj=dict(float_val=0.2),
+                     str_val=None,
+                     enum_val="OPTION_C")
             ],
-            "obj_map":
-                collections.OrderedDict({
-                    "test_b:id_a":
-                        collections.OrderedDict(key="id_a", int_val=10),
-                    "test_b:id_b":
-                        collections.OrderedDict(key="id_b", int_val=20)
-                })
+            "obj_map": {
+                "test_b:id_a": dict(key="id_a", int_val=10),
+                "test_b:id_b": dict(key="id_b", int_val=20)
+            }
         })
 
   def test_serialize_and_pack_with_unsupported_type(self):
@@ -109,8 +103,7 @@ class SerializationTest(unittest.TestCase):
 
   def test_serialize_and_pack_with_unsupported_dict_key(self):
     self.assertRaises(
-        ValueError, lambda: serialization.serialize_and_pack(
-            collections.OrderedDict({(0, 0): "test"})))
+        ValueError, lambda: serialization.serialize_and_pack({(0, 0): "test"}))
 
   def test_serialize_and_pack_with_circular_reference(self):
     obj_a = TestCircularReference(id="0", child=None)
@@ -147,14 +140,14 @@ class SerializationTest(unittest.TestCase):
     b_obj_a = TestB(key="id_a", int_val=10)
     b_obj_b = TestB(key="id_b", int_val=20)
 
-    objs = collections.OrderedDict(
-        x=b_obj_a,
-        y=b_obj_b,
-    )
+    objs = {
+        "x": b_obj_a,
+        "y": b_obj_b,
+    }
 
     json_str = json.dumps(serialization.serialize_and_pack(objs))
-    results = serialization.unpack_and_deserialize(
-        json.loads(json_str), typing.OrderedDict[str, TestB])
+    results = serialization.unpack_and_deserialize(json.loads(json_str),
+                                                   typing.Dict[str, TestB])
 
     self.assertEqual(results, objs)
 

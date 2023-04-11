@@ -11,6 +11,7 @@ include(CMakeParseArguments)
 # CMake function to imitate Bazel's cc_library rule.
 #
 # Parameters:
+# PACKAGE: Name of the package (overrides actual path)
 # NAME: name of target (see Note)
 # HDRS: List of public header files for the library
 # TEXTUAL_HDRS: List of public header files that cannot be compiled on their own
@@ -61,7 +62,7 @@ function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY;SHARED"
-    "NAME;WINDOWS_DEF_FILE"
+    "PACKAGE;NAME;WINDOWS_DEF_FILE"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
   )
@@ -70,14 +71,23 @@ function(iree_cc_library)
     return()
   endif()
 
-  # Replace dependencies passed by ::name with iree::package::name
-  iree_package_ns(_PACKAGE_NS)
-  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
-
   # Prefix the library with the package name, so we get: iree_package_name.
-  iree_package_name(_PACKAGE_NAME)
+  if(_RULE_PACKAGE)
+    set(_PACKAGE_NS "${_RULE_PACKAGE}")
+    string(REPLACE "::" "_" _PACKAGE_NAME ${_RULE_PACKAGE})
+  else()
+    iree_package_ns(_PACKAGE_NS)
+    iree_package_name(_PACKAGE_NAME)
+  endif()
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   set(_OBJECTS_NAME ${_NAME}.objects)
+
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "  : iree_cc_library(${_NAME})")
+  endif()
+
+  # Replace dependencies passed by ::name with iree::package::name
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
   # Check if this is a header-only library.
   # Note that as of February 2019, many popular OS's (for example, Ubuntu
@@ -107,7 +117,7 @@ function(iree_cc_library)
 
   if(NOT _RULE_IS_INTERFACE)
     add_library(${_OBJECTS_NAME} OBJECT)
-    if(_RULE_SHARED)
+    if(_RULE_SHARED OR BUILD_SHARED_LIBS)
       add_library(${_NAME} SHARED "$<TARGET_OBJECTS:${_OBJECTS_NAME}>")
       if(_RULE_WINDOWS_DEF_FILE AND WIN32)
         target_sources(${_NAME} PRIVATE "${_RULE_WINDOWS_DEF_FILE}")
@@ -191,6 +201,17 @@ function(iree_cc_library)
         ${_RULE_DEFINES}
     )
 
+    # If in BUILD_SHARED_LIBS mode, then we need to make sure that visibility
+    # is not hidden. We default to hidden visibility in the main copts so
+    # need to undo it here.
+    # TODO: Switch to the CXX_VISIBILITY_PRESET property and fix the global
+    # hidden setting to follow suit.
+    if(BUILD_SHARED_LIBS AND IREE_SUPPORTS_VISIBILITY_DEFAULT)
+      target_compile_options(${_OBJECTS_NAME} PRIVATE
+        "-fvisibility=default"
+      )
+    endif()
+
     # Add all IREE targets to a folder in the IDE for organization.
     if(_RULE_PUBLIC)
       set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER})
@@ -236,6 +257,9 @@ function(iree_cc_library)
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
+  endif()
   add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
 
   if(NOT "${_PACKAGE_NS}" STREQUAL "")
@@ -243,7 +267,7 @@ function(iree_cc_library)
     # it as a default. For example, foo/bar/ library 'bar' would end up as
     # 'foo::bar'.
     iree_package_dir(_PACKAGE_DIR)
-    if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
+    if("${_RULE_NAME}" STREQUAL "${_PACKAGE_DIR}")
       add_library(${_PACKAGE_NS} ALIAS ${_NAME})
     endif()
   endif()
@@ -324,8 +348,12 @@ function(iree_cc_unified_library)
   set(_LIBS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>>")
 
   # For debugging, write out evaluated objects to a file.
-  file(GENERATE OUTPUT "${_RULE_NAME}.$<CONFIG>.contents.txt" CONTENT
-    "OBJECTS:\n${_OBJECTS}\n\nLIBS:\n${_LIBS}\n")
+  # This cannot be enabled for Xcode given that Xcode does not support
+  # per-configuration sources.
+  if (NOT "${CMAKE_GENERATOR}" STREQUAL "Xcode")
+    file(GENERATE OUTPUT "${_RULE_NAME}.$<CONFIG>.contents.txt" CONTENT
+      "OBJECTS:\n${_OBJECTS}\n\nLIBS:\n${_LIBS}\n")
+  endif()
   if(_RULE_SHARED)
     add_library(${_NAME} SHARED ${_OBJECTS})
   else()
@@ -374,4 +402,22 @@ function(iree_cc_unified_library)
   if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
+endfunction()
+
+# iree_cc_library_exclude_from_all(target exclude)
+#
+# For a target previously defined in the same package, set the
+# EXCLUDE_FROM_ALL property.
+#
+# This is necessary because cc_library targets consist of multiple sub-targets
+# and they all must have the property set.
+function(iree_cc_library_exclude_from_all target exclude_from_all)
+  iree_package_ns(_PACKAGE_NS)
+  iree_package_name(_PACKAGE_NAME)
+
+  set(_NAME "${_PACKAGE_NAME}_${target}")
+  set(_OBJECTS_NAME ${_NAME}.objects)
+
+  set_target_properties(${_NAME} ${_OBJECTS_NAME}
+    PROPERTIES EXCLUDE_FROM_ALL ${exclude_from_all})
 endfunction()

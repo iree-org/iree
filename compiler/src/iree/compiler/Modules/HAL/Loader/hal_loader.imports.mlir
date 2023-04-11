@@ -11,13 +11,13 @@ vm.module @hal_loader {
 //===----------------------------------------------------------------------===//
 
 // Queries whether the given executable format is supported.
-vm.import @executable.query_support(
+vm.import private @executable.query_support(
   %executable_format : !vm.buffer
 ) -> i32
 attributes {nosideeffects}
 
 // Creates and dynamically links an executable library.
-vm.import @executable.load(
+vm.import private @executable.load(
   %executable_format : !vm.buffer,
   %executable_data : !vm.buffer,
   %constants : !vm.buffer
@@ -26,7 +26,7 @@ attributes {nosideeffects}
 
 // Dispatches a grid with the given densely-packed and 0-aligned push constants
 // and bindings.
-vm.import @executable.dispatch(
+vm.import private @executable.dispatch(
   %executable : !vm.ref<!hal.executable>,
   %entry_point : i32,
   %workgroup_x : i32,

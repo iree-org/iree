@@ -16,9 +16,9 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -78,7 +78,7 @@ static IREE::Util::GlobalOp createBufferLikeGlobalOp(
       loc, tensorType, zeroOp, /*result_dims=*/ValueRange{});
   // hal.tensor.export
   auto bufferExportOp = initializerBuilder.create<IREE::HAL::TensorExportOp>(
-      loc, globalOp.getType(), splatOp.getResult());
+      loc, globalOp.getType(), splatOp.getResult(), /*name=*/nullptr);
   // util.optimization_barrier (try to prevent optimizations across the export)
   auto barrierOp = initializerBuilder.create<IREE::Util::OptimizationBarrierOp>(
       loc, bufferExportOp.getTarget());

@@ -23,14 +23,6 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-/// A simple pattern rewriter that implements no special logic.
-class SimpleRewriter : public PatternRewriter {
- public:
-  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
-}  // namespace
-
-namespace {
 
 static LogicalResult tileReduction(linalg::GenericOp op) {
   SmallVector<unsigned> dims;
@@ -39,7 +31,7 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   if (tileSize.empty() || dims.size() != 1 ||
       tileSize.back() == op.getStaticLoopRanges()[dims.back()])
     return success();
-  SimpleRewriter rewriter(op.getContext());
+  IRRewriter rewriter(op.getContext());
   SmallVector<OpFoldResult> sizes;
   for (int64_t size : tileSize) {
     sizes.push_back(rewriter.getIndexAttr(size));
@@ -52,7 +44,7 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
 }
 
 static LogicalResult tileFusedOps(linalg::GenericOp op) {
-  SimpleRewriter rewriter(op.getContext());
+  IRRewriter rewriter(op.getContext());
   rewriter.setInsertionPoint(op);
   SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
   if (tileSizes.empty()) return success();

@@ -96,9 +96,13 @@ static void populateTilingReductionPatterns(
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(computeFn);
 
-  TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNchwFchwOp,
-                 linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
-                 linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
+  TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp>::insert(
+      patterns, tilingOptions, filter);
+  filter.addFilter([](Operation *op) {
+    return success(isa<linalg::ConvolutionOpInterface>(op));
+  });
+  patterns.add<IREE::LinalgExt::LinalgTilingPattern>(patterns.getContext(),
+                                                     tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -159,7 +163,9 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
 
-    populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
+    SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
+    populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns,
+                                                    numWorkgroups);
 
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {

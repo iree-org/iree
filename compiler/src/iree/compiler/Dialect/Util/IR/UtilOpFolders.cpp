@@ -31,14 +31,15 @@ namespace Util {
 // util.cmp.eq
 //===----------------------------------------------------------------------===//
 
-OpFoldResult CmpEQOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpEQOp::fold(FoldAdaptor operands) {
   auto makeBool = [&](bool value) {
     return IntegerAttr::get(IntegerType::get(getContext(), 1), value ? 1 : 0);
   };
   if (getLhs() == getRhs()) {
     // SSA values are exactly the same.
     return makeBool(true);
-  } else if (operands[0] && operands[1] && operands[0] == operands[1]) {
+  } else if (operands.getLhs() && operands.getRhs() &&
+             operands.getLhs() == operands.getRhs()) {
     // Folded attributes are equal but may come from separate ops.
     return makeBool(true);
   }
@@ -72,12 +73,14 @@ static OpFoldResult foldRangeOp(Type type, ValueRange operands,
   return IntegerAttr::get(type, value);
 }
 
-OpFoldResult RangeMinOp::fold(ArrayRef<Attribute> operands) {
-  return foldRangeOp<INT64_MAX, xmin>(getType(), this->getOperands(), operands);
+OpFoldResult RangeMinOp::fold(FoldAdaptor operands) {
+  return foldRangeOp<INT64_MAX, xmin>(getType(), this->getOperands(),
+                                      operands.getOperands());
 }
 
-OpFoldResult RangeMaxOp::fold(ArrayRef<Attribute> operands) {
-  return foldRangeOp<INT64_MIN, xmax>(getType(), this->getOperands(), operands);
+OpFoldResult RangeMaxOp::fold(FoldAdaptor operands) {
+  return foldRangeOp<INT64_MIN, xmax>(getType(), this->getOperands(),
+                                      operands.getOperands());
 }
 
 namespace {
@@ -190,9 +193,8 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
     lengths.reserve(op.getLengths().size());
     int64_t constantMin = INT64_MAX;
     int64_t constantMax = INT64_MIN;
-    for (auto range : llvm::zip_equal(op.getOffsets(), op.getLengths())) {
-      auto offset = std::get<0>(range);
-      auto length = std::get<1>(range);
+    for (auto [offset, length] :
+         llvm::zip_equal(op.getOffsets(), op.getLengths())) {
       APInt rangeOffset, rangeLength;
       if (matchPattern(offset, m_ConstantInt(&rangeOffset)) &&
           matchPattern(length, m_ConstantInt(&rangeLength))) {
@@ -290,9 +292,9 @@ struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
     SmallVector<Value> lengths;
     offsets.reserve(ranges.size());
     lengths.reserve(ranges.size());
-    for (auto range : llvm::enumerate(ranges)) {
-      offsets.push_back(std::get<0>(range.value()));
-      lengths.push_back(std::get<1>(range.value()));
+    for (auto [offset, length] : ranges) {
+      offsets.push_back(offset);
+      lengths.push_back(length);
     }
     rewriter.replaceOpWithNewOp<RangeExtentsOp>(
         op, op.getMin().getType(), op.getMax().getType(), offsets, lengths);
@@ -383,7 +385,7 @@ static bool isAlignedTo(Value value, Value alignment) {
   return false;
 }
 
-OpFoldResult AlignOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult AlignOp::fold(FoldAdaptor operands) {
   // If aligning an already-aligned value then fold if this is provably a
   // no-op. We can check this for equality even with dynamic alignments.
   if (isAlignedTo(getValue(), getAlignment())) return getValue();
@@ -394,7 +396,7 @@ OpFoldResult AlignOp::fold(ArrayRef<Attribute> operands) {
 // util.sizeof
 //===----------------------------------------------------------------------===//
 
-OpFoldResult SizeOfOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SizeOfOp::fold(FoldAdaptor operands) {
   Type t = getSizedType();
   if (t.isa<IntegerType>() || t.isa<FloatType>()) {
     return IntegerAttr::get(IndexType::get(getContext()),
@@ -588,7 +590,7 @@ void BufferAllocOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // util.buffer.subspan
 //===----------------------------------------------------------------------===//
 
-OpFoldResult BufferSubspanOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult BufferSubspanOp::fold(FoldAdaptor operands) {
   if (getSourceSize() == getResultSize()) {
     // Entire range is covered; return it all.
     return getSource();
@@ -702,7 +704,7 @@ void BufferSubspanOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // util.buffer.size
 //===----------------------------------------------------------------------===//
 
-OpFoldResult BufferSizeOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   // Try to find the size in the use-def chain.
   // If it's out of the local scope we'll need IPO to help out.
   // During A->B->C dialect conversion, the type may not be legal so be
@@ -816,7 +818,7 @@ void BufferStorageOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // util.buffer.load
 //===----------------------------------------------------------------------===//
 
-OpFoldResult BufferLoadOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult BufferLoadOp::fold(FoldAdaptor operands) {
   // TODO(benvanik): if source is a constant then perform the load.
   return {};
 }

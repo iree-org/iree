@@ -33,8 +33,8 @@ and can generate efficient code for a variety of runtime platforms:
 - [x] Linux
 - [x] Windows
 - [x] Android
-- [ ] macOS (planned)
-- [ ] iOS (planned)
+- [x] macOS
+- [x] iOS
 - [x] Bare metal
 - [ ] WebAssembly (planned)
 
@@ -66,13 +66,14 @@ like [SPIR-V](https://www.khronos.org/spir/).
 ## Workflow overview
 
 Specific examples outlining IREE's workflow can be found in the
-[User Getting Started Guide](./getting-started/index.md). Using IREE involves the following
-general steps:
+[User Getting Started Guide](./getting-started/index.md). Using IREE involves
+the following general steps:
 
 1. **Import your model**
 
-    Develop your program using one of the [supported frameworks](./getting-started/#supported-frameworks), then run your model
-    using one of IREE's import tools.
+    Develop your program using one of the
+    [supported frameworks](./getting-started/#supported-frameworks), then run
+    your model using one of IREE's import tools.
 
 2. **Select your [deployment configuration](./deployment-configurations/)**
 
@@ -136,31 +137,22 @@ IREE offers a low level C API, as well as several specialized sets of
 
 ## Communication channels
 
-*   :fontawesome-brands-github:
-    [GitHub issues](https://github.com/iree-org/iree/issues): Feature requests,
-    bugs, and other work tracking
-*   :fontawesome-brands-discord:
-    [IREE Discord server](https://discord.gg/26P4xW4): Daily development
-    discussions with the core team and collaborators
-*   :fontawesome-solid-users: [iree-discuss email list](https://groups.google.com/forum/#!forum/iree-discuss):
-    Announcements, general and low-priority discussion
+* :fontawesome-brands-github:
+  [GitHub issues](https://github.com/openxla/iree/issues): Feature requests,
+  bugs, and other work tracking
+* :fontawesome-brands-discord:
+  [IREE Discord server](https://discord.gg/26P4xW4): Daily development
+  discussions with the core team and collaborators
+* :fontawesome-solid-users: [iree-discuss email list](https://groups.google.com/forum/#!forum/iree-discuss):
+  Announcements, general and low-priority discussion
 
 ## Roadmap
 
 IREE is in the early stages of development and is not yet ready for broad
-adoption. Check out the
-[long-term design roadmap](https://github.com/iree-org/iree/blob/main/docs/developers/design_roadmap.md)
-to get a sense of where we're headed.
-
-We plan on a quarterly basis using [OKRs](https://en.wikipedia.org/wiki/OKR).
-Review our latest
-[objectives](https://github.com/iree-org/iree/blob/main/docs/developers/objectives.md) to
-see what we're up to.
-
-We use [GitHub Projects](https://github.com/iree-org/iree/projects) to track
-progress on IREE components and specific efforts and
-[GitHub Milestones](https://github.com/iree-org/iree/milestones) to track the
-work associated with plans for each quarter.
+adoption. We use both
+[GitHub Projects](https://github.com/openxla/iree/projects) and
+[GitHub Milestones](https://github.com/openxla/iree/milestones) to track
+progress.
 
 [^1]:
   Pronounced "eerie" and often styled with the :iree-ghost: emoji

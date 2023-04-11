@@ -38,7 +38,7 @@ class Verifier {
     ILLEGAL,
   };
 
-  using OpVerifierFn = std::function<Optional<Legality>(Operation *op)>;
+  using OpVerifierFn = std::function<std::optional<Legality>(Operation *op)>;
   using TypeVerifierFn = std::function<Legality(Type type)>;
 
   void addIllegalDialect(StringRef dialectName) {
@@ -64,13 +64,13 @@ class Verifier {
     opLegality.insert({OpT::getOperationName(), Legality::ILLEGAL});
   }
 
-  void addOpVerifier(std::function<Optional<Legality>(Operation *)> fn) {
+  void addOpVerifier(std::function<std::optional<Legality>(Operation *)> fn) {
     opVerifiers.push_back(fn);
   }
 
   template <typename OpT>
-  void addOpVerifier(std::function<Optional<Legality>(OpT)> fn) {
-    auto wrapperFn = [=](Operation *baseOp) -> Optional<Legality> {
+  void addOpVerifier(std::function<std::optional<Legality>(OpT)> fn) {
+    auto wrapperFn = [=](Operation *baseOp) -> std::optional<Legality> {
       if (auto op = dyn_cast<OpT>(baseOp)) {
         return fn(op);
       }
@@ -213,30 +213,33 @@ static void setupDefaultOpLegality(Verifier &verifier) {
 }
 
 static void markStreamTensorOpsIllegal(Verifier &verifier) {
-  verifier.addOpVerifier([](Operation *op) -> Optional<Verifier::Legality> {
-    if (op->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
-      return Verifier::Legality::ILLEGAL;
-    }
-    return std::nullopt;
-  });
+  verifier.addOpVerifier(
+      [](Operation *op) -> std::optional<Verifier::Legality> {
+        if (op->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
+          return Verifier::Legality::ILLEGAL;
+        }
+        return std::nullopt;
+      });
 }
 
 static void markStreamAsyncOpsIllegal(Verifier &verifier) {
-  verifier.addOpVerifier([](Operation *op) -> Optional<Verifier::Legality> {
-    if (op->hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) {
-      return Verifier::Legality::ILLEGAL;
-    }
-    return std::nullopt;
-  });
+  verifier.addOpVerifier(
+      [](Operation *op) -> std::optional<Verifier::Legality> {
+        if (op->hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) {
+          return Verifier::Legality::ILLEGAL;
+        }
+        return std::nullopt;
+      });
 }
 
 static void markStreamCmdOpsIllegal(Verifier &verifier) {
-  verifier.addOpVerifier([](Operation *op) -> Optional<Verifier::Legality> {
-    if (op->hasTrait<OpTrait::IREE::Stream::CmdPhaseOp>()) {
-      return Verifier::Legality::ILLEGAL;
-    }
-    return std::nullopt;
-  });
+  verifier.addOpVerifier(
+      [](Operation *op) -> std::optional<Verifier::Legality> {
+        if (op->hasTrait<OpTrait::IREE::Stream::CmdPhaseOp>()) {
+          return Verifier::Legality::ILLEGAL;
+        }
+        return std::nullopt;
+      });
 }
 
 //===----------------------------------------------------------------------===//
@@ -303,11 +306,11 @@ class VerifyLoweringToTensorsPass
 
   void runOnOperation() override {
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
-    // as they use different memory models.
+    // as they use different memory models. We need to allow them through,
+    // though, to allow for compiler re-entrancy.
     Verifier verifier;
     setupDefaultOpLegality(verifier);
     markTensorInputsIllegal(verifier);
-    markStreamCmdOpsIllegal(verifier);
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
@@ -339,12 +342,12 @@ class VerifyLoweringToAsyncPass
 
   void runOnOperation() override {
     // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
-    // as they use different memory models.
+    // as they use different memory models. We need to allow them through,
+    // though, to allow for compiler re-entrancy.
     Verifier verifier;
     setupDefaultOpLegality(verifier);
     markTensorInputsIllegal(verifier);
     markStreamTensorOpsIllegal(verifier);
-    markStreamCmdOpsIllegal(verifier);
 
     // All resources should have had their usage assigned.
     verifier.addTypeVerifier<IREE::Stream::ResourceType>([](auto type) {
@@ -356,7 +359,12 @@ class VerifyLoweringToAsyncPass
 
     // All streamable ops should be inside of execution regions.
     verifier.addOpVerifier<IREE::Stream::StreamableOpInterface>(
-        [](auto op) -> Optional<Verifier::Legality> {
+        [](auto op) -> std::optional<Verifier::Legality> {
+          // Skip cmd ops that may exist.
+          if (op->template hasTrait<OpTrait::IREE::Stream::CmdPhaseOp>()) {
+            return Verifier::Legality::LEGAL;
+          }
+
           // Allow metadata ops outside of execution regions.
           if (op.isMetadata()) return Verifier::Legality::LEGAL;
 

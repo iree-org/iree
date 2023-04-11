@@ -19,13 +19,25 @@
 // Include the ukernel support library so that we can use its implementations
 // as fixed-function components of the runtime.
 #include "iree/base/internal/cpu.h"
-#include "iree/builtins/ukernel/elementwise.h"
-#include "iree/builtins/ukernel/mmt4d.h"
-#include "iree/builtins/ukernel/pack.h"
-#include "iree/builtins/ukernel/unpack.h"
+#include "iree/builtins/ukernel/api.h"
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
+
+// Implementation of iree_uk_assert_fail failure is deferred to users code, i.e.
+// to us here, as core ukernel/ code can't do I/O or depend on anything.
+void iree_uk_assert_fail(const char* file, int line, const char* function,
+                         const char* condition) {
+#if (!defined(NDEBUG)) && (IREE_FILE_IO_ENABLE == 1)
+  fflush(stdout);
+  // Must be a single fprintf call (which must make a single write) - typically
+  // called from multiple worker threads concurrently.
+  fprintf(stderr, "%s:%d: %s: assertion failed: %s\n", file, line, function,
+          condition);
+  fflush(stderr);
+#endif  // (!defined(NDEBUG)) && (IREE_FILE_IO_ENABLE == 1)
+  IREE_ASSERT(false);
+}
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -696,12 +708,8 @@ static iree_status_t iree_vmvx_mmt4d(iree_uk_mmt4d_type_t type,
       .K0 = K0,
       .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
-  iree_uk_status_t status = iree_uk_mmt4d(&ukernel_params);
+  iree_uk_mmt4d(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
   return iree_ok_status();
 }
 
@@ -788,13 +796,10 @@ static iree_status_t iree_vmvx_pack_f(iree_uk_pack_type_t type,
       .out_size3 = args->out_size3,
       .padding_value = &args->padding_value,
       .flags = args->flags,
+      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
-  iree_uk_status_t status = iree_uk_pack(&ukernel_params);
+  iree_uk_pack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
   return iree_ok_status();
 }
 
@@ -833,13 +838,10 @@ static iree_status_t iree_vmvx_pack_i(iree_uk_pack_type_t type,
       .out_size3 = args->out_size3,
       .padding_value = &args->padding_value,
       .flags = args->flags,
+      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
-  iree_uk_status_t status = iree_uk_pack(&ukernel_params);
+  iree_uk_pack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
   return iree_ok_status();
 }
 
@@ -910,13 +912,10 @@ static iree_status_t iree_vmvx_unpack(iree_uk_unpack_type_t type,
       .out_size0 = args->out_size0,
       .out_size1 = args->out_size1,
       .flags = args->flags,
+      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
-  iree_uk_status_t status = iree_uk_unpack(&ukernel_params);
+  iree_uk_unpack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (status != iree_uk_status_ok) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_uk_status_message(status));
-  }
   return iree_ok_status();
 }
 
@@ -930,6 +929,33 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i8i8, unpack, v) {
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i32i32, unpack, v) {
   return iree_vmvx_unpack(iree_uk_unpack_type_i32i32, args);
+}
+
+//===----------------------------------------------------------------------===//
+// Exported query_tile_sizes function definitions
+//===----------------------------------------------------------------------===//
+
+IREE_VMVX_ABI_FIXED_STRUCT(query_tile_sizes_2d, IIi, {
+  int64_t size0;
+  int64_t size1;
+  uint32_t flags;
+});
+IREE_VMVX_ABI_DEFINE_SHIM(query_tile_sizes_2d, II);
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_query_tile_sizes_2d, query_tile_sizes_2d, II) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_uk_query_tile_sizes_2d_params_t ukernel_params = {
+      .size0 = args->size0,
+      .size1 = args->size1,
+      .flags = args->flags,
+      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
+  };
+  iree_uk_query_tile_sizes_2d_out_params_t ukernel_out_params;
+  iree_uk_query_tile_sizes_2d(&ukernel_params, &ukernel_out_params);
+  rets->i0 = ukernel_out_params.tile_size0;
+  rets->i1 = ukernel_out_params.tile_size1;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

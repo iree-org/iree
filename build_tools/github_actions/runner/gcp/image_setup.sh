@@ -16,14 +16,24 @@ set -o errtrace  # make ERR trap inherit
 set -o pipefail  # return error if any part of a pipe errors
 set -o nounset   # error if an undefined variable is used
 
+function save_exit_code() {
+  local exit_code="$?"
+  echo "${exit_code}" > /startup-exit.txt
+  trap - EXIT
+  exit "${exit_code}"
+}
+
+trap save_exit_code EXIT INT TERM
 
 # Copied from build_tools/github_actions/runner/config/functions.sh
+function nice_curl() {
+  curl --silent --fail --show-error --location "$@"
+}
+
 get_metadata() {
   local url="http://metadata.google.internal/computeMetadata/v1/${1}"
   ret=0
-  curl "${url}" \
-    --silent --fail --show-error \
-    --header "Metadata-Flavor: Google" || ret=$?
+  nice_curl --header "Metadata-Flavor: Google" "${url}" || ret=$?
   if [[ "${ret}" != 0 ]]; then
     echo "Failed fetching ${url}" >&2
     return "${ret}"
@@ -37,15 +47,6 @@ get_attribute() {
 RUNNER_TYPE="$(get_attribute github-runner-type)"
 GCLOUD_VERSION=402.0.0
 GCLOUD_ARCHIVE_DIGEST=a9902b57d4cba2ebb76d7354570813d3d8199c36b95a1111a1b7fea013beaaf9
-
-function save_exit_code() {
-  local exit_code="$?"
-  echo "${exit_code}" > /startup-exit.txt
-  trap - EXIT
-  exit "${exit_code}"
-}
-
-trap save_exit_code EXIT INT TERM
 
 function apt_maybe_purge() {
   # Remove and purge packages if they are installed and don't error if they're
@@ -62,15 +63,18 @@ function apt_maybe_purge() {
   fi
 }
 
-function nice_curl() {
-  curl --silent --fail --show-error --location "$@"
-}
-
 function startup() {
   # Shut down in 5 hours. Makes sure this instance doesn't hang around forever
   # if setup fails. Someone can cancel the shutdown with `shutdown -c`.
   nohup shutdown -h +300 &
   cd /
+
+  ############################# Set Up Environment #############################
+
+  # We'll be installing google-cloud-sdk later
+  PATH="/google-cloud-sdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+  echo "PATH=\"${PATH}\"" > /etc/environment
 
   ########################### Create the runner user ###########################
 
@@ -170,35 +174,51 @@ EOF
   apt-get full-upgrade
   apt-get install "${apt_packages[@]}"
 
-  ############################## Fix gcloud Installation Snap ###############################
+  ######################## Fix gcloud Installation Snap ########################
 
   # Snap literally won't let you disable automatic updates. The only thing
   # that's installed through snap here is the gcloud CLI, which we definitely
   # don't want automatically updating (beyond our general desire to not
   # automatically update on ephemeral machines). So we just delete snap entirely
-  # and install the CLI via apt (above)
+  # and install the CLI from a versioned archive.
   systemctl stop snapd
   apt_maybe_purge snapd gnome-software-plugin-snap
   rm -rf /home/*/snap
   rm -rf /root/snap
 
+  local gcloud_checksum="e0382917353272655959bb650643c5df72c85de326a720b97e562bb6ea4478b1"
+
   nice_curl \
-      https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-      | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-  echo \
-      "deb [arch=amd64 signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-      > /etc/apt/sources.list.d/google-cloud-sdk.list
-  apt-get update && apt-get install google-cloud-cli
+    https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-414.0.0-linux-x86_64.tar.gz \
+    --output gcloud.tar.gz
+  echo "${gcloud_checksum} *gcloud.tar.gz" | sha256sum --check --strict
+  tar -xf gcloud.tar.gz
+  rm gcloud.tar.gz
+  google-cloud-sdk/install.sh --quiet
 
   # This setting is now enabled by default. It sounds great, but unfortunately
   # doing such an upload requires *delete* permissions on the bucket, which we
   # deliberately do not give runners. For the life of me, I could not figure out
   # how to use `gcloud config set` (the "proper" way to set properties) to work
   # on the global properties.
-  cat <<EOF >> /usr/lib/google-cloud-sdk/properties
+  cat <<EOF >> /google-cloud-sdk/properties
 [storage]
 parallel_composite_upload_enabled = False
 EOF
+
+  runuser --user runner -- gcloud info
+
+  ########################### Install the ops agent ############################
+
+  nice_curl https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh \
+    | bash -s -- --also-install --remove-repo --version=2.24.0
+  cat <<EOF >> /etc/google-cloud-ops-agent/config.yaml
+logging:
+  receivers:
+    systemd:
+      type: systemd_journald
+EOF
+  service google-cloud-ops-agent restart
 
   ############################### Install Docker ###############################
 
@@ -206,14 +226,23 @@ EOF
   apt_maybe_purge containerd docker docker-engine docker.io moby-engine moby-cli runc
 
   # Install the latest Docker
+
+  local docker_gpg_file="/usr/share/keyrings/docker-archive-keyring.gpg"
+  local docker_apt_file="/etc/apt/sources.list.d/docker.list"
+
   nice_curl \
     https://download.docker.com/linux/ubuntu/gpg \
-    | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    | gpg --dearmor -o "${docker_gpg_file}"
   echo \
-    "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-    > /etc/apt/sources.list.d/docker.list
+    "deb [arch=amd64 signed-by=${docker_gpg_file}] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+    > "${docker_apt_file}"
   apt-get update
   apt-get install docker-ce docker-ce-cli containerd.io
+
+  # Remove gpg keys and corresponding archives since these expire and we don't
+  # want later things relying on them.
+  rm "${docker_gpg_file}" "${docker_apt_file}"
+  apt-get update
 
   # Enable docker.service.
   sudo systemctl enable docker.service
@@ -239,8 +268,8 @@ EOF
     nice_curl \
       --remote-name-all \
       --output-dir "${script_dir}" \
-      https://raw.githubusercontent.com/iree-org/iree/main/build_tools/scripts/check_vulkan.sh \
-      https://raw.githubusercontent.com/iree-org/iree/main/build_tools/scripts/check_cuda.sh
+      https://raw.githubusercontent.com/openxla/iree/main/build_tools/scripts/check_vulkan.sh \
+      https://raw.githubusercontent.com/openxla/iree/main/build_tools/scripts/check_cuda.sh
 
     chmod +x "${script_dir}/check_vulkan.sh" "${script_dir}/check_cuda.sh"
 
@@ -253,18 +282,27 @@ EOF
     "${script_dir}/check_vulkan.sh"
 
 
+    local nvidia_gpg_file="/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"
+    local nvidia_apt_file="/etc/apt/sources.list.d/nvidia-container-toolkit.list"
+
     # Nvidia container toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html
     local distribution="$(source /etc/os-release; echo "${ID}${VERSION_ID}")"
     nice_curl \
         https://nvidia.github.io/libnvidia-container/gpgkey \
-        | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        | gpg --dearmor -o "${nvidia_gpg_file}"
     nice_curl \
         "https://nvidia.github.io/libnvidia-container/${distribution}/libnvidia-container.list" | \
-        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
-        > /etc/apt/sources.list.d/nvidia-container-toolkit.list
+        sed "s#deb https://#deb [signed-by=${nvidia_gpg_file}] https://#g" \
+        > "${nvidia_apt_file}"
 
     apt-get update
     apt-get install nvidia-docker2
+
+    # Remove gpg keys and corresponding archives since these expire and we don't
+    # want later things relying on them.
+    rm "${nvidia_gpg_file}" "${nvidia_apt_file}"
+    apt-get update
+
     systemctl restart docker
 
     # Check GPU usage with Vulkan and Cuda work
@@ -276,8 +314,8 @@ EOF
           bash -c "${script_dir}/check_cuda.sh && ${script_dir}/check_vulkan.sh"
     }
 
-    check_docker gcr.io/iree-oss/nvidia@sha256:b0751e9f2fcb104d9d3d56fab6c6e79405bdcd2e503e53f2bf4f2b66d13cd88b
-    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:3e3965b6b9e431be296900440e5bc66ed46a8f6d6fa80ead7c7a75866f3bd416
+    check_docker gcr.io/iree-oss/nvidia@sha256:b00fe1b21a288b6edd701b30d2b23c85ea96b5f8707792b071fe9f3b7f15b4bb
+    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:fa85a37e3834fe62813608aa3b368578ce17e50620e257e0f5a85c6a425ee0dd
 
     # Remove the docker images we've fetched. We might want to pre-fetch Docker
     # images into the VM image, but that should be a separate decision.

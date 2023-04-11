@@ -3,6 +3,7 @@
 *.pyc
 **/.ipynb_checkpoints/
 .pytype/
+**/__pycache__/**
 
 # Visual Studio files
 .vs/

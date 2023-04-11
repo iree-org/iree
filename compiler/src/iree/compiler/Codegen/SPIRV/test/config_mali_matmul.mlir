@@ -289,10 +289,10 @@ hal.executable @matmul_1x1024x576 {
         %c3436864 = arith.constant 3436864 : index
         %c10141312 = arith.constant 10141312 : index
         %c2304 = arith.constant 2304 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x576xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c3436864) alignment(64) : !flow.dispatch.tensor<readonly:tensor<576x1024xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c10141312) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x1024xf32>>
-        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1x1024xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x576xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c3436864) : !flow.dispatch.tensor<readonly:tensor<576x1024xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c10141312) : !flow.dispatch.tensor<readonly:tensor<1x1024xf32>>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1024xf32>>
         %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 576], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x576xf32>> -> tensor<1x576xf32>
         %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [576, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<576x1024xf32>> -> tensor<576x1024xf32>
         %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1024xf32>> -> tensor<1x1024xf32>
@@ -312,6 +312,58 @@ hal.executable @matmul_1x1024x576 {
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
 //      CHECK: func.func @matmul_1x1024x576()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+// Large matmul with i8 inputs.
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @matmul_1024x2048x512xi8 {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
+    }> {
+    hal.executable.export @matmul_1024x2048x512xi8 layout(#pipeline_layout)
+    builtin.module {
+      func.func @matmul_1024x2048x512xi8() {
+        %c0 = arith.constant 0 : index
+        %c2048 = arith.constant 2048 : index
+        %c1024 = arith.constant 1024 : index
+        %cst = arith.constant 0 : i32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<1024x512xi8>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x2048xi8>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<1024x2048xi32>>
+        %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512xi8>> -> tensor<1024x512xi8>
+        %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [512, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x2048xi8>> -> tensor<512x2048xi8>
+        %15 = tensor.empty() : tensor<1024x2048xi32>
+        %16 = linalg.fill ins(%cst : i32) outs(%15 : tensor<1024x2048xi32>) -> tensor<1024x2048xi32>
+        %17 = linalg.matmul
+            ins(%8, %10 : tensor<1024x512xi8>, tensor<512x2048xi8>) outs(%16 : tensor<1024x2048xi32>) -> tensor<1024x2048xi32>
+        flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [1024, 2048], strides = [1, 1]
+            : tensor<1024x2048xi32> -> !flow.dispatch.tensor<writeonly:tensor<1024x2048xi32>>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 16]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
+//      CHECK: hal.executable.export public @matmul_1024x2048x512xi8
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
+//      CHECK: func.func @matmul_1024x2048x512xi8()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
@@ -449,9 +501,9 @@ hal.executable @generic_batch_matmul_32x2x512 {
       func.func @generic_batch_matmul_32x2x512() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<8x32x64xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32x64x512xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<32x8x512xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<8x32x64xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<32x64x512xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32x8x512xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2, 32, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<8x32x64xf32>> -> tensor<8x32x64xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [32, 64, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x64x512xf32>> -> tensor<32x64x512xf32>
         %5 = tensor.empty() : tensor<32x8x512xf32>
@@ -510,11 +562,11 @@ hal.executable @generic_batch_matmul_8x2500x512x4608 {
         %c537247744 = arith.constant 537247744 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c168607744) alignment(64) : !flow.dispatch.tensor<readonly:tensor<8x2500x4608xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<4608x512xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c537247744) alignment(64) : !flow.dispatch.tensor<readonly:tensor<8x2500x512xf32>>
-        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<8x2500x512xf32>>
-        %4 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<8x2500x512xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c168607744) : !flow.dispatch.tensor<readonly:tensor<8x2500x4608xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4608x512xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c537247744) : !flow.dispatch.tensor<readonly:tensor<8x2500x512xf32>>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<8x2500x512xf32>>
+        %4 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<8x2500x512xf32>>
         %5 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [8, 2500, 4608], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<8x2500x4608xf32>> -> tensor<8x2500x4608xf32>
         %6 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [4608, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4608x512xf32>> -> tensor<4608x512xf32>
         %7 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [8, 2500, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<8x2500x512xf32>> -> tensor<8x2500x512xf32>

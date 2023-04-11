@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -28,10 +29,12 @@
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
+#include <mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h>
 
 using namespace mlir;
 namespace IREE = mlir::iree_compiler::IREE;
@@ -67,7 +70,8 @@ int main(int argc, char **argv) {
       mlir::pdl_interp::PDLInterpDialect,
       mlir::scf::SCFDialect,
       mlir::tensor::TensorDialect,
-      mlir::transform::TransformDialect
+      mlir::transform::TransformDialect,
+      mlir::vector::VectorDialect
       // clang-format on
       >();
 
@@ -89,8 +93,10 @@ int main(int argc, char **argv) {
 
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();
+  mlir::bufferization::registerTransformDialectExtension(registry);
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::scf::registerTransformDialectExtension(registry);
+  mlir::vector::registerTransformDialectExtension(registry);
 
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "MLIR modular optimizer driver\n", registry,

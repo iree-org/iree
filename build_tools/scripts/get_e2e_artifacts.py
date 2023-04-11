@@ -96,7 +96,7 @@ def check_collision(filename: str, test_name: str, written_paths: Set[str],
   """Check that we aren't overwriting files unless we expect to."""
   # Note: We can't use a check that the files have identical contents because
   # tf_input.mlir can have random numbers appended to its function names.
-  # See https://github.com/iree-org/iree/issues/3375
+  # See https://github.com/openxla/iree/issues/3375
 
   expected_collision = any([name in filename for name in EXPECTED_COLLISIONS])
   if filename in written_paths and not expected_collision:
@@ -108,14 +108,14 @@ def check_collision(filename: str, test_name: str, written_paths: Set[str],
 
 
 def update_path(archive_path: str):
-  """Update the --module_file flag with the new location of the compiled.vmfb"""
+  """Update the --module flag with the new location of the compiled.vmfb"""
   backend_path = archive_path.split('traces')[0]  # 'ModuleName/backend_name'.
   compiled_path = os.path.join(FLAGS.artifacts_dir, backend_path,
                                'compiled.vmfb')
   flagfile_path = os.path.join(FLAGS.artifacts_dir, archive_path)
   for line in fileinput.input(files=[flagfile_path], inplace=True):
-    if line.strip().startswith('--module_file'):
-      print(f'--module_file={compiled_path}\n', end='')
+    if line.strip().startswith('--module'):
+      print(f'--module={compiled_path}\n', end='')
     else:
       print(line, end='')
 
@@ -150,8 +150,8 @@ def main(argv):
   print(
       "The bazel integrations build and tests are deprecated. This script "
       "may be reworked in the future. For the time being refer to "
-      "https://iree-org.github.io/iree/building-from-source/python-bindings-and-importers/ "
-      "and https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/e2e_benchmarking.md "
+      "https://openxla.github.io/iree/building-from-source/python-bindings-and-importers/ "
+      "and https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/e2e_benchmarking.md "
       "for information on how to run TensorFlow benchmarks.")
   exit(1)
 

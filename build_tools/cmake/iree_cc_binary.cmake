@@ -68,12 +68,19 @@ function(iree_cc_binary)
     set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   endif()
 
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "  : iree_cc_binary(${_NAME})")
+  endif()
+
   add_executable(${_NAME} "")
 
   if(NOT "${_PACKAGE_NS}" STREQUAL "")
     # Alias the iree_package_name binary to iree::package::name.
     # This lets us more clearly map to Bazel and makes it possible to
     # disambiguate the underscores in paths vs. the separators.
+    if(_DEBUG_IREE_PACKAGE_NAME)
+      message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
+    endif()
     add_executable(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
 
     # If the binary name matches the package then treat it as a default. For
@@ -146,12 +153,14 @@ function(iree_cc_binary)
             RENAME ${_RULE_NAME}
             COMPONENT ${_RULE_NAME}
             RUNTIME DESTINATION bin
+            BUNDLE DESTINATION bin
             EXCLUDE_FROM_ALL)
   else()
     install(TARGETS ${_NAME}
       RENAME ${_RULE_NAME}
       COMPONENT ${_RULE_NAME}
-      RUNTIME DESTINATION bin)
+      RUNTIME DESTINATION bin
+      BUNDLE DESTINATION bin)
   endif()
 
   # Setup RPATH if on a Unix-like system. We have two use cases that we are
@@ -189,5 +198,19 @@ function(iree_cc_binary)
         INSTALL_RPATH "${_install_rpath}"
       )
     endif()
+  endif()
+
+  # Set up Info.plist properties when building macOS/iOS app bundles.
+  get_target_property(APPLE_BUNDLE ${_NAME} MACOSX_BUNDLE)
+  if (APPLE_BUNDLE)
+    set_target_properties(${_NAME} PROPERTIES
+      MACOSX_BUNDLE_BUNDLE_NAME "${_RULE_NAME}"
+      MACOSX_BUNDLE_GUI_IDENTIFIER "dev.iree.${_RULE_NAME}"
+      MACOSX_BUNDLE_COPYRIGHT "Copyright © 2023 The IREE Authors"
+      # These are just placeholder version numbers until we define proper
+      # version scheme and support.
+      MACOSX_BUNDLE_BUNDLE_VERSION 0.1
+      MACOSX_BUNDLE_SHORT_VERSION_STRING 0.1
+      MACOSX_BUNDLE_LONG_VERSION_STRING 0.1)
   endif()
 endfunction()

@@ -10,8 +10,10 @@
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -40,20 +42,20 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     abstraction for implementing fusion heuristics, i.e., the process of
     deciding which ops should form a dispatch region.
 
-    This op also has a second region: `workload_count`. The arguments to the 
-    region represent the workload for the dispatch, and returns the number of 
-    workgroups for the dispatch. The region is lowered directly to 
+    This op also has a second region: `workload_count`. The arguments to the
+    region represent the workload for the dispatch, and returns the number of
+    workgroups for the dispatch. The region is lowered directly to
     `workload_count` region of `dispatch.workgroups`.
   }];
 
-  let arguments = (ins FLOW_ShapeDynamicDims:$result_dims, 
+  let arguments = (ins FLOW_ShapeDynamicDims:$result_dims,
                        Variadic<FLOW_Dim>:$workload);
-  
+
   let results = (outs Variadic<AnyType>:$result);
 
   let regions = (region AnyRegion:$body,
                         AnyRegion:$workgroup_count);
-                        
+
   let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
@@ -747,6 +749,16 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     Variadic<AnyType>:$results
   );
 
+  let assemblyFormat = [{
+    $entry_point
+    (`[` $workload^ `]`)? ``
+    `(` $arguments `)` attr-dict `:`
+    custom<ShapedFunctionType>(ref($arguments),
+                               type($arguments), $argument_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
+  }];
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
@@ -784,14 +796,163 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     }
   }];
 
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Streamable call ops
+//===----------------------------------------------------------------------===//
+
+def FLOW_FuncOp : FLOW_Op<"func", [
+  CallableOpInterface,
+  FunctionOpInterface,
+  IsolatedFromAbove,
+]> {
+  let summary = [{streamable function declaration}];
+  let description = [{
+    Declares a function that can be called as an asynchronous streaming
+    operation via `flow.call`. Today only external functions are allowed.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
   let assemblyFormat = [{
-    $entry_point
-    (`[` $workload^ `]`)? ``
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    ``
+    custom<ShapedFunctionSignature>($function_type,
+                                    $tied_operands,
+                                    $arg_attrs,
+                                    $res_attrs)
+    attr-dict-with-keyword
+    ($body^)?
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "FunctionType":$type,
+      CArg<"ArrayAttr", "{}">:$tied_operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$resAttrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    static FuncOp create(Location location, StringRef name, FunctionType type,
+                         ArrayRef<int64_t> tiedOperands = {},
+                         ArrayRef<NamedAttribute> attrs = {},
+                         ArrayRef<DictionaryAttr> argAttrs = {},
+                         ArrayRef<DictionaryAttr> resAttrs = {});
+
+    bool isDeclaration() { return true; }
+
+    ::mlir::Region *getCallableRegion() { return nullptr; }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
+    ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+  }];
+}
+
+def FLOW_CallOp : FLOW_Op<"call", [
+  AttrSizedOperandSegments,
+  CallOpInterface,
+  FLOW_StreamableOp,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{calls a streamable external host function}];
+  let description = [{
+    Calls a function taking/returning tensor values with stream semantics.
+    Tensors have their shapes captured and may be tied to denote in-place
+    operations. Asynchronous calls must have no side-effects.
+
+    Note that returned tensors must have their shapes declared prior to the call
+    as this is what allows the call to be made on the stream. If external host
+    logic is required to compute the shape (avoid at all costs!) a separate
+    func.call can be used outside of the stream to do so. If shapes are
+    unknowable until the operation is performed it should be made as a normal
+    asynchronous host call with 'coarse-fences' instead.
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    Variadic<AnyType>:$arguments,
+    FLOW_ShapeDynamicDims:$argument_dims,
+    FLOW_ShapeDynamicDims:$result_dims,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    $callee
     `(` $arguments `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($arguments),
                                type($arguments), $argument_dims,
                                type($results), $result_dims,
                                $tied_operands)
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "SymbolRefAttr":$callee,
+      "TypeRange":$resultTypes,
+      "ValueRange":$arguments,
+      "ArrayAttr":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+    OpBuilder<(ins
+      "SymbolRefAttr":$callee,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayAttr":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+  ];
+
+  let extraClassDeclaration = [{
+    FunctionType getCalleeType();
+
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    operand_iterator arg_operand_begin() { return getArguments().begin(); }
+    operand_iterator arg_operand_end() { return getArguments().end(); }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+
+    // StreamableOpInterface:
+    bool isTransfer() { return false; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, getArguments(), getArgumentDims());
+    }
+    ValueRange getResultDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+    }
   }];
 
   let hasVerifier = 1;
@@ -1302,6 +1463,191 @@ def FLOW_DispatchWorkgroupCountFromSetEncodingOp :
     The operands to the op represent the shape of the source of the pack
     operation.
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// Collective communication ops
+//===----------------------------------------------------------------------===//
+
+def FLOW_ChannelDefaultOp : FLOW_Op<"channel.default", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+]> {
+  let summary = [{returns a default collective communication channel}];
+  let description = [{
+    Returns a channel initialized using the runtime environment.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$group
+  );
+  let results = (outs
+    FLOW_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    ($group^)?
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def FLOW_ChannelRankOp : FLOW_Op<"channel.rank", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the rank of the local participant in the group}];
+  let description = [{
+    Returns the rank the channel represents as a participant in a collective
+    group in `[0, count)`.
+  }];
+
+  let arguments = (ins
+    FLOW_Channel:$channel
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+     $channel `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def FLOW_ChannelCountOp : FLOW_Op<"channel.count", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the total number of participants in the group}];
+  let description = [{
+    Returns the total participant count in the collective communicator group.
+  }];
+
+  let arguments = (ins
+    FLOW_Channel:$channel
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+    $channel `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def FLOW_CollectiveAllGatherOp : FLOW_Op<"collective.all_gather", [
+  AllTypesMatch<["target", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{performs all-gather operation}];
+  let description = [{It gathers data from all ranks and concatenates them on the 0-th dimension.}];
+
+  let arguments = (ins
+    FLOW_CollectiveElementTypeAttr:$element_type,
+    FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
+    FLOW_Tensor:$source,
+    FLOW_Channel:$channel,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+  let assemblyFormat = [{
+    $element_type `,` $target `,` $source `,` $channel `:`
+    `(` type($target) `,` type($source) `,` type($channel) `)` `->`
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "CollectiveElementTypeAttr":$element_type,
+      "Value":$target,
+      "Value":$source,
+      "Value":$channel)>,
+  ];
+}
+
+def FLOW_CollectiveAllReduceOp : FLOW_Op<"collective.all_reduce", [
+  AllTypesMatch<["source", "target", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{performs all-reduce operation}];
+  let description = [{The operation reduces data across all the ranks in the channel.}];
+
+  let arguments = (ins
+    FLOW_CollectiveReductionOpAttr:$reduction_op,
+    FLOW_CollectiveElementTypeAttr:$element_type,
+    FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
+    FLOW_Tensor:$source,
+    FLOW_Channel:$channel,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+  let assemblyFormat = [{
+    $reduction_op `,` $element_type `,` $target `,` $source `,` $channel `:`
+    `(` type($target) `,` type($source) `,` type($channel) `)` `->`
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "CollectiveReductionOpAttr":$reduction_op,
+      "CollectiveElementTypeAttr":$element_type,
+      "Value":$target,
+      "Value":$source,
+      "Value":$channel)>,
+  ];
+}
+
+def FLOW_CollectiveReduceScatterOp : FLOW_Op<"collective.reduce_scatter", [
+  AllTypesMatch<["target", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{performs reduce and scatter operations}];
+  let description = [{The operation reduces data across all the ranks in the channel and
+    scatters the result to each rank.}];
+
+  let arguments = (ins
+    FLOW_CollectiveReductionOpAttr:$reduction_op,
+    FLOW_CollectiveElementTypeAttr:$element_type,
+    FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
+    FLOW_Tensor:$source,
+    FLOW_Channel:$channel,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+  let assemblyFormat = [{
+    $reduction_op `,` $element_type `,` $target `,` $source `,` $channel `:`
+    `(` type($target) `,` type($source) `,` type($channel) `)` `->`
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
+  }];
+  let builders = [
+    OpBuilder<(ins
+      "CollectiveReductionOpAttr":$reduction_op,
+      "CollectiveElementTypeAttr":$element_type,
+      "Value":$target,
+      "Value":$source,
+      "Value":$channel)>,
+  ];
 }
 
 #endif  // IREE_DIALECT_FLOW_OPS

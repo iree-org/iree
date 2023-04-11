@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Stream/Conversion/FlowToStream/Patterns.h"
 #include "iree/compiler/Dialect/Stream/Conversion/HALToStream/Patterns.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
@@ -142,9 +143,8 @@ struct GenericResourcePattern : public ConversionPattern {
     SmallVector<Value> newOperands;
     newOperands.reserve(op->getNumOperands());
     rewriter.setInsertionPoint(op);
-    for (auto it : llvm::zip_equal(op->getOperands(), operands)) {
-      auto oldOperand = std::get<0>(it);
-      auto newOperand = std::get<1>(it);
+    for (auto [oldOperand, newOperand] :
+         llvm::zip_equal(op->getOperands(), operands)) {
       if (!newOperand.getType().isa<IREE::Stream::ResourceType>() &&
           !newOperand.getType().isa<TensorType>()) {
         newOperands.push_back(newOperand);
@@ -203,8 +203,13 @@ class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
 
     // Allow unknown types to pass through; these come from custom dialects that
     // may be mixed into the IR we are converting.
-    typeConverter.addConversion(
-        [](Type type) { return !type.isa<TensorType>() ? type : Type{}; });
+    typeConverter.addConversion([=](Type type) -> Type {
+      // convert flow.channel into stream.channel
+      if (type.isa<IREE::Flow::ChannelType>())
+        return IREE::Stream::ChannelType::get(context);
+
+      return !type.isa<TensorType>() ? type : Type{};
+    });
 
     // Disallow tensor dialects; the goal here is to remove all tensors and
     // turn them into stream resource ops.
@@ -219,7 +224,7 @@ class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
         });
     typeConverter.addArgumentMaterialization(
         [](OpBuilder &builder, TensorType resultType, ValueRange inputs,
-           Location loc) -> Optional<Value> {
+           Location loc) -> std::optional<Value> {
           assert(inputs.size() >= 2);
           auto resourceValue = inputs[0];
           auto resourceSize = inputs[1];

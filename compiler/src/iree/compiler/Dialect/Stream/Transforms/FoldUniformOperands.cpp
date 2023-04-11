@@ -173,7 +173,7 @@ static void inlineUniformConstants(
   unsigned operandCount = anyDispatchOp.getUniformOperands().size();
 
   // Find uniform constant values for each operand across all usages.
-  SmallVector<Optional<APInt>> operandValues(operandCount);
+  SmallVector<std::optional<APInt>> operandValues(operandCount);
   SmallVector<SmallVector<Location>> operandLocs(operandCount);
   llvm::BitVector uniformOperandMap(operandCount, /*t=*/true);
   for (auto dispatchOp : dispatchOps) {
@@ -267,9 +267,11 @@ class FoldUniformOperandsPass
     DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.getEntryPoint());
-      entryDispatchMap[exportOp].push_back(dispatchOp);
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp =
+            symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+        entryDispatchMap[exportOp].push_back(dispatchOp);
+      });
     });
 
     // Optimize each dispatch op.

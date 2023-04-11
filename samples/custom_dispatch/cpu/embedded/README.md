@@ -101,7 +101,7 @@ func.call @simple_mul_workgroup(%memref0, %memref1, %memref2, %dim, %tid) : (mem
 ## Instructions
 
 This presumes that `iree-compile` and `iree-run-module` have been installed or
-built. [See here](https://iree-org.github.io/iree/building-from-source/getting-started/)
+built. [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
 for instructions for CMake setup and building from source.
 
 0. Ensure that `clang` is on your PATH:
@@ -123,23 +123,28 @@ for instructions for CMake setup and building from source.
     be used. Note that specific flags are required when producing the object
     files.
 
-2. Compile the [example module](./example.mlir) to a .vmfb file and pass the
-   path to the build directory so the .spv files can be found:
+2. Compile the [example module](./example_stream.mlir) to a .vmfb file and pass
+   the path to the build directory so the .spv files can be found:
 
     ```
     iree-compile \
         --iree-hal-executable-object-search-path=../iree-build/ \
-        samples/custom_dispatch/cpu/embedded/example.mlir \
+        samples/custom_dispatch/cpu/embedded/example_stream.mlir \
         -o=/tmp/example.vmfb
     ```
+
+    [example_stream.mlir](./example_stream.mlir) demonstrates a high-level
+    approach without needing to specify too much information while
+    [example_hal.mlir](./example_hal.mlir) shows the lower-level representation
+    it gets expanded into.
 
 3. Run the example program using the custom functions:
 
     ```
     iree-run-module \
         --device=llvm-sync \
-        --entry_function=mixed_invocation \
-        --function_input=8xf32=2 \
-        --function_input=8xf32=4 \
+        --function=mixed_invocation \
+        --input=8xf32=2 \
+        --input=8xf32=4 \
         /tmp/example.vmfb
     ```

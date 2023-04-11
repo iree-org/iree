@@ -121,8 +121,13 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
     DenseMap<StringRef, llvm::BitVector> correlationMap;
     llvm::BitVector tempBits(globalTable.size());
     for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "FuseGlobals: analyzing " << callableOp << ":\n");
+      std::unique_ptr<AsmState> asmState;
+      LLVM_DEBUG({
+        asmState = std::make_unique<AsmState>(callableOp);
+        llvm::dbgs() << "FuseGlobals: analyzing ";
+        callableOp.print(llvm::dbgs(), *asmState);
+        llvm::dbgs() << ":\n";
+      });
       auto *region = callableOp.getCallableRegion();
       if (!region) continue;
       for (auto &block : *region) {
@@ -131,21 +136,21 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
         for (auto storeOp :
              block.getOps<IREE::Util::GlobalStoreOpInterface>()) {
           auto &global = globalTable.globalMap[storeOp.getGlobalName()];
-          LLVM_DEBUG(llvm::dbgs()
-                     << " - store #" << global.ordinal << ": " << storeOp
-                     << "; candidate=" << global.isCandidate() << "\n");
+          LLVM_DEBUG({
+            llvm::dbgs() << " - store #" << global.ordinal << ": ";
+            storeOp.print(llvm::dbgs(), *asmState);
+            llvm::dbgs() << "; candidate=" << global.isCandidate() << "\n";
+          });
           if (!global.isCandidate()) continue;
           valueStores[storeOp.getStoredGlobalValue()].push_back(storeOp);
         }
         for (auto valueStore : valueStores) {
           LLVM_DEBUG({
-            AsmState asmState(callableOp);
             llvm::dbgs() << "= storing value ";
-            valueStore.first.printAsOperand(llvm::dbgs(), asmState);
+            valueStore.first.printAsOperand(llvm::dbgs(), *asmState);
             llvm::dbgs() << ":\n";
             for (auto storeOp : valueStore.second) {
-              LLVM_DEBUG(llvm::dbgs()
-                         << " => @" << storeOp.getGlobalName() << "\n");
+              llvm::dbgs() << " => @" << storeOp.getGlobalName() << "\n";
             }
           });
           tempBits.reset();
@@ -179,12 +184,14 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
         auto &otherGlobalName = globalTable.globalOrder[ordinal];
         if (otherGlobalName == globalName) continue;
         auto &otherBits = correlationMap[otherGlobalName];
-        tempBits &= otherBits;
-      }
-      if (!tempBits.test(global.ordinal)) {
-        // If the global we are analyzing isn't correlated with itself then we
-        // can't modify it at all.
-        tempBits.reset();
+        if (!otherBits.test(global.ordinal)) {
+          LLVM_DEBUG(llvm::dbgs() << "Fixup: " << globalName
+                                  << " uncorrelated with " << otherGlobalName
+                                  << ", masking off " << otherBits << "\n");
+          tempBits.reset(otherBits);
+        } else {
+          tempBits &= otherBits;
+        }
       }
       correlationMap[globalName] = tempBits;
     }
@@ -239,6 +246,9 @@ class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
     SymbolTable symbolTable(moduleOp);
     for (auto &fusableSet : fusableSets) {
       IREE::Util::GlobalOpInterface baseGlobalOp = fusableSet.front()->op;
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Fusing " << fusableSet.size() << " globals into "
+                 << baseGlobalOp.getGlobalName() << "\n");
 
       // Build fused location from all of the globals.
       SmallVector<Location> locs;

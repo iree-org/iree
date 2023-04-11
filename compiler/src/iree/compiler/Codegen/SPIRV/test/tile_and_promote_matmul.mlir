@@ -27,10 +27,10 @@ hal.executable @matmul_f32_256x1024x128 {
         %c256 = arith.constant 256 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<256x128xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128x1024xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<256x1024xf32>
-        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : memref<256x1024xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<256x128xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<256x1024xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : memref<256x1024xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -73,8 +73,8 @@ hal.executable @matmul_f32_256x1024x128 {
 //  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 //  CHECK-DAG: %[[C128:.+]] = arith.constant 128 : index
 
-//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<128x32xf32, 3>
-//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<32x128xf32, 3>
+//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<128x32xf32, #gpu.address_space<workgroup>>
+//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<32x128xf32, #gpu.address_space<workgroup>>
 
 //  CHECK-DAG: %[[BUFFER_A:.+]] = hal.interface.binding.subspan set(0) binding(0) {{.+}} : memref<256x128xf32>
 //  CHECK-DAG: %[[BUFFER_B:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.+}} : memref<128x1024xf32>
@@ -158,9 +158,9 @@ hal.executable @batch_matmul_16x1024x1024x80 {
         %c1024 = arith.constant 1024 : index
         %cst = arith.constant 0.111803398 : f32
         %cst_0 = arith.constant 0.000000e+00 : f16
-        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<16x1024x80xf16>
-        %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<16x80x1024xf16>
-        %8 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<16x1024x1024xf16>
+        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<16x1024x80xf16>
+        %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<16x80x1024xf16>
+        %8 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x1024x1024xf16>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -201,8 +201,8 @@ hal.executable @batch_matmul_16x1024x1024x80 {
 // CHECK-LABEL: func.func @batch_matmul_16x1024x1024x80()
 
 //  CHECK-NOT: memref.alloc
-//  CHECK-DAG: %[[LHS_MEM:.+]] = memref.alloc() : memref<1x64x16xf16, 3>
-//  CHECK-DAG: %[[RHS_MEM:.+]] = memref.alloc() : memref<1x16x256xf16, 3>
+//  CHECK-DAG: %[[LHS_MEM:.+]] = memref.alloc() : memref<1x64x16xf16, #gpu.address_space<workgroup>>
+//  CHECK-DAG: %[[RHS_MEM:.+]] = memref.alloc() : memref<1x16x256xf16, #gpu.address_space<workgroup>>
 //  CHECK-NOT: memref.alloc
 
 //      CHECK:       gpu.barrier
@@ -241,9 +241,9 @@ hal.executable @batch_matmul_f32_16x4096x40x4096 {
         %c40 = arith.constant 40 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<16x4096x4096xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<16x4096x40xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<16x4096x40xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<16x4096x4096xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<16x4096x40xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x4096x40xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -277,8 +277,8 @@ hal.executable @batch_matmul_f32_16x4096x40x4096 {
 // CHECK-LABEL: func.func @batch_matmul_f32_16x4096x40x4096()
 
 //   CHECK-NOT: memref.alloc()
-//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<1x512x16xf32, 3>
-//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<1x16x8xf32, 3>
+//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<1x512x16xf32, #gpu.address_space<workgroup>>
+//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<1x16x8xf32, #gpu.address_space<workgroup>>
 //   CHECK-NOT: memref.alloc()
 
 //      CHECK:       gpu.barrier

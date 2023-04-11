@@ -4,7 +4,7 @@
 func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   %c0 = arith.constant 0 : index
   %cst = arith.constant -0.000000e+00 : f32
-  
+
   %d0 = tensor.dim %arg, %c0 : !in_tensor_t
   %0 = tensor.empty(%d0) : !out_tensor_t
   %1 = linalg.fill ins(%cst : f32) outs(%0 : !out_tensor_t) ->   !out_tensor_t
@@ -26,34 +26,34 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_v3_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_v3_codegen_spec.mlir | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="123x4567xf32=1" |\
+// RUN: iree-run-module --function=reduce --device=cuda --input="123x4567xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
-// RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
-// RUN: iree-run-module --entry_function=reduce --device=cuda --function_input="123x4567xf32=1" |\
+// RUN: iree-compile %s --iree-hal-target-backends=cuda | \
+// RUN: iree-run-module --function=reduce --device=cuda --input="123x4567xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xf32, 3>
-  
+  //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x1024xf32, #gpu.address_space<workgroup>>
+
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
   // Local per-thread scf.for-based reduction.
-  //         CHECK: scf.for
+  //         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<f32>) {
   //         CHECK:   vector.transfer_read %{{.*}} : memref<?x?xf32>, vector<f32>
-  //         CHECK:   vector.transfer_read %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]], %{{.*}} : memref<1x1024xf32, 3>, vector<f32>
   //         CHECK:   arith.addf {{.*}} : f32
-  //         CHECK:   vector.transfer_write %{{.*}}, %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]] : vector<f32>, memref<1x1024xf32, 3>
+  //         CHECK: }
+  //         CHECK: vector.transfer_write %[[v]], %[[SHMEM_ALLOC]][%[[C0]], %[[TIDX]]] : vector<f32>, memref<1x1024xf32, #gpu.address_space<workgroup>>
 
-  //         CHECK: %[[TIDY:.]] = gpu.thread_id  y
   // Distributed reduction: everyone loads then 5 xor + addf expected
-  //         CHECK: vector.transfer_read %{{.*}}[%[[TIDY]], %{{.*}}]
+  //         CHECK: vector.transfer_read %{{.*}}[%[[C0]], %{{.*}}]
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}

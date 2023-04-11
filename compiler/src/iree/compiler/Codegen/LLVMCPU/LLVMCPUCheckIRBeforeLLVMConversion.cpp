@@ -31,44 +31,63 @@ struct LLVMCPUCheckIRBeforeLLVMConversionPass
 };
 }  // namespace
 
-void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
-  auto moduleOp = getOperation();
-  int64_t totalBits = 0;
-  auto walkResult = moduleOp.walk([&](memref::AllocaOp allocaOp) -> WalkResult {
-    auto type = allocaOp.getType().cast<ShapedType>();
-    int64_t size = 1;
-    for (auto dimSize : type.getShape()) {
-      if (dimSize == ShapedType::kDynamic) continue;
-      size *= dimSize;
+/// Returns success if the cummulative stack allocation size is less than the
+/// limit set by clMaxAllocationSizeInBytes.
+static LogicalResult checkStackAllocationSize(func::FuncOp funcOp) {
+  if (funcOp.getBody().empty()) return success();
+
+  SmallVector<memref::AllocaOp> allocaOps;
+  funcOp.walk(
+      [&](memref::AllocaOp allocaOp) { allocaOps.push_back(allocaOp); });
+  if (allocaOps.empty()) {
+    return success();
+  }
+
+  int cumSize = 0;
+  for (auto allocaOp : allocaOps) {
+    if (allocaOp->getBlock() != &funcOp.getBody().front()) {
+      return allocaOp->emitOpError(
+          "all stack allocations need to be hoisted to the entry block of the "
+          "function");
+    }
+    int allocaSize = 1;
+    auto allocaType = allocaOp.getType().cast<ShapedType>();
+    for (auto dimSize : allocaType.getShape()) {
+      if (ShapedType::isDynamic(dimSize)) continue;
+      allocaSize *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {
       auto ub = linalg::getConstantUpperBoundForIndex(operand);
       if (succeeded(ub)) {
-        size *= *ub;
-      } else if (clFailOnOutOfBoundsStackAllocation) {
-        return allocaOp.emitOpError(
-            "expected no stack allocations without upper bound shapes");
+        allocaSize *= ub.value();
+        continue;
       }
+      return allocaOp.emitOpError("expected no unbounded stack allocations");
     }
-    size *= type.getElementType().getIntOrFloatBitWidth();
+    allocaSize *= allocaType.getElementType().getIntOrFloatBitWidth();
     if (allocaOp.getAlignment()) {
       int64_t alignmentInBits = *allocaOp.getAlignment() * 8;
-      size = llvm::divideCeil(size, alignmentInBits) * alignmentInBits;
+      allocaSize =
+          (llvm::divideCeil(allocaSize, alignmentInBits) * alignmentInBits);
     }
-    totalBits += size;
-    return WalkResult::advance();
-  });
-  if (walkResult.wasInterrupted()) {
-    return signalPassFailure();
+    cumSize += allocaSize / 8;
   }
-  int maxAllocationSizeInBits = clMaxAllocationSizeInBytes * 8;
-  if (clFailOnOutOfBoundsStackAllocation &&
-      totalBits > maxAllocationSizeInBits) {
-    moduleOp.emitOpError(
-        "expected total size of stack allocation is not greater than ")
-        << clMaxAllocationSizeInBytes.getValue() << " bytes, but got "
-        << llvm::divideCeil(totalBits, 8) << " bytes";
-    return signalPassFailure();
+  if (cumSize > clMaxAllocationSizeInBytes) {
+    return funcOp.emitOpError("exceeded stack allocation limit of ")
+           << clMaxAllocationSizeInBytes.getValue()
+           << " bytes for function. Got " << cumSize << " bytes";
+  }
+  return success();
+}
+
+void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
+  auto moduleOp = getOperation();
+
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+    if (clFailOnOutOfBoundsStackAllocation &&
+        failed(checkStackAllocationSize(funcOp))) {
+      return signalPassFailure();
+    }
   }
 }
 

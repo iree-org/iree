@@ -27,7 +27,8 @@ RUN apt-get update \
     unzip \
     wget \
     curl \
-    gnupg2
+    gnupg2 \
+    lsb-release
 
 # Install the oldest supported compiler tools
 ARG LLVM_VERSION=9
@@ -68,7 +69,7 @@ RUN ./install_bazel.sh && rm -rf /install-bazel
 WORKDIR /install-python
 
 # Minimum supported Python version
-ARG PYTHON_VERSION=3.7
+ARG PYTHON_VERSION=3.8
 
 # Versions for things required to build IREE should match the minimum
 # supported versions in the requirements file. There doesn't appear to be a

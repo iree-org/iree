@@ -36,13 +36,13 @@ struct StreamInlinerInterface : public DialectInlinerInterface {
     return true;
   }
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const final {
+                       IRMapping &valueMapping) const final {
     // Sure!
     return true;
   }
 
   bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const final {
+                       IRMapping &valueMapping) const final {
     // Sure!
     return true;
   }
@@ -78,10 +78,10 @@ struct StripResourceConversionCastPattern
     for (auto &use : llvm::make_early_inc_range(result.getUses())) {
       if (auto sizeOp =
               dyn_cast<IREE::Stream::ResourceSizeOp>(use.getOwner())) {
-        sizeOp.getResult().replaceAllUsesWith(sizeValue);
-        rewriter.eraseOp(sizeOp);
+        rewriter.replaceOp(sizeOp, sizeValue);
       } else {
-        use.set(resourceValue);
+        rewriter.updateRootInPlace(use.getOwner(),
+                                   [&]() { use.set(resourceValue); });
       }
     }
     rewriter.eraseOp(castOp);

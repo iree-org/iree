@@ -27,6 +27,8 @@ mkdir -p "${INSTALL_DIR}"
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
   "-DIREE_ENABLE_LLD=ON"
@@ -34,12 +36,6 @@ declare -a CMAKE_ARGS=(
   "-DIREE_BUILD_COMPILER=ON"
   "-DIREE_BUILD_TESTS=OFF"
   "-DIREE_BUILD_SAMPLES=OFF"
-
-  # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
-  # have enough deps to at least build CUDA support and compile CUDA binaries
-  # (but not necessarily test on real hardware).
-  "-DIREE_HAL_DRIVER_CUDA=ON"
-  "-DIREE_TARGET_BACKEND_CUDA=ON"
 
   # Enable the WebGPU compiler build. All deps get fetched as needed, but some
   # of the deps are too large to enable by default for all developers.
@@ -49,6 +45,6 @@ declare -a CMAKE_ARGS=(
 "${CMAKE_BIN}" "${CMAKE_ARGS[@]}"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
 
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
 fi

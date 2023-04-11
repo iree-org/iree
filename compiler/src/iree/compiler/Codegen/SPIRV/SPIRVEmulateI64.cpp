@@ -23,7 +23,7 @@
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/WideIntEmulationConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -59,7 +59,8 @@ struct ConvertHalInterfaceBindingSubspan final
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
             op, newResultTy, adaptor.getSet(), adaptor.getBinding(),
             adaptor.getDescriptorType(), adaptor.getByteOffset(),
-            adaptor.getDynamicDims(), adaptor.getAlignmentAttr());
+            adaptor.getDynamicDims(), adaptor.getAlignmentAttr(),
+            adaptor.getDescriptorFlagsAttr());
     LLVM_DEBUG(llvm::dbgs()
                << "WideIntegerEmulation: new op: " << newOp << "\n");
     (void)newOp;
@@ -79,8 +80,7 @@ static VectorType flattenVectorType(Type type) {
   if (vecTy.isScalable() || vecTy.getRank() <= 1) return nullptr;
 
   int64_t totalElements = vecTy.getNumElements();
-  return VectorType::get(llvm::makeArrayRef(totalElements),
-                         vecTy.getElementType());
+  return VectorType::get(llvm::ArrayRef(totalElements), vecTy.getElementType());
 }
 
 // Flattens 2+-D elementwise vector ops into ops over 1-D vectors by inserting

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <algorithm>
+#include <type_traits>
 
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -192,7 +193,6 @@ namespace {
 template <typename INDIRECT, typename DIRECT>
 struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
@@ -247,7 +247,6 @@ namespace {
 template <typename INDIRECT, typename DIRECT>
 struct PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
@@ -303,13 +302,15 @@ void GlobalStoreIndirectRefOp::getCanonicalizationPatterns(
 
 namespace {
 
-template <typename GeneralOp, typename ZeroOp>
+template <typename AttrT, typename GeneralOp, typename ZeroOp>
 struct FoldZeroConstPrimitive final : public OpRewritePattern<GeneralOp> {
   using OpRewritePattern<GeneralOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(GeneralOp constOp,
                                 PatternRewriter &rewriter) const override {
-    if (matchPattern(constOp.getResult(), m_Zero())) {
+    if ((std::is_same<AttrT, IntegerAttr>::value &&
+         matchPattern(constOp.getResult(), m_Zero())) ||
+        (std::is_same<AttrT, FloatAttr>::value &&
+         matchPattern(constOp.getResult(), m_AnyZeroFloat()))) {
       rewriter.replaceOpWithNewOp<ZeroOp>(constOp);
       return success();
     }
@@ -319,59 +320,57 @@ struct FoldZeroConstPrimitive final : public OpRewritePattern<GeneralOp> {
 
 }  // namespace
 
-OpFoldResult ConstI32Op::fold(ArrayRef<Attribute> operands) {
-  return getValue();
-}
+OpFoldResult ConstI32Op::fold(FoldAdaptor operands) { return getValue(); }
 
 void ConstI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
-  results.insert<FoldZeroConstPrimitive<ConstI32Op, ConstI32ZeroOp>>(context);
+  results
+      .insert<FoldZeroConstPrimitive<IntegerAttr, ConstI32Op, ConstI32ZeroOp>>(
+          context);
 }
 
-OpFoldResult ConstI64Op::fold(ArrayRef<Attribute> operands) {
-  return getValue();
-}
+OpFoldResult ConstI64Op::fold(FoldAdaptor operands) { return getValue(); }
 
 void ConstI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
-  results.insert<FoldZeroConstPrimitive<ConstI64Op, ConstI64ZeroOp>>(context);
+  results
+      .insert<FoldZeroConstPrimitive<IntegerAttr, ConstI64Op, ConstI64ZeroOp>>(
+          context);
 }
 
-OpFoldResult ConstF32Op::fold(ArrayRef<Attribute> operands) {
-  return getValue();
-}
+OpFoldResult ConstF32Op::fold(FoldAdaptor operands) { return getValue(); }
 
 void ConstF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
-  results.insert<FoldZeroConstPrimitive<ConstF32Op, ConstF32ZeroOp>>(context);
+  results.insert<FoldZeroConstPrimitive<FloatAttr, ConstF32Op, ConstF32ZeroOp>>(
+      context);
 }
 
-OpFoldResult ConstF64Op::fold(ArrayRef<Attribute> operands) {
-  return getValue();
-}
+OpFoldResult ConstF64Op::fold(FoldAdaptor operands) { return getValue(); }
 
 void ConstF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
-  results.insert<FoldZeroConstPrimitive<ConstF64Op, ConstF64ZeroOp>>(context);
+  results.insert<FoldZeroConstPrimitive<FloatAttr, ConstF64Op, ConstF64ZeroOp>>(
+      context);
 }
 
-OpFoldResult ConstI32ZeroOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ConstI32ZeroOp::fold(FoldAdaptor operands) {
   return IntegerAttr::get(getResult().getType(), 0);
 }
 
-OpFoldResult ConstI64ZeroOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ConstI64ZeroOp::fold(FoldAdaptor operands) {
   return IntegerAttr::get(getResult().getType(), 0);
 }
 
-OpFoldResult ConstF32ZeroOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ConstF32ZeroOp::fold(FoldAdaptor operands) {
   return FloatAttr::get(getResult().getType(), 0.0f);
 }
 
-OpFoldResult ConstF64ZeroOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ConstF64ZeroOp::fold(FoldAdaptor operands) {
   return FloatAttr::get(getResult().getType(), 0.0);
 }
 
-OpFoldResult ConstRefZeroOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ConstRefZeroOp::fold(FoldAdaptor operands) {
   // TODO(benvanik): relace unit attr with a proper null ref attr.
   return UnitAttr::get(getContext());
 }
@@ -399,23 +398,23 @@ static OpFoldResult foldSelectOp(T op) {
   return {};
 }
 
-OpFoldResult SelectI32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SelectI32Op::fold(FoldAdaptor operands) {
   return foldSelectOp(*this);
 }
 
-OpFoldResult SelectI64Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SelectI64Op::fold(FoldAdaptor operands) {
   return foldSelectOp(*this);
 }
 
-OpFoldResult SelectF32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SelectF32Op::fold(FoldAdaptor operands) {
   return foldSelectOp(*this);
 }
 
-OpFoldResult SelectF64Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SelectF64Op::fold(FoldAdaptor operands) {
   return foldSelectOp(*this);
 }
 
-OpFoldResult SelectRefOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SelectRefOp::fold(FoldAdaptor operands) {
   return foldSelectOp(*this);
 }
 
@@ -447,23 +446,23 @@ static OpFoldResult foldSwitchOp(T op) {
   return {};
 }
 
-OpFoldResult SwitchI32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SwitchI32Op::fold(FoldAdaptor operands) {
   return foldSwitchOp(*this);
 }
 
-OpFoldResult SwitchI64Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SwitchI64Op::fold(FoldAdaptor operands) {
   return foldSwitchOp(*this);
 }
 
-OpFoldResult SwitchF32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SwitchF32Op::fold(FoldAdaptor operands) {
   return foldSwitchOp(*this);
 }
 
-OpFoldResult SwitchF64Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SwitchF64Op::fold(FoldAdaptor operands) {
   return foldSwitchOp(*this);
 }
 
-OpFoldResult SwitchRefOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult SwitchRefOp::fold(FoldAdaptor operands) {
   return foldSwitchOp(*this);
 }
 
@@ -476,17 +475,16 @@ OpFoldResult SwitchRefOp::fold(ArrayRef<Attribute> operands) {
 template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT = std::function<APInt(ElementValueT)>>
-static Attribute constFoldUnaryOp(ArrayRef<Attribute> operands,
+static Attribute constFoldUnaryOp(Attribute rawOperand,
                                   const CalculationT &calculate) {
-  assert(operands.size() == 1 && "unary op takes one operand");
-  if (auto operand = operands[0].dyn_cast_or_null<AttrElementT>()) {
+  if (auto operand = rawOperand.dyn_cast_or_null<AttrElementT>()) {
     return AttrElementT::get(operand.getType(), calculate(operand.getValue()));
-  } else if (auto operand = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+  } else if (auto operand = rawOperand.dyn_cast_or_null<SplatElementsAttr>()) {
     auto elementResult = constFoldUnaryOp<AttrElementT>(
         {operand.getSplatValue<Attribute>()}, calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(operand.getType(), elementResult);
-  } else if (auto operand = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+  } else if (auto operand = rawOperand.dyn_cast_or_null<ElementsAttr>()) {
     return operand.cast<DenseIntOrFPElementsAttr>().mapValues(
         operand.getType().getElementType(),
         llvm::function_ref<ElementValueT(const ElementValueT &)>(
@@ -498,17 +496,15 @@ static Attribute constFoldUnaryOp(ArrayRef<Attribute> operands,
 /// Performs const folding `calculate` with element-wise behavior on the given
 /// attribute in `operands` and returns the result if possible.
 static Attribute constFoldFloatUnaryOp(
-    ArrayRef<Attribute> operands,
-    const std::function<APFloat(APFloat)> &calculate) {
-  assert(operands.size() == 1 && "unary op takes one operand");
-  if (auto operand = operands[0].dyn_cast_or_null<FloatAttr>()) {
+    Attribute rawOperand, const std::function<APFloat(APFloat)> &calculate) {
+  if (auto operand = rawOperand.dyn_cast_or_null<FloatAttr>()) {
     return FloatAttr::get(operand.getType(), calculate(operand.getValue()));
-  } else if (auto operand = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+  } else if (auto operand = rawOperand.dyn_cast_or_null<SplatElementsAttr>()) {
     auto elementResult =
         constFoldFloatUnaryOp({operand.getSplatValue<Attribute>()}, calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(operand.getType(), elementResult);
-  } else if (auto operand = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+  } else if (auto operand = rawOperand.dyn_cast_or_null<ElementsAttr>()) {
     return operand.cast<DenseIntOrFPElementsAttr>().mapValues(
         operand.getType().getElementType(),
         llvm::function_ref<APInt(const APFloat &)>([&](const APFloat &value) {
@@ -525,32 +521,31 @@ template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
-static Attribute constFoldBinaryOp(ArrayRef<Attribute> operands,
+static Attribute constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
                                    const CalculationT &calculate) {
-  assert(operands.size() == 2 && "binary op takes two operands");
-  if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
-    auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
+  if (auto lhs = rawLhs.dyn_cast_or_null<AttrElementT>()) {
+    auto rhs = rawRhs.dyn_cast_or_null<AttrElementT>();
     if (!rhs) return {};
     return AttrElementT::get(lhs.getType(),
                              calculate(lhs.getValue(), rhs.getValue()));
-  } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+  } else if (auto lhs = rawLhs.dyn_cast_or_null<SplatElementsAttr>()) {
     // TODO(benvanik): handle splat/otherwise.
-    auto rhs = operands[1].dyn_cast_or_null<SplatElementsAttr>();
+    auto rhs = rawRhs.dyn_cast_or_null<SplatElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
     auto elementResult = constFoldBinaryOp<AttrElementT>(
-        {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
+        lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>(),
         calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(lhs.getType(), elementResult);
-  } else if (auto lhs = operands[0].dyn_cast_or_null<ElementsAttr>()) {
-    auto rhs = operands[1].dyn_cast_or_null<ElementsAttr>();
+  } else if (auto lhs = rawLhs.dyn_cast_or_null<ElementsAttr>()) {
+    auto rhs = rawRhs.dyn_cast_or_null<ElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
     auto lhsIt = lhs.getValues<AttrElementT>().begin();
     auto rhsIt = rhs.getValues<AttrElementT>().begin();
     SmallVector<Attribute, 4> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
       resultAttrs[i] =
-          constFoldBinaryOp<AttrElementT>({*lhsIt, *rhsIt}, calculate);
+          constFoldBinaryOp<AttrElementT>(*lhsIt, *rhsIt, calculate);
       if (!resultAttrs[i]) return {};
       ++lhsIt;
       ++rhsIt;
@@ -566,33 +561,32 @@ template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
-static Attribute constFoldTernaryOp(ArrayRef<Attribute> operands,
+static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
+                                    Attribute rawC,
                                     const CalculationT &calculate) {
-  assert(operands.size() == 3 && "ternary op takes two operands");
-  if (auto a = operands[0].dyn_cast_or_null<AttrElementT>()) {
-    auto b = operands[1].dyn_cast_or_null<AttrElementT>();
-    auto c = operands[2].dyn_cast_or_null<AttrElementT>();
+  if (auto a = rawA.dyn_cast_or_null<AttrElementT>()) {
+    auto b = rawB.dyn_cast_or_null<AttrElementT>();
+    auto c = rawC.dyn_cast_or_null<AttrElementT>();
     if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
       return {};
     }
     return AttrElementT::get(
         a.getType(), calculate(a.getValue(), b.getValue(), c.getValue()));
-  } else if (auto a = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+  } else if (auto a = rawA.dyn_cast_or_null<SplatElementsAttr>()) {
     // TODO(benvanik): handle splat/otherwise.
-    auto b = operands[1].dyn_cast_or_null<SplatElementsAttr>();
-    auto c = operands[2].dyn_cast_or_null<SplatElementsAttr>();
+    auto b = rawB.dyn_cast_or_null<SplatElementsAttr>();
+    auto c = rawC.dyn_cast_or_null<SplatElementsAttr>();
     if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
       return {};
     }
     auto elementResult = constFoldTernaryOp<AttrElementT>(
-        {a.getSplatValue<Attribute>(), b.getSplatValue<Attribute>(),
-         c.getSplatValue<Attribute>()},
-        calculate);
+        a.getSplatValue<Attribute>(), b.getSplatValue<Attribute>(),
+        c.getSplatValue<Attribute>(), calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(a.getType(), elementResult);
-  } else if (auto a = operands[0].dyn_cast_or_null<ElementsAttr>()) {
-    auto b = operands[1].dyn_cast_or_null<ElementsAttr>();
-    auto c = operands[2].dyn_cast_or_null<ElementsAttr>();
+  } else if (auto a = rawA.dyn_cast_or_null<ElementsAttr>()) {
+    auto b = rawB.dyn_cast_or_null<ElementsAttr>();
+    auto c = rawC.dyn_cast_or_null<ElementsAttr>();
     if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
       return {};
     }
@@ -602,7 +596,7 @@ static Attribute constFoldTernaryOp(ArrayRef<Attribute> operands,
     SmallVector<Attribute, 4> resultAttrs(a.getNumElements());
     for (int64_t i = 0; i < a.getNumElements(); ++i) {
       resultAttrs[i] =
-          constFoldTernaryOp<AttrElementT>({*aIt, *bIt, *cIt}, calculate);
+          constFoldTernaryOp<AttrElementT>(*aIt, *bIt, *cIt, calculate);
       if (!resultAttrs[i]) return {};
       ++aIt;
       ++bIt;
@@ -613,10 +607,45 @@ static Attribute constFoldTernaryOp(ArrayRef<Attribute> operands,
   return {};
 }
 
+// %0 = vm.mul.f32 %a, %b : f32
+// %1 = vm.add.f32 %0, %c : f32
+// ->
+// %1 = vm.fma.f32 %a, %b, %c : f32
+template <class MulOp, class AddOp, class FMAOp>
+struct FuseFMAOp : public OpRewritePattern<AddOp> {
+  using OpRewritePattern<AddOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(AddOp addOp,
+                                PatternRewriter &rewriter) const override {
+    auto fuse = [&](MulOp mulOp, Value a, Value b, Value c) {
+      if (!mulOp->hasOneUse() ||
+          mulOp->isUsedOutsideOfBlock(mulOp->getBlock())) {
+        return failure();
+      }
+      rewriter.replaceOp(
+          addOp,
+          rewriter
+              .create<FMAOp>(rewriter.getFusedLoc({a.getLoc(), c.getLoc()}),
+                             a.getType(), a, b, c)
+              .getResult());
+      return success();
+    };
+    if (auto mulOp = dyn_cast_or_null<MulOp>(addOp.getLhs().getDefiningOp())) {
+      return fuse(mulOp, mulOp.getLhs(), mulOp.getRhs(), addOp.getRhs());
+    } else if (auto mulOp =
+                   dyn_cast_or_null<MulOp>(addOp.getRhs().getDefiningOp())) {
+      return fuse(mulOp, mulOp.getLhs(), mulOp.getRhs(), addOp.getLhs());
+    }
+    return failure();
+  }
+};
+
 template <class AttrElementT, typename ADD, typename SUB,
           class ElementValueT = typename AttrElementT::ValueType>
-static OpFoldResult foldAddOp(ADD op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.getRhs(), m_Zero())) {
+static OpFoldResult foldAddOp(ADD op, Attribute lhs, Attribute rhs) {
+  if ((std::is_same<AttrElementT, IntegerAttr>::value &&
+       matchPattern(op.getRhs(), m_Zero())) ||
+      (std::is_same<AttrElementT, FloatAttr>::value &&
+       matchPattern(op.getRhs(), m_AnyZeroFloat()))) {
     // x + 0 = x or 0 + y = y (commutative)
     return op.getLhs();
   }
@@ -628,22 +657,37 @@ static OpFoldResult foldAddOp(ADD op, ArrayRef<Attribute> operands) {
     if (subOp.getRhs() == op.getLhs()) return subOp.getLhs();
   }
   return constFoldBinaryOp<AttrElementT>(
-      operands,
+      lhs, rhs,
       [](const ElementValueT &a, const ElementValueT &b) { return a + b; });
 }
 
-OpFoldResult AddI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldAddOp<IntegerAttr, AddI32Op, SubI32Op>(*this, operands);
+OpFoldResult AddI32Op::fold(FoldAdaptor operands) {
+  return foldAddOp<IntegerAttr, AddI32Op, SubI32Op>(*this, operands.getLhs(),
+                                                    operands.getRhs());
 }
 
-OpFoldResult AddI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldAddOp<IntegerAttr, AddI64Op, SubI64Op>(*this, operands);
+void AddI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.insert<FuseFMAOp<MulI32Op, AddI32Op, FMAI32Op>>(context);
+}
+
+OpFoldResult AddI64Op::fold(FoldAdaptor operands) {
+  return foldAddOp<IntegerAttr, AddI64Op, SubI64Op>(*this, operands.getLhs(),
+                                                    operands.getRhs());
+}
+
+void AddI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.insert<FuseFMAOp<MulI64Op, AddI64Op, FMAI64Op>>(context);
 }
 
 template <class AttrElementT, typename SUB, typename ADD,
           class ElementValueT = typename AttrElementT::ValueType>
-static OpFoldResult foldSubOp(SUB op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.getRhs(), m_Zero())) {
+static OpFoldResult foldSubOp(SUB op, Attribute lhs, Attribute rhs) {
+  if ((std::is_same<AttrElementT, IntegerAttr>::value &&
+       matchPattern(op.getRhs(), m_Zero())) ||
+      (std::is_same<AttrElementT, FloatAttr>::value &&
+       matchPattern(op.getRhs(), m_AnyZeroFloat()))) {
     // x - 0 = x
     return op.getLhs();
   }
@@ -655,30 +699,38 @@ static OpFoldResult foldSubOp(SUB op, ArrayRef<Attribute> operands) {
     if (addOp.getRhs() == op.getLhs()) return addOp.getLhs();
   }
   return constFoldBinaryOp<AttrElementT>(
-      operands,
+      lhs, rhs,
       [](const ElementValueT &a, const ElementValueT &b) { return a - b; });
 }
 
-OpFoldResult SubI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldSubOp<IntegerAttr, SubI32Op, AddI32Op>(*this, operands);
+OpFoldResult SubI32Op::fold(FoldAdaptor operands) {
+  return foldSubOp<IntegerAttr, SubI32Op, AddI32Op>(*this, operands.getLhs(),
+                                                    operands.getRhs());
 }
 
-OpFoldResult SubI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldSubOp<IntegerAttr, SubI64Op, AddI64Op>(*this, operands);
+OpFoldResult SubI64Op::fold(FoldAdaptor operands) {
+  return foldSubOp<IntegerAttr, SubI64Op, AddI64Op>(*this, operands.getLhs(),
+                                                    operands.getRhs());
 }
 
 template <class AttrElementT, typename T,
           class ElementValueT = typename AttrElementT::ValueType>
-static OpFoldResult foldMulOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.getRhs(), m_Zero())) {
+static OpFoldResult foldMulOp(T op, Attribute lhs, Attribute rhs) {
+  if ((std::is_same<AttrElementT, IntegerAttr>::value &&
+       matchPattern(op.getRhs(), m_Zero())) ||
+      (std::is_same<AttrElementT, FloatAttr>::value &&
+       matchPattern(op.getRhs(), m_AnyZeroFloat()))) {
     // x * 0 = 0 or 0 * y = 0 (commutative)
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.getRhs(), m_One())) {
+  } else if ((std::is_same<AttrElementT, IntegerAttr>::value &&
+              matchPattern(op.getRhs(), m_One())) ||
+             (std::is_same<AttrElementT, FloatAttr>::value &&
+              matchPattern(op.getRhs(), m_OneFloat()))) {
     // x * 1 = x or 1 * y = y (commutative)
     return op.getLhs();
   }
   return constFoldBinaryOp<AttrElementT>(
-      operands,
+      lhs, rhs,
       [](const ElementValueT &a, const ElementValueT &b) { return a * b; });
 }
 
@@ -686,7 +738,6 @@ template <class AttrElementT, typename T, typename CONST_OP,
           class ElementValueT = typename AttrElementT::ValueType>
 struct FoldConstantMulOperand : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     AttrElementT c1, c2;
@@ -696,7 +747,7 @@ struct FoldConstantMulOperand : public OpRewritePattern<T> {
         auto c = rewriter.createOrFold<CONST_OP>(
             rewriter.getFusedLoc({mulOp.getLoc(), op.getLoc()}),
             constFoldBinaryOp<AttrElementT>(
-                {c1, c2}, [](const ElementValueT &a, const ElementValueT &b) {
+                c1, c2, [](const ElementValueT &a, const ElementValueT &b) {
                   return a * b;
                 }));
         rewriter.replaceOpWithNewOp<T>(op, op.getType(), mulOp.getLhs(), c);
@@ -707,8 +758,8 @@ struct FoldConstantMulOperand : public OpRewritePattern<T> {
   }
 };
 
-OpFoldResult MulI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldMulOp<IntegerAttr>(*this, operands);
+OpFoldResult MulI32Op::fold(FoldAdaptor operands) {
+  return foldMulOp<IntegerAttr>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void MulI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -717,8 +768,8 @@ void MulI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
 }
 
-OpFoldResult MulI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldMulOp<IntegerAttr>(*this, operands);
+OpFoldResult MulI64Op::fold(FoldAdaptor operands) {
+  return foldMulOp<IntegerAttr>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void MulI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -728,7 +779,7 @@ void MulI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <typename DivOpT, typename MulOpT>
-static OpFoldResult foldDivSOp(DivOpT op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldDivSOp(DivOpT op, Attribute lhs, Attribute rhs) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x / 0 = death
     op.emitOpError() << "is a divide by constant zero";
@@ -751,19 +802,21 @@ static OpFoldResult foldDivSOp(DivOpT op, ArrayRef<Attribute> operands) {
     }
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [](const APInt &a, const APInt &b) { return a.sdiv(b); });
+      lhs, rhs, [](const APInt &a, const APInt &b) { return a.sdiv(b); });
 }
 
-OpFoldResult DivI32SOp::fold(ArrayRef<Attribute> operands) {
-  return foldDivSOp<DivI32SOp, MulI32Op>(*this, operands);
+OpFoldResult DivI32SOp::fold(FoldAdaptor operands) {
+  return foldDivSOp<DivI32SOp, MulI32Op>(*this, operands.getLhs(),
+                                         operands.getRhs());
 }
 
-OpFoldResult DivI64SOp::fold(ArrayRef<Attribute> operands) {
-  return foldDivSOp<DivI64SOp, MulI64Op>(*this, operands);
+OpFoldResult DivI64SOp::fold(FoldAdaptor operands) {
+  return foldDivSOp<DivI64SOp, MulI64Op>(*this, operands.getLhs(),
+                                         operands.getRhs());
 }
 
 template <typename DivOpT>
-static OpFoldResult foldDivUOp(DivOpT op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldDivUOp(DivOpT op, Attribute lhs, Attribute rhs) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x / 0 = death
     op.emitOpError() << "is a divide by constant zero";
@@ -776,19 +829,19 @@ static OpFoldResult foldDivUOp(DivOpT op, ArrayRef<Attribute> operands) {
     return op.getLhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [](const APInt &a, const APInt &b) { return a.udiv(b); });
+      lhs, rhs, [](const APInt &a, const APInt &b) { return a.udiv(b); });
 }
 
-OpFoldResult DivI32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldDivUOp(*this, operands);
+OpFoldResult DivI32UOp::fold(FoldAdaptor operands) {
+  return foldDivUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult DivI64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldDivUOp(*this, operands);
+OpFoldResult DivI64UOp::fold(FoldAdaptor operands) {
+  return foldDivUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <typename T>
-static OpFoldResult foldRemSOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldRemSOp(T op, Attribute lhs, Attribute rhs) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x % 0 = death
     op.emitOpError() << "is a remainder by constant zero";
@@ -800,19 +853,19 @@ static OpFoldResult foldRemSOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [](const APInt &a, const APInt &b) { return a.srem(b); });
+      lhs, rhs, [](const APInt &a, const APInt &b) { return a.srem(b); });
 }
 
-OpFoldResult RemI32SOp::fold(ArrayRef<Attribute> operands) {
-  return foldRemSOp(*this, operands);
+OpFoldResult RemI32SOp::fold(FoldAdaptor operands) {
+  return foldRemSOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult RemI64SOp::fold(ArrayRef<Attribute> operands) {
-  return foldRemSOp(*this, operands);
+OpFoldResult RemI64SOp::fold(FoldAdaptor operands) {
+  return foldRemSOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <typename T>
-static OpFoldResult foldRemUOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldRemUOp(T op, Attribute lhs, Attribute rhs) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x % 0 = death
     op.emitOpError() << "is a remainder by constant zero";
@@ -824,25 +877,25 @@ static OpFoldResult foldRemUOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [](const APInt &a, const APInt &b) { return a.urem(b); });
+      lhs, rhs, [](const APInt &a, const APInt &b) { return a.urem(b); });
 }
 
-OpFoldResult RemI32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldRemUOp(*this, operands);
+OpFoldResult RemI32UOp::fold(FoldAdaptor operands) {
+  return foldRemUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult RemI64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldRemUOp(*this, operands);
+OpFoldResult RemI64UOp::fold(FoldAdaptor operands) {
+  return foldRemUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <typename T>
-static OpFoldResult foldFMAOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldFMAOp(T op, Attribute a, Attribute b, Attribute c) {
   // a * b + c
   if (matchPattern(op.getA(), m_Zero()) || matchPattern(op.getB(), m_Zero())) {
     return op.getC();
   }
   return constFoldTernaryOp<IntegerAttr>(
-      operands, [](const APInt &a, const APInt &b, const APInt &c) {
+      a, b, c, [](const APInt &a, const APInt &b, const APInt &c) {
         return APInt(a.getBitWidth(),
                      a.getSExtValue() * b.getSExtValue() + c.getSExtValue());
       });
@@ -851,7 +904,6 @@ static OpFoldResult foldFMAOp(T op, ArrayRef<Attribute> operands) {
 template <typename FMAOp, typename MulOp, typename AddOp>
 struct CanonicalizeFMA final : public OpRewritePattern<FMAOp> {
   using OpRewritePattern<FMAOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(FMAOp fmaOp,
                                 PatternRewriter &rewriter) const override {
     // a * b + c
@@ -875,12 +927,12 @@ struct CanonicalizeFMA final : public OpRewritePattern<FMAOp> {
   }
 };
 
-OpFoldResult FMAI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldFMAOp(*this, operands);
+OpFoldResult FMAI32Op::fold(FoldAdaptor operands) {
+  return foldFMAOp(*this, operands.getA(), operands.getB(), operands.getC());
 }
 
-OpFoldResult FMAI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldFMAOp(*this, operands);
+OpFoldResult FMAI64Op::fold(FoldAdaptor operands) {
+  return foldFMAOp(*this, operands.getA(), operands.getB(), operands.getC());
 }
 
 void FMAI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -893,38 +945,118 @@ void FMAI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<CanonicalizeFMA<FMAI64Op, MulI64Op, AddI64Op>>(context);
 }
 
-OpFoldResult AbsI32Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldUnaryOp<IntegerAttr>(operands,
+OpFoldResult AbsI32Op::fold(FoldAdaptor operands) {
+  return constFoldUnaryOp<IntegerAttr>(operands.getOperand(),
                                        [](const APInt &a) { return a.abs(); });
 }
 
-OpFoldResult AbsI64Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldUnaryOp<IntegerAttr>(operands,
+OpFoldResult AbsI64Op::fold(FoldAdaptor operands) {
+  return constFoldUnaryOp<IntegerAttr>(operands.getOperand(),
                                        [](const APInt &a) { return a.abs(); });
+}
+
+OpFoldResult MinI32SOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::smin(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MinI64SOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::smin(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MinI32UOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::umin(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MinI64UOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::umin(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MaxI32SOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::smax(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MaxI64SOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::smax(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MaxI32UOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::umax(lhs, rhs);
+                                        });
+}
+
+OpFoldResult MaxI64UOp::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
+                                        [](const APInt &lhs, const APInt &rhs) {
+                                          return llvm::APIntOps::umax(lhs, rhs);
+                                        });
 }
 
 //===----------------------------------------------------------------------===//
 // Floating-point arithmetic
 //===----------------------------------------------------------------------===//
 
-OpFoldResult AddF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldAddOp<FloatAttr, AddF32Op, SubF32Op>(*this, operands);
+OpFoldResult AddF32Op::fold(FoldAdaptor operands) {
+  return foldAddOp<FloatAttr, AddF32Op, SubF32Op>(*this, operands.getLhs(),
+                                                  operands.getRhs());
 }
 
-OpFoldResult AddF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldAddOp<FloatAttr, AddF64Op, SubF64Op>(*this, operands);
+void AddF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.insert<FoldConstantMulOperand<FloatAttr, MulF32Op, ConstF32Op>>(
+      context);
+  results.insert<FuseFMAOp<MulF32Op, AddF32Op, FMAF32Op>>(context);
 }
 
-OpFoldResult SubF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldSubOp<FloatAttr, SubF32Op, AddF32Op>(*this, operands);
+OpFoldResult AddF64Op::fold(FoldAdaptor operands) {
+  return foldAddOp<FloatAttr, AddF64Op, SubF64Op>(*this, operands.getLhs(),
+                                                  operands.getRhs());
 }
 
-OpFoldResult SubF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldSubOp<FloatAttr, SubF64Op, AddF64Op>(*this, operands);
+void AddF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *context) {
+  results.insert<FuseFMAOp<MulF64Op, AddF64Op, FMAF64Op>>(context);
 }
 
-OpFoldResult MulF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldMulOp<FloatAttr>(*this, operands);
+OpFoldResult SubF32Op::fold(FoldAdaptor operands) {
+  return foldSubOp<FloatAttr, SubF32Op, AddF32Op>(*this, operands.getLhs(),
+                                                  operands.getRhs());
+}
+
+OpFoldResult SubF64Op::fold(FoldAdaptor operands) {
+  return foldSubOp<FloatAttr, SubF64Op, AddF64Op>(*this, operands.getLhs(),
+                                                  operands.getRhs());
+}
+
+OpFoldResult MulF32Op::fold(FoldAdaptor operands) {
+  return foldMulOp<FloatAttr>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void MulF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -933,8 +1065,8 @@ void MulF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
 }
 
-OpFoldResult MulF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldMulOp<FloatAttr>(*this, operands);
+OpFoldResult MulF64Op::fold(FoldAdaptor operands) {
+  return foldMulOp<FloatAttr>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void MulF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -944,47 +1076,47 @@ void MulF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <typename T>
-static OpFoldResult foldDivFOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.getRhs(), m_Zero())) {
+static OpFoldResult foldDivFOp(T op, Attribute lhs, Attribute rhs) {
+  if (matchPattern(op.getRhs(), m_AnyZeroFloat())) {
     // x / 0 = death
     op.emitOpError() << "is a divide by constant zero";
     return {};
-  } else if (matchPattern(op.getLhs(), m_Zero())) {
+  } else if (matchPattern(op.getLhs(), m_AnyZeroFloat())) {
     // 0 / y = 0
     return zeroOfType(op.getType());
-  } else if (matchPattern(op.getRhs(), m_One())) {
+  } else if (matchPattern(op.getRhs(), m_OneFloat())) {
     // x / 1 = x
     return op.getLhs();
   }
   return constFoldBinaryOp<FloatAttr>(
-      operands, [](const APFloat &a, const APFloat &b) {
+      lhs, rhs, [](const APFloat &a, const APFloat &b) {
         APFloat c = a;
         c.divide(b, APFloat::rmNearestTiesToAway);
         return c;
       });
 }
 
-OpFoldResult DivF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldDivFOp(*this, operands);
+OpFoldResult DivF32Op::fold(FoldAdaptor operands) {
+  return foldDivFOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult DivF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldDivFOp(*this, operands);
+OpFoldResult DivF64Op::fold(FoldAdaptor operands) {
+  return foldDivFOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <typename T>
-static OpFoldResult foldRemFOp(T op, ArrayRef<Attribute> operands) {
-  if (matchPattern(op.getRhs(), m_Zero())) {
+static OpFoldResult foldRemFOp(T op, Attribute lhs, Attribute rhs) {
+  if (matchPattern(op.getRhs(), m_AnyZeroFloat())) {
     // x % 0 = death
     op.emitOpError() << "is a remainder by constant zero";
     return {};
-  } else if (matchPattern(op.getLhs(), m_Zero()) ||
-             matchPattern(op.getRhs(), m_One())) {
+  } else if (matchPattern(op.getLhs(), m_AnyZeroFloat()) ||
+             matchPattern(op.getRhs(), m_OneFloat())) {
     // x % 1 = 0
     // 0 % y = 0
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryOp<FloatAttr>(operands,
+  return constFoldBinaryOp<FloatAttr>(lhs, rhs,
                                       [](const APFloat &a, const APFloat &b) {
                                         APFloat c = a;
                                         c.remainder(b);
@@ -992,34 +1124,35 @@ static OpFoldResult foldRemFOp(T op, ArrayRef<Attribute> operands) {
                                       });
 }
 
-OpFoldResult RemF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldRemFOp(*this, operands);
+OpFoldResult RemF32Op::fold(FoldAdaptor operands) {
+  return foldRemFOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult RemF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldRemFOp(*this, operands);
+OpFoldResult RemF64Op::fold(FoldAdaptor operands) {
+  return foldRemFOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <typename T>
-static OpFoldResult foldFMAFOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldFMAFOp(T op, Attribute a, Attribute b, Attribute c) {
   // a * b + c
-  if (matchPattern(op.getA(), m_Zero()) || matchPattern(op.getB(), m_Zero())) {
+  if (matchPattern(op.getA(), m_AnyZeroFloat()) ||
+      matchPattern(op.getB(), m_AnyZeroFloat())) {
     return op.getC();
   }
   return constFoldTernaryOp<FloatAttr>(
-      operands, [](const APFloat &a, const APFloat &b, const APFloat &c) {
+      a, b, c, [](const APFloat &a, const APFloat &b, const APFloat &c) {
         APFloat d = a;
         d.fusedMultiplyAdd(b, c, APFloat::rmNearestTiesToAway);
         return d;
       });
 }
 
-OpFoldResult FMAF32Op::fold(ArrayRef<Attribute> operands) {
-  return foldFMAFOp(*this, operands);
+OpFoldResult FMAF32Op::fold(FoldAdaptor operands) {
+  return foldFMAFOp(*this, operands.getA(), operands.getB(), operands.getC());
 }
 
-OpFoldResult FMAF64Op::fold(ArrayRef<Attribute> operands) {
-  return foldFMAFOp(*this, operands);
+OpFoldResult FMAF64Op::fold(FoldAdaptor operands) {
+  return foldFMAFOp(*this, operands.getA(), operands.getB(), operands.getC());
 }
 
 void FMAF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1032,82 +1165,108 @@ void FMAF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<CanonicalizeFMA<FMAF64Op, MulF64Op, AddF64Op>>(context);
 }
 
-OpFoldResult AbsF32Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult AbsF32Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     auto b = a;
     b.clearSign();
     return b;
   });
 }
 
-OpFoldResult AbsF64Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult AbsF64Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     auto b = a;
     b.clearSign();
     return b;
   });
 }
 
-OpFoldResult NegF32Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult NegF32Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     auto b = a;
     b.changeSign();
     return b;
   });
 }
 
-OpFoldResult NegF64Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult NegF64Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     auto b = a;
     b.changeSign();
     return b;
   });
 }
 
-OpFoldResult CeilF32Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult CeilF32Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     auto b = a;
     b.roundToIntegral(APFloat::rmTowardPositive);
     return b;
   });
 }
 
-OpFoldResult CeilF64Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult CeilF64Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     auto b = a;
     b.roundToIntegral(APFloat::rmTowardPositive);
     return b;
   });
 }
 
-OpFoldResult FloorF32Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult FloorF32Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     auto b = a;
     b.roundToIntegral(APFloat::rmTowardNegative);
     return b;
   });
 }
 
-OpFoldResult FloorF64Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult FloorF64Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     auto b = a;
     b.roundToIntegral(APFloat::rmTowardNegative);
     return b;
   });
+}
+
+OpFoldResult MinF32Op::fold(FoldAdaptor operands) {
+  return constFoldBinaryOp<FloatAttr>(
+      operands.getLhs(), operands.getRhs(),
+      [](const APFloat &a, const APFloat &b) { return llvm::minnum(a, b); });
+}
+
+OpFoldResult MinF64Op::fold(FoldAdaptor operands) {
+  return constFoldBinaryOp<FloatAttr>(
+      operands.getLhs(), operands.getRhs(),
+      [](const APFloat &a, const APFloat &b) { return llvm::minnum(a, b); });
+}
+
+OpFoldResult MaxF32Op::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<FloatAttr>(
+      operands.getLhs(), operands.getRhs(),
+      [](const APFloat &a, const APFloat &b) { return llvm::maxnum(a, b); });
+}
+
+OpFoldResult MaxF64Op::fold(FoldAdaptor operands) {
+  if (getLhs() == getRhs()) return getLhs();
+  return constFoldBinaryOp<FloatAttr>(
+      operands.getLhs(), operands.getRhs(),
+      [](const APFloat &a, const APFloat &b) { return llvm::maxnum(a, b); });
 }
 
 //===----------------------------------------------------------------------===//
 // Floating-point math
 //===----------------------------------------------------------------------===//
 
-OpFoldResult SqrtF32Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult SqrtF32Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     return APFloat(sqrtf(a.convertToFloat()));
   });
 }
 
-OpFoldResult SqrtF64Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldFloatUnaryOp(operands, [](const APFloat &a) {
+OpFoldResult SqrtF64Op::fold(FoldAdaptor operands) {
+  return constFoldFloatUnaryOp(operands.getOperand(), [](const APFloat &a) {
     return APFloat(sqrt(a.convertToDouble()));
   });
 }
@@ -1117,23 +1276,23 @@ OpFoldResult SqrtF64Op::fold(ArrayRef<Attribute> operands) {
 //===----------------------------------------------------------------------===//
 
 template <typename T>
-static OpFoldResult foldNotOp(T op, ArrayRef<Attribute> operands) {
-  return constFoldUnaryOp<IntegerAttr>(operands, [](APInt a) {
+static OpFoldResult foldNotOp(T op, Attribute operand) {
+  return constFoldUnaryOp<IntegerAttr>(operand, [](APInt a) {
     a.flipAllBits();
     return a;
   });
 }
 
-OpFoldResult NotI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldNotOp(*this, operands);
+OpFoldResult NotI32Op::fold(FoldAdaptor operands) {
+  return foldNotOp(*this, operands.getOperand());
 }
 
-OpFoldResult NotI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldNotOp(*this, operands);
+OpFoldResult NotI64Op::fold(FoldAdaptor operands) {
+  return foldNotOp(*this, operands.getOperand());
 }
 
 template <typename T>
-static OpFoldResult foldAndOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldAndOp(T op, Attribute lhs, Attribute rhs) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x & 0 = 0 or 0 & y = 0 (commutative)
     return zeroOfType(op.getType());
@@ -1142,19 +1301,19 @@ static OpFoldResult foldAndOp(T op, ArrayRef<Attribute> operands) {
     return op.getLhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [](const APInt &a, const APInt &b) { return a & b; });
+      lhs, rhs, [](const APInt &a, const APInt &b) { return a & b; });
 }
 
-OpFoldResult AndI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldAndOp(*this, operands);
+OpFoldResult AndI32Op::fold(FoldAdaptor operands) {
+  return foldAndOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult AndI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldAndOp(*this, operands);
+OpFoldResult AndI64Op::fold(FoldAdaptor operands) {
+  return foldAndOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <typename T>
-static OpFoldResult foldOrOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldOrOp(T op, Attribute lhs, Attribute rhs) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x | 0 = x or 0 | y = y (commutative)
     return op.getLhs();
@@ -1163,19 +1322,19 @@ static OpFoldResult foldOrOp(T op, ArrayRef<Attribute> operands) {
     return op.getLhs();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [](const APInt &a, const APInt &b) { return a | b; });
+      lhs, rhs, [](const APInt &a, const APInt &b) { return a | b; });
 }
 
-OpFoldResult OrI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldOrOp(*this, operands);
+OpFoldResult OrI32Op::fold(FoldAdaptor operands) {
+  return foldOrOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult OrI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldOrOp(*this, operands);
+OpFoldResult OrI64Op::fold(FoldAdaptor operands) {
+  return foldOrOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <typename T>
-static OpFoldResult foldXorOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldXorOp(T op, Attribute lhs, Attribute rhs) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x ^ 0 = x or 0 ^ y = y (commutative)
     return op.getLhs();
@@ -1184,30 +1343,30 @@ static OpFoldResult foldXorOp(T op, ArrayRef<Attribute> operands) {
     return zeroOfType(op.getType());
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [](const APInt &a, const APInt &b) { return a ^ b; });
+      lhs, rhs, [](const APInt &a, const APInt &b) { return a ^ b; });
 }
 
-OpFoldResult XorI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldXorOp(*this, operands);
+OpFoldResult XorI32Op::fold(FoldAdaptor operands) {
+  return foldXorOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult XorI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldXorOp(*this, operands);
+OpFoldResult XorI64Op::fold(FoldAdaptor operands) {
+  return foldXorOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <typename T>
-static OpFoldResult foldCtlzOp(T op, ArrayRef<Attribute> operands) {
-  return constFoldUnaryOp<IntegerAttr>(operands, [](APInt a) {
+static OpFoldResult foldCtlzOp(T op, Attribute operand) {
+  return constFoldUnaryOp<IntegerAttr>(operand, [](APInt a) {
     return APInt(a.getBitWidth(), a.countLeadingZeros());
   });
 }
 
-OpFoldResult CtlzI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCtlzOp(*this, operands);
+OpFoldResult CtlzI32Op::fold(FoldAdaptor operands) {
+  return foldCtlzOp(*this, operands.getOperand());
 }
 
-OpFoldResult CtlzI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCtlzOp(*this, operands);
+OpFoldResult CtlzI64Op::fold(FoldAdaptor operands) {
+  return foldCtlzOp(*this, operands.getOperand());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1215,7 +1374,7 @@ OpFoldResult CtlzI64Op::fold(ArrayRef<Attribute> operands) {
 //===----------------------------------------------------------------------===//
 
 template <typename T>
-static OpFoldResult foldShlOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldShlOp(T op, Attribute operand, Attribute amount) {
   if (matchPattern(op.getOperand(), m_Zero())) {
     // 0 << y = 0
     return zeroOfType(op.getType());
@@ -1224,19 +1383,20 @@ static OpFoldResult foldShlOp(T op, ArrayRef<Attribute> operands) {
     return op.getOperand();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.shl(b); });
+      operand, amount,
+      [&](const APInt &a, const APInt &b) { return a.shl(b); });
 }
 
-OpFoldResult ShlI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldShlOp(*this, operands);
+OpFoldResult ShlI32Op::fold(FoldAdaptor operands) {
+  return foldShlOp(*this, operands.getOperand(), operands.getAmount());
 }
 
-OpFoldResult ShlI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldShlOp(*this, operands);
+OpFoldResult ShlI64Op::fold(FoldAdaptor operands) {
+  return foldShlOp(*this, operands.getOperand(), operands.getAmount());
 }
 
 template <typename T>
-static OpFoldResult foldShrSOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldShrSOp(T op, Attribute operand, Attribute amount) {
   if (matchPattern(op.getOperand(), m_Zero())) {
     // 0 >> y = 0
     return zeroOfType(op.getType());
@@ -1245,19 +1405,20 @@ static OpFoldResult foldShrSOp(T op, ArrayRef<Attribute> operands) {
     return op.getOperand();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.ashr(b); });
+      operand, amount,
+      [&](const APInt &a, const APInt &b) { return a.ashr(b); });
 }
 
-OpFoldResult ShrI32SOp::fold(ArrayRef<Attribute> operands) {
-  return foldShrSOp(*this, operands);
+OpFoldResult ShrI32SOp::fold(FoldAdaptor operands) {
+  return foldShrSOp(*this, operands.getOperand(), operands.getAmount());
 }
 
-OpFoldResult ShrI64SOp::fold(ArrayRef<Attribute> operands) {
-  return foldShrSOp(*this, operands);
+OpFoldResult ShrI64SOp::fold(FoldAdaptor operands) {
+  return foldShrSOp(*this, operands.getOperand(), operands.getAmount());
 }
 
 template <typename T>
-static OpFoldResult foldShrUOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldShrUOp(T op, Attribute operand, Attribute amount) {
   if (matchPattern(op.getOperand(), m_Zero())) {
     // 0 >> y = 0
     return zeroOfType(op.getType());
@@ -1266,15 +1427,16 @@ static OpFoldResult foldShrUOp(T op, ArrayRef<Attribute> operands) {
     return op.getOperand();
   }
   return constFoldBinaryOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.lshr(b); });
+      operand, amount,
+      [&](const APInt &a, const APInt &b) { return a.lshr(b); });
 }
 
-OpFoldResult ShrI32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldShrUOp(*this, operands);
+OpFoldResult ShrI32UOp::fold(FoldAdaptor operands) {
+  return foldShrUOp(*this, operands.getOperand(), operands.getAmount());
 }
 
-OpFoldResult ShrI64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldShrUOp(*this, operands);
+OpFoldResult ShrI64UOp::fold(FoldAdaptor operands) {
+  return foldShrUOp(*this, operands.getOperand(), operands.getAmount());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1286,115 +1448,113 @@ OpFoldResult ShrI64UOp::fold(ArrayRef<Attribute> operands) {
 template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT = std::function<ElementValueT(ElementValueT)>>
-static Attribute constFoldConversionOp(Type resultType,
-                                       ArrayRef<Attribute> operands,
+static Attribute constFoldConversionOp(Type resultType, Attribute rawOperand,
                                        const CalculationT &calculate) {
-  assert(operands.size() == 1 && "unary op takes one operand");
-  if (auto operand = operands[0].dyn_cast_or_null<AttrElementT>()) {
+  if (auto operand = rawOperand.dyn_cast_or_null<AttrElementT>()) {
     return AttrElementT::get(resultType, calculate(operand.getValue()));
   }
   return {};
 }
 
-OpFoldResult TruncI32I8Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TruncI32I8Op::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(8).zext(32); });
 }
 
-OpFoldResult TruncI32I16Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TruncI32I16Op::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(16).zext(32); });
 }
 
-OpFoldResult TruncI64I8Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TruncI64I8Op::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(8).zext(32); });
 }
 
-OpFoldResult TruncI64I16Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TruncI64I16Op::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(16).zext(32); });
 }
 
-OpFoldResult TruncI64I32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TruncI64I32Op::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(32); });
 }
 
-OpFoldResult TruncF64F32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult TruncF64F32Op::fold(FoldAdaptor operands) {
   return constFoldConversionOp<FloatAttr>(
-      FloatType::getF32(getContext()), operands,
+      FloatType::getF32(getContext()), operands.getOperand(),
       [&](const APFloat &a) { return APFloat(a.convertToFloat()); });
 }
 
-OpFoldResult ExtI8I32SOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI8I32SOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(8).sext(32); });
 }
 
-OpFoldResult ExtI8I32UOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI8I32UOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(8).zext(32); });
 }
 
-OpFoldResult ExtI16I32SOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI16I32SOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(16).sext(32); });
 }
 
-OpFoldResult ExtI16I32UOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI16I32UOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands,
+      IntegerType::get(getContext(), 32), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(16).zext(32); });
 }
 
-OpFoldResult ExtI8I64SOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI8I64SOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 64), operands,
+      IntegerType::get(getContext(), 64), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(8).sext(64); });
 }
 
-OpFoldResult ExtI8I64UOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI8I64UOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 64), operands,
+      IntegerType::get(getContext(), 64), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(8).zext(64); });
 }
 
-OpFoldResult ExtI16I64SOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI16I64SOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 64), operands,
+      IntegerType::get(getContext(), 64), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(16).sext(64); });
 }
 
-OpFoldResult ExtI16I64UOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI16I64UOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 64), operands,
+      IntegerType::get(getContext(), 64), operands.getOperand(),
       [&](const APInt &a) { return a.trunc(16).zext(64); });
 }
 
-OpFoldResult ExtI32I64SOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI32I64SOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 64), operands,
+      IntegerType::get(getContext(), 64), operands.getOperand(),
       [&](const APInt &a) { return a.sext(64); });
 }
 
-OpFoldResult ExtI32I64UOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtI32I64UOp::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
-      IntegerType::get(getContext(), 64), operands,
+      IntegerType::get(getContext(), 64), operands.getOperand(),
       [&](const APInt &a) { return a.zext(64); });
 }
 
-OpFoldResult ExtF32F64Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult ExtF32F64Op::fold(FoldAdaptor operands) {
   return constFoldConversionOp<FloatAttr>(
-      FloatType::getF64(getContext()), operands,
+      FloatType::getF64(getContext()), operands.getOperand(),
       [&](const APFloat &a) { return APFloat(a.convertToDouble()); });
 }
 
@@ -1404,7 +1564,6 @@ template <typename SRC_OP, typename OP_A, int SZ_T, typename OP_B>
 struct PseudoIntegerConversionToSplitConversionOp
     : public OpRewritePattern<SRC_OP> {
   using OpRewritePattern<SRC_OP>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(SRC_OP op,
                                 PatternRewriter &rewriter) const override {
     auto tmp = rewriter.createOrFold<OP_A>(
@@ -1457,36 +1616,38 @@ template <
     class SrcElementValueT = typename SrcAttrElementT::ValueType,
     class DstElementValueT = typename DstAttrElementT::ValueType,
     class CalculationT = std::function<DstElementValueT(SrcElementValueT)>>
-static Attribute constFoldCastOp(Type resultType, ArrayRef<Attribute> operands,
+static Attribute constFoldCastOp(Type resultType, Attribute rawOperand,
                                  const CalculationT &calculate) {
-  assert(operands.size() == 1 && "unary op takes one operand");
-  if (auto operand = operands[0].dyn_cast_or_null<SrcAttrElementT>()) {
+  if (auto operand = rawOperand.dyn_cast_or_null<SrcAttrElementT>()) {
     return DstAttrElementT::get(resultType, calculate(operand.getValue()));
   }
   return {};
 }
 
-OpFoldResult CastSI32F32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CastSI32F32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
-      Float32Type::get(getContext()), operands, [&](const APInt &a) {
+      Float32Type::get(getContext()), operands.getOperand(),
+      [&](const APInt &a) {
         APFloat b = APFloat(0.0f);
         b.convertFromAPInt(a, /*IsSigned=*/true, APFloat::rmNearestTiesToAway);
         return b;
       });
 }
 
-OpFoldResult CastUI32F32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CastUI32F32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
-      Float32Type::get(getContext()), operands, [&](const APInt &a) {
+      Float32Type::get(getContext()), operands.getOperand(),
+      [&](const APInt &a) {
         APFloat b = APFloat(0.0f);
         b.convertFromAPInt(a, /*IsSigned=*/false, APFloat::rmNearestTiesToAway);
         return b;
       });
 }
 
-OpFoldResult CastF32SI32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CastF32SI32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<FloatAttr, IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands, [&](const APFloat &a) {
+      IntegerType::get(getContext(), 32), operands.getOperand(),
+      [&](const APFloat &a) {
         bool isExact = false;
         llvm::APSInt b(/*BitWidth=*/32, /*isUnsigned=*/false);
         a.convertToInteger(b, APFloat::rmNearestTiesToAway, &isExact);
@@ -1494,9 +1655,10 @@ OpFoldResult CastF32SI32Op::fold(ArrayRef<Attribute> operands) {
       });
 }
 
-OpFoldResult CastF32UI32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CastF32UI32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<FloatAttr, IntegerAttr>(
-      IntegerType::get(getContext(), 32), operands, [&](const APFloat &a) {
+      IntegerType::get(getContext(), 32), operands.getOperand(),
+      [&](const APFloat &a) {
         bool isExact = false;
         llvm::APSInt b(/*BitWidth=*/32, /*isUnsigned=*/false);
         a.convertToInteger(b, APFloat::rmNearestTiesToAway, &isExact);
@@ -1520,13 +1682,12 @@ namespace {
 template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT = std::function<APInt(ElementValueT)>>
-static Attribute constFoldUnaryCmpOp(ArrayRef<Attribute> operands,
+static Attribute constFoldUnaryCmpOp(Attribute rawOperand,
                                      const CalculationT &calculate) {
-  assert(operands.size() == 1 && "unary cmp op takes one operand");
-  if (auto operand = operands[0].dyn_cast_or_null<AttrElementT>()) {
+  if (auto operand = rawOperand.dyn_cast_or_null<AttrElementT>()) {
     auto boolType = IntegerType::get(operand.getContext(), 32);
     return IntegerAttr::get(boolType, calculate(operand.getValue()));
-  } else if (auto operand = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+  } else if (auto operand = rawOperand.dyn_cast_or_null<ElementsAttr>()) {
     auto boolType = IntegerType::get(operand.getContext(), 32);
     return operand.cast<DenseIntOrFPElementsAttr>().mapValues(
         boolType,
@@ -1542,11 +1703,10 @@ template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
-static Attribute constFoldBinaryCmpOp(ArrayRef<Attribute> operands,
+static Attribute constFoldBinaryCmpOp(Attribute rawLhs, Attribute rawRhs,
                                       const CalculationT &calculate) {
-  assert(operands.size() == 2 && "binary op takes two operands");
-  if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
-    auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
+  if (auto lhs = rawLhs.dyn_cast_or_null<AttrElementT>()) {
+    auto rhs = rawRhs.dyn_cast_or_null<AttrElementT>();
     if (!rhs) return {};
     auto boolType = IntegerType::get(lhs.getContext(), 32);
     return AttrElementT::get(boolType,
@@ -1586,17 +1746,17 @@ struct SwapInvertedCmpOps : public OpRewritePattern<OP> {
 }  // namespace
 
 template <typename T>
-static OpFoldResult foldCmpEQOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpEQOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x == x = true
     return oneOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.eq(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.eq(b); });
 }
 
-OpFoldResult CmpEQI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQOp(*this, operands);
+OpFoldResult CmpEQI32Op::fold(FoldAdaptor operands) {
+  return foldCmpEQOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpEQI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1604,8 +1764,8 @@ void CmpEQI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<SwapInvertedCmpOps<CmpEQI32Op, CmpNEI32Op>>(context);
 }
 
-OpFoldResult CmpEQI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQOp(*this, operands);
+OpFoldResult CmpEQI64Op::fold(FoldAdaptor operands) {
+  return foldCmpEQOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpEQI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1614,21 +1774,21 @@ void CmpEQI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <typename T>
-static OpFoldResult foldCmpNEOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpNEOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x != x = false
     return zeroOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.ne(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.ne(b); });
 }
 
-OpFoldResult CmpNEI32Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpNEOp(*this, operands);
+OpFoldResult CmpNEI32Op::fold(FoldAdaptor operands) {
+  return foldCmpNEOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpNEI64Op::fold(ArrayRef<Attribute> operands) {
-  return foldCmpNEOp(*this, operands);
+OpFoldResult CmpNEI64Op::fold(FoldAdaptor operands) {
+  return foldCmpNEOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 namespace {
@@ -1662,21 +1822,21 @@ void CmpNEI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <typename T>
-static OpFoldResult foldCmpLTSOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpLTSOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x < x = false
     return zeroOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.slt(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.slt(b); });
 }
 
-OpFoldResult CmpLTI32SOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTSOp(*this, operands);
+OpFoldResult CmpLTI32SOp::fold(FoldAdaptor operands) {
+  return foldCmpLTSOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTI64SOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTSOp(*this, operands);
+OpFoldResult CmpLTI64SOp::fold(FoldAdaptor operands) {
+  return foldCmpLTSOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpLTI32SOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1686,21 +1846,21 @@ void CmpLTI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
 template <typename T>
-static OpFoldResult foldCmpLTUOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpLTUOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x < x = false
     return zeroOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.ult(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.ult(b); });
 }
 
-OpFoldResult CmpLTI32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTUOp(*this, operands);
+OpFoldResult CmpLTI32UOp::fold(FoldAdaptor operands) {
+  return foldCmpLTUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTI64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTUOp(*this, operands);
+OpFoldResult CmpLTI64UOp::fold(FoldAdaptor operands) {
+  return foldCmpLTUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpLTI32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1730,21 +1890,21 @@ struct RewritePseudoCmpLTEToLT : public OpRewritePattern<T> {
 }  // namespace
 
 template <typename T>
-static OpFoldResult foldCmpLTESOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpLTESOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x <= x = true
     return oneOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.sle(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.sle(b); });
 }
 
-OpFoldResult CmpLTEI32SOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTESOp(*this, operands);
+OpFoldResult CmpLTEI32SOp::fold(FoldAdaptor operands) {
+  return foldCmpLTESOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTEI64SOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTESOp(*this, operands);
+OpFoldResult CmpLTEI64SOp::fold(FoldAdaptor operands) {
+  return foldCmpLTESOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpLTEI32SOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1760,21 +1920,21 @@ void CmpLTEI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <typename T>
-static OpFoldResult foldCmpLTEUOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpLTEUOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x <= x = true
     return oneOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.ule(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.ule(b); });
 }
 
-OpFoldResult CmpLTEI32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTEUOp(*this, operands);
+OpFoldResult CmpLTEI32UOp::fold(FoldAdaptor operands) {
+  return foldCmpLTEUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTEI64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTEUOp(*this, operands);
+OpFoldResult CmpLTEI64UOp::fold(FoldAdaptor operands) {
+  return foldCmpLTEUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpLTEI32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1806,21 +1966,21 @@ struct RewritePseudoCmpGTToLT : public OpRewritePattern<T> {
 }  // namespace
 
 template <typename T>
-static OpFoldResult foldCmpGTSOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpGTSOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x > x = false
     return zeroOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.sgt(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.sgt(b); });
 }
 
-OpFoldResult CmpGTI32SOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTSOp(*this, operands);
+OpFoldResult CmpGTI32SOp::fold(FoldAdaptor operands) {
+  return foldCmpGTSOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTI64SOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTSOp(*this, operands);
+OpFoldResult CmpGTI64SOp::fold(FoldAdaptor operands) {
+  return foldCmpGTSOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpGTI32SOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1836,21 +1996,21 @@ void CmpGTI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <typename T>
-static OpFoldResult foldCmpGTUOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpGTUOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x > x = false
     return zeroOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.ugt(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.ugt(b); });
 }
 
-OpFoldResult CmpGTI32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTUOp(*this, operands);
+OpFoldResult CmpGTI32UOp::fold(FoldAdaptor operands) {
+  return foldCmpGTUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTI64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTUOp(*this, operands);
+OpFoldResult CmpGTI64UOp::fold(FoldAdaptor operands) {
+  return foldCmpGTUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpGTI32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1886,21 +2046,21 @@ struct RewritePseudoCmpGTEToLT : public OpRewritePattern<T> {
 }  // namespace
 
 template <typename T>
-static OpFoldResult foldCmpGTESOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpGTESOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x >= x = true
     return oneOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.sge(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.sge(b); });
 }
 
-OpFoldResult CmpGTEI32SOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTESOp(*this, operands);
+OpFoldResult CmpGTEI32SOp::fold(FoldAdaptor operands) {
+  return foldCmpGTESOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTEI64SOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTESOp(*this, operands);
+OpFoldResult CmpGTEI64SOp::fold(FoldAdaptor operands) {
+  return foldCmpGTESOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpGTEI32SOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1916,21 +2076,21 @@ void CmpGTEI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <typename T>
-static OpFoldResult foldCmpGTEUOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpGTEUOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x >= x = true
     return oneOfType(op.getType());
   }
   return constFoldBinaryCmpOp<IntegerAttr>(
-      operands, [&](const APInt &a, const APInt &b) { return a.uge(b); });
+      lhs, rhs, [&](const APInt &a, const APInt &b) { return a.uge(b); });
 }
 
-OpFoldResult CmpGTEI32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTEUOp(*this, operands);
+OpFoldResult CmpGTEI32UOp::fold(FoldAdaptor operands) {
+  return foldCmpGTEUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTEI64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTEUOp(*this, operands);
+OpFoldResult CmpGTEI64UOp::fold(FoldAdaptor operands) {
+  return foldCmpGTEUOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpGTEI32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -1945,14 +2105,16 @@ void CmpGTEI64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEI64UOp, CmpLTI64UOp>>(context);
 }
 
-OpFoldResult CmpNZI32Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpNZI32Op::fold(FoldAdaptor operands) {
   return constFoldUnaryOp<IntegerAttr>(
-      operands, [&](const APInt &a) { return APInt(32, a.getBoolValue()); });
+      operands.getOperand(),
+      [&](const APInt &a) { return APInt(32, a.getBoolValue()); });
 }
 
-OpFoldResult CmpNZI64Op::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpNZI64Op::fold(FoldAdaptor operands) {
   return constFoldUnaryOp<IntegerAttr>(
-      operands, [&](const APInt &a) { return APInt(64, a.getBoolValue()); });
+      operands.getOperand(),
+      [&](const APInt &a) { return APInt(64, a.getBoolValue()); });
 }
 
 //===----------------------------------------------------------------------===//
@@ -1966,34 +2128,32 @@ template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
-static Attribute constFoldBinaryCmpFOp(ArrayRef<Attribute> operands,
+static Attribute constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
                                        const CalculationT &calculate) {
-  assert(operands.size() == 2 && "binary op takes two operands");
-
-  if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
-    auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
+  if (auto lhs = rawLhs.dyn_cast_or_null<AttrElementT>()) {
+    auto rhs = rawRhs.dyn_cast_or_null<AttrElementT>();
     if (!rhs) return {};
     return IntegerAttr::get(IntegerType::get(lhs.getContext(), 32),
                             calculate(lhs.getValue(), rhs.getValue()));
-  } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
+  } else if (auto lhs = rawLhs.dyn_cast_or_null<SplatElementsAttr>()) {
     // TODO(benvanik): handle splat/otherwise.
-    auto rhs = operands[1].dyn_cast_or_null<SplatElementsAttr>();
+    auto rhs = rawRhs.dyn_cast_or_null<SplatElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
     auto elementResult = constFoldBinaryCmpFOp<AttrElementT>(
-        {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
+        lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>(),
         calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
                                   elementResult);
-  } else if (auto lhs = operands[0].dyn_cast_or_null<ElementsAttr>()) {
-    auto rhs = operands[1].dyn_cast_or_null<ElementsAttr>();
+  } else if (auto lhs = rawLhs.dyn_cast_or_null<ElementsAttr>()) {
+    auto rhs = rawRhs.dyn_cast_or_null<ElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
     auto lhsIt = lhs.getValues<AttrElementT>().begin();
     auto rhsIt = rhs.getValues<AttrElementT>().begin();
     SmallVector<Attribute, 4> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
       resultAttrs[i] =
-          constFoldBinaryCmpFOp<AttrElementT>({*lhsIt, *rhsIt}, calculate);
+          constFoldBinaryCmpFOp<AttrElementT>(*lhsIt, *rhsIt, calculate);
       if (!resultAttrs[i]) return {};
       ++lhsIt;
       ++rhsIt;
@@ -2010,13 +2170,13 @@ enum CmpFOrdering {
 };
 
 template <CmpFOrdering ordering, typename T>
-static OpFoldResult foldCmpEQFOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpEQFOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x == x = true
     return oneOfType(op.getType());
   }
   return constFoldBinaryCmpFOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
+      lhs, rhs, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result == APFloat::cmpEqual;
@@ -2026,20 +2186,20 @@ static OpFoldResult foldCmpEQFOp(T op, ArrayRef<Attribute> operands) {
       });
 }
 
-OpFoldResult CmpEQF32OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQFOp<ORDERED>(*this, operands);
+OpFoldResult CmpEQF32OOp::fold(FoldAdaptor operands) {
+  return foldCmpEQFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpEQF64OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQFOp<ORDERED>(*this, operands);
+OpFoldResult CmpEQF64OOp::fold(FoldAdaptor operands) {
+  return foldCmpEQFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpEQF32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpEQF32UOp::fold(FoldAdaptor operands) {
+  return foldCmpEQFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpEQF64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpEQF64UOp::fold(FoldAdaptor operands) {
+  return foldCmpEQFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpEQF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -2134,13 +2294,13 @@ struct RewritePseudoCmpNear : public OpRewritePattern<T> {
 }  // namespace
 
 template <typename T>
-static OpFoldResult foldCmpEQNearOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpEQNearOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x ~ x = true
     return oneOfType(op.getType());
   }
   return constFoldBinaryCmpFOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
+      lhs, rhs, [&](const APFloat &a, const APFloat &b) {
         // See the corresponding rewrite pattern above for references used here.
         if (a.isNegative() != b.isNegative()) {
           return a.compare(b) == APFloat::cmpEqual;
@@ -2154,12 +2314,12 @@ static OpFoldResult foldCmpEQNearOp(T op, ArrayRef<Attribute> operands) {
       });
 }
 
-OpFoldResult CmpEQF32NearOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQNearOp(*this, operands);
+OpFoldResult CmpEQF32NearOp::fold(FoldAdaptor operands) {
+  return foldCmpEQNearOp(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpEQF64NearOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpEQNearOp(*this, operands);
+OpFoldResult CmpEQF64NearOp::fold(FoldAdaptor operands) {
+  return foldCmpEQNearOp(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpEQF32NearOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -2179,13 +2339,13 @@ void CmpEQF64NearOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <CmpFOrdering ordering, typename T>
-static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpNEFOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x != x = false
     return zeroOfType(op.getType());
   }
   return constFoldBinaryCmpFOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
+      lhs, rhs, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result != APFloat::cmpEqual;
@@ -2195,20 +2355,20 @@ static OpFoldResult foldCmpNEFOp(T op, ArrayRef<Attribute> operands) {
       });
 }
 
-OpFoldResult CmpNEF32OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpNEFOp<ORDERED>(*this, operands);
+OpFoldResult CmpNEF32OOp::fold(FoldAdaptor operands) {
+  return foldCmpNEFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpNEF64OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpNEFOp<ORDERED>(*this, operands);
+OpFoldResult CmpNEF64OOp::fold(FoldAdaptor operands) {
+  return foldCmpNEFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpNEF32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpNEFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpNEF32UOp::fold(FoldAdaptor operands) {
+  return foldCmpNEFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpNEF64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpNEFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpNEF64UOp::fold(FoldAdaptor operands) {
+  return foldCmpNEFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpNEF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -2232,36 +2392,37 @@ void CmpNEF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <CmpFOrdering ordering, typename T>
-static OpFoldResult foldCmpLTFOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpLTFOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x < x = false
     return zeroOfType(op.getType());
   }
-  return constFoldBinaryCmpFOp<FloatAttr>(operands, [&](const APFloat &a,
-                                                        const APFloat &b) {
-    auto result = a.compare(b);
-    if (ordering == ORDERED) {
-      return result == APFloat::cmpLessThan;
-    } else {
-      return result == APFloat::cmpLessThan || result == APFloat::cmpUnordered;
-    }
-  });
+  return constFoldBinaryCmpFOp<FloatAttr>(
+      lhs, rhs, [&](const APFloat &a, const APFloat &b) {
+        auto result = a.compare(b);
+        if (ordering == ORDERED) {
+          return result == APFloat::cmpLessThan;
+        } else {
+          return result == APFloat::cmpLessThan ||
+                 result == APFloat::cmpUnordered;
+        }
+      });
 }
 
-OpFoldResult CmpLTF32OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTFOp<ORDERED>(*this, operands);
+OpFoldResult CmpLTF32OOp::fold(FoldAdaptor operands) {
+  return foldCmpLTFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTF64OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTFOp<ORDERED>(*this, operands);
+OpFoldResult CmpLTF64OOp::fold(FoldAdaptor operands) {
+  return foldCmpLTFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTF32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpLTF32UOp::fold(FoldAdaptor operands) {
+  return foldCmpLTFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTF64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpLTF64UOp::fold(FoldAdaptor operands) {
+  return foldCmpLTFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpLTF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -2277,13 +2438,13 @@ void CmpLTF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
 template <CmpFOrdering ordering, typename T>
-static OpFoldResult foldCmpLTEFOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpLTEFOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x <= x = true
     return oneOfType(op.getType());
   }
   return constFoldBinaryCmpFOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
+      lhs, rhs, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result == APFloat::cmpLessThan || result == APFloat::cmpEqual;
@@ -2294,30 +2455,30 @@ static OpFoldResult foldCmpLTEFOp(T op, ArrayRef<Attribute> operands) {
       });
 }
 
-OpFoldResult CmpLTEF32OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTEFOp<ORDERED>(*this, operands);
+OpFoldResult CmpLTEF32OOp::fold(FoldAdaptor operands) {
+  return foldCmpLTEFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTEF64OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTEFOp<ORDERED>(*this, operands);
+OpFoldResult CmpLTEF64OOp::fold(FoldAdaptor operands) {
+  return foldCmpLTEFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTEF32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTEFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpLTEF32UOp::fold(FoldAdaptor operands) {
+  return foldCmpLTEFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpLTEF64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpLTEFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpLTEF64UOp::fold(FoldAdaptor operands) {
+  return foldCmpLTEFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
 template <CmpFOrdering ordering, typename T>
-static OpFoldResult foldCmpGTFOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpGTFOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x > x = false
     return zeroOfType(op.getType());
   }
   return constFoldBinaryCmpFOp<FloatAttr>(
-      operands, [&](const APFloat &a, const APFloat &b) {
+      lhs, rhs, [&](const APFloat &a, const APFloat &b) {
         auto result = a.compare(b);
         if (ordering == ORDERED) {
           return result == APFloat::cmpGreaterThan;
@@ -2328,20 +2489,20 @@ static OpFoldResult foldCmpGTFOp(T op, ArrayRef<Attribute> operands) {
       });
 }
 
-OpFoldResult CmpGTF32OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTFOp<ORDERED>(*this, operands);
+OpFoldResult CmpGTF32OOp::fold(FoldAdaptor operands) {
+  return foldCmpGTFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTF64OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTFOp<ORDERED>(*this, operands);
+OpFoldResult CmpGTF64OOp::fold(FoldAdaptor operands) {
+  return foldCmpGTFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTF32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpGTF32UOp::fold(FoldAdaptor operands) {
+  return foldCmpGTFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTF64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpGTF64UOp::fold(FoldAdaptor operands) {
+  return foldCmpGTFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpGTF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -2369,37 +2530,38 @@ void CmpGTF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 template <CmpFOrdering ordering, typename T>
-static OpFoldResult foldCmpGTEFOp(T op, ArrayRef<Attribute> operands) {
+static OpFoldResult foldCmpGTEFOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x >= x = true
     return oneOfType(op.getType());
   }
-  return constFoldBinaryCmpFOp<FloatAttr>(operands, [&](const APFloat &a,
-                                                        const APFloat &b) {
-    auto result = a.compare(b);
-    if (ordering == ORDERED) {
-      return result == APFloat::cmpGreaterThan || result == APFloat::cmpEqual;
-    } else {
-      return result == APFloat::cmpGreaterThan || result == APFloat::cmpEqual ||
-             result == APFloat::cmpUnordered;
-    }
-  });
+  return constFoldBinaryCmpFOp<FloatAttr>(
+      lhs, rhs, [&](const APFloat &a, const APFloat &b) {
+        auto result = a.compare(b);
+        if (ordering == ORDERED) {
+          return result == APFloat::cmpGreaterThan ||
+                 result == APFloat::cmpEqual;
+        } else {
+          return result == APFloat::cmpGreaterThan ||
+                 result == APFloat::cmpEqual || result == APFloat::cmpUnordered;
+        }
+      });
 }
 
-OpFoldResult CmpGTEF32OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTEFOp<ORDERED>(*this, operands);
+OpFoldResult CmpGTEF32OOp::fold(FoldAdaptor operands) {
+  return foldCmpGTEFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTEF64OOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTEFOp<ORDERED>(*this, operands);
+OpFoldResult CmpGTEF64OOp::fold(FoldAdaptor operands) {
+  return foldCmpGTEFOp<ORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTEF32UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTEFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpGTEF32UOp::fold(FoldAdaptor operands) {
+  return foldCmpGTEFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
-OpFoldResult CmpGTEF64UOp::fold(ArrayRef<Attribute> operands) {
-  return foldCmpGTEFOp<UNORDERED>(*this, operands);
+OpFoldResult CmpGTEF64UOp::fold(FoldAdaptor operands) {
+  return foldCmpGTEFOp<UNORDERED>(*this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpGTEF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -2442,26 +2604,28 @@ struct RewritePseudoCmpNZToNE : public OpRewritePattern<T> {
 
 }  // namespace
 
-OpFoldResult CmpNZF32OOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpNZF32OOp::fold(FoldAdaptor operands) {
   return constFoldUnaryCmpOp<FloatAttr>(
-      operands, [&](const APFloat &a) { return APInt(32, a.isNonZero()); });
+      operands.getOperand(),
+      [&](const APFloat &a) { return APInt(32, a.isNonZero()); });
 }
 
-OpFoldResult CmpNZF64OOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpNZF64OOp::fold(FoldAdaptor operands) {
   return constFoldUnaryCmpOp<FloatAttr>(
-      operands, [&](const APFloat &a) { return APInt(32, a.isNonZero()); });
+      operands.getOperand(),
+      [&](const APFloat &a) { return APInt(32, a.isNonZero()); });
 }
 
-OpFoldResult CmpNZF32UOp::fold(ArrayRef<Attribute> operands) {
-  return constFoldUnaryCmpOp<FloatAttr>(operands, [&](const APFloat &a) {
-    return APInt(32, a.isNonZero() || a.isNaN());
-  });
+OpFoldResult CmpNZF32UOp::fold(FoldAdaptor operands) {
+  return constFoldUnaryCmpOp<FloatAttr>(
+      operands.getOperand(),
+      [&](const APFloat &a) { return APInt(32, a.isNonZero() || a.isNaN()); });
 }
 
-OpFoldResult CmpNZF64UOp::fold(ArrayRef<Attribute> operands) {
-  return constFoldUnaryCmpOp<FloatAttr>(operands, [&](const APFloat &a) {
-    return APInt(32, a.isNonZero() || a.isNaN());
-  });
+OpFoldResult CmpNZF64UOp::fold(FoldAdaptor operands) {
+  return constFoldUnaryCmpOp<FloatAttr>(
+      operands.getOperand(),
+      [&](const APFloat &a) { return APInt(32, a.isNonZero() || a.isNaN()); });
 }
 
 void CmpNZF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
@@ -2492,16 +2656,16 @@ void CmpNZF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
           context);
 }
 
-OpFoldResult CmpNaNF32Op::fold(ArrayRef<Attribute> operands) {
-  if (auto operand = operands[0].dyn_cast_or_null<FloatAttr>()) {
+OpFoldResult CmpNaNF32Op::fold(FoldAdaptor operands) {
+  if (auto operand = operands.getOperand().dyn_cast_or_null<FloatAttr>()) {
     return operand.getValue().isNaN() ? oneOfType(getType())
                                       : zeroOfType(getType());
   }
   return {};
 }
 
-OpFoldResult CmpNaNF64Op::fold(ArrayRef<Attribute> operands) {
-  if (auto operand = operands[0].dyn_cast_or_null<FloatAttr>()) {
+OpFoldResult CmpNaNF64Op::fold(FoldAdaptor operands) {
+  if (auto operand = operands.getOperand().dyn_cast_or_null<FloatAttr>()) {
     return operand.getValue().isNaN() ? oneOfType(getType())
                                       : zeroOfType(getType());
   }
@@ -2512,11 +2676,12 @@ OpFoldResult CmpNaNF64Op::fold(ArrayRef<Attribute> operands) {
 // vm.ref comparison
 //===----------------------------------------------------------------------===//
 
-OpFoldResult CmpEQRefOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpEQRefOp::fold(FoldAdaptor operands) {
   if (getLhs() == getRhs()) {
     // x == x = true
     return oneOfType(getType());
-  } else if (operands[0] && operands[1]) {
+  } else if (operands.getLhs() && operands.getRhs() &&
+             operands.getLhs() == operands.getRhs()) {
     // Constant null == null = true
     return oneOfType(getType());
   }
@@ -2550,7 +2715,7 @@ void CmpEQRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<NullCheckCmpEQRefToCmpNZRef>(context);
 }
 
-OpFoldResult CmpNERefOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpNERefOp::fold(FoldAdaptor operands) {
   if (getLhs() == getRhs()) {
     // x != x = false
     return zeroOfType(getType());
@@ -2581,7 +2746,7 @@ void CmpNERefOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<NullCheckCmpNERefToCmpNZRef>(context);
 }
 
-OpFoldResult CmpNZRefOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult CmpNZRefOp::fold(FoldAdaptor operands) {
   Attribute operandValue;
   if (matchPattern(getOperand(), m_Constant(&operandValue))) {
     // x == null
@@ -2654,7 +2819,6 @@ namespace {
 /// (same logic as for std.br)
 struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
   using OpRewritePattern<BranchOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(BranchOp op,
                                 PatternRewriter &rewriter) const override {
     // Check that the successor block has a single predecessor.
@@ -2665,8 +2829,9 @@ struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
     }
 
     // Merge the successor into the current block and erase the branch.
-    rewriter.mergeBlocks(succ, opParent, op.getOperands());
+    SmallVector<Value> operands(op.getOperands());
     rewriter.eraseOp(op);
+    rewriter.mergeBlocks(succ, opParent, operands);
     return success();
   }
 };
@@ -2680,7 +2845,6 @@ struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
 /// (same logic as for std.br)
 struct SimplifyPassThroughBr : public OpRewritePattern<BranchOp> {
   using OpRewritePattern<BranchOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(BranchOp op,
                                 PatternRewriter &rewriter) const override {
     Block *dest = op.getDest();

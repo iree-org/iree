@@ -11,8 +11,8 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -47,7 +47,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
 
 /// Follow the reverse SSA use-def chain of the given value (always taking the
 /// tied operand) and return the first value outside of `regionOp`.
-static Optional<Value> findFirstTiedValueOutsideOfRegionOp(
+static std::optional<Value> findFirstTiedValueOutsideOfRegionOp(
     Flow::DispatchRegionOp regionOp, Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {
@@ -140,7 +140,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       loc, regionOp.getWorkload(), regionOp.getResultTypes(),
       regionOp.getResultDims(), arguments, argumentDims, tiedArguments);
   workgroupsOp->setDialectAttrs(regionOp->getDialectAttrs());
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   bvm.map(arguments, workgroupsOp.getInputBlockArguments());
 
   // Create DispatchTensorLoadOp for all tensor arguments.

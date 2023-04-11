@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/Matchers.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
@@ -94,7 +95,7 @@ constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
 }
 }  // namespace
 
-llvm::Optional<int32_t> getElementTypeValue(Type type) {
+std::optional<int32_t> getElementTypeValue(Type type) {
   if (auto intType = type.dyn_cast_or_null<IntegerType>()) {
     NumericalType numericalType;
     if (intType.isInteger(1)) {
@@ -133,7 +134,7 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
   return std::nullopt;
 }
 
-llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
+std::optional<int32_t> getEncodingTypeValue(Attribute attr) {
   // TODO(#6762): encoding attribute handling/mapping to enums.
   assert(!attr && "encoding types other than default not yet supported");
   // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
@@ -156,6 +157,48 @@ uint32_t CollectiveAttr::getEncodedValue() const {
       getReduction().value_or(CollectiveReductionOp::None));
   value.elementType = static_cast<uint8_t>(getElementType());
   return value.packed;
+}
+
+//===----------------------------------------------------------------------===//
+// Alignment
+//===----------------------------------------------------------------------===//
+
+llvm::MaybeAlign commonAlignment(llvm::MaybeAlign lhs, llvm::MaybeAlign rhs) {
+  if (!lhs.has_value() || !rhs.has_value()) return std::nullopt;
+  return llvm::MaybeAlign(
+      llvm::MinAlign(lhs.value().value(), rhs.value().value()));
+}
+
+// TODO(benvanik): share with align op folder and analysis.
+// May need an interface for querying the alignment from ops that can carry it.
+std::optional<uint64_t> lookupOffsetOrAlignment(Value value) {
+  APInt constantValue;
+  if (matchPattern(value, m_ConstantInt(&constantValue))) {
+    // Value is constant and we can just treat that as if it were an alignment.
+    return constantValue.getZExtValue();
+  }
+
+  auto op = value.getDefiningOp();
+  if (!op) return std::nullopt;
+  if (auto alignmentAttr = op->getAttrOfType<IntegerAttr>("stream.alignment")) {
+    // The op has an alignment tagged on it we can use directly.
+    return alignmentAttr.getValue().getZExtValue();
+  }
+
+  // TODO(benvanik): walk other pass-through. These are the most common in our
+  // programs today.
+  if (auto loadOp = dyn_cast<IREE::HAL::InterfaceConstantLoadOp>(op)) {
+    // Push constants have an optional value alignment.
+    auto alignment = loadOp.getAlignment();
+    if (alignment.has_value()) {
+      return alignment.value().getZExtValue();
+    }
+  } else if (auto castOp = dyn_cast<arith::IndexCastUIOp>(op)) {
+    return lookupOffsetOrAlignment(castOp.getOperand());
+  }
+
+  // TODO(benvanik): more searching using util.align and other ops.
+  return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//
@@ -421,11 +464,27 @@ void ExecutableObjectAttr::print(AsmPrinter &p) const {
   if (auto pathAttr = getPath()) {
     os << "path = ";
     p.printAttribute(getPath());
-  } else if (auto dataAttr = getData()) {
-    os << "data = ";
+  }
+  if (auto dataAttr = getData()) {
+    os << ", data = ";
     p.printAttribute(getData());
   }
   os << "}>";
+}
+
+// static
+void ExecutableObjectAttr::filterObjects(
+    ArrayAttr objectAttrs, ArrayRef<StringRef> extensions,
+    SmallVectorImpl<ExecutableObjectAttr> &filteredAttrs) {
+  if (!objectAttrs) return;
+  for (auto objectAttr :
+       objectAttrs.getAsRange<IREE::HAL::ExecutableObjectAttr>()) {
+    auto path = objectAttr.getPath();
+    auto ext = llvm::sys::path::extension(path);
+    if (llvm::is_contained(extensions, ext)) {
+      filteredAttrs.push_back(objectAttr);
+    }
+  }
 }
 
 // Tries to find |filePath| on disk either at its absolute path or joined with
@@ -469,7 +528,7 @@ FailureOr<std::string> ExecutableObjectAttr::getAbsolutePath() {
   return findFileInPaths(pathAttr.getValue(), clExecutableObjectSearchPath);
 }
 
-Optional<std::string> ExecutableObjectAttr::loadData() {
+std::optional<std::string> ExecutableObjectAttr::loadData() {
   if (auto dataAttr = getData()) {
     // This is shady but so is using this feature.
     // TODO(benvanik): figure out a way to limit the attribute to signless int8.
@@ -558,7 +617,7 @@ void ExecutableObjectsAttr::print(AsmPrinter &p) const {
   os << "}>";
 }
 
-Optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
+std::optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
     IREE::HAL::ExecutableTargetAttr specificTargetAttr) {
   SmallVector<Attribute> allObjectAttrs;
   for (auto [targetAttr, objectsAttr] :

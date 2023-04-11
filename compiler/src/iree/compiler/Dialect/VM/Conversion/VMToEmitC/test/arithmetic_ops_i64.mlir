@@ -99,6 +99,17 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @my_module_min_i64_s
+vm.module @my_module {
+  vm.func @min_i64_s(%arg0: i64, %arg1: i64) {
+    // CHECK: %0 = emitc.call "vm_min_i64s"(%arg3, %arg4) : (i64, i64) -> i64
+    %0 = vm.min.i64.s %arg0, %arg1 : i64
+    vm.return %0 : i64
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @my_module_not_i64
 vm.module @my_module {
   vm.func @not_i64(%arg0 : i64) -> i64 {

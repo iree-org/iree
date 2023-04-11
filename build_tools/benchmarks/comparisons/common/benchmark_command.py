@@ -110,7 +110,7 @@ class IreeBenchmarkCommand(BenchmarkCommand):
                      num_threads,
                      num_runs,
                      taskset=taskset)
-    self.args.append("--module_file=" + model_path)
+    self.args.append("--module=" + model_path)
     self._latency_regex = re.compile(
         r".*?BM_main/process_time/real_time_mean\s+(.*?) ms.*")
 
@@ -130,6 +130,6 @@ class IreeBenchmarkCommand(BenchmarkCommand):
   def generate_benchmark_command(self) -> list[str]:
     command = super().generate_benchmark_command()
     command.append("--device=" + self.driver)
-    command.append("--task_topology_group_count=" + str(self.num_threads))
+    command.append("--task_topology_max_group_count=" + str(self.num_threads))
     command.append("--benchmark_repetitions=" + str(self.num_runs))
     return command

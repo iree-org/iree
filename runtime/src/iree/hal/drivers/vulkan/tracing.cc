@@ -10,9 +10,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
-#include "third_party/tracy/public/client/TracyProfiler.hpp"
-#include "third_party/tracy/public/common/TracyAlloc.hpp"
-#include "third_party/tracy/public/tracy/Tracy.hpp"
 
 // Total number of queries the per-queue query pool will contain. This
 // translates to the maximum number of outstanding queries before collection is
@@ -187,7 +184,7 @@ static void iree_hal_vulkan_tracing_query_calibration_timestamps(
   switch (context->time_domain) {
 #if defined(IREE_PLATFORM_WINDOWS)
     case VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT:
-      *out_cpu_time *= (uint64_t)(1000000000.0 / tracy::GetFrequencyQpc());
+      *out_cpu_time *= (uint64_t)(1000000000.0 / iree_tracing_frequency());
       break;
 #else
     case VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT:
@@ -235,7 +232,7 @@ static void iree_hal_vulkan_tracing_perform_initial_calibration(
     }
 
     // Query the timestamp from the host and the device.
-    *out_cpu_time = tracy::Profiler::GetTime();
+    *out_cpu_time = iree_tracing_time();
     syms->vkGetQueryPoolResults(
         *context->logical_device, context->query_pool, 0, 1,
         sizeof(*out_gpu_time), out_gpu_time, sizeof(*out_gpu_time),
@@ -284,7 +281,7 @@ static void iree_hal_vulkan_tracing_perform_initial_calibration(
 
   iree_hal_vulkan_tracing_query_calibration_timestamps(
       context, &context->previous_cpu_time, out_gpu_time);
-  *out_cpu_time = tracy::Profiler::GetTime();
+  *out_cpu_time = iree_tracing_time();
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -303,17 +300,12 @@ void iree_hal_vulkan_tracing_perform_calibration(
   iree_hal_vulkan_tracing_query_calibration_timestamps(context, &cpu_time,
                                                        &gpu_time);
 
-  uint64_t tracy_time = tracy::Profiler::GetTime();
+  uint64_t tracy_time = iree_tracing_time();
   if (cpu_time > context->previous_cpu_time) {
     uint64_t cpu_delta = cpu_time - context->previous_cpu_time;
     context->previous_cpu_time = cpu_time;
-    auto* item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuCalibration);
-    tracy::MemWrite(&item->gpuCalibration.gpuTime, gpu_time);
-    tracy::MemWrite(&item->gpuCalibration.cpuTime, tracy_time);
-    tracy::MemWrite(&item->gpuCalibration.cpuDelta, cpu_delta);
-    tracy::MemWrite(&item->gpuCalibration.context, context->id);
-    tracy::Profiler::QueueSerialFinish();
+    iree_tracing_gpu_context_calibrate(context->id, cpu_delta, tracy_time,
+                                       gpu_time);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -354,15 +346,6 @@ static void iree_hal_vulkan_tracing_prepare_gpu_context(
     VkPhysicalDevice physical_device, iree_string_view_t queue_name) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Allocate the process-unique GPU context ID. There's a max of 255 available;
-  // if we are recreating devices a lot we may exceed that. Don't do that, or
-  // wrap around and get weird (but probably still usable) numbers.
-  context->id =
-      tracy::GetGpuCtxCounter().fetch_add(1, std::memory_order_relaxed);
-  if (context->id >= 255) {
-    context->id %= 255;
-  }
-
   // The number of nanoseconds required for a timestamp query to be incremented
   // by 1.
   VkPhysicalDeviceProperties device_properties;
@@ -377,40 +360,13 @@ static void iree_hal_vulkan_tracing_prepare_gpu_context(
   iree_hal_vulkan_tracing_perform_initial_calibration(context, &cpu_time,
                                                       &gpu_time);
 
-  uint8_t context_flags = 0;
-  if (context->time_domain != VK_TIME_DOMAIN_DEVICE_EXT) {
-    // Tell tracy we'll be passing calibrated timestamps and not to mess with
-    // the times. We'll periodically send GpuCalibration events in case the
-    // times drift.
-    context_flags |= tracy::GpuContextCalibration;
-  }
-  {
-    auto* item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuNewContext);
-    tracy::MemWrite(&item->gpuNewContext.cpuTime, cpu_time);
-    tracy::MemWrite(&item->gpuNewContext.gpuTime, gpu_time);
-    memset(&item->gpuNewContext.thread, 0, sizeof(item->gpuNewContext.thread));
-    tracy::MemWrite(&item->gpuNewContext.period, timestamp_period);
-    tracy::MemWrite(&item->gpuNewContext.context, context->id);
-    tracy::MemWrite(&item->gpuNewContext.flags, context_flags);
-    tracy::MemWrite(&item->gpuNewContext.type, tracy::GpuContextType::Vulkan);
-    tracy::Profiler::QueueSerialFinish();
-  }
-
-  // Send the name of the context along.
-  // NOTE: Tracy will unconditionally free the name so we must clone it here.
-  // Since internally Tracy will use its own rpmalloc implementation we must
-  // make sure we allocate from the same source.
-  char* cloned_name = (char*)tracy::tracy_malloc(queue_name.size);
-  memcpy(cloned_name, queue_name.data, queue_name.size);
-  {
-    auto* item = tracy::Profiler::QueueSerial();
-    tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuContextName);
-    tracy::MemWrite(&item->gpuContextNameFat.context, context->id);
-    tracy::MemWrite(&item->gpuContextNameFat.ptr, (uint64_t)cloned_name);
-    tracy::MemWrite(&item->gpuContextNameFat.size, queue_name.size);
-    tracy::Profiler::QueueSerialFinish();
-  }
+  // Allocate the GPU context and pass initial calibration data.
+  // We may need to periodically refresh the calibration depending on the device
+  // timestamp mode.
+  bool is_calibrated = context->time_domain == VK_TIME_DOMAIN_DEVICE_EXT;
+  context->id = iree_tracing_gpu_context_allocate(
+      IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN, queue_name.data, queue_name.size,
+      is_calibrated, cpu_time, gpu_time, timestamp_period);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -567,13 +523,8 @@ void iree_hal_vulkan_tracing_context_collect(
     for (uint32_t i = 0; i < try_query_count; ++i) {
       if (context->readback_buffer[i].availability == 0) break;
       read_query_count = i + 1;
-      auto* item = tracy::Profiler::QueueSerial();
-      tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuTime);
-      tracy::MemWrite(&item->gpuTime.gpuTime,
-                      context->readback_buffer[i].timestamp);
-      tracy::MemWrite(&item->gpuTime.queryId, (uint16_t)(query_base + i));
-      tracy::MemWrite(&item->gpuTime.context, context->id);
-      tracy::Profiler::QueueSerialFinish();
+      iree_tracing_gpu_zone_notify(context->id, (uint16_t)(query_base + i),
+                                   context->readback_buffer[i].timestamp);
     }
 
     // Reset the range of queries read back.
@@ -609,14 +560,7 @@ void iree_hal_vulkan_tracing_zone_begin_impl(
       command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool,
       query_id);
 
-  auto* item = tracy::Profiler::QueueSerial();
-  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneBeginSerial);
-  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime());
-  tracy::MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)src_loc);
-  tracy::MemWrite(&item->gpuZoneBegin.thread, tracy::GetThreadHandle());
-  tracy::MemWrite(&item->gpuZoneBegin.queryId, (uint16_t)query_id);
-  tracy::MemWrite(&item->gpuZoneBegin.context, context->id);
-  tracy::Profiler::QueueSerialFinish();
+  iree_tracing_gpu_zone_begin(context->id, (uint16_t)query_id, src_loc);
 }
 
 void iree_hal_vulkan_tracing_zone_begin_external_impl(
@@ -631,18 +575,9 @@ void iree_hal_vulkan_tracing_zone_begin_external_impl(
       command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool,
       query_id);
 
-  const auto src_loc = tracy::Profiler::AllocSourceLocation(
-      line, file_name, file_name_length, function_name, function_name_length,
-      name, name_length);
-  auto* item = tracy::Profiler::QueueSerial();
-  tracy::MemWrite(&item->hdr.type,
-                  tracy::QueueType::GpuZoneBeginAllocSrcLocSerial);
-  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime());
-  tracy::MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)src_loc);
-  tracy::MemWrite(&item->gpuZoneBegin.thread, tracy::GetThreadHandle());
-  tracy::MemWrite(&item->gpuZoneBegin.queryId, (uint16_t)query_id);
-  tracy::MemWrite(&item->gpuZoneBegin.context, context->id);
-  tracy::Profiler::QueueSerialFinish();
+  iree_tracing_gpu_zone_begin_external(
+      context->id, (uint16_t)query_id, file_name, file_name_length, line,
+      function_name, function_name_length, name, name_length);
 }
 
 void iree_hal_vulkan_tracing_zone_end_impl(
@@ -655,13 +590,27 @@ void iree_hal_vulkan_tracing_zone_end_impl(
       command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool,
       query_id);
 
-  auto* item = tracy::Profiler::QueueSerial();
-  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneEndSerial);
-  tracy::MemWrite(&item->gpuZoneEnd.cpuTime, tracy::Profiler::GetTime());
-  tracy::MemWrite(&item->gpuZoneEnd.thread, tracy::GetThreadHandle());
-  tracy::MemWrite(&item->gpuZoneEnd.queryId, (uint16_t)query_id);
-  tracy::MemWrite(&item->gpuZoneEnd.context, context->id);
-  tracy::Profiler::QueueSerialFinish();
+  iree_tracing_gpu_zone_end(context->id, (uint16_t)query_id);
 }
+
+#else
+
+iree_status_t iree_hal_vulkan_tracing_context_allocate(
+    VkPhysicalDevice physical_device,
+    iree::hal::vulkan::VkDeviceHandle* logical_device, VkQueue queue,
+    iree_string_view_t queue_name, VkQueue maintenance_dispatch_queue,
+    iree::hal::vulkan::VkCommandPoolHandle* maintenance_command_pool,
+    iree_allocator_t host_allocator,
+    iree_hal_vulkan_tracing_context_t** out_context) {
+  *out_context = NULL;
+  return iree_ok_status();
+}
+
+void iree_hal_vulkan_tracing_context_free(
+    iree_hal_vulkan_tracing_context_t* context) {}
+
+void iree_hal_vulkan_tracing_context_collect(
+    iree_hal_vulkan_tracing_context_t* context,
+    VkCommandBuffer command_buffer) {}
 
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION

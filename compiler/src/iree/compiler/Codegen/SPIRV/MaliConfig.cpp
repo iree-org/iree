@@ -16,7 +16,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -27,9 +26,12 @@ static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
-  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+  Type inputType = op.getDpsInputOperand(0)->get().getType();
+  Type elementType = inputType.cast<ShapedType>().getElementType();
+  if (elementType.getIntOrFloatBitWidth() == 16) {
     threadMNK = {2, 8, 8};
+  } else if (elementType.isInteger(8)) {
+    threadMNK = {4, 4, 16};
   } else {
     threadMNK = {6, 4, 4};
   }
@@ -50,23 +52,13 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setMaliMatmulConfig(linalgOp, limits);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [limits](auto op) { return setMaliMatmulConfig(op, limits); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            bool hasPaddedInput =
-                op.image().template getDefiningOp<tensor::PadOp>();
-            int bestTilingFactor = hasPaddedInput ? 8 : 16;
-            return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        bool hasPaddedInput =
-            op.image().template getDefiningOp<tensor::PadOp>();
-        int bestTilingFactor = hasPaddedInput ? 8 : 16;
-        return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-      })
-      .Default([](Operation *) { return success(); });
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
+    int bestTilingFactor = hasPaddedInput ? 8 : 16;
+    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+  }
+
+  return failure();
 }
 
 }  // namespace detail

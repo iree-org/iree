@@ -12,6 +12,7 @@
 # Parameters:
 #   TARGET_NAME: The target name to be created for this module.
 #   SOURCE: Source TF model direcotry
+#   IMPORT_FLAGS: Flags to include in the import command.
 #   OUTPUT_MLIR_FILE: The path to output the generated MLIR file.
 function(iree_import_tflite_model)
   cmake_parse_arguments(
@@ -19,7 +20,7 @@ function(iree_import_tflite_model)
     _RULE
     ""
     "TARGET_NAME;SOURCE;OUTPUT_MLIR_FILE"
-    ""
+    "IMPORT_FLAGS"
   )
   iree_validate_required_arguments(
     _RULE
@@ -32,7 +33,7 @@ function(iree_import_tflite_model)
                       " that iree-import-tflite be available "
                       " (either on PATH or via IREE_IMPORT_TFLITE_PATH). "
                       " Install from a release with "
-                      " `python -m pip install iree-tools-tflite -f https://iree-org.github.io/iree/pip-release-links.html`")
+                      " `python -m pip install iree-tools-tflite -f https://openxla.github.io/iree/pip-release-links.html`")
   endif()
 
   if(NOT TARGET "${_RULE_TARGET_NAME}")
@@ -43,6 +44,7 @@ function(iree_import_tflite_model)
         "${IREE_IMPORT_TFLITE_PATH}"
         "${_RULE_SOURCE}"
         "-o=${_RULE_OUTPUT_MLIR_FILE}"
+        ${_RULE_IMPORT_FLAGS}
       DEPENDS
         "${_RULE_SOURCE}"
       COMMENT "Importing TFLite model ${_MODEL_BASENAME}"
@@ -65,19 +67,19 @@ endfunction()
 # Parameters:
 #   TARGET_NAME: The target name to be created for this module.
 #   SOURCE: Source TF model direcotry
-#   ENTRY_FUNCTION: The entry function name for the input module.
+#   IMPORT_FLAGS: Flags to include in the import command.
 #   OUTPUT_MLIR_FILE: The path to output the generated MLIR file.
 function(iree_import_tf_model)
   cmake_parse_arguments(
     PARSE_ARGV 0
     _RULE
     ""
-    "TARGET_NAME;SOURCE;ENTRY_FUNCTION;OUTPUT_MLIR_FILE"
-    ""
+    "TARGET_NAME;SOURCE;OUTPUT_MLIR_FILE"
+    "IMPORT_FLAGS"
   )
   iree_validate_required_arguments(
     _RULE
-    "TARGET_NAME;SOURCE;ENTRY_FUNCTION;OUTPUT_MLIR_FILE"
+    "TARGET_NAME;SOURCE;OUTPUT_MLIR_FILE"
     ""
   )
 
@@ -86,7 +88,7 @@ function(iree_import_tf_model)
                       " that iree-import-tf be available "
                       " (either on PATH or via IREE_IMPORT_TF_PATH). "
                       " Install from a release with "
-                      " `python -m pip install iree-tools-tf -f https://iree-org.github.io/iree/pip-release-links.html`")
+                      " `python -m pip install iree-tools-tf -f https://openxla.github.io/iree/pip-release-links.html`")
   endif()
 
   if(NOT TARGET "${_RULE_TARGET_NAME}")
@@ -95,9 +97,9 @@ function(iree_import_tf_model)
       OUTPUT "${_RULE_OUTPUT_MLIR_FILE}"
       COMMAND
         "${IREE_IMPORT_TF_PATH}"
-        "--tf-savedmodel-exported-names=${_RULE_ENTRY_FUNCTION}"
         "${_RULE_SOURCE}"
         "-o=${_RULE_OUTPUT_MLIR_FILE}"
+        ${_RULE_IMPORT_FLAGS}
       DEPENDS
         "${_RULE_SOURCE}"
       COMMENT "Importing TF model ${_MODEL_BASENAME}"
@@ -171,7 +173,7 @@ endfunction()
 # requirements (e.g., big-core vs. little-core).
 #
 function(iree_benchmark_suite)
-  if(NOT IREE_BUILD_BENCHMARKS)
+  if(NOT IREE_BUILD_LEGACY_BENCHMARKS)
     return()
   endif()
 
@@ -190,11 +192,11 @@ function(iree_benchmark_suite)
   )
 
   # Try to check if the compiler supports the TARGET_BACKEND. If
-  # IREE_HOST_BINARY_ROOT is defined, we are using a compiler binary, in which
-  # case we can't check it's supported backend just by looking at this build
+  # IREE_HOST_BIN_DIR is set, we are using a compiler binary, in which
+  # case we can't check its supported backends just by looking at this build
   # dir's cmake variables --- we would have to implement a configure-check
-  # executing that compiler.
-  if (NOT DEFINED IREE_HOST_BINARY_ROOT)
+  # executing `iree-compile --iree-hal-list-target-backends`.
+  if(NOT IREE_HOST_BIN_DIR)
     string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
     string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
     if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
@@ -215,7 +217,7 @@ function(iree_benchmark_suite)
       _MODULE
       ""
       "NAME;TAGS;SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
-      ""
+      "IMPORT_FLAGS"
       ${_MODULE}
     )
     iree_validate_required_arguments(
@@ -266,6 +268,9 @@ function(iree_benchmark_suite)
       iree_import_tflite_model(
         TARGET_NAME "${_MODULE_SOURCE_TARGET}"
         SOURCE "${_MODULE_SOURCE}"
+        IMPORT_FLAGS
+          "--output-format=mlir-bytecode"
+          ${_MODULE_IMPORT_FLAGS}
         OUTPUT_MLIR_FILE "${_MODULE_SOURCE}.mlir"
       )
       set(_MODULE_SOURCE "${_MODULE_SOURCE}.mlir")
@@ -278,7 +283,9 @@ function(iree_benchmark_suite)
       iree_import_tf_model(
         TARGET_NAME "${_MODULE_SOURCE_TARGET}"
         SOURCE "${_MODULE_SOURCE}"
-        ENTRY_FUNCTION "${_MODULE_ENTRY_FUNCTION}"
+        IMPORT_FLAGS
+          "--output-format=mlir-bytecode"
+          ${_MODULE_IMPORT_FLAGS}
         OUTPUT_MLIR_FILE "${_MODULE_SOURCE}.mlir"
       )
       set(_MODULE_SOURCE "${_MODULE_SOURCE}.mlir")
@@ -358,7 +365,7 @@ function(iree_benchmark_suite)
       set(_COMPILE_STATS_VMFB_FILE
         "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME_WITH_HASH}-compile-stats.vmfb"
       )
-      if(IREE_ENABLE_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_COMPILATION_TARGET_NAME}")
+      if(IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS AND NOT TARGET "${_COMPILE_STATS_COMPILATION_TARGET_NAME}")
         iree_bytecode_module(
           NAME
             "${_COMPILE_STATS_COMPILATION_NAME}"
@@ -370,7 +377,7 @@ function(iree_benchmark_suite)
             # Enable zip polyglot to provide component sizes.
             "--iree-vm-emit-polyglot-zip=true"
             # Disable debug symbols to provide correct component sizes.
-            "--iree-llvm-debug-symbols=false"
+            "--iree-llvmcpu-debug-symbols=false"
             ${_COMPILATION_ARGS}
           DEPENDS
             "${_MODULE_SOURCE_TARGET}"
@@ -391,7 +398,7 @@ function(iree_benchmark_suite)
         add_custom_target("${_FRIENDLY_TARGET_NAME}")
       endif()
       add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_COMPILATION_TARGET_NAME}")
-      if(IREE_ENABLE_COMPILATION_BENCHMARKS)
+      if(IREE_ENABLE_LEGACY_COMPILATION_BENCHMARKS)
         add_dependencies("${_FRIENDLY_TARGET_NAME}"
           "${_COMPILE_STATS_COMPILATION_TARGET_NAME}")
       endif()
@@ -402,16 +409,18 @@ function(iree_benchmark_suite)
       # Create the command and target for the flagfile spec used to execute
       # the generated artifacts.
       set(_FLAG_FILE "${_RUN_SPEC_DIR}/flagfile")
-      set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\"")
+      set(_ADDITIONAL_ARGS "${_RULE_RUNTIME_FLAGS}")
+      list(APPEND _ADDITIONAL_ARGS "--device_allocator=caching")
+      set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_ADDITIONAL_ARGS}\"")
       file(RELATIVE_PATH _MODULE_FILE_FLAG "${_RUN_SPEC_DIR}" "${_VMFB_FILE}")
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
         COMMAND
           "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/generate_flagfile.py"
-            --module_file="${_MODULE_FILE_FLAG}"
+            --module="${_MODULE_FILE_FLAG}"
             --device=${_RULE_DRIVER}
-            --entry_function=${_MODULE_ENTRY_FUNCTION}
-            --function_inputs=${_MODULE_FUNCTION_INPUTS}
+            --function=${_MODULE_ENTRY_FUNCTION}
+            --inputs=${_MODULE_FUNCTION_INPUTS}
             "${_ADDITIONAL_ARGS_CL}"
             -o "${_FLAG_FILE}"
         DEPENDS

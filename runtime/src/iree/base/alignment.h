@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/base/attributes.h"
 #include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 
@@ -73,6 +74,11 @@ static inline iree_host_size_t iree_host_align(iree_host_size_t value,
   return (value + (alignment - 1)) & ~(alignment - 1);
 }
 
+// Returns true if |value| is a power-of-two.
+static inline bool iree_host_size_is_power_of_two(iree_host_size_t value) {
+  return (value != 0) && ((value & (value - 1)) == 0);
+}
+
 // Returns true if |value| matches the given minimum |alignment|.
 static inline bool iree_host_size_has_alignment(iree_host_size_t value,
                                                 iree_host_size_t alignment) {
@@ -84,6 +90,11 @@ static inline bool iree_host_size_has_alignment(iree_host_size_t value,
 static inline iree_device_size_t iree_device_align(
     iree_device_size_t value, iree_device_size_t alignment) {
   return (value + (alignment - 1)) & ~(alignment - 1);
+}
+
+// Returns true if |value| is a power-of-two.
+static inline bool iree_device_size_is_power_of_two(iree_device_size_t value) {
+  return (value != 0) && ((value & (value - 1)) == 0);
 }
 
 // Returns true if |value| matches the given minimum |alignment|.
@@ -105,6 +116,37 @@ static inline bool iree_device_size_has_alignment(
 //  iree_host_size_t total_size = iree_sizeof_struct(*buffer) + extra_data_size;
 //  IREE_CHECK_OK(iree_allocator_malloc(allocator, total_size, (void**)&p));
 #define iree_sizeof_struct(t) iree_host_align(sizeof(t), iree_max_align_t)
+
+//===----------------------------------------------------------------------===//
+// Alignment intrinsics
+//===----------------------------------------------------------------------===//
+
+#if IREE_HAVE_BUILTIN(__builtin_unreachable) || defined(__GNUC__)
+#define IREE_BUILTIN_UNREACHABLE() __builtin_unreachable()
+#elif defined(IREE_COMPILER_MSVC)
+#define IREE_BUILTIN_UNREACHABLE() __assume(false)
+#else
+#define IREE_BUILTIN_UNREACHABLE() ((void)0)
+#endif  // IREE_HAVE_BUILTIN(__builtin_unreachable) || defined(__GNUC__)
+
+#if !defined(__cplusplus)
+#define IREE_DECLTYPE(v) __typeof__(v)
+#else
+#define IREE_DECLTYPE(v) decltype(v)
+#endif  // __cplusplus
+
+#if IREE_HAVE_BUILTIN(__builtin_assume_aligned) || defined(__GNUC__)
+// NOTE: gcc only assumes on the result so we have to reset ptr.
+#define IREE_BUILTIN_ASSUME_ALIGNED(ptr, size) \
+  (ptr = (IREE_DECLTYPE(ptr))(__builtin_assume_aligned((void*)(ptr), (size))))
+#elif 0  // defined(IREE_COMPILER_MSVC)
+#define IREE_BUILTIN_ASSUME_ALIGNED(ptr, size) \
+  (__assume((((uintptr_t)(ptr)) & ((1 << (size))) - 1)) == 0)
+#else
+#define IREE_BUILTIN_ASSUME_ALIGNED(ptr, size) \
+  ((((uintptr_t)(ptr) % (size)) == 0) ? (ptr)  \
+                                      : (IREE_BUILTIN_UNREACHABLE(), (ptr)))
+#endif  // IREE_HAVE_BUILTIN(__builtin_assume_aligned) || defined(__GNUC__)
 
 //===----------------------------------------------------------------------===//
 // Alignment-safe memory accesses

@@ -6,7 +6,7 @@
 
 # Run commands below on the workstation that the phone is attached to.
 # Prerequisites:
-#   Manual installations of the Android NDK and ADB are needed. See https://iree-org.github.io/iree/building-from-source/android/#install-android-ndk-and-adb for instructions.
+#   Manual installations of the Android NDK and ADB are needed. See https://openxla.github.io/iree/building-from-source/android/#install-android-ndk-and-adb for instructions.
 #   Manual installations of the Termux App and python are needed on the Android device. See README.md for instructions.
 
 #!/bin/bash
@@ -54,7 +54,7 @@ rm -rf "${SOURCE_DIR}"
 mkdir "${SOURCE_DIR}"
 cd "${SOURCE_DIR}"
 
-git clone https://github.com/iree-org/iree.git
+git clone https://github.com/openxla/iree.git
 
 cd iree
 cp "${SOURCE_DIR}/iree/build_tools/benchmarks/set_adreno_gpu_scaling_policy.sh" "${ROOT_DIR}/setup/"
@@ -95,8 +95,8 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=aarch64-none-linux-android29 \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-target-triple=aarch64-none-linux-android29 \
+    --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
@@ -106,8 +106,8 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=aarch64-none-linux-android29 \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-target-triple=aarch64-none-linux-android29 \
+    --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops" \
@@ -119,12 +119,12 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=aarch64-none-linux-android29 \
+    --iree-llvmcpu-target-triple=aarch64-none-linux-android29 \
     --iree-flow-enable-data-tiling \
-    --iree-llvm-target-cpu-features=+dotprod \
+    --iree-llvmcpu-target-cpu-features=+dotprod \
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops" \
     "--iree-llvmcpu-enable-pad-consumer-fusion" \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
@@ -134,13 +134,13 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=aarch64-none-linux-android29 \
+    --iree-llvmcpu-target-triple=aarch64-none-linux-android29 \
     --iree-flow-enable-data-tiling \
-    --iree-llvm-target-cpu-features=+dotprod \
+    --iree-llvmcpu-target-cpu-features=+dotprod \
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops" \
     "--iree-llvmcpu-enable-pad-consumer-fusion" \
     --iree-flow-enable-conv-img2col-transform \
-    --iree-llvm-debug-symbols=false \
+    --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
@@ -152,7 +152,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
       --iree-vulkan-target-triple=valhall-unknown-android31 \
-      --iree-llvm-debug-symbols=false \
+      --iree-llvmcpu-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
       "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
@@ -163,7 +163,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
       --iree-vulkan-target-triple=valhall-unknown-android31 \
-      --iree-llvm-debug-symbols=false \
+      --iree-llvmcpu-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
       --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
@@ -176,7 +176,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-hal-target-backends=vulkan-spirv \
       --iree-vulkan-target-triple=valhall-unknown-android31 \
       --iree-flow-demote-f32-to-f16 \
-      --iree-llvm-debug-symbols=false \
+      --iree-llvmcpu-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
       --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
@@ -188,7 +188,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
       --iree-vulkan-target-triple=adreno-unknown-android31 \
-      --iree-llvm-debug-symbols=false \
+      --iree-llvmcpu-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
       --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
@@ -209,7 +209,7 @@ rm -rf ${SOURCE_DIR}/iree-build-android
 
 cmake -GNinja -B ../iree-build-android/ \
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK?}/build/cmake/android.toolchain.cmake" \
-  -DIREE_HOST_BINARY_ROOT="${PWD}/../iree-build/install" \
+  -DIREE_HOST_BIN_DIR="${PWD}/../iree-build/install/bin" \
   -DANDROID_ABI="arm64-v8a" \
   -DANDROID_PLATFORM="latest" \
   -DIREE_BUILD_COMPILER=OFF \

@@ -20,6 +20,9 @@ DIRECT_UPDATE_COMMAND_NAME = "direct-update"
 
 CANARY_SIZE = compute.FixedOrPercent(fixed=1)
 
+TESTING_ENV_NAME = "testing"
+PROD_ENV_NAME = "prod"
+
 
 def resource_basename(resource):
   return os.path.basename(urllib.parse.urlparse(resource).path)
@@ -97,7 +100,7 @@ def main(args):
   )
 
   # Prod instances just have the bare name
-  modifier = None if args.env == "prod" else args.env
+  modifier = None if args.env == PROD_ENV_NAME else args.env
   migs = updater.get_migs(region=args.region,
                           type=args.type,
                           group=args.group,
@@ -123,7 +126,7 @@ def main(args):
   for mig in migs:
     region = resource_basename(mig.region)
     if args.command in [DIRECT_UPDATE_COMMAND_NAME, CANARY_COMMAND_NAME]:
-      if "testing" in args.version and args.env != "testing":
+      if "testing" in args.version and args.env != TESTING_ENV_NAME:
         scary_action = (f"using testing template version '{args.version}' in"
                         f" environment '{args.env}'")
         check_scary_action(scary_action, args.skip_confirmation)
@@ -265,6 +268,7 @@ def parse_args():
   )
   subparser_base.add_argument(
       "--mode",
+      default="opportunistic",
       choices=["opportunistic", "proactive"],
       help=(
           "The mode in which to update instances. See README and"
@@ -272,7 +276,6 @@ def parse_args():
       ))
   subparser_base.add_argument(
       "--action",
-      default="refresh",
       choices=["refresh", "restart", "replace"],
       help=(
           "What action to take when updating an instance. See README and"
@@ -280,22 +283,35 @@ def parse_args():
       ))
   subparser_base.add_argument("--env",
                               "--environment",
-                              default="testing",
+                              default=TESTING_ENV_NAME,
                               help="The environment for the MIGs.",
-                              choices=["prod", "testing"])
+                              choices=[PROD_ENV_NAME, TESTING_ENV_NAME])
   subparser_base.add_argument(
       "--dry-run",
       action="store_true",
       default=False,
       help="Print all output but don't actually send the update request.")
-  subparser_base.add_argument("--skip-confirmation",
-                              "--force",
-                              action="store_true",
-                              help="Skip all confirmation prompts. Be careful.")
+
+  # Defaulting to true for testing environment avoids people getting in the
+  # habit of routinely passing --force.
+  skip_confirmation = subparser_base.add_mutually_exclusive_group()
+  skip_confirmation.add_argument(
+      "--skip-confirmation",
+      "--force",
+      action="store_true",
+      default=None,
+      help=("Skip all confirmation prompts. Be careful."
+            " Defaults to True for testing environment"))
+  skip_confirmation.add_argument("--noskip-confirmation",
+                                 "--noforce",
+                                 action="store_false",
+                                 default=None,
+                                 dest="skip_confirmation")
+
   # These shouldn't be set very often, but it's just as easy to make them flags
   # as it is to make them global constants.
   subparser_base.add_argument("--name-prefix",
-                              default="github-runner",
+                              default="gh-runner",
                               help="The first part of MIG and template names.")
   subparser_base.add_argument(
       "--base-version-name",
@@ -329,19 +345,22 @@ def parse_args():
   for sp in [canary_sp, direct_sp]:
     sp.add_argument(
         "--version",
-        help=("The new instance template version. Usually git hash + ISO date +"
-              " timestamp, e.g. b213037174-2022-09-06-1662502818"))
+        help=("The new instance template version. Usually git hash +"
+              " 3-character uid, e.g. 56e40f6505-9lp"))
 
   # TODO: Add this argument with a custom parser
   # canary_sp.add_argument("--canary-size", type=int, default=1)
 
   args = parser.parse_args()
 
-  if args.mode is None:
-    if args.action == "refresh":
-      args.mode = "proactive"
+  if args.skip_confirmation is None:
+    args.skip_confirmation = args.env == TESTING_ENV_NAME
+
+  if args.action is None:
+    if args.mode == "proactive":
+      args.action = "refresh"
     else:
-      args.mode = "opportunistic"
+      args.action = "replace"
 
   return args
 

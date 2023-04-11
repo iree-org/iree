@@ -101,20 +101,20 @@ overall steps are as follows:
    `VK_CapabilitiesAttr` to the attribute added to `SPV_ResourceLimitsAttr`.
 
 [d89364]: https://reviews.llvm.org/D89364
-[iree-hal]: https://github.com/iree-org/iree/tree/main/iree/hal
-[iree-hal-c-api]: https://github.com/iree-org/iree/blob/main/iree/hal/api.h
-[iree-hal-dialect]: https://github.com/iree-org/iree/tree/main/iree/compiler/Dialect/HAL
-[iree-vulkan-dialect]: https://github.com/iree-org/iree/tree/main/iree/compiler/Dialect/Vulkan
-[iree-vulkan-base-td]: https://github.com/iree-org/iree/blob/main/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
-[iree-vulkan-cap-td]: https://github.com/iree-org/iree/blob/main/iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.td
-[iree-vulkan-target-env]: https://github.com/iree-org/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.cpp#L66-L70
-[iree-vulkan-target-triple]: https://github.com/iree-org/iree/blob/main/iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.cpp
-[iree-vulkan-target-conv]: https://github.com/iree-org/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h#L29-L42
-[iree-spirv-target-attach]: https://github.com/iree-org/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.cpp#L228-L240
+[iree-hal]: https://github.com/openxla/iree/tree/main/iree/hal
+[iree-hal-c-api]: https://github.com/openxla/iree/blob/main/iree/hal/api.h
+[iree-hal-dialect]: https://github.com/openxla/iree/tree/main/iree/compiler/Dialect/HAL
+[iree-vulkan-dialect]: https://github.com/openxla/iree/tree/main/iree/compiler/Dialect/Vulkan
+[iree-vulkan-base-td]: https://github.com/openxla/iree/blob/main/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
+[iree-vulkan-cap-td]: https://github.com/openxla/iree/blob/main/iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.td
+[iree-vulkan-target-env]: https://github.com/openxla/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.cpp#L66-L70
+[iree-vulkan-target-triple]: https://github.com/openxla/iree/blob/main/iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.cpp
+[iree-vulkan-target-conv]: https://github.com/openxla/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h#L29-L42
+[iree-spirv-target-attach]: https://github.com/openxla/iree/blob/b4739d704de15029cd671e53e7d7e743f4ca2e35/iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.cpp#L228-L240
 [mlir-spirv-extensions-attr]: https://github.com/llvm/llvm-project/blob/076305568cd6c7c02ceb9cfc35e1543153406d19/mlir/include/mlir/Dialect/SPIRV/SPIRVBase.td#L314
 [mlir-spirv-target]: https://mlir.llvm.org/docs/Dialects/SPIR-V/#target-environment
 [mlir-spirv-attr]: https://github.com/llvm/llvm-project/blob/076305568cd6c7c02ceb9cfc35e1543153406d19/mlir/include/mlir/Dialect/SPIRV/SPIRVAttributes.h
 [mlir-spirv-target-td]: https://github.com/llvm/llvm-project/blob/076305568cd6c7c02ceb9cfc35e1543153406d19/mlir/include/mlir/Dialect/SPIRV/TargetAndABI.td
-[pr-3469]: https://github.com/iree-org/iree/pull/3469
+[pr-3469]: https://github.com/openxla/iree/pull/3469
 [vk-coop-mat-ext]: khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_NV_cooperative_matrix.html
 [vulkaninfo]: https://vulkan.lunarg.com/doc/view/latest/linux/vulkaninfo.html

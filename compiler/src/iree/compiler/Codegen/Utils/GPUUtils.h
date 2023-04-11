@@ -9,7 +9,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 namespace mlir {
 namespace iree_compiler {
 
@@ -48,16 +48,21 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
                                            int64_t threadCount,
                                            int64_t vectorSize);
 
+/// Pick an unrolling order that will allow tensorcore operation to reuse LHS
+/// register. This is needed to get good performance on sm_80 target.
+std::optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
+    vector::ContractionOp contract);
+
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory
 //===----------------------------------------------------------------------===//
 
 /// Allocates GPU workgroup memory matching the given `subview`. If there are
 /// dynamic dimensions, the bounds are in `sizeBounds`.
-Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
-                                        memref::SubViewOp subview,
-                                        ArrayRef<Value> sizeBounds,
-                                        DataLayout &);
+std::optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
+                                             memref::SubViewOp subview,
+                                             ArrayRef<Value> sizeBounds,
+                                             DataLayout &);
 
 /// Deallocates GPU workgroup memory behind `buffer`.
 LogicalResult deallocateWorkgroupMemory(OpBuilder &, Value buffer);
@@ -71,6 +76,30 @@ void propagateSharedMemoryCopy(func::FuncOp funcOp);
 
 /// Inserts barriers before and after shared memory copy.
 void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp);
+
+/// Emit reduction across a group for a given input.
+Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
+                            vector::CombiningKind kind, uint32_t size,
+                            const int warpSize);
+
+/// Return the native size of an operation used in contraction calculation.
+// TODO: Make this take HW specific sizes.
+std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
+
+/// Helper function to return native size for MMA.SYNC-based operations.
+std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
+
+/// Return true if the given memref has workgroup memory space.
+bool hasSharedMemoryAddressSpace(MemRefType memrefType);
+
+/// Packs vector of lower precision into a single 32-bit width element.
+/// (i.e <2xf16> -> i32 and <4xi8> -> i32)
+Value packVectorToSupportedWidth(Location loc, OpBuilder &builder, Value input);
+
+/// Unpack single scalar element into a target vector type.
+/// (i.e i32 -> vector<4xi8> or f32 -> vector<2xf16>)
+Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
+                     VectorType targetVecType);
 
 }  // namespace iree_compiler
 }  // namespace mlir

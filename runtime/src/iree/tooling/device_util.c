@@ -10,6 +10,7 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
+#include "iree/hal/utils/allocators.h"
 
 //===----------------------------------------------------------------------===//
 // Shared driver registry
@@ -281,99 +282,51 @@ IREE_FLAG_CALLBACK(
     "  Show all devices from a particular driver: --dump_devices=vulkan\n");
 
 //===----------------------------------------------------------------------===//
+// Allocator configuration
+//===----------------------------------------------------------------------===//
+
+IREE_FLAG_LIST(
+    string, device_allocator,
+    "Specifies one or more HAL device allocator specs to augment the base\n"
+    "device allocator. See each allocator type for supported configurations.");
+
+// Configures the |device| allocator based on the --device_allocator= flag.
+// This will wrap the underlying device allocator in zero or more configurable
+// allocator shims.
+//
+// WARNING: not thread-safe and must only be called immediately after device
+// creation.
+static iree_status_t iree_hal_configure_allocator_from_flags(
+    iree_hal_device_t* device) {
+  const iree_flag_string_list_t list = FLAG_device_allocator_list();
+  return iree_hal_configure_allocator_from_specs(list.count, list.values,
+                                                 device);
+}
+
+//===----------------------------------------------------------------------===//
 // Device selection
 //===----------------------------------------------------------------------===//
 
-// Common case is for 1 device, so to keep our memory profiles simpler we allow
-// for storing a single device inline in the struct. As soon as more than one
-// device is used we grow it.
-typedef struct iree_hal_devices_flag_t {
-  iree_host_size_t capacity;
-  iree_host_size_t count;
-  union {
-    iree_string_view_t inline_uri;  // only if count == 1
-    iree_string_view_t* uris;       // only if count > 1
-  };
-} iree_hal_devices_flag_t;
-iree_hal_devices_flag_t iree_hal_devices_flag = {
-    .capacity = 1,  // inline
-    .count = 0,
-    .uris = NULL,
-};
-
-static iree_status_t iree_hal_flags_parse_device(iree_string_view_t flag_name,
-                                                 void* storage,
-                                                 iree_string_view_t value) {
-  iree_hal_devices_flag_t* flag = (iree_hal_devices_flag_t*)storage;
-  if (flag->count == 0) {
-    // Inline storage (common case).
-    flag->count = 1;
-    flag->inline_uri = value;
-  } else if (flag->count == 1) {
-    // Switching from inline storage to external storage.
-    iree_host_size_t new_capacity = 4;
-    iree_string_view_t* uris = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        iree_allocator_system(), sizeof(iree_string_view_t*) * new_capacity,
-        (void**)&uris));
-    uris[0] = flag->inline_uri;
-    flag->capacity = new_capacity;
-    flag->uris = uris;
-    flag->uris[flag->count++] = value;
-  } else {
-    // Growing external storage list.
-    iree_host_size_t new_capacity = iree_max(4, flag->capacity * 2);
-    IREE_RETURN_IF_ERROR(iree_allocator_realloc(
-        iree_allocator_system(), sizeof(iree_string_view_t*) * new_capacity,
-        (void**)&flag->uris));
-    flag->capacity = new_capacity;
-    flag->uris[flag->count++] = value;
-  }
-  return iree_ok_status();
-}
-
-static void iree_hal_flags_print_devices(iree_string_view_t flag_name,
-                                         void* storage, FILE* file) {
-  iree_hal_devices_flag_t* flag = (iree_hal_devices_flag_t*)storage;
-  if (flag->count == 0) {
-    fprintf(file, "# --%.*s=driver://path?params\n", (int)flag_name.size,
-            flag_name.data);
-  } else if (flag->count == 1) {
-    fprintf(file, "--%.*s=%.*s\n", (int)flag_name.size, flag_name.data,
-            (int)flag->inline_uri.size, flag->inline_uri.data);
-  } else {
-    for (iree_host_size_t i = 0; i < flag->count; ++i) {
-      const iree_string_view_t device_uri = flag->uris[i];
-      fprintf(file, "--%.*s=%.*s\n", (int)flag_name.size, flag_name.data,
-              (int)device_uri.size, device_uri.data);
-    }
-  }
-}
-
-IREE_FLAG_CALLBACK(
-    iree_hal_flags_parse_device, iree_hal_flags_print_devices,
-    &iree_hal_devices_flag, device,
+IREE_FLAG_LIST(
+    string, device,
     "Specifies one or more HAL devices to use for execution.\n"
     "Use --list_devices/--dump_devices to see available devices and their\n"
     "canonical URI used with this flag.");
 
 // TODO(#5724): remove this and replace with an iree_hal_device_set_t.
 void iree_hal_get_devices_flag_list(iree_host_size_t* out_count,
-                                    iree_string_view_t** out_list) {
-  *out_count = iree_hal_devices_flag.count;
-  if (iree_hal_devices_flag.count == 1) {
-    *out_list = &iree_hal_devices_flag.inline_uri;
-  } else {
-    *out_list = iree_hal_devices_flag.uris;
-  }
+                                    const iree_string_view_t** out_list) {
+  *out_count = FLAG_device_list().count;
+  *out_list = FLAG_device_list().values;
 }
 
 iree_status_t iree_hal_create_device_from_flags(
+    iree_hal_driver_registry_t* driver_registry,
     iree_string_view_t default_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   iree_string_view_t device_uri = default_device;
-  const iree_hal_devices_flag_t* flag = &iree_hal_devices_flag;
-  if (flag->count == 0) {
+  const iree_flag_string_list_t list = FLAG_device_list();
+  if (list.count == 0) {
     // No devices specified. Use default if provided.
     if (iree_string_view_is_empty(default_device)) {
       return iree_make_status(
@@ -381,17 +334,38 @@ iree_status_t iree_hal_create_device_from_flags(
           "no device specified; use --list_devices to see the "
           "available devices and specify one with --device=");
     }
-  } else if (flag->count > 1) {
+  } else if (list.count > 1) {
     // Too many devices for the single device creation function.
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "too many devices specified; only one --device= "
                             "flag may be provided with this API");
   } else {
     // Exactly one device specified.
-    device_uri = flag->inline_uri;
+    device_uri = list.values[0];
   }
-  return iree_hal_create_device(iree_hal_available_driver_registry(),
-                                device_uri, host_allocator, out_device);
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Create the device, which may be slow and dynamically load big dependencies
+  // (CUDA, Vulkan, etc).
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_create_device(iree_hal_available_driver_registry(),
+                                 device_uri, host_allocator, &device));
+
+  // Optionally wrap the base device allocator with caching/pooling.
+  // Doing this here satisfies the requirement that no buffers have been
+  // allocated yet - if we returned the device without doing this the caller can
+  // more easily break the rules.
+  iree_status_t status = iree_hal_configure_allocator_from_flags(device);
+
+  if (iree_status_is_ok(status)) {
+    *out_device = device;
+  } else {
+    iree_hal_device_release(device);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 //===----------------------------------------------------------------------===//

@@ -20,5 +20,6 @@
 #include "iree/vm/stack.h"          // IWYU pragma: export
 #include "iree/vm/type_def.h"       // IWYU pragma: export
 #include "iree/vm/value.h"          // IWYU pragma: export
+#include "iree/vm/variant.h"        // IWYU pragma: export
 
 #endif  // IREE_VM_API_H_

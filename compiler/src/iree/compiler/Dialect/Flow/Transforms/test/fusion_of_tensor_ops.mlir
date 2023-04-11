@@ -46,18 +46,24 @@ func.func @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
 //       CHECK:   %[[FILL0:.+]] = linalg.fill
 //  CHECK-SAME:       outs(%[[INIT0]] :
 //       CHECK:   %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:       ["parallel", "parallel", "reduction"]
 //  CHECK-SAME:       ins(%[[ARG0]] :
 //  CHECK-SAME:       outs(%[[FILL0]] :
 //       CHECK:   %[[INIT1:.+]] = tensor.empty()
+//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:       ["parallel", "parallel", "parallel"]
+//  CHECK-SAME:       ins(%[[ARG0]], %[[GENERIC0]] :
+//  CHECK-SAME:       outs(%[[INIT1]] :
 //       CHECK:   %[[FILL1:.+]] = linalg.fill
 //  CHECK-SAME:       outs(%[[INIT0]] :
-//       CHECK:   %[[GENERIC1:.+]]:2 = linalg.generic
-//  CHECK-SAME:       ins(%[[ARG0]], %[[GENERIC0]] :
-//  CHECK-SAME:       outs(%[[INIT1]], %[[FILL1]] :
 //       CHECK:   %[[GENERIC2:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[GENERIC1]]#0, %[[GENERIC1]]#1 :
+//  CHECK-SAME:       ["parallel", "parallel", "reduction"]
+//  CHECK-SAME:       ins(%[[GENERIC1]] :
+//  CHECK-SAME:       outs(%[[FILL1]] :
+//       CHECK:   %[[GENERIC3:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[GENERIC1]], %[[GENERIC2]] :
 //  CHECK-SAME:       outs(%[[INIT1]] :
-//       CHECK:   return %[[GENERIC2]]
+//       CHECK:   return %[[GENERIC3]]
 
 // -----
 
@@ -160,3 +166,43 @@ module {
 // CHECK-LABEL: func.func @fuse_only_with_same_marke
 // CHECK:         linalg.generic
 // CHECK-NOT:     linalg.generic
+
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d1 + d4, d2 + d5)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d4, d5)>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+module {
+  func.func @fuse_only_projected_perm(%arg0: tensor<16x1082x1922xi8>, %arg1: tensor<32x16x3x3xf32>, %arg2: tensor<32x1080x1920xi32>) -> tensor<32x1080x1920xi32> {
+    %0 = tensor.empty() : tensor<32x16x3x3xi8>
+    %eltwise = linalg.generic {
+             indexing_maps = [#map0, #map0],
+             iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+             ins(%arg1 : tensor<32x16x3x3xf32>)
+             outs(%0 : tensor<32x16x3x3xi8>) {
+    ^bb0(%in: f32, %out: i8):
+      %1 = arith.fptosi %in : f32 to i8
+      linalg.yield %1 : i8
+    } -> tensor<32x16x3x3xi8>
+
+    %conv = linalg.generic {
+          indexing_maps = [#map1, #map2, #map3],
+          iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"] }
+          ins(%arg0, %eltwise : tensor<16x1082x1922xi8>, tensor<32x16x3x3xi8>)
+          outs(%arg2 : tensor<32x1080x1920xi32>) {
+    ^bb0(%in: i8, %in_108: i8, %out: i32):
+      %232 = arith.extui %in : i8 to i32
+      %233 = arith.extsi %in_108 : i8 to i32
+      %234 = arith.muli %232, %233 : i32
+      %235 = arith.addi %234, %out : i32
+      linalg.yield %235 : i32
+    } -> tensor<32x1080x1920xi32>
+
+    return %conv : tensor<32x1080x1920xi32>
+  }
+}
+// CHECK-LABEL: func.func @fuse_only_projected_perm
+// CHECK:         linalg.generic
+// CHECK:         linalg.generic

@@ -213,6 +213,7 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // Note that attributes are dropped. Consider preserving some if needed.
     auto importOp = rewriter.create<IREE::VM::ImportOp>(
         srcOp.getLoc(), srcOp.getName(), newSignature);
+    importOp.setSymVisibilityAttr(srcOp.getSymVisibilityAttr());
 
     // If there is a fallback then the import is optional.
     if (srcOp->hasAttr("vm.fallback")) {
@@ -741,11 +742,11 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
     }
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
       case 32:
-        rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, srcOp.getType(),
+        rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, rewriter.getI32Type(),
                                                adaptor.getLhs(), amount);
         break;
       case 64:
-        rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, srcOp.getType(),
+        rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, rewriter.getI64Type(),
                                                adaptor.getLhs(), amount);
         break;
       default:
@@ -1106,6 +1107,14 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                            IREE::VM::RemI64SOp>,
               BinaryArithmeticOpConversion<arith::RemUIOp, IREE::VM::RemI32UOp,
                                            IREE::VM::RemI64UOp>,
+              BinaryArithmeticOpConversion<arith::MinSIOp, IREE::VM::MinI32SOp,
+                                           IREE::VM::MinI64SOp>,
+              BinaryArithmeticOpConversion<arith::MinUIOp, IREE::VM::MinI32UOp,
+                                           IREE::VM::MinI64UOp>,
+              BinaryArithmeticOpConversion<arith::MaxSIOp, IREE::VM::MaxI32SOp,
+                                           IREE::VM::MaxI64SOp>,
+              BinaryArithmeticOpConversion<arith::MaxUIOp, IREE::VM::MaxI32UOp,
+                                           IREE::VM::MaxI64UOp>,
               BinaryArithmeticOpConversion<arith::SubIOp, IREE::VM::SubI32Op,
                                            IREE::VM::SubI64Op>,
               BinaryArithmeticOpConversion<arith::AndIOp, IREE::VM::AndI32Op,
@@ -1135,7 +1144,11 @@ void populateStandardToVMPatterns(MLIRContext *context,
               BinaryArithmeticOpConversion<arith::RemFOp, IREE::VM::RemF32Op,
                                            IREE::VM::RemF64Op>,
               BinaryArithmeticOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
-                                           IREE::VM::SubF64Op>>(typeConverter,
+                                           IREE::VM::SubF64Op>,
+              BinaryArithmeticOpConversion<arith::MinFOp, IREE::VM::MinF32Op,
+                                           IREE::VM::MinF64Op>,
+              BinaryArithmeticOpConversion<arith::MaxFOp, IREE::VM::MaxF32Op,
+                                           IREE::VM::MaxF64Op>>(typeConverter,
                                                                 context);
 
   // Floating-point conversion ops.

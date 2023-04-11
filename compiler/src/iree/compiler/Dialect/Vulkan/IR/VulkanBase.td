@@ -84,18 +84,19 @@ def VK_VersionAttr : VK_I32Enum<"Version", "valid Vulkan version", [
 def VK_KHR_16bit_storage : I32EnumAttrCase<"VK_KHR_16bit_storage", 0>;
 def VK_KHR_8bit_storage : I32EnumAttrCase<"VK_KHR_8bit_storage", 1>;
 def VK_KHR_shader_float16_int8 : I32EnumAttrCase<"VK_KHR_shader_float16_int8", 2>;
-def VK_KHR_spirv_1_4 : I32EnumAttrCase<"VK_KHR_spirv_1_4", 3>;
-def VK_KHR_storage_buffer_storage_class : I32EnumAttrCase<"VK_KHR_storage_buffer_storage_class", 4>;
-def VK_KHR_variable_pointers: I32EnumAttrCase<"VK_KHR_variable_pointers", 5>;
-def VK_EXT_subgroup_size_control : I32EnumAttrCase<"VK_EXT_subgroup_size_control", 6>;
-def VK_NV_cooperative_matrix : I32EnumAttrCase<"VK_NV_cooperative_matrix", 7>;
+def VK_KHR_shader_integer_dot_product : I32EnumAttrCase<"VK_KHR_shader_integer_dot_product", 3>;
+def VK_KHR_spirv_1_4 : I32EnumAttrCase<"VK_KHR_spirv_1_4", 4>;
+def VK_KHR_storage_buffer_storage_class : I32EnumAttrCase<"VK_KHR_storage_buffer_storage_class", 5>;
+def VK_KHR_variable_pointers: I32EnumAttrCase<"VK_KHR_variable_pointers", 6>;
+def VK_EXT_subgroup_size_control : I32EnumAttrCase<"VK_EXT_subgroup_size_control", 7>;
+def VK_NV_cooperative_matrix : I32EnumAttrCase<"VK_NV_cooperative_matrix", 8>;
 
 def VK_ExtensionAttr :
     VK_I32EnumAttr<"Extension", "supported Vulkan extension", "extension", [
       VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
-      VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class,
-      VK_KHR_variable_pointers, VK_EXT_subgroup_size_control,
-      VK_NV_cooperative_matrix
+      VK_KHR_shader_integer_dot_product, VK_KHR_spirv_1_4,
+      VK_KHR_storage_buffer_storage_class, VK_KHR_variable_pointers,
+      VK_EXT_subgroup_size_control, VK_NV_cooperative_matrix
     ]>;
 
 //===----------------------------------------------------------------------===//
@@ -116,14 +117,17 @@ def VK_TTA_Valhall   : I32EnumAttrCase<"ARM_Valhall", 300, "valhall">;
 // NVIDIA GPU
 def VK_TTA_Turing    : I32EnumAttrCase<"NV_Turing", 400, "turing">;
 def VK_TTA_Ampere    : I32EnumAttrCase<"NV_Ampere", 401, "ampere">;
+def VK_TTA_Pascal    : I32EnumAttrCase<"NV_Pascal", 402, "pascal">;
 // Qualcomm Adreno GPU
 def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 500, "adreno">;
+// Intel ARC GPU
+def VK_TTA_Arc       : I32EnumAttrCase<"Intel_Arc", 600, "arc">;
 
 def VK_TargetArchAttr : VK_I32Enum<
   "TargetTripleArch", "recognized target architecture", [
     VK_TTA_Unknown, VK_TTA_CPU, VK_TTA_RDNAv1, VK_TTA_RDNAv2,
     VK_TTA_RDNAv3, VK_TTA_M1, VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere,
-    VK_TTA_Adreno,
+    VK_TTA_Pascal, VK_TTA_Adreno, VK_TTA_Arc,
   ]>;
 
 def VK_TTP_Unknown     : I32EnumAttrCase<"Unknown", 0, "unknown">;

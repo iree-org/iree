@@ -128,6 +128,12 @@ struct SchedulingOptions {
   using FromFlags = OptionsFromFlags<SchedulingOptions>;
 };
 
+struct PreprocessingOptions {
+  std::string preprocessingPassPipeline;
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<PreprocessingOptions>;
+};
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

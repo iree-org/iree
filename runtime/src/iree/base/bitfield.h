@@ -30,7 +30,30 @@ typedef struct iree_bitfield_string_mapping_t {
   iree_string_view_t string;
 } iree_bitfield_string_mapping_t;
 
-// Appends the formatted contents of the given bitfield value.
+// Parses the bitfield |value| from a string.
+// The provided |mappings| table is used for string lookup. Unknown values
+// result in a failure.
+//
+// Usage:
+//  // Static mapping table:
+//  static const iree_bitfield_string_mapping_t my_bitfield_mappings[] = {
+//    {MY_BITFIELD_ALL, IREE_SVL("ALL")},  // combined flags first
+//    {MY_BITFIELD_A,   IREE_SVL("A")},
+//    {MY_BITFIELD_B,   IREE_SVL("B")},
+//    {MY_BITFIELD_C,   IREE_SVL("C")},
+//  };
+//
+//  // Produces the bits MY_BITFIELD_A|MY_BITFIELD_B:
+//  uint32_t value_ab = 0;
+//  IREE_RETURN_IF_ERROR(iree_bitfield_parse(
+//      IREE_SV("A|B"),
+//      IREE_ARRAYSIZE(my_bitfield_mappings), my_bitfield_mappings,
+//      &value_ab));
+IREE_API_EXPORT iree_status_t iree_bitfield_parse(
+    iree_string_view_t value, iree_host_size_t mapping_count,
+    const iree_bitfield_string_mapping_t* mappings, uint32_t* out_value);
+
+// Appends the formatted contents of the given bitfield |value|.
 // Processes values in the order of the mapping table provided and will only
 // use each bit once. Use this to prioritize combined flags over split ones.
 //

@@ -25,7 +25,7 @@
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=local-sync" are added automatically.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvm-target-cpu-features.
+#       --iree-llvmcpu-target-cpu-features.
 #
 # Example:
 #   iree_static_linker_test(
@@ -48,11 +48,11 @@ function(iree_static_linker_test)
   endif()
 
   # See comment in iree_check_test about this condition.
-  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BINARY_ROOT)
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BIN_DIR)
     return()
   endif()
 
-  if(NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT) OR
+  if(NOT (IREE_TARGET_BACKEND_LLVM_CPU OR IREE_HOST_BIN_DIR) OR
      NOT IREE_HAL_DRIVER_LOCAL_SYNC)
     return()
   endif()
@@ -66,11 +66,9 @@ function(iree_static_linker_test)
   )
 
   if(_RULE_EMITC AND
-     NOT (IREE_OUTPUT_FORMAT_C OR DEFINED IREE_HOST_BINARY_ROOT))
+     NOT (IREE_OUTPUT_FORMAT_C OR IREE_HOST_BIN_DIR))
     return()
   endif()
-
-  iree_get_executable_path(_COMPILER_TOOL "iree-compile")
 
   iree_package_name(_PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
@@ -84,7 +82,7 @@ function(iree_static_linker_test)
   set(_COMPILER_ARGS ${_RULE_COMPILER_FLAGS})
   list(APPEND _COMPILER_ARGS "--iree-hal-target-backends=llvm-cpu")
   if(_RULE_TARGET_CPU_FEATURES)
-    list(APPEND _COMPILER_ARGS "--iree-llvm-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
+    list(APPEND _COMPILER_ARGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
 
   if(_RULE_EMITC)

@@ -56,6 +56,8 @@ class BenchmarkConfig:
     benchmark_min_time: min number of seconds to run the benchmark for, if
       specified. Otherwise, the benchmark will be repeated a fixed number of
       times.
+    continue_from_previous: skip the benchmarks if their results are found in
+      the benchmark_results_dir.
   """
 
   root_benchmark_dir: pathlib.Path
@@ -71,6 +73,7 @@ class BenchmarkConfig:
 
   keep_going: bool = False
   benchmark_min_time: float = 0
+  continue_from_previous: bool = False
 
   @staticmethod
   def build_from_args(args: Namespace, git_commit_hash: str):
@@ -113,7 +116,7 @@ class BenchmarkConfig:
     else:
       # TODO(#11076): Remove legacy path.
       build_dir = args.build_dir.resolve()
-      if args.run_config is not None:
+      if args.execution_benchmark_config is not None:
         root_benchmark_dir = build_dir / E2E_TEST_ARTIFACTS_REL_PATH
       else:
         root_benchmark_dir = build_dir / BENCHMARK_SUITE_REL_PATH
@@ -129,4 +132,5 @@ class BenchmarkConfig:
                            model_name_filter=args.model_name_regex,
                            mode_filter=args.mode_regex,
                            keep_going=args.keep_going,
-                           benchmark_min_time=args.benchmark_min_time)
+                           benchmark_min_time=args.benchmark_min_time,
+                           continue_from_previous=args.continue_from_previous)

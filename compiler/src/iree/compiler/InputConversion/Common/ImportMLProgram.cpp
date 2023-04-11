@@ -80,7 +80,7 @@ class MLProgramGlobalOpPattern
     auto srcOpAttr = srcOp.getValue();
     auto srcOpTypedAttr =
         srcOpAttr.has_value()
-            ? Optional<TypedAttr>(srcOpAttr.value().cast<TypedAttr>())
+            ? std::optional<TypedAttr>(srcOpAttr.value().cast<TypedAttr>())
             : std::nullopt;
     const bool isMutable = srcOp.getIsMutable();
     const SymbolTable::Visibility visibility = srcOp.getVisibility();

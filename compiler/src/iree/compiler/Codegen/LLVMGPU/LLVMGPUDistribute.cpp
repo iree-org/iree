@@ -42,18 +42,11 @@ struct LLVMGPUDistributePass
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
 
     IRRewriter rewriter(funcOp->getContext());
-    rewriter.setInsertionPoint(funcOp);
-    MLIRContext* ctx = funcOp->getContext();
-    SmallVector<DeviceMappingAttrInterface> threadMappingAttributes = {
-        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimX),
-        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimY),
-        gpu::GPUThreadMappingAttr::get(ctx, gpu::Threads::DimZ)};
-
-    DiagnosedSilenceableFailure const result =
-        mlir::transform::gpu::mapNestedForeachToThreadsImpl(
-            rewriter, funcOp, workgroupSize, false, std::nullopt,
-            threadMappingAttributes);
-
+    rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+    DiagnosedSilenceableFailure result =
+        mlir::transform::gpu::mapNestedForallToThreadsImpl(
+            rewriter, std::nullopt, funcOp, workgroupSize, /*warpDims=*/{},
+            false);
     if (!result.succeeded()) return signalPassFailure();
   }
 };

@@ -11,13 +11,6 @@ Hopefully these quirks actually make usage in other downstream projects easier,
 but integrators may need to look past some details (like the Bazel build system,
 Android support, etc.) based on their specific requirements.
 
-## Branches
-
-The default branch is called `main`. PRs should be sent there. We also have a
-`google` branch that is sometimes used to interface with the Google internal
-source repository. For the most part any work on the `google` branch should
-have minimal effect on normal developer workflows.
-
 ## Build Systems
 
 IREE supports building from source with both Bazel and CMake. CMake is the

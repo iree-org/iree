@@ -32,7 +32,7 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
 
 namespace detail {
 size_t getSegmentSpanSize(Type spanType);
-Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
+std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     Location loc, Attribute attrValue, Type inputType,
     ConversionPatternRewriter &rewriter);
 }  // namespace detail
@@ -56,7 +56,7 @@ void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp);
 // Automatically handles type conversion and special logic for variadic operands
 // and special types (such as ranked shape).
 template <typename T, typename Adaptor = typename T::Adaptor>
-Optional<SmallVector<Value>> rewriteToCall(
+std::optional<SmallVector<Value>> rewriteToCall(
     T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
     TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
   auto *operation = op.getOperation();
@@ -93,16 +93,16 @@ Optional<SmallVector<Value>> rewriteToCall(
       auto newOperands =
           llvm::to_vector<4>(adaptor.getODSOperands(inputSetIndex));
       ++inputSetIndex;
-      if (auto inputTupleType = inputType.dyn_cast<TupleType>()) {
+      if (auto inputTupleType = inputType.template dyn_cast<TupleType>()) {
         // Unpack a tuple<...> from the variadic.
         // This only supports a single level of unpacking.
         if (inputTupleType.size() != newOperands.size()) {
           assert(false && "arity mismatch between tuple and variadic");
           return std::nullopt;
         }
-        for (auto it : llvm::zip(newOperands, inputTupleType.getTypes())) {
-          state.addOperands(
-              castToImportType(std::get<0>(it), std::get<1>(it), rewriter));
+        for (auto [newOperand, inputType] :
+             llvm::zip_equal(newOperands, inputTupleType.getTypes())) {
+          state.addOperands(castToImportType(newOperand, inputType, rewriter));
         }
       } else {
         for (auto &operand : newOperands) {
@@ -135,10 +135,8 @@ Optional<SmallVector<Value>> rewriteToCall(
   copyImportAttrs(importOp, callOp);
 
   SmallVector<Value> results;
-  for (auto resultToType :
-       llvm::zip(callOp->getResults(), operation->getResultTypes())) {
-    auto result = std::get<0>(resultToType);
-    auto targetType = std::get<1>(resultToType);
+  for (auto [result, targetType] :
+       llvm::zip_equal(callOp->getResults(), operation->getResultTypes())) {
     targetType = typeConverter.convertType(targetType);
     if (!targetType) return std::nullopt;
     results.push_back(castFromImportType(result, targetType, rewriter));

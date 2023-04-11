@@ -1,7 +1,7 @@
-# IREE Benchmark Suites Tool
+# IREE Benchmark Suites Tool (Legacy)
 
-This directory contains the tools to run IREE benchmark suites and generate
-reports. More information about benchmark suites can be found [here](/benchmarks/README.md).
+**For working with the new benchmark suite, see the
+[docs for IREE new benchmark suites](/docs/developers/developing_iree/benchmark_suites.md)**
 
 ## Benchmark Tools
 
@@ -55,6 +55,7 @@ See [here](/benchmarks/README.md#collect-compile-stats) for additional build
 steps to enable compilation statistics collection.
 ```sh
 ./collect_compilation_statistics.py \
+  legacy \
   --output "compile-stats.json" \
   "${IREE_BUILD_DIR}"
 ```

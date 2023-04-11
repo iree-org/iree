@@ -57,6 +57,11 @@ typedef enum iree_thread_priority_class_e {
 //   effectively just asking nicely and hoping the kernel is on the same
 //   wavelength.
 //
+//   Mapping:
+//    group: (unused)
+//       id: used for THREAD_AFFINITY_POLICY to request exclusive cores.
+//      smt: (unused)
+//
 // Linux/Android:
 //   sched_setaffinity is used to pin the thread to the core with the given ID.
 //   There are, naturally, issues on Android where if the governor has turned
@@ -67,12 +72,33 @@ typedef enum iree_thread_priority_class_e {
 //   ¯\_(ツ)_/¯ intervals. In the future we can try to hook into power
 //   management infra to see if we can tell when we need to do this.
 //
+//   Mapping:
+//    group: NUMA node passed to set_mempolicy.
+//       id: CPU_SET bit indicating which CPU to run on.
+//      smt: whether to CPU_SET both the base ID and the subsequent ID.
+//
 // Windows:
 //   Stuff just works. Love it.
+//
+//   Mapping:
+//    group: GROUP_AFFINITY::Group/PROCESSOR_NUMBER::Group.
+//       id: GROUP_AFFINITY::Mask bit/PROCESSOR_NUMBER::Number.
+//      smt: whether to set both the base ID and the subsequent ID in Mask.
 typedef struct iree_thread_affinity_t {
+  // When 0 the affinity is undefined and the system may place the thread
+  // anywhere and migrate it as much as it likes. In practice it may do that
+  // even when specified.
   uint32_t specified : 1;
+  // When 1 and the specified processor is part of an SMT set all logical cores
+  // in the set should be reserved for the thread to avoid contention.
   uint32_t smt : 1;
+  // Processor group the thread should be assigned to, aka NUMA node, cluster,
+  // etc depending on platform. On platforms where the processor ID is unique
+  // for the purposes of scheduling (e.g. Linux) this is used for related APIs
+  // like mbind/set_mempolicy.
   uint32_t group : 7;
+  // Processor ID the thread should be scheduled on. The interpretation and
+  // efficacy of this request varies per platform.
   uint32_t id : 23;
 } iree_thread_affinity_t;
 
@@ -141,6 +167,11 @@ typedef struct iree_thread_override_t iree_thread_override_t;
 // The priority of the thread will be the max of the base priority and the
 // overridden priority. Callers must pass the returned override token to
 // iree_thread_override_end.
+//
+// This is only a hint to the OS and may be ignored. Implementations may
+// non-deterministically return NULL and callers must gracefully handle that.
+// It's safe to pass NULL to iree_thread_override_end and in most cases as
+// callers aren't checking the returned value they won't notice.
 iree_thread_override_t* iree_thread_priority_class_override_begin(
     iree_thread_t* thread, iree_thread_priority_class_t priority_class);
 

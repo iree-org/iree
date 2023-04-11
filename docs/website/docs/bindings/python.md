@@ -22,10 +22,10 @@ components:
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-!!! warning
+!!! Caution
     The TensorFlow, TensorFlow Lite, and XLA packages are currently only
     available on Linux and macOS. They are not available on Windows yet (see
-    [this issue](https://github.com/iree-org/iree/issues/6417)).
+    [this issue](https://github.com/openxla/iree/issues/6417)).
 
 ## Prerequisites
 
@@ -39,7 +39,14 @@ To use IREE's Python bindings, you will first need to install
     ([about](https://docs.python.org/3/library/venv.html),
     [tutorial](https://docs.python.org/3/tutorial/venv.html)):
 
-    === "Linux and MacOS"
+    === "Linux"
+
+        ``` shell
+        python -m venv .venv
+        source .venv/bin/activate
+        ```
+
+    === "macOS"
 
         ``` shell
         python -m venv .venv
@@ -97,11 +104,11 @@ Stable release packages are published to
 !!! Tip
 
     Nightly packages are also published on
-    [GitHub releases](https://github.com/iree-org/iree/releases). To use these,
+    [GitHub releases](https://github.com/openxla/iree/releases). To use these,
     run `pip install` with this extra option:
 
     ```
-    --find-links https://iree-org.github.io/iree/pip-release-links.html
+    --find-links https://openxla.github.io/iree/pip-release-links.html
     ```
 
 ### Building from source
@@ -115,7 +122,7 @@ API reference pages for IREE's runtime and compiler Python APIs are hosted on
 [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
 
 Check out the samples in IREE's
-[samples/colab/ directory](https://github.com/iree-org/iree/tree/main/samples/colab)
+[samples/colab/ directory](https://github.com/openxla/iree/tree/main/samples/colab)
 and the [iree-samples repository](https://github.com/iree-org/iree-samples) for
 examples using the Python APIs.
 

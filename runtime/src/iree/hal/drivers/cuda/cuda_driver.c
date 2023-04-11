@@ -69,6 +69,15 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
 
   iree_status_t status =
       iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
+
+  // Initialize NCCL too if a channel provider is defined or any default
+  // collective group values.
+  if (iree_status_is_ok(status) &&
+      default_params->channel_provider.query_group_params) {
+    status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
+                                                           &driver->syms);
+  }
+
   if (iree_status_is_ok(status)) {
     *out_driver = (iree_hal_driver_t*)driver;
   } else {
@@ -162,7 +171,7 @@ static iree_status_t iree_hal_cuda_populate_device_info(
   return iree_ok_status();
 }
 
-// Return true if the device support all the extension required.
+// Return true if the device supports all the extension required.
 static bool iree_hal_cuda_is_valid_device(iree_hal_cuda_driver_t* driver,
                                           CUdevice device) {
   return true;

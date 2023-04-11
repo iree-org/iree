@@ -16,12 +16,6 @@
 #include "iree/base/tracing.h"
 #include "iree/vm/module.h"
 
-#ifndef NDEBUG
-#define VMCHECK(expr) assert(expr)
-#else
-#define VMCHECK(expr)
-#endif  // NDEBUG
-
 //===----------------------------------------------------------------------===//
 // Stack implementation
 //===----------------------------------------------------------------------===//
@@ -289,6 +283,11 @@ IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+IREE_API_EXPORT iree_allocator_t
+iree_vm_stack_allocator(const iree_vm_stack_t* stack) {
+  return stack->allocator;
+}
+
 IREE_API_EXPORT iree_vm_invocation_flags_t
 iree_vm_stack_invocation_flags(const iree_vm_stack_t* stack) {
   return stack->flags;
@@ -543,7 +542,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
     iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
     iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn,
-    iree_vm_stack_frame_t** out_callee_frame) {
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame) {
   if (out_callee_frame) *out_callee_frame = NULL;
 
   // Allocate stack space and grow stack, if required.

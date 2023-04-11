@@ -38,12 +38,6 @@ def Convert1X1FilterConv2DToMatmul:
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvert1X1FilterConv2DToMatmulPass()";
 }
 
-def ConvertConv2DToImg2Col :
-    Pass<"iree-flow-convert-conv2d-to-img2col", ""> {
-  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
-}
-
 def ConvertRegionToWorkgroups :
     Pass<"iree-flow-convert-region-to-workgroups", ""> {
   let summary = "Convert DispatchRegion ops to Workgroups ops.";
@@ -73,12 +67,14 @@ def FormDispatchRegions :
   let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions";
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormDispatchRegionsPass()";
   let options = [
-    Option<"aggressiveFusion", "aggressive-fusion", "bool",
-           /*default=*/"false", "Fuse with aggressive heuristics">,
+    Option<"fuseMultiUse", "fuse-multi-use", "bool",
+           /*default=*/"false", "Fuse multi-use ops">,
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
-    Option<"collapse", "collapse", "bool",
-           /*default=*/"true", "Collapse Op and tensors that are used">,
+    Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
+           /*default=*/"false", "Enalbe fusing pad with consumer">,
+    Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",
+           /*default=*/"false", "Enable fusion of pad with producers">
   ];
 }
 
@@ -92,15 +88,53 @@ def FormDispatchWorkgroups :
   ];
 }
 
+def CloneProducersIntoDispatchRegions :
+    InterfacePass<"iree-flow-clone-producers-into-dispatch-regions", "mlir::FunctionOpInterface"> {
+  let summary = "Clone producers into dispatch regions to be isolated above";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCloneProducersIntoDispatchRegionsPass()";
+}
+
+def CollapseDimensions :
+    InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
+  let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimensionsPass()";  
+}
+
 def DispatchWithTransformDialect :
     InterfacePass<"iree-flow-dispatch-with-transform-dialect", "mlir::FunctionOpInterface"> {
   let summary = "Dispatch Linalg operations on tensors by using the transform dialect interpreter";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchWithTransformDialect()";
 
   let options = [
-    Option<"transformFileName", "transform-file-name", "std::string", /*default=*/"",
-           "File name containing a transform dialect specification to apply.">
+    Option<"transformFileName", "transform-file-name", "std::string",
+            /*default=*/"\"\"",
+            "Optional filename containing a transform dialect specification to "
+            "apply. If left empty, the IR is assumed to contain one top-level "
+            "transform dialect operation somewhere in the module.">,
+    Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
+            /*default=*/"\"\"",
+            "Select the operation with 'transform.iree_tag' attribute having "
+            "the given value as payload IR root. This allows user control on "
+            "what operation to transform in debug mode, without requiring "
+            "intimate knowledge of the IREE nested pass pipeline.\\n"
+            "If empty (normal operation mode), select the pass anchor "
+            "operation in the IREE pipeline, as the payload IR root.">,
+    Option<"debugTransformRootTag", "debug-transform-root-tag", "std::string",
+            /*default=*/"\"\"",
+            "Select the operation with 'transform.iree_tag' attribute having "
+            "the given value as container IR for top-level transform ops. This "
+            "allows user control on what transformation to apply in debug "
+            "mode, without requiring intimate knowledge of the IREE nested "
+            "pass pipeline.\\n"
+            "If empty (normal operation mode), select the container of the "
+            "top-level transform op.">
   ];
+}
+
+def EraseUnusedLinalgOperands :
+    Pass<"iree-flow-erase-unused-linalg-operands", "mlir::ModuleOp"> {
+  let summary = "Erase unused linalg operand and remove dead code.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createEraseUnusedLinalgOperands()";
 }
 
 def ExpandTensorShapes :
@@ -172,29 +206,6 @@ def OutlineDispatchRegions :
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }
 
-def PadLinalgOps :
-    Pass<"iree-flow-pad-linalg-ops", ""> {
-  let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
-}
-
-def ConvertLinalgMatmulToMmt4D :
-    Pass<"iree-flow-convert-linalg-matmul-to-mmt4d", ""> {
-  let summary = "Convert linalg.matmul to linalg.mmt4d";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulToMmt4DPass()";
-  let options = [
-    Option<"arch", "arch", "std::string",
-           /*default=*/"",
-           "Target architecture, e.g. aarch64">,
-    Option<"features", "features", "std::string",
-           /*default=*/"",
-           "Additional CPU feature flags, e.g. +dotprod">,
-    Option<"enableGenericSlow", "enable_generic_slow", "bool",
-           /*default=*/"false",
-           "For tests only. Use mmt4d even for cases that are not expected to compile to efficient code by using some arbitrary generic tile shape.">,
-  ];
-}
-
 def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
   let summary = "Introduce tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::IREE::Flow::createSetEncodingPass()";
@@ -232,6 +243,12 @@ def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
             /*default=*/"true", "Print result types of operations">
   ];
   let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
+}
+
+def RaiseSpecialOps :
+    Pass<"iree-flow-raise-special-ops", ""> {
+  let summary = "raise special ops like softmax to the high level linalg.ext representation";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
 }
 
 def SplitReduction :

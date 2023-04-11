@@ -6,6 +6,7 @@
 
 #include <array>
 #include <string>
+#include <string_view>
 
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
@@ -17,6 +18,7 @@ using iree::StatusCode;
 using iree::testing::status::IsOkAndHolds;
 using iree::testing::status::StatusIs;
 using testing::ElementsAre;
+using testing::Eq;
 
 static std::string ToString(iree_string_view_t value) {
   return std::string(value.data, value.size);
@@ -35,6 +37,25 @@ TEST(StringViewTest, Equal) {
   EXPECT_FALSE(equal("b", "ab"));
   EXPECT_TRUE(equal("abc", "abc"));
   EXPECT_FALSE(equal("abc", "aBc"));
+  EXPECT_TRUE(equal("a_c", "a_c"));
+}
+
+TEST(StringViewTest, EqualCase) {
+  auto equal_case = [](const char* lhs, const char* rhs) -> bool {
+    return iree_string_view_equal_case(iree_make_cstring_view(lhs),
+                                       iree_make_cstring_view(rhs));
+  };
+  EXPECT_TRUE(equal_case("", ""));
+  EXPECT_FALSE(equal_case("a", ""));
+  EXPECT_FALSE(equal_case("", "a"));
+  EXPECT_TRUE(equal_case("a", "a"));
+  EXPECT_TRUE(equal_case("A", "a"));
+  EXPECT_TRUE(equal_case("a", "A"));
+  EXPECT_FALSE(equal_case("a", "ab"));
+  EXPECT_FALSE(equal_case("b", "ab"));
+  EXPECT_TRUE(equal_case("abc", "abc"));
+  EXPECT_TRUE(equal_case("abc", "aBc"));
+  EXPECT_TRUE(equal_case("a_c", "a_C"));
 }
 
 TEST(StringViewTest, FindChar) {
@@ -503,6 +524,37 @@ TEST(StringViewTest, InvalidParseHex) {
   // Invalid characters:
   EXPECT_THAT(ParseHex<1>("ZF"), StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(ParseHex<2>("AB-C?"), StatusIs(StatusCode::kInvalidArgument));
+}
+
+iree::StatusOr<iree_device_size_t> ParseDeviceSize(std::string_view value) {
+  iree_device_size_t size = 0;
+  IREE_RETURN_IF_ERROR(iree::Status(iree_string_view_parse_device_size(
+      iree_string_view_t{value.data(), value.size()}, &size)));
+  return size;
+}
+
+TEST(StringViewTest, ParseDeviceSize) {
+  EXPECT_THAT(ParseDeviceSize("0"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("1"), IsOkAndHolds(Eq(1u)));
+  EXPECT_THAT(ParseDeviceSize("10000"), IsOkAndHolds(Eq(10000u)));
+  EXPECT_THAT(ParseDeviceSize("0b"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("0kb"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("0gib"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("1b"), IsOkAndHolds(Eq(1)));
+  EXPECT_THAT(ParseDeviceSize("1kb"), IsOkAndHolds(Eq(1 * 1000u)));
+  EXPECT_THAT(ParseDeviceSize("1kib"), IsOkAndHolds(Eq(1 * 1024u)));
+  EXPECT_THAT(ParseDeviceSize("1000b"), IsOkAndHolds(Eq(1000 * 1u)));
+  EXPECT_THAT(ParseDeviceSize("1000kb"), IsOkAndHolds(Eq(1000 * 1000u)));
+  EXPECT_THAT(ParseDeviceSize("1000kib"), IsOkAndHolds(Eq(1000 * 1024u)));
+
+  // NOTE: we don't verify very hard here and accept random suffixes just like
+  // atoi does (because under the covers we're using atoi).
+  EXPECT_THAT(ParseDeviceSize("123fb"), IsOkAndHolds(Eq(123u)));
+}
+
+TEST(StringViewTest, ParseDeviceSizeInvalid) {
+  EXPECT_THAT(ParseDeviceSize(""), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseDeviceSize("abc"), StatusIs(StatusCode::kInvalidArgument));
 }
 
 }  // namespace

@@ -21,7 +21,7 @@
 // order to get a large sample set.
 //
 // By default all functions taking no inputs will be benchmarked. If a function
-// takes inputs then the user will need to specify them using --function_input=
+// takes inputs then the user will need to specify them using --input=
 // flags. Depending on the input program the -iree-flow-export-benchmark-funcs
 // flag can be passed to the compiler to attempt to wrap each function with
 // dummy inputs however this will fail in programs with dynamically shaped
@@ -68,7 +68,7 @@
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/vm_util_cc.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 
 constexpr char kNanosecondsUnitString[] = "ns";
@@ -84,38 +84,16 @@ IREE_FLAG(int32_t, batch_size, 1,
 IREE_FLAG(int32_t, batch_concurrency, 1,
           "Number of invocations within a batch that should run concurrently.");
 
-IREE_FLAG(string, entry_function, "",
-          "Name of a function contained in the module specified by module_file "
+IREE_FLAG(string, function, "",
+          "Name of a function contained in the module specified by --module= "
           "to run. If this is not set, all the exported functions will be "
           "benchmarked and they are expected to not have input arguments.");
 
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
-// TODO(benvanik): move --function_input= flag into a util.
-static iree_status_t parse_function_input(iree_string_view_t flag_name,
-                                          void* storage,
-                                          iree_string_view_t value) {
-  auto* list = (std::vector<std::string>*)storage;
-  list->push_back(std::string(value.data, value.size));
-  return iree_ok_status();
-}
-static void print_function_input(iree_string_view_t flag_name, void* storage,
-                                 FILE* file) {
-  auto* list = (std::vector<std::string>*)storage;
-  if (list->empty()) {
-    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
-  } else {
-    for (size_t i = 0; i < list->size(); ++i) {
-      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
-              list->at(i).c_str());
-    }
-  }
-}
-static std::vector<std::string> FLAG_function_inputs;
-IREE_FLAG_CALLBACK(
-    parse_function_input, print_function_input, &FLAG_function_inputs,
-    function_input,
+IREE_FLAG_LIST(
+    string, input,
     "An input value or buffer of the format:\n"
     "  [shape]xtype=[value]\n"
     "  2x2xi32=1 2 3 4\n"
@@ -459,7 +437,7 @@ class IREEBenchmark {
       IREE_RETURN_IF_ERROR(Init());
     }
 
-    auto function_name = std::string(FLAG_entry_function);
+    auto function_name = std::string(FLAG_function);
     if (!function_name.empty()) {
       IREE_RETURN_IF_ERROR(RegisterSpecificFunction(function_name));
     } else {
@@ -499,11 +477,10 @@ class IREEBenchmark {
         iree_string_view_t{function_name.data(), function_name.size()},
         &function));
 
-    IREE_CHECK_OK(ParseToVariantList(
-        device_allocator_.get(),
-        iree::span<const std::string>{FLAG_function_inputs.data(),
-                                      FLAG_function_inputs.size()},
-        iree_vm_instance_allocator(instance_.get()), &inputs_));
+    IREE_CHECK_OK(iree_tooling_parse_to_variant_list(
+        device_allocator_.get(), FLAG_input_list().values,
+        FLAG_input_list().count, iree_vm_instance_allocator(instance_.get()),
+        &inputs_));
 
     iree_string_view_t invocation_model = iree_vm_function_lookup_attr_by_name(
         &function, IREE_SV("iree.abi.model"));

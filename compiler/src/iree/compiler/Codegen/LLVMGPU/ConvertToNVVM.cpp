@@ -7,9 +7,11 @@
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
@@ -23,9 +25,10 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -42,13 +45,11 @@ struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
 
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {
-    unsigned addressSpace =
-        op.getMemref().getType().cast<MemRefType>().getMemorySpaceAsInt();
-    if (addressSpace == gpu::GPUDialect::getWorkgroupAddressSpace()) {
-      rewriter.eraseOp(op);
-      return success();
-    }
-    return failure();
+    if (!hasSharedMemoryAddressSpace(
+            op.getMemref().getType().cast<MemRefType>()))
+      return failure();
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 
@@ -68,6 +69,21 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(64);
     LLVMTypeConverter converter(m.getContext(), options);
+    populateGpuMemorySpaceAttributeConversions(
+        converter, [](gpu::AddressSpace space) -> unsigned {
+          switch (space) {
+            case gpu::AddressSpace::Global:
+              return static_cast<unsigned>(
+                  NVVM::NVVMMemorySpace::kGlobalMemorySpace);
+            case gpu::AddressSpace::Workgroup:
+              return static_cast<unsigned>(
+                  NVVM::NVVMMemorySpace::kSharedMemorySpace);
+            case gpu::AddressSpace::Private:
+              return 0;
+          }
+          llvm_unreachable("unknown address space enum value");
+          return 0;
+        });
     // Lowering for MMAMatrixType.
     converter.addConversion([&](gpu::MMAMatrixType type) -> Type {
       return convertMMAToLLVMType(type);
@@ -93,7 +109,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
               vector::VectorContractLowering::OuterProduct));
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       vector::populateVectorShapeCastLoweringPatterns(patterns);
-      vector::populateVectorTransposeLoweringPatterns(patterns);
+      // TODO: doubtful that the "default" does what one want here, it is likely
+      // better to use something else.
+      vector::populateVectorTransposeLoweringPatterns(
+          patterns, vector::VectorTransformsOptions());
       vector::populateVectorTransferLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
@@ -110,9 +129,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       RewritePatternSet llvmPatterns(&getContext());
       populateLowerHALInterfaceOp(llvmPatterns);
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
+      populateComplexToLLVMConversionPatterns(converter, llvmPatterns);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       memref::populateExpandStridedMetadataPatterns(llvmPatterns);
-      populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
+      populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);

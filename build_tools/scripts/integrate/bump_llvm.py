@@ -44,95 +44,92 @@ import iree_utils
 
 
 def main(args):
-    if not args.disable_setup_remote:
-        iree_utils.git_setup_remote(args.upstream_remote,
-                                    args.upstream_repository)
+  if not args.disable_setup_remote:
+    iree_utils.git_setup_remote(args.upstream_remote, args.upstream_repository)
 
-    iree_utils.git_check_porcelain()
-    print(f"Fetching remote repository: {args.upstream_remote}")
-    iree_utils.git_fetch(repository=args.upstream_remote)
+  iree_utils.git_check_porcelain()
+  print(f"Fetching remote repository: {args.upstream_remote}")
+  iree_utils.git_fetch(repository=args.upstream_remote)
 
-    # If re-using a branch, make sure we are not on that branch.
-    if args.reuse_branch:
-        iree_utils.git_checkout("main")
+  # If re-using a branch, make sure we are not on that branch.
+  if args.reuse_branch:
+    iree_utils.git_checkout("main")
 
-    # Create branch.
-    branch_name = args.branch_name
-    if not branch_name:
-        branch_name = f"bump-llvm-{date.today().strftime('%Y%m%d')}"
-    print(f"Creating branch {branch_name} (override with --branch-name=)")
-    iree_utils.git_create_branch(branch_name,
-                                 checkout=True,
-                                 ref=f"{args.upstream_remote}/main",
-                                 force=args.reuse_branch)
+  # Create branch.
+  branch_name = args.branch_name
+  if not branch_name:
+    branch_name = f"bump-llvm-{date.today().strftime('%Y%m%d')}"
+  print(f"Creating branch {branch_name} (override with --branch-name=)")
+  iree_utils.git_create_branch(branch_name,
+                               checkout=True,
+                               ref=f"{args.upstream_remote}/main",
+                               force=args.reuse_branch)
 
-    # Reset the llvm-project submodule to track upstream.
-    # This will discard any cherrypicks that may have been committed locally,
-    # but the assumption is that if doing a main llvm version bump, the
-    # cherrypicks will be incorporated at the new commit. If not, well, ymmv
-    # and you will find out.
-    iree_utils.git_submodule_set_origin(
-        "third_party/llvm-project",
-        url="https://github.com/iree-org/iree-llvm-fork.git",
-        branch="--default")
+  # Reset the llvm-project submodule to track upstream.
+  # This will discard any cherrypicks that may have been committed locally,
+  # but the assumption is that if doing a main llvm version bump, the
+  # cherrypicks will be incorporated at the new commit. If not, well, ymmv
+  # and you will find out.
+  iree_utils.git_submodule_set_origin(
+      "third_party/llvm-project",
+      url="https://github.com/iree-org/iree-llvm-fork.git",
+      branch="--default")
 
-    # Remove the branch pin file, reverting us to pure upstream.
-    branch_pin_file = os.path.join(
-        iree_utils.get_repo_root(),
-        iree_modules.MODULE_INFOS["llvm-project"].branch_pin_file)
-    if os.path.exists(branch_pin_file):
-        os.remove(branch_pin_file)
+  # Remove the branch pin file, reverting us to pure upstream.
+  branch_pin_file = os.path.join(
+      iree_utils.get_repo_root(),
+      iree_modules.MODULE_INFOS["llvm-project"].branch_pin_file)
+  if os.path.exists(branch_pin_file):
+    os.remove(branch_pin_file)
 
-    # Update the LLVM submodule.
-    llvm_commit = args.llvm_commit
-    print(f"Updating LLVM submodule to {llvm_commit}")
-    llvm_root = iree_utils.get_submodule_root("llvm-project")
-    iree_utils.git_fetch(repository="origin",
-        ref="refs/heads/main", repo_dir=llvm_root)
-    if llvm_commit == "HEAD":
-        llvm_commit = "origin/main"
-    iree_utils.git_reset(llvm_commit, repo_dir=llvm_root)
-    llvm_commit, llvm_summary = iree_utils.git_current_commit(
-        repo_dir=llvm_root)
-    print(f"LLVM submodule reset to:\n  {llvm_summary}\n")
+  # Update the LLVM submodule.
+  llvm_commit = args.llvm_commit
+  print(f"Updating LLVM submodule to {llvm_commit}")
+  llvm_root = iree_utils.get_submodule_root("llvm-project")
+  iree_utils.git_fetch(repository="origin",
+                       ref="refs/heads/main",
+                       repo_dir=llvm_root)
+  if llvm_commit == "HEAD":
+    llvm_commit = "origin/main"
+  iree_utils.git_reset(llvm_commit, repo_dir=llvm_root)
+  llvm_commit, llvm_summary = iree_utils.git_current_commit(repo_dir=llvm_root)
+  print(f"LLVM submodule reset to:\n  {llvm_summary}\n")
 
-    # Create a commit.
-    print("Create commit...")
-    iree_utils.git_create_commit(
-        message=(f"Integrate llvm-project at {llvm_commit}\n\n"
-                 f"* Reset third_party/llvm-project: {llvm_summary}"),
-        add_all=True)
+  # Create a commit.
+  print("Create commit...")
+  iree_utils.git_create_commit(
+      message=(f"Integrate llvm-project at {llvm_commit}\n\n"
+               f"* Reset third_party/llvm-project: {llvm_summary}"),
+      add_all=True)
 
-    # Push.
-    print("Pushing...")
-    iree_utils.git_push_branch(args.upstream_remote, branch_name)
+  # Push.
+  print("Pushing...")
+  iree_utils.git_push_branch(args.upstream_remote, branch_name)
 
 
 def parse_arguments(argv):
-    parser = argparse.ArgumentParser(description="IREE LLVM-bump-inator")
-    parser.add_argument("--upstream-remote",
-                        help="Upstream remote",
-                        default="UPSTREAM_AUTOMATION")
-    parser.add_argument("--upstream-repository",
-                        help="Upstream repository URL",
-                        default="git@github.com:iree-org/iree.git")
-    parser.add_argument("--disable-setup-remote",
-                        help="Disable remote setup",
-                        action="store_true",
-                        default=False)
-    parser.add_argument("--llvm-commit",
-                        help="LLVM commit sha",
-                        default="HEAD")
-    parser.add_argument("--branch-name",
-                        help="Integrate branch to create",
-                        default=None)
-    parser.add_argument("--reuse-branch",
-                        help="Allow re-use of an existing branch",
-                        action="store_true",
-                        default=False)
-    args = parser.parse_args(argv)
-    return args
+  parser = argparse.ArgumentParser(description="IREE LLVM-bump-inator")
+  parser.add_argument("--upstream-remote",
+                      help="Upstream remote",
+                      default="UPSTREAM_AUTOMATION")
+  parser.add_argument("--upstream-repository",
+                      help="Upstream repository URL",
+                      default="git@github.com:openxla/iree.git")
+  parser.add_argument("--disable-setup-remote",
+                      help="Disable remote setup",
+                      action="store_true",
+                      default=False)
+  parser.add_argument("--llvm-commit", help="LLVM commit sha", default="HEAD")
+  parser.add_argument("--branch-name",
+                      help="Integrate branch to create",
+                      default=None)
+  parser.add_argument("--reuse-branch",
+                      help="Allow re-use of an existing branch",
+                      action="store_true",
+                      default=False)
+  args = parser.parse_args(argv)
+  return args
 
 
 if __name__ == "__main__":
-    main(parse_arguments(sys.argv[1:]))
+  main(parse_arguments(sys.argv[1:]))

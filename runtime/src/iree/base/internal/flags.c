@@ -34,8 +34,6 @@ static iree_status_t iree_flags_leaky_allocator_ctl(
   return status;
 }
 
-static void iree_flags_leaky_free(void* self, void* ptr) { free(ptr); }
-
 // Allocates heap memory that is leaked without triggering leak checkers.
 // We do this so that we have valid memory for the lifetime of the process.
 // The memory may still be freed but if not will not hurt anything (besides the
@@ -144,6 +142,63 @@ static int iree_flag_cmp(const void* lhs_ptr, const void* rhs_ptr) {
 static void iree_flag_registry_sort(iree_flag_registry_t* registry) {
   qsort(registry->flags, registry->flag_count, sizeof(iree_flag_t),
         iree_flag_cmp);
+}
+
+//===----------------------------------------------------------------------===//
+// List parsing/printing
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_flag_string_list_parse(iree_string_view_t flag_name,
+                                          void* storage,
+                                          iree_string_view_t value) {
+  iree_flag_string_list_storage_t* flag =
+      (iree_flag_string_list_storage_t*)storage;
+  if (flag->count == 0) {  // currently empty
+    // Inline storage (common case).
+    flag->count = 1;
+    flag->inline_value = value;
+  } else if (flag->count == 1) {  // currently inline
+    // Switching from inline storage to external storage.
+    iree_host_size_t new_capacity = 4;
+    iree_string_view_t* values = NULL;
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+        iree_flags_leaky_allocator(), sizeof(iree_string_view_t) * new_capacity,
+        (void**)&values));
+    values[0] = flag->inline_value;
+    flag->capacity = new_capacity;
+    flag->values = values;
+    flag->values[flag->count++] = value;
+  } else if (flag->count < flag->capacity) {  // external storage available
+    // Stash in external storage list.
+    flag->values[flag->count++] = value;
+  } else {  // external storage full
+    // Growing external storage list.
+    iree_host_size_t new_capacity = iree_max(4, flag->capacity * 2);
+    IREE_RETURN_IF_ERROR(iree_allocator_realloc(
+        iree_flags_leaky_allocator(), sizeof(iree_string_view_t) * new_capacity,
+        (void**)&flag->values));
+    flag->capacity = new_capacity;
+    flag->values[flag->count++] = value;
+  }
+  return iree_ok_status();
+}
+
+void iree_flag_string_list_print(iree_string_view_t flag_name, void* storage,
+                                 FILE* file) {
+  iree_flag_string_list_storage_t* flag =
+      (iree_flag_string_list_storage_t*)storage;
+  if (flag->count == 0) {
+    fprintf(file, "# --%.*s=...\n", (int)flag_name.size, flag_name.data);
+  } else if (flag->count == 1) {
+    fprintf(file, "--%.*s=%.*s\n", (int)flag_name.size, flag_name.data,
+            (int)flag->inline_value.size, flag->inline_value.data);
+  } else {
+    for (iree_host_size_t i = 0; i < flag->count; ++i) {
+      const iree_string_view_t value = flag->values[i];
+      fprintf(file, "--%.*s=%.*s\n", (int)flag_name.size, flag_name.data,
+              (int)value.size, value.data);
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -543,5 +598,18 @@ IREE_FLAG_CALLBACK(iree_flags_parse_flagfile, iree_flags_print_flagfile, NULL,
                    "and pass it back in using --flagfile=.");
 
 #endif  // IREE_FLAGS_ENABLE_FLAG_FILE
+
+#else
+
+void iree_flags_set_usage(const char* program_name, const char* usage) {}
+
+int iree_flags_parse(iree_flags_parse_mode_t mode, int* argc, char*** argv) {
+  return 0;
+}
+
+void iree_flags_parse_checked(iree_flags_parse_mode_t mode, int* argc,
+                              char*** argv) {}
+
+void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file) {}
 
 #endif  // IREE_FLAGS_ENABLE_CLI

@@ -25,21 +25,28 @@ class DeviceSetupTest(unittest.TestCase):
       print(f"DeviceInfos: {device_infos}")
       if driver_name == "local-sync":
         # We happen to know that this should have one device_info
-        self.assertEqual(device_infos, [(0, "default")])
+        self.assertEqual(device_infos, [{
+            "device_id": 0,
+            "path": "",
+            "name": "default"
+        }])
 
   def testCreateBadDeviceId(self):
     driver = ss.get_driver("local-sync")
     with self.assertRaises(
         ValueError,
-        msg="Device id 5555 not found. Available devices: [(0, 'default')]"):
+        msg=
+        "Device id 5555 not found. Available devices: [{ device_id:0, path:'', name:'default'}]"
+    ):
       _ = driver.create_device(5555)
 
   def testCreateDevice(self):
     driver = ss.get_driver("local-sync")
     infos = driver.query_available_devices()
-    # Each info record is (device_id, name)
-    device1 = driver.create_device(infos[0][0])
-    # Should also take the info tuple directly for convenience.
+    # Each record is a dict:
+    # {"device_id": obj, "path": str, "name": str}.
+    device1 = driver.create_device(infos[0]["device_id"])
+    # Should also take the info dict directly for convenience.
     device2 = driver.create_device(infos[0])
 
   def testCreateDeviceByName(self):
@@ -53,6 +60,13 @@ class DeviceSetupTest(unittest.TestCase):
 
     with self.assertRaises(ValueError, msg="Device not found: local-sync://1"):
       _ = ss.get_device("local-sync://1")
+
+  def testCreateDeviceWithAllocators(self):
+    driver = ss.get_driver("local-sync")
+    infos = driver.query_available_devices()
+    device1 = driver.create_device(infos[0]["device_id"], allocators=[])
+    device2 = driver.create_device(infos[0]["device_id"],
+                                   allocators=["caching", "debug"])
 
 
 if __name__ == "__main__":

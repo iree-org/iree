@@ -37,7 +37,6 @@ hal.executable private @buffer_types {
 // Check that without the Int64 capability emulation produces expected i32 ops.
 //
 // CHECK-LABEL: func.func @buffer_types
-//       CHECK:   [[REF_I32:%.+]]   = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8xi32, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   [[REF_I64_0:%.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   [[REF_I64_1:%.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   [[VI64:%.+]]      = memref.load [[REF_I64_0]][{{%.+}}] : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
@@ -65,9 +64,9 @@ hal.executable private @emulate_1d_vector {
         %c36864 = arith.constant 36864 : index
         %c1523712 = arith.constant 1523712 : index
         %c96 = arith.constant 96 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c96}
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c1523712) alignment(64) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c96}
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c1523712) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %3 = gpu.thread_id  x

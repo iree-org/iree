@@ -129,6 +129,9 @@ static OwningOpRef<mlir::ModuleOp> importSavedModelV1(
 
 int main(int argc, char **argv) {
   tensorflow::InitMlir y(&argc, &argv);
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
 
   static cl::opt<std::string> inputPath(
       cl::Positional, cl::desc("<saved model directory>"), cl::Required);
@@ -245,8 +248,12 @@ int main(int argc, char **argv) {
 
   // Run passes.
   {
-    PassManager pm(&context, PassManager::Nesting::Implicit);
-    applyPassManagerCLOptions(pm);
+    PassManager pm(&context, module.get()->getName().getStringRef(),
+                   PassManager::Nesting::Implicit);
+    if (failed(applyPassManagerCLOptions(pm))) {
+      llvm::errs() << "Failed to apply pass manager CL options\n";
+      return 1;
+    }
 
     if (prettifyTfDebugInfo) {
       pm.addPass(iree_integrations::TF::createPrettifyDebugInfoPass());

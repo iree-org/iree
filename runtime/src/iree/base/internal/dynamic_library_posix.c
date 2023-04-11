@@ -158,7 +158,9 @@ iree_status_t iree_dynamic_library_load_from_files(
   if (!handle) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "dynamic library not found on any search path");
+                            "failed to load dynamic library (possibly not "
+                            "found on any search path): %s",
+                            dlerror());
   }
 
   iree_dynamic_library_t* library = NULL;

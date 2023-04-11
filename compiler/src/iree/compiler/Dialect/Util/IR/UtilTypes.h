@@ -16,7 +16,6 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SubElementInterfaces.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
@@ -129,10 +128,10 @@ IREE::Util::GlobalOpInterface lookupGlobalOp(
 
 namespace detail {
 
-llvm::Optional<unsigned> getTiedResultOperandIndex(Operation *op,
-                                                   unsigned resultIndex);
+std::optional<unsigned> getTiedResultOperandIndex(Operation *op,
+                                                  unsigned resultIndex);
 void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
-                               llvm::Optional<unsigned> operandIndex);
+                               std::optional<unsigned> operandIndex);
 SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op);
 bool isOperandTied(Operation *tiedOp, unsigned operandIndex);
 SmallVector<Value> getOperandTiedResults(Operation *op, unsigned operandIndex);
@@ -153,13 +152,13 @@ void excludeTiedOperandAndResultIndices(
 
 // Walks the SSA use-def chain upwards to find the dynamic dimensions of the
 // value. Returns None if the shape cannot be found.
-Optional<ValueRange> findDynamicDims(Value shapedValue);
+std::optional<ValueRange> findDynamicDims(Value shapedValue);
 
 // Walks the SSA use-def chain to find the dynamic dimensions of the value.
 // Returns None if the shape cannot be found or if it is defined after
 // {|block|, |insertionPoint|}.
-Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
-                                     Block::iterator insertionPoint);
+std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
+                                          Block::iterator insertionPoint);
 
 // Returns the dynamic dimensions for the value at |idx|.
 ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
@@ -205,6 +204,10 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
 static inline int32_t getRoundedElementByteWidth(Type type) {
   if (auto complexType = type.dyn_cast<ComplexType>()) {
     return 2 * getRoundedElementByteWidth(complexType.getElementType());
+  }
+  if (auto vectorType = type.dyn_cast<VectorType>()) {
+    return vectorType.getNumElements() *
+           getRoundedElementByteWidth(vectorType.getElementType());
   }
   unsigned bitsUnaligned = type.getIntOrFloatBitWidth();
   assert(bitsUnaligned > 0 && "0-width types unsupported");

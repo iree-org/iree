@@ -29,8 +29,15 @@ static void iree_task_topology_initialize_fallback(
 
 #if defined(IREE_TASK_CPUINFO_DISABLED)
 
+iree_host_size_t iree_task_topology_query_node_count(void) { return 1; }
+
+iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
+  return 0;
+}
+
 void iree_task_topology_initialize_from_physical_cores(
-    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+    iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
+    iree_task_topology_t* out_topology) {
   iree_task_topology_initialize_fallback(max_core_count, out_topology);
 }
 
@@ -42,12 +49,20 @@ static bool iree_task_topology_is_cpuinfo_available() {
   return cpuinfo_initialize() && cpuinfo_get_cores_count() > 0;
 }
 
+// TODO(benvanik): change to a system API and move to iree/base/allocator.h so
+// it can be used there for binding memory to nodes.
+iree_host_size_t iree_task_topology_query_node_count(void) {
+  if (!iree_task_topology_is_cpuinfo_available()) return 1;
+  // NOTE: this may span across packages!
+  return cpuinfo_get_clusters_count();
+}
+
 // Returns the core of the calling thread or NULL if not supported.
 // We wrap this here because cpuinfo only returns non-NULL on linux.
 static const struct cpuinfo_core* iree_task_topology_get_current_core() {
   const struct cpuinfo_core* current_core = cpuinfo_get_current_core();
 #if defined(IREE_PLATFORM_WINDOWS)
-  // TODO(benvanik): upstream into cpuinfo.
+  // TODO(benvanik): drop cpuinfo.
   if (current_core == NULL) {
     PROCESSOR_NUMBER processor_number;
     GetCurrentProcessorNumberEx(&processor_number);
@@ -58,6 +73,13 @@ static const struct cpuinfo_core* iree_task_topology_get_current_core() {
   }
 #endif  // IREE_PLATFORM_WINDOWS
   return current_core;
+}
+
+iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
+  if (!iree_task_topology_is_cpuinfo_available()) return 0;
+  const struct cpuinfo_core* current_core =
+      iree_task_topology_get_current_core();
+  return current_core ? current_core->cluster->cluster_id : 0;
 }
 
 // Returns |core_id| rotated by the calling base core ID.
@@ -97,8 +119,10 @@ static void iree_task_topology_set_affinity_from_processor(
   // For now, we just use some random pointer bytes. It's just a tag used by
   // the kernel to distribute the threads so the exact bits don't matter as long
   // as they are unique per group we want isolated.
+  out_affinity->group = processor->cluster->cluster_id;
   out_affinity->id = (uint32_t)(uintptr_t)processor;
 #elif defined(__linux__)
+  out_affinity->group = processor->cluster->cluster_id;
   out_affinity->id = processor->linux_id;
 #elif defined(_WIN32) || defined(__CYGWIN__)
   out_affinity->group = processor->windows_group_id;
@@ -186,16 +210,24 @@ static void iree_task_topology_fixup_constructive_sharing_masks(
   }
 }
 
+// Returns true if the given |core| passes the filter and should be included.
+// |user_data| is the value passed alongside the filter function.
+typedef bool (*iree_task_topology_core_filter_t)(
+    const struct cpuinfo_core* core, uintptr_t user_data);
+
 // Matches all cores.
 static bool iree_task_topology_core_filter_all(const struct cpuinfo_core* core,
                                                uintptr_t user_data) {
   return true;
 }
 
-// Returns true if the given |core| passes the filter and should be included.
-// |user_data| is the value passed alongside the filter function.
-typedef bool (*iree_task_topology_core_filter_t)(
-    const struct cpuinfo_core* core, uintptr_t user_data);
+// Matches all cores that have the provided cluster ID.
+static bool iree_task_topology_core_filter_by_cluster_id(
+    const struct cpuinfo_core* core, uintptr_t user_data) {
+  uint32_t cluster_id = (uint32_t)user_data;
+  if (cluster_id == IREE_TASK_TOPOLOGY_NODE_ID_ANY) return true;
+  return core->cluster->cluster_id == cluster_id;
+}
 
 // Initializes a topology with one group for each core that matches |filter_fn|.
 //
@@ -248,9 +280,11 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
 }
 
 void iree_task_topology_initialize_from_physical_cores(
-    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+    iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
+    iree_task_topology_t* out_topology) {
   iree_task_topology_initialize_from_physical_cores_with_filter(
-      iree_task_topology_core_filter_all, 0, max_core_count, out_topology);
+      iree_task_topology_core_filter_by_cluster_id, (uintptr_t)node_id,
+      max_core_count, out_topology);
 }
 
 #endif  // IREE_TASK_CPUINFO_DISABLED

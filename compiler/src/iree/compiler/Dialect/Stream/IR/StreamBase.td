@@ -14,7 +14,6 @@ include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/EnumAttr.td"
-include "mlir/IR/SubElementInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // IREE stream modeling dialect
@@ -228,7 +227,7 @@ def Stream_CollectiveAttr :
   }];
   let parameters = (ins
     AttrParameter<"CollectiveKind", "">:$kind,
-    OptionalParameter<"mlir::Optional<CollectiveReductionOp>">:$reduction,
+    OptionalParameter<"std::optional<CollectiveReductionOp>">:$reduction,
     AttrParameter<"CollectiveElementType", "">:$element_type
   );
   let assemblyFormat = [{
@@ -249,9 +248,7 @@ def Stream_FavorAttr :
 }
 
 def Stream_PartitioningConfigAttr :
-    AttrDef<Stream_Dialect, "PartitioningConfig", [
-      SubElementAttrInterface,
-    ]> {
+    AttrDef<Stream_Dialect, "PartitioningConfig"> {
   let mnemonic = "partitioning_config";
   let summary = [{defines partitioning configuration}];
   let description = [{

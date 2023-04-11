@@ -10,9 +10,9 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/IRMapping.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -99,7 +99,7 @@ struct FoldBlockArgumentsPattern
                                         region.getBlocks().end())) {
       unsigned numArgs = block.getNumArguments();
       if (numArgs == 0) continue;
-      auto blockSources = llvm::makeArrayRef(blockSourceMap[&block]);
+      auto blockSources = llvm::ArrayRef(blockSourceMap[&block]);
       if (blockSources.size() == 0) continue;
 
       // Which args we'll end up erasing.
@@ -132,23 +132,25 @@ struct FoldBlockArgumentsPattern
         // Replace all of the subsequent duplicate arguments with the first.
         auto baseArg = block.getArgument(argIndex);
         for (unsigned dupeIndex : sameValues.set_bits()) {
-          block.getArgument(dupeIndex).replaceAllUsesWith(baseArg);
+          rewriter.replaceAllUsesWith(block.getArgument(dupeIndex), baseArg);
         }
       }
 
       // Erase all the block arguments we've deduplicated.
-      for (auto &blockSource : blockSources) {
-        auto successorOperands = blockSource.branchOp.getSuccessorOperands(
-            blockSource.successorIndex);
-        auto operands =
-            successorOperands.slice(successorOperands.getProducedOperandCount(),
-                                    successorOperands.size());
-        rewriter.updateRootInPlace(blockSource.branchOp, [&]() {
-          eraseOperands(operands, elidedArgs);
-        });
+      if (elidedArgs.any()) {
+        for (auto &blockSource : blockSources) {
+          auto successorOperands = blockSource.branchOp.getSuccessorOperands(
+              blockSource.successorIndex);
+          auto operands = successorOperands.slice(
+              successorOperands.getProducedOperandCount(),
+              successorOperands.size());
+          rewriter.updateRootInPlace(blockSource.branchOp, [&]() {
+            eraseOperands(operands, elidedArgs);
+          });
+        }
+        block.eraseArguments(elidedArgs);
+        didChange |= !elidedArgs.none();
       }
-      block.eraseArguments(elidedArgs);
-      didChange |= !elidedArgs.none();
     }
 
     if (didChange) {
@@ -211,7 +213,7 @@ struct ElideBranchOperandsPattern
                                         region.getBlocks().end())) {
       unsigned numArgs = block.getNumArguments();
       if (numArgs == 0) continue;
-      auto blockSources = llvm::makeArrayRef(blockSourceMap[&block]);
+      auto blockSources = llvm::ArrayRef(blockSourceMap[&block]);
       if (blockSources.size() == 0) continue;
 
       // Which args we'll end up erasing.
@@ -258,7 +260,8 @@ struct ElideBranchOperandsPattern
         if (!uniformValue.getDefiningOp() ||
             dominance.dominates(uniformValue.getDefiningOp()->getBlock(),
                                 &block)) {
-          block.getArgument(argIndex).replaceAllUsesWith(uniformValue);
+          rewriter.replaceAllUsesWith(block.getArgument(argIndex),
+                                      uniformValue);
           elidedArgs.set(argIndex);
         }
       }

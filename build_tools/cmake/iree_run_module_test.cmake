@@ -5,15 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Utility function to return the platform name in crosscompile.
+# List of CMAKE_SYSTEM_NAME values:
+#   https://gitlab.kitware.com/cmake/cmake/-/issues/21489#note_1077167
+# Examples: arm_64-Android arm_32-Linux x86_64-Windows arm_64-iOS riscv_64-Linux
 function(iree_get_platform PLATFORM)
-  if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
-    set(_PLATFORM "android-arm64-v8a")
-  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    set(_PLATFORM "x86_64")
-  else()
-    set(_PLATFORM "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}")
-  endif()
-  set(${PLATFORM} "${_PLATFORM}" PARENT_SCOPE)
+  set(${PLATFORM} "${IREE_ARCH}-${CMAKE_SYSTEM_NAME}" PARENT_SCOPE)
 endfunction()
 
 # iree_run_module_test()
@@ -33,13 +29,10 @@ endfunction()
 #       containing the same.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   XFAIL_PLATFORMS: List of platforms (all, x86_64, android-arm64-v8a,
-#       riscv64-Linux, riscv32-Linux) for which the test is expected to fail
-#       e.g. due to issues with the upstream llvm backend. The target will be
-#       run, but its pass/fail status will be inverted.
-#   UNSUPPORTED_PLATFORMS: List of platforms (x86_64, android-arm64-v8a,
-#       riscv64-Linux, riscv32-Linux) not supported by the test target. The
-#       target will be skipped entirely.
+#   XFAIL_PLATFORMS: List of platforms (see iree_get_platform) for which the
+#       test is expected to fail. The test pass/fail status is inverted.
+#   UNSUPPORTED_PLATFORMS: List of platforms (see iree_get_platform) for which
+#       the test is skipped entirely.
 #   DEPS: (Optional) List of targets to build the test artifacts.
 #   TIMEOUT: (optional) Test timeout.
 #
@@ -53,8 +46,8 @@ endfunction()
 #   DRIVER
 #     "local-sync"
 #   RUNNER_ARGS
-#     "--entry_function=abs"
-#     "--function_input=f32=-10"
+#     "--function=abs"
+#     "--input=f32=-10"
 #   EXPECTED_OUTPUT
 #     "f32=10"
 # )
@@ -67,13 +60,13 @@ endfunction()
 #   DRIVER
 #     "local-sync"
 #   RUNNER_ARGS
-#     "--entry_function=main"
-#     "--function_input=1x224x224x3xf32=0"
+#     "--function=main"
+#     "--input=1x224x224x3xf32=0"
 #   EXPECTED_OUTPUT
 #     "mobilenet_v1_fp32_expected_output.txt"
 #   UNSUPPORTED_PLATFORMS
-#     "android-arm64-v8a"
-#     "riscv32-Linux"
+#     "arm_64-Android"
+#     "riscv_32-Linux"
 # )
 
 function(iree_run_module_test)
@@ -102,7 +95,7 @@ function(iree_run_module_test)
 
   # All the file paths referred in the _RUNNER_FILE_ARGS are absolute paths and
   # the portability is handled by `iree_native_test`.
-  list(APPEND _RUNNER_FILE_ARGS "--module_file={{${_RULE_MODULE_SRC}}}")
+  list(APPEND _RUNNER_FILE_ARGS "--module={{${_RULE_MODULE_SRC}}}")
 
   if(_RULE_EXPECTED_OUTPUT)
     # this may be a file or a literal output. In the latter case, the
@@ -150,7 +143,7 @@ function(iree_run_module_test)
   endif(_RULE_EXPECTED_OUTPUT)
 
   # Dump the flags into a flag file to avoid CMake's naive handling of spaces
-  # in expected output. `--module_file` is coded separatedly to make it portable.
+  # in expected output. `--module` is coded separatedly to make it portable.
   if(_RULE_RUNNER_ARGS)
     # Write each argument in a new line.
     string(REPLACE ";" "\n" _OUTPUT_FLAGS "${_RULE_RUNNER_ARGS}")
@@ -209,29 +202,26 @@ endfunction()
 
 # iree_benchmark_suite_module_test()
 #
-# Creates a test using iree-run-module to run a benchmark suite module.
-#
 # The function is unimplemented in Bazel because it is not used there.
+#
+# Creates a test using iree-run-module to run a benchmark suite module.
 #
 # Parameters:
 #   NAME: Name of the target
-#   MODEL: "<UUID>_<model name>" of models defined under
-#       "build_tools/python/e2e_test_framework/models" with UUID in
-#       "build_tools/python/e2e_test_framework/unique_ids.py".
 #   DRIVER: Driver to run the module with.
+#   MODULES: Platform-module path list (relative to IREE_E2E_TEST_ARTIFACTS_DIR)
+#       for the supported platforms. Each item is in the format:
+#       "${PLATFORM}=${MODULE_PATH}"
 #   RUNNER_ARGS: additional args to pass to iree-run-module. The driver
 #       and input file are passed automatically.
 #   EXPECTED_OUTPUT: A file of expected output to compare with the output from
 #       iree-run-module
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   XFAIL_PLATFORMS: List of platforms (all, x86_64, android-arm64-v8a,
-#       riscv64-Linux, riscv32-Linux) for which the test is expected to fail
-#       e.g. due to issues with the upstream llvm backend. The target will be
-#       run, but its pass/fail status will be inverted.
-#   UNSUPPORTED_PLATFORMS: List of platforms (x86_64, android-arm64-v8a,
-#       riscv64-Linux, riscv32-Linux) not supported by the test target. The
-#       target will be skipped entirely.
+#   XFAIL_PLATFORMS: List of platforms (see iree_get_platform) for which the
+#       test is expected to fail. The test pass/fail status is inverted.
+#   UNSUPPORTED_PLATFORMS: List of platforms (see iree_get_platform) for which
+#       the test is skipped entirely.
 #   TIMEOUT: (optional) Test timeout.
 #
 # Example:
@@ -239,18 +229,16 @@ endfunction()
 # iree_benchmark_suite_module_test(
 #   NAME
 #     mobilenet_v1_fp32_correctness_test
-#   MODEL
-#     "bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8"
 #   DRIVER
 #     "local-sync"
+#   MODULES
+#     "riscv32-Linux=EfficientNet_int8_riscv32_module.vmfb"
+#     "x86_64=EfficientNet_int8_x86_64_module.vmfb"
 #   RUNNER_ARGS
-#     "--entry_function=main"
-#     "--function_input=1x224x224x3xf32=0"
+#     "--function=main"
+#     "--input=1x224x224x3xf32=0"
 #   EXPECTED_OUTPUT
 #     "mobilenet_v1_fp32_expected_output.txt"
-#   UNSUPPORTED_PLATFORMS
-#     "android-arm64-v8a"
-#     "riscv32-Linux"
 # )
 function(iree_benchmark_suite_module_test)
   if(NOT IREE_BUILD_TESTS)
@@ -260,8 +248,8 @@ function(iree_benchmark_suite_module_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;MODEL;DRIVER;EXPECTED_OUTPUT;TIMEOUT"
-    "RUNNER_ARGS;LABELS;XFAIL_PLATFORMS;UNSUPPORTED_PLATFORMS"
+    "NAME;DRIVER;EXPECTED_OUTPUT;TIMEOUT"
+    "MODULES;RUNNER_ARGS;LABELS;XFAIL_PLATFORMS;UNSUPPORTED_PLATFORMS"
     ${ARGN}
   )
 
@@ -272,25 +260,25 @@ function(iree_benchmark_suite_module_test)
   endif()
 
   iree_get_platform(_PLATFORM)
-  if(_PLATFORM IN_LIST _RULE_UNSUPPORTED_PLATFORMS)
-    return()
-  endif()
 
-  string(TOUPPER "${_PLATFORM}" _UPPER_PLATFORM)
-  set(_IREE_MODULE_COMPILE_CONFIG_ID "${IREE_MODULE_COMPILE_CONFIG_ID_${_UPPER_PLATFORM}}")
-  if("${_IREE_MODULE_COMPILE_CONFIG_ID}" STREQUAL "")
-    message(SEND_ERROR "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
+  foreach(_PLATFORM_MODULE_PAIR IN LISTS _RULE_MODULES)
+    string(REGEX MATCH "^${_PLATFORM}=(.+)$" _MATCHED_PAIR "${_PLATFORM_MODULE_PAIR}")
+    if (_MATCHED_PAIR)
+      set(_MODULE_PATH "${CMAKE_MATCH_1}")
+      break()
+    endif()
+  endforeach()
+
+  # Platform is not in the supported module list, skip the test.
+  if (NOT _MODULE_PATH)
     return()
   endif()
-  # TODO(#11136): We shouldn't composite the module path here by better
-  # integrating with e2e test framework.
-  set(_SRC "${IREE_E2E_TEST_ARTIFACTS_DIR}/iree_${_RULE_MODEL}_${_IREE_MODULE_COMPILE_CONFIG_ID}/module.vmfb")
 
   iree_run_module_test(
     NAME
       "${_RULE_NAME}"
     MODULE_SRC
-      "${_SRC}"
+      "${IREE_E2E_TEST_ARTIFACTS_DIR}/${_MODULE_PATH}"
     DRIVER
       "${_RULE_DRIVER}"
     EXPECTED_OUTPUT

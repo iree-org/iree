@@ -13,9 +13,9 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
 #define DEBUG_TYPE "iree-const-eval"
@@ -122,6 +122,7 @@ struct ProgramExtractor {
 struct CompileOptions {
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
+  PreprocessingOptions preprocessingOptions;
   HighLevelOptimizationOptions highLevelOptimizationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions executableOptions;
@@ -146,9 +147,9 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
     buildIREEVMTransformPassPipeline(
         options->bindingOptions, options->inputOptions,
-        options->highLevelOptimizationOptions, options->schedulingOptions,
-        options->executableOptions, options->targetOptions, options->hooks,
-        compilePipeline);
+        options->preprocessingOptions, options->highLevelOptimizationOptions,
+        options->schedulingOptions, options->executableOptions,
+        options->targetOptions, options->hooks, compilePipeline);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {

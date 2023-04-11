@@ -5,9 +5,11 @@
 func.func @channel_create() -> !stream.channel {
   // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant 3
+  // CHECK-DAG: %[[ID:.+]] = util.null : !util.buffer
+  // CHECK-DAG: %[[GROUP:.+]] = util.buffer.constant : !util.buffer = "group"
   // CHECK-DAG: %[[DEFAULT:.+]] = arith.constant -1
-  // CHECK: %[[CHANNEL:.+]] = hal.channel.create device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) rank(%[[DEFAULT]]) count(%[[DEFAULT]]) : !hal.channel
-  %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) : !stream.channel
+  // CHECK: %[[CHANNEL:.+]] = hal.channel.create device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) rank(%[[DEFAULT]]) count(%[[DEFAULT]]) : !hal.channel
+  %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) group("group") : !stream.channel
   // CHECK: return %[[CHANNEL]]
   return %channel : !stream.channel
 }

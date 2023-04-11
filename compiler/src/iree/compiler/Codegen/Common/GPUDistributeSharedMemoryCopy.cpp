@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <numeric>
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -73,6 +74,8 @@ static void populateTilingCopyToWorkgroupMemPatterns(
                                        .cast<MemRefType>();
 
         unsigned rank = dstMemRefType.getRank();
+        // Return empty tile size for zero dim tensor.
+        if (rank == 0) return tileSizesVal;
         int copyTileSize =
             copyVectorNumBits / dstMemRefType.getElementTypeBitWidth();
         for (unsigned i = 0; i < rank - 1; i++) {
@@ -109,7 +112,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 
 /// Compute a tile size so that the numer of iteraton is equal to the flat
 /// workgroup size.
-static Optional<SmallVector<int64_t>> getTileToDistributableSize(
+static std::optional<SmallVector<int64_t>> getTileToDistributableSize(
     linalg::GenericOp copyOp, int64_t flatWorkgroupSize) {
   SmallVector<int64_t, 4> shape = copyOp.getStaticLoopRanges();
   unsigned bitWidth = copyOp.getDpsInitOperand(0)
@@ -145,7 +148,7 @@ static void populateTileToUnroll(RewritePatternSet &patterns,
         SmallVector<Value, 4> tileSizesVal;
         auto copyOp = dyn_cast<linalg::GenericOp>(operation);
         if (!copyOp) return tileSizesVal;
-        Optional<SmallVector<int64_t>> staticSize =
+        std::optional<SmallVector<int64_t>> staticSize =
             getTileToDistributableSize(copyOp, flatWorkgroupSize);
         for (int64_t dim : *staticSize) {
           tileSizesVal.push_back(
@@ -252,11 +255,12 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   VectorizationPatterns<linalg::GenericOp>::insert(
-      patterns, IREE::LinalgExt::LinalgTransformationFilter(
-                    {StringAttr::get(patterns.getContext(),
-                                     getCopyToWorkgroupMemoryMarker()),
-                     StringAttr::get(patterns.getContext(), kCopyDistributed)},
-                    std::nullopt));
+      patterns, IREE::LinalgExt::LinalgVectorizationOptions(),
+      IREE::LinalgExt::LinalgTransformationFilter(
+          {StringAttr::get(patterns.getContext(),
+                           getCopyToWorkgroupMemoryMarker()),
+           StringAttr::get(patterns.getContext(), kCopyDistributed)},
+          std::nullopt));
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.

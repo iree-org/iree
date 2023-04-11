@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -12,8 +13,9 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -26,15 +28,12 @@ using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 namespace mlir {
 namespace iree_compiler {
 
-// Max vector size we want to create. This could be changed to a pass option
-// based on target.
-static constexpr int64_t kMaxVectorSize = 4096;
-
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
 //====---------------------------------------------------------------------===//
 
-static void populateVectorizationPatterns(RewritePatternSet &patterns) {
+static void populateVectorizationPatterns(RewritePatternSet &patterns,
+                                          int64_t maxVectorSize) {
   MLIRContext *ctx = patterns.getContext();
   IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(ctx, getWorkgroupKTiledMarker()),
@@ -44,7 +43,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   // When vectorizing if some ops didn't get tiled we may end up with large
   // vectors being created that will later explode code size. If we have any
   // vectors larger than what would fit in register skip vectorization.
-  f.addFilter([](Operation *op) {
+  f.addFilter([maxVectorSize](Operation *op) {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) return success();
     int64_t maxFlatVecSize = 1;
@@ -54,21 +53,27 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
       if (!type.hasStaticShape()) return failure();
       maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());
     }
-    return success(maxFlatVecSize <= kMaxVectorSize);
+    return success(maxFlatVecSize <= maxVectorSize);
   });
+
+  IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
-                        linalg::Conv1DNwcWcfOp,
-                        linalg::Conv1DNcwFcwOp>::insert(patterns, f);
+                        linalg::Conv1DNwcWcfOp, linalg::Conv1DNcwFcwOp,
+                        linalg::TransposeOp>::insert(patterns,
+                                                     vectorizationOptions, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<LinalgVectorizationPattern>(
-      ctx, f.addOpFilter<linalg::ContractionOpInterface>());
+      ctx, vectorizationOptions,
+      f.addOpFilter<linalg::ContractionOpInterface>());
+  linalg::populatePadOpVectorizationPatterns(patterns);
 }
 
 namespace {
 struct GPUVectorizationPass
     : public GPUVectorizationBase<GPUVectorizationPass> {
-  GPUVectorizationPass(bool generateContract) {
+  GPUVectorizationPass(bool generateContract, int64_t maxVectorSize) {
     this->generateContract = generateContract;
+    this->maxVectorSize = maxVectorSize;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
@@ -78,24 +83,15 @@ struct GPUVectorizationPass
     MLIRContext *context = &getContext();
 
     // Pre-process convolution ops.
-    RewritePatternSet decompositionPattern(funcOp.getContext());
-    IREE::LinalgExt::LinalgTransformationFilter f(
-        {StringAttr::get(context, getWorkgroupKTiledMarker())},
-        StringAttr::get(context, getVectorizeMarker()));
-    f.setMatchByDefault();
-    decompositionPattern
-        .add<IREE::LinalgExt::DownscaleSizeOneWindowed2DConvolution<
-                 linalg::Conv2DNhwcHwcfOp, linalg::Conv1DNwcWcfOp>,
-             IREE::LinalgExt::DownscaleSizeOneWindowed2DConvolution<
-                 linalg::Conv2DNchwFchwOp, linalg::Conv1DNcwFcwOp>,
-             IREE::LinalgExt::DownscaleDepthwiseConv2DNhwcHwcOp>(
-            funcOp.getContext(), f);
+    RewritePatternSet decompositionPattern(context);
+    linalg::populateDecomposeConvolutionPatterns(decompositionPattern);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(decompositionPattern))))
+                                            std::move(decompositionPattern)))) {
       return signalPassFailure();
+    }
 
     RewritePatternSet vectorizationPatterns(context);
-    populateVectorizationPatterns(vectorizationPatterns);
+    populateVectorizationPatterns(vectorizationPatterns, maxVectorSize);
     if (generateContract) {
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           vectorizationPatterns);
@@ -112,8 +108,9 @@ struct GPUVectorizationPass
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
-    bool generateContract) {
-  return std::make_unique<GPUVectorizationPass>(generateContract);
+    bool generateContract, int64_t maxVectorSize) {
+  return std::make_unique<GPUVectorizationPass>(generateContract,
+                                                maxVectorSize);
 }
 
 }  // namespace iree_compiler

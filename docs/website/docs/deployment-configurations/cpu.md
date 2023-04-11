@@ -45,8 +45,9 @@ python -m pip install iree-compiler
     `iree-compile` is installed to your python module installation path. If you
     pip install with the user mode, it is under `${HOME}/.local/bin`, or
     `%APPDATA%Python` on Windows. You may want to include the path in your
-    system's `PATH` environment variable.
-    ``` shell
+    system's `PATH` environment variable:
+
+    ```shell
     export PATH=${HOME}/.local/bin:${PATH}
     ```
 
@@ -54,9 +55,9 @@ python -m pip install iree-compiler
 
 Please make sure you have followed the [Getting started][get-started] page
 to build IREE for your host platform and the
-[Android cross-compilation][android-cc] page if you are cross compiling for
-Android. The LLVM (CPU) compiler backend is compiled in by default on all
-platforms.
+[Android cross-compilation][android-cc] or [iOS cross-compilation][ios-cc] page
+if you are cross compiling for a mobile device. The LLVM (CPU) compiler backend
+is compiled in by default on all platforms.
 
 Ensure that the `IREE_TARGET_BACKEND_LLVM_CPU` CMake option is `ON` when
 configuring for the host.
@@ -97,9 +98,9 @@ where `iree_input.mlir` is the imported program.
 
 !!! tip
 
-    The `--iree-llvm-target-triple=` flag tells the compiler to generate code
+    The `--iree-llvmcpu-target-triple=` flag tells the compiler to generate code
     for a specific type of CPU. You can see the list of supported targets with
-    `iree-compile --iree-llvm-list-targets`, or omit the flag to let LLVM infer
+    `iree-compile --iree-llvmcpu-list-targets`, or omit the flag to let LLVM infer
     the triple from your host machine (e.g. `x86_64-linux-gnu`).
 
 ### Get IREE runtime with local CPU HAL driver
@@ -129,16 +130,15 @@ In the build directory, run the following command:
 ``` shell hl_lines="2"
 tools/iree-run-module \
     --device=local-task \
-    --module_file=mobilenet_cpu.vmfb \
-    --entry_function=predict \
-    --function_input="1x224x224x3xf32=0"
+    --module=mobilenet_cpu.vmfb \
+    --function=predict \
+    --input="1x224x224x3xf32=0"
 ```
 
 The above assumes the exported function in the model is named as `predict` and
 it expects one 224x224 RGB image. We are feeding in an image with all 0 values
 here for brevity, see `iree-run-module --help` for the format to specify
 concrete values.
-
 
 <!-- TODO(??): deployment options -->
 
@@ -147,6 +147,7 @@ concrete values.
 <!-- TODO(??): troubleshooting -->
 
 [android-cc]: ../building-from-source/android.md
+[ios-cc]: ../building-from-source/ios.md
 [get-started]: ../building-from-source/getting-started.md
 [llvm]: https://llvm.org/
 [mlir]: https://mlir.llvm.org/
@@ -154,4 +155,3 @@ concrete values.
 [python-bindings]: ../bindings/python.md
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
 [tf-import]: ../getting-started/tensorflow.md
-[tflite-import]: ../getting-started/tensorflow-lite.md

@@ -47,7 +47,7 @@ class ConvertStandardToVMTestPass
         IREE::VM::TargetOptions::FromFlags::get());
 
     typeConverter.addConversion(
-        [](IREE::Util::BufferType type) -> Optional<Type> {
+        [](IREE::Util::BufferType type) -> std::optional<Type> {
           return IREE::VM::RefType::get(
               IREE::VM::BufferType::get(type.getContext()));
         });

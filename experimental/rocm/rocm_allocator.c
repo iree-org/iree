@@ -85,27 +85,88 @@ static void iree_hal_rocm_allocator_query_statistics(
   });
 }
 
-static iree_hal_buffer_compatibility_t
-iree_hal_rocm_allocator_query_compatibility(
+static iree_status_t iree_hal_rocm_allocator_query_memory_heaps(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
-    const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size) {
+    iree_host_size_t capacity,
+    iree_hal_allocator_memory_heap_t* IREE_RESTRICT heaps,
+    iree_host_size_t* IREE_RESTRICT out_count) {
+  const iree_host_size_t count = 3;
+  if (out_count) *out_count = count;
+  if (capacity < count) {
+    // NOTE: lightweight as this is hit in normal pre-sizing usage.
+    return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
+  }
+
+  // NOTE: this is all a guess - someone who is familiar with rocm will want
+  // to refine this further.
+
+  // Don't think there's a query for these.
+  // Max allocation size may be much smaller in certain memory types such as
+  // page-locked memory and it'd be good to enforce that.
+  const iree_device_size_t max_allocation_size = ~(iree_device_size_t)0;
+  const iree_device_size_t min_alignment = 64;
+
+  // Device-local memory (dispatch resources):
+  heaps[0] = (iree_hal_allocator_memory_heap_t){
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+      .allowed_usage =
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH,
+      .max_allocation_size = max_allocation_size,
+      .min_alignment = min_alignment,
+  };
+
+  // Write-combined page-locked host-local memory (upload):
+  heaps[1] = (iree_hal_allocator_memory_heap_t){
+      .type =
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
+      .allowed_usage =
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+      .max_allocation_size = max_allocation_size,
+      .min_alignment = min_alignment,
+  };
+
+  // Cached page-locked host-local memory (download):
+  heaps[2] = (iree_hal_allocator_memory_heap_t){
+      .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+              IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
+              IREE_HAL_MEMORY_TYPE_HOST_CACHED,
+      .allowed_usage =
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+      .max_allocation_size = max_allocation_size,
+      .min_alignment = min_alignment,
+  };
+
+  return iree_ok_status();
+}
+
+static iree_hal_buffer_compatibility_t
+iree_hal_rocm_allocator_query_buffer_compatibility(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_device_size_t* IREE_RESTRICT allocation_size) {
   // All buffers can be allocated on the heap.
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
 
-  // ROCM supports host <-> device for all copies.
-  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+  if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
     compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
   }
 
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
-    if (iree_all_bits_set(params->usage,
-                          IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
+    if (iree_any_bit_set(params->usage,
+                         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }
+
+  // We are now optimal.
+  params->type &= ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+
+  // Guard against the corner case where the requested buffer size is 0. The
+  // application is unlikely to do anything when requesting a 0-byte buffer; but
+  // it can happen in real world use cases. So we should at least not crash.
+  if (*allocation_size == 0) *allocation_size = 4;
 
   return compatibility;
 }
@@ -130,17 +191,24 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_rocm_allocator_t* allocator =
       iree_hal_rocm_allocator_cast(base_allocator);
-  // Guard against the corner case where the requested buffer size is 0. The
-  // application is unlikely to do anything when requesting a 0-byte buffer; but
-  // it can happen in real world use cases. So we should at least not crash.
-  if (allocation_size == 0) allocation_size = 4;
+  // Coerce options into those required by the current device.
+  iree_hal_buffer_params_t compat_params = *params;
+  if (!iree_all_bits_set(iree_hal_rocm_allocator_query_buffer_compatibility(
+                             base_allocator, &compat_params, &allocation_size),
+                         IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "allocator cannot allocate a buffer with the given parameters");
+  }
 
   iree_status_t status = iree_ok_status();
   void* host_ptr = NULL;
   hipDeviceptr_t device_ptr = 0;
-  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+  if (iree_all_bits_set(compat_params.type,
+                        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
-    if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    if (iree_all_bits_set(compat_params.type,
+                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       status = ROCM_RESULT_TO_STATUS(
           allocator->context->syms,
           hipMallocManaged(&device_ptr, allocation_size, hipMemAttachGlobal));
@@ -152,7 +220,8 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
     }
   } else {
     unsigned int flags = hipHostMallocMapped;
-    if (!iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
+    if (!iree_all_bits_set(compat_params.type,
+                           IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
       flags |= hipHostMallocWriteCombined;
     }
     status = ROCM_RESULT_TO_STATUS(
@@ -168,8 +237,8 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_rocm_buffer_wrap(
-        (iree_hal_allocator_t*)allocator, params->type, params->access,
-        params->usage, allocation_size,
+        (iree_hal_allocator_t*)allocator, compat_params.type,
+        compat_params.access, compat_params.usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, device_ptr, host_ptr, &buffer);
   }
@@ -188,12 +257,12 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
 
   if (iree_status_is_ok(status)) {
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
-        &allocator->statistics, params->type, allocation_size));
+        &allocator->statistics, compat_params.type, allocation_size));
     *out_buffer = buffer;
   } else {
     if (!buffer) {
-      iree_hal_rocm_buffer_free(allocator->context, params->type, device_ptr,
-                                host_ptr);
+      iree_hal_rocm_buffer_free(allocator->context, compat_params.type,
+                                device_ptr, host_ptr);
     } else {
       iree_hal_buffer_release(buffer);
     }
@@ -244,7 +313,9 @@ static const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable = {
     .host_allocator = iree_hal_rocm_allocator_host_allocator,
     .trim = iree_hal_rocm_allocator_trim,
     .query_statistics = iree_hal_rocm_allocator_query_statistics,
-    .query_compatibility = iree_hal_rocm_allocator_query_compatibility,
+    .query_memory_heaps = iree_hal_rocm_allocator_query_memory_heaps,
+    .query_buffer_compatibility =
+        iree_hal_rocm_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_rocm_allocator_allocate_buffer,
     .deallocate_buffer = iree_hal_rocm_allocator_deallocate_buffer,
     .import_buffer = iree_hal_rocm_allocator_import_buffer,

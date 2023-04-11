@@ -9,9 +9,11 @@
 #include "iree/compiler/InputConversion/Common/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -25,40 +27,48 @@ namespace iree_compiler {
 
 namespace {
 
-Value makeLinalgInit(ImplicitLocOpBuilder &rewriter, Value value) {
-  RankedTensorType ty = value.getType().cast<RankedTensorType>();
-  Type eTy = ty.getElementType();
-
-  SmallVector<Value> dynSizes;
-  for (int i = 0, s = ty.getRank(); i < s; i++) {
-    if (ty.isDynamicDim(i)) {
-      dynSizes.push_back(rewriter.create<tensor::DimOp>(value, i));
-    }
-  }
-
-  return rewriter.create<tensor::EmptyOp>(ty.getShape(), eTy, dynSizes);
+// Creates an empty copy matching the provided value.
+Value emptyCopy(ImplicitLocOpBuilder &rewriter, Value value) {
+  Type eTy = getElementTypeOrSelf(value.getType());
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::createDimValues(rewriter, rewriter.getLoc(), value);
+  return rewriter.create<tensor::EmptyOp>(mixedSizes, eTy);
 }
 
-Value applyZeroPoint(ImplicitLocOpBuilder &rewriter, Value conv, Value sum,
+// Creates an zero initialized tensor of given shape and type.
+Value emptyZero(ImplicitLocOpBuilder &builder, RankedTensorType ty,
+                llvm::SmallVector<Value> dyn) {
+  Value empty =
+      builder.create<tensor::EmptyOp>(ty.getShape(), ty.getElementType(), dyn);
+
+  Attribute attr = builder.getZeroAttr(ty.getElementType());
+  Value cnst = builder.create<arith::ConstantOp>(attr);
+  return builder.create<linalg::FillOp>(ValueRange{cnst}, ValueRange{empty})
+      .result();
+}
+
+// Apply the multiply subtract corresponding with a zero-point adjustment
+// broadcasting according to the afifne map.
+Value applyZeroPoint(ImplicitLocOpBuilder &builder, Value conv, Value sum,
                      Value zp, ArrayRef<int> affine_map) {
-  auto context = rewriter.getContext();
+  auto context = builder.getContext();
   auto convTy = conv.getType().cast<RankedTensorType>();
 
   llvm::SmallVector<AffineExpr> sumExprs;
   for (auto i : affine_map) {
-    sumExprs.push_back(rewriter.getAffineDimExpr(i));
+    sumExprs.push_back(builder.getAffineDimExpr(i));
   }
 
   SmallVector<utils::IteratorType> iterators(convTy.getRank(),
                                              utils::IteratorType::parallel);
 
-  auto convMap = rewriter.getMultiDimIdentityMap(convTy.getRank());
+  auto convMap = builder.getMultiDimIdentityMap(convTy.getRank());
   auto sumMap = AffineMap::get(convTy.getRank(), 0, sumExprs, context);
 
   SmallVector<AffineMap> affineMaps{convMap, sumMap, convMap};
 
-  Value init = makeLinalgInit(rewriter, conv);
-  return rewriter
+  Value init = emptyCopy(builder, conv);
+  return builder
       .create<linalg::GenericOp>(
           init.getType(), ValueRange{conv, sum}, ValueRange{init}, affineMaps,
           iterators,
@@ -68,6 +78,46 @@ Value applyZeroPoint(ImplicitLocOpBuilder &rewriter, Value conv, Value sum,
             b.create<linalg::YieldOp>(loc, sum);
           })
       .getResult(0);
+}
+
+// Add the scalar value to the tensor.
+Value addScalar(ImplicitLocOpBuilder &builder, Value value, Value scalar) {
+  auto ty = value.getType().cast<RankedTensorType>();
+  SmallVector<utils::IteratorType> iterators(ty.getRank(),
+                                             utils::IteratorType::parallel);
+  auto map = builder.getMultiDimIdentityMap(ty.getRank());
+  Value init = emptyCopy(builder, value);
+  return builder
+      .create<linalg::GenericOp>(
+          init.getType(), ValueRange{value}, ValueRange{init},
+          ArrayRef<AffineMap>{map, map}, iterators,
+          [=](OpBuilder &b, Location loc, ValueRange args) {
+            Value add = b.create<arith::AddIOp>(loc, args[0], scalar);
+            b.create<linalg::YieldOp>(loc, add);
+          })
+      .getResult(0);
+}
+
+void GetDynamicDym(ImplicitLocOpBuilder &builder,
+                   llvm::SmallVector<int64_t> &dims,
+                   llvm::SmallVector<Value> &dynDims, Value value,
+                   int64_t dim) {
+  ShapedType ty = value.getType().cast<ShapedType>();
+  dims.push_back(ty.getDimSize(dim));
+  if (ty && ty.isDynamicDim(dim))
+    dynDims.push_back(builder.create<tensor::DimOp>(value, dim));
+}
+
+Value multiplyDims(ImplicitLocOpBuilder &builder, Value value,
+                   llvm::ArrayRef<int64_t> dims) {
+  Value count = builder.create<tensor::DimOp>(value, dims.front());
+
+  for (auto d : dims.drop_front()) {
+    Value dim = builder.create<tensor::DimOp>(value, d);
+    count = builder.create<arith::MulIOp>(count, dim);
+  }
+
+  return count;
 }
 
 // Pattern lowering conv_2d_nhwc_hwcf_q to conv_2d_nhwc_hwcf.
@@ -86,15 +136,13 @@ struct QuantizedConvToConv
     auto iZp = op.getInputs()[2];
     auto fZp = op.getInputs()[3];
     auto inputTy = input.getType().cast<RankedTensorType>();
-    auto filterTy = filter.getType().cast<RankedTensorType>();
     auto resultTy = op.getType(0).cast<ShapedType>();
     auto accETy = resultTy.getElementType();
 
     auto strides = op.getStrides();
     auto dilations = op.getDilations();
 
-    IntegerAttr iZpConst;
-    IntegerAttr fZpConst;
+    IntegerAttr iZpConst, fZpConst;
     bool iZpIsZero = matchPattern(iZp, m_Constant(&iZpConst)) &&
                      iZpConst.getValue().isZero();
     bool fZpIsZero = matchPattern(fZp, m_Constant(&fZpConst)) &&
@@ -106,7 +154,6 @@ struct QuantizedConvToConv
                             resultTy, ValueRange{input, filter},
                             op.getOutputs(), strides, dilations)
                         .getResult(0);
-    RankedTensorType newConvTy = newConv.getType().cast<RankedTensorType>();
 
     // If the zero pointer value is zero we can just replace.
     if (iZpIsZero && fZpIsZero) {
@@ -144,48 +191,27 @@ struct QuantizedConvToConv
       inputSum = builder.create<tensor::ExpandShapeOp>(expandTy, inputSum,
                                                        reassociationMap);
 
-      // Perform a sum-pooling operation across the kernel width and height.
-      auto poolTy = RankedTensorType::get(
-          {expandTy.getDimSize(0), newConvTy.getDimSize(1),
-           newConvTy.getDimSize(2), expandTy.getDimSize(3)},
-          accETy);
-
+      llvm::SmallVector<int64_t> poolDims;
       llvm::SmallVector<Value> poolDynDims;
-      if (expandTy.isDynamicDim(0))
-        poolDynDims.push_back(builder.create<tensor::DimOp>(inputSum, 0));
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 0);
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 1);
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 2);
+      GetDynamicDym(builder, poolDims, poolDynDims, inputSum, 3);
 
-      if (newConvTy.isDynamicDim(1))
-        poolDynDims.push_back(builder.create<tensor::DimOp>(newConv, 1));
+      // Perform a sum-pooling operation across the kernel width and height.
+      auto poolTy = RankedTensorType::get(poolDims, accETy);
+      Value poolTensor = emptyZero(builder, poolTy, poolDynDims);
 
-      if (newConvTy.isDynamicDim(2))
-        poolDynDims.push_back(builder.create<tensor::DimOp>(newConv, 2));
+      // Create the empty kernel defining the shape for the pooling operation.
+      llvm::SmallVector<int64_t> kDims;
+      llvm::SmallVector<Value> kDyn;
+      GetDynamicDym(builder, kDims, kDyn, filter, 0);
+      GetDynamicDym(builder, kDims, kDyn, filter, 1);
+      Value poolInit = builder.create<tensor::EmptyOp>(kDims, accETy, kDyn);
 
-      if (expandTy.isDynamicDim(3))
-        poolDynDims.push_back(builder.create<tensor::DimOp>(inputSum, 3));
-
-      Value poolTensor = builder.create<tensor::EmptyOp>(poolTy.getShape(),
-                                                         accETy, poolDynDims);
-
-      Attribute initialAttr = builder.getZeroAttr(accETy);
-      Value initialValue = builder.create<arith::ConstantOp>(initialAttr);
-      poolTensor = builder
-                       .create<linalg::FillOp>(ValueRange{initialValue},
-                                               ValueRange{poolTensor})
-                       .result();
-
-      llvm::SmallVector<int64_t> kernel{filterTy.getDimSize(0),
-                                        filterTy.getDimSize(1)};
-      llvm::SmallVector<Value> kernelDynDims;
-      for (int i = 0; i < 2; i++) {
-        if (filterTy.isDynamicDim(i))
-          kernelDynDims.push_back(builder.create<tensor::DimOp>(filter, i));
-      }
-
-      Value poolDims =
-          builder.create<tensor::EmptyOp>(kernel, accETy, kernelDynDims);
       inputSum = builder
                      .create<linalg::PoolingNhwcSumOp>(
-                         ArrayRef<Type>{poolTy}, ValueRange{inputSum, poolDims},
+                         ArrayRef<Type>{poolTy}, ValueRange{inputSum, poolInit},
                          poolTensor, strides, dilations)
                      .getResult(0);
 
@@ -201,34 +227,108 @@ struct QuantizedConvToConv
 
     // Apply the final update that occurs when there are multiple zero-points.
     if (!iZpIsZero && !fZpIsZero) {
-      Value dim0 = builder.create<tensor::DimOp>(filter, 0);
-      Value dim1 = builder.create<tensor::DimOp>(filter, 1);
-      Value dim2 = builder.create<tensor::DimOp>(filter, 2);
-      Value mul_dim0_dim1 = builder.create<arith::MulIOp>(dim0, dim1);
-      Value mul_dim0_dim1_dim2 =
-          builder.create<arith::MulIOp>(mul_dim0_dim1, dim2);
-      Value cast =
-          builder.create<arith::IndexCastOp>(accETy, mul_dim0_dim1_dim2);
+      Value count = multiplyDims(builder, filter, {0, 1, 2});
+      Value cast = builder.create<arith::IndexCastOp>(accETy, count);
+      Value ifZp = builder.create<arith::MulIOp>(iZp, fZp);
+      Value zpUpdate = builder.create<arith::MulIOp>(ifZp, cast);
 
-      auto convTy = newConv.getType().cast<RankedTensorType>();
-      SmallVector<utils::IteratorType> iterators(convTy.getRank(),
-                                                 utils::IteratorType::parallel);
-      auto convMap = rewriter.getMultiDimIdentityMap(convTy.getRank());
-      SmallVector<AffineMap> affineMaps{convMap, convMap};
+      newConv = addScalar(builder, newConv, zpUpdate);
+    }
 
-      Value init = makeLinalgInit(builder, newConv);
-      newConv = builder
-                    .create<linalg::GenericOp>(
-                        init.getType(), ValueRange{newConv}, ValueRange{init},
-                        affineMaps, iterators,
-                        [=](OpBuilder &b, Location loc, ValueRange args) {
-                          Value mul1 = b.create<arith::MulIOp>(loc, iZp, fZp);
-                          Value mul2 = b.create<arith::MulIOp>(loc, mul1, cast);
-                          Value sum =
-                              b.create<arith::AddIOp>(loc, args[0], mul2);
-                          b.create<linalg::YieldOp>(loc, sum);
-                        })
-                    .getResult(0);
+    rewriter.replaceOp(op, newConv);
+    return success();
+  }
+};
+
+// Pattern lowering depthwise_conv_2d_nhwc_hwc_q to depthwise_conv_2d_nhwc_hwc.
+//
+// This is implementing the math explained in Section 2.3 of
+// https://arxiv.org/abs/1712.05877.
+struct QuantizedDepthwiseConvToDepthwiseConv
+    : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcQOp> {
+  using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcQOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcQOp op,
+                                PatternRewriter &rewriter) const override {
+    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
+    auto input = op.getInputs()[0];
+    auto filter = op.getInputs()[1];
+    auto iZp = op.getInputs()[2];
+    auto fZp = op.getInputs()[3];
+    auto resultTy = op.getType(0).cast<ShapedType>();
+    auto accETy = resultTy.getElementType();
+
+    auto strides = op.getStrides();
+    auto dilations = op.getDilations();
+
+    IntegerAttr iZpConst, fZpConst;
+    bool iZpIsZero = matchPattern(iZp, m_Constant(&iZpConst)) &&
+                     iZpConst.getValue().isZero();
+    bool fZpIsZero = matchPattern(fZp, m_Constant(&fZpConst)) &&
+                     fZpConst.getValue().isZero();
+
+    // First implement the convolution without the zero point.
+    Value newConv = builder
+                        .create<linalg::DepthwiseConv2DNhwcHwcOp>(
+                            resultTy, ValueRange{input, filter},
+                            op.getOutputs(), strides, dilations)
+                        .getResult(0);
+
+    // If the zero pointer value is zero we can just replace.
+    if (iZpIsZero && fZpIsZero) {
+      rewriter.replaceOp(op, newConv);
+      return success();
+    }
+
+    // Compute the summation and correction for the filter zero point:
+    //  sum(c) = filter(a, b, c)
+    //  conv(a, b, c, d) -= iZp * sum(d)
+    if (!iZpIsZero) {
+      Value filterSum =
+          sumReduceDimensionSubset(builder, filter, accETy,
+                                   /*reduce_dim=*/{true, true, false});
+      newConv = applyZeroPoint(builder, newConv, filterSum, iZp, {3});
+    }
+
+    if (!fZpIsZero) {
+      llvm::SmallVector<int64_t> poolDims;
+      llvm::SmallVector<Value> poolDynDims;
+      GetDynamicDym(builder, poolDims, poolDynDims, input, 0);
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 1);
+      GetDynamicDym(builder, poolDims, poolDynDims, newConv, 2);
+      GetDynamicDym(builder, poolDims, poolDynDims, input, 3);
+
+      // Perform a sum-pooling operation across the kernel width and height.
+      auto poolTy = RankedTensorType::get(poolDims, accETy);
+      Value poolTensor = emptyZero(builder, poolTy, poolDynDims);
+
+      // Create the empty kernel defining the shape for the pooling operation.
+      llvm::SmallVector<int64_t> kDims;
+      llvm::SmallVector<Value> kDyn;
+      GetDynamicDym(builder, kDims, kDyn, filter, 0);
+      GetDynamicDym(builder, kDims, kDyn, filter, 1);
+      Value poolInit = builder.create<tensor::EmptyOp>(kDims, accETy, kDyn);
+
+      Value inputSum =
+          builder
+              .create<linalg::PoolingNhwcSumOp>(ArrayRef<Type>{poolTy},
+                                                ValueRange{input, poolInit},
+                                                poolTensor, strides, dilations)
+              .getResult(0);
+
+      // Apply the zero-point update based on the input sum.
+      newConv = applyZeroPoint(builder, newConv, inputSum, fZp, {0, 1, 2, 3});
+    }
+
+    // Apply the final update that occurs when there are multiple zero-points.
+    if (!iZpIsZero && !fZpIsZero) {
+      Value count = multiplyDims(builder, filter, {0, 1});
+      Value cast = builder.create<arith::IndexCastOp>(accETy, count);
+
+      Value ifZp = builder.create<arith::MulIOp>(iZp, fZp);
+      Value zpUpdate = builder.create<arith::MulIOp>(ifZp, cast);
+
+      newConv = addScalar(builder, newConv, zpUpdate);
     }
 
     rewriter.replaceOp(op, newConv);
@@ -243,7 +343,9 @@ struct LinalgQuantizedConvToConvPass
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
     RewritePatternSet patterns(context);
-    patterns.add<QuantizedConvToConv>(context);
+    linalg::populateLinalgNamedOpConversionPatterns(patterns);
+    patterns.add<QuantizedConvToConv, QuantizedDepthwiseConvToDepthwiseConv>(
+        context);
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
       signalPassFailure();

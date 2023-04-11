@@ -22,7 +22,7 @@ then
 fi
 
 BUILD_DIR="build-emscripten"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -31,7 +31,9 @@ cd "${BUILD_DIR}"
 
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
-  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DIREE_HOST_BIN_DIR="${IREE_HOST_BIN_DIR}" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
@@ -48,10 +50,6 @@ echo "Building test deps"
 echo "------------------"
 "${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0
 
-echo "Building sample deps"
-echo "------------------"
-"${CMAKE_BIN?}" --build . --target iree-sample-deps -- -k 0
-
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
 fi

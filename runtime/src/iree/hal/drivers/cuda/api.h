@@ -16,6 +16,10 @@
 extern "C" {
 #endif  // __cplusplus
 
+//===----------------------------------------------------------------------===//
+// iree_hal_cuda_device_t
+//===----------------------------------------------------------------------===//
+
 // Defines how command buffers are recorded and executed.
 typedef enum iree_hal_cuda_command_buffer_mode_e {
   // Command buffers are recorded into CUDA graphs.
@@ -50,23 +54,30 @@ typedef struct iree_hal_cuda_device_params_t {
   // IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION bit set will use this.
   bool allow_inline_execution;
 
-  // Opaque NCCL ID used during channel creation when empty IDs are provided.
-  // Today this is used for all communicators created but in the future this may
-  // just be used as a default when not otherwise specified on channel creation.
-  iree_hal_cuda_nccl_id_t nccl_default_id;
-  // Default base rank to use when creating collective channels.
-  // This will be added to the local rank assigned to communicators when
-  // IREE_HAL_CHANNEL_RANK_DEFAULT is specified on creation calls.
-  int nccl_default_rank;
-  // Default total number of participants to use when creating collective
-  // channels. This will be used IREE_HAL_CHANNEL_COUNT_DEFAULT is specified on
-  // creation calls.
-  int nccl_default_count;
+  // Enables tracing of command buffers when IREE tracing is enabled.
+  // May take advantage of additional extensions for more accurate timing or
+  // hardware-specific performance counters.
+  //
+  // NOTE: tracing has a non-trivial overhead and will skew the timing of
+  // submissions and introduce false barriers between dispatches. Use this to
+  // identify slow dispatches and refine from there; be wary of whole-program
+  // tracing with this enabled.
+  bool stream_tracing;
+
+  // Unowned provider of default channel configuration and creation.
+  // Must remain valid for the lifetime of the driver/device.
+  iree_hal_channel_provider_t channel_provider;
 } iree_hal_cuda_device_params_t;
 
 // Initializes |out_params| to default values.
-void iree_hal_cuda_device_params_initialize(
+IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
     iree_hal_cuda_device_params_t* out_params);
+
+// Calls ncclGetUniqueId and returns the resulting unique ID.
+// Only valid if NCCL is initialized by having set a channel provider when the
+// device was configured.
+IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_get_unique_id(
+    iree_hal_device_t* device, iree_hal_cuda_nccl_id_t* out_id);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda_driver_t

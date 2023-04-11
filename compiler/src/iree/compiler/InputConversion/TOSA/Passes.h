@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_TOSA_PASSES_H_
 #define IREE_COMPILER_INPUTCONVERSION_TOSA_PASSES_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -30,6 +31,12 @@ void registerTOSAConversionPassPipeline();
 // IR structures that are supported at that level.
 std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyCompilerTOSAInputLegality();
+
+// Set of patterns for materializing TOSA operations to linalg_ext.
+void populateTosaToLinalgExtPatterns(RewritePatternSet *patterns);
+
+// Creates a pass that converts TOSA operations to linalg_ext.
+std::unique_ptr<OperationPass<func::FuncOp>> createTosaToLinalgExt();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

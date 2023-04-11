@@ -37,12 +37,11 @@ constexpr unsigned AMDNumMNTilesPerSubgroup = 8;
 
 static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
                                         const spirv::TargetEnv &targetEnv) {
-  if (failed(setCooperativeMatrixConfig(
+  if (succeeded(setCooperativeMatrixConfig(
           targetEnv, op, AMDNumSubgroupsPerWorkgroup, AMDNumMNTilesPerSubgroup,
           AMDCoopMatrixSoftwarePipelineDepth,
           AMDCoopMatrixSoftwarePipelineStoreStage)))
-    return failure();
-  if (getLoweringConfig(op)) return success();
+    return success();
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   const int subgroupSize = limits.getSubgroupSize();
@@ -82,23 +81,13 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAMDMatmulConfig(linalgOp, targetEnv);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [targetEnv](auto op) { return setAMDMatmulConfig(op, targetEnv); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            bool hasPaddedInput =
-                op.image().template getDefiningOp<tensor::PadOp>();
-            int bestTilingFactor = hasPaddedInput ? 16 : 32;
-            return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        bool hasPaddedInput =
-            op.image().template getDefiningOp<tensor::PadOp>();
-        int bestTilingFactor = hasPaddedInput ? 16 : 32;
-        return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-      })
-      .Default([](Operation *) { return success(); });
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
+    int bestTilingFactor = hasPaddedInput ? 16 : 32;
+    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+  }
+
+  return failure();
 }
 
 }  // namespace detail

@@ -98,7 +98,7 @@ static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
-                     Optional<TypedAttr> initialValue,
+                     std::optional<TypedAttr> initialValue,
                      ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));

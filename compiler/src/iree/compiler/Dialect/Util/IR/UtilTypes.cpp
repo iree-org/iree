@@ -58,7 +58,7 @@ Value BufferType::createSubrangeOp(Location loc, Value resource,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult parseListElementType(AsmParser &parser,
-                                          FailureOr<Type> &elementType) {
+                                          Type &elementType) {
   if (succeeded(parser.parseOptionalQuestion())) {
     elementType = IREE::Util::VariantType::get(parser.getContext());
     return success();
@@ -294,26 +294,31 @@ IREE::Util::GlobalOpInterface lookupGlobalOp(
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
-llvm::Optional<unsigned> detail::getTiedResultOperandIndex(
+std::optional<unsigned> detail::getTiedResultOperandIndex(
     Operation *op, unsigned resultIndex) {
-  auto storageAttr =
-      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
+  auto storageAttr = op->getAttrOfType<ArrayAttr>(
+      IREE::Util::TiedOpInterface::getStorageAttrName());
   if (!storageAttr) return std::nullopt;
   auto valueAttrs = storageAttr.getValue();
   if (valueAttrs.empty()) return std::nullopt;
-  auto tiedOp = cast<TiedOpInterface>(op);
-  auto indexAndLength = tiedOp.getTiedResultsIndexAndLength();
-  if (resultIndex < indexAndLength.first) return std::nullopt;
-  resultIndex -= indexAndLength.first;
-  if (resultIndex >= indexAndLength.second) return std::nullopt;
+  if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+    auto indexAndLength = tiedOp.getTiedResultsIndexAndLength();
+    if (resultIndex < indexAndLength.first) return std::nullopt;
+    resultIndex -= indexAndLength.first;
+    if (resultIndex >= indexAndLength.second) return std::nullopt;
+  }
   int64_t value = valueAttrs[resultIndex].cast<IntegerAttr>().getInt();
-  if (value == TiedOpInterface::kUntiedIndex) return std::nullopt;
-  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
-  return tiedOperandsOffset + static_cast<unsigned>(value);
+  if (value == IREE::Util::TiedOpInterface::kUntiedIndex) return std::nullopt;
+  if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+    unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+    return tiedOperandsOffset + static_cast<unsigned>(value);
+  } else {
+    return static_cast<unsigned>(value);
+  }
 }
 
 void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
-                                       llvm::Optional<unsigned> operandIndex) {
+                                       std::optional<unsigned> operandIndex) {
   auto tiedOp = cast<TiedOpInterface>(op);
   auto resultRange = tiedOp.getTiedResultsIndexAndLength();
   resultIndex -= resultRange.first;
@@ -546,7 +551,7 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
 // IREE::Util::ShapeAware*
 //===----------------------------------------------------------------------===//
 
-Optional<ValueRange> findDynamicDims(Value shapedValue) {
+std::optional<ValueRange> findDynamicDims(Value shapedValue) {
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
   SmallVector<Value> worklist;
@@ -565,8 +570,8 @@ Optional<ValueRange> findDynamicDims(Value shapedValue) {
   return std::nullopt;
 }
 
-Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
-                                     Block::iterator insertionPoint) {
+std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
+                                          Block::iterator insertionPoint) {
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
   auto upwardRange = findDynamicDims(shapedValue);

@@ -14,10 +14,10 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/FunctionImplementation.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -39,7 +39,8 @@ static ParseResult parseDescriptorType(OpAsmParser &parser,
                                        DescriptorTypeAttr &dtAttr) {
   StringRef enumKeyword;
   if (failed(parser.parseKeyword(&enumKeyword))) return failure();
-  Optional<DescriptorType> maybeEnum = symbolizeDescriptorType(enumKeyword);
+  std::optional<DescriptorType> maybeEnum =
+      symbolizeDescriptorType(enumKeyword);
   if (!maybeEnum) return failure();
   dtAttr = DescriptorTypeAttr::get(parser.getContext(), *maybeEnum);
   return success();
@@ -140,13 +141,12 @@ LogicalResult ReturnOp::verify() {
                               << op.getNumOperands() << ", expected "
                               << expectedTypes.size() << ")";
     }
-    for (auto pair :
+    for (auto &&[index, values] :
          llvm::enumerate(llvm::zip_equal(op.getOperands(), expectedTypes))) {
-      auto operand = std::get<0>(pair.value());
-      auto expectedType = std::get<1>(pair.value());
+      auto [operand, expectedType] = values;
       if (operand.getType() != expectedType) {
         return op.emitOpError()
-               << "parent expected result " << pair.index() << " to be "
+               << "parent expected result " << index << " to be "
                << expectedType << " but returning " << operand.getType();
       }
     }
@@ -160,12 +160,13 @@ LogicalResult ReturnOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source) {
-  build(builder, result, resultType, source, /*waitFence=*/Value{});
+                           Type resultType, Value source, StringAttr name) {
+  build(builder, result, resultType, source, /*waitFence=*/Value{}, name);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, Value waitFence) {
+                           Type resultType, Value source, Value waitFence,
+                           StringAttr name) {
   auto shapedType = resultType.cast<ShapedType>();
   assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
           shapedType.hasStaticShape()) &&
@@ -179,14 +180,14 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         builder.getIndexAttr(i)));
   }
   build(builder, result, resultType, source, TypeAttr::get(shapedType),
-        dynamicDims, waitFence);
+        dynamicDims, waitFence, name);
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::llvm::Optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
@@ -252,18 +253,18 @@ LogicalResult TensorImportOp::verify() {
 }
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source) {
+                           Type resultType, Value source, StringAttr name) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
   build(builder, result, resultType, source, TypeAttr::get(source.getType()),
-        dynamicDims, /*target_storage=*/nullptr);
+        dynamicDims, /*target_storage=*/nullptr, name);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::llvm::Optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
@@ -299,7 +300,7 @@ Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
       getSources()[resultIndex]);
 }
 
-::llvm::Optional<unsigned> TensorBarrierOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorBarrierOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {resultIndex};  // sources[i]
 }
@@ -816,7 +817,7 @@ static std::array<Value, 3> calculateWorkgroupCountFromRegion(
     Location loc, Block *body, Value device, ValueRange workload,
     OpBuilder &builder) {
   // TODO(benvanik): replace with region inlining util.
-  BlockAndValueMapping bvm;
+  IRMapping bvm;
   bvm.map(body->getArgument(0), device);
   // For now use the number of args to minimum of number of args used by
   // the body, and number of workload entries. When there is a more explicit
@@ -1061,6 +1062,19 @@ void ExecutableLookupOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
+void InterfaceBindingSubspanOp::build(
+    OpBuilder &builder, OperationState &result, Type resultType, APInt set,
+    APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
+    ValueRange dynamic_dims, IntegerAttr alignment,
+    std::optional<DescriptorFlags> flags) {
+  IREE::HAL::DescriptorFlagsAttr descriptorAttr;
+  if (flags.has_value()) {
+    descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
+                                                         flags.value());
+  }
+  build(builder, result, resultType, set, binding, descriptor_type, byte_offset,
+        dynamic_dims, alignment, descriptorAttr);
+}
 
 LogicalResult InterfaceBindingSubspanOp::verify() {
   InterfaceBindingSubspanOp op = *this;
@@ -1076,30 +1090,10 @@ LogicalResult InterfaceBindingSubspanOp::verify() {
   return success();
 }
 
-// TODO(benvanik): share with align op folder and analysis.
-// May need an interface for querying the alignment from ops that can carry it.
-
-// Tries to find the alignment of the given |value| based on either the IR
-// structure or annotations.
-static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
-  APInt constantValue;
-  if (matchPattern(value, m_ConstantInt(&constantValue))) {
-    // Value is constant and we can just treat that as if it were an alignment.
-    return constantValue;
+llvm::MaybeAlign InterfaceBindingSubspanOp::getBaseAlignment() {
+  if (auto baseAlignmentInt = getAlignment()) {
+    return llvm::MaybeAlign(baseAlignmentInt.value().getZExtValue());
   }
-
-  auto op = value.getDefiningOp();
-  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceConstantLoadOp>(op)) {
-    // Push constants have an optional value alignment.
-    auto alignment = loadOp.getAlignment();
-    if (alignment.has_value()) return alignment;
-  } else if (auto alignmentAttr =
-                 op->getAttrOfType<IntegerAttr>("stream.alignment")) {
-    // The op has an alignment tagged on it we can use directly.
-    return alignmentAttr.getValue();
-  }
-
-  // TODO(benvanik): more searching.
   return std::nullopt;
 }
 
@@ -1115,25 +1109,23 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   }
 
   // If the binding has no assigned alignment we fall back to natural alignment.
-  auto bindingAlignmentInt = getAlignment();
-  if (!bindingAlignmentInt) return naturalAlignment;
-  auto bindingAlignment =
-      llvm::Align(bindingAlignmentInt.value().getZExtValue());
+  auto baseAlignment = getBaseAlignment();
+  if (!baseAlignment) return naturalAlignment;
 
   // If there's no offset specified then we can use the binding alignment
   // directly.
-  if (!getByteOffset()) return bindingAlignment;
+  if (!getByteOffset()) return baseAlignment.value();
 
   // Try to get the alignment of the byte offset. If it's a constant then we can
   // find a common alignment between it and the base and otherwise we need to
   // try to infer the alignment from the IR - otherwise we fall back.
-  auto offsetOrAlignment = lookupValueOrAlignment(getByteOffset());
+  auto offsetOrAlignment = lookupOffsetOrAlignment(getByteOffset());
   if (!offsetOrAlignment.has_value()) return naturalAlignment;
 
   // Compute the common alignment between that of the binding base and that of
   // the byte offset.
-  return llvm::commonAlignment(bindingAlignment,
-                               offsetOrAlignment->getZExtValue());
+  return llvm::commonAlignment(baseAlignment.value(),
+                               offsetOrAlignment.value());
 }
 
 //===----------------------------------------------------------------------===//

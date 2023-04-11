@@ -20,9 +20,9 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -56,14 +56,19 @@ static void computeRegionValueAliases(Operation *regionOp,
     aliasedSet.insert(streamValue);
   };
 
+  // Filter out to only resource results - some regions may return additional
+  // things like stream.async.execute returning a timepoint.
+  auto resourceResults = llvm::to_vector_of<OpResult>(
+      llvm::make_filter_range(regionOp->getResults(), [](OpResult result) {
+        return result.getType().isa<IREE::Stream::ResourceType>();
+      }));
+
   // Start with outputs so that we handle tied values that may lead all the way
   // back up the chain to the stream inputs.
   auto tiedStreamOp = cast<IREE::Util::TiedOpInterface>(regionOp);
   auto yieldOp = cast<IREE::Stream::YieldOp>(block->getTerminator());
-  for (auto it :
-       llvm::zip(regionOp->getResults(), yieldOp.getResourceOperands())) {
-    auto outerResult = std::get<0>(it);
-    auto innerResult = std::get<1>(it);
+  for (auto [outerResult, innerResult] :
+       llvm::zip_equal(resourceResults, yieldOp.getResourceOperands())) {
     auto tiedOperandIndex =
         tiedStreamOp.getTiedResultOperandIndex(outerResult.getResultNumber());
     if (tiedOperandIndex.has_value()) {
@@ -688,9 +693,142 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   }
 
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPoint(),
-      newOperands, newResources, newResourceSizes, newResourceOffsets,
-      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
+      asyncOp.getLoc(), asyncOp.getWorkload(),
+      builder.getArrayAttr({asyncOp.getEntryPoint()}), newOperands,
+      newResources, newResourceSizes, newResourceOffsets, newResourceLengths,
+      builder.getArrayAttr(newResourceAccesses));
+  newOp->setDialectAttrs(asyncOp->getDialectAttrs());
+  asyncOp.erase();
+  return success();
+}
+
+// Converts an stream.async.func op into a stream.cmd.func op.
+// Result resources are appended to the end of the operands and resources each
+// get an offset and length of their subrange.
+static void convertAsyncFuncOp(IREE::Stream::AsyncFuncOp asyncOp) {
+  auto indexType = IndexType::get(asyncOp.getContext());
+  auto oldFunctionType = asyncOp.getFunctionType();
+
+  SmallVector<Type> newInputs;
+  SmallVector<DictionaryAttr> newArgAttrs;
+  for (auto [i, oldInput] : llvm::enumerate(oldFunctionType.getInputs())) {
+    auto oldArgAttr = asyncOp.getArgAttrDict(i);
+    if (oldInput.isa<IREE::Stream::ResourceType>()) {
+      newInputs.push_back(oldInput);  // resource
+      newArgAttrs.push_back(oldArgAttr);
+      newInputs.push_back(indexType);  // offset
+      newArgAttrs.push_back(nullptr);
+      newInputs.push_back(indexType);  // length
+      newArgAttrs.push_back(nullptr);
+    } else {
+      newInputs.push_back(oldInput);
+      newArgAttrs.push_back(oldArgAttr);
+    }
+  }
+
+  SmallVector<Type> newResults;
+  SmallVector<DictionaryAttr> newResultAttrs;
+  for (auto [i, oldResult] : llvm::enumerate(oldFunctionType.getResults())) {
+    auto oldResultAttr = asyncOp.getResultAttrDict(i);
+    if (oldResult.isa<IREE::Stream::ResourceType>()) {
+      if (asyncOp.isResultTied(i)) {
+        // Tied results reuse the operands they are tied to.
+        continue;
+      }
+      newInputs.push_back(oldResult);  // resource
+      newArgAttrs.push_back(oldResultAttr);
+      newInputs.push_back(indexType);  // offset
+      newArgAttrs.push_back(nullptr);
+      newInputs.push_back(indexType);  // length
+      newArgAttrs.push_back(nullptr);
+    } else {
+      newResults.push_back(oldResult);
+      newResultAttrs.push_back(oldResultAttr);
+    }
+  }
+
+  auto newFunctionType =
+      FunctionType::get(asyncOp.getContext(), newInputs, newResults);
+
+  OpBuilder builder(asyncOp);
+  auto cmdOp = builder.create<IREE::Stream::CmdFuncOp>(
+      asyncOp.getLoc(), asyncOp.getName(), newFunctionType, newArgAttrs,
+      newResultAttrs);
+  cmdOp->setDialectAttrs(asyncOp->getDialectAttrs());
+  asyncOp.erase();
+}
+
+static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
+                                      AllocationScope &scope,
+                                      OpBuilder builder) {
+  SmallVector<Value> newResourceOperands;
+  SmallVector<Value> newResourceSizes;
+  SmallVector<Value> newResourceOffsets;
+  SmallVector<Value> newResourceLengths;
+  SmallVector<Attribute> newResourceAccesses;
+  SmallVector<Type> newResultTypes;
+
+  unsigned resourceIndex = 0;
+  for (auto [i, operand] : llvm::enumerate(asyncOp.getResourceOperands())) {
+    if (!operand.getType().isa<IREE::Stream::ResourceType>()) {
+      // Primitive operand.
+      newResourceOperands.push_back(operand);
+      continue;
+    }
+
+    // Read-only or read-write. Write-only are untied results below.
+    unsigned operandIdx = asyncOp.getTiedOperandsIndexAndLength().first + i;
+    auto accessBits = IREE::Stream::ResourceAccessBitfield::Read;
+    if (asyncOp.isOperandTied(operandIdx)) {
+      accessBits = accessBits | IREE::Stream::ResourceAccessBitfield::Write;
+    }
+
+    auto resourceRange = scope.lookupResourceRange(operand);
+    auto resourceOffset =
+        scope.add(asyncOp.getLoc(), resourceRange.offset,
+                  asyncOp.getResourceOperandOffsets()[resourceIndex]);
+    auto resourceLength = asyncOp.getResourceOperandLengths()[resourceIndex];
+    auto resourceAccess = IREE::Stream::ResourceAccessBitfieldAttr::get(
+        builder.getContext(), accessBits);
+    newResourceOperands.push_back(resourceRange.resource);
+    newResourceSizes.push_back(resourceRange.resourceSize);
+    newResourceOffsets.push_back(resourceOffset);
+    newResourceLengths.push_back(resourceLength);
+    newResourceAccesses.push_back(resourceAccess);
+    ++resourceIndex;
+  }
+
+  for (auto result : asyncOp.getResults()) {
+    if (!result.getType().isa<IREE::Stream::ResourceType>()) {
+      // Primitive result.
+      newResultTypes.push_back(result.getType());
+      continue;
+    }
+
+    auto tiedOperand = asyncOp.getTiedResultOperand(result);
+    if (tiedOperand) {
+      // All tied results are handled above as read-write.
+      continue;
+    }
+
+    auto resourceRange = scope.lookupResourceRange(result);
+    auto resourceOffset = resourceRange.offset;
+    auto resourceLength = asyncOp.getResultSize(result.getResultNumber());
+    auto resourceAccess = IREE::Stream::ResourceAccessBitfieldAttr::get(
+        builder.getContext(), IREE::Stream::ResourceAccessBitfield::Write);
+    newResourceOperands.push_back(resourceRange.resource);
+    newResourceSizes.push_back(resourceRange.resourceSize);
+    newResourceOffsets.push_back(resourceOffset);
+    newResourceLengths.push_back(resourceLength);
+    newResourceAccesses.push_back(resourceAccess);
+  }
+
+  auto newOp = builder.create<IREE::Stream::CmdCallOp>(
+      asyncOp.getLoc(), newResultTypes, asyncOp.getCalleeAttr(),
+      newResourceOperands, newResourceSizes, newResourceOffsets,
+      newResourceLengths,
+      /*result_sizes=*/ValueRange{},
+      /*tied_operands=*/nullptr, builder.getArrayAttr(newResourceAccesses));
   newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();
@@ -777,6 +915,9 @@ static LogicalResult applyAsyncAllocations(Region &region,
                    .Case([&](IREE::Stream::AsyncDispatchOp op) {
                      return applyAsyncDispatchOp(op, scope, OpBuilder(op));
                    })
+                   .Case([&](IREE::Stream::AsyncCallOp op) {
+                     return applyAsyncCallOp(op, scope, OpBuilder(op));
+                   })
                    .Case([&](IREE::Stream::AsyncConcurrentOp op) {
                      return applyAsyncConcurrentOp(op, scope, OpBuilder(op));
                    })
@@ -808,7 +949,7 @@ struct TransientAllocation {
 // Performs allocation for all local transients in the execution region (those
 // !stream.resource<transient> values that don't escape). A new allocation op
 // will be inserted using |externalBuilder| and mappings added to |scope|.
-static llvm::Optional<TransientAllocation> allocateLocalTransients(
+static std::optional<TransientAllocation> allocateLocalTransients(
     IREE::Stream::AsyncExecuteOp executeOp, AllocationScope &scope,
     OpBuilder &externalBuilder) {
   // Track which values we've already reserved. This makes it easier to early-
@@ -924,7 +1065,7 @@ static bool isOnlyUseYield(Value value) {
 // Extracts stream.async.constant ops from |executeOp| into their own dedicated
 // stream.resource.constants upload op. The uploaded constants will be captured
 // by the region for use within as if they had still existed in there.
-static Optional<ConstantAllocation> extractConstants(
+static std::optional<ConstantAllocation> extractConstants(
     IREE::Stream::AsyncExecuteOp executeOp, OpBuilder &externalBuilder) {
   // Gather all constant ops from the region, if any.
   auto constantOps =
@@ -1205,10 +1346,8 @@ static LogicalResult allocateExecutionRegion(
     scope.mapResourceRange(arg, resourceRange, asmState.get());
   }
   SmallVector<ResultReservation> resultReservations;
-  for (auto it :
-       llvm::zip(executeOp.getResults(), executeOp.getResultSizes())) {
-    auto result = std::get<0>(it);
-    auto resultSize = std::get<1>(it);
+  for (auto [result, resultSize] :
+       llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
     auto resultType = result.getType().cast<IREE::Stream::ResourceType>();
     if (handledResults.contains(result)) {
       resultReplacements.push_back(std::make_pair(result, Value{}));
@@ -1294,11 +1433,8 @@ static LogicalResult allocateExecutionRegion(
       llvm::dbgs() << ":\n";
     });
 
-    for (auto it :
-         llvm::zip(reservationSet.reservations, allocOp.getResults())) {
-      auto &reservation = std::get<0>(it);
-      auto allocResult = std::get<1>(it);
-
+    for (auto [reservation, allocResult] :
+         llvm::zip_equal(reservationSet.reservations, allocOp.getResults())) {
       newOperands.push_back(allocResult);
       newOperandSizes.push_back(reservation.resultSize);
       resultReplacements.push_back(
@@ -1395,10 +1531,9 @@ static LogicalResult allocateExecutionRegion(
   asmState = getRootAsmState(newExecuteOp->getParentOp());
   newExecuteOp.getBody().walk<WalkOrder::PreOrder>(
       [&](IREE::Stream::AsyncConcurrentOp concurrentOp) {
-        for (auto it : llvm::zip(concurrentOp.getResourceOperands(),
-                                 concurrentOp.getBody().getArguments())) {
-          auto outerValue = std::get<0>(it);
-          auto innerValue = std::get<1>(it);
+        for (auto [outerValue, innerValue] :
+             llvm::zip_equal(concurrentOp.getResourceOperands(),
+                             concurrentOp.getBody().getArguments())) {
           LLVM_DEBUG({
             llvm::dbgs() << "  = shady alias of wave operand ";
             outerValue.printAsOperand(llvm::dbgs(), *asmState);
@@ -1412,10 +1547,8 @@ static LogicalResult allocateExecutionRegion(
         }
         auto yieldOp = cast<IREE::Stream::YieldOp>(
             concurrentOp.getBody().front().getTerminator());
-        for (auto it : llvm::zip(yieldOp.getResourceOperands(),
-                                 concurrentOp.getResults())) {
-          auto innerValue = std::get<0>(it);
-          auto outerValue = std::get<1>(it);
+        for (auto [innerValue, outerValue] : llvm::zip_equal(
+                 yieldOp.getResourceOperands(), concurrentOp.getResults())) {
           LLVM_DEBUG({
             llvm::dbgs() << "  = shady alias of wave result ";
             innerValue.printAsOperand(llvm::dbgs(), *asmState);
@@ -1508,26 +1641,32 @@ class ScheduleAllocationPass
   }
 
   void runOnOperation() override {
-    auto parentOp = getOperation();
-    if (!parentOp.getCallableRegion() ||
-        parentOp.getCallableRegion()->empty()) {
-      return;
-    }
-
-    for (auto &op :
-         llvm::make_early_inc_range(parentOp.getCallableRegion()->getOps())) {
-      if (failed(TypeSwitch<Operation *, LogicalResult>(&op)
-                     .Case([&](IREE::Stream::AsyncExecuteOp op) {
-                       return allocateExecutionRegion(op);
-                     })
-                     .Case([&](IREE::Stream::AsyncLoadOp op) {
-                       return convertAsyncLoadOp(op);
-                     })
-                     .Case([&](IREE::Stream::AsyncStoreOp op) {
-                       return convertAsyncStoreOp(op);
-                     })
-                     .Default(success()))) {
-        return signalPassFailure();
+    auto moduleOp = getOperation();
+    for (auto &parentOp : llvm::make_early_inc_range(moduleOp.getOps())) {
+      if (auto asyncFuncOp = dyn_cast<IREE::Stream::AsyncFuncOp>(parentOp)) {
+        convertAsyncFuncOp(asyncFuncOp);
+        continue;
+      }
+      auto callableOp = dyn_cast<CallableOpInterface>(parentOp);
+      if (!callableOp || !callableOp.getCallableRegion() ||
+          callableOp.getCallableRegion()->empty()) {
+        continue;
+      }
+      for (auto &op : llvm::make_early_inc_range(
+               callableOp.getCallableRegion()->getOps())) {
+        if (failed(TypeSwitch<Operation *, LogicalResult>(&op)
+                       .Case([&](IREE::Stream::AsyncExecuteOp op) {
+                         return allocateExecutionRegion(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncLoadOp op) {
+                         return convertAsyncLoadOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncStoreOp op) {
+                         return convertAsyncStoreOp(op);
+                       })
+                       .Default(success()))) {
+          return signalPassFailure();
+        }
       }
     }
   }
@@ -1535,8 +1674,7 @@ class ScheduleAllocationPass
 
 }  // namespace
 
-std::unique_ptr<InterfacePass<CallableOpInterface>>
-createScheduleAllocationPass() {
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createScheduleAllocationPass() {
   return std::make_unique<ScheduleAllocationPass>();
 }
 

@@ -284,6 +284,24 @@ if(IREE_DEV_MODE)
   )
 endif()
 
+#-------------------------------------------------------------------------------
+# Enable frame pointers in IREE_DEV_MODE and in RelWithDebInfo build type ---
+# these are conditions under which the instrumentation/debugging/profiling
+# benefits of frame pointers outweigh the cost.
+#
+# `perf record -g` defaults to relying on frame pointers. There is a non-default
+# option `perf record --call-graph=dwarf`, to rely on debug info instead. It
+# produces inferior results and has a discoverability issue anyway.
+#-------------------------------------------------------------------------------
+
+string(TOUPPER "${CMAKE_BUILD_TYPE}" _UPPERCASE_CMAKE_BUILD_TYPE)
+if (IREE_DEV_MODE OR (_UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "RELWITHDEBINFO"))
+  iree_select_compiler_opts(IREE_DEFAULT_COPTS
+    CLANG_OR_GCC
+      "-fno-omit-frame-pointer"
+  )
+endif()
+
 # Debug information and __FILE__ macros get expanded with full paths by default.
 # This results in binaries that differ based on what directories they are built
 # from and that's annoying.
@@ -309,7 +327,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 # compatible solution.
 #
 # See also:
-#   https://github.com/iree-org/iree/issues/4665.
+#   https://github.com/openxla/iree/issues/4665.
 #   https://discourse.cmake.org/t/how-to-fix-build-warning-d9025-overriding-gr-with-gr/878
 #   https://gitlab.kitware.com/cmake/cmake/-/issues/20610
 if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -358,6 +376,16 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
+# Our Emscripten library code uses dynCall, which needs these link flags.
+# TODO(scotttodd): Find a way to refactor this, this is nasty to always set :(
+if(EMSCRIPTEN)
+  iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
+    ALL
+      "-sDYNCALLS=1"
+      "-sEXPORTED_RUNTIME_METHODS=['dynCall']"
+  )
+endif()
+
 #-------------------------------------------------------------------------------
 # Size-optimized build flags
 #-------------------------------------------------------------------------------
@@ -392,6 +420,7 @@ if(IREE_SIZE_OPTIMIZED)
       "-DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
       "-DIREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=0"
       "-DIREE_VM_BACKTRACE_ENABLE=0"
+      "-DIREE_VM_BYTECODE_VERIFICATION_ENABLE=0"
       "-DIREE_VM_EXT_F32_ENABLE=0"
       "-DIREE_VM_EXT_F64_ENABLE=0"
   )
@@ -417,13 +446,27 @@ endif()
 # Compiler: MSVC
 #-------------------------------------------------------------------------------
 
-# TODO(benvanik): MSVC options.
+if(MSVC)
+  if("${CMAKE_C_COMPILER_LAUNCHER}" MATCHES "ccache" OR
+     "${CMAKE_CXX_COMPILER_LAUNCHER}" MATCHES "ccache")
+    # Disable separate PDB file generation (for debug info) when using ccache.
+    # ccache silently falls back to the real compiler when an unsupported flag
+    # like /Zi is encountered.
+    message(STATUS "Replacing /Zi with /Z7 since ccache is in use and does not support /Zi")
+    # https://learn.microsoft.com/en-us/cpp/build/reference/z7-zi-zi-debug-information-format
+    string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+    string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+  endif()
+endif()
 
 #-------------------------------------------------------------------------------
 # Third party: llvm-project
 #-------------------------------------------------------------------------------
+
 if(IREE_BUILD_COMPILER)
-  # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
-  # tools in LLVM.
-  iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
+  # iree-tblgen is not defined using the add_tablegen mechanism as other
+  # TableGen tools in LLVM.
+  set(IREE_TABLEGEN_EXE "$<TARGET_FILE:iree-tblgen>")
 endif()

@@ -43,6 +43,9 @@ struct PrimitiveTypeConverter : public TypeConverter {
       if (!isSourceType(type)) return type;
       return getTargetType(type);
     });
+    addConversion([&](ComplexType type) {
+      return ComplexType::get(convertType(type.getElementType()));
+    });
     addConversion([&](RankedTensorType type) {
       return RankedTensorType::get(type.getShape(),
                                    convertType(type.getElementType()),
@@ -173,8 +176,8 @@ struct ConvertTypesPass : public Base {
 
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
-      if (auto globalOp = dyn_cast<IREE::Util::GlobalOp>(op)) {
-        return typeConverter.isLegal(globalOp.getType());
+      if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
+        return typeConverter.isLegal(globalOp.getGlobalType());
       } else if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
         for (Type type : funcOp.getFunctionType().getInputs()) {
           if (!typeConverter.isLegal(type)) return false;
@@ -254,6 +257,22 @@ struct PromoteF16ToF32Pass
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass() {
   return std::make_unique<PromoteF16ToF32Pass>();
+}
+
+namespace {
+struct PromoteBF16ToF32Converter
+    : public PrimitiveTypeConverter<BFloat16Type, Float32Type> {
+  Type getTargetType(BFloat16Type type) override {
+    return Float32Type::get(type.getContext());
+  }
+};
+struct PromoteBF16ToF32Pass
+    : public ConvertTypesPass<PromoteBF16ToF32Base<PromoteBF16ToF32Pass>,
+                              PromoteBF16ToF32Converter> {};
+}  // namespace
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass() {
+  return std::make_unique<PromoteBF16ToF32Pass>();
 }
 
 namespace {

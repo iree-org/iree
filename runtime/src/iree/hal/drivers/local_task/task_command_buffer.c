@@ -171,8 +171,8 @@ static void iree_hal_task_command_buffer_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   memset(&command_buffer->state, 0, sizeof(command_buffer->state));
-  iree_task_list_discard(&command_buffer->leaf_tasks);
   iree_task_list_discard(&command_buffer->root_tasks);
+  iree_task_list_discard(&command_buffer->leaf_tasks);
   iree_arena_deinitialize(&command_buffer->arena);
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_allocator_free(host_allocator, command_buffer);

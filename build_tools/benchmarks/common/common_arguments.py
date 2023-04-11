@@ -59,7 +59,7 @@ class Parser(argparse.ArgumentParser):
         help=(
             "Path to the IREE e2e test artifacts directory. This will override "
             "<build-dir> and eventually replace it. For now must use with "
-            "--run_config"))
+            "--execution_benchmark_config"))
 
     self.add_argument(
         "--normal_benchmark_tool_dir",
@@ -137,14 +137,11 @@ class Parser(argparse.ArgumentParser):
         help="Base directory in which to store temporary files. A subdirectory"
         " with a name matching the git commit hash will be created.")
     self.add_argument(
-        "--continue_from_directory",
-        "--continue-from-directory",
-        default=None,
-        type=_check_dir_path,
-        help="Path to directory with previous benchmark temporary files. This"
-        " should be for the specific commit (not the general tmp-dir). Previous"
-        " benchmark and capture results from here will not be rerun and will be"
-        " combined with the new runs.")
+        "--continue_from_previous",
+        "--continue-from-previous",
+        action="store_true",
+        help="Previous benchmark and capture results will be used and not "
+        "rerun if they are found in the benchmark results directory.")
     self.add_argument(
         "--benchmark_min_time",
         "--benchmark-min-time",
@@ -155,17 +152,33 @@ class Parser(argparse.ArgumentParser):
         "for). In that case, no --benchmark_repetitions flag will be passed."
         " If not specified, a --benchmark_repetitions will be passed "
         "instead.")
-    self.add_argument("--run_config",
+    self.add_argument("--execution_benchmark_config",
                       type=_check_file_path,
                       default=None,
-                      help="JSON file of the run config")
+                      help="JSON config for the execution benchmarks")
+    self.add_argument("--target_device_name",
+                      type=str,
+                      default=None,
+                      help="Target device in benchmark config to run")
 
   def parse_args(
       self, arg_strs: Optional[Sequence[str]] = None) -> argparse.Namespace:
     args = super().parse_args(arg_strs)
 
-    if args.e2e_test_artifacts_dir is not None and args.run_config is None:
-      raise self.error("--e2e_test_artifacts_dir requires --run_config.")
+    # TODO(#11076): Remove these checks and make --execution_benchmark_config
+    # and --target_device_name required args.
+    use_new_benchmark_suite = (args.execution_benchmark_config is not None or
+                               args.target_device_name is not None)
+    if use_new_benchmark_suite:
+      if (args.execution_benchmark_config is None or
+          args.target_device_name is None):
+        self.error(
+            "--execution_benchmark_config and --target_device_name must be set together."
+        )
+    elif args.e2e_test_artifacts_dir is not None:
+      self.error(
+          "--e2e_test_artifacts_dir requires --execution_benchmark_config and --target_device_name."
+      )
 
     return args
 

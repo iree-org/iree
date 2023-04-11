@@ -10,7 +10,7 @@
 set(IREE_COMPILER_TARGETS "")
 set(IREE_COMPILER_TARGET_COPTS "")
 if(IREE_TARGET_BACKEND_LLVM_CPU)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM)
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVMCPU)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVM_CPU_TARGET")
 endif()
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
@@ -38,13 +38,21 @@ if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
 endif()
 
+set(IREE_VERSION_TARGET_COPTS "")
+if(IREE_EMBEDDED_RELEASE_INFO)
+  list(APPEND IREE_VERSION_TARGET_COPTS "-DIREE_RELEASE_REVISION=\"${IREE_RELEASE_REVISION}\"")
+  list(APPEND IREE_VERSION_TARGET_COPTS "-DIREE_RELEASE_VERSION=\"${IREE_RELEASE_VERSION}\"")
+endif()
+
 # Enable input dialects based on options.
 set(IREE_INPUT_DEPS "")
 if(IREE_INPUT_MHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
   list(APPEND IREE_INPUT_DEPS tensorflow::external_mhlo_includes)
   list(APPEND IREE_INPUT_DEPS ChloOps)
   list(APPEND IREE_INPUT_DEPS MhloDialect)
+  list(APPEND IREE_INPUT_DEPS StablehloOps)
 endif()
 if(IREE_INPUT_TORCH)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
@@ -111,6 +119,7 @@ iree_cc_library(
     iree::compiler::Modules::HAL::Loader::IR::HALLoaderDialect
     iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::Pipelines
+    iree::compiler::Preprocessing::Passes
   PUBLIC
 )
 
@@ -126,6 +135,7 @@ iree_cc_library(
     MLIRArmNeonDialect
     MLIRArmNeon2dToIntr
     MLIRBufferizationDialect
+    MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRGPUOps
     MLIRGPUToSPIRV
@@ -210,8 +220,20 @@ iree_cc_library(
     "iree_compile_lib.cc"
   DEPS
     LLVMSupport
-    iree::compiler::API2::Headers
-    iree::compiler::API2::Internal::Embed
+    iree::compiler::API::Internal::Embed
     iree::compiler::Pipelines
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    version
+  HDRS
+    "version.h"
+  SRCS
+    "version.cc"
+  COPTS
+    ${IREE_VERSION_TARGET_COPTS}
+)
+

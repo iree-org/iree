@@ -19,7 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -32,8 +32,8 @@ namespace IREE {
 namespace Flow {
 
 /// Check if any of the use dominates all other uses of the operation.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo &dominanceInfo) {
+static std::optional<OpOperand *> getFusableUse(Operation *op,
+                                                DominanceInfo &dominanceInfo) {
   auto uses = op->getUses();
   for (OpOperand &source : uses) {
     Operation *sourceOp = source.getOwner();
@@ -71,6 +71,15 @@ static bool areFusableOps(MLIRContext *context, Operation *producerOp,
         return false;
       })) {
     return true;
+  }
+
+  // Don't fuse if all of the consumer maps aren't projected permutations.
+  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+    if (!llvm::all_of(
+            linalgConsumerOp.getIndexingMapsArray(),
+            [](AffineMap map) { return map.isProjectedPermutation(); })) {
+      return false;
+    }
   }
 
   // If producer has a single user, always fuse
@@ -123,19 +132,17 @@ struct FuseElementwiseOpsWithMultipleUses
     consumerOp->removeAttr(getConsumerAttributeName());
     producerOp->removeAttr(getProducerAttributeName());
 
-    FailureOr<Operation *> fusedOperation =
+    FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
         linalg::fuseElementwiseOps(rewriter, fusedOperand);
-    if (failed(fusedOperation)) {
+    if (failed(fusionResult)) {
       return rewriter.notifyMatchFailure(consumerOp,
                                          "failed to fuse with producer");
     }
-    assert(fusedOperation.value()->getNumResults() ==
-           producerOp->getNumResults() + consumerOp->getNumResults());
-    auto fusedResults = fusedOperation.value()->getResults();
-    rewriter.replaceOp(producerOp,
-                       fusedResults.take_front(producerOp->getNumResults()));
-    rewriter.replaceOp(consumerOp,
-                       fusedResults.take_back(consumerOp->getNumResults()));
+    for (auto replacement : fusionResult->replacements) {
+      rewriter.replaceUsesWithIf(
+          replacement.first, replacement.second,
+          [&](OpOperand &use) { return use.getOwner() != consumerOp; });
+    }
     return success();
   }
 };
@@ -160,11 +167,22 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
       return;
     }
 
-    Optional<OpOperand *> fusableUse = getFusableUse(genericOp, dominanceInfo);
+    std::optional<OpOperand *> fusableUse =
+        getFusableUse(genericOp, dominanceInfo);
     if (!fusableUse) return;
     if (!linalg::areElementwiseOpsFusable(fusableUse.value())) return;
 
-    Operation *consumer = fusableUse.value()->getOwner();
+    auto consumer = dyn_cast<linalg::GenericOp>(fusableUse.value()->getOwner());
+    auto isParallelIteratorType = [](Attribute attr) {
+      return linalg::isParallelIterator(
+          attr.cast<linalg::IteratorTypeAttr>().getValue());
+    };
+    if (!consumer ||
+        !(llvm::all_of(genericOp.getIteratorTypes(), isParallelIteratorType) &&
+          llvm::all_of(consumer.getIteratorTypes(), isParallelIteratorType))) {
+      return;
+    }
+
     genericOp->setAttr(producerAttrName,
                        builder.getI64IntegerAttr(numCandidates));
     consumer->setAttr(consumerAttrName,
@@ -180,8 +198,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
   RewritePatternSet fusionPatterns(context);
   fusionPatterns.insert<FuseElementwiseOpsWithMultipleUses>(context);
   linalg::GenericOp::getCanonicalizationPatterns(fusionPatterns, context);
-  if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
-                                          std::move(fusionPatterns)))) {
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
     return funcOp->emitOpError("multi use producer -> consumer fusion failed");
   }
   return numCandidates;
@@ -274,9 +291,8 @@ struct FusionOfTensorOpsPass
       memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
 
       GreedyRewriteConfig rewriteConfig;
-      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoIterationLimit;
-      if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
-                                              std::move(fusionPatterns),
+      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns),
                                               rewriteConfig))) {
         funcOp->emitError("failed to apply fusion patterns");
         return signalPassFailure();
@@ -317,7 +333,7 @@ struct FusionOfTensorOpsPass
       memref::populateResolveRankedShapeTypeResultDimsPatterns(
           collapsingReshapePatterns);
       if (failed(applyPatternsAndFoldGreedily(
-              funcOp->getRegions(), std::move(collapsingReshapePatterns)))) {
+              funcOp, std::move(collapsingReshapePatterns)))) {
         funcOp->emitError("failed to apply collapsing reshape patterns");
         return signalPassFailure();
       }
@@ -333,7 +349,7 @@ struct FusionOfTensorOpsPass
     {
       RewritePatternSet opFoldingPatterns(&getContext());
       tensor::populateFoldTensorEmptyPatterns(opFoldingPatterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp->getRegions(),
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(opFoldingPatterns)))) {
         funcOp->emitError("failed to apply op folding patterns");
         return signalPassFailure();

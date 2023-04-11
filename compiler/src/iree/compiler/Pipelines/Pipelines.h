@@ -16,6 +16,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+class PipelineExtensions;
+
 // Hooks for injecting behavior into the IREEVM pipeline. Since these are not
 // derived from CLI options, we maintain them as a separate struct.
 struct IREEVMPipelineHooks {
@@ -26,13 +28,19 @@ struct IREEVMPipelineHooks {
   // the constant evaluator, which needs to recursively invoke these
   // pipelines.
   std::function<void(OpPassManager &)> buildConstEvalPassPipelineCallback;
+
+  // Applies pipeline extensions to the built pipeline if not nullptr.
+  PipelineExtensions *pipelineExtensions = nullptr;
 };
 
 enum class IREEVMPipelinePhase {
   Input,
   ABI,
+  Preprocessing,
   Flow,
   Stream,
+  ExecutableSources,
+  ExecutableTargets,
   HAL,
   VM,
   End,
@@ -47,10 +55,17 @@ inline static void enumerateIREEVMPipelinePhases(
            "input dialects (linalg/etc).");
   callback(IREEVMPipelinePhase::ABI, "abi",
            "Adjusts program ABI for the specified execution environment.");
+  callback(IREEVMPipelinePhase::Preprocessing, "preprocessing",
+           "Compiles up to the `preprocessing` specified");
   callback(IREEVMPipelinePhase::Flow, "flow",
            "Compiles up to the `flow` dialect.");
   callback(IREEVMPipelinePhase::Stream, "stream",
            "Compiles up to the `stream` dialect.");
+  callback(IREEVMPipelinePhase::ExecutableSources, "executable-sources",
+           "Compiles up to just before `hal.executable`s are translated, "
+           "excluding codegen.");
+  callback(IREEVMPipelinePhase::ExecutableTargets, "executable-targets",
+           "Compiles up to translated `hal.executable`s, including codegen.");
   callback(IREEVMPipelinePhase::HAL, "hal",
            "Compiles up to the `hal` dialect, including codegen.");
   callback(IREEVMPipelinePhase::VM, "vm", "Compiles up to the `vm` dialect.");
@@ -65,6 +80,7 @@ inline static void enumerateIREEVMPipelinePhases(
 // IR after the phase completes.
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    PreprocessingOptions preprocessingOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,

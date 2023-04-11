@@ -39,7 +39,7 @@ done
 
 # Update IREE.
 pushd external/iree
-git fetch https://github.com/iree-org/iree "${IREE_COMMIT}"
+git fetch https://github.com/openxla/iree "${IREE_COMMIT}"
 git checkout "${IREE_COMMIT}"
 git submodule update --init --jobs 8 --depth 1
 popd # external/iree
@@ -47,7 +47,10 @@ popd # external/iree
 popd # ${REPO_DIR}
 
 # Build ConvPerf.
-cmake -GNinja -B "${BUILD_DIR}" "${REPO_DIR}"
+cmake -GNinja \
+  -DCMAKE_C_COMPILER="${CC:-clang}" \
+  -DCMAKE_CXX_COMPILER="${CXX:-clang++}" \
+  -B "${BUILD_DIR}" "${REPO_DIR}"
 cmake --build "${BUILD_DIR}"
 
 # Run ConvPerf for several threading configurations.
@@ -65,6 +68,3 @@ for i in "${threads[@]}"; do
   mv runtimes.json "${RESULTS_DIR}/resnet50_thread$i.json"
   mv convs.png "${RESULTS_DIR}/resnet50_thread$i.png"
 done
-
-
-

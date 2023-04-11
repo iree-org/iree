@@ -32,7 +32,7 @@ func.func @batch_norm_inference(
 // -----
 
 // CHECK: @reorder_broadcast_in_dim_scalar_binary(%[[ARG0:.*]]: tensor<f32>, %[[ARG1:.*]]: tensor<f32>, %[[ARG2:.*]]: tensor<i32>, %[[ARG3:.*]]: tensor<i32>)
-func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>) {
+func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>) {
   // CHECK: %[[ADD:.*]] = mhlo.add %[[ARG0]], %[[ARG1]] : tensor<f32>
   // CHECK: "mhlo.broadcast_in_dim"(%[[ADD]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
   // CHECK: %[[ATAN2:.*]] = mhlo.atan2 %[[ARG0]], %[[ARG1]] : tensor<f32>
@@ -49,12 +49,12 @@ func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: ten
   // CHECK: "mhlo.broadcast_in_dim"(%[[POW]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
   // CHECK: %[[REM:.*]] = mhlo.remainder %[[ARG0]], %[[ARG1]] : tensor<f32>
   // CHECK: "mhlo.broadcast_in_dim"(%[[REM]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
-  // CHECK: %[[SL:.*]] = mhlo.shift_left %[[ARG0]], %[[ARG1]] : tensor<f32>
-  // CHECK: "mhlo.broadcast_in_dim"(%[[SL]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
-  // CHECK: %[[SRA:.*]] = mhlo.shift_right_arithmetic %[[ARG0]], %[[ARG1]] : tensor<f32>
-  // CHECK: "mhlo.broadcast_in_dim"(%[[SRA]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
-  // CHECK: %[[SRL:.*]] = mhlo.shift_right_logical %[[ARG0]], %[[ARG1]] : tensor<f32>
-  // CHECK: "mhlo.broadcast_in_dim"(%[[SRL]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
+  // CHECK: %[[SL:.*]] = mhlo.shift_left %[[ARG2]], %[[ARG3]] : tensor<i32>
+  // CHECK: "mhlo.broadcast_in_dim"(%[[SL]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<i32>) -> tensor<1x8x8x64xi32>
+  // CHECK: %[[SRA:.*]] = mhlo.shift_right_arithmetic %[[ARG2]], %[[ARG3]] : tensor<i32>
+  // CHECK: "mhlo.broadcast_in_dim"(%[[SRA]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<i32>) -> tensor<1x8x8x64xi32>
+  // CHECK: %[[SRL:.*]] = mhlo.shift_right_logical %[[ARG2]], %[[ARG3]] : tensor<i32>
+  // CHECK: "mhlo.broadcast_in_dim"(%[[SRL]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<i32>) -> tensor<1x8x8x64xi32>
   // CHECK: %[[SUB:.*]] = mhlo.subtract %[[ARG0]], %[[ARG1]] : tensor<f32>
   // CHECK: "mhlo.broadcast_in_dim"(%[[SUB]]) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
   // CHECK: %[[AND:.*]] = mhlo.and %[[ARG2]], %[[ARG3]] : tensor<i32>
@@ -75,21 +75,21 @@ func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: ten
   %9 = mhlo.multiply %0, %1 : tensor<1x8x8x64xf32>
   %10 = mhlo.power %0, %1 : tensor<1x8x8x64xf32>
   %11 = mhlo.remainder %0, %1 : tensor<1x8x8x64xf32>
-  %12 = mhlo.shift_left %0, %1 : tensor<1x8x8x64xf32>
-  %13 = mhlo.shift_right_arithmetic %0, %1 : tensor<1x8x8x64xf32>
-  %14 = mhlo.shift_right_logical %0, %1 : tensor<1x8x8x64xf32>
+  %12 = mhlo.shift_left %2, %3 : tensor<1x8x8x64xi32>
+  %13 = mhlo.shift_right_arithmetic %2, %3 : tensor<1x8x8x64xi32>
+  %14 = mhlo.shift_right_logical %2, %3 : tensor<1x8x8x64xi32>
   %15 = mhlo.subtract %0, %1 : tensor<1x8x8x64xf32>
   %16 = mhlo.and %2, %3 : tensor<1x8x8x64xi32>
   %17 = mhlo.or %2, %3 : tensor<1x8x8x64xi32>
   %18 = mhlo.xor %2, %3 : tensor<1x8x8x64xi32>
-  return %4, %5, %6, %7, %8, %9, %10, %11, %12, %13, %14, %15, %16, %17, %18 : tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>
+  return %4, %5, %6, %7, %8, %9, %10, %11, %12, %13, %14, %15, %16, %17, %18 : tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>
 }
 
 // -----
 
 // CHECK: @reorder_broadcast_in_dim_scalar_binary_diff_type(%[[ARG0:.*]]: tensor<f32>, %[[ARG1:.*]]: tensor<f32>) -> tensor<1x8x8x64xcomplex<f32>>
 func.func @reorder_broadcast_in_dim_scalar_binary_diff_type(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<1x8x8x64xcomplex<f32>> {
-  // CEHCK: %0 = "mhlo.complex"(%[[ARG0]], %[[ARG1]]) : (tensor<f32>, tensor<f32>) -> tensor<complex<f32>>
+  // CHECK: %0 = mhlo.complex %[[ARG0]], %[[ARG1]] : tensor<complex<f32>>
   // CHECK: "mhlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<complex<f32>>) -> tensor<1x8x8x64xcomplex<f32>>
   %0 = "mhlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
   %1 = "mhlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>

@@ -54,7 +54,7 @@ module attributes {hal.device.targets = [
     %c2 = arith.constant 2 : index
     %0 = stream.resource.alloc uninitialized : !stream.resource<transient>{%arg2}
     %1 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<constant>{%arg2}, %arg1 as %arg5: !stream.resource<transient>{%arg2}, %0 as %arg6: !stream.resource<transient>{%arg2}) {
-      // CHECK: stream.cmd.dispatch @ex_workgroups::@entry
+      // CHECK: stream.cmd.dispatch {@ex_workgroups::@embedded_elf_arm_64::@entry, @ex_workgroups::@embedded_elf_x86_64::@entry}
       // CHECK: attributes {
       // CHECK-SAME: hal.interface.bindings = [
       // CHECK-SAME:   #hal.interface.binding<0, 0>,
@@ -101,8 +101,8 @@ hal.executable.source public @ex {
     func.func @entry() {
       %const0 = hal.interface.constant.load[0] : index
       %const1 = hal.interface.constant.load[1] : index
-      %s0b0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%const0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
-      %s1b0 = hal.interface.binding.subspan set(1) binding(0) type(storage_buffer) offset(%const1) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s0b0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%const0) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s1b0 = hal.interface.binding.subspan set(1) binding(0) type(storage_buffer) alignment(32) offset(%const1) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
       %s1b1 = hal.interface.binding.subspan set(1) binding(1) type(storage_buffer) alignment(16) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index

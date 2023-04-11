@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
+#include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -32,7 +33,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 
   LogicalResult beginBlock(Block *block) override {
     blockOffsets_[block] = bytecode_.size();
-    return success();
+    return writeUint8(static_cast<uint8_t>(Opcode::Block));
   }
 
   LogicalResult endBlock(Block *block) override { return success(); }
@@ -257,7 +258,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return success();
   }
 
-  Optional<std::vector<uint8_t>> finish() {
+  std::optional<std::vector<uint8_t>> finish() {
     if (failed(fixupOffsets())) {
       return std::nullopt;
     }
@@ -342,7 +343,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 }  // namespace
 
 // static
-Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
+std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
     SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase) {
   EncodedBytecodeFunction result;
@@ -389,6 +390,7 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
 
   debugDatabase.addFunctionSourceMap(funcOp, sourceMap);
 
+  size_t finalLength = encoder.getOffset();
   if (failed(encoder.ensureAlignment(8))) {
     funcOp.emitError() << "failed to pad function";
     return std::nullopt;
@@ -399,6 +401,8 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     return std::nullopt;
   }
   result.bytecodeData = bytecodeData.value();
+  result.bytecodeLength = finalLength;
+  result.blockCount = funcOp.getBlocks().size();
   result.i32RegisterCount = registerAllocation.getMaxI32RegisterOrdinal() + 1;
   result.refRegisterCount = registerAllocation.getMaxRefRegisterOrdinal() + 1;
   return result;

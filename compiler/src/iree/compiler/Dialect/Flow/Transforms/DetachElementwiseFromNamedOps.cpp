@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/PatternMatch.h"
@@ -66,14 +67,10 @@ struct DetachElementwisePattern
 
     // Create a zero tensor as the new output tensor operand to the Linalg
     // contraction op.
-    SmallVector<Value> dynamicDims;
-    for (unsigned i = 0; i < outputType.getRank(); i++) {
-      if (outputType.isDynamicDim(i))
-        dynamicDims.push_back(
-            rewriter.create<tensor::DimOp>(loc, outputOperand, i));
-    }
-    auto initOp = rewriter.create<tensor::EmptyOp>(loc, outputType.getShape(),
-                                                   elementType, dynamicDims);
+    SmallVector<OpFoldResult> mixedSizes =
+        tensor::createDimValues(rewriter, loc, outputOperand);
+    auto initOp =
+        rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value fill =
@@ -120,31 +117,37 @@ struct DetachElementwisePattern
 };
 
 /// Replace uses of splat constants as `outs` operands of `LinalgExt`
-/// operations. More canonical representation is to use a `init_tensor -> fill
+/// operations. More canonical representation is to use a `empty -> fill
 /// -> outs` operand sequence. Splat constants pulled in this way causes issues
 /// with allocations. Using `fill` will allow for fusing with the op just like
 /// fill -> linalg ops are fused. If not as a fallback they would be converted
 /// to a splat, but both without stack allocations.
+template <typename InterfaceOp>
 struct DetachSplatConstantOutsOperands
-    : public OpInterfaceRewritePattern<IREE::LinalgExt::LinalgExtOp> {
-  using OpInterfaceRewritePattern<
-      IREE::LinalgExt::LinalgExtOp>::OpInterfaceRewritePattern;
+    : public OpInterfaceRewritePattern<InterfaceOp> {
+  using OpInterfaceRewritePattern<InterfaceOp>::OpInterfaceRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::LinalgExt::LinalgExtOp linalgExtOp,
+  LogicalResult matchAndRewrite(InterfaceOp interfaceOp,
                                 PatternRewriter &rewriter) const {
     SmallVector<Value> newOutsOperands;
+    auto dpsInterfaceOp =
+        dyn_cast<DestinationStyleOpInterface>(interfaceOp.getOperation());
+    if (!dpsInterfaceOp) {
+      return rewriter.notifyMatchFailure(
+          interfaceOp, "expected op to implement DPS interface");
+    }
     bool madeChanges = false;
-    for (auto outsOperandNum :
-         llvm::seq<unsigned>(0, linalgExtOp.getNumOutputs())) {
-      OpOperand *outOperand = linalgExtOp.getOutputOperand(outsOperandNum);
-      auto constOp = outOperand->get().getDefiningOp<arith::ConstantOp>();
+    for (auto outOperand :
+         llvm::enumerate(dpsInterfaceOp.getDpsInitOperands())) {
+      auto constOp =
+          outOperand.value()->get().template getDefiningOp<arith::ConstantOp>();
       if (!constOp) continue;
 
       auto resultType =
-          constOp.getResult().getType().dyn_cast<RankedTensorType>();
+          constOp.getResult().getType().template dyn_cast<RankedTensorType>();
       if (!resultType || !resultType.getElementType().isIntOrFloat()) continue;
 
-      auto attr = constOp.getValue().dyn_cast<DenseElementsAttr>();
+      auto attr = constOp.getValue().template dyn_cast<DenseElementsAttr>();
       if (!attr || !attr.isSplat()) continue;
 
       Location loc = constOp.getLoc();
@@ -153,11 +156,11 @@ struct DetachSplatConstantOutsOperands
           loc, resultType.getShape(), elementType);
       Attribute constValue;
       if (elementType.isa<IntegerType>()) {
-        constValue =
-            rewriter.getIntegerAttr(elementType, attr.getSplatValue<APInt>());
+        constValue = rewriter.getIntegerAttr(
+            elementType, attr.template getSplatValue<APInt>());
       } else {
-        constValue =
-            rewriter.getFloatAttr(elementType, attr.getSplatValue<APFloat>());
+        constValue = rewriter.getFloatAttr(
+            elementType, attr.template getSplatValue<APFloat>());
       }
       Value scalarConstantOp =
           rewriter.create<arith::ConstantOp>(loc, elementType, constValue);
@@ -166,8 +169,8 @@ struct DetachSplatConstantOutsOperands
                          .create<linalg::FillOp>(
                              loc, resultType, scalarConstantOp, emptyTensorOp)
                          .getResult(0);
-      rewriter.updateRootInPlace(linalgExtOp, [&]() {
-        linalgExtOp->setOperand(outOperand->getOperandNumber(), fillOp);
+      rewriter.updateRootInPlace(dpsInterfaceOp, [&]() {
+        dpsInterfaceOp.setDpsInitOperand(outOperand.index(), fillOp);
       });
       madeChanges = true;
     }
@@ -185,7 +188,9 @@ struct DetachElementwiseFromNamedOpsPass
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<DetachElementwisePattern, DetachSplatConstantOutsOperands>(
+    patterns.add<DetachElementwisePattern,
+                 DetachSplatConstantOutsOperands<IREE::LinalgExt::LinalgExtOp>,
+                 DetachSplatConstantOutsOperands<linalg::LinalgOp>>(
         &getContext());
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {

@@ -161,34 +161,18 @@ iree_cc_test(
 # to excusively static linkage scenarios and note that it's unstable. It's just
 # really really useful and the only way for applications to interleave with our
 # tracing (today).
-if(IREE_ENABLE_RUNTIME_TRACING)
-  iree_cc_library(
-    NAME
-      tracing
-    HDRS
-      "tracing.h"
-      "${IREE_ROOT_DIR}/third_party/tracy/public/tracy/Tracy.hpp"
-      "${IREE_ROOT_DIR}/third_party/tracy/public/tracy/TracyC.h"
-    SRCS
-      "tracing.cc"
-    DEPS
-      ${CMAKE_DL_LIBS}
-      ::core_headers
-    DEFINES
-      "IREE_TRACING_MODE=2"
-    PUBLIC
-  )
-else()
-  iree_cc_library(
-    NAME
-      tracing
-    HDRS
-      "tracing.h"
-    DEPS
-      ::core_headers
-    PUBLIC
-  )
-endif()
+iree_cc_library(
+  NAME
+    tracing
+  HDRS
+    "tracing.h"
+  SRCS
+    "tracing.cc"
+  DEPS
+    ::core_headers
+    tracy_client::runtime_impl
+  PUBLIC
+)
 
 if(EMSCRIPTEN)
   iree_cc_library(

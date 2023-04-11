@@ -10,10 +10,10 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
-#include "iree/compiler/Codegen/Common/TransformDialectStrategiesGPU.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -40,13 +40,32 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
+    llvm::cl::init(true));
+
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
+    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
+                   "payload root operation"),
+    llvm::cl::init(""));
+
+llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
+    "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
+    llvm::cl::desc(
+        "tag attribute value for the transform dialect transform op container"),
+    llvm::cl::init(""));
+
+/// Flag to force using WMMA tensorcore operations.
+llvm::cl::opt<bool> clGPUUseWMMA(
+    "iree-codegen-llvmgpu-use-wmma",
+    llvm::cl::desc("force use of wmma operations for tensorcore"),
     llvm::cl::init(false));
 
-llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
-    "iree-codegen-llvmgpu-workgroup-tile-sizes",
-    llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
-                   "from IR already workgroup distributed"),
-    llvm::cl::CommaSeparated);
+/// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
+llvm::cl::opt<bool> clGPUUseMMASync(
+    "iree-codegen-llvmgpu-use-mma-sync",
+    llvm::cl::desc("force use mma sync instead of wmma ops"),
+    llvm::cl::init(false));
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
@@ -63,10 +82,9 @@ struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
   std::array<int64_t, 3> workgroupSize;
+  int64_t pipelineDepth;
 };
 
-// Software pipeline depths
-constexpr unsigned softwarePipelineDepthTensorCore = 4;
 // Simt codegen does not do software pipelining.
 constexpr unsigned softwarePipelineDepthSimt = 0;
 }  // namespace
@@ -77,29 +95,44 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   // Pick tile size so that M*K and K*N dividible by wgSize * \*vecSize=*\4.
   // This way workgroup memory copy don't need to be masked. Once we support
   // masked load we can get performance out of more configuration.
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}, 1}));
 
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
-  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}, 1}));
+  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
 }
 
 /// Return the best combination of tile size and wg size when using tensorcore
 /// operations.
 static void getTensorCoreConfig(
-    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16) {
-  // Tile sizes are skewed towards small matmul for now. Long term the plan is
-  // to not rely on hardcoded configurations.
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
+    int64_t N, int64_t K) {
+  // Based on early analysis we found that 128x256x32_3 gives acceptable
+  // performance across many of the large matrix sizes for f16 and fp32. This
+  // needs to be refined into a better startegy based on empircal data but this
+  // gives us a quick solution to achieve performance in the right order of
+  // magnitude for large square like cases.
+  int64_t parallelDim = M * N;
+  static constexpr int64_t kLargDimThreashold = 1536;
   if (isFp16) {
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}}));
+    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
+    }
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}}));
+    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
+    }
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
   }
 }
 
@@ -174,6 +207,29 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
     }
   }
   return true;
+}
+
+/// Decides which tensorcore operations to use.
+static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
+    bool isF16) {
+  // Currently mma.sync is on by default for fp16 only.
+  IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
+      isF16 ? IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCoreMmaSync
+            : IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCore;
+
+  // Override the decision based on cl flags.
+  assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
+  if (clGPUUseMMASync) {
+    codegenPipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUMatmulTensorCoreMmaSync;
+  }
+  if (clGPUUseWMMA) {
+    codegenPipeline =
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+  };
+  return codegenPipeline;
 }
 
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
@@ -257,25 +313,26 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-
-      getTensorCoreConfig(TCtileSizeConfig, op.getDpsInputOperand(0)
-                                                ->get()
-                                                .getType()
-                                                .cast<RankedTensorType>()
-                                                .getElementType()
-                                                .isF16());
+      bool isFp16 = op.getDpsInputOperand(0)
+                        ->get()
+                        .getType()
+                        .cast<RankedTensorType>()
+                        .getElementType()
+                        .isF16();
+      getTensorCoreConfig(TCtileSizeConfig, isFp16, sizeM, sizeN, sizeK);
       // Pick the best configuration where the original shape is aligned on the
       // tile size.
       for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
         if (sizeK % config.tileSize[2] == 0 &&
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
+          IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
+              getTensorCorePipeline(isFp16);
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,
-              sizeK == config.tileSize[2] ? 1 : softwarePipelineDepthTensorCore,
-              IREE::Codegen::DispatchLoweringPassPipeline::
-                  LLVMGPUMatmulTensorCore);
+              sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
+              codegenPipeline);
         }
       }
     }
@@ -292,7 +349,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     // Pick the best configuration where the original shape is aligned on the
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
-      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
+      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0 &&
+          sizeK % config.tileSize[2] == 0) {
         return setMatmulConfig(
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize, softwarePipelineDepthSimt,
@@ -309,7 +367,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   const TileWorkgroupSizePair &config = tileSizeConfig[configIndex];
   const int64_t tileX = config.tileSize[0];
   const int64_t tileY = config.tileSize[1];
-  const int64_t tileK = config.tileSize[2];
+  int64_t tileK = config.tileSize[2];
+  // Since specialization doesn't work for K loop and peeling is not enabled yet
+  // we pick a tileK size that is aligned on the K size.
+  if (ShapedType::isDynamic(sizeK)) tileK = 1;
+  while (sizeK % tileK != 0) {
+    tileK >>= 1;
+  }
   const std::array<int64_t, 3> workgroupSize{config.workgroupSize[0],
                                              config.workgroupSize[1],
                                              config.workgroupSize[2]};
@@ -387,6 +451,47 @@ static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
       workgroupSize);
 }
 
+static SmallVector<int64_t> getDefaultWorkgroupTileSizesForPackUnPack(
+    TilingInterface op, int64_t defaultSize) {
+  unsigned numLoops = op.getLoopIteratorTypes().size();
+  auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
+                              .getPartitionableLoops(kNumMaxParallelDims);
+  SmallVector<int64_t> workgroupTileSizes(numLoops, defaultSize);
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
+    if (!partitionedLoopsSet.count(dim)) {
+      workgroupTileSizes[dim] = 0;
+    }
+  }
+
+  return workgroupTileSizes;
+}
+
+static LogicalResult setPackConfig(func::FuncOp entryPoint,
+                                   tensor::PackOp packOp) {
+  SmallVector<int64_t> tileSizes = getDefaultWorkgroupTileSizesForPackUnPack(
+      cast<TilingInterface>(packOp.getOperation()), cudaWarpSize);
+
+  // The default function aims to returns the number of workload per workgroup,
+  // but it does not know that it is working on packed domain. We need to take
+  // inner tile sizes into account and adjust the distribution tile sizes.
+  SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
+  ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    tileSizes[pos] = tileSizes[pos] / size;
+    tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+  }
+
+  TileSizesListType tileSizesList = {tileSizes};
+  std::array<int64_t, 3> workgroupSizes = {cudaWarpSize, 1, 1};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, packOp, tileSizesList,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack,
+      workgroupSizes);
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
 static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
                                           Operation *op) {
@@ -414,7 +519,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       workgroupTileSizes[depth] = 0;
     }
   }
-
+  int64_t skipInnerTiling = 0;
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     for (auto [index, outputOperand] :
          llvm::enumerate(genericOp.getDpsInitOperands())) {
@@ -448,6 +553,28 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         vectorSize = 1;
         break;
       }
+      // If the inner dimension is too small to have one element per thread
+      // reduce the workgroup size try to distribute amongst more dimensions.
+      if (shape.back() < vectorSize * workgroupSize[0]) {
+        int64_t flatWG = workgroupSize[0];
+        vectorSize = 1;
+        int64_t id = 0;
+        for (int64_t dim : llvm::reverse(shape)) {
+          // Unit loops are already skipped.
+          if (dim == 1) continue;
+          if (dim < flatWG) {
+            skipInnerTiling++;
+            workgroupSize[id] = dim;
+          } else {
+            workgroupSize[id] = flatWG;
+            break;
+          }
+          flatWG = flatWG / dim;
+          id++;
+          if (flatWG <= 1 || id >= workgroupSize.size()) break;
+        }
+        break;
+      }
     }
   }
 
@@ -466,13 +593,24 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize;
   }
 
+  int64_t id = 0;
   // Set the inner most parallel loop to `lowerTs`.
   for (int64_t depth = numLoops; depth > 0; depth--) {
     if (partitionedLoopsSet.count(depth - 1)) {
-      workgroupTileSizes[depth - 1] = workgroupSize[0] * vectorSize;
+      if (skipInnerTiling > 0) {
+        // For dimensions that don't need to be distributed across blocks skip
+        // tiling by setting tile size to 0.
+        workgroupTileSizes[depth - 1] = 0;
+        skipInnerTiling--;
+        id++;
+        if (id >= workgroupSize.size()) break;
+        continue;
+      }
+      workgroupTileSizes[depth - 1] = workgroupSize[id] * vectorSize;
       break;
     }
   }
+
   if (linalgOp) {
     // Tile reduction dimension to 4 to allow doing load4 if the reduction size
     // is the most inner dimension.
@@ -487,7 +625,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 // TODO: this should be part of LinalgOp interface, the equivalent member
 // function currently only support the case where all the dimensions are static
 // while we want to support dynamic shapes.
-static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
+static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   for (auto [mapIdx, map] : llvm::enumerate(op.getIndexingMapsArray())) {
     for (auto [dimIdx, dim] : llvm::enumerate(map.getResults())) {
       auto expr = dim.dyn_cast<AffineDimExpr>();
@@ -502,19 +640,36 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 }
 
 /// Set configuration for reduction transform dialect based strategy.
-static LogicalResult setReductionTransformJitConfig(
+static LogicalResult setReductionTransformDialectConfig(
     func::FuncOp entryPoint, linalg::LinalgOp op,
     const TargetInfo &targetInfo) {
-  if (!clGPUEnableTransformDialectJit) return failure();
+  if (!clGPUCodegenTransformDialectFileName.empty() &&
+      clGPUEnableTransformDialectJit) {
+    return entryPoint.emitError()
+           << "option clash in transform dialect lowering config: the filename "
+              "cannot be provided when the jit option is set";
+  }
+
+  if (!clGPUEnableTransformDialectJit &&
+      clGPUCodegenTransformDialectFileName.empty()) {
+    return failure();
+  }
   if (!targetInfo.hasWarpShuffle) return failure();
-  if (failed(matchAndSetGPUReductionTransformStrategy(entryPoint, op)))
+
+  // Transform script file provided, use it.
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint.getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
+  if (!clGPUCodegenTransformDialectFileName.empty()) {
+    return setTranslationInfo(entryPoint, translationInfo);
+  }
+
+  iree_compiler::gpu::GPUModel gpuModel;
+  if (failed(iree_compiler::gpu::matchAndSetReductionStrategy(entryPoint, op,
+                                                              gpuModel)))
     return failure();
 
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint->getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                    TransformDialectJitterCodegen);
-  if (failed(setTranslationInfo(entryPoint, translationInfo))) return failure();
-  return success();
+  return setTranslationInfo(entryPoint, translationInfo);
 }
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
@@ -524,7 +679,11 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if (!targetInfo.hasWarpShuffle) return failure();
   if (!isa<linalg::GenericOp>(op)) return failure();
   // TODO(thomasraoux): Enable dynamic shape.
-  if (op.hasDynamicShape()) return failure();
+  bool hasDynamicShape = false;
+  entryPoint.walk([&hasDynamicShape](linalg::LinalgOp op) {
+    if (op.hasDynamicShape()) hasDynamicShape = true;
+  });
+  if (hasDynamicShape) return failure();
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
   if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
@@ -538,12 +697,22 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
       }))
     return failure();
 
-  // Only single combiner operations are supported for now.
-  SmallVector<Operation *, 4> combinerOps;
-  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
-      combinerOps.size() != 1)
-    return failure();
-  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
+  bool foundSingleReductionOutput = false;
+  for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
+    // Only single combiner operations are supported for now.
+    SmallVector<Operation *, 4> combinerOps;
+    if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
+        combinerOps.size() == 1) {
+      if (foundSingleReductionOutput) return failure();
+      foundSingleReductionOutput = true;
+      continue;
+    }
+    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity())
+      return failure();
+  }
+  if (!foundSingleReductionOutput) return failure();
+
+  std::optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
 
   const Type elementType = op.getDpsInitOperand(0)
@@ -774,8 +943,8 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
     // and width.
     const bool tileToSquare = distributeToSquare(
         oh, ow, residualThreads, residualTilingFactor,
-        llvm::makeMutableArrayRef(workgroupSize).drop_front(),
-        llvm::makeMutableArrayRef(workgroupTileSizes).drop_front().drop_back());
+        llvm::MutableArrayRef(workgroupSize).drop_front(),
+        llvm::MutableArrayRef(workgroupTileSizes).drop_front().drop_back());
 
     // Otherwise treat OW and OH separately to allow them to have different
     // number of threads and tiling size.
@@ -810,17 +979,6 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
-  if (!clGPUCodegenTransformDialectTileSizes.empty()) {
-    SmallVector<int64_t, 4> workgroupTileSizes(
-        clGPUCodegenTransformDialectTileSizes.begin(),
-        clGPUCodegenTransformDialectTileSizes.end());
-    TileSizesListType tileSizes;
-    tileSizes.emplace_back(std::move(workgroupTileSizes));
-    auto config = IREE::Codegen::LoweringConfigAttr::get(
-        computeOp->getContext(), tileSizes);
-    setLoweringConfig(computeOp, config);
-    return success();
-  }
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
@@ -829,11 +987,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     return setUserConfig(entryPointFn, computeOp, compilationInfo);
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
+    if (succeeded(setReductionTransformDialectConfig(entryPointFn, linalgOp,
+                                                     targetInfo))) {
       return success();
     }
-    if (succeeded(setReductionTransformJitConfig(entryPointFn, linalgOp,
-                                                 targetInfo))) {
+    if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
       return success();
     }
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp, targetInfo))) {
@@ -847,12 +1005,28 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       return success();
     }
   }
+
+  // If using the transform dialect, call the proper pipeline.
+  assert((clGPUCodegenTransformDialectFileName.empty() ||
+          !clGPUEnableTransformDialectJit) &&
+         "Can't use both transform dialect interpreted and jitted modes");
+  if (clGPUCodegenTransformDialectFileName.size() > 0) {
+    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        entryPointFn.getContext(),
+        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
+    return setTranslationInfo(entryPointFn, translationInfo);
+  }
+
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
   }
   if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(computeOp)) {
     return setSortConfig(entryPointFn, sortOp);
   }
+  if (auto packOp = dyn_cast<tensor::PackOp>(computeOp)) {
+    return setPackConfig(entryPointFn, packOp);
+  }
+
   return setRootDefaultConfig(entryPointFn, computeOp);
 }
 
@@ -867,23 +1041,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
-    SmallVector<Operation *> computeOps;
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return funcOp.emitOpError("failed to get compute ops");
-    }
-
-    // If using the transform dialect, call the proper pipeline.
-    assert((clGPUCodegenTransformDialectFileName.empty() ||
-            !clGPUEnableTransformDialectJit) &&
-           "Can't use both transform dialect interpreted and jitted modes");
-    if (clGPUCodegenTransformDialectFileName.size() > 0) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectInterpreterCodegen);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) return failure();
-      if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
-    }
-
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     Operation *rootOperation = nullptr;
     // Find the root operation. linalg.generic and linalg.fill are not root
     // operations if there are other compute operations present.
@@ -911,12 +1069,8 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     if (!rootOperation) {
-      // setTranslationInfo(
-      //    funcOp,
-      //    IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-      //    {1, 1, 1});
-      // continue;
-      return funcOp.emitOpError("unable to find root operation");
+      // No root operation found. Allow it to pass through without a config.
+      continue;
     }
 
     if (failed(setRootConfig(funcOp, rootOperation))) continue;

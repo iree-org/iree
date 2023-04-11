@@ -53,7 +53,33 @@ class MaterializeResourceCachesPass
     if (moduleOp.getBody()->empty()) return;
     moduleBuilder = OpBuilder(&moduleOp.getBody()->front());
 
+    // Find all relevant ops. If we don't find any we skip the pass as it's
+    // likely it's already been run. We could fix the pass to better support
+    // partial materialization but there's no use cases for that today.
     auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());
+    SmallVector<IREE::HAL::DescriptorSetLayoutLookupOp>
+        descriptorSetLayoutLookupOps;
+    SmallVector<IREE::HAL::PipelineLayoutLookupOp> pipelineLayoutLookupOps;
+    SmallVector<IREE::HAL::ExecutableLookupOp> executableLookupOps;
+    for (Operation &funcLikeOp : moduleOp.getOps()) {
+      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
+      if (!funcOp) continue;
+      for (auto &block : funcOp.getFunctionBody()) {
+        block.walk([&](Operation *op) {
+          if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
+            descriptorSetLayoutLookupOps.push_back(lookupOp);
+          } else if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
+            pipelineLayoutLookupOps.push_back(lookupOp);
+          } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
+            executableLookupOps.push_back(lookupOp);
+          }
+        });
+      }
+    }
+    if (descriptorSetLayoutLookupOps.empty() &&
+        pipelineLayoutLookupOps.empty() && executableLookupOps.empty()) {
+      return;
+    }
 
     // Declare all layouts used by the executables. This will ensure that the
     // initialization order is correct as any pipeline layout needed (and its
@@ -73,28 +99,19 @@ class MaterializeResourceCachesPass
     // Declare executable variables so that we can reference them during lookup
     // replacement.
     for (auto executableOp : executableOps) {
-      if (!defineExecutableOp(executableOp)) {
-        signalPassFailure();
-        return;
-      }
+      defineExecutableOp(executableOp);
     }
 
     // Generate cached resource singletons and replace lookup ops with direct
     // loads from variables.
-    for (Operation &funcLikeOp : moduleOp.getOps()) {
-      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
-      if (!funcOp) continue;
-      for (auto &block : funcOp.getFunctionBody()) {
-        block.walk([&](Operation *op) {
-          if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
-            replaceDescriptorSetLayoutLookupOp(lookupOp);
-          } else if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
-            replacePipelineLayoutLookupOp(lookupOp);
-          } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
-            replaceExecutableLookupOp(lookupOp);
-          }
-        });
-      }
+    for (auto lookupOp : descriptorSetLayoutLookupOps) {
+      replaceDescriptorSetLayoutLookupOp(lookupOp);
+    }
+    for (auto lookupOp : pipelineLayoutLookupOps) {
+      replacePipelineLayoutLookupOp(lookupOp);
+    }
+    for (auto lookupOp : executableLookupOps) {
+      replaceExecutableLookupOp(lookupOp);
     }
   }
 
@@ -182,7 +199,7 @@ class MaterializeResourceCachesPass
     return globalOp;
   }
 
-  IREE::Util::GlobalOp defineExecutableOp(ExecutableOp executableOp) {
+  void defineExecutableOp(ExecutableOp executableOp) {
     auto loc = executableOp.getLoc();
     auto symbolName =
         (StringRef("_executable_") + executableOp.getSymName()).str();
@@ -259,8 +276,6 @@ class MaterializeResourceCachesPass
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableValue,
                                                    globalOp.getName());
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
-
-    return globalOp;
   }
 
   // Inlines a constant block as a function in |moduleBuilder| and then inserts

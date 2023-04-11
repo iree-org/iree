@@ -7,17 +7,32 @@
 #include "iree/tooling/comparison.h"
 
 #include "iree/base/api.h"
+#include "iree/base/internal/span.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/tooling/vm_util_cc.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 
 namespace iree {
 namespace {
 
 using ::testing::HasSubstr;
+
+static void ParseToVariantList(iree_hal_allocator_t* device_allocator,
+                               iree::span<const std::string> input_strings,
+                               iree_allocator_t host_allocator,
+                               iree_vm_list_t** out_list) {
+  std::vector<iree_string_view_t> input_string_views(input_strings.size());
+  for (size_t i = 0; i < input_strings.size(); ++i) {
+    input_string_views[i].data = input_strings[i].data();
+    input_string_views[i].size = input_strings[i].size();
+  }
+  IREE_CHECK_OK(iree_tooling_parse_to_variant_list(
+      device_allocator, input_string_views.data(), input_string_views.size(),
+      host_allocator, out_list));
+}
 
 class ComparisonTest : public ::testing::Test {
  protected:
@@ -37,12 +52,13 @@ class ComparisonTest : public ::testing::Test {
       iree::span<const std::string> expected_strings,
       iree::span<const std::string> actual_strings, std::string* out_string) {
     vm::ref<iree_vm_list_t> expected_list;
-    IREE_CHECK_OK(ParseToVariantList(device_allocator_, expected_strings,
-                                     host_allocator_, &expected_list));
+    ParseToVariantList(device_allocator_, expected_strings, host_allocator_,
+                       &expected_list);
 
     vm::ref<iree_vm_list_t> actual_list;
-    IREE_CHECK_OK(ParseToVariantList(device_allocator_, actual_strings,
-                                     host_allocator_, &actual_list));
+    ParseToVariantList(device_allocator_, actual_strings, host_allocator_,
+                       &actual_list);
+
     iree_string_builder_t builder;
     iree_string_builder_initialize(host_allocator_, &builder);
     bool all_match = iree_tooling_compare_variant_lists_and_append(

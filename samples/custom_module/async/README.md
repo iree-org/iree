@@ -1,4 +1,4 @@
-# Synchronous tensor I/O custom module sample
+# Asynchronous tensor I/O custom module sample
 
 This sample expects that you've already produced a working version of the
 [basic sample](/samples/custom_module/basic/) (including compiler installation
@@ -34,7 +34,7 @@ work.
     ```
     (here we force runtime execution tracing for demonstration purposes)
 
-    [See here](https://iree-org.github.io/iree/building-from-source/getting-started/)
+    [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
     for general instructions on building using CMake.
 
 3. Run the example program to call the main function:

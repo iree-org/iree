@@ -20,22 +20,22 @@ jobs:
     runs-on: ubuntu-20.04-64core
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: "Testing Colab Notebooks"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
-            gcr.io/iree-oss/samples@sha256:291d87d125b41e1539dbb96c7c4f734cc98fc158a36d18496cda360658f00bde \
+            gcr.io/iree-oss/samples@sha256:efbcad1868c292932e0a293eaf62f9c15dbedb5b9944a5ff98f40befd84939eb \
             ./samples/colab/test_notebooks.py
 
   samples:
     runs-on: ubuntu-20.04-64core
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: "Testing Samples"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
-            gcr.io/iree-oss/samples@sha256:291d87d125b41e1539dbb96c7c4f734cc98fc158a36d18496cda360658f00bde \
+            gcr.io/iree-oss/samples@sha256:efbcad1868c292932e0a293eaf62f9c15dbedb5b9944a5ff98f40befd84939eb \
             ./build_tools/testing/test_samples.sh
 
   # FIXME: unify this with host build from ci.yml. This is complicated by
@@ -48,14 +48,14 @@ jobs:
       HOST_BUILD_DIR: build-host-install
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           submodules: true
       - name: "Building host tools"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206" \
-            gcr.io/iree-oss/base@sha256:605d86ccf4197e978a24867fabb7fc100334c926b067ee0518e46d0a4396e206 \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb" \
+            gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb \
             ./build_tools/cmake/build_host_tools.sh "${HOST_BUILD_DIR}"
       - name: "Testing Experimental Web Samples"
         env:
@@ -64,5 +64,5 @@ jobs:
           ./build_tools/github_actions/docker_run.sh  \
             --env "IREE_HOST_BUILD_DIR=${HOST_BUILD_DIR}" \
             --env "IREE_EMPSCRIPTEN_BUILD_DIR=${IREE_EMPSCRIPTEN_BUILD_DIR}" \
-            gcr.io/iree-oss/emscripten@sha256:20847a0a9503852d9594f3c4e7e633b913b450240b097d378dcd42d22ac0948e \
+            gcr.io/iree-oss/emscripten@sha256:1bb106b471a446e64a04ea313743174c5b51f1b49d5a41ccff3f70bbda9e7fd0 \
             ./experimental/web/build_and_test_samples.sh

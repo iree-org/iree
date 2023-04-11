@@ -288,6 +288,14 @@ typedef struct iree_task_executor_options_t {
   // scheduling, and the environment).
   iree_duration_t worker_spin_ns;
 
+  // Minimum size in bytes of each worker thread stack.
+  // The underlying platform may allocate more stack space but _should_
+  // guarantee that the available stack space is near this amount. Note that the
+  // task system will take some stack space and not all bytes should be assumed
+  // usable. Note that as much as possible users should not rely on the stack
+  // for storage over ~16-32KB and instead use local workgroup memory.
+  iree_host_size_t worker_stack_size;
+
   // Defines the bytes to be allocated and reserved by each worker to use for
   // local memory operations. Will be rounded up to the next power of two.
   // Dispatches performed will be able to request up to this amount of memory

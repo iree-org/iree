@@ -34,32 +34,56 @@ static bool isRankZeroOrOneMemRef(Type type) {
   return false;
 }
 
-/// Returns the offset, in bytes, of an index within a linearized dense buffer
-/// and the element length accessed.
-/// Expects that the |memrefValue| has been linearized already.
-static std::pair<Value, Value> getBufferOffsetAndLength(
-    Location loc, Value memrefValue, ValueRange indices,
-    ConversionPatternRewriter &rewriter) {
-  // Element type byte length as the base. Note that this is the unconverted
-  // element type. Since these are storage types within a buffer, they are
-  // not subject to general type conversion (i.e. a general type converter
-  // may elect to represent all i8 registers as i32, but this does not mean
-  // that all memrefs are widened from i8 to i32).
-  auto memrefType = memrefValue.getType().cast<ShapedType>();
-  auto elementType = memrefType.getElementType();
-  auto elementSize =
-      rewriter.createOrFold<IREE::Util::SizeOfOp>(loc, elementType);
+static Value getElementTypeByteSize(OpBuilder &builder, Location loc,
+                                    Value memrefValue) {
+  auto elementType = memrefValue.getType().cast<ShapedType>().getElementType();
+  return builder.createOrFold<IREE::Util::SizeOfOp>(loc, elementType);
+}
 
+/// Returns the offset, in bytes, of an index within a linearized dense buffer.
+/// Expects that the |memrefValue| has been linearized already. This function
+/// only takes a `ValueRange indices` because that's more convenient for callers
+/// but in practice it only uses `indices[0]`.
+///
+static Value getByteOffsetForIndices(OpBuilder &builder, Location loc,
+                                     Value memrefValue, ValueRange indices,
+                                     Value elementTypeByteSize) {
+  auto memrefType = memrefValue.getType().cast<MemRefType>();
   if (memrefType.getRank() == 0) {
     // Rank 0 buffers (like memref<i32>) have only a single valid offset at 0.
-    return {rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0), elementSize};
+    return builder.createOrFold<arith::ConstantIndexOp>(loc, 0);
   }
-  assert(memrefType.getRank() == 1 && "memrefs should have been flattened");
+  if (memrefType.getRank() != 1) {
+    emitError(loc, "memrefs should have been flattened");
+    return {};
+  }
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  if (failed(getStridesAndOffset(memrefType, strides, offset)) ||
+      strides[0] != 1) {
+    emitError(loc, "expected memref stride 1");
+    return {};
+  }
 
   // Rank 1 memrefs are just offset by their element width by the offset.
-  auto elementCount = indices.front();
-  return {rewriter.create<arith::MulIOp>(loc, elementSize, elementCount),
-          elementSize};
+  auto elementCount = indices[0];
+  return builder.create<arith::MulIOp>(loc, elementTypeByteSize, elementCount);
+}
+
+static Value getByteLength(OpBuilder &builder, Location loc,
+                           Value memrefValue) {
+  auto memrefType = memrefValue.getType().cast<MemRefType>();
+  if (memrefType.getRank() == 0) {
+    return getElementTypeByteSize(builder, loc, memrefValue);
+  }
+  if (memrefType.getRank() != 1) {
+    emitError(loc, "memrefs should have been flattened");
+    return {};
+  }
+  Value size = builder.create<memref::DimOp>(loc, memrefValue, 0);
+  Value elementTypeByteSize = getElementTypeByteSize(builder, loc, memrefValue);
+  return getByteOffsetForIndices(builder, loc, memrefValue, {size},
+                                 elementTypeByteSize);
 }
 
 /// Pattern to lower operations that become a no-ops at this level.
@@ -152,19 +176,12 @@ struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
   LogicalResult matchAndRewrite(
       memref::AllocaOp allocaOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto type = allocaOp.getType().cast<ShapedType>();
-    if (!type.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(
-          allocaOp, "unable to create buffers for dynamic shapes");
-    }
-    auto numElements = rewriter.create<arith::ConstantIndexOp>(
-        allocaOp.getLoc(), type.getNumElements());
-    auto elementSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
-        allocaOp.getLoc(), type.getElementType());
-    auto allocationSize = rewriter.createOrFold<arith::MulIOp>(
-        allocaOp.getLoc(), numElements, elementSize);
+    Location loc = allocaOp.getLoc();
+    auto allocationSize = getByteLength(rewriter, loc, allocaOp.getMemref());
+    uint64_t alignment = allocaOp.getAlignment().value_or(0);
     rewriter.replaceOpWithNewOp<IREE::Util::BufferAllocOp>(
-        allocaOp, rewriter.getType<IREE::Util::BufferType>(), allocationSize);
+        allocaOp, rewriter.getType<IREE::Util::BufferType>(), allocationSize,
+        alignment ? rewriter.getIndexAttr(alignment) : IntegerAttr{});
     return success();
   }
 };
@@ -202,13 +219,17 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
     }
     auto oldType = loadOp.getResult().getType();
     auto newType = getTypeConverter()->convertType(oldType);
+    Location loc = loadOp.getLoc();
     auto memRefSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
-        loadOp.getLoc(), rewriter.getIndexType(), adaptor.getMemref());
-    auto [byteOffset, byteLength] = getBufferOffsetAndLength(
-        loadOp.getLoc(), loadOp.getMemref(), loadOp.getIndices(), rewriter);
+        loc, rewriter.getIndexType(), adaptor.getMemref());
+    auto elementTypeByteSize =
+        getElementTypeByteSize(rewriter, loc, loadOp.getMemref());
+    auto byteOffset =
+        getByteOffsetForIndices(rewriter, loc, loadOp.getMemref(),
+                                loadOp.getIndices(), elementTypeByteSize);
     Value loaded = rewriter.create<IREE::Util::BufferLoadOp>(
-        loadOp.getLoc(), oldType, adaptor.getMemref(), memRefSize, byteOffset,
-        byteLength);
+        loc, oldType, adaptor.getMemref(), memRefSize, byteOffset,
+        elementTypeByteSize);
     if (newType != oldType) {
       // Since the BufferLoadOp semantics include its result type (i.e. a load
       // of an i8 is different than a load of an i32), in the presence of type
@@ -216,9 +237,7 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
       // conversion cast for downstreams. In this case, further legalizations
       // will be required to resolve it. This comes up in A->B->C lowerings
       // where the BufferLoad is an intermediate stage.
-      loaded = rewriter
-                   .create<UnrealizedConversionCastOp>(loadOp.getLoc(), newType,
-                                                       loaded)
+      loaded = rewriter.create<UnrealizedConversionCastOp>(loc, newType, loaded)
                    .getResult(0);
     }
     rewriter.replaceOp(loadOp, loaded);
@@ -236,10 +255,14 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
           storeOp,
           "only rank-0 and rank-1 memrefs are supported; flatten first");
     }
+    Location loc = storeOp.getLoc();
     auto memRefSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
-        storeOp.getLoc(), rewriter.getIndexType(), adaptor.getMemref());
-    auto [byteOffset, byteLength] = getBufferOffsetAndLength(
-        storeOp.getLoc(), storeOp.getMemref(), storeOp.getIndices(), rewriter);
+        loc, rewriter.getIndexType(), adaptor.getMemref());
+    auto elementTypeByteSize =
+        getElementTypeByteSize(rewriter, loc, storeOp.getMemref());
+    auto byteOffset =
+        getByteOffsetForIndices(rewriter, loc, storeOp.getMemref(),
+                                storeOp.getIndices(), elementTypeByteSize);
     Value newValue = adaptor.getValue();
     if (newValue.getType() != storeOp.getValue().getType()) {
       // In combination with type conversion, the elemental type may change,
@@ -248,15 +271,27 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
       // conversion target widens). Insert an unrealized conversion cast to
       // preserve the original semantic. Presumably, something will clear this
       // with additional lowering.
-      newValue =
-          rewriter
-              .create<UnrealizedConversionCastOp>(
-                  storeOp.getLoc(), storeOp.getValue().getType(), newValue)
-              .getResult(0);
+      newValue = rewriter
+                     .create<UnrealizedConversionCastOp>(
+                         loc, storeOp.getValue().getType(), newValue)
+                     .getResult(0);
     }
     rewriter.replaceOpWithNewOp<IREE::Util::BufferStoreOp>(
         storeOp, newValue, adaptor.getMemref(), memRefSize, byteOffset,
-        byteLength);
+        elementTypeByteSize);
+    return success();
+  }
+};
+
+// Make `reinterpret_cast` a no-op.
+struct ConvertMemRefReinterpretCastOp
+    : public OpConversionPattern<memref::ReinterpretCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      memref::ReinterpretCastOp castOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(castOp, adaptor.getSource());
     return success();
   }
 };
@@ -271,7 +306,7 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
   conversionTarget.addIllegalDialect<memref::MemRefDialect>();
 
   typeConverter.addConversion(
-      [convertedBufferType](MemRefType type) -> llvm::Optional<Type> {
+      [convertedBufferType](MemRefType type) -> std::optional<Type> {
         if (isRankZeroOrOneMemRef(type)) {
           if (convertedBufferType) {
             return convertedBufferType;
@@ -286,10 +321,11 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
       .insert<FoldAsNoOp<bufferization::ToMemrefOp>,
               ElideNoOp<memref::AssumeAlignmentOp>, FoldAsNoOp<memref::CastOp>>(
           typeConverter, context);
-  patterns.insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
-                  ConvertMemRefAllocaOp, ConvertMemRefDimOp,
-                  ConvertMemRefLoadOp, ConvertMemRefStoreOp>(typeConverter,
-                                                             context);
+  patterns
+      .insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
+              ConvertMemRefAllocaOp, ConvertMemRefDimOp, ConvertMemRefLoadOp,
+              ConvertMemRefStoreOp, ConvertMemRefReinterpretCastOp>(
+          typeConverter, context);
 }
 
 }  // namespace iree_compiler

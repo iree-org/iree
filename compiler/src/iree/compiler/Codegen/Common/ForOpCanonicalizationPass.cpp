@@ -8,9 +8,9 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -86,7 +86,8 @@ struct CanonicalizeForOpInductionVarShape final
     rewriter.mergeBlocks(source, dest, dest->getArguments());
     // Replace the yield op by one that returns only the used values.
     auto yieldOp = cast<scf::YieldOp>(dest->getTerminator());
-    yieldOp.getOperation()->setOperands(results);
+    rewriter.updateRootInPlace(
+        yieldOp, [&]() { yieldOp.getOperation()->setOperands(results); });
   }
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
@@ -110,7 +111,7 @@ struct CanonicalizeForOpInductionVarShape final
       resultOps.push_back(returnValDef);
       returnValues[index] = newReturn;
 
-      BlockAndValueMapping mapping;
+      IRMapping mapping;
       mapping.map(iterArg, initArgs[index]);
       initArgs[index] = rewriter.clone(*op, mapping)->getResult(0);
     }
@@ -124,14 +125,15 @@ struct CanonicalizeForOpInductionVarShape final
     SmallVector<Value, 8> repResults(newLoop.getResults().begin(),
                                      newLoop.getResults().end());
     for (auto [index, iter] : llvm::enumerate(iteratorFolded)) {
-      BlockAndValueMapping mapping;
+      IRMapping mapping;
       mapping.map(returnValues[iter], newLoop.getResult(iter));
       repResults[index] =
           rewriter.clone(*resultOps[index], mapping)->getResult(0);
       Operation* oldOp =
           newLoop.getRegionIterArgs()[index].use_begin()->getOwner();
-      SmallVector<Value, 1> arg(1, newLoop.getRegionIterArgs()[index]);
-      oldOp->replaceAllUsesWith(arg);
+      assert(oldOp->getNumResults() == 1 && "expected single result");
+      rewriter.replaceAllUsesWith(oldOp->getResult(0),
+                                  newLoop.getRegionIterArgs()[index]);
     }
     rewriter.replaceOp(forOp, repResults);
     return success();

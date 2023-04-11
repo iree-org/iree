@@ -427,7 +427,7 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
         # reduction axes return True.
         *tf_test_utils.unit_test_specs_from_args(
             names_to_input_args={
-                "all_true": [np.ones(RANK_7_SHAPE, np.bool)],
+                "all_true": [np.ones(RANK_7_SHAPE, bool)],
             },
             kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
         *tf_test_utils.unit_test_specs_from_signatures(
@@ -440,7 +440,7 @@ FUNCTIONS_TO_UNIT_TEST_SPECS = {
         # reduction axes return False.
         *tf_test_utils.unit_test_specs_from_args(
             names_to_input_args={
-                "all_false": [np.zeros(RANK_7_SHAPE, np.bool)],
+                "all_false": [np.zeros(RANK_7_SHAPE, bool)],
             },
             kwargs_to_values=REDUCE_KWARGS_TO_VALUES),
         *tf_test_utils.unit_test_specs_from_signatures(

@@ -23,10 +23,10 @@ hal.executable @matmul_1x4096x9216 {
         %c209920 = arith.constant 209920 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x9216xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c209920) alignment(64) : !flow.dispatch.tensor<readonly:tensor<9216x4096xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c667974912) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x4096xf32>>
-        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c36864) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1x4096xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x9216xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c209920) : !flow.dispatch.tensor<readonly:tensor<9216x4096xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c667974912) : !flow.dispatch.tensor<readonly:tensor<1x4096xf32>>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c36864) : !flow.dispatch.tensor<writeonly:tensor<1x4096xf32>>
         %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 9216], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x9216xf32>> -> tensor<1x9216xf32>
         %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [9216, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<9216x4096xf32>> -> tensor<9216x4096xf32>
         %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x4096xf32>> -> tensor<1x4096xf32>

@@ -95,7 +95,7 @@ allowing them to be patched out of band. These repositories are:
 * https://github.com/iree-org/iree-tf-fork (`master` branch)
 
 Iree repository has an
-action named [Advance Upstream Forks](https://github.com/iree-org/iree/actions/workflows/advance_upstream_forks.yml)
+action named [Advance Upstream Forks](https://github.com/openxla/iree/actions/workflows/advance_upstream_forks.yml)
 to update the forks. Just select `Run Workflow` on that action and give it a
 minute. You should see the fork repository mainline branch move forward. This
 action runs hourly. If needing up to the minute changes, you may need to trigger
@@ -302,6 +302,20 @@ git commit ...
 git push UPSTREAM_AUTOMATION bump-llvm-...
 ```
 
+### Update C-API exported
+
+If a new symbol needs to be export in the C-API run this [script](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/API/generate_exports.py)
+from IREE root directory:
+
+```
+python compiler/src/iree/compiler/API/generate_exports.py
+```
+
+Missing symbols would usually cause the following kind of errors in python builf kind of error:
+```
+ImportError: /work/full-build-dir/compiler/bindings/python/iree/compiler/_mlir_libs/_mlir.cpython-37m-x86_64-linux-gnu.so: undefined symbol: mlirLocationFromAttribute
+```
+
 ### Cherry-picking
 
 Please add the integrator to reviewers in the cherry-pick PR, so the integrator
@@ -358,8 +372,8 @@ under docker, we can find the hash from CI log.
 An example from a log:
 
 ```
-[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:8dbbfe9d0b9d72e8af591f9390ef8865536cc67bd262285335b7a83b2218548d build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
-Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:8dbbfe9d0b9d72e8af591f9390ef8865536cc67bd262285335b7a83b2218548d' locally
+[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:800c9bbefc2f396f99b91a29bead233d85b746fa1effa7845a4336c9b6106dd6 build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
+Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:800c9bbefc2f396f99b91a29bead233d85b746fa1effa7845a4336c9b6106dd6' locally
 sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405: Pulling from iree-oss/frontends-swiftshader
 ```
 
@@ -367,7 +381,7 @@ You can find the hash tag from log and run the below command. It makes sure that
 you have the enviroment as same as CI bot and requires less local setup.
 
 ```
-docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:8dbbfe9d0b9d72e8af591f9390ef8865536cc67bd262285335b7a83b2218548d
+docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:800c9bbefc2f396f99b91a29bead233d85b746fa1effa7845a4336c9b6106dd6
 ```
 
 To repro failures in `iree/e2e/`:
@@ -402,7 +416,7 @@ cmake -G Ninja \
   ..
 ```
 
-To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/iree-org/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
+To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [doc](https://github.com/openxla/iree/blob/main/docs/developers/get_started/building_with_bazel_linux.md) to build IREE using bazel. E.g.,
 
 ```bash
 export CC=clang

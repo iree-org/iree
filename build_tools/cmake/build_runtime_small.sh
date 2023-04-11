@@ -18,11 +18,13 @@ source build_tools/cmake/setup_ccache.sh
 
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \
   -G Ninja . \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
   -DIREE_SIZE_OPTIMIZED=ON \
   -DIREE_BUILD_COMPILER=OFF
 "${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
 
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
 fi

@@ -13,6 +13,7 @@
 #include "iree/vm/ref.h"
 #include "iree/vm/type_def.h"
 #include "iree/vm/value.h"
+#include "iree/vm/variant.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,6 +105,32 @@ IREE_API_EXPORT iree_status_t iree_vm_list_resize(iree_vm_list_t* list,
 // Clears the list contents. Equivalent to resizing to 0.
 IREE_API_EXPORT void iree_vm_list_clear(iree_vm_list_t* list);
 
+// Swaps the storage of |list_a| and |list_b|. The list references remain the
+// same but the count, capacity, and underlying storage will be swapped. This
+// can be used to treat lists as persistent stable references to dynamically
+// mutated storage such as when emulating structs or dicts.
+//
+// WARNING: if a list is initialized in-place with iree_vm_list_initialize this
+// will still perform the storage swap but may lead to unexpected issues if the
+// lifetime of the storage is shorter than the lifetime of the newly-swapped
+// list.
+IREE_API_EXPORT void iree_vm_list_swap_storage(iree_vm_list_t* list_a,
+                                               iree_vm_list_t* list_b);
+
+// Copies |count| elements from |src_list| starting at |src_i| to |dst_list|
+// starting at |dst_i|. The ranges specified must be valid in both lists.
+//
+// Supported list types:
+//   any type -> variant list
+//   variant list -> compatible element types only
+//   same value type -> same value type
+//   same ref type -> same ref type
+IREE_API_EXPORT iree_status_t iree_vm_list_copy(iree_vm_list_t* src_list,
+                                                iree_host_size_t src_i,
+                                                iree_vm_list_t* dst_list,
+                                                iree_host_size_t dst_i,
+                                                iree_host_size_t count);
+
 // Returns the value of the element at the given index.
 // Note that the value type may vary from element to element in variant lists
 // and callers should check the |out_value| type.
@@ -176,22 +203,48 @@ iree_vm_list_pop_front_ref_move(iree_vm_list_t* list, iree_vm_ref_t* out_value);
 // a ref it will *not* be retained and the caller must retain it to extend its
 // lifetime.
 IREE_API_EXPORT iree_status_t
-iree_vm_list_get_variant(const iree_vm_list_t* list, iree_host_size_t i,
-                         iree_vm_variant_t* out_value);
+iree_vm_list_get_variant_assign(const iree_vm_list_t* list, iree_host_size_t i,
+                                iree_vm_variant_t* out_variant);
+
+// Returns the value of the element at the given index.
+// If the variant is a ref then it will be retained.
+IREE_API_EXPORT iree_status_t
+iree_vm_list_get_variant_retain(const iree_vm_list_t* list, iree_host_size_t i,
+                                iree_vm_variant_t* out_variant);
+
+// Returns the value of the element at the given index.
+// If the variant is a ref then it will be moved.
+IREE_API_EXPORT iree_status_t
+iree_vm_list_get_variant_move(const iree_vm_list_t* list, iree_host_size_t i,
+                              iree_vm_variant_t* out_variant);
 
 // Sets the value of the element at the given index. If the specified |value|
 // type differs from the list storage type the value will be converted using the
 // value type semantics (such as sign/zero extend, etc). If the variant is a ref
 // then it will be retained.
-IREE_API_EXPORT iree_status_t iree_vm_list_set_variant(
-    iree_vm_list_t* list, iree_host_size_t i, const iree_vm_variant_t* value);
+IREE_API_EXPORT iree_status_t iree_vm_list_set_variant_retain(
+    iree_vm_list_t* list, iree_host_size_t i, const iree_vm_variant_t* variant);
+
+// Sets the value of the element at the given index. If the specified |value|
+// type differs from the list storage type the value will be converted using the
+// value type semantics (such as sign/zero extend, etc). If the variant is a ref
+// then it will be moved.
+IREE_API_EXPORT iree_status_t iree_vm_list_set_variant_move(
+    iree_vm_list_t* list, iree_host_size_t i, iree_vm_variant_t* variant);
 
 // Pushes the value of the element to the end of the list. If the specified
-// |value| type differs from the list storage type the value will be converted
+// |variant| type differs from the list storage type the value will be converted
 // using the value type semantics (such as sign/zero extend, etc). If the
 // variant is a ref then it will be retained.
-IREE_API_EXPORT iree_status_t
-iree_vm_list_push_variant(iree_vm_list_t* list, const iree_vm_variant_t* value);
+IREE_API_EXPORT iree_status_t iree_vm_list_push_variant_retain(
+    iree_vm_list_t* list, const iree_vm_variant_t* variant);
+
+// Pushes the value of the element to the end of the list. If the specified
+// |variant| type differs from the list storage type the value will be converted
+// using the value type semantics (such as sign/zero extend, etc). If the
+// variant is a ref then it will be moved.
+IREE_API_EXPORT iree_status_t iree_vm_list_push_variant_move(
+    iree_vm_list_t* list, iree_vm_variant_t* variant);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -173,9 +173,8 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
                                 const TransformOptions &transformOptions) {
   // Schedule fine-grained allocations and insert placeholders for larger/longer
   // lifetime allocations.
+  passManager.addPass(IREE::Stream::createScheduleAllocationPass());
   FunctionLikeNest(passManager)
-      .addPass(IREE::Stream::createScheduleAllocationPass)
-
       // TODO(benvanik): passes to convert alloc to alloca and thread through
       // streams. Ideally all transient allocs become stream-ordered allocas.
       // createPropagateTransientsPass()
@@ -266,6 +265,11 @@ void buildStreamOptimizationPassPipeline(
     // dispatches and the dispatch function argument order.
   }
 
+  // Annotate dispatch region arguments based on the operands passed at dispatch
+  // sites. This allows codegen to see the potential values for the operands
+  // when operating locally on executables.
+  passManager.addPass(IREE::Stream::createAnnotateDispatchArgumentsPass());
+
   // Pack dispatch operands on stream.executable into i32 values.
   // We do this prior to exiting the pipeline as here we can still easily
   // add/remove operands.
@@ -284,15 +288,6 @@ void buildStreamOptimizationPassPipeline(
   // TODO(benvanik): when we spill push constants spill to staging buffers.
   // Need to know push constant limit but that could be specified as a stream
   // option (max operand count).
-
-  //----------------------------------------------------------------------------
-  // Annotations to aid future lowering pipelines
-  //----------------------------------------------------------------------------
-
-  // Annotate dispatch region arguments based on the operands passed at dispatch
-  // sites. This allows codegen to see the potential values for the operands
-  // when operating locally on executables.
-  passManager.addPass(IREE::Stream::createAnnotateDispatchArgumentsPass());
 }
 
 //===----------------------------------------------------------------------===//

@@ -296,8 +296,10 @@ typedef uint8_t iree_hal_collective_kind_t;
 
 // Specifies the reduction operator of a collective reduction operation.
 enum iree_hal_collective_reduction_e {
+  // Specifies that the reduction operation is unspecified.
+  IREE_HAL_COLLECTIVE_REDUCTION_NONE = 0,
   // Specifies that the reduction operation computes a sum (addition).
-  IREE_HAL_COLLECTIVE_REDUCTION_SUM = 0,
+  IREE_HAL_COLLECTIVE_REDUCTION_SUM = 1,
   // Specifies that the reduction operation computes a product (multiplication).
   IREE_HAL_COLLECTIVE_REDUCTION_PRODUCT,
   // Specifies that the reduction operation computes a minimum (min).
@@ -306,6 +308,9 @@ enum iree_hal_collective_reduction_e {
   IREE_HAL_COLLECTIVE_REDUCTION_MAXIMUM,
   // Specifies that the reduction operation computes an average (avg).
   IREE_HAL_COLLECTIVE_REDUCTION_AVERAGE,
+  // Maximum enumeration value for reduction types.
+  IREE_HAL_COLLECTIVE_REDUCTION_MAX_VALUE =
+      IREE_HAL_COLLECTIVE_REDUCTION_AVERAGE,
 };
 typedef uint8_t iree_hal_collective_reduction_t;
 
@@ -327,6 +332,8 @@ enum iree_hal_collective_element_type_e {
   IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_32,
   IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_64,
   IREE_HAL_COLLECTIVE_ELEMENT_TYPE_BFLOAT_16,
+  IREE_HAL_COLLECTIVE_ELEMENT_TYPE_MAX_VALUE =
+      IREE_HAL_COLLECTIVE_ELEMENT_TYPE_BFLOAT_16,
 };
 typedef uint8_t iree_hal_collective_element_type_t;
 
@@ -346,6 +353,11 @@ typedef union {
 } iree_hal_collective_op_t;
 static_assert(sizeof(iree_hal_collective_op_t) == sizeof(uint32_t),
               "must pack");
+
+// Writes a string description of |op| to the |out_temp| storage and returns
+// a string view into the storage of the resulting value.
+IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
+    const iree_hal_collective_op_t* op, iree_bitfield_string_temp_t* out_temp);
 
 // Describes a subrange of a buffer that can be bound to a binding slot.
 typedef struct iree_hal_buffer_binding_t {

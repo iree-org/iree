@@ -20,6 +20,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-fuse-dispatch-bindings"
@@ -86,20 +87,17 @@ static SmallVector<Binding> findCorrelatedBindings(
   for (auto dispatchOp : dispatchOps) {
     llvm::EquivalenceClasses<unsigned> ec;
     DenseMap<Value, unsigned> leaders;
-    for (auto it : llvm::enumerate(llvm::zip_equal(
-             dispatchOp.getResources(), dispatchOp.getResourceAccesses()))) {
-      auto resource = std::get<0>(it.value());
-
+    for (auto [idx, resource, resourceAccessAttr] : llvm::enumerate(
+             dispatchOp.getResources(), dispatchOp.getResourceAccesses())) {
       // If the resource is mutable and we were told not to alias mutable
       // bindings we always put the resource into its own class.
       auto resourceAccess =
-          std::get<1>(it.value())
-              .cast<IREE::Stream::ResourceAccessBitfieldAttr>();
+          resourceAccessAttr.cast<IREE::Stream::ResourceAccessBitfieldAttr>();
       if (!aliasMutableBindings &&
           bitEnumContainsAll(resourceAccess.getValue(),
                              IREE::Stream::ResourceAccessBitfield::Write)) {
-        ec.insert(it.index());
-        leaders.insert(std::make_pair(resource, it.index()));
+        ec.insert(idx);
+        leaders.insert(std::make_pair(resource, idx));
         continue;
       }
 
@@ -107,11 +105,11 @@ static SmallVector<Binding> findCorrelatedBindings(
       auto ecIt = leaders.find(resource);
       if (ecIt == leaders.end()) {
         // New unique value.
-        ec.insert(it.index());
-        leaders.insert(std::make_pair(resource, it.index()));
+        ec.insert(idx);
+        leaders.insert(std::make_pair(resource, idx));
       } else {
         // Found existing; union with leader.
-        ec.unionSets(ecIt->second, it.index());
+        ec.unionSets(ecIt->second, idx);
       }
     }
     ecs.push_back(std::move(ec));
@@ -214,9 +212,12 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
         if (auto subspanOp =
                 dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner())) {
           OpBuilder builder(subspanOp);
-          auto sum = builder.createOrFold<arith::AddIOp>(
-              newBindingArg.getLoc(), subspanOp.getByteOffset(), offsetArg);
-          subspanOp.getByteOffsetMutable().assign(sum);
+          Value offsetSum = offsetArg;
+          if (!mlir::matchPattern(subspanOp.getByteOffset(), m_Zero())) {
+            offsetSum = builder.createOrFold<arith::AddIOp>(
+                newBindingArg.getLoc(), subspanOp.getByteOffset(), offsetSum);
+          }
+          subspanOp.getByteOffsetMutable().assign(offsetSum);
         }
         use.set(newBindingArg);
       }
@@ -297,7 +298,7 @@ static void updateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
   OpBuilder builder(dispatchOp);
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
       dispatchOp.getLoc(), dispatchOp.getWorkload(),
-      dispatchOp.getEntryPointAttr(), newOperands, newResources,
+      dispatchOp.getEntryPointsAttr(), newOperands, newResources,
       newResourceSizes, newOffsets, newLengths,
       builder.getArrayAttr(newAccesses));
   (void)newOp;
@@ -431,9 +432,11 @@ class FuseDispatchBindingsPass
     DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.getEntryPoint());
-      entryDispatchMap[exportOp].push_back(dispatchOp);
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp =
+            symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+        entryDispatchMap[exportOp].push_back(dispatchOp);
+      });
     });
 
     // Perform fusion for each executable entry point using all known dispatches

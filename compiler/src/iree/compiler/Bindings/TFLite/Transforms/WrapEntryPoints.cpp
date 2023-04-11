@@ -94,7 +94,7 @@ class WrapEntryPointsPass
     TensorType tensorType;
     mutable SmallVector<IREE::Util::GlobalOp> globalOps;
 
-    SmallVector<Value> loadDynamicDims(OpBuilder &builder) {
+    SmallVector<Value> loadDynamicDims(OpBuilder &builder) const {
       SmallVector<Value> dims;
       unsigned dynamicDimIdx = 0;
       for (unsigned i = 0; i < tensorType.getRank(); ++i) {
@@ -159,24 +159,22 @@ class WrapEntryPointsPass
     }
 
     SmallVector<DynamicDims> inputDynamicDims;
-    for (auto input : llvm::zip_equal(funcOp.getArguments(), inputNames,
-                                      funcType.getInputs())) {
-      auto argLoc = std::get<0>(input).getLoc();
-      auto name = (namePrefix + "_" + std::get<1>(input) + "_shape").str();
-      auto type = std::get<2>(input);
-      auto tensorType = type.dyn_cast<TensorType>();
+    for (auto [arg, inputName, inputType] : llvm::zip_equal(
+             funcOp.getArguments(), inputNames, funcType.getInputs())) {
+      auto fullName = (namePrefix + "_" + inputName + "_shape").str();
+      auto tensorType = inputType.dyn_cast<TensorType>();
       assert(tensorType && "expecting only tensors in tflite function I/O");
-      inputDynamicDims.push_back(
-          createDynamicDimGlobals(argLoc, name, tensorType, moduleBuilder));
+      inputDynamicDims.push_back(createDynamicDimGlobals(
+          arg.getLoc(), fullName, tensorType, moduleBuilder));
     }
     SmallVector<DynamicDims> outputDynamicDims;
-    for (auto output : llvm::zip_equal(outputNames, funcType.getResults())) {
-      auto name = (namePrefix + "_" + std::get<0>(output) + "_shape").str();
-      auto type = std::get<1>(output);
-      auto tensorType = type.dyn_cast<TensorType>();
+    for (auto [outputName, outputType] :
+         llvm::zip_equal(outputNames, funcType.getResults())) {
+      auto fullName = (namePrefix + "_" + outputName + "_shape").str();
+      auto tensorType = outputType.dyn_cast<TensorType>();
       assert(tensorType && "expecting only tensors in tflite function I/O");
       outputDynamicDims.push_back(
-          createDynamicDimGlobals(loc, name, tensorType, moduleBuilder));
+          createDynamicDimGlobals(loc, fullName, tensorType, moduleBuilder));
     }
 
     return std::make_pair(inputDynamicDims, outputDynamicDims);
@@ -219,16 +217,14 @@ class WrapEntryPointsPass
     calcFuncOp.setType(
         recalculateBuilder.getFunctionType(/*inputs=*/TypeRange{},
                                            /*outputs=*/TypeRange{}));
-    for (auto inputValueDims :
+    for (auto [inputValue, inputDynamicDims] :
          llvm::zip_equal(entryBlock.getArguments(), inputDynamicDims)) {
-      auto inputValue = std::get<0>(inputValueDims);
-      auto inputDynamicDims = std::get<1>(inputValueDims);
       auto inputPlaceholder =
           recalculateBuilder.createOrFold<IREE::Util::NullOp>(loc, bufferType);
       auto dynamicDims = inputDynamicDims.loadDynamicDims(recalculateBuilder);
       auto castOp = recalculateBuilder.create<IREE::HAL::TensorImportOp>(
           loc, inputValue.getType(), inputPlaceholder, inputValue.getType(),
-          dynamicDims, /*wait_fence=*/Value{});
+          dynamicDims, /*wait_fence=*/Value{}, /*name=*/nullptr);
       inputValue.replaceAllUsesWith(castOp.getTarget());
     }
     while (entryBlock.getNumArguments() > 0) {
@@ -247,10 +243,8 @@ class WrapEntryPointsPass
       // Store the derived shape values into the output shape variables.
       // We do this per exit-site so that if the function has multiple code
       // paths that may return different shape sizes we capture them all.
-      for (auto outputValueDims :
+      for (auto [outputValue, outputDynamicDims] :
            llvm::zip_equal(returnOp.getOperands(), outputDynamicDims)) {
-        auto outputValue = std::get<0>(outputValueDims);
-        auto outputDynamicDims = std::get<1>(outputValueDims);
         SmallVector<Value> dynamicDims;
         for (int64_t i = 0; i < outputDynamicDims.globalOps.size(); ++i) {
           auto dimValue =
@@ -515,10 +509,8 @@ class WrapEntryPointsPass
     auto *entryBlock = wrapperFuncOp.addEntryBlock();
     auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
     SmallVector<Value> callOperands;
-    for (auto input :
+    for (auto [arg, inputDynamicDims] :
          llvm::zip_equal(entryBlock->getArguments(), inputDynamicDims)) {
-      auto arg = std::get<0>(input);
-      auto inputDynamicDims = std::get<1>(input);
       SmallVector<Value> dynamicDims;
       for (auto globalOp : inputDynamicDims.globalOps) {
         dynamicDims.push_back(entryBuilder.create<IREE::Util::GlobalLoadOp>(
@@ -527,15 +519,13 @@ class WrapEntryPointsPass
       callOperands.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), inputDynamicDims.tensorType, arg,
           TypeAttr::get(inputDynamicDims.tensorType), dynamicDims,
-          /*wait_fence=*/Value{}));
+          /*wait_fence=*/Value{}, /*name=*/nullptr));
     }
     auto callOp = entryBuilder.create<mlir::func::CallOp>(
         entryFuncOp.getLoc(), entryFuncOp, callOperands);
     SmallVector<Value> callResults;
-    for (auto output :
+    for (auto [result, outputDynamicDims] :
          llvm::zip_equal(callOp.getResults(), outputDynamicDims)) {
-      auto result = std::get<0>(output);
-      auto outputDynamicDims = std::get<1>(output);
       SmallVector<Value> dynamicDims;
       for (unsigned i = 0; i < outputDynamicDims.tensorType.getRank(); ++i) {
         if (outputDynamicDims.tensorType.isDynamicDim(i)) {
@@ -545,11 +535,9 @@ class WrapEntryPointsPass
       }
       callResults.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), bufferType, result, outputDynamicDims.tensorType,
-          dynamicDims, /*target_storage=*/nullptr));
-      for (auto it :
+          dynamicDims, /*target_storage=*/nullptr, /*name=*/nullptr));
+      for (auto [dynamicDim, globalOp] :
            llvm::zip_equal(dynamicDims, outputDynamicDims.globalOps)) {
-        auto dynamicDim = std::get<0>(it);
-        auto globalOp = std::get<1>(it);
         entryBuilder.create<IREE::Util::GlobalStoreOp>(
             result.getLoc(), dynamicDim, globalOp.getSymName());
       }

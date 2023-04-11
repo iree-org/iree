@@ -18,7 +18,7 @@
 #include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 #if defined(IREE_HAVE_VMVX_MODULE)
 #include "iree/modules/vmvx/module.h"
@@ -32,7 +32,7 @@
 // either files or builtin module names in order to customize things. When we
 // support multiple types of dynamically loadable modules (lua/etc) we could
 // also allow mixes and use file ID snooping to choose a loader.
-IREE_FLAG(string, module_file, "-",
+IREE_FLAG(string, module, "-",
           "File containing the module to load. Defaults to stdin (`-`).");
 
 iree_status_t iree_tooling_load_module_from_flags(
@@ -42,13 +42,13 @@ iree_status_t iree_tooling_load_module_from_flags(
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, FLAG_module_file);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, FLAG_module);
 
   // Fetch the file contents into memory.
   // We could map the memory here if we wanted to and were coming from a file
   // on disk.
   iree_file_contents_t* file_contents = NULL;
-  if (strcmp(FLAG_module_file, "-") == 0) {
+  if (strcmp(FLAG_module, "-") == 0) {
     // Reading from stdin. We print it out here because people often get
     // confused when the tool hangs waiting for input.
     fprintf(stderr, "Reading module contents from stdin...\n");
@@ -56,8 +56,8 @@ iree_status_t iree_tooling_load_module_from_flags(
         z0, iree_stdin_read_contents(host_allocator, &file_contents));
   } else {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_file_read_contents(FLAG_module_file, host_allocator,
-                                    &file_contents));
+        z0,
+        iree_file_read_contents(FLAG_module, host_allocator, &file_contents));
   }
 
   // Try to load the module as bytecode (all we have today that we can use).
@@ -111,8 +111,9 @@ static iree_status_t iree_tooling_load_hal_async_module(
   }
   iree_hal_device_t* device = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_create_device_from_flags(default_device_uri, host_allocator,
-                                            &device));
+      z0, iree_hal_create_device_from_flags(
+              iree_hal_available_driver_registry(), default_device_uri,
+              host_allocator, &device));
 
   // Fetch the allocator from the device to pass back to the caller.
   iree_hal_allocator_t* device_allocator = iree_hal_device_allocator(device);

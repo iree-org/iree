@@ -339,6 +339,11 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   pthread_setaffinity_np(thread->handle, sizeof(cpu_set), &cpu_set);
 #endif  // IREE_PLATFORM_*
 
+  // TODO(benvanik): make a set_mempolicy syscall where available to set the
+  // NUMA allocation pinning for the calling thread. We'll likely want an
+  // iree_allocator_t control operation for this to allow users to plug in
+  // their own implementations and also let the HAL pin allocated buffers.
+
   IREE_TRACE_ZONE_END(z0);
 }
 

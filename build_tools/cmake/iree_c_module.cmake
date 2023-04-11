@@ -41,7 +41,7 @@ function(iree_c_module)
   endif()
 
   if(_RULE_STATIC_LIB_PATH AND
-     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
+     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR IREE_HOST_BIN_DIR))
     message(SEND_ERROR "Static library only supports llvm-cpu backend")
   endif()
 
@@ -60,7 +60,6 @@ function(iree_c_module)
     set(_COMPILE_TOOL "iree-compile")
   endif()
 
-  iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
   get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
 
   set(_ARGS "--output-format=vm-c")
@@ -73,9 +72,9 @@ function(iree_c_module)
   # Check LLVM static library setting. If the static libary output path is set,
   # retrieve the object path and the corresponding header file path.
   if(_RULE_STATIC_LIB_PATH)
-    list(APPEND _ARGS "--iree-llvm-link-embedded=false")
-    list(APPEND _ARGS "--iree-llvm-link-static")
-    list(APPEND _ARGS "--iree-llvm-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
+    list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
+    list(APPEND _ARGS "--iree-llvmcpu-link-static")
+    list(APPEND _ARGS "--iree-llvmcpu-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
 
     string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
     list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
@@ -88,9 +87,8 @@ function(iree_c_module)
 
   add_custom_command(
     OUTPUT ${_OUTPUT_FILES}
-    COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_ARGS}
-    # Changes to either the compiler tool or the input source should rebuild.
-    DEPENDS ${_COMPILE_TOOL_EXECUTABLE} ${_SRC_PATH}
+    COMMAND ${_COMPILE_TOOL} ${_ARGS}
+    DEPENDS ${_COMPILE_TOOL} ${_SRC_PATH}
   )
 
   iree_cc_library(
@@ -103,7 +101,7 @@ function(iree_c_module)
       "${_TESTONLY_ARG}"
     DEPS
       # Include paths and options for the runtime sources.
-      iree::runtime::src::defs
+      iree::defs
   )
 
   if(_RULE_NO_RUNTIME)

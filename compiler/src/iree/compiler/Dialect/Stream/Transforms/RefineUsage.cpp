@@ -358,6 +358,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncLoadOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncStoreOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncDispatchOp>,
+                  ApplyStreamableOp<IREE::Stream::AsyncCallOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncExecuteOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncConcurrentOp>,
                   ApplyStreamableOp<IREE::Stream::YieldOp>>(context, analysis);

@@ -96,11 +96,30 @@
 // or stick to generic code.
 #include "iree/builtins/ukernel/arch/config.h"
 
+// Now that we have IREE_UK_ARCH_ARM_64 et al defined, based on that we can
+// include the architecture-specific configured header. What it defines is
+// architecture-specific details that we don't necessarily need in this header,
+// but having it included here ensures that all files consistently have this
+// defined.
+#if defined(IREE_UK_ARCH_ARM_64)
+#include "iree/builtins/ukernel/arch/arm_64/config.h"
+#elif defined(IREE_UK_ARCH_X86_64)
+#include "iree/builtins/ukernel/arch/x86_64/config.h"
+#endif
+
 // Include common flag values, shared with the compiler.
-#include "iree/builtins/ukernel/exported_flag_bits.h"
+#include "iree/builtins/ukernel/exported_bits.h"
 
 // Include IREE_UK_STATIC_ASSERT.
 #include "iree/builtins/ukernel/static_assert.h"
+
+// Clang on Windows has __builtin_clzll; otherwise we need to use the
+// windows intrinsic functions.
+#if defined(_MSC_VER)
+#include <intrin.h>
+#pragma intrinsic(_BitScanReverse)
+#pragma intrinsic(_BitScanForward)
+#endif  // defined(_MSC_VER)
 
 #ifdef __cplusplus
 extern "C" {
@@ -195,6 +214,21 @@ extern "C" {
 #define IREE_UK_ATTRIBUTE_NOINLINE
 #endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
 
+#if defined(__GNUC__) || defined(__clang__)
+#define IREE_UK_LIKELY(x) (__builtin_expect(!!(x), 1))
+#define IREE_UK_UNLIKELY(x) (__builtin_expect(!!(x), 0))
+#else
+#define IREE_UK_LIKELY(x) (x)
+#define IREE_UK_UNLIKELY(x) (x)
+#endif  // IREE_HAVE_ATTRIBUTE(likely)
+
+#if IREE_UK_HAVE_ATTRIBUTE(aligned) || \
+    (defined(__GNUC__) && !defined(__clang__))
+#define IREE_UK_ATTRIBUTE_ALIGNED(N) __attribute__((aligned(N)))
+#else
+#define IREE_UK_ATTRIBUTE_ALIGNED(N)
+#endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
+
 //===----------------------------------------------------------------------===//
 // Local replacements for stdint.h types and constants
 // Refer to the comment at the top of this file for why we can't include
@@ -224,18 +258,31 @@ IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint16_t) == 2);
 IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint32_t) == 4);
 IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint64_t) == 8);
 
-#define IREE_UK_INT8_MIN (-127i8 - 1)
-#define IREE_UK_INT16_MIN (-32767i16 - 1)
-#define IREE_UK_INT32_MIN (-2147483647i32 - 1)
-#define IREE_UK_INT64_MIN (-9223372036854775807i64 - 1)
-#define IREE_UK_INT8_MAX 127i8
-#define IREE_UK_INT16_MAX 32767i16
-#define IREE_UK_INT32_MAX 2147483647i32
-#define IREE_UK_INT64_MAX 9223372036854775807i64
-#define IREE_UK_UINT8_MAX 0xffui8
-#define IREE_UK_UINT16_MAX 0xffffui16
-#define IREE_UK_UINT32_MAX 0xffffffffui32
-#define IREE_UK_UINT64_MAX 0xffffffffffffffffui64
+#define IREE_UK_INT8_MIN -0x80
+#define IREE_UK_INT16_MIN -0x8000
+#define IREE_UK_INT32_MIN -0x80000000
+#define IREE_UK_INT64_MIN -0x8000000000000000LL
+#define IREE_UK_INT8_MAX 0x7f
+#define IREE_UK_INT16_MAX 0x7fff
+#define IREE_UK_INT32_MAX 0x7fffffff
+#define IREE_UK_INT64_MAX 0x7fffffffffffffffLL
+#define IREE_UK_UINT8_MAX 0xff
+#define IREE_UK_UINT16_MAX 0xffff
+#define IREE_UK_UINT32_MAX 0xffffffffU
+#define IREE_UK_UINT64_MAX 0xffffffffffffffffULL
+
+IREE_UK_STATIC_ASSERT(IREE_UK_INT8_MIN == -(1 << 7));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT16_MIN == -(1 << 15));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT32_MIN == -(1U << 31));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT64_MIN == -(1ULL << 63));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT8_MAX == (1 << 7) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT16_MAX == (1 << 15) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT32_MAX == (1U << 31) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT64_MAX == (1ULL << 63) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT8_MAX == ((iree_uk_uint8_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT16_MAX == ((iree_uk_uint16_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT32_MAX == ((iree_uk_uint32_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT64_MAX == ((iree_uk_uint64_t)-1));
 
 // Helper for microkernel input validation
 #define IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(VALUE, BIT_COUNT) \
@@ -263,6 +310,22 @@ static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
   *b = t;
 }
 
+static inline iree_uk_ssize_t iree_uk_ssize_min(iree_uk_ssize_t a,
+                                                iree_uk_ssize_t b) {
+  return a <= b ? a : b;
+}
+
+static inline iree_uk_ssize_t iree_uk_ssize_max(iree_uk_ssize_t a,
+                                                iree_uk_ssize_t b) {
+  return a >= b ? a : b;
+}
+
+static inline iree_uk_ssize_t iree_uk_ssize_clamp(iree_uk_ssize_t val,
+                                                  iree_uk_ssize_t min,
+                                                  iree_uk_ssize_t max) {
+  return iree_uk_ssize_min(max, iree_uk_ssize_max(min, val));
+}
+
 //===----------------------------------------------------------------------===//
 // Local replacement for stdbool.h
 //===----------------------------------------------------------------------===//
@@ -278,67 +341,28 @@ static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
 #endif
 
 //===----------------------------------------------------------------------===//
-// Status codes returned by microkernels.
+// Local replacement for <assert.h>
 //===----------------------------------------------------------------------===//
 
-// When IREE_UK_ENABLE_VALIDATION is defined, ukernels validate their inputs and
-// may return statuses other than iree_uk_status_ok.
-//
-// When IREE_UK_ENABLE_VALIDATION is not defined, statuses other than
-// iree_uk_status_ok are not even defined.
-//
-// Currently IREE_UK_ENABLE_VALIDATION is defined if and only if NDEBUG is not,
-// that is, validation treated as assertions, disabling them in release.
-//
-// This actually enables more thorough validation as it removes optimization
-// concerns from the validation code. Microkernels take raw
-// pointers/sizes/strides anyway, so if params are incorrect, UB will happen no
-// matter how much we try to validate.
+// Microkernel code needs to be stand-alone, not including the standard library
+// (see comment in common.h). But it's hard to implement assertion failure
+// without the standard library. So it's up to each piece of code that uses
+// microkernels, to provide its own implementation of this function.
+extern void iree_uk_assert_fail(const char* file, int line,
+                                const char* function, const char* condition);
+
 #ifndef NDEBUG
-#define IREE_UK_ENABLE_VALIDATION
+#define IREE_UK_ENABLE_ASSERTS
 #endif
 
-// Status codes that ukernels may return.
-typedef enum iree_uk_status_e {
-  iree_uk_status_ok = 0,
-#ifdef IREE_UK_ENABLE_VALIDATION
-  iree_uk_status_bad_type,
-  iree_uk_status_bad_flags,
-  iree_uk_status_unsupported_huge_or_negative_dimension,
-  iree_uk_status_unsupported_generic_tile_size,
-  iree_uk_status_shapes_mismatch,
-#endif
-} iree_uk_status_t;
-
-#ifdef IREE_UK_ENABLE_VALIDATION
-// Convert a status code to a human-readable string.
-IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status);
-#else
-static inline const char* iree_uk_status_message(iree_uk_status_t status) {
-  // Typical callers do:
-  //
-  //   iree_uk_status_t status = iree_uk_someukernel(&ukernel_params);
-  //   if (status != iree_uk_status_ok) {
-  //     return iree_make_status(IREE_STATUS_INTERNAL,
-  //                             iree_uk_status_message(status));
-  //   }
-  //
-  // The below UNREACHABLE actually helps Clang 16 elide the caller's
-  // `if (status != iree_uk_status_ok)` branch: https://godbolt.org/z/xoanddxrv
-  if (status != iree_uk_status_ok) {
-    IREE_UK_ASSUME_UNREACHABLE;
-  }
-  return "OK";
-}
-#endif
-
-#define IREE_UK_RETURN_IF_ERROR(X)     \
-  do {                                 \
-    iree_uk_status_t status = (X);     \
-    if (status != iree_uk_status_ok) { \
-      return status;                   \
-    }                                  \
+#ifdef IREE_UK_ENABLE_ASSERTS
+#define IREE_UK_ASSERT(COND)                                               \
+  do {                                                                     \
+    if (!(COND)) iree_uk_assert_fail(__FILE__, __LINE__, __func__, #COND); \
   } while (0)
+#else
+#define IREE_UK_ASSERT(COND)
+#endif
 
 //===----------------------------------------------------------------------===//
 // Element type IDs for the data accessed by microkernels.
@@ -365,7 +389,7 @@ static inline const char* iree_uk_status_message(iree_uk_status_t status) {
 //     (C++ scoped enums would be perfect, but this is C code).
 //   * If people ever need these type ids in assembly code, then the raw
 //     numerical macros will be the only thing we'll be able to share with that
-//     (as is the case today with  exported_flag_bits.h).
+//     (as is the case today with  exported_bits.h).
 
 // Defines the element type of a buffer passed to a microkernel.
 //
@@ -478,18 +502,30 @@ static inline int iree_uk_type_size(iree_uk_type_t t) {
 typedef iree_uk_uint16_t iree_uk_type_pair_t;
 typedef iree_uk_uint32_t iree_uk_type_triple_t;
 
-#define IREE_UK_TIE_2_TYPES(B0, B1) ((B0) + ((B1) << 8))
-#define IREE_UK_TIE_3_TYPES(B0, B1, B2) ((B0) + ((B1) << 8) + ((B2) << 16))
+// These need to be macros because they are used to define enum values.
+#define IREE_UK_TIE_2_TYPES(T0, T1) ((T0) + ((T1) << 8))
+#define IREE_UK_TIE_3_TYPES(T0, T1, T2) ((T0) + ((T1) << 8) + ((T2) << 16))
+
+// Convenience macros to build tuples of literal types.
 #define IREE_UK_TIE_2_TYPES_LITERAL(T0, T1) \
   IREE_UK_TIE_2_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1)
 #define IREE_UK_TIE_3_TYPES_LITERAL(T0, T1, T2) \
   IREE_UK_TIE_3_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1, IREE_UK_TYPE_##T2)
 
-#define IREE_UK_UNTIE_TYPE(POS, WORD) (((WORD) >> (8 * (POS))) & 0xFF)
+static inline iree_uk_uint32_t iree_uk_tie_2_types(iree_uk_type_t t0,
+                                                   iree_uk_type_t t1) {
+  return IREE_UK_TIE_2_TYPES(t0, t1);
+}
+
+static inline iree_uk_uint32_t iree_uk_tie_3_types(iree_uk_type_t t0,
+                                                   iree_uk_type_t t1,
+                                                   iree_uk_type_t t2) {
+  return IREE_UK_TIE_3_TYPES(t0, t1, t2);
+}
 
 static inline iree_uk_type_t iree_uk_untie_type(int pos,
                                                 iree_uk_uint32_t word) {
-  return IREE_UK_UNTIE_TYPE(pos, word);
+  return (word >> (8 * pos)) & 0xFF;
 }
 
 //===----------------------------------------------------------------------===//
@@ -497,8 +533,7 @@ static inline iree_uk_type_t iree_uk_untie_type(int pos,
 //===----------------------------------------------------------------------===//
 
 // The `restrict` here have the effect of enabling the compiler to rewrite this
-// as a memcpy call, shrinking code size of the (slow anyway) generic code paths
-// that would use this.
+// as a memcpy call.
 static inline void iree_uk_memcpy(void* IREE_UK_RESTRICT dst,
                                   const void* IREE_UK_RESTRICT src,
                                   iree_uk_ssize_t size) {
@@ -507,12 +542,63 @@ static inline void iree_uk_memcpy(void* IREE_UK_RESTRICT dst,
 }
 
 static inline void iree_uk_memset(void* buf, int val, iree_uk_ssize_t n) {
-  // No need for memset builtins: this naive loop is already transformed into a
-  // memset by both clang and gcc on ARM64. As __builtin_memset_inline requires
-  // a compile-time-constant size, it would require writing more complex code,
-  // which could actually prevent the optimization matching it as a single
-  // memset!
+  // This naive loop is lifted to a memset by both clang and gcc on ARM64.
   for (iree_uk_ssize_t i = 0; i < n; ++i) ((char*)buf)[i] = val;
+}
+
+//===----------------------------------------------------------------------===//
+// Count leading zeros (extracted from base/internal/math.h and adapted
+// to be able to be used standalone).
+//===----------------------------------------------------------------------===//
+
+static inline int iree_uk_count_leading_zeros_u32(const iree_uk_uint32_t n) {
+#if defined(_MSC_VER)
+  unsigned long result = 0;  // NOLINT(runtime/int)
+  if (_BitScanReverse(&result, n)) {
+    return (int)(31 - result);
+  }
+  return 32;
+#elif defined(__GNUC__) || defined(__clang__)
+#if defined(__LCZNT__)
+  // NOTE: LZCNT is a risky instruction; it is not supported on architectures
+  // before Haswell, yet it is encoded as 'rep bsr', which typically ignores
+  // invalid rep prefixes, and interprets it as the 'bsr' instruction, which
+  // returns the index of the value rather than the count, resulting in
+  // incorrect code.
+  return (int)__lzcnt32(n);
+#endif  // defined(__LCZNT__)
+
+  // Handle 0 as a special case because __builtin_clz(0) is undefined.
+  if (n == 0) return 32;
+  // Use __builtin_clz, which uses the following instructions:
+  //  x86: bsr
+  //  ARM64: clz
+  //  PPC: cntlzd
+  return (int)__builtin_clz(n);
+#else
+#error No clz for this arch.
+#endif  // MSVC / GCC / CLANG
+}
+
+//===----------------------------------------------------------------------===//
+// Power-of-two math helpers
+//===----------------------------------------------------------------------===//
+
+static inline bool iree_uk_is_po2_u32(const iree_uk_uint32_t n) {
+  return !(n & (n - 1));
+}
+
+static inline int iree_uk_floor_log2_u32(const iree_uk_uint32_t n) {
+  return 31 - iree_uk_count_leading_zeros_u32(n);
+}
+
+static inline int iree_uk_po2_log2_u32(const iree_uk_uint32_t n) {
+  IREE_UK_ASSERT(iree_uk_is_po2_u32(n));
+  return iree_uk_floor_log2_u32(n);
+}
+
+static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
+  return n <= 1 ? 0 : (1 + iree_uk_floor_log2_u32(n - 1));
 }
 
 #ifdef __cplusplus

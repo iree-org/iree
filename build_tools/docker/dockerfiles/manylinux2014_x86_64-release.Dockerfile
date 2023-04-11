@@ -15,21 +15,18 @@
 # to a newer revision. Newer manylinux images are based on Debian.
 #
 # Refer to: https://github.com/pypa/manylinux
-FROM quay.io/pypa/manylinux2014_x86_64@sha256:9b463efac479efbcab6dec77eca28c5cfa0c5ef64f13ac184eb7117dc1f8edda
+FROM quay.io/pypa/manylinux2014_x86_64@sha256:1818cd784995512fd6865baf79bd34c8f426f356a98fdc53495cf0bcd9e6b790
 
 SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
 
 USER root
 
 ######## Pre-requisite packages ########
-# Add RHEL7 CUDA repo.
-RUN yum-config-manager --add-repo \
-  https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
 RUN yum install -y \
-  cuda-nvcc-11-6 cuda-cudart-devel-11-6 cuda-cupti-11-6 \
-  java-11-openjdk-devel \
-  ccache \
-  capstone-devel libzstd-devel
+      java-11-openjdk-devel \
+      ccache \
+      capstone-devel libzstd-devel \
+  && yum clean all
 
 ######## Bazel ########
 WORKDIR /install-bazel
@@ -56,7 +53,17 @@ ARG ROCM_VERSION=5.2.1
 ARG AMDGPU_VERSION=22.20.1
 
 # Install the ROCm rpms
-RUN yum clean all \
-  && echo -e "[ROCm]\nname=ROCm\nbaseurl=https://repo.radeon.com/rocm/yum/${ROCM_VERSION}/main\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/rocm.repo \
+RUN  echo -e "[ROCm]\nname=ROCm\nbaseurl=https://repo.radeon.com/rocm/yum/${ROCM_VERSION}/main\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/rocm.repo \
   && echo -e "[amdgpu]\nname=amdgpu\nbaseurl=https://repo.radeon.com/amdgpu/${AMDGPU_VERSION}/rhel/7.9/main/x86_64\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/amdgpu.repo \
-  && yum install -y rocm-dev
+  && yum install -y rocm-dev \
+  && yum clean all
+
+
+######## GIT CONFIGURATION ########
+# Git started enforcing strict user checking, which thwarts version
+# configuration scripts in a docker image where the tree was checked
+# out by the host and mapped in. Disable the check.
+# See: https://github.com/openxla/iree/issues/12046
+# We use the wildcard option to disable the checks. This was added
+# in git 2.35.3
+RUN git config --global --add safe.directory '*'

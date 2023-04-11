@@ -90,7 +90,7 @@ void BufferLengthOp::getAsmResultNames(
   setNameFn(getResult(), "length");
 }
 
-OpFoldResult BufferLengthOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult BufferLengthOp::fold(FoldAdaptor operands) {
   Operation *op = this->getOperation();
   return IREE::Util::SizeAwareTypeInterface::findSizeValue(
       getBuffer(), op->getBlock(), Block::iterator(op));
@@ -105,7 +105,7 @@ void BufferStorageOp::getAsmResultNames(
   setNameFn(getResult(), "storage");
 }
 
-OpFoldResult BufferStorageOp::fold(ArrayRef<Attribute> operands) {
+OpFoldResult BufferStorageOp::fold(FoldAdaptor operands) {
   auto *definingOp = getBuffer().getDefiningOp();
   if (!definingOp) return {};
   if (auto sourceOp =
@@ -161,7 +161,7 @@ struct FoldBufferViewCreateSubspan
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = op.getSourceOffset();
+    auto newSourceOffset = op.getSourceOffset().cast<Value>();
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();

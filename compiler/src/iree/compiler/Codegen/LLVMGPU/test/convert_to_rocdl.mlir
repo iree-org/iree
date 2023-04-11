@@ -16,7 +16,7 @@ hal.executable @abs_ex_dispatch_0 {
     builtin.module {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<16xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) flags(ReadOnly) : memref<16xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<16xf32>
         %3 = gpu.block_id x
@@ -34,7 +34,8 @@ hal.executable @abs_ex_dispatch_0 {
   }
 }
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32}, %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32},
-//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32})
+//  CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+//  CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//  CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias})
 //      CHECK:    rocdl.workgroup.dim.x
 //      CHECK:    llvm.fadd

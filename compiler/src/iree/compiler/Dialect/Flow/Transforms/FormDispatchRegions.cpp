@@ -16,13 +16,10 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -43,15 +40,6 @@
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-regions"
 
-// NOTE: These flags are added for experimental purposes only
-// for developer control. These should be treated as internal
-// compiler implementation details.
-static llvm::cl::opt<int> clInlineConstantByteLength(
-    "iree-flow-inline-constants-max-byte-length",
-    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
-                   "dispatch region"),
-    llvm::cl::init(256));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -63,6 +51,7 @@ namespace mlir {
 
 TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
     : IRRewriter(op->getContext()) {
+  setListener(this);
   op->walk([&](tensor::DimOp dimOp) { dimOps.insert(dimOp.getOperation()); });
 }
 SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
@@ -71,12 +60,12 @@ SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
   return result;
 }
 void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
-  IRRewriter::notifyOperationRemoved(op);
+  IRRewriter::Listener::notifyOperationRemoved(op);
   if (isa<tensor::DimOp>(op)) dimOps.erase(op);
 }
 
 void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
-  IRRewriter::notifyOperationInserted(op);
+  IRRewriter::Listener::notifyOperationInserted(op);
   if (isa<tensor::DimOp>(op)) dimOps.insert(op);
 }
 
@@ -88,7 +77,7 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps) {
   for (tensor::DimOp dimOp : dimOps) {
     // Only DimOps with static indices are supported.
-    Optional<int64_t> idx = dimOp.getConstantIndex();
+    std::optional<int64_t> idx = dimOp.getConstantIndex();
     if (!idx.has_value()) continue;
     // Only DimOps with ranked tensors are supported.
     auto tensorType = dimOp.getSource().getType().dyn_cast<RankedTensorType>();
@@ -196,68 +185,52 @@ static bool isRootOp(Operation *op) {
     }
     return !isa<linalg::FillOp>(op);
   }
-  return isa<TilingInterface>(op) ||
-         isa<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp>(op);
+  if (isa<TilingInterface>(op)) {
+    return !isa<tensor::PadOp, tensor::PackOp>(op);
+  }
+  return isa<LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op);
 }
 
-/// Operations that are cloned into dispatch regions formed with other
-/// operations as roots.
-bool isClonableIntoDispatchOp(Operation *op) {
-  // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
-  // trivially clonable too, but they cause problems
-  // with bufferization. Make them clonable when fixed.
-  if (isa<AffineApplyOp, arith::IndexCastOp, linalg::FillOp, tensor::EmptyOp,
-          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp,
-          tensor::PadOp>(op)) {
-    return true;
-  }
-  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.getValue();
-    auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      auto shapedType = constantOp.getType().cast<ShapedType>();
-      uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
-          8;
-      return denseAttr.isSplat() ||
-             estimatedByteLength <= clInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
-  }
-  if (llvm::all_of(op->getOperands(),
-                   [&](Value v) { return v.getType().isIntOrFloat(); }) &&
-      llvm::all_of(op->getResults(),
-                   [&](Value v) { return v.getType().isIntOrFloat(); })) {
-    return true;
-  }
-  return false;
+/// Returns true if the operation is a `pack` op or a `set_encoding` op that
+/// has pack semantics.
+// TODO(ravishankarm): This seems like a use case for an interface.
+static bool isPackLikeOp(Operation *op) {
+  return isa<IREE::LinalgExt::SetEncodingOp, tensor::PackOp>(op);
 }
 
-//===----------------------------------------------------------------------===//
-// Methods for getting the workload information for dispatch region creation.
-//===----------------------------------------------------------------------===//
+/// Returns the source of the pack-like operation.
+// TODO(ravishankarm): This seems like a use case for an interface.
+static Value getSourceOfPackLikeOp(Operation *op) {
+  return TypeSwitch<Operation *, Value>(op)
+      .Case<tensor::PackOp>([](auto packOp) { return packOp.getSource(); })
+      .Case<IREE::LinalgExt::SetEncodingOp>(
+          [](auto setEncodingOp) { return setEncodingOp.getSource(); })
+      .Default([](Operation *) { return nullptr; });
+}
+static RankedTensorType getSourceTypeOfPackLikeOp(Operation *op) {
+  Value source = getSourceOfPackLikeOp(op);
+  if (!source) return nullptr;
+  return source.getType().cast<RankedTensorType>();
+}
 
-/// Compute the workload to use for the workgroup based on the root op.
-static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
-                                               Operation *rootOp) {
-  // Compute workgroup count to use for the dispatch op. These are the ranges
-  // of the outermost parallel loops that can be distributed.
-  Location loc = rootOp->getLoc();
-  SmallVector<Range> loopRanges = getLoopRanges(rootOp, loc, builder);
-  AffineExpr s0, s1, s2;
-  bindSymbols(builder.getContext(), s0, s1, s2);
-  AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
-  return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
-    Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
-    Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
-    Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
-    return builder.create<AffineApplyOp>(rootOp->getLoc(), workload,
-                                         ValueRange{offset, size, stride});
-  }));
+/// Returns true if the operation is an `unpack` op or an `unset_encoding` op
+/// that has unpack semantics
+// TODO(ravishankarm): This seems like a use case for interface.
+static bool isUnPackLikeOp(Operation *op) {
+  return isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op);
+}
+
+/// Since `iree_linalg_ext.set_encoding` doesnt have padding semantics a
+/// `tensor.pad` is introduced to get the shapes of the input and output to
+/// match. The `tensor.pad` -> `set_encoding` can be folded later on into a
+/// single `tensor.pack` operation. But it means the fusion has to try to keep
+/// these in the same dispatch.
+// TODO(ravishankarm): Maybe make `set_encoding` have pad semantics that can be
+// explicitly broken down if needed.
+static bool isPadUsedInSetEncoding(tensor::PadOp padOp) {
+  return llvm::any_of(padOp->getUsers(), [](Operation *user) {
+    return isa<IREE::LinalgExt::SetEncodingOp>(user);
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -266,7 +239,16 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
 
 /// Returns a bit vector of size number of loops of the `interfaceOp` with
 /// the bits corresponding to outer parallel loops set to `true`.
-static llvm::SmallBitVector getOuterParallelLoops(TilingInterface interfaceOp) {
+static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
+  if (auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(op)) {
+    return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
+  }
+
+  auto interfaceOp = dyn_cast<TilingInterface>(op);
+  if (!interfaceOp) {
+    // For ops that dont implement the `TilingInterface` just return empty.
+    return llvm::SmallBitVector{};
+  }
   SmallVector<utils::IteratorType> loopIteratorTypes =
       interfaceOp.getLoopIteratorTypes();
   llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
@@ -282,6 +264,7 @@ static llvm::SmallBitVector getOuterParallelLoops(TilingInterface interfaceOp) {
 /// identity.
 static bool isIdentityMapWithZeros(AffineMap map) {
   if (map.getNumSymbols() != 0) return false;
+  if (map.isEmpty()) return false;
   unsigned dimsSeen = 0;
   for (auto result : map.getResults()) {
     bool isValidExpr = TypeSwitch<AffineExpr, bool>(result)
@@ -300,56 +283,33 @@ static bool isIdentityMapWithZeros(AffineMap map) {
   return dimsSeen == map.getNumDims();
 }
 
-/// For the fusion of root op -> elementwise operation to be bufferized
-/// in-place without use of extra memory, the result of the root operation
-/// must be able to reuse the buffer for the result of the elementwise
-/// operation. This is possible if input and output are accessed using the same
-/// indexing map.
-// TODO: This restriction can go away if we can vectorize always, but that has
-// a long tail of tasks.
-static bool isInsOperandBufferizable(OpOperand *insOperand,
-                                     bool aggressiveFusion) {
-  // Ignore the check if in-place bufferization is not required.
-  if (aggressiveFusion) return true;
+static bool matchIteratorTypes(
+    const llvm::SmallBitVector &rootOuterParallelLoop,
+    const llvm::SmallBitVector &candidateOuterParallelLoop) {
+  // If the candidate is not all parallel, then its loop configuration should be
+  // the same as the root.
+  if (candidateOuterParallelLoop.size() != candidateOuterParallelLoop.count()) {
+    return rootOuterParallelLoop == candidateOuterParallelLoop;
+  }
 
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
-  if (!linalgOp) return false;
-
-  AffineMap insOperandIndexingMap = linalgOp.getMatchingIndexingMap(insOperand);
-
-  auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    AffineMap outsOperandIndexingMap =
-        linalgOp.getMatchingIndexingMap(outsOperand);
-
-    if (outsOperandIndexingMap != insOperandIndexingMap) {
-      // if (!aggressiveFusion) return false;
-      // If the operand is a projected permutation a small stack might be
-      // fine.
-      if (!(insOperandIndexingMap.isProjectedPermutation() &&
-            !insOperandIndexingMap.isPermutation())) {
-        return false;
-      }
-    }
-
-    // TODO(#8411): Until ops are vectorized (always), we need
-    // to check that the elementtype matches for the operands to be tied.
-    // For now just doing this check for convolution ops since we expect
-    // contraction ops to be vectorized.
-    auto producer = insOperand->get().getDefiningOp();
-    if (isa<linalg::GenericOp, linalg::ConvolutionOpInterface>(producer) &&
-        insOperand->get().getType().cast<ShapedType>().getElementType() !=
-            outsOperand->get().getType().cast<ShapedType>().getElementType()) {
+  // If the candidate is all parallel, then it should be at least as parallel as
+  // the root.
+  for (int pos : llvm::seq<int>(0, rootOuterParallelLoop.size())) {
+    // If we reach the end of the outer loops of the root, break out of the
+    // loop.
+    if (!rootOuterParallelLoop.test(pos)) break;
+    // If the root loop is parallel, the candidate loop should also be parallel.
+    if (pos >= candidateOuterParallelLoop.size() ||
+        !candidateOuterParallelLoop.test(pos))
       return false;
-    }
-    return true;
-  };
-  return llvm::any_of(linalgOp.getDpsInitOperands(), canTieWithOutsOperand);
+  }
+  return true;
 }
 
 /// Method to check if two `linalg.generic` op with producer-consumer
 /// relationship through `operand` have compatible outer-parallel loops.
 static bool hasCompatibleOuterParallelLoops(
-    OpOperand &operand, bool allowConsumerParallelismPessimization) {
+    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
   auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
   auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
   if (!producer || !consumer) return false;
@@ -359,10 +319,8 @@ static bool hasCompatibleOuterParallelLoops(
   llvm::SmallBitVector consumerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(consumer.getOperation()));
 
-  if (allowConsumerParallelismPessimization) {
-    if (producerParallelLoops.count() > consumerParallelLoops.count())
-      return false;
-  } else if (producerParallelLoops.count() != consumerParallelLoops.count()) {
+  if (!matchIteratorTypes(rootOuterParallelLoops, producerParallelLoops) ||
+      !matchIteratorTypes(rootOuterParallelLoops, consumerParallelLoops)) {
     return false;
   }
 
@@ -375,12 +333,12 @@ static bool hasCompatibleOuterParallelLoops(
   }
 
   /// Project out the non-parallel dimensions.
-  llvm::SmallBitVector producerProjectedDims(producerParallelLoops);
+  llvm::SmallBitVector producerProjectedDims(rootOuterParallelLoops);
   producerProjectedDims.flip();
   auto projectedProducerMap =
       getProjectedMap(producerIndexingMap, producerProjectedDims);
 
-  llvm::SmallBitVector consumerProjectedDims(producerParallelLoops);
+  llvm::SmallBitVector consumerProjectedDims(rootOuterParallelLoops);
   consumerProjectedDims.flip();
   consumerProjectedDims.resize(consumer.getNumLoops(), true);
   auto projectedConsumerMap =
@@ -391,14 +349,26 @@ static bool hasCompatibleOuterParallelLoops(
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo const &dominanceInfo,
-                                           bool fuseMultiUse) {
-  if (!fuseMultiUse && !op->hasOneUse()) return std::nullopt;
+static std::optional<OpOperand *> getFusableUse(
+    Operation *op, DominanceInfo const &dominanceInfo, bool fuseMultiUse) {
+  if (!fuseMultiUse && llvm::count_if(op->getUses(), [](OpOperand &use) {
+                         return !isa<tensor::DimOp>(use.getOwner());
+                       }) != 1) {
+    return std::nullopt;
+  }
 
+  // Collect non-dim users.
+  SmallVector<Operation *> nonDimUsers;
+  for (Operation *user : op->getUsers()) {
+    if (isa<tensor::DimOp>(user)) continue;
+    nonDimUsers.push_back(user);
+  }
+
+  // Find the use in a non-dim user that dominates all other non-dim users.
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
-    if (llvm::all_of(op->getUsers(), [&](Operation *c) {
+    if (isa<tensor::DimOp>(user)) continue;
+    if (llvm::all_of(nonDimUsers, [&](Operation *c) {
           return dominanceInfo.dominates(user, c);
         })) {
       return &use;
@@ -407,11 +377,9 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
   return std::nullopt;
 }
 
-/// Returns true if the operands are fusable under the aggressive fusion
-/// heuristics.
-static bool areOpsAggresiveFusable(Operation *producer, Operation *consumer,
-                                   bool allowConsumerParallelismPessimization,
-                                   bool aggressiveFusion) {
+/// Returns true if the operands are fusable.
+static bool areOpsFusable(Operation *producer, Operation *consumer,
+                          const llvm::SmallBitVector &rootOuterParallelLoops) {
   // Collect all the uses from producer to consumer.
   SmallVector<OpOperand *> allUses;
   for (OpOperand &producerUse : producer->getUses()) {
@@ -421,47 +389,102 @@ static bool areOpsAggresiveFusable(Operation *producer, Operation *consumer,
 
   // Check that the consumer and producer have compatible outer parallel loops.
   if (!llvm::all_of(allUses, [&](OpOperand *operand) {
-        return hasCompatibleOuterParallelLoops(
-            *operand, allowConsumerParallelismPessimization);
+        return hasCompatibleOuterParallelLoops(*operand,
+                                               rootOuterParallelLoops);
       })) {
     return false;
   }
+  return true;
+}
 
-  // Finally only fuse if the `ins` operand can be properly bufferized.
-  // TODO(#10498): Handle the multi-result case.
-  return llvm::all_of(allUses, [&](OpOperand *operand) {
-    return isInsOperandBufferizable(operand, aggressiveFusion);
-  });
+/// For the fusion of root op -> elementwise operation to be bufferized
+/// in-place without use of extra memory, the result of the root operation
+/// must be able to reuse the buffer for the result of the elementwise
+/// operation. Check if that is possible for the input/init operand pair.
+static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
+                                         OpOperand *initOperand) {
+  assert(inOperand->getOwner() == initOperand->getOwner() &&
+         "expected in-operand and init-operand to be owned by same operation");
+
+  // Check that the owner is a `generic` op.
+  auto genericOp = dyn_cast<linalg::GenericOp>(inOperand->getOwner());
+  if (!genericOp) return false;
+
+  // All loops to be parallel.
+  if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+    return false;
+  }
+
+  /// The input operand cannot be an init operand already.
+  if (genericOp.isDpsInit(inOperand)) return false;
+
+  // If the init operand value is used it cannot be reused for the input
+  // operand.
+  if (genericOp.payloadUsesValueFromOperand(initOperand)) return false;
+
+  // Indexing map used to access the input and init have to match.
+  if (genericOp.getMatchingIndexingMap(inOperand) !=
+      genericOp.getMatchingIndexingMap(initOperand)) {
+    return false;
+  }
+
+  // Types have to match for the input operand to reuse the buffer from the init
+  // operand
+  if (inOperand->get().getType() != initOperand->get().getType()) return false;
+
+  return true;
 }
 
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
-static bool isFusableWithConsumer(OpOperand &fusedOperand,
-                                  bool aggressiveFusion) {
-  // Logics with aggressive fusion heuristics.
+static bool isFusableWithConsumer(
+    OpOperand &fusedOperand, const llvm::SmallBitVector &rootOuterParallelLoops,
+    FormDispatchRegionsOptions const &options) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
   // generic ops.
-  auto producerUnsetEncodingOp = dyn_cast<LinalgExt::UnsetEncodingOp>(producer);
-  if (producerUnsetEncodingOp && isa<tensor::ExtractSliceOp>(consumer)) {
-    auto sliceOp = cast<tensor::ExtractSliceOp>(consumer);
-    return llvm::all_of(
-               sliceOp.getMixedOffsets(),
-               [](OpFoldResult ofr) { return isConstantIntValue(ofr, 0); }) &&
-           llvm::all_of(sliceOp.getMixedStrides(), [](OpFoldResult ofr) {
-             return isConstantIntValue(ofr, 1);
-           });
+  if (isUnPackLikeOp(producer)) {
+    // Fuse `unset_encoding` -> `extract_slice` op since they get folded into
+    // `unpack` on materialization.
+    if (isa<tensor::ExtractSliceOp>(consumer)) {
+      auto sliceOp = cast<tensor::ExtractSliceOp>(consumer);
+      return llvm::all_of(
+                 sliceOp.getMixedOffsets(),
+                 [](OpFoldResult ofr) { return isConstantIntValue(ofr, 0); }) &&
+             llvm::all_of(sliceOp.getMixedStrides(), [](OpFoldResult ofr) {
+               return isConstantIntValue(ofr, 1);
+             });
+    }
+    // Fuse `unset_encoding/unpack` -> elementwise operations for now. This
+    // could be generalized, but unpack fusion code-generation is harder.
+    if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
+      return linalg::isElementwise(consumerLinalgOp) &&
+             consumerLinalgOp.getNumLoops() == producer->getResult(0)
+                                                   .getType()
+                                                   .cast<RankedTensorType>()
+                                                   .getRank();
+    }
+    return false;
   }
-  auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
-  if (producerUnsetEncodingOp && consumerLinalgOp) {
-    return linalg::isElementwise(consumerLinalgOp) &&
-           consumerLinalgOp.getNumLoops() ==
-               producerUnsetEncodingOp.getType().getRank();
+
+  if (isPackLikeOp(consumer)) {
+    return isa<linalg::LinalgOp, tensor::PadOp>(producer);
+  }
+
+  // By default, padding should be fused with producers. It is hard to square
+  // this with fusion of pad with consumer. So for now split the difference.
+  // Either fuse pad with producer or with consumer.
+  if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
+    if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
+      return isa<linalg::LinalgOp>(producer);
+    }
+    return false;
   }
 
   auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
+  auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
   if (!producerLinalgOp || !consumerLinalgOp) return false;
 
   // Check that the consumer is all parallel.
@@ -470,21 +493,33 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  if (!areOpsAggresiveFusable(producer, consumer,
-                              /*allowConsumerParallelismPessimization=*/true,
-                              aggressiveFusion)) {
+  if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
     return false;
   }
 
-  // Check if the iteration spaces of the producer and consumer are same.
-  // TODO: This is unnecessary requirement, but needed to pass tests right now
-  if (!aggressiveFusion) {
-    auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
-    auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
-    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+  // While fusing with consumer, the result of the root might not be the final
+  // result of the dispatch. To avoid a stack allocation we have to ensure that
+  // all operations can bufferize without needing additional memory.
+  for (OpOperand *inputOperand : consumerLinalgOp.getDpsInputOperands()) {
+    if (inputOperand->get().getDefiningOp() != producer) continue;
+    if (isa<linalg::ConvolutionOpInterface>(producer) &&
+        !llvm::any_of(
+            consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
+              return canUseInOperandAsInitOperand(inputOperand, initOperand);
+            })) {
       return false;
     }
   }
+
+  // Check if the iteration spaces of the producer and consumer are same.
+  // TODO(#12664): This is unnecessary requirement, but we need a better config
+  // to tile the consumer with a larger iteration space.
+  auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
+  auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
+  if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+    return false;
+  }
+
   return true;
 }
 
@@ -493,52 +528,79 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
 static void fuseRootsWithConsumers(MLIRContext *context,
                                    ArrayRef<Operation *> roots,
                                    DominanceInfo const &dominanceInfo,
-                                   bool aggressiveFusion) {
-  SmallVector<Operation *> workList(roots.begin(), roots.end());
+                                   FormDispatchRegionsOptions const &options) {
   // Fuse with consumers where possible.
-  while (!workList.empty()) {
-    Operation *currRoot = workList.pop_back_val();
-    assert(hasRootOpAttribute(currRoot) &&
-           "unexpected non-root op in worklist");
+  for (Operation *root : roots) {
+    SmallVector<Operation *> workList;
+    llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
+    workList.push_back(root);
+    while (!workList.empty()) {
+      Operation *currRoot = workList.pop_back_val();
+      assert(hasRootOpAttribute(currRoot) &&
+             "unexpected non-root op in worklist");
 
-    // Helper function to make the consumer the root instead of the producer
-    // when they are to be fused.
-    auto updateRootTo = [&context, &currRoot](Operation *newRoot) {
-      int64_t rootNumber = getRootNumber(currRoot);
-      setRootAttribute(context, newRoot, rootNumber);
-      removeRootOpAttribute(currRoot);
-      appendToFusionGroup(currRoot, rootNumber);
-    };
+      // Helper function to make the consumer the root instead of the producer
+      // when they are to be fused.
+      auto updateRootTo = [&context, &currRoot](Operation *newRoot) {
+        int64_t rootNumber = getRootNumber(currRoot);
+        setRootAttribute(context, newRoot, rootNumber);
+        removeRootOpAttribute(currRoot);
+        appendToFusionGroup(currRoot, rootNumber);
+      };
 
-    Optional<OpOperand *> fusableUse = getFusableUse(
-        currRoot, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
-    if (!fusableUse) continue;
+      std::optional<OpOperand *> fusableUse = getFusableUse(
+          currRoot, dominanceInfo, /*fuseMultiUse=*/options.fuseMultiUse);
+      if (!fusableUse) continue;
 
-    // Analyse the use to see if it is fusable.
-    Operation *consumerOp = fusableUse.value()->getOwner();
-    if (hasRootOpAttribute(consumerOp) ||
-        hasFusionGroupsAttribute(consumerOp)) {
-      continue;
-    }
+      // Analyse the use to see if it is fusable.
+      Operation *consumerOp = fusableUse.value()->getOwner();
+      if (hasRootOpAttribute(consumerOp) ||
+          hasFusionGroupsAttribute(consumerOp)) {
+        continue;
+      }
 
-    if (isFusableWithConsumer(*(fusableUse.value()), aggressiveFusion)) {
-      updateRootTo(consumerOp);
-      workList.push_back(consumerOp);
+      if (isFusableWithConsumer(*(fusableUse.value()), rootOuterParallelLoops,
+                                options)) {
+        updateRootTo(consumerOp);
+        workList.push_back(consumerOp);
+      }
     }
   }
 }
 
 /// Method to check if the consumer of a use can be fused with its producer.
-static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
+static bool isFusableWithProducer(
+    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops,
+    FormDispatchRegionsOptions const &options) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
-  auto linalgProducerOp = dyn_cast<linalg::LinalgOp>(producer);
-  auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(consumer);
-  if (linalgProducerOp && setEncodingOp) {
-    return linalg::isElementwise(linalgProducerOp) &&
-           linalgProducerOp.getNumLoops() ==
-               setEncodingOp.getSourceType().getRank();
+  if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
+    if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
+      return isa<linalg::LinalgOp>(producer);
+    }
+    return false;
+  }
+
+  if (options.fusePadWithConsumers && isa<tensor::PadOp>(producer) &&
+      isa<linalg::ConvolutionOpInterface>(consumer)) {
+    return true;
+  }
+
+  if (isPackLikeOp(consumer)) {
+    if (auto linalgProducerOp = dyn_cast<linalg::LinalgOp>(producer)) {
+      if (auto packOp = dyn_cast<tensor::PackOp>(consumer)) {
+        // TODO(#12746): fusion of pack with dynamic inner tile size
+        // causes an error in backend. Disable for now.
+        if (!packOp.getInnerTiles().empty()) {
+          return false;
+        }
+      }
+      return linalg::isElementwise(linalgProducerOp) &&
+             linalgProducerOp.getNumLoops() ==
+                 getSourceTypeOfPackLikeOp(consumer).getRank();
+    }
+    return isa<tensor::PadOp>(producer);
   }
 
   if (!isa<linalg::LinalgOp>(consumer) || !isa<linalg::LinalgOp>(producer)) {
@@ -548,7 +610,7 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
   if (consumerLinalgOp.isDpsInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
-    if (!aggressiveFusion || !isa<linalg::GenericOp>(consumer) ||
+    if (!isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {
       return false;
     }
@@ -556,9 +618,7 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
     return false;
   }
 
-  return areOpsAggresiveFusable(producer, consumer,
-                                /*allowConsumerParallelismPessimization=*/false,
-                                aggressiveFusion);
+  return areOpsFusable(producer, consumer, rootOuterParallelLoops);
 }
 
 /// Starting from the `root` op, traverse the operand use-def chain
@@ -566,10 +626,10 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
 static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
                                    unsigned groupNum,
                                    DominanceInfo const &dominanceInfo,
-                                   bool aggressiveFusion) {
+                                   FormDispatchRegionsOptions const &options) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
-
+  llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
   while (!worklist.empty()) {
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
@@ -580,11 +640,13 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      Optional<OpOperand *> fusableUse = getFusableUse(
-          producer, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
+      std::optional<OpOperand *> fusableUse = getFusableUse(
+          producer, dominanceInfo, /*fuseMultiUse=*/options.fuseMultiUse);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
-      if (!isFusableWithProducer(operand, aggressiveFusion)) continue;
+      if (!isFusableWithProducer(operand, rootOuterParallelLoops, options)) {
+        continue;
+      }
 
       appendToFusionGroup(producer, groupNum);
       worklist.push_back(producer);
@@ -600,9 +662,9 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
 /// be marked to fuse with multiple root operations (i.e. replicated). For now a
 /// very simple heuristic is used below, but the mechanism should be general
 /// enough to capture any heuristic.
-static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
-                                       DominanceInfo const &dominanceInfo,
-                                       bool aggressiveFusion) {
+static unsigned decideFusableLinalgOps(
+    FunctionOpInterface funcOp, DominanceInfo const &dominanceInfo,
+    FormDispatchRegionsOptions const &options) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
@@ -619,12 +681,11 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
 
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo,
-                             aggressiveFusion);
+      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo, aggressiveFusion);
+    fuseRootsWithConsumers(context, roots, dominanceInfo, options);
   }
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
@@ -637,14 +698,20 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
       // to convert them to splats.
-      if (!isa<linalg::LinalgOp>(op) || isa<linalg::FillOp>(op)) continue;
+      if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
+               IREE::LinalgExt::SetEncodingOp>(op) ||
+          isa<linalg::FillOp>(op)) {
+        continue;
+      }
 
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
+
+      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo, aggressiveFusion);
+    fuseRootsWithConsumers(context, roots, dominanceInfo, options);
   }
 
   return numRootOps;
@@ -671,16 +738,6 @@ static void buildDefaultWorkloadRegion(OpBuilder &builder, Location loc,
 FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
                                                     Operation *rootOp) {
   Flow::WorkloadBuilder result;
-
-  // Compute workload (before entering the dispatch region).
-  OpBuilder::InsertionGuard g(builder);
-  SmallVector<Value> workload;
-  builder.setInsertionPoint(rootOp);
-  FailureOr<SmallVector<Value>> maybeWorkload =
-      getWorkloadForRootOp(builder, rootOp);
-  if (failed(maybeWorkload)) return failure();
-  result.workload = *maybeWorkload;
-
   // The workload region of the WorkgroupsOp is populated by the
   // `regionBuilder` during ConvertRegionToWorkgroups .
   if (isa<LinalgExt::SetEncodingOp>(rootOp)) {
@@ -692,151 +749,14 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
   return result;
 }
 
-/// Searches the same sequence in all the affine maps and collapses these
-/// dimensions. It only applies these to "parallel" loops without mixing them
-/// with "reduction" types.
-static SmallVector<ReassociationIndices> getCollapsibleLoops(
-    linalg::GenericOp genericOp) {
-  SmallVector<ReassociationIndices> contiguousLoops;
-
-  SmallVector<unsigned> pDims;
-  genericOp.getParallelDims(pDims);
-  if (pDims.size() < 2) return contiguousLoops;
-
-  llvm::SmallDenseSet<unsigned> pLoops(pDims.begin(), pDims.end());
-
-  auto hasAllMapsSameSequence = [&](AffineExpr preExpr, AffineExpr nextExpr) {
-    for (AffineMap map : genericOp.getIndexingMapsArray()) {
-      bool foundSeq = false;
-      for (auto [index, resultExpr] : llvm::enumerate(map.getResults())) {
-        if (resultExpr == nextExpr) {
-          foundSeq = (index > 0 && preExpr == map.getResult(index - 1));
-          break;
-        }
-      }
-      if (!foundSeq) return false;
-    }
-    return true;
-  };
-
-  ReassociationIndices range;
-  AffineExpr preExpr;
-  for (auto nextExpr : genericOp.getIndexingMapsArray().front().getResults()) {
-    unsigned pos = nextExpr.cast<AffineDimExpr>().getPosition();
-    if (!range.empty()) {
-      if (!hasAllMapsSameSequence(preExpr, nextExpr) || !pLoops.count(pos)) {
-        if (range.size() > 1)
-          contiguousLoops.push_back({range.begin(), range.end()});
-        range.clear();
-      }
-    }
-    preExpr = nextExpr;
-    if (pLoops.count(pos)) range.push_back(pos);
-  }
-  if (range.size() > 1) contiguousLoops.push_back(range);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Collapsing dimensions if possible: ";
-    for (auto indices : contiguousLoops) {
-      llvm::dbgs() << "[";
-      for (auto idx : indices) llvm::dbgs() << idx << ",";
-      llvm::dbgs() << "]\t";
-    }
-    llvm::dbgs() << "\n";
-  });
-
-  return contiguousLoops;
-}
-
-/// Collapse possible dimension of the given linalg.generic and return the
-/// new one
-static FailureOr<linalg::GenericOp> collapseLinalgGeneric(
-    TensorDimTrackingRewriter &rewriter, linalg::GenericOp genericOp) {
-  SmallVector<ReassociationIndices> collapseIndices =
-      getCollapsibleLoops(genericOp);
-
-  if (collapseIndices.empty()) return genericOp;
-
-  rewriter.setInsertionPoint(genericOp);
-  FailureOr<SmallVector<Value>> replacements =
-      mlir::linalg::collapseGenericOpIterationDims(genericOp, collapseIndices,
-                                                   rewriter);
-  if (failed(replacements) || replacements->empty()) {
-    return rewriter.notifyMatchFailure(genericOp,
-                                       "failed to collapse dimensions");
-  }
-
-  // Find and return collapsed linalg.generic
-  auto expandshapeOp =
-      replacements->front().getDefiningOp<tensor::ExpandShapeOp>();
-  if (!expandshapeOp) return failure();
-
-  auto newGenericOp =
-      expandshapeOp.getOperand().getDefiningOp<linalg::GenericOp>();
-  if (!newGenericOp) return failure();
-
-  rewriter.replaceOp(genericOp, *replacements);
-  return newGenericOp;
-}
-
-/// Returns true if the given op is collapsable.
-static bool isEligibleForCollapse(Operation *op,
-                                  ArrayRef<Operation *> producers) {
-  if (!producers.empty()) return false;
-
-  auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp) return false;
-
-  // TODO(guray) There is no mechanism to tell the collapsed indexes to
-  // `tensor.expand_shape`. Once we have this support in MLIR, we can enable
-  // dynamic tensor shapes.
-  if (genericOp.hasDynamicShape()) return false;
-
-  // TODO(guray) Currently we can only collapse when result of all the
-  // AffineMaps are dimensions. Possible to collapse cases like
-  // affine_map<d0, d1+d2> with affine_map<d0, d1+d2>, however, this is not
-  // supported in collapsing mechanism in MLIR. Once we have this support,
-  // we can remove this if statement.
-  if (llvm::any_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
-        return !map.isProjectedPermutation();
-      })) {
-    return false;
-  }
-
-  // IndexOp allows accesing induction variables. Collapsing might cause
-  // performance regression, so we disable it.
-  if (genericOp.hasIndexSemantics()) return false;
-
-  return true;
-}
-
-/// Traverses all the ops in `roots`; collapse the ops if they are eligible
-/// ops.
-static LogicalResult collapseDimensions(
-    TensorDimTrackingRewriter &rewriter, SmallVectorImpl<Operation *> &roots,
-    DenseMap<unsigned, SmallVector<Operation *>> &producers) {
-  for (auto [index, op] : llvm::enumerate(roots)) {
-    if (!isEligibleForCollapse(op, producers[index])) continue;
-
-    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-      auto maybeLinalgGeneric = collapseLinalgGeneric(rewriter, genericOp);
-      if (failed(maybeLinalgGeneric)) return failure();
-      roots[index] = *maybeLinalgGeneric;
-    }
-  }
-  return success();
-}
-
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
-static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
-                                        FunctionOpInterface funcOp,
-                                        DominanceInfo const &dominanceInfo,
-                                        bool generateWorkloadRegion,
-                                        bool aggressiveFusion, bool collapse) {
+static LogicalResult createFusionGroups(
+    TensorDimTrackingRewriter &rewriter, FunctionOpInterface funcOp,
+    DominanceInfo const &dominanceInfo,
+    FormDispatchRegionsOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
-  unsigned numRoots =
-      decideFusableLinalgOps(funcOp, dominanceInfo, aggressiveFusion);
+  unsigned numRoots = decideFusableLinalgOps(funcOp, dominanceInfo, options);
   SmallVector<Operation *> roots(numRoots, nullptr);
   DenseMap<unsigned, SmallVector<Operation *>> producers;
 
@@ -860,26 +780,15 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
     }
   });
 
-  // TODO(guray): This can be extracted to a pass.
-  if (collapse) {
-    if (failed(collapseDimensions(rewriter, roots, producers)))
-      return failure();
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Collapsing dimension ---\n";
-      funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Flow::DispatchRegionOp> regionOps;
-  DenseMap<Flow::DispatchRegionOp, Optional<Flow::WorkloadBuilder>>
+  DenseMap<Flow::DispatchRegionOp, std::optional<Flow::WorkloadBuilder>>
       workloadBuilders;
   for (const auto &it : llvm::enumerate(roots)) {
     // Compute workload.
-    Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
-    if (generateWorkloadRegion) {
+    std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
+    if (options.generateWorkloadRegion) {
       auto maybeBuilder = iree_compiler::IREE::Flow::getWorkloadBuilder(
           rewriter, /*rootOp=*/it.value());
       if (failed(maybeBuilder)) return failure();
@@ -887,9 +796,11 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
     }
 
     // Simplify tensor::DimOps.
-    SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-    if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
-      return failure();
+    {
+      SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        return failure();
+      }
     }
 
     // Create fusion group.
@@ -907,6 +818,15 @@ static LogicalResult createFusionGroups(TensorDimTrackingRewriter &rewriter,
 
     // Move ops into the region.
     for (Operation *producer : llvm::reverse(producers[it.index()])) {
+      // Simplify tensor::DimOps.
+      {
+        SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+        if (failed(
+                iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+          return failure();
+        }
+      }
+
       auto newRegionOp =
           movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
       if (failed(newRegionOp)) return failure();
@@ -928,20 +848,32 @@ namespace {
 /// Pass declaration.
 struct FormDispatchRegionsPass
     : public FormDispatchRegionsBase<FormDispatchRegionsPass> {
+  using FormDispatchRegionsBase<
+      FormDispatchRegionsPass>::FormDispatchRegionsBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
                 scf::SCFDialect, tensor::TensorDialect>();
   }
-  FormDispatchRegionsPass(bool aggressiveFusion, bool generateWorkloadRegion,
-                          bool collapse) {
-    this->aggressiveFusion = aggressiveFusion;
-    this->generateWorkloadRegion = generateWorkloadRegion;
-    this->collapse = collapse;
+  /// These constructors are auto-generated in `Passes.h.inc` from the
+  /// tablegen file if `GEN_PASS_DEF_FORMDISPATCHREGIONS` is defined
+  /// before including that file. Doing that requires changing
+  /// all Flow passes to use similar mechanism.
+  // TODO(ravishankarm): Modify Flow passes to use the auto-generated
+  // options struct.
+  FormDispatchRegionsPass() {}
+  FormDispatchRegionsPass(const FormDispatchRegionsOptions &options)
+      : FormDispatchRegionsPass() {
+    fuseMultiUse = options.fuseMultiUse;
+    generateWorkloadRegion = options.generateWorkloadRegion;
+    fusePadWithConsumers = options.fusePadWithConsumers;
+    fusePadWithProducers = options.fusePadWithProducers;
   }
-  FormDispatchRegionsPass(const FormDispatchRegionsPass &pass)
-      : FormDispatchRegionsPass(pass.aggressiveFusion,
-                                pass.generateWorkloadRegion, pass.collapse) {}
+  FormDispatchRegionsPass(const FormDispatchRegionsPass &other)
+      : FormDispatchRegionsPass(FormDispatchRegionsOptions{
+            other.fuseMultiUse, other.generateWorkloadRegion,
+            other.fusePadWithConsumers, other.fusePadWithProducers}) {}
+
   void runOnOperation() override;
 };
 }  // namespace
@@ -951,17 +883,18 @@ void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
-  if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo,
-                                generateWorkloadRegion, aggressiveFusion,
-                                collapse)))
+  FormDispatchRegionsOptions options{fuseMultiUse, generateWorkloadRegion,
+                                     fusePadWithConsumers,
+                                     fusePadWithProducers};
+  if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
+    funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();
+  }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchRegionsPass(bool aggressiveFusion,
-                              bool generateWorkloadRegion, bool collapse) {
-  return std::make_unique<FormDispatchRegionsPass>(
-      aggressiveFusion, generateWorkloadRegion, collapse);
+createFormDispatchRegionsPass(FormDispatchRegionsOptions options) {
+  return std::make_unique<FormDispatchRegionsPass>(options);
 }
 }  // namespace Flow
 }  // namespace IREE

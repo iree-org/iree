@@ -10,6 +10,7 @@
 #include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
 #include "pybind11/numpy.h"
 
@@ -299,33 +300,71 @@ py::list HalDriver::QueryAvailableDevices() {
                  "Error querying devices");
   py::list results;
   for (iree_host_size_t i = 0; i < count; ++i) {
-    results.append(py::make_tuple(
-        py::cast(device_infos[i].device_id),
-        py::str(device_infos[i].name.data, device_infos[i].name.size)));
+    py::dict device_data;
+    device_data["device_id"] = py::cast(device_infos[i].device_id);
+    device_data["path"] =
+        py::str(device_infos[i].path.data, device_infos[i].path.size);
+    device_data["name"] =
+        py::str(device_infos[i].name.data, device_infos[i].name.size);
+    results.append(device_data);
   }
 
   iree_allocator_free(iree_allocator_system(), device_infos);
   return results;
 }
 
-HalDevice HalDriver::CreateDefaultDevice() {
+// Configures |device| based on flags before returning it to the user.
+static iree_status_t ConfigureDevice(iree_hal_device_t* device,
+                                     const py::kwargs& kwargs) {
+  // Optionally wrap the base device allocator with caching/pooling.
+  // Doing this here satisfies the requirement that no buffers have been
+  // allocated yet - if we returned the device without doing this the caller
+  // can more easily break the rules.
+  if (kwargs.contains("allocators")) {
+    // NOTE: we need to pass string views that point to the std::string storage.
+    // We do that in two passes because as we grow spec_storage it may
+    // reallocate itself and invalidate the pointers - only after we're done
+    // can we capture them in views.
+    auto spec_list = py::cast<py::list>(kwargs["allocators"]);
+    std::vector<std::string> spec_storage;
+    spec_storage.reserve(spec_list.size());
+    for (auto item : spec_list) {
+      auto spec = py::cast<std::string>(item);
+      spec_storage.push_back(std::move(spec));
+    }
+    std::vector<iree_string_view_t> spec_views;
+    spec_views.reserve(spec_list.size());
+    for (const auto& spec : spec_storage) {
+      spec_views.push_back(iree_make_string_view(spec.data(), spec.size()));
+    }
+    IREE_RETURN_IF_ERROR(iree_hal_configure_allocator_from_specs(
+        spec_views.size(), spec_views.data(), device));
+  }
+  return iree_ok_status();
+}
+
+HalDevice HalDriver::CreateDefaultDevice(const py::kwargs& kwargs) {
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_default_device(
                      raw_ptr(), iree_allocator_system(), &device),
                  "Error creating default device");
+  CheckApiStatus(ConfigureDevice(device, kwargs),
+                 "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
 
-HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id) {
+HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
+                                  const py::kwargs& kwargs) {
   // Since the device ids are supposed to be opaque, we need to verify
   // them by querying available devices.
   py::list available_devices = QueryAvailableDevices();
   bool found = false;
   py::object compare_device_id = py::cast(device_id);
   for (auto record : available_devices) {
-    // Each record is a tuple of (device_id, name).
-    auto record_tuple = py::cast<py::tuple>(record);
-    py::object found_device_id = record_tuple[0];
+    // Each record is a dict:
+    // {"device_id": obj, "path": str, "name": str}.
+    auto record_dict = py::cast<py::dict>(record);
+    py::object found_device_id = record_dict["device_id"];
     if (found_device_id.is(compare_device_id)) {
       found = true;
       break;
@@ -347,16 +386,21 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id) {
                      raw_ptr(), device_id, params.size(), &params.front(),
                      iree_allocator_system(), &device),
                  "Error creating default device");
+  CheckApiStatus(ConfigureDevice(device, kwargs),
+                 "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
 
-HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri) {
+HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
+                                       const py::kwargs& kwargs) {
   iree_hal_device_t* device;
   iree_string_view_t device_uri_sv{device_uri.data(), device_uri.size()};
   CheckApiStatus(
       iree_hal_driver_create_device_by_uri(raw_ptr(), device_uri_sv,
                                            iree_allocator_system(), &device),
       "Error creating device");
+  CheckApiStatus(ConfigureDevice(device, kwargs),
+                 "Error configuring the device");
   return HalDevice::StealFromRawPtr(device);
 }
 
@@ -367,54 +411,65 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri) {
 namespace {
 
 py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
-  // See: https://docs.python.org/3/c-api/arg.html#numbers
-  // TODO: Handle dtypes that do not map to a code (i.e. fp16).
-  const char* dtype_code;
+  // See:
+  //   * https://numpy.org/doc/stable/reference/arrays.dtypes.html
+  //   * https://docs.python.org/3/c-api/arg.html#numbers
+  //
+  // Single letter codes can be ambiguous across platforms, so prefer explicit
+  // bit depth values, ("Type strings: Any string in numpy.sctypeDict.keys()").
+  // See https://github.com/pybind/pybind11/issues/1908
+  const char* dtype_string;
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
-      dtype_code = "?";
+      dtype_string = "?";
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      dtype_code = "b";
+      dtype_string = "int8";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      dtype_code = "B";
+      dtype_string = "uint8";
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      dtype_code = "h";
+      dtype_string = "int16";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      dtype_code = "H";
+      dtype_string = "uint16";
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      dtype_code = "i";
+      dtype_string = "int32";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      dtype_code = "I";
+      dtype_string = "uint32";
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      dtype_code = "l";
+      dtype_string = "int64";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      dtype_code = "L";
+      dtype_string = "uint64";
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      dtype_code = "e";
+      dtype_string = "float16";
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      dtype_code = "f";
+      dtype_string = "float32";
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      dtype_code = "d";
+      dtype_string = "float64";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
+      dtype_string = "complex64";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
+      dtype_string = "complex128";
       break;
     default:
       throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
   }
-  return py::dtype(dtype_code);
+  return py::dtype(dtype_string);
 }
 
 }  // namespace
@@ -586,11 +641,13 @@ void SetupHalBindings(pybind11::module m) {
            py::keep_alive<0, 1>())
       .def(
           "create_device",
-          [](HalDriver& self, py::tuple device_info) -> HalDevice {
-            // Alias of create_device that takes a tuple as returned from
+          [](HalDriver& self, py::dict device_info,
+             const py::kwargs& kwargs) -> HalDevice {
+            // Alias of create_device that takes a dict as returned from
             // query_available_devices for convenience.
-            auto device_id = py::cast<iree_hal_device_id_t>(device_info[0]);
-            return self.CreateDevice(device_id);
+            auto device_id =
+                py::cast<iree_hal_device_id_t>(device_info["device_id"]);
+            return self.CreateDevice(device_id, kwargs);
           },
           py::keep_alive<0, 1>())
       .def("query_available_devices", &HalDriver::QueryAvailableDevices);
@@ -616,14 +673,15 @@ void SetupHalBindings(pybind11::module m) {
       .def_property_readonly("formatted_statistics",
                              &HalAllocator::FormattedStatistics)
       .def(
-          "query_compatibility",
+          "query_buffer_compatibility",
           [](HalAllocator& self, int memory_type, int allowed_usage,
              int intended_usage, iree_device_size_t allocation_size) -> int {
             iree_hal_buffer_params_t params = {0};
             params.type = memory_type;
             params.usage = allowed_usage & intended_usage;
-            return iree_hal_allocator_query_compatibility(
-                self.raw_ptr(), params, allocation_size);
+            return iree_hal_allocator_query_buffer_compatibility(
+                self.raw_ptr(), params, allocation_size,
+                /*out_params=*/nullptr, /*out_allocation_size=*/0);
           },
           py::arg("memory_type"), py::arg("allowed_usage"),
           py::arg("intended_usage"), py::arg("allocation_size"))

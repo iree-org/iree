@@ -80,7 +80,8 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims,
-    Optional<HAL_Fence>:$wait_fence
+    Optional<HAL_Fence>:$wait_fence,
+    OptionalAttr<StrAttr>:$name
   );
   let results = (outs
     AnyTensor:$target
@@ -88,21 +89,24 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 
   let assemblyFormat = [{
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
-    $source `:` type($source)
-    `->`
+    $source
+    ($name^)?
+    `:` type($source) `->`
     custom<TypeAlias>($target_encoding, type($target)) (`{` $target_dims^ `}`)?
-    attr-dict-with-keyword
+    attr-dict
   }];
 
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source
+      "Value":$source,
+      "StringAttr":$name
     )>,
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source,
-      "Value":$waitFence
+      "Value":$waitFence,
+      "StringAttr":$name
     )>,
   ];
 
@@ -146,7 +150,8 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     AnyTensor:$source,
     TypeAttr:$source_encoding,
     HAL_ShapeDynamicDims:$source_dims,
-    Optional<HAL_Buffer>:$target_storage
+    Optional<HAL_Buffer>:$target_storage,
+    OptionalAttr<StrAttr>:$name
   );
   let results = (outs
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
@@ -154,18 +159,20 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
 
   let assemblyFormat = [{
     $source
+    ($name^)?
     (`into` $target_storage^)?
     `:`
     custom<TypeAlias>($source_encoding, type($source)) (`{` $source_dims^ `}`)?
     `->`
     type($target)
-    attr-dict-with-keyword
+    attr-dict
   }];
 
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source
+      "Value":$source,
+      "StringAttr":$name
     )>,
   ];
 
@@ -688,17 +695,17 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
     queue. Collective operations using this channel must only be submitted on
     compatible queues.
 
-    A rank or count of -1 can be used to indicate a default inherited from the
-    environment or device configuration.
+    The group and ID are optional and may be null. A rank or count of -1 can be
+    used to indicate a default inherited from the environment or device
+    configuration.
   }];
 
   let arguments = (ins
     HAL_Device:$device,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    // TODO(benvanik): optional discriminator for groupings.
-    // TODO(benvanik): channel ID as a `Util_BufferType:$id`.
-    // TODO(benvanik): make rank/count optional (but then would need a custom vm
-    // import pattern).
+    I32Attr:$flags,
+    Util_BufferType:$id,
+    Util_BufferType:$group,
     I32:$rank,
     I32:$count
   );
@@ -709,6 +716,9 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
     `affinity` `(` $queue_affinity `)`
+    `flags` `(` $flags `)`
+    `id` `(` $id `)`
+    `group` `(` $group `)`
     `rank` `(` $rank `)`
     `count` `(` $count `)`
     `:` type($result)
@@ -1848,6 +1858,19 @@ def HAL_ExecutableConstantBlockOp :
     // CallableOpInterface:
     ::mlir::Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
+
     // FunctionOpInterface:
     ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
     ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
@@ -1855,6 +1878,9 @@ def HAL_ExecutableConstantBlockOp :
     // Placeholder attribute added to ops that look up constants by key.
     // Ordinal assignment passes use this to identify and update usage.
     static StringRef getKeyAttrName() { return "hal.executable.constant.key"; }
+
+    /// Make symbol optional as this op has no symbol.
+    bool isOptionalSymbol() { return true; }
   }];
 
   let hasCanonicalizer = 1;
@@ -2029,6 +2055,150 @@ def HAL_ExecutableCalculateWorkgroupsOp : HAL_PureOp<"executable.calculate_workg
 }
 
 //===----------------------------------------------------------------------===//
+// hal.instrument.*
+//===----------------------------------------------------------------------===//
+
+def HAL_InstrumentWorkgroupOp : HAL_Op<"instrument.workgroup", []> {
+  let summary = [{emits a dispatch workgroup instrumentation event}];
+  let description = [{
+    Emits an `iree_instrument_dispatch_workgroup_t` event into the
+    instrumentation stream. The workgroup event identifies the unique dispatch,
+    its workgroup count, and the ID of the emitting workgroup within the
+    dispatch. Optionally targets that support querying the processor ID
+    executing the workgroup can attach that information for tracking purposes.
+
+    On targets such as CPUs where entire workgroups execute as atomic units
+    only one workgroup event should be emitted. On targets such as GPUs where
+    there may be multiple invocations executing as part of a single workgroup
+    only the first invocation within the workgroup should emit the workgroup
+    event (by checking if the LocalInvocationIndex or threadIdx == 0, etc).
+
+    The resulting workgroup key is used by subsequent workgroup-specific
+    instrumentation events.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    I32:$dispatchId
+  );
+  let results = (outs
+    Index:$workgroupKey
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `]`
+    `dispatch` `(` $dispatchId `)`
+    attr-dict `:` type($workgroupKey)
+  }];
+}
+
+def HAL_InstrumentPrintOp : HAL_Op<"instrument.print", []> {
+  let summary = [{emits a human-readable printf-style string event}];
+  let description = [{
+    Formats a string using a limited subset of printf format specifiers and the
+    provided values and then emits an `iree_instrument_dispatch_print_t` event. Final
+    formatted string lengths may be limited to as much as 1024 characters and
+    should be kept as small as possible to avoid easily exceeding the
+    instrumentation storage buffers with redundant strings.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    Index:$workgroupKey,
+    StrAttr:$format,
+    Variadic<AnyType>:$values
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
+    $format (`*` `(` $values^ `:` type($values) `)`)?
+    attr-dict
+  }];
+}
+
+def HAL_InstrumentValueOp : HAL_Op<"instrument.value", [
+    AllTypesMatch<["operand", "result"]>,
+  ]> {
+  let summary = [{emits a scalar value instrumentation event}];
+  let description = [{
+    Emits a workgroup-specific typed value with the given workgroup-relative
+    ordinal.
+
+    This op will be preserved even if the output is not used as it is only for
+    debugging purposes.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    Index:$workgroupKey,
+    AnyI8Attr:$ordinal,
+    AnyType:$operand
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
+    $ordinal `=` $operand attr-dict `:` type($operand)
+  }];
+}
+
+def HAL_InstrumentMemoryLoadOp : HAL_PureOp<"instrument.memory.load", [
+    AllTypesMatch<["loadValue", "result"]>,
+  ]> {
+  let summary = [{emits a memory load instrumentation event}];
+  let description = [{
+    Emits a workgroup-specific memory load event indicating that a number of
+    bytes from the given resolved pointer have been loaded by the workgroup.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    Index:$workgroupKey,
+    AnyType:$loadValue,
+    AnyMemRef:$base,
+    Variadic<Index>:$indices
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
+    $base `[` $indices `]` `,` $loadValue
+    attr-dict `:` type($base) `,` type($result)
+  }];
+}
+
+def HAL_InstrumentMemoryStoreOp : HAL_PureOp<"instrument.memory.store", [
+    AllTypesMatch<["storeValue", "result"]>,
+  ]> {
+  let summary = [{emits a memory store instrumentation event}];
+  let description = [{
+    Emits a workgroup-specific memory store event indicating that a number of
+    bytes have been stored to the given resolved pointer by the workgroup.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$buffer,
+    Index:$workgroupKey,
+    AnyType:$storeValue,
+    AnyMemRef:$base,
+    Variadic<Index>:$indices
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    `` `[` $buffer `:` type($buffer) `for` $workgroupKey `]`
+    $base `[` $indices `]` `,` $storeValue
+    attr-dict `:` type($base) `,` type($result)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // hal.interface
 //===----------------------------------------------------------------------===//
 
@@ -2169,9 +2339,8 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   }];
 }
 
-def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
+def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     AttrSizedOperandSegments,
-    MemoryEffects<[MemAlloc]>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
@@ -2191,26 +2360,44 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     HAL_DescriptorTypeAttr:$descriptor_type,
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
-    OptionalAttr<IndexAttr>:$alignment
+    OptionalAttr<IndexAttr>:$alignment,
+    OptionalAttr<HAL_DescriptorFlagsAttr>:$descriptor_flags
   );
   let results = (outs
-    Res<AnyType, "", [MemAlloc]>:$result
+    AnyType:$result
   );
 
   let assemblyFormat = [{
     `set` `(` $set `)`
     `binding` `(` $binding `)`
     `type` `(` custom<DescriptorType>($descriptor_type) `)`
-    (`offset` `(` $byte_offset^ `)`)?
     (`alignment` `(` $alignment^ `)`)?
+    (`offset` `(` $byte_offset^ `)`)?
+    (`flags` `(` $descriptor_flags^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$resultType,
+      "APInt":$set,
+      "APInt":$binding,
+      "IREE::HAL::DescriptorType":$descriptor_type,
+      "Value":$byte_offset,
+      "ValueRange":$dynamic_dims,
+      "IntegerAttr":$alignment,
+      CArg<"std::optional<DescriptorFlags>", "llvm::None">:$flags
+    )>,
+  ];
 
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
     ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
+
+    // Returns the alignment of the base buffer pointer (before offset).
+    llvm::MaybeAlign getBaseAlignment();
 
     // Attempts to calculate an alignment of the final subspan offset in the
     // parent storage buffer. This is a combination of both the binding

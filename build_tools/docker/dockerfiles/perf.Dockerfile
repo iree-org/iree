@@ -22,24 +22,29 @@ RUN apt-get update \
 ##############
 
 ######## Clang/LLVM ########
+ARG LLVM_VERSION=14
+
 RUN apt-get update \
   && apt-get install -y \
-    llvm-14 \
-    llvm-14-dev \
-    clang-14 \
-    clang-tools-14 \
-    libclang-common-14-dev \
-    libclang-14-dev \
-    libclang1-14 \
-    clang-format-14 \
-    clangd-14 \
-    clang-tidy-14 \
-    lldb-14 \
-    lld-14 \
-    libmlir-14-dev \
-    mlir-14-tools \
-  && ln -s /usr/lib/llvm-14/bin/clang /usr/bin/clang \
-  && ln -s /usr/lib/llvm-14/bin/clang++ /usr/bin/clang++
+    llvm-${LLVM_VERSION} \
+    llvm-${LLVM_VERSION}-dev \
+    clang-${LLVM_VERSION} \
+    clang-tools-${LLVM_VERSION} \
+    libclang-common-${LLVM_VERSION}-dev \
+    libclang-${LLVM_VERSION}-dev \
+    libclang1-${LLVM_VERSION} \
+    clang-format-${LLVM_VERSION} \
+    clangd-${LLVM_VERSION} \
+    clang-tidy-${LLVM_VERSION} \
+    lldb-${LLVM_VERSION} \
+    lld-${LLVM_VERSION} \
+    libmlir-${LLVM_VERSION}-dev \
+    mlir-${LLVM_VERSION}-tools \
+  && ln -s /usr/lib/llvm-${LLVM_VERSION}/bin/clang /usr/bin/clang \
+  && ln -s /usr/lib/llvm-${LLVM_VERSION}/bin/clang++ /usr/bin/clang++
+
+ENV CC /usr/bin/clang
+ENV CXX /usr/bin/clang++
 ##############
 
 ######## Python ########

@@ -77,7 +77,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   }
 
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const final {
+                       IRMapping &valueMapping) const final {
     // TODO(benvanik): disallow inlining across async calls.
 
     // Don't inline functions with the 'noinline' attribute.
@@ -92,7 +92,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   }
 
   bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
-                       BlockAndValueMapping &valueMapping) const final {
+                       IRMapping &valueMapping) const final {
     // TODO(benvanik): disallow inlining across async calls.
     return true;
   }
@@ -188,7 +188,8 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
     if (spec == "?") {
       elementType = OpaqueType::get(getContext());
     } else {
-      elementType = mlir::parseType(spec, getContext());
+      // Make sure to pass a null-terminated string to the type parser.
+      elementType = mlir::parseType(spec.str(), getContext());
     }
     if (!elementType) {
       parser.emitError(parser.getCurrentLocation())
@@ -209,7 +210,8 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
       return IREE::VM::RefType::getChecked(
           IREE::VM::OpaqueType::get(getContext()), loc);
     }
-    auto objectType = mlir::parseType(spec, getContext());
+    // Make sure to pass a null-terminated string to the type parser.
+    auto objectType = mlir::parseType(spec.str(), getContext());
     if (!objectType) {
       parser.emitError(parser.getCurrentLocation())
           << "invalid ref object type specification: '"

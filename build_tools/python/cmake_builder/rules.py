@@ -30,7 +30,7 @@ iree_fetch_artifact(
 )
 """
 
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 INDENT_SPACES = " " * 2
 
@@ -95,6 +95,7 @@ def build_iree_bytecode_module(target_name: str,
                                c_identifier: Optional[str] = None,
                                static_lib_path: Optional[str] = None,
                                deps: List[str] = [],
+                               friendly_name: Optional[str] = None,
                                testonly: bool = False,
                                public: bool = True) -> str:
   name_block = _get_string_arg_block("NAME", target_name)
@@ -106,6 +107,7 @@ def build_iree_bytecode_module(target_name: str,
                                                     compile_tool_target)
   flags_block = _get_string_list_arg_block("FLAGS", flags)
   deps_block = _get_string_list_arg_block("DEPS", deps)
+  friendly_name_block = _get_string_arg_block("FRIENDLY_NAME", friendly_name)
   testonly_block = _get_option_arg_block("TESTONLY", testonly)
   public_block = _get_option_arg_block("PUBLIC", public)
   return _convert_block_to_string(
@@ -113,8 +115,8 @@ def build_iree_bytecode_module(target_name: str,
                        parameter_blocks=[
                            name_block, src_block, module_name_block,
                            c_identifier_block, compile_tool_target_block,
-                           static_lib_block, flags_block, deps_block,
-                           testonly_block, public_block
+                           static_lib_block, flags_block, friendly_name_block,
+                           deps_block, testonly_block, public_block
                        ]))
 
 
@@ -133,50 +135,53 @@ def build_iree_fetch_artifact(target_name: str, source_url: str, output: str,
 
 
 def build_iree_import_tf_model(target_path: str, source: str,
-                               entry_function: str,
+                               import_flags: List[str],
                                output_mlir_file: str) -> str:
   target_name_block = _get_string_arg_block("TARGET_NAME", target_path)
   source_block = _get_string_arg_block("SOURCE", source)
-  entry_function_block = _get_string_arg_block("ENTRY_FUNCTION", entry_function)
+  import_flags_block = _get_string_list_arg_block("IMPORT_FLAGS", import_flags)
   output_mlir_file_block = _get_string_arg_block("OUTPUT_MLIR_FILE",
                                                  output_mlir_file)
   return _convert_block_to_string(
       _build_call_rule(rule_name="iree_import_tf_model",
                        parameter_blocks=[
-                           target_name_block, source_block,
-                           entry_function_block, output_mlir_file_block
+                           target_name_block, source_block, import_flags_block,
+                           output_mlir_file_block
                        ]))
 
 
 def build_iree_import_tflite_model(target_path: str, source: str,
+                                   import_flags: List[str],
                                    output_mlir_file: str) -> str:
   target_name_block = _get_string_arg_block("TARGET_NAME", target_path)
   source_block = _get_string_arg_block("SOURCE", source)
+  import_flags_block = _get_string_list_arg_block("IMPORT_FLAGS", import_flags)
   output_mlir_file_block = _get_string_arg_block("OUTPUT_MLIR_FILE",
                                                  output_mlir_file)
   return _convert_block_to_string(
       _build_call_rule(rule_name="iree_import_tflite_model",
                        parameter_blocks=[
-                           target_name_block, source_block,
+                           target_name_block, source_block, import_flags_block,
                            output_mlir_file_block
                        ]))
 
 
 def build_iree_benchmark_suite_module_test(
     target_name: str,
-    model: str,
     driver: str,
     expected_output: str,
+    platform_module_map: Dict[str, str],
     runner_args: Sequence[str],
     timeout_secs: Optional[int] = None,
     labels: Sequence[str] = [],
-    xfail_platforms: Sequence[str] = [],
-    unsupported_platforms: Sequence[str] = []) -> str:
+    xfail_platforms: Sequence[str] = []) -> str:
   name_block = _get_string_arg_block("NAME", target_name)
-  model_block = _get_string_arg_block("MODEL", model)
   driver_block = _get_string_arg_block("DRIVER", driver)
   expected_output_block = _get_string_arg_block("EXPECTED_OUTPUT",
                                                 expected_output)
+  modules_block = _get_string_list_arg_block(
+      "MODULES",
+      [f"{platform}={path}" for platform, path in platform_module_map.items()])
   timeout_block = _get_string_arg_block(
       "TIMEOUT",
       str(timeout_secs) if timeout_secs is not None else None)
@@ -184,15 +189,12 @@ def build_iree_benchmark_suite_module_test(
   labels_block = _get_string_list_arg_block("LABELS", labels)
   xfail_platforms_block = _get_string_list_arg_block("XFAIL_PLATFORMS",
                                                      xfail_platforms)
-  unsupported_platforms_block = _get_string_list_arg_block(
-      "UNSUPPORTED_PLATFORMS", unsupported_platforms)
   return _convert_block_to_string(
       _build_call_rule(rule_name="iree_benchmark_suite_module_test",
                        parameter_blocks=[
-                           name_block, model_block, driver_block,
-                           expected_output_block, timeout_block,
-                           runner_args_block, labels_block,
-                           xfail_platforms_block, unsupported_platforms_block
+                           name_block, driver_block, expected_output_block,
+                           timeout_block, modules_block, runner_args_block,
+                           labels_block, xfail_platforms_block
                        ]))
 
 

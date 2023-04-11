@@ -50,17 +50,14 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
   OperationState state{srcOp->getLoc(), dstOpName};
   state.addAttributes(srcOp->getAttrs());
 
-  for (auto srcDstOperand : llvm::zip_equal(srcOp->getOperands(), operands)) {
-    auto dstOperand = std::get<1>(srcDstOperand);
-
+  for (auto [srcOperand, dstOperand] :
+       llvm::zip_equal(srcOp->getOperands(), operands)) {
     // Check that any type that should have been mapped to buffer view was.
     // This is just to catch conflicts in type conversions that may sneak in
     // during development.
-    assert(!HALTypeConverter::shouldConvertToBufferView(
-               std::get<0>(srcDstOperand).getType()) ||
+    assert(!HALTypeConverter::shouldConvertToBufferView(srcOperand.getType()) ||
            dstOperand.getType().isa<IREE::HAL::BufferViewType>() &&
                "expect that tensors have been mapped to buffer views");
-
     state.addOperands({dstOperand});
   }
   for (auto resultType : srcOp->getResultTypes()) {

@@ -59,6 +59,9 @@ void convertExtensions(Vulkan::TargetEnvAttr vkTargetEnv,
       case Extension::VK_KHR_shader_float16_int8:
         // This extension allows using certain SPIR-V capabilities.
         break;
+      case Extension::VK_KHR_shader_integer_dot_product:
+        extensions.push_back(spirv::Extension::SPV_KHR_integer_dot_product);
+        break;
       case Extension::VK_KHR_spirv_1_4:
         // This extension only affects SPIR-V version.
         break;
@@ -140,6 +143,14 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
   }
   if (vkCapabilities.getVariablePointersStorageBuffer()) {
     capabilities.push_back(spirv::Capability::VariablePointersStorageBuffer);
+  }
+  if (vkCapabilities.getShaderIntegerDotProduct()) {
+    capabilities.push_back(spirv::Capability::DotProduct);
+    capabilities.push_back(spirv::Capability::DotProductInputAll);
+    capabilities.push_back(spirv::Capability::DotProductInput4x8BitPacked);
+    if (vkCapabilities.getShaderInt8()) {
+      capabilities.push_back(spirv::Capability::DotProductInput4x8Bit);
+    }
   }
   if (ArrayAttr attr = vkCapabilities.getCooperativeMatrixPropertiesNV()) {
     if (!attr.empty()) {

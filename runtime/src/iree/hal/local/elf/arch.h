@@ -14,8 +14,9 @@
 // ELF machine type/ABI
 //==============================================================================
 
-// Returns true if the reported ELF machine specification is valid.
-bool iree_elf_arch_is_valid(const iree_elf_ehdr_t* ehdr);
+// Returns true if the reported ELF machine specification is valid for the
+// current architecture.
+bool iree_elf_machine_is_valid(iree_elf_half_t machine);
 
 //==============================================================================
 // ELF relocations
@@ -29,8 +30,12 @@ typedef struct iree_elf_relocation_state_t {
   uint8_t* vaddr_bias;
 
   // PT_DYNAMIC table.
-  iree_host_size_t dyn_table_count;
   const iree_elf_dyn_t* dyn_table;
+  iree_host_size_t dyn_table_count;
+
+  // Dynamic symbol table (.dynsym) loaded into virtual memory.
+  const iree_elf_sym_t* dynsym;   // DT_SYMTAB
+  iree_host_size_t dynsym_count;  // DT_SYMENT (bytes) / sizeof(iree_elf_sym_t)
 } iree_elf_relocation_state_t;
 
 // Applies architecture-specific relocations.

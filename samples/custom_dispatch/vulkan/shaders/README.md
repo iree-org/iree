@@ -105,7 +105,7 @@ glslc -fshader-stage=compute simple_mul.glsl -o simple_mul.spv
 ## Instructions
 
 This presumes that `iree-compile` and `iree-run-module` have been installed or
-built. [See here](https://iree-org.github.io/iree/building-from-source/getting-started/)
+built. [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
 for instructions for CMake setup and building from source.
 
 0. Ensure that `glslc` is on your PATH (comes with the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home)):
@@ -140,8 +140,8 @@ for instructions for CMake setup and building from source.
     ```
     iree-run-module \
         --device=vulkan \
-        --entry_function=mixed_invocation \
-        --function_input=8xf32=2 \
-        --function_input=8xf32=4 \
+        --function=mixed_invocation \
+        --input=8xf32=2 \
+        --input=8xf32=4 \
         /tmp/example.vmfb
     ```

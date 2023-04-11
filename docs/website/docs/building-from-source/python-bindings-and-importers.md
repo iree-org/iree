@@ -25,7 +25,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
 
 **Pre-requisites:**
 
-* A relatively recent Python3 installation >=3.7 (we aim to support
+* A relatively recent Python3 installation >=3.8 (we aim to support
   [non-eol Python versions](https://endoflife.date/python)).
 
 **CMake Variables:**
@@ -49,12 +49,12 @@ as through `venv`, which may need to be installed via your system
 package manager ([about](https://docs.python.org/3/library/venv.html),
 [tutorial](https://docs.python.org/3/tutorial/venv.html)):
 
-=== "Linux and MacOS"
+=== "Linux"
 
     ``` shell
     # Make sure your 'python' is what you expect. Note that on multi-python
-    # systems, this may have a version suffix, and on many Linuxes and MacOS where
-    # python2 and python3 co-exist, you may also want to use `python3`.
+    # systems, this may have a version suffix, and on many Linuxes where
+    # python2 and python3 can co-exist, you may also want to use `python3`.
     which python
     python --version
 
@@ -68,6 +68,30 @@ package manager ([about](https://docs.python.org/3/library/venv.html),
 
     # Upgrade PIP. On Linux, many packages cannot be installed for older
     # PIP versions. See: https://github.com/pypa/manylinux
+    python -m pip install --upgrade pip
+
+    # Install IREE build pre-requisites.
+    python -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+    ```
+
+=== "macOS"
+
+    ``` shell
+    # Make sure your 'python' is what you expect. Note that on multi-python
+    # systems, this may have a version suffix, and on macOS where python2
+    # and python3 can co-exist, you may also want to use `python3`.
+    which python
+    python --version
+
+    # Create a persistent virtual environment (first time only).
+    python -m venv iree.venv
+
+    # Activate the virtual environment (per shell).
+    # Now the `python` command will resolve to your virtual environment
+    # (even on systems where you typically use `python3`).
+    source iree.venv/bin/activate
+
+    # Upgrade PIP.
     python -m pip install --upgrade pip
 
     # Install IREE build pre-requisites.
@@ -106,7 +130,24 @@ or running `deactivate`.
 
 From the `iree-build` directory:
 
-=== "Linux and MacOS"
+=== "Linux"
+
+    ``` shell
+    cmake \
+        -GNinja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DIREE_BUILD_PYTHON_BINDINGS=ON \
+        -DPython3_EXECUTABLE="$(which python)" \
+        .
+    cmake --build .
+
+    # Add the bindings/python paths to PYTHONPATH and use the API.
+    source .env && export PYTHONPATH
+    python -c "import iree.compiler"
+    python -c "import iree.runtime"
+    ```
+
+=== "macOS"
 
     ``` shell
     cmake \
@@ -158,10 +199,10 @@ These tools packages are needed in order for the frontend specific, high-level
 APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
 `import iree.compiler.xla`, and `import iree.jax` to be fully functional.
 
-!!! Warning
+!!! Caution
 
     This section is under construction. Refer to the
-    [source documentation](https://github.com/iree-org/iree/tree/main/integrations/tensorflow#readme)
+    [source documentation](https://github.com/openxla/iree/tree/main/integrations/tensorflow#readme)
     for the latest building from source instructions.
 
 ???+ Note

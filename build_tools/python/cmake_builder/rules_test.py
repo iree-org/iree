@@ -100,7 +100,10 @@ class RulesTest(unittest.TestCase):
     rule = cmake_builder.rules.build_iree_import_tf_model(
         target_path="pkg_abcd",
         source="abcd/model",
-        entry_function="main",
+        import_flags=[
+            "--tf-savedmodel-exported-names=main",
+            "--tf-import-type=savedmodel_v1"
+        ],
         output_mlir_file="abcd.mlir")
 
     self.assertEqual(
@@ -111,8 +114,9 @@ class RulesTest(unittest.TestCase):
             "pkg_abcd"
           SOURCE
             "abcd/model"
-          ENTRY_FUNCTION
-            "main"
+          IMPORT_FLAGS
+            "--tf-savedmodel-exported-names=main"
+            "--tf-import-type=savedmodel_v1"
           OUTPUT_MLIR_FILE
             "abcd.mlir"
         )
@@ -122,6 +126,7 @@ class RulesTest(unittest.TestCase):
     rule = cmake_builder.rules.build_iree_import_tflite_model(
         target_path="pkg_abcd",
         source="abcd.tflite",
+        import_flags=["--fake-flag=abcd"],
         output_mlir_file="abcd.mlir")
 
     self.assertEqual(
@@ -132,6 +137,8 @@ class RulesTest(unittest.TestCase):
             "pkg_abcd"
           SOURCE
             "abcd.tflite"
+          IMPORT_FLAGS
+            "--fake-flag=abcd"
           OUTPUT_MLIR_FILE
             "abcd.mlir"
         )
@@ -140,14 +147,16 @@ class RulesTest(unittest.TestCase):
   def test_build_iree_benchmark_suite_module_test(self):
     rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name="model_test",
-        model="123_abc",
         driver="LOCAL_TASK",
         expected_output="xyz",
+        platform_module_map={
+            "x86_64": "a.vmfb",
+            "arm": "b.vmfb"
+        },
         runner_args=["--x=0", "--y=1"],
         timeout_secs=10,
         labels=["defaults", "e2e"],
-        xfail_platforms=["arm", "ppc"],
-        unsupported_platforms=["riscv", "z80"])
+        xfail_platforms=["arm_64-Android", "riscv_32-Linux"])
 
     self.assertEqual(
         rule,
@@ -155,14 +164,15 @@ class RulesTest(unittest.TestCase):
         iree_benchmark_suite_module_test(
           NAME
             "model_test"
-          MODEL
-            "123_abc"
           DRIVER
             "LOCAL_TASK"
           EXPECTED_OUTPUT
             "xyz"
           TIMEOUT
             "10"
+          MODULES
+            "x86_64=a.vmfb"
+            "arm=b.vmfb"
           RUNNER_ARGS
             "--x=0"
             "--y=1"
@@ -170,11 +180,8 @@ class RulesTest(unittest.TestCase):
             "defaults"
             "e2e"
           XFAIL_PLATFORMS
-            "arm"
-            "ppc"
-          UNSUPPORTED_PLATFORMS
-            "riscv"
-            "z80"
+            "arm_64-Android"
+            "riscv_32-Linux"
         )
         """))
 

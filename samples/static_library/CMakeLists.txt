@@ -10,16 +10,13 @@ if(NOT IREE_TARGET_BACKEND_LLVM_CPU OR
   return()
 endif()
 
-# Set iree-compile binary.
-set(_COMPILE_TOOL_EXECUTABLE $<TARGET_FILE:iree-compile>)
-
 ## Example with VM bytecode module.
 # Setup args for iree-compile.
 set(_COMPILE_ARGS)
 list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=llvm-cpu")
-list(APPEND _COMPILE_ARGS "--iree-llvm-link-embedded=false")
-list(APPEND _COMPILE_ARGS "--iree-llvm-link-static")
-list(APPEND _COMPILE_ARGS "--iree-llvm-static-library-output-path=simple_mul.o")
+list(APPEND _COMPILE_ARGS "--iree-llvmcpu-link-embedded=false")
+list(APPEND _COMPILE_ARGS "--iree-llvmcpu-link-static")
+list(APPEND _COMPILE_ARGS "--iree-llvmcpu-static-library-output-path=simple_mul.o")
 list(APPEND _COMPILE_ARGS "--iree-vm-target-index-bits=32")
 list(APPEND _COMPILE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
 list(APPEND _COMPILE_ARGS "-o")
@@ -31,8 +28,8 @@ add_custom_command(
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.h
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.o
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.vmfb
-  COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_COMPILE_ARGS}
-  DEPENDS ${_COMPILE_TOOL_EXECUTABLE} "simple_mul.mlir"
+  COMMAND iree-compile ${_COMPILE_ARGS}
+  DEPENDS iree-compile "simple_mul.mlir"
 )
 
 # Tell cmake about the simple_mul library so it will link it.
@@ -94,8 +91,7 @@ iree_lit_test(
     "hostonly"
 )
 
-
-if(NOT (IREE_OUTPUT_FORMAT_C OR DEFINED IREE_HOST_BINARY_ROOT))
+if(NOT (IREE_OUTPUT_FORMAT_C OR IREE_HOST_BIN_DIR))
   return()
 endif()
 
@@ -104,9 +100,9 @@ endif()
 set(_COMPILE_ARGS)
 list(APPEND _COMPILE_ARGS "--output-format=vm-c")
 list(APPEND _COMPILE_ARGS "--iree-hal-target-backends=llvm-cpu")
-list(APPEND _COMPILE_ARGS "--iree-llvm-link-embedded=false")
-list(APPEND _COMPILE_ARGS "--iree-llvm-link-static")
-list(APPEND _COMPILE_ARGS "--iree-llvm-static-library-output-path=simple_mul_c_module.o")
+list(APPEND _COMPILE_ARGS "--iree-llvmcpu-link-embedded=false")
+list(APPEND _COMPILE_ARGS "--iree-llvmcpu-link-static")
+list(APPEND _COMPILE_ARGS "--iree-llvmcpu-static-library-output-path=simple_mul_c_module.o")
 list(APPEND _COMPILE_ARGS "--iree-vm-target-index-bits=32")
 list(APPEND _COMPILE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
 list(APPEND _COMPILE_ARGS "-o")
@@ -118,8 +114,8 @@ add_custom_command(
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.h
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.o
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_emitc.h
-  COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_COMPILE_ARGS}
-  DEPENDS ${_COMPILE_TOOL_EXECUTABLE} "simple_mul.mlir"
+  COMMAND iree-compile ${_COMPILE_ARGS}
+  DEPENDS iree-compile "simple_mul.mlir"
 )
 
 # TODO(marbre): Cleanup custom targets and libraries.

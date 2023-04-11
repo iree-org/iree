@@ -7,18 +7,40 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Determines whether CI should run on a given PR.
 
+The following environment variables are required:
+- GITHUB_EVENT_NAME: GitHub event name, e.g. pull_request.
+- GITHUB_OUTPUT: path to write workflow output variables.
+- GITHUB_STEP_SUMMARY: path to write workflow summary output.
+
+When GITHUB_EVENT_NAME is "pull_request", there are additional environment
+variables to be set:
+- PR_TITLE (required): PR title.
+- PR_BODY (optional): PR description.
+- PR_LABELS (optional): JSON list of PR label names.
+- BASE_REF (required): base commit SHA of the PR.
+- ORIGINAL_PR_TITLE (optional): PR title from the original PR event, showing a
+    notice if PR_TITLE is different.
+- ORIGINAL_PR_BODY (optional): PR description from the original PR event,
+    showing a notice if PR_BODY is different. ORIGINAL_PR_TITLE must also be
+    set.
+- ORIGINAL_PR_LABELS (optional): PR labels from the original PR event, showing a
+    notice if PR_LABELS is different. ORIGINAL_PR_TITLE must also be set.
+
 Exit code 0 indicates that it should and exit code 2 indicates that it should
 not.
 """
 
+import difflib
 import fnmatch
+import json
 import os
 import subprocess
-import sys
-from typing import Iterable, Mapping, MutableMapping
+import textwrap
+from typing import Iterable, List, Mapping, Sequence, Tuple
 
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
+BENCHMARK_PRESET_KEY = "benchmarks"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
 # patterns because they don't treat '/' specially. The standard library doesn't
@@ -27,6 +49,7 @@ RUNNER_ENV_KEY = "runner-env"
 # worth the dependency.
 SKIP_PATH_PATTERNS = [
     "docs/*",
+    "third_party/mkdocs-material/*",
     "experimental/*",
     "build_tools/buildkite/*",
     # These configure the runners themselves and don't affect presubmit.
@@ -50,6 +73,10 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
+BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
+
+PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
+
 
 def skip_path(path: str) -> bool:
   return any(fnmatch.fnmatch(path, pattern) for pattern in SKIP_PATH_PATTERNS)
@@ -59,27 +86,108 @@ def set_output(d: Mapping[str, str]):
   print(f"Setting outputs: {d}")
   step_output_file = os.environ["GITHUB_OUTPUT"]
   with open(step_output_file, "a") as f:
-    f.writelines(f"{k}={v}" "\n" for k, v in d.items())
+    f.writelines(f"{k}={v}" + "\n" for k, v in d.items())
 
 
-def get_trailers() -> Mapping[str, str]:
+def write_job_summary(summary: str):
+  """Write markdown messages on Github workflow UI.
+  See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
+  """
+  step_summary_file = os.environ["GITHUB_STEP_SUMMARY"]
+  with open(step_summary_file, "a") as f:
+    # Use double newlines to split sections in markdown.
+    f.write(summary + "\n\n")
+
+
+def check_description_and_show_diff(original_description: str,
+                                    original_labels: Sequence[str],
+                                    current_description: str,
+                                    current_labels: Sequence[str]):
+  original_labels = sorted(original_labels)
+  current_labels = sorted(current_labels)
+  if (original_description == current_description and
+      original_labels == current_labels):
+    return
+
+  description_diffs = difflib.unified_diff(
+      original_description.splitlines(keepends=True),
+      current_description.splitlines(keepends=True))
+  description_diffs = "".join(description_diffs)
+
+  if description_diffs != "":
+    description_diffs = textwrap.dedent("""\
+    ```diff
+    {}
+    ```
+    """).format(description_diffs)
+
+  if original_labels == current_labels:
+    label_diffs = ""
+  else:
+    label_diffs = textwrap.dedent("""\
+    ```
+    Original labels: {original_labels}
+    Current labels: {current_labels}
+    ```
+    """).format(original_labels=original_labels, current_labels=current_labels)
+
+  write_job_summary(
+      textwrap.dedent("""\
+  :pushpin: Using the PR description and labels different from the original PR event that started this workflow.
+
+  <details>
+  <summary>Click to show diff (original vs. current)</summary>
+
+  {description_diffs}
+
+  {label_diffs}
+  </details>""").format(description_diffs=description_diffs,
+                        label_diffs=label_diffs))
+
+
+def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
+  if not is_pr:
+    return ({}, [])
+
   title = os.environ["PR_TITLE"]
   body = os.environ.get("PR_BODY", "")
+  labels = json.loads(os.environ.get("PR_LABELS", "[]"))
+  original_title = os.environ.get("ORIGINAL_PR_TITLE")
+  original_body = os.environ.get("ORIGINAL_PR_BODY", "")
+  original_labels = json.loads(os.environ.get("ORIGINAL_PR_LABELS", "[]"))
 
-  description = f"{title}" "\n\n" f"{body}"
+  description = PR_DESCRIPTION_TEMPLATE.format(title=title, body=body)
 
-  print("Parsing PR description:", description, sep="\n")
+  # PR information can be fetched from API for the latest updates. If
+  # ORIGINAL_PR_TITLE is set, compare the current and original description and
+  # show a notice if they are different. This is mostly to inform users that the
+  # workflow might not parse the PR description they expect.
+  if original_title is not None:
+    original_description = PR_DESCRIPTION_TEMPLATE.format(title=original_title,
+                                                          body=original_body)
+    print("Original PR description and labels:",
+          original_description,
+          original_labels,
+          sep="\n")
+    check_description_and_show_diff(original_description=original_description,
+                                    original_labels=original_labels,
+                                    current_description=description,
+                                    current_labels=labels)
 
-  trailer_lines = subprocess.run(["git", "interpret-trailers", "--parse"],
-                                 input=description,
-                                 stdout=subprocess.PIPE,
-                                 check=True,
-                                 text=True,
-                                 timeout=60).stdout.splitlines()
-  return {
+  print("Parsing PR description and labels:", description, labels, sep="\n")
+
+  trailer_lines = subprocess.run(
+      ["git", "interpret-trailers", "--parse", "--no-divider"],
+      input=description,
+      stdout=subprocess.PIPE,
+      check=True,
+      text=True,
+      timeout=60).stdout.splitlines()
+  trailer_map = {
       k.lower().strip(): v.strip()
       for k, v in (line.split(":", maxsplit=1) for line in trailer_lines)
   }
+  return (trailer_map, labels)
 
 
 def get_modified_paths(base_ref: str) -> Iterable[str]:
@@ -94,18 +202,17 @@ def modifies_included_path(base_ref: str) -> bool:
   return any(not skip_path(p) for p in get_modified_paths(base_ref))
 
 
-def should_run_ci(event_name, trailers) -> bool:
-  base_ref = os.environ["BASE_REF"]
-
-  if event_name != "pull_request":
-    print(f"Running CI independent of diff because run was not triggered by a"
-          f" pull request event (event name is '{event_name}')")
+def should_run_ci(is_pr: bool, trailers: Mapping[str, str]) -> bool:
+  if not is_pr:
+    print("Running CI independent of diff because run was not triggered by a"
+          " pull request event.")
     return True
 
   if SKIP_CI_KEY in trailers:
     print(f"Not running CI because PR description has '{SKIP_CI_KEY}' trailer.")
     return False
 
+  base_ref = os.environ["BASE_REF"]
   try:
     modifies = modifies_included_path(base_ref)
   except TimeoutError as e:
@@ -132,26 +239,56 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
   return runner_env
 
 
-def get_ci_stage(event_name):
-  return 'presubmit' if event_name == 'pull_request' else 'postsubmit'
+def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
+                          labels: Sequence[str]) -> str:
+  """Parses and validates the benchmark presets from trailers.
+
+  Args:
+    is_pr: is pull request event.
+    trailers: trailers from PR description.
+    labels: list of PR labels.
+
+  Returns:
+    A comma separated preset string, which later will be parsed by
+    build_tools/benchmarks/export_benchmark_config.py.
+  """
+  if not is_pr:
+    preset_options = ["all"]
+  else:
+    preset_options = set(
+        label.split(":", maxsplit=1)[1]
+        for label in labels
+        if label.startswith(BENCHMARK_PRESET_KEY + ":"))
+    trailer = trailers.get(BENCHMARK_PRESET_KEY)
+    if trailer is not None:
+      preset_options = preset_options.union(
+          option.strip() for option in trailer.split(","))
+    preset_options = sorted(preset_options)
+    print(f"Using benchmark preset '{preset_options}' from trailers and labels")
+
+  for preset_option in preset_options:
+    if preset_option not in BENCHMARK_PRESET_OPTIONS:
+      raise ValueError(f"Unknown benchmark preset option: '{preset_option}'.\n"
+                       f"Available options: '{BENCHMARK_PRESET_OPTIONS}'.")
+
+  if "all" in preset_options:
+    preset_options = list(
+        option for option in BENCHMARK_PRESET_OPTIONS if option != "all")
+
+  return ",".join(preset_options)
 
 
 def main():
-  output: MutableMapping[str, str] = {}
-  trailers = get_trailers()
-  event_name = os.environ["GITHUB_EVENT_NAME"]
-  if should_run_ci(event_name, trailers):
-    output["should-run"] = "true"
-  else:
-    output["should-run"] = "false"
-  output[RUNNER_ENV_KEY] = get_runner_env(trailers)
-  ci_stage = get_ci_stage(event_name)
-  output["ci-stage"] = ci_stage
-  output["runner-group"] = ci_stage
-  write_caches = "0"
-  if ci_stage == "postsubmit":
-    write_caches = "1"
-  output["write-caches"] = write_caches
+  is_pr = os.environ["GITHUB_EVENT_NAME"] == "pull_request"
+  trailers, labels = get_trailers_and_labels(is_pr)
+  output = {
+      "should-run": json.dumps(should_run_ci(is_pr, trailers)),
+      "is-pr": json.dumps(is_pr),
+      "runner-env": get_runner_env(trailers),
+      "runner-group": "presubmit" if is_pr else "postsubmit",
+      "write-caches": "0" if is_pr else "1",
+      "benchmark-presets": get_benchmark_presets(is_pr, trailers, labels),
+  }
 
   set_output(output)
 

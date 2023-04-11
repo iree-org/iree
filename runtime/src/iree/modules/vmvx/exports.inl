@@ -51,6 +51,7 @@ EXPORT_FN("or.2d.i32", iree_uk_x32b_ori_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
 EXPORT_FN("pack.f32f32", iree_vmvx_pack_f32f32, pack_f, rIIrIIIIIIIIfi, v)
 EXPORT_FN("pack.i32i32", iree_vmvx_pack_i32i32, pack_i, rIIrIIIIIIIIii, v)
 EXPORT_FN("pack.i8i8", iree_vmvx_pack_i8i8, pack_i, rIIrIIIIIIIIii, v)
+EXPORT_FN("query_tile_sizes.2d", iree_vmvx_query_tile_sizes_2d, query_tile_sizes_2d, IIi, II)
 EXPORT_FN("rsqrt.2d.f32", iree_uk_x32u_rsqrtf_2d, ukernel_x32u_2d, rIIIrIIIII, v)
 EXPORT_FN("shl.2d.i32", iree_uk_x32b_shli_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
 EXPORT_FN("shrs.2d.i32", iree_uk_x32b_shrsi_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
@@ -61,5 +62,6 @@ EXPORT_FN("unpack.f32f32", iree_vmvx_unpack_f32f32, unpack, rIIrIIIIIIIIi, v)
 EXPORT_FN("unpack.i32i32", iree_vmvx_unpack_i32i32, unpack, rIIrIIIIIIIIi, v)
 EXPORT_FN("unpack.i8i8", iree_vmvx_unpack_i8i8, unpack, rIIrIIIIIIIIi, v)
 EXPORT_FN("xor.2d.i32", iree_uk_x32b_xori_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
+
 
 // clang-format on

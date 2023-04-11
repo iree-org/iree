@@ -8,7 +8,7 @@
 
 # Cross-compile the runtime using CMake targeting Android
 #
-# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
+# The required IREE_HOST_BIN_DIR environment variable indicates the location
 # of the precompiled IREE binaries. Also requires that IREE_TARGET_ABI and
 # ANDROID_NDK variables be set. The BUILD_PRESET environment variable indicates
 # how the project should be configured: "test", "benchmark",
@@ -25,7 +25,7 @@ set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-android}}"
 ANDROID_ABI="${IREE_TARGET_ABI}"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
@@ -35,10 +35,12 @@ source build_tools/cmake/setup_ccache.sh
 declare -a args=(
   -G Ninja
   -B "${BUILD_DIR}"
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}"
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}"
   -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake"
   -DANDROID_ABI="${ANDROID_ABI}"
   -DANDROID_PLATFORM=android-29
-  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}"
+  -DIREE_HOST_BIN_DIR="${IREE_HOST_BIN_DIR}"
   -DIREE_BUILD_COMPILER=OFF
   -DIREE_BUILD_TESTS=ON
   -DIREE_BUILD_SAMPLES=OFF
@@ -88,10 +90,6 @@ echo "Building test deps for device"
 echo "------------------"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
 
-echo "Building sample deps for device"
-echo "------------------"
-"${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-sample-deps -- -k 0
-
-if (( IREE_READ_REMOTE_CCACHE == 1 )); then
+if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
 fi

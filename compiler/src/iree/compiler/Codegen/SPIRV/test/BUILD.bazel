@@ -1,0 +1,75 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests for common transforms.
+
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        [
+            "annotate_winograd_loops.mlir",
+            "break_down_large_vector.mlir",
+            "config_adreno_conv.mlir",
+            "config_adreno_matmul.mlir",
+            "config_amd_matmul.mlir",
+            "config_amd_matmul_cooperative_ops.mlir",
+            "config_default_conv.mlir",
+            "config_default_linalg_ext_ops.mlir",
+            "config_default_linalg_ops.mlir",
+            "config_default_matmul.mlir",
+            "config_default_reduction.mlir",
+            "config_mali_conv.mlir",
+            "config_mali_matmul.mlir",
+            "config_nvidia_matmul.mlir",
+            "config_nvidia_matmul_cooperative_ops.mlir",
+            "config_user.mlir",
+            "convert_to_spirv.mlir",
+            "create_fast_slow_path.mlir",
+            "distribute_to_invocations.mlir",
+            "emulate_i64.mlir",
+            "erase_storage_buffer_static_shape.mlir",
+            "illegal_configuration.mlir",
+            "lowering_matmul_promotion.mlir",
+            "lowering_reduction.mlir",
+            "map_memref_storage_class.mlir",
+            "pipeline_matmul_cooperative_ops.mlir",
+            "pipeline_matmul_promotion.mlir",
+            "pipeline_matmul_vectorization.mlir",
+            "pipeline_reduction_subgroup.mlir",
+            "tile_and_distribute.mlir",
+            "tile_and_distribute_scatter.mlir",
+            "tile_and_distribute_sort.mlir",
+            "tile_and_promote_cooperative_matrix.mlir",
+            "tile_and_promote_matmul.mlir",
+            "tile_and_vectorize_batch_matmul.mlir",
+            "tile_and_vectorize_conv.mlir",
+            "tile_and_vectorize_matmul.mlir",
+            "tile_and_vectorize_pooling.mlir",
+            "tile_and_vectorize_to_cooperative_ops.mlir",
+            "tile_linalg_ops.mlir",
+            "vectorize_conv.mlir",
+            "vectorize_elementwise_ops.mlir",
+            "vectorize_gather.mlir",
+            "vectorize_matmul.mlir",
+            "vectorize_load_store.mlir",
+            "vectorize_reduction.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+    cfg = "//compiler:lit.cfg.py",
+    tools = [
+        "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

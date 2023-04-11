@@ -66,25 +66,25 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[C4:.+]] = arith.constant 4 : index
 //     CHECK-DAG:  %[[C256:.+]] = arith.constant 256 : index
 //     CHECK-DAG:  %[[C1024:.+]] = arith.constant 1024 : index
-//     CHECK-DAG:  %[[BUFFER0:.+]] = memref.alloc() : memref<4x256xf32, 3>
-//     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
-//     CHECK-DAG:  %[[BUFFER2:.+]] = memref.alloc() : memref<2x256xf32, 3>
+//     CHECK-DAG:  %[[BUFFER0:.+]] = memref.alloc() : memref<4x256xf32, #gpu.address_space<workgroup>>
+//     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, #gpu.address_space<workgroup>>
+//     CHECK-DAG:  %[[BUFFER2:.+]] = memref.alloc() : memref<2x256xf32, #gpu.address_space<workgroup>>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, strided<[1024, 1], offset: ?>> to memref<2x4xf32, 3>
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, strided<[1024, 1], offset: ?>> to memref<2x4xf32, #gpu.address_space<workgroup>>
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x256xf32, strided<[1024, 1], offset: ?>> to memref<4x256xf32, 3>
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x256xf32, strided<[1024, 1], offset: ?>> to memref<4x256xf32, #gpu.address_space<workgroup>>
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C2]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
-//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [2, 4] [1, 1] : memref<2x4xf32, 3> to memref<2x4xf32, strided<[4, 1], offset: ?>, 3>
-//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 4] [1, 1] : memref<4x256xf32, 3> to memref<4x4xf32, strided<[256, 1], offset: ?>, 3>
-//     CHECK-DAG:        %[[C:.+]] = memref.subview %[[BUFFER2]][%[[IND0]], %[[IND1]]] [2, 4] [1, 1] : memref<2x256xf32, 3> to memref<2x4xf32, strided<[256, 1], offset: ?>, 3>
-//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<2x4xf32, strided<[4, 1], offset: ?>, 3>, memref<4x4xf32, strided<[256, 1], offset: ?>, 3>) outs(%[[C]] : memref<2x4xf32, strided<[256, 1], offset: ?>, 3>)
+//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [2, 4] [1, 1] : memref<2x4xf32, #gpu.address_space<workgroup>> to memref<2x4xf32, strided<[4, 1], offset: ?>, #gpu.address_space<workgroup>>
+//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 4] [1, 1] : memref<4x256xf32, #gpu.address_space<workgroup>> to memref<4x4xf32, strided<[256, 1], offset: ?>, #gpu.address_space<workgroup>>
+//     CHECK-DAG:        %[[C:.+]] = memref.subview %[[BUFFER2]][%[[IND0]], %[[IND1]]] [2, 4] [1, 1] : memref<2x256xf32, #gpu.address_space<workgroup>> to memref<2x4xf32, strided<[256, 1], offset: ?>, #gpu.address_space<workgroup>>
+//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<2x4xf32, strided<[4, 1], offset: ?>, #gpu.address_space<workgroup>>, memref<4x4xf32, strided<[256, 1], offset: ?>, #gpu.address_space<workgroup>>) outs(%[[C]] : memref<2x4xf32, strided<[256, 1], offset: ?>, #gpu.address_space<workgroup>>)
 //         CHECK:    }
 //         CHECK:  }
 //         CHECK:  gpu.barrier
-//         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x256xf32, 3> to memref<2x256xf32,
+//         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x256xf32, #gpu.address_space<workgroup>> to memref<2x256xf32,
 //         CHECK:  gpu.barrier
 
 // -----
@@ -111,11 +111,11 @@ builtin.module {
     %c4 = arith.constant 4 : index
     %c32 = arith.constant 32 : index
     %c64 = arith.constant 64 : index
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : memref<4x32x1024xf32>
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0) : memref<4x32x1024xf32>
     memref.assume_alignment %0, 32 : memref<4x32x1024xf32>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : memref<4x1024x64xf32>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0) : memref<4x1024x64xf32>
     memref.assume_alignment %1, 32 : memref<4x1024x64xf32>
-    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : memref<4x32x64xf32>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) offset(%c0) : memref<4x32x64xf32>
     memref.assume_alignment %2, 32 : memref<4x32x64xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -159,11 +159,11 @@ builtin.module {
 //     CHECK-DAG:       memref.subview
 //     CHECK-DAG:       memref.subview
 //     CHECK-DAG:       memref.subview
-//         CHECK:       linalg.batch_matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%{{.*}}, %{{.*}} : memref<1x1x32xf32, strided<[256, 32, 1], offset: ?>, 3>, memref<1x32x4xf32, strided<[1024, 32, 1], offset: ?>, 3>) outs(%{{.*}} : memref<1x1x4xf32, strided<[256, 32, 1], offset: ?>, 3>)
+//         CHECK:       linalg.batch_matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%{{.*}}, %{{.*}} : memref<1x1x32xf32, strided<[256, 32, 1], offset: ?>, #gpu.address_space<workgroup>>, memref<1x32x4xf32, strided<[1024, 32, 1], offset: ?>, #gpu.address_space<workgroup>>) outs(%{{.*}} : memref<1x1x4xf32, strided<[256, 32, 1], offset: ?>, #gpu.address_space<workgroup>>)
 //         CHECK:    }
 //         CHECK:  }
 //         CHECK:  gpu.barrier
-//         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<1x8x32xf32, 3> to memref<1x8x32xf32
+//         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<1x8x32xf32, #gpu.address_space<workgroup>> to memref<1x8x32xf32
 //         CHECK:  gpu.barrier
 
 // -----
@@ -236,25 +236,25 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[C32:.+]] = arith.constant 32 : index
 //     CHECK-DAG:  %[[C64:.+]] = arith.constant 64 : index
 //     CHECK-DAG:  %[[C1024:.+]] = arith.constant 1024 : index
-//     CHECK-DAG:  %[[BUFFER0:.+]] = memref.alloc() : memref<4x32xf32, 3>
-//     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
-//     CHECK-DAG:  %[[BUFFER2:.+]] = memref.alloc() : memref<2x32xf32, 3>
+//     CHECK-DAG:  %[[BUFFER0:.+]] = memref.alloc() : memref<4x32xf32, #gpu.address_space<workgroup>>
+//     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, #gpu.address_space<workgroup>>
+//     CHECK-DAG:  %[[BUFFER2:.+]] = memref.alloc() : memref<2x32xf32, #gpu.address_space<workgroup>>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, strided<[1024, 1], offset: ?>> to memref<2x4xf32, 3>
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, strided<[1024, 1], offset: ?>> to memref<2x4xf32, #gpu.address_space<workgroup>>
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x32xf32, strided<[1024, 1], offset: ?>> to memref<4x32xf32, 3>
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x32xf32, strided<[1024, 1], offset: ?>> to memref<4x32xf32, #gpu.address_space<workgroup>>
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C8]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C32]] step %[[C64]] {
-//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [1, 4] [1, 1] : memref<2x4xf32, 3> to memref<1x4xf32, strided<[4, 1], offset: ?>, 3>
-//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 1] [1, 1] : memref<4x32xf32, 3> to memref<4x1xf32, strided<[32, 1], offset: ?>, 3>
-//     CHECK-DAG:        %[[C:.+]] = memref.subview %[[BUFFER2]][%[[IND0]], %[[IND1]]] [1, 1] [1, 1] : memref<2x32xf32, 3> to memref<1x1xf32, strided<[32, 1], offset: ?>, 3>
-//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<1x4xf32, strided<[4, 1], offset: ?>, 3>, memref<4x1xf32, strided<[32, 1], offset: ?>, 3>) outs(%[[C]] : memref<1x1xf32, strided<[32, 1], offset: ?>, 3>)
+//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [1, 4] [1, 1] : memref<2x4xf32, #gpu.address_space<workgroup>> to memref<1x4xf32, strided<[4, 1], offset: ?>, #gpu.address_space<workgroup>>
+//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 1] [1, 1] : memref<4x32xf32, #gpu.address_space<workgroup>> to memref<4x1xf32, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>
+//     CHECK-DAG:        %[[C:.+]] = memref.subview %[[BUFFER2]][%[[IND0]], %[[IND1]]] [1, 1] [1, 1] : memref<2x32xf32, #gpu.address_space<workgroup>> to memref<1x1xf32, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>
+//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<1x4xf32, strided<[4, 1], offset: ?>, #gpu.address_space<workgroup>>, memref<4x1xf32, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>) outs(%[[C]] : memref<1x1xf32, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>)
 //         CHECK:    }
 //         CHECK:  }
 //         CHECK:  gpu.barrier
-//         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x32xf32, 3> to memref<2x32xf32
+//         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x32xf32, #gpu.address_space<workgroup>> to memref<2x32xf32
 //         CHECK:  gpu.barrier
 
 
@@ -330,11 +330,11 @@ hal.executable private @conv_dispatch  {
         %c41664 = arith.constant 41664 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<1x64x56x56xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<1x64x56x56xf32>
         memref.assume_alignment %0, 64 : memref<1x64x56x56xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c41664) alignment(64) : memref<64x64x1x1xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c41664) : memref<64x64x1x1xf32>
         memref.assume_alignment %1, 64 : memref<64x64x1x1xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c802816) alignment(64) : memref<1x64x56x56xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c802816) : memref<1x64x56x56xf32>
         memref.assume_alignment %2, 64 : memref<1x64x56x56xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -400,9 +400,9 @@ hal.executable private @contract_4d  {
         %cst_0 = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.constant.load[0] : i32
         %6 = arith.index_cast %0 : i32 to index
-        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%6) alignment(64) : memref<?x?x12x64xf32>{%6, %6}
-        %13 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%6) alignment(64) : memref<?x?x12x64xf32>{%6, %6}
-        %15 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<?x12x?x?xf32>{%6, %6, %6}
+        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%6) : memref<?x?x12x64xf32>{%6, %6}
+        %13 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%6) : memref<?x?x12x64xf32>{%6, %6}
+        %15 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<?x12x?x?xf32>{%6, %6, %6}
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index

@@ -2,9 +2,9 @@
 // RUN:     --iree-hal-executable-object-search-path=$IREE_BINARY_DIR | \
 // RUN: iree-run-module \
 // RUN:     --device=vulkan \
-// RUN:     --entry_function=mixed_invocation \
-// RUN:     --function_input=8xf32=2 \
-// RUN:     --function_input=8xf32=4 | \
+// RUN:     --function=mixed_invocation \
+// RUN:     --input=8xf32=2 \
+// RUN:     --input=8xf32=4 | \
 // RUN: FileCheck %s
 
 // The configuration used for executable compilation.
@@ -120,9 +120,9 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
   // Function demonstrating a few hand-authored dispatches mixed with codegen.
   // Invoke with:
   //  --device=vulkan
-  //  --entry_function=mixed_invocation
-  //  --function_input=8xf32=2
-  //  --function_input=8xf32=4
+  //  --function=mixed_invocation
+  //  --input=8xf32=2
+  //  --input=8xf32=4
   // CHECK-LABEL: EXEC @mixed_invocation
   func.func @mixed_invocation(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
     // HACK: for hand-authored shaders all primitive values passed in need to

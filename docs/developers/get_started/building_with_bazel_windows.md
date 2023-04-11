@@ -18,7 +18,7 @@ documented separately, as they require further setup.
 ### Install Bazel
 
 Install Bazel version > 2.0.0 (see
-[`.bazelversion`](https://github.com/iree-org/iree/blob/main/.bazelversion) for
+[`.bazelversion`](https://github.com/openxla/iree/blob/main/.bazelversion) for
 the specific version IREE uses) by following the
 [official docs](https://docs.bazel.build/versions/master/install-windows.html).
 
@@ -52,7 +52,7 @@ Using your shell of choice (such as PowerShell or [cmder](https://cmder.net/)),
 clone the repository, initialize its submodules, and configure:
 
 ```powershell
-> git clone https://github.com/iree-org/iree.git
+> git clone https://github.com/openxla/iree.git
 > cd iree
 > git submodule update --init
 > python configure_bazel.py
@@ -111,10 +111,10 @@ Check out what was built:
 ```
 
 Translate a
-[MLIR file](https://github.com/iree-org/iree/blob/main/samples/models/simple_abs.mlir)
+[MLIR file](https://github.com/openxla/iree/blob/main/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```powershell
 > REM iree-run-mlir <compiler flags> [input.mlir] <runtime flags>
-> .\bazel-bin\tools\iree-run-mlir.exe --iree-hal-target-backends=vmvx --print-mlir .\iree\samples\models\simple_abs.mlir --function_input=f32=-2
+> .\bazel-bin\tools\iree-run-mlir.exe --iree-hal-target-backends=vmvx --print-mlir .\iree\samples\models\simple_abs.mlir --input=f32=-2
 ```

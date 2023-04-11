@@ -8,14 +8,14 @@ r"""Script to generate a HTML summary of SHARK Tank benchmarks.
 Example usage:
 
 python parse_shark_benchmarks.py \
-  --shark_version=20220924.162 \
-  --iree_version=20220924.276 \
   --cpu_shark_csv=icelake_shark_bench_results.csv \
   --cpu_iree_csv=icelake_iree_bench_results.csv \
+  --cpu_baseline_csv=cpu_baseline.csv \
   --gpu_shark_csv=a100_shark_bench_results.csv \
   --gpu_iree_csv=a100_iree_bench_results.csv \
+  --gpu_baseline_csv=a100_baseline.csv \
+  --version_info iree=version_info.txt \
   --output_path=/tmp/summary.html
-
 """
 
 import argparse
@@ -41,9 +41,13 @@ _SHARK_LATENCY = "SHARK latency (ms)"
 _IREE_VS_BASELINE = "IREE vs baseline"
 _SHARK_VS_BASELINE = "SHARK vs baseline"
 _IREE_VS_SHARK = "IREE vs SHARK"
+_BASELINE_MEMORY = "Baseline Peak Device Memory (MB)"
+_IREE_MEMORY = "IREE Peak Device Memory (MB)"
+_SHARK_MEMORY = "SHARK Peak Device Memory (MB)"
 
 _PERF_COLUMNS = [_IREE_VS_BASELINE, _SHARK_VS_BASELINE, _IREE_VS_SHARK]
 _LATENCY_COLUMNS = [_BASELINE_LATENCY, _IREE_LATENCY, _SHARK_LATENCY]
+_MEMORY_COLUMNS = [_BASELINE_MEMORY, _IREE_MEMORY, _SHARK_MEMORY]
 
 
 def _generate_table(df_iree, df_shark, df_baseline, title):
@@ -51,7 +55,7 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
   summary = pd.DataFrame(columns=[
       _MODEL, _BASELINE, _DATA_TYPE, _DIALECT, _DEVICE, _BASELINE_LATENCY,
       _IREE_LATENCY, _SHARK_LATENCY, _IREE_VS_BASELINE, _SHARK_VS_BASELINE,
-      _IREE_VS_SHARK
+      _IREE_VS_SHARK, _BASELINE_MEMORY, _IREE_MEMORY, _SHARK_MEMORY
   ])
 
   models = df_iree.model.unique()
@@ -90,16 +94,19 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
                 f" {data_type}, {device}. Using IREE version as baseline. Please"
                 f" update baseline csv.")
             engine = iree_results.engine.iloc[0]
-            baseline_latency = iree_results.loc[iree_results.engine == engine]
-            baseline_latency = baseline_latency.iloc[0]["ms/iter"]
+            baseline_df = iree_results.loc[iree_results.engine == engine]
+            baseline_latency = baseline_df.iloc[0]["ms/iter"]
+            baseline_device_mb = baseline_df.iloc[0]["device_memory_mb"]
           else:
             engine = baseline_results.engine.iloc[0]
-            baseline_latency = baseline_results.loc[baseline_results.engine ==
-                                                    engine]
-            baseline_latency = baseline_latency.iloc[0]["ms/iter"]
+            baseline_df = baseline_results.loc[baseline_results.engine ==
+                                               engine]
+            baseline_latency = baseline_df.iloc[0]["ms/iter"]
+            baseline_device_mb = baseline_df.iloc[0]["device_memory_mb"]
 
-          iree_latency = iree_results.loc[iree_results.engine == "shark_iree_c"]
-          iree_latency = iree_latency.iloc[0]["ms/iter"]
+          iree_df = iree_results.loc[iree_results.engine == "shark_iree_c"]
+          iree_latency = iree_df.iloc[0]["ms/iter"]
+          iree_device_mb = iree_df.iloc[0]["device_memory_mb"]
           iree_vs_baseline = html_utils.format_latency_comparison(
               iree_latency, baseline_latency)
 
@@ -114,9 +121,9 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
               )
               continue
 
-            shark_latency = shark_results.loc[shark_results.engine ==
-                                              "shark_iree_c"]
-            shark_latency = shark_latency.iloc[0]["ms/iter"]
+            shark_df = shark_results.loc[shark_results.engine == "shark_iree_c"]
+            shark_latency = shark_df.iloc[0]["ms/iter"]
+            shark_device_mb = shark_df.iloc[0]["device_memory_mb"]
             shark_vs_baseline = html_utils.format_latency_comparison(
                 shark_latency, baseline_latency)
             iree_vs_shark = html_utils.format_latency_comparison(
@@ -129,10 +136,20 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
             iree_vs_shark = "<missing_comparison>"
 
           summary.loc[len(summary)] = [
-              model, engine, data_type, dialect, device,
-              f"{baseline_latency:.1f}", f"{iree_latency:.1f}",
-              f"{shark_latency:.1f}", iree_vs_baseline, shark_vs_baseline,
-              iree_vs_shark
+              model,
+              engine,
+              data_type,
+              dialect,
+              device,
+              f"{baseline_latency:.1f}",
+              f"{iree_latency:.1f}",
+              f"{shark_latency:.1f}",
+              iree_vs_baseline,
+              shark_vs_baseline,
+              iree_vs_shark,
+              f"{baseline_device_mb:.3f}",
+              f"{iree_device_mb:.3f}",
+              f"{shark_device_mb:.3f}",
           ]
 
   summary = summary.round(2)
@@ -169,6 +186,11 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
                              "width": "150px",
                              "text-align": "right",
                              "color": "#ffffff"
+                         })
+  st = st.set_properties(subset=_MEMORY_COLUMNS,
+                         **{
+                             "width": "100",
+                             "text-align": "right",
                          })
 
   return st.to_html() + "<br/>"
@@ -212,11 +234,15 @@ def generate_table(iree_csv,
 
 def main(args):
   """Summarizes benchmark results generated by the SHARK Tank."""
-  verison_html = (f"<i>IREE version: {args.iree_version}</i><br/>"
-                  f"<i>SHARK version: {args.shark_version}</i><br/>"
-                  f"<i>last updated: {date.today().isoformat()}</i><br/><br/>")
+  version_html = f"<i>last updated: {date.today().isoformat()}</i><br/><br/>"
+  version_html += "<i><b>Version Info</b></i><br/>"
+  with open(args.version_info) as f:
+    version_info = dict(l.strip().split("=", 1) for l in f)
+  for key, value in version_info.items():
+    version_html += f"<i>{key}: {value}</i><br/>"
+  version_html += "<br/>"
 
-  html = html_utils.generate_header_and_legend(verison_html)
+  html = html_utils.generate_header_and_legend(version_html)
 
   # Generate Server CPU Static.
   if args.cpu_iree_csv is not None:
@@ -292,14 +318,13 @@ def parse_args():
       type=str,
       default="data/a100_baseline_2022-09-19.csv",
       help="The path to the csv file containing baseline GPU results.")
-  parser.add_argument("--iree_version",
-                      type=str,
-                      default=None,
-                      help="The IREE version.")
-  parser.add_argument("--shark_version",
-                      type=str,
-                      default=None,
-                      help="The SHARK version.")
+  parser.add_argument(
+      "--version_info",
+      type=pathlib.Path,
+      default=None,
+      help=
+      "The path to a text file containing version information of the frameworks tested."
+  )
   parser.add_argument(
       "--output_path",
       type=pathlib.Path,

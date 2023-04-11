@@ -45,7 +45,7 @@ hal.executable private @matmul_tensors  {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [16, 4, 0], [0, 0, 64]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUAArchDoubleTilingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<Mmt4dTilingExpert>
 //      CHECK: hal.executable.export public @matmul_tensors
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
@@ -96,7 +96,7 @@ hal.executable private @batch_matmul_tensors {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64, 0], [1, 16, 4, 0], [0, 0, 0, 64]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUAArchDoubleTilingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<Mmt4dTilingExpert>
 //      CHECK: hal.executable.export public @batch_matmul_tensors
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:  linalg.batch_matmul
@@ -144,7 +144,7 @@ hal.executable private @matmul_static {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[49, 8, 0], [7, 4, 0], [0, 0, 60]{{\]}}>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUAArchDoubleTilingExpert>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<Mmt4dTilingExpert>
 //       CHECK: hal.executable.export public @matmul_static
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
@@ -171,9 +171,9 @@ hal.executable private @conv_static {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c607520 = arith.constant 607520 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<1x51x41x512xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c607520) alignment(32) : !flow.dispatch.tensor<readonly:tensor<3x3x512x512xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<1x25x20x512xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x51x41x512xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c607520) : !flow.dispatch.tensor<readonly:tensor<3x3x512x512xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x25x20x512xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 51, 41, 512], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x51x41x512xf32>> -> tensor<1x51x41x512xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 512, 512], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x512x512xf32>> -> tensor<3x3x512x512xf32>
         %5 = tensor.empty() : tensor<1x25x20x512xf32>
@@ -260,9 +260,9 @@ hal.executable private @matmul_aarch_i8_i8_i32_static  {
       func.func @matmul_aarch_i8_i8_i32_static() {
         %c0_i32 = arith.constant 0 : i32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<128x384xi8>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<384x1536xi8>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<128x1536xi32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x384xi8>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<384x1536xi8>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x1536xi32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x384xi8>> -> tensor<128x384xi8>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [384, 1536], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x1536xi8>> -> tensor<384x1536xi8>
         %5 = tensor.empty() : tensor<128x1536xi32>
@@ -304,11 +304,11 @@ hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
         %M = hal.interface.constant.load[0] : index
         %N = hal.interface.constant.load[1] : index
         %K = hal.interface.constant.load[2] : index
-        %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32)
+        %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0)
             : !flow.dispatch.tensor<readonly:tensor<?x?xi8>>{%M, %K}
-        %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32)
+        %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0)
             : !flow.dispatch.tensor<readonly:tensor<?x?xi8>>{%K, %N}
-        %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32)
+        %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) offset(%c0)
             : !flow.dispatch.tensor<readwrite:tensor<?x?xi32>>{%M, %N}
         %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:tensor<?x?xi8>>{%M, %K} -> tensor<?x?xi8>
@@ -340,6 +340,43 @@ hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
+hal.executable private @pack  {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+  hal.executable.export public @pack layout(#pipeline_layout)
+    builtin.module {
+      func.func @pack() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<20x40xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<20x40xf32>> -> tensor<20x40xf32>
+        %3 = tensor.empty() : tensor<4x48x8x1xf32>
+        %4 = tensor.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %3 : tensor<20x40xf32> -> tensor<4x48x8x1xf32>
+        flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [4, 48, 8, 1], strides = [1, 1, 1, 1] : tensor<4x48x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x48x8x1xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 64]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//      CHECK: hal.executable.export public @pack
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   tensor.pack
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @unpack_outer_dynamic  {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
@@ -359,20 +396,20 @@ hal.executable private @unpack_outer_dynamic  {
         %5 = arith.index_castui %1 : i32 to index
         %6 = arith.index_castui %2 : i32 to index
         %7 = arith.index_castui %3 : i32 to index
-        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5}
-        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c131072) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
+        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5}
+        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
         %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
-        %12 = iree_linalg_ext.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+        %12 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
         flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         return
       }
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 16]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
 //      CHECK: hal.executable.export public @unpack_outer_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   iree_linalg_ext.unpack
+//      CHECK:   tensor.unpack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]

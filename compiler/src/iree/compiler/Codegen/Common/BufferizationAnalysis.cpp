@@ -24,7 +24,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -119,6 +119,32 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
   return equivalentOp;
 }
 
+/// Check if two sets can be merged based on what operations exist in that set.
+static bool canSetsBeMerged(Value v1, Value v2, BufferizationPlan &plan) {
+  // Dont merge two sets if one of the sets is a constant.
+  if (getEquivalentOpOfType<arith::ConstantOp>(v1, plan) ||
+      getEquivalentOpOfType<arith::ConstantOp>(v2, plan)) {
+    return false;
+  }
+  auto v1InterfaceBinding =
+      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(v1, plan);
+  auto v2InterfaceBinding =
+      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(v2, plan);
+  // If any of these sets do not have a interface binding, they can be merged.
+  if (!v1InterfaceBinding || !v2InterfaceBinding) {
+    return true;
+  }
+  if (v1InterfaceBinding.getSet() != v2InterfaceBinding.getSet() ||
+      v1InterfaceBinding.getBinding() != v2InterfaceBinding.getBinding() ||
+      v1InterfaceBinding.getByteOffset() !=
+          v2InterfaceBinding.getByteOffset()) {
+    // If the set, binding or offsets are different, map these to different
+    // memrefs.
+    return false;
+  }
+  return true;
+}
+
 /// Returns true if the value and target of a `flow.dispatch.tensor.store`
 /// operation can be added to the same equivalence set. This can be done only if
 /// - The `value` is not from a equivalence set that contains a read-only
@@ -130,32 +156,24 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
 /// `hal.interface.binding.subspan` op.'
 static bool canSetStoreValueAndTargetAsEquivalent(
     IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
-  Value value = storeOp.getValue();
-  Value target = storeOp.getTarget();
-  auto targetInterfaceOp =
-      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target, plan);
-  assert(targetInterfaceOp);
-  if (auto valueConstantOp =
-          getEquivalentOpOfType<arith::ConstantOp>(value, plan)) {
+  if (!canSetsBeMerged(storeOp.getValue(), storeOp.getTarget(), plan)) {
     return false;
   }
-  if (auto valueInterfaceOp =
-          getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(value,
-                                                                      plan)) {
-    if (targetInterfaceOp.getBinding() != valueInterfaceOp.getBinding() ||
-        targetInterfaceOp.getByteOffset() != valueInterfaceOp.getByteOffset()) {
-      // If the binding and offsets are different, map these to different
-      // memrefs.
-      return false;
-    }
-    // If the binding and offsets are the same, make sure that the
-    // !flow.dispatch.tensor is read-write.
-    auto sourceType =
-        valueInterfaceOp.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
-    return sourceType &&
-           sourceType.getAccess() == IREE::Flow::TensorAccess::ReadWrite;
+  auto valueInterfaceBinding =
+      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
+          storeOp.getValue(), plan);
+  auto targetInterfaceBinding =
+      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
+          storeOp.getTarget(), plan);
+  if (!valueInterfaceBinding || !targetInterfaceBinding) {
+    return true;
   }
-  return true;
+  // If the binding and offsets are the same, make sure that the
+  // !flow.dispatch.tensor is read-write.
+  auto sourceType = valueInterfaceBinding.getType()
+                        .dyn_cast<IREE::Flow::DispatchTensorType>();
+  return sourceType &&
+         sourceType.getAccess() == IREE::Flow::TensorAccess::ReadWrite;
 }
 
 /// Tries to add the `value` and `target` to the same equivalence class.
@@ -195,12 +213,9 @@ static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
 
 /// For every result of the LinalgOp, gets the operands (`ins` or `outs`) whose
 /// buffer can be reused for the result.
-template <typename OpType>
-static SmallVector<Value> getTiedOperandsForLinalgOps(
-    OpType linalgOp, const BufferizationPlan &plan) {
-  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(linalgOp.getOperation());
-  if (!dpsOp) return {};
-  SmallVector<Value> tiedOperands(linalgOp.getOperation()->getNumResults());
+static SmallVector<Value> getTiedOperandsForDPSOps(
+    DestinationStyleOpInterface dpsOp, const BufferizationPlan &plan) {
+  SmallVector<Value> tiedOperands(dpsOp.getOperation()->getNumResults());
   auto outputOperands = dpsOp.getDpsInitOperands();
   for (auto [index, outTensor] : llvm::enumerate(outputOperands)) {
     // If the `outs` tensor has a single use (this op) and is not from a
@@ -215,14 +230,11 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
 
 /// Adds the corresponding `outs` and result tensors of the linalg op into the
 /// same equivalence class.
-template <typename OpType>
-static LogicalResult analyseLinalgOps(OpType linalgOp,
-                                      BufferizationPlan &plan) {
-  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(linalgOp.getOperation());
-  if (!dpsOp) return failure();
+static LogicalResult analyseDPSOps(DestinationStyleOpInterface dpsOp,
+                                   BufferizationPlan &plan) {
   if (!dpsOp.hasTensorSemantics()) return success();
-  auto results = linalgOp->getResults();
-  auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp, plan);
+  auto results = dpsOp->getResults();
+  auto tiedOperands = getTiedOperandsForDPSOps(dpsOp, plan);
   if (tiedOperands.empty()) return failure();
   for (auto [index, resultTensor, tiedOperand] : llvm::zip_equal(
            llvm::seq<int64_t>(0, results.size()), results, tiedOperands)) {
@@ -468,13 +480,37 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
   }
 }
 
+void BufferizationPlan::unionSets(Value v1, Value v2) {
+  if (!canSetsBeMerged(v1, v2, *this)) {
+    return;
+  }
+  // If one the sets was part of the store set, the store set
+  // needs to be updated to drop the all leaders from the store set
+  // and add the new leader to it.
+  Value leader1 = getLeaderValue(v1);
+  Value leader2 = getLeaderValue(v2);
+  bool insertNewStoreLeader =
+      storeLeaders.count(leader1) || storeLeaders.count(leader2);
+  storeLeaders.erase(leader1);
+  storeLeaders.erase(leader2);
+  mappedTensors.unionSets(getPointer(v1), getPointer(v2));
+  if (insertNewStoreLeader) {
+    storeLeaders.insert(getLeaderValue(v1));
+  }
+}
+
 void BufferizationPlan::dump() {
   llvm::dbgs() << "BufferMappings : \n";
   unsigned numSets = 0;
   for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
        ++it) {
     if (!it->isLeader()) continue;
-    llvm::dbgs() << "\tSet " << numSets << ":\n";
+    llvm::dbgs() << "\tSet " << numSets;
+    if (storeLeaders.count(
+            getLeaderValue(getValue(*mappedTensors.member_begin(it))))) {
+      llvm::dbgs() << "(StoreSet) ";
+    }
+    llvm::dbgs() << ":\n";
     for (auto member : llvm::make_range(mappedTensors.member_begin(it),
                                         mappedTensors.member_end())) {
       llvm::dbgs() << "\t\t";
@@ -482,6 +518,11 @@ void BufferizationPlan::dump() {
       llvm::dbgs() << "\n";
     }
     numSets++;
+  }
+  llvm::dbgs() << "StoreLeaders : \n";
+  for (auto storeLeader : storeLeaders) {
+    storeLeader.print(llvm::dbgs());
+    llvm::dbgs() << "\n";
   }
 }
 
@@ -507,12 +548,9 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         .Case<tensor::PadOp>([&](tensor::PadOp padTensorOp) {
           return analysePadTensorOp(padTensorOp, plan);
         })
-        .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-          return analyseLinalgOps(linalgOp, plan);
-        })
-        .Case<IREE::LinalgExt::LinalgExtOp>(
-            [&](IREE::LinalgExt::LinalgExtOp linalgExtOp) {
-              return analyseLinalgOps(linalgExtOp, plan);
+        .Case<DestinationStyleOpInterface>(
+            [&](DestinationStyleOpInterface dpsOp) {
+              return analyseDPSOps(dpsOp, plan);
             })
         .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
             [&](auto reshapeOp) {
@@ -559,7 +597,8 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Case<scf::YieldOp, tensor::EmptyOp, tensor::DimOp, tensor::ExtractOp,
-              tensor::PadOp, bufferization::ToMemrefOp>(
+              tensor::GenerateOp, tensor::PadOp, bufferization::ToMemrefOp,
+              bufferization::AllocTensorOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {
           if (llvm::any_of(op->getOperands(),
@@ -576,7 +615,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
   if (funcOp.walk<WalkOrder::PreOrder>(bufferMappingFn).wasInterrupted()) {
     return failure();
   }
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+  LLVM_DEBUG({
     llvm::dbgs() << "After First walk ";
     plan.dump();
   });
@@ -592,18 +631,8 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
       }
     }
   });
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+  LLVM_DEBUG({
     llvm::dbgs() << "After Destructive update walk ";
-    plan.dump();
-  });
-
-  // Tie operands to allow for operand fusion support. To be dropped once the
-  // operand fusion is generalized in IREE.
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    return tieOperandsForOperandFusion(linalgOp, plan);
-  });
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "After union for supporting operand fusion";
     plan.dump();
   });
 
@@ -614,6 +643,11 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
           .wasInterrupted()) {
     return failure();
   }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "After Store walk ";
+    plan.dump();
+  });
 
   return success();
 }

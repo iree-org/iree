@@ -10,8 +10,10 @@
 include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -588,6 +590,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     Value getSubrangeResult() { return getResult(); }
 
     // Walks up the use-def chain to find a subview op that feeds into |value|.
+    // Stops at any timeline op that may indicate a change in resource contents.
     static IREE::Stream::ResourceSubviewOp findSubviewOp(Value value);
   }];
 
@@ -1973,10 +1976,10 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     (`on` `(` $affinity^ `)`)?
     $entry_point
     (`[` $workload^ `]`)? ``
-    `(` custom<DispatchOperands>($resource_operands,
-                                 $resource_operand_offsets,
-                                 $resource_operand_ends,
-                                 $resource_operand_lengths) `)` attr-dict `:`
+    custom<DispatchOperands>($resource_operands,
+                             $resource_operand_offsets,
+                             $resource_operand_ends,
+                             $resource_operand_lengths) attr-dict `:`
     custom<ShapedFunctionType>(ref($resource_operands),
                                type($resource_operands), $resource_operand_sizes,
                                type($results), $result_sizes,
@@ -2004,6 +2007,167 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 // TODO(benvanik): stream.async.if
 // TODO(benvanik): stream.async.select
 // TODO(benvanik): stream.async.for
+
+def Stream_AsyncFuncOp : Stream_Op<"async.func", [
+  CallableOpInterface,
+  FunctionOpInterface,
+  IsolatedFromAbove,
+  Stream_AsyncPhaseOp,
+]> {
+  let summary = [{streamable function declaration}];
+  let description = [{
+    Declares a function that can be called as an asynchronous streaming
+    operation via `stream.async.call`. Today only external functions are
+    allowed.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    ``
+    custom<ShapedFunctionSignature>($function_type,
+                                    $tied_operands,
+                                    $arg_attrs,
+                                    $res_attrs)
+    attr-dict-with-keyword
+    ($body^)?
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "FunctionType":$type,
+      CArg<"ArrayAttr", "{}">:$tied_operands,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$resAttrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    static AsyncFuncOp create(Location location, StringRef name,
+                              FunctionType type,
+                              ArrayRef<int64_t> tiedOperands = {},
+                              ArrayRef<DictionaryAttr> argAttrs = {},
+                              ArrayRef<DictionaryAttr> resAttrs = {});
+
+    bool isDeclaration() { return true; }
+
+    ::mlir::Region *getCallableRegion() { return nullptr; }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
+    ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    // Returns true if the given result is tied to an argument.
+    bool isResultTied(int resultIndex);
+  }];
+}
+
+def Stream_AsyncCallOp : Stream_Op<"async.call", [
+  AttrSizedOperandSegments,
+  CallOpInterface,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{calls a streamable external host function}];
+  let description = [{
+    Calls a function taking/returning resource values with stream semantics.
+    Asynchronous calls must have no side-effects.
+
+    Note that returned resources must have their sizes declared prior to the
+    call as this is what allows the call to be made on the stream. If external
+    host logic is required to compute the size (avoid at all costs!) a separate
+    func.call can be used outside of the stream to do so. If sizes are
+    unknownable until the operation is performed it should be made as a normal
+    asynchronous host call with 'coarse-fences' instead.
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    Variadic<AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_PrimitiveType,
+      AnyType,
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
+    Variadic<Stream_Offset>:$resource_operand_offsets,
+    Variadic<Stream_Offset>:$resource_operand_ends,
+    Variadic<Stream_Size>:$resource_operand_lengths,
+    Variadic<Stream_Size>:$result_sizes,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_PrimitiveType,
+    ]>>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $callee ``
+    custom<DispatchOperands>($resource_operands,
+                             $resource_operand_offsets,
+                             $resource_operand_ends,
+                             $resource_operand_lengths) attr-dict `:`
+    custom<ShapedFunctionType>(ref($resource_operands),
+                               type($resource_operands), $resource_operand_sizes,
+                               type($results), $result_sizes,
+                               $tied_operands)
+  }];
+
+  let extraClassDeclaration = [{
+    FunctionType getCalleeType();
+
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    operand_iterator arg_operand_begin() { return getResourceOperands().begin(); }
+    operand_iterator arg_operand_end() { return getResourceOperands().end(); }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+
+    Value getOperandSize(unsigned idx) {
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+    }
+    Value getResultSize(unsigned idx) {
+      return findValueSizeInList(idx, getResults(), getResultSizes());
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
 
 def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   AttrSizedOperandSegments,
@@ -2480,7 +2644,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
 
   let arguments = (ins
     Variadic<Index>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<Stream_PrimitiveType>:$uniform_operands,
     Variadic<Stream_AnyStreamResource>:$resources,
     Variadic<Stream_Size>:$resource_sizes,
@@ -2491,7 +2655,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   let results = (outs);
 
   let assemblyFormat = [{
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     (`(` $uniform_operands^ `:` type($uniform_operands) `)`)? `{`
     custom<DispatchResources>($resources, type($resources), $resource_sizes,
@@ -2502,6 +2666,13 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   }];
 
   let extraClassDeclaration = [{
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(
           idx - getODSOperandIndexAndLength(2).first,
@@ -2513,6 +2684,142 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
     static SmallVector<unsigned> makeOperandToArgMap(mlir::func::FuncOp funcOp);
     // Builds a map of resource to argument index of the corresponding binding.
     static SmallVector<unsigned> makeResourceToArgMap(mlir::func::FuncOp funcOp);
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_CmdFuncOp : Stream_Op<"cmd.func", [
+  CallableOpInterface,
+  FunctionOpInterface,
+  IsolatedFromAbove,
+  Stream_CmdPhaseOp,
+]> {
+  let summary = [{streamable function declaration}];
+  let description = [{
+    Declares a function that can be called as an asynchronous streaming
+    operation via `stream.cmd.call`. Today only external functions are
+    allowed.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name ``
+    custom<DispatchFunctionSignature>($function_type,
+                                      $arg_attrs,
+                                      $res_attrs)
+    attr-dict-with-keyword
+    ($body^)?
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "FunctionType":$type,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$resAttrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    static CmdFuncOp create(Location location, StringRef name,
+                            FunctionType type,
+                            ArrayRef<DictionaryAttr> argAttrs = {},
+                            ArrayRef<DictionaryAttr> resAttrs = {});
+
+    bool isDeclaration() { return true; }
+
+    ::mlir::Region *getCallableRegion() { return nullptr; }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
+    ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+  }];
+}
+
+def Stream_CmdCallOp : Stream_Op<"cmd.call", [
+  AttrSizedOperandSegments,
+  CallOpInterface,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  Stream_CmdPhaseOp,
+  Stream_StreamableOp,
+  Stream_SubviewEffectOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{calls a streamable external host function}];
+  let description = [{
+    Calls a function operating on resource values with stream semantics.
+    Asynchronous calls must have no side-effects.
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    // TODO(benvanik): rework this to make more sense - it's mostly a copy of
+    // stream.cmd.dispatch mashed together with stream.async.call and it's kind
+    // of confusing.
+    Variadic<AnyTypeOf<[
+      Stream_PrimitiveType,
+      Stream_AnyStreamResource,
+      AnyType,  // for custom types
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
+    Variadic<Stream_Offset>:$resource_operand_offsets,
+    Variadic<Stream_Size>:$resource_operand_lengths,
+    Variadic<Stream_Size>:$result_sizes,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    Stream_ResourceAccessArrayAttr:$resource_operand_accesses
+  );
+  let results = (outs
+    Variadic<Stream_PrimitiveType>:$results
+  );
+
+  let assemblyFormat = [{
+    $callee ``
+    custom<CmdCallOperands>($resource_operands,
+                            $resource_operand_offsets,
+                            $resource_operand_lengths,
+                            $resource_operand_accesses) attr-dict `:`
+    custom<ShapedFunctionType>(ref($resource_operands),
+                               type($resource_operands),
+                               $resource_operand_sizes,
+                               type($results),
+                               $result_sizes,
+                               $tied_operands)
+  }];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    operand_iterator arg_operand_begin() { return getOperands().begin(); }
+    operand_iterator arg_operand_end() { return getOperands().end(); }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+
+    Value getOperandSize(unsigned idx) {
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+    }
+    Value getResultSize(unsigned idx) { return {}; }
   }];
 
   let hasVerifier = 1;
@@ -3013,7 +3320,7 @@ def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
   }];
 
   let arguments = (ins
-    // TODO(benvanik): optional discriminator for groupings.
+    OptionalAttr<StrAttr>:$group,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -3022,6 +3329,7 @@ def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
+    (`group` `(` $group^ `)`)?
     `:` type($result)
     attr-dict-with-keyword
   }];
@@ -3038,12 +3346,14 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
     affinity. Collective operations using this channel must only be submitted on
     compatible affinities.
 
-    The rank can be omitted to indicate a default inherited from the environment
-    or device configuration at runtime.
+    The group and ID are optional and may be null. The rank and count can be
+    omitted to indicate a default inherited from the environment or device
+    configuration at runtime.
   }];
 
   let arguments = (ins
-    // TODO(benvanik): optional discriminator for groupings.
+    Optional<Util_BufferType>:$id,
+    OptionalAttr<StrAttr>:$group,
     Optional<Index>:$rank,
     Optional<Index>:$count,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -3054,6 +3364,8 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
+    (`id` `(` $id^ `)`)?
+    (`group` `(` $group^ `)`)?
     (`rank` `(` $rank^ `)`)?
     (`count` `(` $count^ `)`)?
     `:` type($result)

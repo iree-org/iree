@@ -8,7 +8,7 @@
 
 # Cross-compile the runtime using CMake targeting RISC-V
 #
-# The required IREE_HOST_BINARY_ROOT environment variable indicates the location
+# The required IREE_HOST_BIN_DIR environment variable indicates the location
 # of the precompiled IREE binaries. The BUILD_PRESET environment variable
 # indicates how the project should be configured: "test", "benchmark",
 # "benchmark-with-tracing", or "benchmark-suite-test". Defaults to "test".
@@ -22,10 +22,11 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
+BUILD_TYPE="${IREE_BUILD_TYPE:-RelWithDebInfo}"
 RISCV_PLATFORM="${IREE_TARGET_PLATFORM:-linux}"
 RISCV_ARCH="${IREE_TARGET_ARCH:-riscv_64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts/e2e_test_artifacts}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
@@ -38,13 +39,16 @@ declare -a args
 args=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
-  -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}"
-  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}"
-  -DRISCV_CPU="${RISCV_PLATFORM_ARCH}"
-  -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS}"
-  -DIREE_BUILD_COMPILER=OFF
+  "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}"
+  "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
+  "-DRISCV_CPU=${RISCV_PLATFORM_ARCH}"
+  "-DRISCV_COMPILER_FLAGS=${RISCV_COMPILER_FLAGS}"
+  "-DIREE_BUILD_COMPILER=OFF"
   # CPU info doesn't work on RISCV
-  -DIREE_ENABLE_CPUINFO=OFF
+  "-DIREE_ENABLE_CPUINFO=OFF"
 )
 
 if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
@@ -114,8 +118,5 @@ else
     echo "Building test deps for RISC-V"
     echo "-----------------------------"
     "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
-    echo "Building sample deps for RISC-V"
-    echo "------------------"
-    "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-sample-deps -- -k 0
   fi
 fi

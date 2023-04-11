@@ -30,6 +30,17 @@
 // also cannot directly expose the architecture-specific registers as not all
 // environments and access-levels can query them.
 //
+// On a best-effort basis, we try to pack the most commonly used values in data
+// field 0, and we try to have some consistency in the bit allocation: ideally,
+// ISA extensions that are either closely related or from the same era should
+// occupy bits close to each other, if only so that the bit values enumedated
+// below from lowest to highest bits are easier to read (e.g. look up at a
+// glance which AVX512 features we already have bits for). Inevitably, the
+// aforementioned requirement that bits are set in stone, will force us away
+// from that at times. To strike a decent compromise, we typically try to
+// reserve some range of bits for families or eras of ISA extensions, but don't
+// overthink it.
+//
 // This is similar in functionality to getauxval(AT_HWCAP*) in linux but
 // platform-independent and with additional fields and values that may not yet
 // be available in cpufeature.h. AT_HWCAP stores only bit flags but we can
@@ -49,29 +60,16 @@
 // in the future.
 #define IREE_CPU_DATA_FIELD_COUNT 8
 
+#define IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name) \
+  IREE_CPU_DATA##field_index##_##arch##_##bit_name
+
 // Bitmasks and values for processor data field 0.
 enum iree_cpu_data_field_0_e {
 
-  //===--------------------------------------------------------------------===//
-  // IREE_ARCH_ARM_64 / aarch64
-  //===--------------------------------------------------------------------===//
-
-  // Indicates support for Dot Product instructions.
-  //
-  // UDOT and SDOT instructions implemented.
-  //
-  // Source: ID_AA64ISAR0_EL1.DP [47:44] == 0b0001 / HWCAP_ASIMDDP
-  // Canonical key: "dotprod"
-  IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD = 1ull << 0,
-
-  // Indicates support for Advanced SIMD and Floating-point Int8 matrix
-  // multiplication instructions.
-  //
-  // SMMLA, SUDOT, UMMLA, USMMLA, and USDOT instructions are implemented.
-  //
-  // Source: ID_AA64ISAR1_EL1.I8MM [55:52] == 0b0001 / HWCAP2_I8MM
-  // Canonical key: "i8mm"
-  IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM = 1ull << 1,
+#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
+  IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name) = 1ull << bit_pos,
+#include "iree/schemas/cpu_feature_bits.inl"
+#undef IREE_CPU_FEATURE_BIT
 
 };
 

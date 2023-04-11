@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h"
@@ -22,8 +23,9 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -48,6 +50,19 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(64);
     LLVMTypeConverter converter(m.getContext(), options);
+    populateGpuMemorySpaceAttributeConversions(
+        converter, [](gpu::AddressSpace space) {
+          switch (space) {
+            case gpu::AddressSpace::Global:
+              return 1;
+            case gpu::AddressSpace::Workgroup:
+              return 3;
+            case gpu::AddressSpace::Private:
+              return 5;
+          }
+          llvm_unreachable("unknown address space enum value");
+          return 0;
+        });
     // Apply in-dialect lowering first. In-dialect lowering will replace ops
     // which need to be lowered further, which is not supported by a single
     // conversion pass.
@@ -64,7 +79,10 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
               vector::VectorContractLowering::OuterProduct));
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       vector::populateVectorShapeCastLoweringPatterns(patterns);
-      mlir::vector::populateVectorTransposeLoweringPatterns(patterns);
+      // TODO: doubtful that the "default" does what one want here, it is likely
+      // better to use something else.
+      vector::populateVectorTransposeLoweringPatterns(
+          patterns, vector::VectorTransformsOptions());
       vector::populateVectorTransferLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
@@ -81,9 +99,10 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       RewritePatternSet llvmPatterns(&getContext());
       populateLowerHALInterfaceOp(llvmPatterns);
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
+      populateComplexToLLVMConversionPatterns(converter, llvmPatterns);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       memref::populateExpandStridedMetadataPatterns(llvmPatterns);
-      populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
+      populateFinalizeMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);

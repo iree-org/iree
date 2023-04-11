@@ -22,11 +22,6 @@
 // !custom.string type
 //===----------------------------------------------------------------------===//
 
-// Runtime type descriptor for the !custom.string describing how to manage it
-// and destroy it. The type ID is allocated at runtime and does not need to
-// match the compiler ID.
-static iree_vm_ref_type_descriptor_t iree_custom_string_descriptor = {0};
-
 // The "string" type we use to store and retain string data.
 // This could be arbitrarily complex or simply wrap another user-defined type.
 // The descriptor that is registered at startup defines how to manage the
@@ -43,6 +38,9 @@ typedef struct iree_custom_string_t {
   iree_string_view_t value;
 } iree_custom_string_t;
 
+// Runtime type descriptor for the !custom.string describing how to manage it
+// and destroy it. The type ID is allocated at runtime and does not need to
+// match the compiler ID.
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_custom_string, iree_custom_string_t);
 
 extern "C" iree_status_t iree_custom_string_create(

@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Passes.h"
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/Sandbox/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -20,7 +19,6 @@ namespace {
 void registerCodegenPasses() {
   // Generated.
   registerPasses();
-  registerSandboxPasses();
 
   static PassPipelineRegistration<> LinalgLLVMPipeline(
       "iree-codegen-linalg-to-llvm-pipeline",
@@ -72,13 +70,12 @@ LogicalResult verifyLoweringConfiguration(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        CPUAArchDoubleTilingExpert:
+    case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
       return verifyDoubleTilingExpertPassPipelineConfig(op, loweringConfig,
                                                         translationInfo);
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-      return verifyGPUMatmulSimtPassPipeline(op, loweringConfig,
-                                             translationInfo, workgroupSize);
+      return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo,
+                                     workgroupSize);
     default:
       break;
   }

@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -21,28 +22,48 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-Optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(Attribute attr) {
-  auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>();
-  if (!dtAttr) return spirv::mapMemorySpaceToVulkanStorageClass(attr);
-  switch (dtAttr.getValue()) {
-    case IREE::HAL::DescriptorType::UniformBuffer:
-      return spirv::StorageClass::Uniform;
-    case IREE::HAL::DescriptorType::StorageBuffer:
-      return spirv::StorageClass::StorageBuffer;
+std::optional<spirv::StorageClass> mapHALDescriptorTypeForVulkan(
+    Attribute attr) {
+  if (auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>()) {
+    switch (dtAttr.getValue()) {
+      case IREE::HAL::DescriptorType::UniformBuffer:
+        return spirv::StorageClass::Uniform;
+      case IREE::HAL::DescriptorType::StorageBuffer:
+        return spirv::StorageClass::StorageBuffer;
+      default:
+        return std::nullopt;
+    }
   }
-  return std::nullopt;
+  if (auto gpuAttr = attr.dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
+    switch (gpuAttr.getValue()) {
+      case gpu::AddressSpace::Workgroup:
+        return spirv::StorageClass::Workgroup;
+      default:
+        return std::nullopt;
+    }
+  };
+  return spirv::mapMemorySpaceToVulkanStorageClass(attr);
 }
 
-Optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(Attribute attr) {
-  auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>();
-  if (!dtAttr) return spirv::mapMemorySpaceToOpenCLStorageClass(attr);
-  switch (dtAttr.getValue()) {
-    case IREE::HAL::DescriptorType::UniformBuffer:
-      return spirv::StorageClass::Uniform;
-    case IREE::HAL::DescriptorType::StorageBuffer:
-      return spirv::StorageClass::CrossWorkgroup;
+std::optional<spirv::StorageClass> mapHALDescriptorTypeForOpenCL(
+    Attribute attr) {
+  if (auto dtAttr = attr.dyn_cast_or_null<IREE::HAL::DescriptorTypeAttr>()) {
+    switch (dtAttr.getValue()) {
+      case IREE::HAL::DescriptorType::UniformBuffer:
+        return spirv::StorageClass::Uniform;
+      case IREE::HAL::DescriptorType::StorageBuffer:
+        return spirv::StorageClass::CrossWorkgroup;
+    }
   }
-  return std::nullopt;
+  if (auto gpuAttr = attr.dyn_cast_or_null<gpu::AddressSpaceAttr>()) {
+    switch (gpuAttr.getValue()) {
+      case gpu::AddressSpace::Workgroup:
+        return spirv::StorageClass::Workgroup;
+      default:
+        return std::nullopt;
+    }
+  };
+  return spirv::mapMemorySpaceToOpenCLStorageClass(attr);
 }
 
 struct SPIRVMapMemRefStorageClassPass final

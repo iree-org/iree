@@ -4,6 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Special case package namespace for tools/ -> "" (empty string)
+# For example, tools/iree-compile -> iree-compile (no namespace)
+set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
 # Tools IREE provides for compiling, executing, and benchmarking programs, as
 # well as other utilities.
 #
@@ -11,33 +15,38 @@
 # directory. Library targets and header files should be placed in the
 # appropriate subtree, e.g. `compiler/src/iree/compiler/Tools/`.
 #
-# Programs with a dependency on the compiler are not designed to run on device
-# platforms (e.g. Android), so they are tagged "hostonly".
+# Compiler tools are designed to run on host platforms (Linux, macOS, Windows),
+# so they are only built when IREE_BUILD_COMPILER is set and are tagged
+# "hostonly". When cross-compiling (or generally wanting to use already-built
+# compiler tools), set the IREE_HOST_BIN_DIR CMake option.
 #
 # This file does not use bazel_to_cmake because of special logic throughout.
+
+# Write some important CMake options to a file for convenient use from scripts.
+configure_file(build_config_template.txt.in build_config.txt)
+
+# For sub-directories, we want targets fully qualified relative to the
+# root. But after, we want those in *this* directory to be unqualified
+# (i.e. 'iree-compile').
+set(IREE_PACKAGE_ROOT_PREFIX "iree/tools")
+iree_add_all_subdirs()
+set(IREE_PACKAGE_ROOT_PREFIX "")
+
+# TODO(scotttodd): Should this be checking IREE_BUILD_COMPILER?
+#   Maybe we should disallow setting both at the same time, since it's
+#   ambigious which should be used
+if(IREE_HOST_BIN_DIR AND NOT IREE_BUILD_COMPILER)
+  iree_import_binary(NAME iree-tblgen)
+  iree_import_binary(NAME iree-compile)
+  iree_import_binary(NAME iree-opt)
+  iree_import_binary(NAME iree-run-mlir)
+endif()
 
 # TODO(#6353): Tools has thread dependencies in gtest, benchmark, yaml, etc.
 # This should be split between runtime/compiler with optional threading support.
 if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
-
-# Write some important CMake options to a file for convenient use from scripts.
-configure_file(build_config_template.txt.in build_config.txt)
-
-# Depending on which target backends are enabled, we may or may not have built
-# LLD.
-if(IREE_LLD_TARGET)
-  # lld install - required by the compiler to link codegen executables.
-  install(
-    TARGETS lld
-    COMPONENT Compiler
-    RUNTIME DESTINATION bin
-  )
-endif()
-
-add_subdirectory(android)
-add_subdirectory(test)
 
 iree_cc_binary(
   NAME
@@ -53,7 +62,7 @@ iree_cc_binary(
     iree::modules::hal::types
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util_cc
+    iree::tooling::vm_util
     iree::vm
 )
 
@@ -65,6 +74,7 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::atomic_slist
+    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
     iree::base::tracing
@@ -73,6 +83,7 @@ iree_cc_binary(
     iree::testing::benchmark
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
@@ -94,10 +105,35 @@ iree_cc_binary(
     iree::testing::gtest
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util_cc
+    iree::tooling::vm_util
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   TESTONLY
+)
+
+iree_cc_binary(
+  NAME
+    iree-cpuinfo
+  SRCS
+    "iree-cpuinfo.c"
+  DEPS
+    iree::base
+    iree::base::internal::cpu
+    iree::schemas::cpu_data
+)
+
+iree_cc_binary(
+  NAME
+    iree-dump-instruments
+  SRCS
+    "iree-dump-instruments-main.c"
+  DEPS
+    flatcc::runtime
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flatcc::parsing
+    iree::schemas::instruments
+    iree::schemas::instruments::dispatch_def_c_fbs
 )
 
 iree_cc_binary(
@@ -111,8 +147,25 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::internal::flatcc::debugging
     iree::schemas::bytecode_module_def_c_fbs
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
 )
+
+# Only enable fatelf tool when we're compiling it in.
+# Currently it requires that the host and target both support embedded ELFs as
+# the ELF implementation is only compiled when the target supports it.
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
+iree_cc_binary(
+  NAME
+    iree-fatelf
+  SRCS
+    "iree-fatelf.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::path
+    iree::hal::local::elf::elf_module
+)
+endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
 
 iree_cc_binary(
   NAME
@@ -128,7 +181,8 @@ iree_cc_binary(
     iree::tooling::comparison
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util_cc
+    iree::tooling::instrument_util
+    iree::tooling::vm_util
     iree::vm
 )
 
@@ -146,6 +200,7 @@ iree_cc_binary(
     iree::modules::hal
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
@@ -172,6 +227,16 @@ iree_cc_binary(
 )
 
 if(IREE_BUILD_COMPILER)
+  # If a target backend that requires LLD to link codegen executables is
+  # enabled, install the target.
+  if(IREE_LLD_TARGET)
+    install(
+      TARGETS lld
+      COMPONENT Compiler
+      RUNTIME DESTINATION bin
+    )
+  endif()
+
   iree_cc_binary(
     NAME
       iree-tblgen
@@ -195,8 +260,8 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-compile-main.cc"
     DEPS
-      iree::compiler::API2::Headers
-      iree::compiler::API2::Impl
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -209,8 +274,8 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-opt-main.cc"
     DEPS
-      iree::compiler::API2::Headers
-      iree::compiler::API2::Impl
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -223,8 +288,8 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-mlir-lsp-server.cc"
     DEPS
-      iree::compiler::API2::Headers
-      iree::compiler::API2::Impl
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
     SETUP_INSTALL_RPATH
   )
 
@@ -254,9 +319,9 @@ if(IREE_BUILD_COMPILER)
       iree::modules::hal::types
       iree::tooling::context_util
       iree::tooling::device_util
-      iree::tooling::vm_util_cc
+      iree::tooling::vm_util
       iree::vm
-      iree::vm::bytecode_module
+      iree::vm::bytecode::module
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
@@ -269,17 +334,9 @@ if(IREE_BUILD_COMPILER)
   # below, which we use for cross-platform testing.
   set_target_properties(FileCheck PROPERTIES EXCLUDE_FROM_ALL OFF)
   set_target_properties(not PROPERTIES EXCLUDE_FROM_ALL OFF)
-
-  # Bundle the FileCheck and associated binaries from LLVM into our tests/bin
-  # directory so installed FileCheck tests are hermetic.
-  install(
-    TARGETS FileCheck
-    DESTINATION "tests/bin"
-    COMPONENT Tests
-  )
-  install(
-    TARGETS not
-    DESTINATION "tests/bin"
-    COMPONENT Tests
-  )
-endif(IREE_BUILD_COMPILER)
+elseif(NOT IREE_HOST_BIN_DIR)
+  message(STATUS
+      "*Not* building or importing IREE's compiler tools.\n   "
+      "Set IREE_BUILD_COMPILER to build them or IREE_HOST_BIN_DIR to "
+      "import them.")
+endif()

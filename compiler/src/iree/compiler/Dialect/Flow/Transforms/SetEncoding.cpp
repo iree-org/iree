@@ -18,7 +18,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
@@ -63,9 +63,9 @@ static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
 
 /// Pads `value` to `padding` if needed. If no padding is specified,
 /// return `value` itself.
-static FailureOr<Value> padIfNeeded(OpBuilder &builder, Location loc,
-                                    Value value,
-                                    Optional<int64_t> padding = std::nullopt) {
+static FailureOr<Value> padIfNeeded(
+    OpBuilder &builder, Location loc, Value value,
+    std::optional<int64_t> padding = std::nullopt) {
   if (!padding) return value;
 
   OpFoldResult paddingOfr = builder.getIndexAttr(padding.value());
@@ -155,13 +155,13 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
 
     if (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()) {
       lhsEncoding = TensorEncoding::MATMUL_F32F32F32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE;
+      rhsEncoding = TensorEncoding::MATMUL_F32F32F32_RHS;
       outEncoding = TensorEncoding::MATMUL_F32F32F32_RESULT;
     } else if (lhsElemType.isSignlessInteger(8) &&
                rhsElemType.isSignlessInteger(8) &&
                outElemType.isSignlessInteger(32)) {
       lhsEncoding = TensorEncoding::MATMUL_I8I8I32_LHS;
-      rhsEncoding = TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE;
+      rhsEncoding = TensorEncoding::MATMUL_I8I8I32_RHS;
       outEncoding = TensorEncoding::MATMUL_I8I8I32_RESULT;
     } else {
       return rewriter.notifyMatchFailure(

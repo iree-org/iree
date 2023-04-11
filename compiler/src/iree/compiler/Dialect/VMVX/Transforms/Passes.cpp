@@ -34,12 +34,15 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
       createTypePropagationPass());
   passManager.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
+  // Decompose linalg.ext.softmax before bufferization.
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createEraseHALDescriptorTypeFromMemRefPass());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createIREEMaterializeEncodingPass());
+      createVMVXMaterializeEncodingPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -73,7 +76,11 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Resolve get_buffer_descriptor ops. All structural buffer manipulations
   // must conclude before this point.
   nestedModulePM.addNestedPass<func::FuncOp>(
+      createIREEExpandStridedMetadataPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
       createResolveBufferDescriptorsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createCleanupBufferAllocViewPass());
 
   // Flatten and cleanup memrefs.
   nestedModulePM.addNestedPass<func::FuncOp>(

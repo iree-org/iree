@@ -35,6 +35,7 @@ BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripten}"
 INSTALL_ROOT="$(realpath ${1:-${HOST_BUILD_DIR}/install})"
 SOURCE_DIR=${ROOT_DIR}/experimental/web/sample_dynamic
 BINARY_DIR=${BUILD_DIR}/experimental/web/sample_dynamic
+IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 
 
 ###############################################################################
@@ -62,8 +63,8 @@ compile_sample() {
   "${COMPILE_TOOL}" "$2" \
     --iree-input-type=mhlo \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=wasm32-unknown-emscripten \
-    --iree-llvm-target-cpu-features=+atomics,+bulk-memory,+simd128 \
+    --iree-llvmcpu-target-triple=wasm32-unknown-emscripten \
+    --iree-llvmcpu-target-cpu-features=+atomics,+bulk-memory,+simd128 \
     --o "${BINARY_DIR}/$1.vmfb"
 }
 
@@ -83,8 +84,10 @@ echo "=== Building web artifacts using Emscripten ==="
 emcmake "${CMAKE_BIN}" \
   -B "${BUILD_DIR}" \
   -G Ninja \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_HOST_BINARY_ROOT="${INSTALL_ROOT}" \
+  -DIREE_HOST_BIN_DIR="${INSTALL_ROOT}/bin" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
@@ -99,6 +102,6 @@ echo "=== Copying static files (.html, .js) to the build directory ==="
 
 cp "${SOURCE_DIR}/index.html" "${BINARY_DIR}"
 cp "${SOURCE_DIR}/benchmarks.html" "${BINARY_DIR}"
-cp "${ROOT_DIR}/docs/website/overrides/ghost.svg" "${BINARY_DIR}"
+cp "${ROOT_DIR}/docs/website/overrides/.icons/iree/ghost.svg" "${BINARY_DIR}"
 cp "${SOURCE_DIR}/iree_api.js" "${BINARY_DIR}"
 cp "${SOURCE_DIR}/iree_worker.js" "${BINARY_DIR}"

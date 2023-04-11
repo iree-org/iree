@@ -22,7 +22,7 @@ include(CMakeParseArguments)
 # ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARG and
 #     --device=DRIVER are automatically added if specified.
 #     File-related arguments can be passed with `{{}}` locator,
-#     e.g., --function_input=@{{foo.npy}}. The locator is used to portably
+#     e.g., --input=@{{foo.npy}}. The locator is used to portably
 #     pass the file arguments to tests and add the file to DATA.
 # SRC: binary target to run as the test.
 # WILL_FAIL: The target will run, but its pass/fail status will be inverted.
@@ -123,8 +123,8 @@ function(iree_native_test)
         "TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir"
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
-  elseif((CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" OR
-          CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32") AND
+  elseif((IREE_ARCH STREQUAL "riscv_64" OR
+          IREE_ARCH STREQUAL "riscv_32") AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # The test target needs to run within the QEMU emulator for RV64 Linux
     # crosscompile build or on-device.

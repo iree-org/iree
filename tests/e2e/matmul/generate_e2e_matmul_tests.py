@@ -44,6 +44,7 @@ class CompilationInfoId(enum.Enum):
   NONE = ""
   LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
   LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
+  LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
   SPIRVVectorizeMali = "SPIRVVectorizeMali"
   SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
 
@@ -192,7 +193,7 @@ def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
 
 # Returns the list of CompilationInfo's to use for the CompilationInfoId.
 def get_test_compilation_infos(
-    compilation_info_id: CompilationInfoId
+    compilation_info_id: CompilationInfoId, lhs_rhs_type: MatrixElemTypeId
 ) -> typing.List[typing.Optional[CompilationInfo]]:
   if compilation_info_id == CompilationInfoId.NONE:
     return [None]
@@ -210,10 +211,25 @@ def get_test_compilation_infos(
     tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(32)
   elif compilation_info_id == CompilationInfoId.SPIRVVectorizeMali:
     tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(4)
-  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
-    tile_workgroup_size_pairs = [
-        TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1]),
-    ]
+  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCoreMmaSync:
+    tile_workgroup_size_pairs = []
+    ## WarpShape = 2x2
+    tile_workgroup_size_pairs.append(
+        TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1]))
+    tile_workgroup_size_pairs.append(
+        TileWorkgroupSizePair([[64, 64, 64]], [64, 2, 1]))
+
+    ## WarpShape = 4x1
+    tile_workgroup_size_pairs.append(
+        TileWorkgroupSizePair([[32, 32, 32]], [64, 1, 1]))
+
+    ## WarpShape = 2x2 with large tiles using larger Shared Memory capacity.
+    if lhs_rhs_type == MatrixElemTypeId.F16:
+      tile_workgroup_size_pairs.append(
+          TileWorkgroupSizePair([[128, 128, 64]], [64, 2, 1]))
+    elif lhs_rhs_type == MatrixElemTypeId.F32:
+      tile_workgroup_size_pairs.append(
+          TileWorkgroupSizePair([[128, 128, 16]], [64, 2, 1]))
 
   compilation_infos = []
   for tile_workgroup_size_pair in tile_workgroup_size_pairs:
@@ -225,7 +241,7 @@ def get_test_compilation_infos(
                 a for a in reversed(tile_workgroup_size_pair.tile_size[0:2])
             ],
             workgroup_size=tile_workgroup_size_pair.workgroup_size,
-            software_pipeline_depth=4))
+            software_pipeline_depth=3))
   return compilation_infos
 
 
@@ -484,7 +500,8 @@ def generate(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
   function_definitions = {}
   traces = []
 
-  for compilation_info in get_test_compilation_infos(compilation_info_id):
+  for compilation_info in get_test_compilation_infos(compilation_info_id,
+                                                     lhs_rhs_type):
     for shape in get_test_shapes(shapes_id):
       for dynamicity in get_dynamicities(shapes_id):
         function = generate_function(lhs_rhs_type, acc_type, shape, dynamicity,
@@ -539,7 +556,7 @@ def parse_arguments():
       "--requirements",
       type=str,
       help=
-      "Target requirements for this module. Comma-separated. As in -iree-llvm-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
+      "Target requirements for this module. Comma-separated. As in -iree-llvmcpu-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
       required=False)
   return parser.parse_args()
 

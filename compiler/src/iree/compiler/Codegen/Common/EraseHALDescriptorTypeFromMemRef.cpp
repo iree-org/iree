@@ -35,7 +35,7 @@ struct MemRefTypeConverter final : public TypeConverter {
     // Pass through for all other types.
     addConversion([](Type type) { return type; });
 
-    addConversion([](BaseMemRefType memRefType) -> Optional<Type> {
+    addConversion([](BaseMemRefType memRefType) -> std::optional<Type> {
       // Expect #hal.descriptor_type memory spaces.
       Attribute spaceAttr = memRefType.getMemorySpace();
       if (!spaceAttr) return std::nullopt;

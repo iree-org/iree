@@ -207,7 +207,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       exportOp->getWorkgroupSize().value(),
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
+  std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize) {
     funcOp->emitError("failed to query subgroup size");
     return signalPassFailure();
@@ -278,7 +278,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
     RewritePatternSet patterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
-    populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+    SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
+    populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       // TODO(#4759): This does not converge after the max number of iterations.
       // It indicates that some pattern upstream is generating ops even when the
@@ -300,10 +301,7 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   MLIRContext *context = funcOp.getContext();
   if (!promoteCMatrix) return success();
 
-  SmallVector<Operation *> computeOps;
-  if (failed(getComputeOps(funcOp, computeOps)))
-    return funcOp.emitError("failed to get compute ops");
-
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   SmallVector<Operation *> linalgOps;
   for (Operation *op : computeOps) {
     if (isa<linalg::FillOp>(op)) continue;  // Don't care
@@ -326,7 +324,7 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
 
   auto matmulType =
       matmulOp.getDpsInitOperand(0)->get().getType().cast<MemRefType>();
-  if (isInWorkgroupMemory(matmulType)) {
+  if (hasSharedMemoryAddressSpace(matmulType)) {
     // The matmul output is already in shared memory. This can happen when
     // bufferization decides an allocation is needed, e.g., matmul + arith.extf,
     // where the output have different element types. For such cases, don't need

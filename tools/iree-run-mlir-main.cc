@@ -52,9 +52,9 @@
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/vm_util_cc.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -83,6 +83,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 
 static llvm::cl::opt<std::string> input_file_flag{
@@ -138,41 +139,52 @@ static llvm::cl::list<std::string> run_args_flag{
     llvm::cl::ConsumeAfter,
 };
 
-// TODO(benvanik): move --function_input= flag into a util.
-static iree_status_t parse_function_input(iree_string_view_t flag_name,
-                                          void* storage,
-                                          iree_string_view_t value) {
-  auto* list = (std::vector<std::string>*)storage;
-  list->push_back(std::string(value.data, value.size));
-  return iree_ok_status();
-}
-static void print_function_input(iree_string_view_t flag_name, void* storage,
-                                 FILE* file) {
-  auto* list = (std::vector<std::string>*)storage;
-  if (list->empty()) {
-    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
-  } else {
-    for (size_t i = 0; i < list->size(); ++i) {
-      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
-              list->at(i).c_str());
-    }
-  }
-}
-static std::vector<std::string> FLAG_function_inputs;
-IREE_FLAG_CALLBACK(
-    parse_function_input, print_function_input, &FLAG_function_inputs,
-    function_input,
-    "An input value or buffer of the format:\n"
-    "  [shape]xtype=[value]\n"
-    "  2x2xi32=1 2 3 4\n"
+IREE_FLAG_LIST(
+    string, input,
+    "An input (a) value or (b) buffer of the format:\n"
+    "  (a) scalar value\n"
+    "     value\n"
+    "     e.g.: --input=\"3.14\"\n"
+    "  (b) buffer:\n"
+    "     [shape]xtype=[value]\n"
+    "     e.g.: --input=\"2x2xi32=1 2 3 4\"\n"
     "Optionally, brackets may be used to separate the element values:\n"
     "  2x2xi32=[[1 2][3 4]]\n"
     "Raw binary files can be read to provide buffer contents:\n"
     "  2x2xi32=@some/file.bin\n"
-    "numpy npy files (from numpy.save) can be read to provide 1+ values:\n"
+    "\n"
+    "Numpy npy files from numpy.save can be read to provide 1+ values:\n"
     "  @some.npy\n"
+    "\n"
     "Each occurrence of the flag indicates an input in the order they were\n"
     "specified on the command line.");
+
+IREE_FLAG_LIST(
+    string, output,
+    "Specifies how to handle an output from the invocation:\n"
+    "  `` (empty): ignore output\n"
+    "     e.g.: --output=\n"
+    "  `-`: print textual form to stdout\n"
+    "     e.g.: --output=-\n"
+    "  `@file.npy`: create/overwrite a numpy npy file and write buffer view\n"
+    "     e.g.: --output=@file.npy\n"
+    "  `+file.npy`: create/append a numpy npy file and write buffer view\n"
+    "     e.g.: --output=+file.npy\n"
+    "\n"
+    "Numpy npy files can be read in Python using numpy.load, for example an\n"
+    "invocation producing two outputs can be concatenated as:\n"
+    "    --output=@file.npy --output=+file.npy\n"
+    "And then loaded in Python by reading from the same file:\n"
+    "  with open('file.npy', 'rb') as f:\n"
+    "    print(numpy.load(f))\n"
+    "    print(numpy.load(f))\n"
+    "\n"
+    "Each occurrence of the flag indicates an output in the order they were\n"
+    "specified on the command line.");
+
+IREE_FLAG(int32_t, output_max_element_count, 1024,
+          "Prints up to the maximum number of elements of output tensors, "
+          "eliding the remainder.");
 
 namespace iree {
 namespace {
@@ -226,6 +238,7 @@ void BuildDefaultIREEVMTransformPassPipeline(mlir::OpPassManager& passManager) {
   buildIREEVMTransformPassPipeline(
       mlir::iree_compiler::BindingOptions::FromFlags::get(),
       mlir::iree_compiler::InputDialectOptions::FromFlags::get(),
+      mlir::iree_compiler::PreprocessingOptions::FromFlags::get(),
       mlir::iree_compiler::HighLevelOptimizationOptions::FromFlags::get(),
       mlir::iree_compiler::SchedulingOptions::FromFlags::get(),
       mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get(),
@@ -258,7 +271,10 @@ Status PrepareModule(std::string target_backend,
   printf("Compiling for target backend '%s'...\n", target_backend.c_str());
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verify_passes_flag);
-  mlir::applyPassManagerCLOptions(pass_manager);
+  if (failed(mlir::applyPassManagerCLOptions(pass_manager))) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "failed to apply pass manager CL options");
+  }
   mlir::applyDefaultTimingPassManagerCLOptions(pass_manager);
   BuildDefaultIREEVMTransformPassPipeline(pass_manager);
   if (failed(pass_manager.run(mlir_module.get()))) {
@@ -273,12 +289,14 @@ Status PrepareModule(std::string target_backend,
   // NOTE: if we have an output file specified then we could compile into that
   // for greater efficiency. Today we assume that users aren't passing multi-GB
   // models through this tool (or if they are they have the memory to run them).
+  auto vm_options =
+      mlir::iree_compiler::IREE::VM::TargetOptions::FromFlags::get();
   auto bytecode_options =
       mlir::iree_compiler::IREE::VM::BytecodeTargetOptions::FromFlags::get();
   std::string binary_contents;
   llvm::raw_string_ostream binary_output(binary_contents);
   if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
-          mlir_module.get(), bytecode_options, binary_output))) {
+          mlir_module.get(), vm_options, bytecode_options, binary_output))) {
     return iree_make_status(
         IREE_STATUS_INTERNAL,
         "serialization to flatbuffer bytecode (binary) failed");
@@ -293,7 +311,7 @@ Status PrepareModule(std::string target_backend,
     std::string text_contents;
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
-            mlir_module.get(), bytecode_options, text_output))) {
+            mlir_module.get(), vm_options, bytecode_options, text_output))) {
       return iree_make_status(IREE_STATUS_INTERNAL,
                               "serialization to annotated MLIR (text) failed");
     }
@@ -306,7 +324,7 @@ Status PrepareModule(std::string target_backend,
     std::string text_contents;
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
-            mlir_module.get(), bytecode_options, text_output))) {
+            mlir_module.get(), vm_options, bytecode_options, text_output))) {
       return iree_make_status(
           IREE_STATUS_INTERNAL,
           "serialization to flatbuffer bytecode (text) failed");
@@ -342,10 +360,8 @@ Status EvaluateFunction(iree_vm_context_t* context, iree_hal_device_t* device,
 
   // Parse input values from the flags.
   vm::ref<iree_vm_list_t> inputs;
-  IREE_RETURN_IF_ERROR(ParseToVariantList(
-      device_allocator,
-      iree::span<const std::string>{FLAG_function_inputs.data(),
-                                    FLAG_function_inputs.size()},
+  IREE_RETURN_IF_ERROR(iree_tooling_parse_to_variant_list(
+      device_allocator, FLAG_input_list().values, FLAG_input_list().count,
       host_allocator, &inputs));
 
   // If the function is async add fences so we can invoke it synchronously.
@@ -370,7 +386,19 @@ Status EvaluateFunction(iree_vm_context_t* context, iree_hal_device_t* device,
   }
 
   // Print outputs.
-  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()));
+  if (FLAG_output_list().count == 0) {
+    IREE_RETURN_IF_ERROR(
+        iree_tooling_variant_list_fprint(
+            IREE_SV("result"), outputs.get(),
+            (iree_host_size_t)FLAG_output_max_element_count, stdout),
+        "printing results");
+  } else {
+    IREE_RETURN_IF_ERROR(
+        iree_tooling_output_variant_list(
+            outputs.get(), FLAG_output_list().values, FLAG_output_list().count,
+            (iree_host_size_t)FLAG_output_max_element_count, stdout),
+        "outputting results");
+  }
 
   return OkStatus();
 }
@@ -551,6 +579,7 @@ extern "C" int main(int argc_llvm, char** argv_llvm) {
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
+  mlir::registerBuiltinDialectTranslation(registry);
   mlir::registerLLVMDialectTranslation(registry);
   // Make sure command line options are registered.
   // Flag options structs (must resolve prior to CLI parsing).
@@ -573,6 +602,9 @@ extern "C" int main(int argc_llvm, char** argv_llvm) {
 
   // On Windows InitLLVM re-queries the command line from Windows directly and
   // totally messes up the array.
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);
   llvm::cl::ParseCommandLineOptions(argc_llvm, argv_llvm);
 

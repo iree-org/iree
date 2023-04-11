@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/builtins/ukernel/exported_flag_bits.h"
+#include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -72,7 +72,11 @@ void leftPadToRank(Location loc, SmallVectorImpl<Value> &indices,
 }
 
 // Returns true if all inner dimensions (that is, all but the outer-most dim)
-// are statically known to be contiguous row-major. This is vacuously true for
+// are contiguous row-major.
+//
+// TODO(#11633): Dynamic dimensions are currently assumed to be row-major.
+//
+// This is vacuously true for
 // rank<=1 (as there are no inner dims). For rank 2, this is equivalent to
 // asking for the inner dimension to have unit stride. For rank>=3, this is
 // asking for the strides of all but the outermost dimension to equal the
@@ -102,9 +106,13 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
   int64_t product_of_inner_sizes = 1;
   for (int i = rank - 1; i >= 2; --i) {
     if (sizes[i] == ShapedType::kDynamic) {
-      return false;
+      // TODO(#11633): Dynamic dimensions are currently assumed to be row-major.
+      product_of_inner_sizes = ShapedType::kDynamic;
+    } else {
+      if (product_of_inner_sizes != ShapedType::kDynamic) {
+        product_of_inner_sizes *= sizes[i];
+      }
     }
-    product_of_inner_sizes *= sizes[i];
     if (strides[i - 1] != product_of_inner_sizes) {
       return false;
     }
@@ -202,7 +210,7 @@ class StridedBufferAnalysis {
 
  private:
   Value buffer;
-  Optional<StridedBufferDescriptor> desc;
+  std::optional<StridedBufferDescriptor> desc;
 };
 
 /// Emits a vmvx binary op.
@@ -550,7 +558,8 @@ struct LinalgBinaryGenericConversion
     // Returns an emitter for a generic binary compatible operation where
     // |binaryOp| has a 1:1 correspondance with |opcode|.
     auto configureGenericBinary =
-        [&](Operation *binaryOp, StringRef opcode) -> Optional<BinaryEmitter> {
+        [&](Operation *binaryOp,
+            StringRef opcode) -> std::optional<BinaryEmitter> {
       SmallVector<BinaryEmitter::Descriptor, 2> operands;
       // Make sure that the binary op has operands that map to the
       // ins and detect the order.
@@ -586,87 +595,87 @@ struct LinalgBinaryGenericConversion
     // Emit from the iree_ukernel_x32b_opcode_t table.
     Type resultType = binaryOp->getResult(0).getType();
     if (!resultType.isIntOrFloat()) return failure();
-    Optional<BinaryEmitter> emitter =
-        TypeSwitch<Operation *, Optional<BinaryEmitter>>(binaryOp)
-            .Case([&](arith::AddFOp op) -> Optional<BinaryEmitter> {
+    std::optional<BinaryEmitter> emitter =
+        TypeSwitch<Operation *, std::optional<BinaryEmitter>>(binaryOp)
+            .Case([&](arith::AddFOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "add");
               }
               return std::nullopt;
             })
-            .Case([&](arith::AddIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::AddIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "add");
               }
               return std::nullopt;
             })
-            .Case([&](arith::AndIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::AndIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "and");
               }
               return std::nullopt;
             })
-            .Case([&](arith::DivFOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::DivFOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "div");
               }
               return std::nullopt;
             })
-            .Case([&](arith::DivSIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::DivSIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "divs");
               }
               return std::nullopt;
             })
-            .Case([&](arith::DivUIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::DivUIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "divu");
               }
               return std::nullopt;
             })
-            .Case([&](arith::MulFOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::MulFOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "mul");
               }
               return std::nullopt;
             })
-            .Case([&](arith::MulIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::MulIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "mul");
               }
               return std::nullopt;
             })
-            .Case([&](arith::OrIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::OrIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "or");
               }
               return std::nullopt;
             })
-            .Case([&](arith::ShLIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::ShLIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "shl");
               }
               return std::nullopt;
             })
-            .Case([&](arith::ShRSIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::ShRSIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "shrs");
               }
               return std::nullopt;
             })
-            .Case([&](arith::XOrIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::XOrIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "xor");
               }
               return std::nullopt;
             })
-            .Case([&](arith::SubFOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::SubFOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "sub");
               }
               return std::nullopt;
             })
-            .Case([&](arith::SubIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::SubIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "sub");
               }
@@ -721,7 +730,8 @@ struct LinalgUnaryGenericConversion
     // Returns an emitter for a generic binary compatible operation where
     // |binaryOp| has a 1:1 correspondance with |opcode|.
     auto configureGenericUnary =
-        [&](Operation *unaryOp, StringRef opcode) -> Optional<UnaryEmitter> {
+        [&](Operation *unaryOp,
+            StringRef opcode) -> std::optional<UnaryEmitter> {
       SmallVector<UnaryEmitter::Descriptor, 2> operands;
       // Make sure that the binary op has operands that map to the
       // ins and detect the order.
@@ -738,51 +748,52 @@ struct LinalgUnaryGenericConversion
     // Emit from the iree_ukernel_x32b_opcode_t table.
     Type resultType = unaryOp->getResult(0).getType();
     if (!resultType.isIntOrFloat()) return failure();
-    Optional<UnaryEmitter> emitter =
-        TypeSwitch<Operation *, Optional<UnaryEmitter>>(unaryOp)
-            .Case([&](math::AbsFOp op) -> Optional<UnaryEmitter> {
+    std::optional<UnaryEmitter> emitter =
+        TypeSwitch<Operation *, std::optional<UnaryEmitter>>(unaryOp)
+            .Case([&](math::AbsFOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "abs");
               }
               return std::nullopt;
             })
-            .Case([&](math::CeilOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::CeilOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "ceil");
               }
               return std::nullopt;
             })
-            .Case([&](math::CountLeadingZerosOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::CountLeadingZerosOp op)
+                      -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "ctlz");
               }
               return std::nullopt;
             })
-            .Case([&](math::ExpOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::ExpOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "exp");
               }
               return std::nullopt;
             })
-            .Case([&](math::FloorOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::FloorOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "floor");
               }
               return std::nullopt;
             })
-            .Case([&](math::LogOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::LogOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "log");
               }
               return std::nullopt;
             })
-            .Case([&](arith::NegFOp op) -> Optional<UnaryEmitter> {
+            .Case([&](arith::NegFOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "neg");
               }
               return std::nullopt;
             })
-            .Case([&](math::RsqrtOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::RsqrtOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "rsqrt");
               }
@@ -1155,35 +1166,6 @@ struct LinalgExtUnpackConversion
   }
 };
 
-bool isMmt4d(ArrayAttr indexingMaps) {
-  if (indexingMaps.size() != 3) return false;
-
-  auto map0 = indexingMaps[0].cast<AffineMapAttr>().getValue();
-  auto map1 = indexingMaps[1].cast<AffineMapAttr>().getValue();
-  auto map2 = indexingMaps[2].cast<AffineMapAttr>().getValue();
-
-  if (map0.getNumResults() != 4 || map1.getNumResults() != 4 ||
-      map2.getNumResults() != 4 || map0.getNumInputs() != 6 ||
-      map1.getNumInputs() != 6 || map2.getNumInputs() != 6) {
-    return false;
-  }
-
-  // Extract dimensions for MxK * KxN -> MxN
-  AffineExpr m = map2.getResult(0);
-  AffineExpr n = map2.getResult(1);
-  AffineExpr k = map0.getResult(1);
-  AffineExpr m0 = map2.getResult(2);
-  AffineExpr n0 = map2.getResult(3);
-  AffineExpr k0 = map0.getResult(3);
-
-  auto *context = indexingMaps.getContext();
-  auto mapA = AffineMapAttr::get(AffineMap::get(6, 0, {m, k, m0, k0}, context));
-  auto mapB = AffineMapAttr::get(AffineMap::get(6, 0, {n, k, n0, k0}, context));
-  auto mapC = AffineMapAttr::get(AffineMap::get(6, 0, {m, n, m0, n0}, context));
-  auto maps = ArrayAttr::get(context, {mapA, mapB, mapC});
-  return indexingMaps == maps;
-}
-
 int getNumberOfUses(Value v) {
   auto uses = v.getUses();
   return std::distance(uses.begin(), uses.end());
@@ -1226,7 +1208,7 @@ linalg::FillOp findFillOpSolelyZeroingOutputOf(linalg::LinalgOp op) {
   return nullptr;
 }
 
-/// Convert supported linalg contraction ops like matmul and mmt4d.
+/// Convert supported linalg contraction ops like matmul.
 struct LinalgContractionConversion
     : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
@@ -1300,10 +1282,6 @@ struct LinalgContractionConversion
       if (succeeded(handleConformingMatmul2D(info, rewriter))) {
         return success();
       }
-    } else if (isMmt4d(info.op.getIndexingMaps())) {
-      if (succeeded(handleConformingMmt4d(info, rewriter))) {
-        return success();
-      }
     }
 
     // Match failure.
@@ -1342,49 +1320,6 @@ struct LinalgContractionConversion
         outBuffer, outDesc.offset, outDesc.strides[0],
         // m,n,k
         m, n, k,
-        // flags
-        lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
-        outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
-    return success();
-  }
-
-  LogicalResult handleConformingMmt4d(OpInfo &info,
-                                      PatternRewriter &rewriter) const {
-    int flags = 0;
-    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
-      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
-    } else {
-      flags |= IREE_UK_FLAG_ACCUMULATE;  // accumulate into existing.
-    }
-
-    auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
-    auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
-    auto &outDesc = info.outAnal.getDesc(rewriter);
-
-    Value m = lhsDesc.sizes[0];
-    Value n = rhsDesc.sizes[0];
-    Value k = rhsDesc.sizes[1];
-    Value m0 = lhsDesc.sizes[2];
-    Value n0 = rhsDesc.sizes[2];
-    Value k0 = rhsDesc.sizes[3];
-
-    auto loc = info.op.getLoc();
-    auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
-    auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
-    auto outBuffer = outDesc.castToLinear(loc, rewriter);
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::Mmt4dOp>(
-        info.op,
-        // LHS
-        lhsBuffer, lhsDesc.offset, lhsDesc.strides[0],
-        // RHS
-        rhsBuffer, rhsDesc.offset, rhsDesc.strides[0],
-        // Out
-        outBuffer, outDesc.offset, outDesc.strides[0],
-        // m,n,k
-        m, n, k,
-        // m0,n0,k0
-        m0, n0, k0,
         // flags
         lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
         outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));

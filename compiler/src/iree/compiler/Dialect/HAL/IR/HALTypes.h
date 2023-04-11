@@ -45,17 +45,29 @@ namespace HAL {
 
 // Returns a stable identifier for the MLIR element type or nullopt if the
 // type is unsupported in the ABI.
-llvm::Optional<int32_t> getElementTypeValue(Type type);
+std::optional<int32_t> getElementTypeValue(Type type);
 
 // Returns a stable identifier for the MLIR encoding type or 0 (opaque) if the
 // type is unsupported in the ABI.
-llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr);
+std::optional<int32_t> getEncodingTypeValue(Attribute attr);
 
 template <typename T>
 inline bool allEnumBitsSet(T value, T required) {
   return (static_cast<uint32_t>(value) & static_cast<uint32_t>(required)) ==
          static_cast<uint32_t>(required);
 }
+
+//===----------------------------------------------------------------------===//
+// Alignment
+//===----------------------------------------------------------------------===//
+
+// Returns the common (minimum) alignment between |lhs| and |rhs| or nullopt if
+// either is unaligned.
+llvm::MaybeAlign commonAlignment(llvm::MaybeAlign lhs, llvm::MaybeAlign rhs);
+
+// Returns either the constant offset |value| or the alignment of the offset
+// inferred from the IR. Returns nullopt if no alignment is available.
+std::optional<uint64_t> lookupOffsetOrAlignment(Value value);
 
 //===----------------------------------------------------------------------===//
 // Object types
@@ -152,7 +164,7 @@ namespace mlir {
 
 template <>
 struct FieldParser<
-    mlir::Optional<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>> {
+    std::optional<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>> {
   static FailureOr<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp> parse(
       AsmParser &parser) {
     std::string value;
@@ -165,7 +177,7 @@ struct FieldParser<
 };
 static inline AsmPrinter &operator<<(
     AsmPrinter &printer,
-    mlir::Optional<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>
+    std::optional<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>
         param) {
   printer << (param.has_value()
                   ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
@@ -175,7 +187,7 @@ static inline AsmPrinter &operator<<(
 
 template <>
 struct FieldParser<
-    mlir::Optional<mlir::iree_compiler::IREE::HAL::DescriptorFlags>> {
+    std::optional<mlir::iree_compiler::IREE::HAL::DescriptorFlags>> {
   static FailureOr<mlir::iree_compiler::IREE::HAL::DescriptorFlags> parse(
       AsmParser &parser) {
     std::string value;
@@ -188,7 +200,7 @@ struct FieldParser<
 };
 static inline AsmPrinter &operator<<(
     AsmPrinter &printer,
-    mlir::Optional<mlir::iree_compiler::IREE::HAL::DescriptorFlags> param) {
+    std::optional<mlir::iree_compiler::IREE::HAL::DescriptorFlags> param) {
   printer << (param.has_value()
                   ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
                   : StringRef{""});

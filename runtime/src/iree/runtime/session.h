@@ -144,14 +144,15 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_append_module(
     iree_runtime_session_t* session, iree_vm_module_t* module);
 
 // Appends a bytecode module to the context loaded from the given memory blob.
-// If a |flatbuffer_allocator| is provided then it will be used to free the
-// |flatbuffer_data| when the module is destroyed and otherwise the ownership of
-// the |flatbuffer_data| remains with the caller. The data must remain valid for
-// the lifetime of the session.
-//
 // If the module exists as a file prefer instead to use
 // iree_runtime_session_append_bytecode_module_from_file to use memory mapped
 // I/O and reduce total memory consumption.
+//
+// The data must remain valid for the lifetime of the session. If a
+// |flatbuffer_allocator| is provided then it will be used to free the
+// |flatbuffer_data| when the module is destroyed. This call always consumes the
+// data and even if the module fails to load or be registered with the session
+// the |flatbuffer_allocator| will be used to release it.
 //
 // NOTE: only valid if the context is not yet frozen; see
 // iree_vm_context_freeze for more information.

@@ -187,9 +187,8 @@ static void insertConstantTableLookup(mlir::func::FuncOp funcOp,
   // TODO(benvanik): invert this loop so that we preserve argument order.
 
   // Replace the arguments with lookups into the lookup table tensors.
-  for (auto it : llvm::zip_equal(constantTable.sets, tableTensors)) {
-    auto &set = std::get<0>(it);
-    auto tableTensor = std::get<1>(it);
+  for (auto [set, tableTensor] :
+       llvm::zip_equal(constantTable.sets, tableTensors)) {
     for (auto operandValues : llvm::enumerate(set.values)) {
       unsigned operandIdx = operandValues.value().first;
       unsigned argIdx = operandToArgMap[operandIdx];
@@ -344,9 +343,11 @@ class SpecializeDispatchesPass
     DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.getEntryPoint());
-      entryDispatchMap[exportOp].push_back(dispatchOp);
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp =
+            symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+        entryDispatchMap[exportOp].push_back(dispatchOp);
+      });
     });
 
     // Optimize each dispatchable function and its dispatch sites.

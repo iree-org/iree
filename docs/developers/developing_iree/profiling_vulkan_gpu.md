@@ -48,7 +48,7 @@ In order to perform capture and analysis with AGI, you will need a full Android
 app. In IREE we have a simple Android native app wrapper to help package
 IREE core libraries together with a specific VM bytecode invocation into an
 Android app. The wrapper and its documentation are placed at
-[`tools/android/run_module_app/`](https://github.com/iree-org/iree/tree/main/tools/android/run_module_app).
+[`tools/android/run_module_app/`](https://github.com/openxla/iree/tree/main/tools/android/run_module_app).
 
 For example, to package a module compiled from the following `mhlo-dot.mlir` as
 an Android app:
@@ -72,9 +72,9 @@ $ /path/to/iree/build/tools/iree-compile -- \
 $ /path/to/iree/source/tools/android/run_module_app/build_apk.sh \
   ./build-apk \
   --device vulkan \
-  --module_file /tmp/mhlo-dot.vmfb \
-  --entry_function dot \
-  --function_input=...
+  --module /tmp/mhlo-dot.vmfb \
+  --function dot \
+  --input=...
 ```
 
 Where `/path/to/input/file` is a file containing inputs to `dot`, for example:
@@ -100,7 +100,7 @@ how to use it. In general the steps are:
 
 * Install the latest AGI from https://github.com/google/agi/releases and launch.
 * Fill in the "Application" field by searching the app. The line should read
-  like `android.intent.action.MAIN:com.google.iree.run_module/android.app.NativeActivity`.
+  like `android.intent.action.MAIN:dev.iree.run_module/android.app.NativeActivity`.
 * Select start at beginning and choose a proper duration.
 * Configure system profile to include all GPU counters.
 * Start capture.

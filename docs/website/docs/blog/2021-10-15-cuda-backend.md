@@ -1,6 +1,5 @@
-
- Friday, October 15, 2021<br>
- By Thomas Raoux
+Friday, October 15, 2021<br>
+By Thomas Raoux
 
 # CUDA Backend in IREE
 
@@ -19,7 +18,7 @@ then shares some metrics and next steps.
 
 ### HAL support
 
-IREE has a [HAL API](https://github.com/iree-org/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables)
+IREE has a [HAL API](https://github.com/openxla/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables)
 that abstract all the targets behind a common interface. The first step to
 supporting a CUDA target was to map the HAL API onto CUDA. We use the CUDA
 driver API to reduce dependencies and be closer to the hardware. The HAL API is
@@ -32,7 +31,7 @@ using CUDA streams for comparison.
 
 HAL exposes an API that can be tested independently, even if we are not able to
 create CUDA kernels yet we can test a large portion of the CUDA driver using
-[CTS tests](https://github.com/iree-org/iree/blob/main/iree/hal/cts/README.md).
+[CTS tests](https://github.com/openxla/iree/blob/main/iree/hal/cts/README.md).
 Those can be run to make sure a system has the required CUDA support.
 
  ![Compilation flow](./2021-10-15-cuda-compiler-flow.png){ align=left }
@@ -42,7 +41,8 @@ Those can be run to make sure a system has the required CUDA support.
 CUDA has an open source backend in LLVM generating PTX that we are leveraging.
 Therefore IREE can create [NVVM](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
 (CUDA LLVM variant) and use LLVM's backend to generate PTX. The CUDA driver
-will do the "last mile compilation" at runtime to convert PTX into the GPU's native ISA.
+will do the "last mile compilation" at runtime to convert PTX into the GPU's
+native ISA.
 
 IREE compiler pipeline starts from [linalg](https://mlir.llvm.org/docs/Dialects/Linalg/)
 with tensor operands. A large part of the compiler is independent of the target.
@@ -64,7 +64,7 @@ Kernels are encoded in a FlatBuffer containing the PTX code as well as the
 workgroup size to use for the dispatch. This allows serialization of the kernels
 in the IR, it is then de-serialized by the HAL layer.
 
-```
+``` tablegen
 table CUDAExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
@@ -86,7 +86,7 @@ can now successfully compile full models.
 ![Compilation diagram](./2021-10-15-cuda-bring_up.png)
 
 The steps to reproduce running a simple op end to end through CUDA backend are
-described [here](https://github.com/iree-org/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
+described [here](https://github.com/openxla/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
 
 ## Performance
 
@@ -109,7 +109,8 @@ We will then have a pass tiling the ops in the dispatch region a second time to
 distribute the work onto threads within the block.
 
 At this stage the IR looks like the following:
-```
+
+``` mlir
     %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
     %9 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref<128xf32, affine_map<(d0)[s0] -> (d0 + s0)>> to memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
@@ -140,7 +141,8 @@ load4/store4. This significantly improves the memory access pattern of the code
 generated.
 
 This convert the previous IR to:
-```
+
+``` mlir
     %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
     %9 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref<128xf32, affine_map<(d0)[s0] -> (d0 + s0)>> to memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>

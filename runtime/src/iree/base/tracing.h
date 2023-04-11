@@ -181,7 +181,7 @@
 // Flush the settings we have so far; settings after this point will be
 // overriding values set by Tracy itself.
 #if defined(TRACY_ENABLE)
-#include "third_party/tracy/public/tracy/TracyC.h"  // IWYU pragma: export
+#include "tracy/TracyC.h"  // IWYU pragma: export
 #endif
 
 // Disable callstack capture if our depth is 0; this allows us to avoid any
@@ -217,6 +217,9 @@ typedef struct ___tracy_source_location_data iree_tracing_location_t;
   (TracyCZoneCtx) { zone_id, 1 }
 #endif  // __cplusplus
 
+int64_t iree_tracing_time(void);
+int64_t iree_tracing_frequency(void);
+
 IREE_MUST_USE_RESULT iree_zone_id_t
 iree_tracing_zone_begin_impl(const iree_tracing_location_t* src_loc,
                              const char* name, size_t name_length);
@@ -226,8 +229,43 @@ IREE_MUST_USE_RESULT iree_zone_id_t iree_tracing_zone_begin_external_impl(
     size_t name_length);
 void iree_tracing_zone_end(iree_zone_id_t zone_id);
 
+// Matches GpuContextType.
+// TODO(benvanik): upstream a few more enum values for CUDA/Metal/etc.
+// The only real behavior that changes in tracy is around whether multi-threaded
+// recording is assumed and IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN is a safe
+// default choice - the context name provided during creation should be
+// descriptive enough for the user.
+typedef enum iree_tracing_gpu_context_type_e {
+  IREE_TRACING_GPU_CONTEXT_TYPE_INVALID = 0,
+  IREE_TRACING_GPU_CONTEXT_TYPE_OPENGL,
+  IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN,
+  IREE_TRACING_GPU_CONTEXT_TYPE_OPENCL,
+  IREE_TRACING_GPU_CONTEXT_TYPE_DIRECT3D12,
+  IREE_TRACING_GPU_CONTEXT_TYPE_DIRECT3D11,
+} iree_tracing_gpu_context_type_t;
+
+uint8_t iree_tracing_gpu_context_allocate(iree_tracing_gpu_context_type_t type,
+                                          const char* name, size_t name_length,
+                                          bool is_calibrated,
+                                          uint64_t cpu_timestamp,
+                                          uint64_t gpu_timestamp,
+                                          float timestamp_period);
+void iree_tracing_gpu_context_calibrate(uint8_t context_id, int64_t cpu_delta,
+                                        int64_t cpu_timestamp,
+                                        int64_t gpu_timestamp);
+void iree_tracing_gpu_zone_begin(uint8_t context_id, uint16_t query_id,
+                                 const iree_tracing_location_t* src_loc);
+void iree_tracing_gpu_zone_begin_external(
+    uint8_t context_id, uint16_t query_id, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length);
+void iree_tracing_gpu_zone_end(uint8_t context_id, uint16_t query_id);
+void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
+                                  int64_t gpu_timestamp);
+
 void iree_tracing_set_plot_type_impl(const char* name_literal,
-                                     uint8_t plot_type);
+                                     uint8_t plot_type, bool step, bool fill,
+                                     uint32_t color);
 void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value);
 void iree_tracing_plot_value_f32_impl(const char* name_literal, float value);
 void iree_tracing_plot_value_f64_impl(const char* name_literal, double value);
@@ -364,8 +402,8 @@ enum {
   IREE_RETURN_AND_EVAL_IF_ERROR(IREE_TRACE_ZONE_END(zone_id), __VA_ARGS__)
 
 // Configures the named plot with an IREE_TRACING_PLOT_TYPE_* representation.
-#define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type) \
-  iree_tracing_set_plot_type_impl(name_literal, plot_type)
+#define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type, step, fill, color) \
+  iree_tracing_set_plot_type_impl(name_literal, plot_type, step, fill, color)
 // Plots a value in the named plot group as an integer.
 #define IREE_TRACE_PLOT_VALUE_I64(name_literal, value) \
   iree_tracing_plot_value_i64_impl(name_literal, value)
@@ -439,7 +477,7 @@ enum {
 #define IREE_TRACE_ZONE_END(zone_id)
 #define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
   IREE_RETURN_IF_ERROR(__VA_ARGS__)
-#define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type)
+#define IREE_TRACE_SET_PLOT_TYPE(name_literal, plot_type, step, fill, color)
 #define IREE_TRACE_PLOT_VALUE_I64(name_literal, value)
 #define IREE_TRACE_PLOT_VALUE_F32(name_literal, value)
 #define IREE_TRACE_PLOT_VALUE_F64(name_literal, value)
@@ -503,7 +541,7 @@ enum {
 #ifdef __cplusplus
 
 #if defined(TRACY_ENABLE)
-#include "third_party/tracy/public/tracy/Tracy.hpp"  // IWYU pragma: export
+#include "tracy/Tracy.hpp"  // IWYU pragma: export
 #endif
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
