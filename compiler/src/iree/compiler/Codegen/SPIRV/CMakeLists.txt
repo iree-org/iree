@@ -60,6 +60,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRBufferizationDialect
     MLIRComplexToSPIRV
+    MLIRComplexToStandard
     MLIRControlFlowToSPIRV
     MLIRFuncDialect
     MLIRFuncToSPIRV
