@@ -32,6 +32,7 @@ iree_py_test(
 )
 
 # Mark the CUDA test as WILL_FAIL if it was defined.
+# TODO(#13007): Thread this through the test rule instead of custom logic.
 iree_package_path(PKG_PATH)
 set(CUDA_TEST_NAME ${PKG_PATH}/mnist_train_test_cuda)
 get_directory_property(TESTS_LIST TESTS)
