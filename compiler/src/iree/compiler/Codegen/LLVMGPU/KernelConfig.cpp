@@ -125,10 +125,40 @@ static void getTensorCoreConfig(
     }
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
-    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+    // if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+    //   tileSizes.push_back(
+    //       TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
+    // }
+
+    // Tuned sizes
+    if (M > 1024 && N > 1024 && K > 1024) {  // All large shapes
       tileSizes.push_back(
-          TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
+          TileWorkgroupSizePair({{128, 128, 64}, {128, 1, 1}, 2}));
     }
+
+    if (M > 128 && N < 128 && K > 128) {  // Small N
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{256, 64, 32}, {64, 2, 1}, 2}));
+    }
+
+    if (M > 128 && N / M > 2 && K / M > 2) {  // Big N compared to N
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{64, 128, 32}, {128, 1, 1}, 2}));
+    }
+
+    // Applied to a weird shape... maybe move down?
+    tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 16}, {64, 1, 1}, 2}));
+
+    if (M <= K && N <= K) {  // Bigger K???
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{32, 64, 32}, {128, 1, 1}, 4}));
+    }
+
+    tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 32}, {32, 4, 1}, 2}));
+
+    tileSizes.push_back(TileWorkgroupSizePair({{64, 64, 32}, {64, 1, 1}, 2}));
+
+    // Original sizes
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
