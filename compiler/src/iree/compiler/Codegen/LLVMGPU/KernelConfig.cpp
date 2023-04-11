@@ -108,13 +108,14 @@ static FailureOr<StringRef> returnCtype(Type type) {
 
 static LogicalResult findMicrokernel(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, linalg::LinalgOp op) {
-  if (clGPUEnableMicroKernel) return failure();
+  if (!clGPUEnableMicroKernel) return failure();
 
   auto elementTypeA = returnCtype(op.getDpsInputOperand(0)->get().getType());
   auto elementTypeB = returnCtype(op.getDpsInputOperand(1)->get().getType());
   auto elementTypeC = returnCtype(op.getDpsInitOperand(0)->get().getType());
   if (failed(elementTypeA) || failed(elementTypeB) || failed(elementTypeC))
     return failure();
+
   if (existuCUDAKernel(tileSizes[0].tileSize[0], tileSizes[0].tileSize[1],
                        tileSizes[0].tileSize[2], tileSizes[0].pipelineDepth,
                        elementTypeA->str(), elementTypeB->str(),
@@ -168,15 +169,18 @@ static void getTensorCoreConfig(
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
-      if (clGPUShmemSizeKb >= 64 || clGPUShmemSizeKb < 164) {
-        tileSizes.push_back(
-            TileWorkgroupSizePair({{128, 128, 32}, {128, 1, 1}, 2}));
-      } else if (clGPUShmemSizeKb >= 131) {
+      if (clGPUShmemSizeKb >= 131) {
         tileSizes.push_back(
             TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
-      } else if (clGPUShmemSizeKb <= 48) {
+      } else if (clGPUShmemSizeKb >= 64) {
+        tileSizes.push_back(
+            TileWorkgroupSizePair({{128, 128, 32}, {128, 1, 1}, 2}));
+      } else if (clGPUShmemSizeKb >= 48) {
         tileSizes.push_back(
             TileWorkgroupSizePair({{64, 64, 32}, {32, 1, 1}, 2}));
+      } else {
+        llvm::errs() << "Cannot select tile size, shared size is set to "
+                     << clGPUShmemSizeKb << "kb that is incorrect\n";
       }
     }
 
@@ -315,17 +319,29 @@ static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
   }
 
   LLVM_DEBUG({
-    auto elementTypeA = op.getDpsInputOperand(0)->get().getType();
-    auto elementTypeB = op.getDpsInputOperand(1)->get().getType();
-    auto elementTypeC = op.getDpsInitOperand(0)->get().getType();
+    auto elementTypeA = op.getDpsInputOperand(0)
+                            ->get()
+                            .getType()
+                            .cast<TensorType>()
+                            .getElementType();
+    auto elementTypeB = op.getDpsInputOperand(1)
+                            ->get()
+                            .getType()
+                            .cast<TensorType>()
+                            .getElementType();
+    auto elementTypeC = op.getDpsInitOperand(0)
+                            ->get()
+                            .getType()
+                            .cast<TensorType>()
+                            .getElementType();
     auto pipelineName =
         IREE::Codegen::stringifyDispatchLoweringPassPipeline(codegenPipeline);
+    auto tile = tileSizes.front();
     llvm::dbgs() << "GEMM (A = " << elementTypeA << ", B = " << elementTypeB
                  << ", C = " << elementTypeC << ") " << M << "x" << N << "x"
-                 << K << " -> ";
-    llvm::dbgs() << "Using [" << pipelineName << "] Codegen Pipeline";
-    auto tile = tileSizes.front();
-    llvm::dbgs() << " Tile Sizes = " << tile.tileSize[0] << "x"
+                 << K << " -> "
+                 << "Using [" << pipelineName << "] Codegen Pipeline"
+                 << " Tile Sizes = " << tile.tileSize[0] << "x"
                  << tile.tileSize[1] << "x" << tile.tileSize[2]
                  << ", Stages = " << tile.pipelineDepth
                  << ", CTA Size = ( x = " << tile.workgroupSize[0]
