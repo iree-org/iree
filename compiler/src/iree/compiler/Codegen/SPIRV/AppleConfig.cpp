@@ -50,10 +50,8 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
   }
 
   if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
-    if (rootOp->getResult(0).getType().cast<ShapedType>().getRank() == 4) {
-      return setConvOpConfig(rootOp, subgroupSize,
-                             /*bestTilingFactor=*/16);
-    }
+    return setConvOpConfig(rootOp, subgroupSize,
+                           /*bestTilingFactor=*/16);
   }
 
   return failure();

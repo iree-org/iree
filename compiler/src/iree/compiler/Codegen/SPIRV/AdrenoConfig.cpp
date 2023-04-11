@@ -50,12 +50,10 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
   }
 
   if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
-    if (rootOp->getResult(0).getType().cast<ShapedType>().getRank() == 4) {
-      linalg::detail::ConvolutionDimensions convDims;
-      linalg::detail::isConvolutionInterfaceImpl(rootOp, &convDims);
-      const int bestTilingFactor = convDims.depth.empty() ? 32 : 16;
-      return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
-    }
+    linalg::detail::ConvolutionDimensions convDims;
+    linalg::detail::isConvolutionInterfaceImpl(rootOp, &convDims);
+    const int bestTilingFactor = convDims.depth.empty() ? 32 : 16;
+    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
   }
 
   return failure();

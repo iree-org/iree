@@ -168,9 +168,14 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     return failure();
   }
 
+  Type inputType = linalgOp.getDpsInputOperand(0)->get().getType();
+  ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
   ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
-  if (outputShape.size() != 4) return failure();  // Only 2-D conv for now
+  // Restrict to pure 4-D input/output shapes for now. This excludes convolution
+  // ops with 1- or 3-D window sizes. It also excludes 2-D-window convolution
+  // ops like `linalg.depthwise_conv_2d_nhwc_hwcm`.
+  if (inputShape.size() != 4 || outputShape.size() != 4) return failure();
 
   linalg::detail::ConvolutionDimensions convDims;
   linalg::detail::isConvolutionInterfaceImpl(linalgOp, &convDims);
@@ -1444,21 +1449,15 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         return setDefaultOpConfig(limits, op);
       })
       .Case<linalg::ConvolutionOpInterface>([limits](auto op) {
-        Type outputType = op->getResult(0).getType();
-        if (outputType.template cast<ShapedType>().getRank() == 4) {
-          // Try to tile and vectorize first. It's common to see 32 threads
-          // per subgroup for GPUs.
-          auto result = detail::setConvOpConfig(cast<linalg::LinalgOp>(*op),
-                                                /*subgroupSize=*/32,
-                                                /*bestTilingFactor=*/32);
-          if (succeeded(result)) return success();
+        // Try to tile and vectorize first. It's common to see 32 threads
+        // per subgroup for GPUs.
+        auto result = detail::setConvOpConfig(cast<linalg::LinalgOp>(*op),
+                                              /*subgroupSize=*/32,
+                                              /*bestTilingFactor=*/32);
+        if (succeeded(result)) return success();
 
-          // If unsuccessful, try to tile and distribute.
-          return setDefaultOpConfig(limits, op);
-        }
-
-        // Other convolution/pooling op vectorization is not wired up.
-        return setDefaultOpConfig(limits, op, /*allowVectorization=*/false);
+        // If unsuccessful, try to tile and distribute/vectorize.
+        return setDefaultOpConfig(limits, op);
       })
       .Case<linalg::GenericOp>([&](linalg::GenericOp op) {
         LLVM_DEBUG(llvm::dbgs() << "figuring configuration for generic op\n");
