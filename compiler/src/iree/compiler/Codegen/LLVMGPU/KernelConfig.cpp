@@ -24,6 +24,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 
 #define DEBUG_TYPE "iree-codegen-llvmgpu-kernelconfig"
 
@@ -40,11 +41,11 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
 
-llvm::cl::opt<bool> clGPUHas48KShmem(
-    "iree-codegen-llvmgpu-48k-shmem",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(false));
+llvm::cl::opt<int> clGPUShmemSizeKb(
+    "iree-codegen-llvmgpu-shmem-size-kb",
+    llvm::cl::desc("Set the size of the shared memory of the GPU. The default "
+                   "is 164kb, the same size as the A100 GPU."),
+    llvm::cl::init(164));
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
@@ -104,6 +105,30 @@ static FailureOr<StringRef> returnCtype(Type type) {
   }
   return failure();
 }
+
+static LogicalResult findMicrokernel(
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, linalg::LinalgOp op) {
+  if (clGPUEnableMicroKernel) return failure();
+
+  auto elementTypeA = returnCtype(op.getDpsInputOperand(0)->get().getType());
+  auto elementTypeB = returnCtype(op.getDpsInputOperand(1)->get().getType());
+  auto elementTypeC = returnCtype(op.getDpsInitOperand(0)->get().getType());
+  if (failed(elementTypeA) || failed(elementTypeB) || failed(elementTypeC))
+    return failure();
+  if (existuCUDAKernel(tileSizes[0].tileSize[0], tileSizes[0].tileSize[1],
+                       tileSizes[0].tileSize[2], tileSizes[0].pipelineDepth,
+                       elementTypeA->str(), elementTypeB->str(),
+                       elementTypeC->str())) {
+    return success();
+  }
+
+  llvm::errs() << "Requested microkernel does not exist, maybe forget to "
+                  "pre-compile it. Add a contract in uGPUContracts struct in "
+                  "uGPUContract.h";
+
+  return failure();
+}
+
 }  // namespace
 
 /// Return the best combination of tile size and wg size. It will then used to
@@ -143,12 +168,15 @@ static void getTensorCoreConfig(
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
-      if (clGPUHas48KShmem) {
+      if (clGPUShmemSizeKb >= 64 || clGPUShmemSizeKb < 164) {
         tileSizes.push_back(
-            TileWorkgroupSizePair({{64, 64, 32}, {32, 1, 1}, 3}));
-      } else {
+            TileWorkgroupSizePair({{128, 128, 32}, {128, 1, 1}, 2}));
+      } else if (clGPUShmemSizeKb >= 131) {
         tileSizes.push_back(
             TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
+      } else if (clGPUShmemSizeKb <= 48) {
+        tileSizes.push_back(
+            TileWorkgroupSizePair({{64, 64, 32}, {32, 1, 1}, 2}));
       }
     }
 
@@ -260,18 +288,10 @@ static void makeDimYPrimaryWarp(
 static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isF16,
     linalg::LinalgOp op, int64_t M, int64_t N, int64_t K) {
-  auto elementTypeA = returnCtype(op.getDpsInputOperand(0)->get().getType());
-  auto elementTypeB = returnCtype(op.getDpsInputOperand(1)->get().getType());
-  auto elementTypeC = returnCtype(op.getDpsInitOperand(0)->get().getType());
   IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline;
   // If microkernel flag is enabled, add the tile sizes of the available
   // microkernels. If there is none, bail out and use iree codegen
-  if (clGPUEnableMicroKernel && succeeded(elementTypeA) &&
-      succeeded(elementTypeB) && succeeded(elementTypeC) &&
-      existuCUDAKernel(tileSizes[0].tileSize[0], tileSizes[0].tileSize[1],
-                       tileSizes[0].tileSize[2], tileSizes[0].pipelineDepth,
-                       elementTypeA->str(), elementTypeB->str(),
-                       elementTypeC->str())) {
+  if (succeeded(findMicrokernel(tileSizes, op))) {
     codegenPipeline =
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMicroKernel;
     makeDimYPrimaryWarp(tileSizes);
@@ -295,10 +315,14 @@ static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
   }
 
   LLVM_DEBUG({
+    auto elementTypeA = op.getDpsInputOperand(0)->get().getType();
+    auto elementTypeB = op.getDpsInputOperand(1)->get().getType();
+    auto elementTypeC = op.getDpsInitOperand(0)->get().getType();
     auto pipelineName =
         IREE::Codegen::stringifyDispatchLoweringPassPipeline(codegenPipeline);
-    llvm::dbgs() << "GEMM (A, B = " << elementTypeA << ", C = " << elementTypeC
-                 << ") " << M << "x" << N << "x" << K << " -> ";
+    llvm::dbgs() << "GEMM (A = " << elementTypeA << ", B = " << elementTypeB
+                 << ", C = " << elementTypeC << ") " << M << "x" << N << "x"
+                 << K << " -> ";
     llvm::dbgs() << "Using [" << pipelineName << "] Codegen Pipeline";
     auto tile = tileSizes.front();
     llvm::dbgs() << " Tile Sizes = " << tile.tileSize[0] << "x"
