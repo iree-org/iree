@@ -359,7 +359,7 @@ class ref {
 // Usage:
 //   ref<MyType> a = make_ref<MyType>(...);
 template <typename T, typename... Args>
-inline ref<T> make_ref(Args... args) {
+inline ref<T> make_ref(Args&&... args) {
   return ref<T>(new T(std::forward<Args>(args)...));
 }
 
