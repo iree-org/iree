@@ -49,12 +49,12 @@ recommend the [Ninja](https://ninja-build.org/) CMake generator and the
     3. Install Ninja from the [official site](https://ninja-build.org/)
 
     !!! note
-        You will need to initialize MSVC by running `vcvarsall.bat` to use it
-        from the command line. See the
+        Initialize MSVC by running `vcvarsall.bat` to build on the command line.
+        See the
         [official documentation](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line)
         for details.
 
-<!-- TODO(scotttodd): add notes about Docker and/or dev containers  -->
+<!-- TODO(#12921): add notes about Docker and/or dev containers  -->
 
 ## Quickstart: clone and build
 
@@ -79,7 +79,8 @@ cmake --build ../iree-build/
 
 !!! Caution "Caution - slow builds"
     The compiler build is complex. You will want a powerful machine and to tune
-    the settings following the next section.
+    the settings following the next section. In 2023, we've seen builds take
+    around 5-10 minutes on 64-core Linux machines.
 
     Use case permitting, disabling the compiler build with
     `-DIREE_BUILD_COMPILER=OFF` will drastically simplify the build.
@@ -89,7 +90,7 @@ cmake --build ../iree-build/
 The configure step should be customized for your build environment. These
 settings can improve compile and link times substantially.
 
-<!-- TODO(scotttodd): add notes about CMake presets?  -->
+<!-- TODO(#5804): add notes about CMake presets?  -->
 
 === "Linux"
 
@@ -98,6 +99,8 @@ settings can improve compile and link times substantially.
     cmake -G Ninja -B ../iree-build/ -S . \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DIREE_ENABLE_ASSERTIONS=ON \
+        -DIREE_ENABLE_SPLIT_DWARF=ON \
+        -DIREE_ENABLE_THIN_ARCHIVES=ON \
         -DCMAKE_C_COMPILER=clang \
         -DCMAKE_CXX_COMPILER=clang++ \
         -DIREE_ENABLE_LLD=ON
@@ -110,6 +113,8 @@ settings can improve compile and link times substantially.
     cmake -G Ninja -B ../iree-build/ -S . \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DIREE_ENABLE_ASSERTIONS=ON \
+        -DIREE_ENABLE_SPLIT_DWARF=ON \
+        -DIREE_ENABLE_THIN_ARCHIVES=ON \
         -DCMAKE_C_COMPILER=clang \
         -DCMAKE_CXX_COMPILER=clang++ \
         -DIREE_ENABLE_LLD=ON
