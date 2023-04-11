@@ -161,6 +161,13 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   assert(isa<linalg::ConvolutionOpInterface>(*linalgOp));
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as convolution...\n");
 
+  if (isa<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+          linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+          linalg::PoolingNhwcMinUnsignedOp>(*linalgOp)) {
+    // TODO(antiagainst): Enable configuration for pooling op.
+    return failure();
+  }
+
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
   ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
   if (outputShape.size() != 4) return failure();  // Only 2-D conv for now
