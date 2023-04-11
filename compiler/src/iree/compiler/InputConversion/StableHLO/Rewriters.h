@@ -17,6 +17,17 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
                                                  RewritePatternSet* patterns,
                                                  bool enablePrimitiveOps);
 
+//===----------------------------------------------------------------------===//
+// Fine-grained patterns used by the implementation.
+//===----------------------------------------------------------------------===//
+namespace detail {
+/// Populates the patterns that convert from StableHLO to Linalg on tensors.
+void populatePointwiseStableHloToLinalgConversionPatterns(
+    MLIRContext* context, TypeConverter& typeConverter,
+    RewritePatternSet* patterns, bool enablePrimitiveOps);
+
+}  // namespace detail
+
 }  // namespace mlir::iree_compiler::stablehlo
 
 #endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_REWRITERS_H_

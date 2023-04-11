@@ -49,6 +49,7 @@ iree_compiler_cc_library(
         "LegalizeToLinalgUtils.cpp",
         "Passes.cpp",
         "StableHLOToLinalg.cpp",
+        "StableHLOToLinalgPointwise.cpp",
         "TypeConversion.cpp",
     ],
     hdrs = [

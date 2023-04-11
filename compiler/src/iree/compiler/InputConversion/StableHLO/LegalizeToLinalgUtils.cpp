@@ -81,6 +81,13 @@ Value getEmptyTensorFor(OpBuilder& b, Location loc, ShapedType resultType,
                   : getEmptyTensor(b, loc, resultType, sizes);
 }
 
+Value coerceTensorShape(OpBuilder& builder, Location loc,
+                        TypedValue<ShapedType> value, ShapedType targetType) {
+  return builder.createOrFold<tensor::CastOp>(
+      loc, targetType.cloneWith(std::nullopt, value.getType().getElementType()),
+      value);
+}
+
 Value preSparsify(Operation* op, llvm::SmallVector<Value, 2>& values, Type rtp,
                   OpBuilder* b) {
   // Apply for semi-ring operations that lower to elaborate code
