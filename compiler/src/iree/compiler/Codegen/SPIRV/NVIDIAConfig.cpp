@@ -91,10 +91,7 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setNVIDIAMatmulConfig(linalgOp, targetEnv);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [&](auto op) { return setNVIDIAMatmulConfig(op, targetEnv); })
-      .Default([](Operation *) { return failure(); });
+  return failure();
 }
 
 }  // namespace detail

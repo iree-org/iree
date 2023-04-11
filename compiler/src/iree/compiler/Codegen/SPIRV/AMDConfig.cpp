@@ -81,23 +81,16 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAMDMatmulConfig(linalgOp, targetEnv);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [targetEnv](auto op) { return setAMDMatmulConfig(op, targetEnv); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            bool hasPaddedInput =
-                op.image().template getDefiningOp<tensor::PadOp>();
-            int bestTilingFactor = hasPaddedInput ? 16 : 32;
-            return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        bool hasPaddedInput =
-            op.image().template getDefiningOp<tensor::PadOp>();
-        int bestTilingFactor = hasPaddedInput ? 16 : 32;
-        return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-      })
-      .Default([](Operation *) { return failure(); });
+  if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
+    if (rootOp->getResult(0).getType().cast<ShapedType>().getRank() == 4) {
+      bool hasPaddedInput =
+          rootOp->getOperand(0).template getDefiningOp<tensor::PadOp>();
+      int bestTilingFactor = hasPaddedInput ? 16 : 32;
+      return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+    }
+  }
+
+  return failure();
 }
 
 }  // namespace detail

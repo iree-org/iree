@@ -160,11 +160,13 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns,
   auto filter =
       IREE::LinalgExt::LinalgTransformationFilter({marker}, std::nullopt);
 
-  TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNchwFchwOp,
-                 linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
-                 linalg::GenericOp, linalg::MatmulOp>::insert(patterns,
-                                                              tilingOptions,
-                                                              filter);
+  TilingPatterns<linalg::BatchMatmulOp, linalg::GenericOp,
+                 linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
+  filter.addFilter([](Operation *op) {
+    return success(isa<linalg::ConvolutionOpInterface>(op));
+  });
+  patterns.add<IREE::LinalgExt::LinalgTilingPattern>(context, tilingOptions,
+                                                     filter);
 }
 
 /// Tiles reduction dimensions.
