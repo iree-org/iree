@@ -18,9 +18,9 @@ DRY_RUN="${DRY_RUN:-0}"
 TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
 GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-01-30-1675109292}"
-GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-100}"
+GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-1000}"
 CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-01-30-1675109033}"
-CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-100}"
+CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-1000}"
 
 PROD_TEMPLATE_CONFIG_REPO="${PROD_TEMPLATE_CONFIG_REPO:-openxla/iree}"
 GITHUB_RUNNER_SCOPE="${GITHUB_RUNNER_SCOPE:-openxla}"
@@ -81,9 +81,7 @@ declare -a common_args=(
   # Matches firewall rule for health check traffic
   --tags="allow-health-checks"
   --provisioning-model=STANDARD
-  # The instance group manager handles this for us and this is necessary to
-  # achieve better local SSD performance:
-  # https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable-automatic-restart
+  # The instance group manager handles this for us
   --no-restart-on-failure
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
@@ -133,21 +131,19 @@ function create_template() {
       --machine-type=a2-highgpu-1g
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
-      # See comment in build_tools/github_actions/runner/config/setup.sh
-      --local-ssd=interface=NVME
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-ssd"
     )
   elif [[ "${type}" == cpu ]]; then
     cmd+=(
       --machine-type=n1-standard-96
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-ssd"
     )
   elif [[ "${type}" == c2s16 ]]; then
     cmd+=(
       --machine-type=c2-standard-16
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-ssd"
     )
   else
     echo "Got unrecognized type '${type}'" >2
