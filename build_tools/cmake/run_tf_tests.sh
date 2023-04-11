@@ -16,6 +16,7 @@ IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-0}"
 IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 
 source "${BUILD_DIR}/.env" && export PYTHONPATH
+source build_tools/cmake/setup_local_python.sh
 
 echo "***** Running TensorFlow integration tests *****"
 # TODO: Use "--timeout 900" instead of --max-time below. Requires that

@@ -29,6 +29,7 @@ IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
 
 source build_tools/cmake/setup_build.sh
+source build_tools/cmake/setup_local_python.sh
 
 echo "Configuring to build e2e test artifacts"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
@@ -40,8 +41,7 @@ echo "Configuring to build e2e test artifacts"
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
   -DIREE_BUILD_TESTS=OFF \
-  -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite" \
-  -DIREE_IMPORT_TF_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tf"
+  -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite"
 
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
