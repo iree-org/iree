@@ -181,7 +181,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   }
 
   if (loweringConfig.getTileSizes().size() !=
-      static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
+      static_cast<unsigned>(TilingLevel::NumTileLevels)) {
     return op->emitOpError("expected three tiling sizes, got ")
            << loweringConfig.getTileSizes().size();
   }
@@ -197,7 +197,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
 
     SmallVector<int64_t> secondLevelTileSizes = loweringConfig.getTileSizeVals(
-        static_cast<unsigned>(StrategyTilingLevel::ParallelTiles));
+        static_cast<unsigned>(TilingLevel::ParallelTiles));
     for (auto [index, tileSize] : llvm::enumerate(secondLevelTileSizes)) {
       if (tileSize != 0 && !pLoopsSet.contains(index)) {
         return op->emitOpError(
@@ -208,7 +208,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
 
     SmallVector<int64_t> thirdLevelTileSizes = loweringConfig.getTileSizeVals(
-        static_cast<unsigned>(StrategyTilingLevel::ReductionTiles));
+        static_cast<unsigned>(TilingLevel::ReductionTiles));
     for (auto [index, tileSize] : llvm::enumerate(thirdLevelTileSizes)) {
       if (tileSize != 0 && pLoopsSet.contains(index)) {
         return op->emitOpError(
@@ -248,7 +248,7 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
   if (loweringConfig.getTileSizes().size() !=
-      static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
+      static_cast<unsigned>(TilingLevel::NumTileLevels)) {
     return op->emitOpError("expected three tiling sizes, got ")
            << loweringConfig.getTileSizes().size();
   }
@@ -323,8 +323,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
   // Skip tiling reduction loops because this is expected to apply on copy ops
   // only.
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ParallelTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   {
     LLVMCPUVectorizationPassOptions options;
@@ -355,11 +355,11 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
+      static_cast<int64_t>(TilingLevel::ParallelTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ParallelDims));
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(StrategyTilingLevel::ReductionTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ReductionDims));
 
@@ -497,15 +497,15 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   // along reduction dim again, which needs them to be Linalg ops form.
 
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
+      static_cast<int64_t>(TilingLevel::ParallelTiles)));
   if (clEnablePadConsumerFusion) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createFuseTensorPadWithConsumerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
         createConcretizePadResultShapePass());
   }
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(StrategyTilingLevel::ReductionTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposeConvolutionToLowerDimOpsPass());
 
@@ -551,9 +551,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(StrategyTilingLevel::ReductionTiles)));
+      static_cast<int64_t>(TilingLevel::ParallelTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
 
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
