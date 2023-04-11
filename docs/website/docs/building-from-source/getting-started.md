@@ -225,14 +225,11 @@ export IREE_VULKAN_DISABLE=1
 ### Running samples
 
 ``` shell
-# Build the 'install' target to collect all executables in one directory
-cmake --build ../iree-build/ --target install
-
-# List that directory's contents
-ls ../iree-build/install/bin/
+# Build
+cmake --build ../iree-build/
 
 # Run a standalone sample application
-../iree-build/install/bin/hello_world_embedded
+../iree-build/runtime/src/iree/runtime/demo/hello_world_embedded
 # 4xf32=1 1.1 1.2 1.3
 #  *
 # 4xf32=10 100 1000 10000
@@ -240,6 +237,7 @@ ls ../iree-build/install/bin/
 # 4xf32=10 110 1200 13000
 
 # Try out the developer tools
-../iree-build/install/bin/iree-compile --help
-../iree-build/install/bin/iree-run-module --help
+ls ../iree-build/tools/
+../iree-build/tools/iree-compile --help
+../iree-build/tools/iree-run-module --help
 ```
