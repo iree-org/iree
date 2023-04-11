@@ -32,8 +32,9 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
       "driver=cuda"
   )
 
-  # Mark the CUDA test as WILL_FAIL if it was defined.
-  # TODO(#13007): Thread this through the test rule instead of custom logic.
+  # The test fails on CUDA with `Mismatched elements: 1 / 100352 (0.000996%)`,
+  # so mark as WILL_FAIL if the test was defined.
+  # TODO(#13007): Plumb WILL_FAIL through the test rule instead of custom logic.
   iree_package_path(PKG_PATH)
   set(CUDA_TEST_NAME ${PKG_PATH}/mnist_train_test_cuda)
   get_directory_property(TESTS_LIST TESTS)
