@@ -71,6 +71,8 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithTransforms",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:ComplexToSPIRV",
+        "@llvm-project//mlir:ComplexToStandard",
         "@llvm-project//mlir:ControlFlowToSPIRV",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",

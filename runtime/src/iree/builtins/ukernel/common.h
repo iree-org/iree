@@ -258,18 +258,31 @@ IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint16_t) == 2);
 IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint32_t) == 4);
 IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint64_t) == 8);
 
-#define IREE_UK_INT8_MIN (-127i8 - 1)
-#define IREE_UK_INT16_MIN (-32767 - 1)
-#define IREE_UK_INT32_MIN (-2147483647 - 1)
-#define IREE_UK_INT64_MIN (-9223372036854775807LL - 1)
-#define IREE_UK_INT8_MAX 127i8
-#define IREE_UK_INT16_MAX 32767
-#define IREE_UK_INT32_MAX 2147483647
-#define IREE_UK_INT64_MAX 9223372036854775807LL
+#define IREE_UK_INT8_MIN -0x80
+#define IREE_UK_INT16_MIN -0x8000
+#define IREE_UK_INT32_MIN -0x80000000
+#define IREE_UK_INT64_MIN -0x8000000000000000LL
+#define IREE_UK_INT8_MAX 0x7f
+#define IREE_UK_INT16_MAX 0x7fff
+#define IREE_UK_INT32_MAX 0x7fffffff
+#define IREE_UK_INT64_MAX 0x7fffffffffffffffLL
 #define IREE_UK_UINT8_MAX 0xff
 #define IREE_UK_UINT16_MAX 0xffff
 #define IREE_UK_UINT32_MAX 0xffffffffU
 #define IREE_UK_UINT64_MAX 0xffffffffffffffffULL
+
+IREE_UK_STATIC_ASSERT(IREE_UK_INT8_MIN == -(1 << 7));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT16_MIN == -(1 << 15));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT32_MIN == -(1U << 31));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT64_MIN == -(1ULL << 63));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT8_MAX == (1 << 7) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT16_MAX == (1 << 15) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT32_MAX == (1U << 31) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT64_MAX == (1ULL << 63) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT8_MAX == ((iree_uk_uint8_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT16_MAX == ((iree_uk_uint16_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT32_MAX == ((iree_uk_uint32_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT64_MAX == ((iree_uk_uint64_t)-1));
 
 // Helper for microkernel input validation
 #define IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(VALUE, BIT_COUNT) \
@@ -297,12 +310,20 @@ static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
   *b = t;
 }
 
+static inline iree_uk_ssize_t iree_uk_ssize_min(iree_uk_ssize_t a,
+                                                iree_uk_ssize_t b) {
+  return a <= b ? a : b;
+}
+
+static inline iree_uk_ssize_t iree_uk_ssize_max(iree_uk_ssize_t a,
+                                                iree_uk_ssize_t b) {
+  return a >= b ? a : b;
+}
+
 static inline iree_uk_ssize_t iree_uk_ssize_clamp(iree_uk_ssize_t val,
                                                   iree_uk_ssize_t min,
                                                   iree_uk_ssize_t max) {
-  if (val < min) val = min;
-  if (val > max) val = max;
-  return val;
+  return iree_uk_ssize_min(max, iree_uk_ssize_max(min, val));
 }
 
 //===----------------------------------------------------------------------===//
