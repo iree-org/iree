@@ -799,6 +799,62 @@ void transform_dialect::ForallToWorkgroupOp::getEffects(
 }
 
 //===---------------------------------------------------------------------===//
+// LowerSingleThreadedWorkgroupCountRegionOp
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::LowerSingleThreadedWorkgroupCountRegionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::LowerSingleThreadedWorkgroupCountRegionOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  if (targetOps.empty()) {
+    return DiagnosedSilenceableFailure::success();
+  }
+  if (targetOps.size() != 1) {
+    return mlir::emitDefiniteFailure(
+               state.getTopLevel(),
+               "expected single target op in payload, got: ")
+           << targetOps.size();
+  }
+  auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (failed(exportOp)) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "couldn't find export op for func");
+  }
+
+  Region &r = exportOp.value().getWorkgroupCount();
+  if (!r.hasOneBlock()) {
+    return mlir::emitDefiniteFailure(exportOp.value(),
+                                     "expected export op to have a workgroup "
+                                     "count region with a single block");
+  }
+  auto workgroupCountOps =
+      r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
+  if (!llvm::hasSingleElement(workgroupCountOps)) {
+    return mlir::emitDefiniteFailure(
+        exportOp.value(),
+        "expected region to have a single "
+        "flow.dispatch.workgroup_count_from_dag_root op");
+  }
+
+  IRRewriter rewriter(getContext());
+  auto workgroupCountOp = *workgroupCountOps.begin();
+  rewriter.setInsertionPoint(workgroupCountOp);
+  auto loc = workgroupCountOp.getLoc();
+  Value c1 = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  SmallVector<Value> replacements(workgroupCountOp.getNumResults(), c1);
+  rewriter.replaceOp(workgroupCountOp, replacements);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
 // TileToForallAndWorkgroupCountRegionOp
 //===---------------------------------------------------------------------===//
 

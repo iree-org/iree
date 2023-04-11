@@ -462,6 +462,28 @@ def ShareForallOperandsOp : Op<
   }];
 }
 
+def LowerSingleThreadedWorkgroupCountRegionOp :
+    Op<Transform_Dialect, "iree.lower_single_threaded_workgroup_count_region_op",
+      [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       TransformOpInterface]> {
+  let description = [{
+    Lowers the `workgroup_count` region of the export op to corresponding to the
+    parent `func.func` of the target to return the number of workgroups.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let assemblyFormat = [{
+    $target attr-dict
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def TileToForallAndWorkgroupCountRegionOp :
     Op<Transform_Dialect, "iree.tile_to_forall_and_workgroup_count_region",
       [AttrSizedOperandSegments,
