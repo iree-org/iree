@@ -506,6 +506,10 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
         command_buffer->push_constant[i];
   }
 
+  printf("<<< (%d,%d,%d), (%d,%d,%d), shmem=%d >>>\n", workgroup_x, workgroup_y,
+         workgroup_z, kernel_params.block_size[0], kernel_params.block_size[1],
+         kernel_params.block_size[2], kernel_params.shared_memory_size);
+
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
       cuLaunchKernel(kernel_params.function, workgroup_x, workgroup_y,

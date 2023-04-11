@@ -119,7 +119,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
                                   entry_name);
         break;
       }
-
+      printf("Setting shmem, `%s` = %dkb ", entry_name, shared_memory_sizes[i]);
       int32_t max_shared_mem = 0;
       status = CU_RESULT_TO_STATUS(
           context->syms,
