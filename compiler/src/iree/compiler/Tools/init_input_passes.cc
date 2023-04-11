@@ -10,6 +10,7 @@
 
 #ifdef IREE_HAVE_MHLO_INPUT
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/StableHLO/Passes.h"
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
@@ -28,6 +29,7 @@ void registerInputPasses() {
 
 #ifdef IREE_HAVE_MHLO_INPUT
   MHLO::registerMHLOConversionPasses();
+  stablehlo::registerStableHLOConversionPasses();
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
   TMTensor::registerTMTensorConversionPasses();

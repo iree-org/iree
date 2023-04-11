@@ -8,6 +8,7 @@
 set(IREE_INPUT_DEPS "")
 if(IREE_INPUT_MHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
 endif()
 if(IREE_INPUT_TORCH)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
