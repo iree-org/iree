@@ -715,18 +715,45 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#clone-and-build" class="md-nav__link">
-    Clone and build
+  <a href="#quickstart-clone-and-build" class="md-nav__link">
+    Quickstart: clone and build
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    What's next?
+  <a href="#configuration-settings" class="md-nav__link">
+    Configuration settings
   </a>
   
-    <nav class="md-nav" aria-label="What's next?">
+    <nav class="md-nav" aria-label="Configuration settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-components" class="md-nav__link">
+    Optional components
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extensions-and-project-integrations" class="md-nav__link">
+    Extensions and project integrations
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests-and-samples" class="md-nav__link">
+    Tests and samples
+  </a>
+  
+    <nav class="md-nav" aria-label="Tests and samples">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -737,8 +764,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#take-a-look-around" class="md-nav__link">
-    Take a look around
+  <a href="#running-samples" class="md-nav__link">
+    Running samples
   </a>
   
 </li>
@@ -1216,18 +1243,45 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#clone-and-build" class="md-nav__link">
-    Clone and build
+  <a href="#quickstart-clone-and-build" class="md-nav__link">
+    Quickstart: clone and build
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    What's next?
+  <a href="#configuration-settings" class="md-nav__link">
+    Configuration settings
   </a>
   
-    <nav class="md-nav" aria-label="What's next?">
+    <nav class="md-nav" aria-label="Configuration settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-components" class="md-nav__link">
+    Optional components
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extensions-and-project-integrations" class="md-nav__link">
+    Extensions and project integrations
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests-and-samples" class="md-nav__link">
+    Tests and samples
+  </a>
+  
+    <nav class="md-nav" aria-label="Tests and samples">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1238,8 +1292,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#take-a-look-around" class="md-nav__link">
-    Take a look around
+  <a href="#running-samples" class="md-nav__link">
+    Running samples
   </a>
   
 </li>
@@ -1269,17 +1323,14 @@
 
 <h1 id="getting-started">Getting started<a class="headerlink" href="#getting-started" title="Permanent link">link</a></h1>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>You will need to install <a href="https://cmake.org/">CMake</a>, the
-<a href="https://ninja-build.org/">Ninja</a> CMake generator, and the clang or MSVC C/C++
-compilers. The tests also requires <a href="https://www.python.org/">Python3</a> and the
-python package <a href="https://requests.readthedocs.io/en/latest/">requests</a> to run.</p>
-<details class="note" open="open">
-<summary>Note</summary>
-<p>You are welcome to try different CMake generators and compilers, but IREE
-devs and CIs exclusively use these and other configurations are "best
-effort". Additionally, compilation on macOS is "best effort" as well, though
-we generally expect it to work due to its similarity with Linux. Patches to
-improve support for these are always welcome.</p>
+<p>IREE can be built from source using <a href="https://cmake.org/">CMake</a>. We also
+recommend the <a href="https://ninja-build.org/">Ninja</a> CMake generator and the
+<a href="https://clang.llvm.org/">clang</a> or MSVC C/C++ compilers.</p>
+<details class="note">
+<summary>Note - Other CMake generators and compilers</summary>
+<p>IREE developers and CIs primarily use Ninja, clang, and MSVC. Other
+configurations (including the Makefile generator and gcc) are "best effort".
+Patches to improve support are always welcome.</p>
 </details>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Linux</label><label for="__tabbed_1_2">macOS</label><label for="__tabbed_1_3">Windows</label></div>
 <div class="tabbed-content">
@@ -1296,18 +1347,17 @@ improve support for these are always welcome.</p>
    package)</p>
 </li>
 </ol>
-<p>On a relatively recent Debian/Ubuntu:</p>
+<p>On Debian/Ubuntu:</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>cmake<span class="w"> </span>ninja-build<span class="w"> </span>clang<span class="w"> </span>lld
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <ol>
 <li>
-<p>Install <a href="https://cmake.org/download/">CMake</a> (typically "cmake" package)</p>
+<p>Install <a href="https://cmake.org/download/">CMake</a></p>
 </li>
 <li>
-<p>Install <a href="https://ninja-build.org/">Ninja</a> (typically "ninja-build"
-   package)</p>
+<p>Install <a href="https://ninja-build.org/">Ninja</a></p>
 </li>
 </ol>
 <p>If using Homebrew:</p>
@@ -1325,105 +1375,184 @@ improve support for these are always welcome.</p>
    <a href="https://cmake.org/download/">official downloads page</a></p>
 </li>
 <li>
-<p>Install Ninja either from the
-   <a href="https://ninja-build.org/">official site</a></p>
+<p>Install Ninja from the <a href="https://ninja-build.org/">official site</a></p>
 </li>
 </ol>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>You will need to initialize MSVC by running <code>vcvarsall.bat</code> to use it
-from the command line. See the
+<p>Initialize MSVC by running <code>vcvarsall.bat</code> to build on the command line.
+See the
 <a href="https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line">official documentation</a>
 for details.</p>
 </div>
 </div>
 </div>
 </div>
-<h2 id="clone-and-build">Clone and build<a class="headerlink" href="#clone-and-build" title="Permanent link">link</a></h2>
+<!-- TODO(#12921): add notes about Docker and/or dev containers  -->
+
+<h2 id="quickstart-clone-and-build">Quickstart: clone and build<a class="headerlink" href="#quickstart-clone-and-build" title="Permanent link">link</a></h2>
 <p>Use <a href="https://git-scm.com/">Git</a> to clone the IREE repository and initialize its
 submodules:</p>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/openxla/iree.git
 <span class="nb">cd</span><span class="w"> </span>iree
 git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init
 </code></pre></div>
-<p>Configure then build all targets using CMake:</p>
-<p>Configure CMake:</p>
+<p>The most basic CMake workflow is:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Configure</span>
+cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>.
+
+<span class="c1"># Build</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
+</code></pre></div>
+<div class="admonition caution">
+<p class="admonition-title">Caution - slow builds</p>
+<p>The compiler build is complex. You will want a powerful machine and to tune
+the settings following the next section. In 2023, we've seen builds take
+around 5-10 minutes on 64-core Linux machines.</p>
+<p>Use case permitting, disabling the compiler build with
+<code>-DIREE_BUILD_COMPILER=OFF</code> will drastically simplify the build.</p>
+</div>
+<h2 id="configuration-settings">Configuration settings<a class="headerlink" href="#configuration-settings" title="Permanent link">link</a></h2>
+<p>The configure step should be customized for your build environment. These
+settings can improve compile and link times substantially.</p>
+<!-- TODO(#5804): add notes about CMake presets?  -->
+
 <div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Linux</label><label for="__tabbed_2_2">macOS</label><label for="__tabbed_2_3">Windows</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="c1"># Recommended for simple development using clang and lld:</span>
-cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Recommended development options using clang and lld:</span>
+cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_SPLIT_DWARF<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_THIN_ARCHIVES<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_ENABLE_LLD<span class="o">=</span>ON
-
-<span class="c1"># Alternately, with system compiler and your choice of CMake generator:</span>
-<span class="c1"># cmake -B ../iree-build/ -S .</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="c1"># Recommended for simple development using clang and lld:</span>
-cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Recommended development options using clang and lld:</span>
+cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_SPLIT_DWARF<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-DIREE_ENABLE_THIN_ARCHIVES<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_ENABLE_LLD<span class="o">=</span>ON
-
-<span class="c1"># Alternately, with system compiler and your choice of CMake generator:</span>
-<span class="c1"># cmake -B ../iree-build/ -S .</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Recommended development options:</span>
+cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON
 </code></pre></div>
 </div>
 </div>
 </div>
-<p>Build:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
-</code></pre></div>
 <details class="tip" open="open">
-<summary>Tip - Build types</summary>
+<summary>Tip - CMAKE_BUILD_TYPE values</summary>
 <p>We recommend using the <code>RelWithDebInfo</code> build type by default for a good
-balance of debugging information and performance. The <code>Debug</code>, <code>Release</code>,
-and <code>MinSizeRel</code> build types are useful in more specific scenarios.
-In particular, note that several useful LLVM debugging features are only
-available in <code>Debug</code> builds. See the
+balance of debug info and performance. The <code>Debug</code>, <code>Release</code>, and
+<code>MinSizeRel</code> build types are useful in more specific cases. Note that
+several useful LLVM debugging features are only available in <code>Debug</code> builds.
+See the
 <a href="https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html">official CMake documentation</a>
 for general details.</p>
 </details>
 <details class="tip" open="open">
 <summary>Tip - Faster recompilation with ccache</summary>
-<p>We recommend using <a href="https://ccache.dev/"><code>ccache</code></a> together with CMake. To
-use it, configure CMake with:</p>
+<p>We recommend using <a href="https://ccache.dev/"><code>ccache</code></a> with CMake, especially
+when rebuilding the compiler. To use it, configure CMake with:</p>
 <div class="highlight"><pre><span></span><code>-DCMAKE_C_COMPILER_LAUNCHER<span class="o">=</span>ccache
 -DCMAKE_CXX_COMPILER_LAUNCHER<span class="o">=</span>ccache
 </code></pre></div>
 <p>See also our <a href="https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/ccache.md">developer documentation for ccache</a>.</p>
 </details>
-<h2 id="whats-next">What's next?<a class="headerlink" href="#whats-next" title="Permanent link">link</a></h2>
-<!-- TODO(scotttodd): "at this point you can..." -->
-
+<h3 id="optional-components">Optional components<a class="headerlink" href="#optional-components" title="Permanent link">link</a></h3>
+<p>By default, the CMake build includes:</p>
+<ul>
+<li>All compiler targets (<code>llvm-cpu</code>, <code>cuda</code>, <code>vulkan-spirv</code>, etc.)</li>
+<li>All runtime HAL drivers (<code>local-task</code>, <code>cuda</code>, <code>vulkan</code>, etc.)</li>
+<li>All compiler input formats (StableHLO, TOSA, etc.)</li>
+<li>All compiler output formats (VM bytecode, C)</li>
+</ul>
+<p>The default build does <em>not</em> include:</p>
+<ul>
+<li>Compiler or runtime bindings (Python, TFLite, etc.)</li>
+<li>Advanced features like AddressSanitizer or tracing instrumentation</li>
+<li>Experimental components</li>
+</ul>
+<p>These can be changed via the <code>IREE_</code> CMake options listed in the root
+<a href="https://github.com/openxla/iree/blob/main/CMakeLists.txt"><code>CMakeLists.txt</code></a>.</p>
+<h3 id="extensions-and-project-integrations">Extensions and project integrations<a class="headerlink" href="#extensions-and-project-integrations" title="Permanent link">link</a></h3>
+<p>When using IREE within other projects, you can register compiler plugins and
+runtime HAL drivers. You can also bring your own copy of LLVM and some other
+tools. See the root
+<a href="https://github.com/openxla/iree/blob/main/CMakeLists.txt"><code>CMakeLists.txt</code></a>
+for details.</p>
+<h2 id="tests-and-samples">Tests and samples<a class="headerlink" href="#tests-and-samples" title="Permanent link">link</a></h2>
 <h3 id="running-tests">Running tests<a class="headerlink" href="#running-tests" title="Permanent link">link</a></h3>
-<p>Build test dependencies and run tests:</p>
-<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build<span class="w"> </span>--target<span class="w"> </span>iree-run-tests
+<p>Tests are run via <a href="https://cmake.org/cmake/help/latest/manual/ctest.1.html">ctest</a>.
+To build and run the core project tests:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Build default targets</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
+
+<span class="c1"># Run tests</span>
+ctest<span class="w"> </span>--test-dir<span class="w"> </span>../iree-build/
 </code></pre></div>
-<p>Internally, this builds dependencies via the <code>iree-test-deps</code> target and
-invokes <a href="https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest">CTest</a>.</p>
-<p>The parallel testing level can be set via the environment variable
-<code>CTEST_PARALLEL_LEVEL</code> when invoking ctest in this fashion. Instructions
-are printed to test with a custom command line.</p>
-<h3 id="take-a-look-around">Take a look around<a class="headerlink" href="#take-a-look-around" title="Permanent link">link</a></h3>
-<p>Check out the contents of the 'tools' build directory:</p>
-<div class="highlight"><pre><span></span><code>ls<span class="w"> </span>../iree-build/tools/
+<div class="admonition caution">
+<p class="admonition-title">Caution</p>
+<p>This has two limitations:</p>
+<ol>
+<li>Large tests are excluded from the build by default</li>
+<li>Some tests require hardware like a GPU and will fail on unsupported systems</li>
+</ol>
+</div>
+<p>To build and then run all tests:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Build default targets</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
+
+<span class="c1"># 2. Build test dependencies</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span class="w"> </span>--target<span class="w"> </span>iree-test-deps
+
+<span class="c1"># 3. Run tests</span>
+ctest<span class="w"> </span>--test-dir<span class="w"> </span>../iree-build/
+
+
+<span class="c1"># Or combine all steps using a utility target</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build<span class="w"> </span>--target<span class="w"> </span>iree-run-tests
+</code></pre></div>
+<p>To run only certain tests, we have a
+<a href="https://github.com/openxla/iree/blob/main/build_tools/cmake/ctest_all.sh">helper script</a>
+that converts environment variables into ctest filters:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Run default tests</span>
+./build_tools/cmake/ctest_all.sh
+
+<span class="c1"># Run tests, turning CUDA on and Vulkan off</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">IREE_CUDA_DISABLE</span><span class="o">=</span><span class="m">0</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">IREE_VULKAN_DISABLE</span><span class="o">=</span><span class="m">1</span>
+./build_tools/cmake/ctest_all.sh
+</code></pre></div>
+<h3 id="running-samples">Running samples<a class="headerlink" href="#running-samples" title="Permanent link">link</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Build</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
+
+<span class="c1"># Run a standalone sample application</span>
+../iree-build/runtime/src/iree/runtime/demo/hello_world_embedded
+<span class="c1"># 4xf32=1 1.1 1.2 1.3</span>
+<span class="c1">#  *</span>
+<span class="c1"># 4xf32=10 100 1000 10000</span>
+<span class="c1">#  =</span>
+<span class="c1"># 4xf32=10 110 1200 13000</span>
+
+<span class="c1"># Try out the developer tools</span>
+ls<span class="w"> </span>../iree-build/tools/
 ../iree-build/tools/iree-compile<span class="w"> </span>--help
+../iree-build/tools/iree-run-module<span class="w"> </span>--help
 </code></pre></div>
-<!-- TODO(scotttodd): troubleshooting section? link to github issues? -->
 
 
 
