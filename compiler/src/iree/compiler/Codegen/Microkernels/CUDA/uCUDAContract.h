@@ -121,6 +121,7 @@ struct uGPUContracts {
     auto generateF32Microkernels = [&](const char* t, const char* OutT) {
       int st = 2;
       generateVariant(t, t, OutT, {64, 64, 32}, {64, 64}, {16, 8, 8}, st);
+      generateVariant(t, t, OutT, {128, 128, 32}, {64, 64}, {16, 8, 8}, st);
 
       st = 3;
       generateVariant(t, t, OutT, {128, 128, 16}, {64, 64}, {16, 8, 8}, st);
