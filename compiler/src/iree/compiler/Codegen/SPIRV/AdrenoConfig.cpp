@@ -50,7 +50,7 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
   }
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
-    auto type = convOp.image().getType().cast<ShapedType>();
+    auto type = cast<ShapedType>(convOp.image().getType());
     const int bitwidth = type.getElementTypeBitWidth();
     if (bitwidth > 32) return failure();
     const int multipler = 32 / bitwidth;
