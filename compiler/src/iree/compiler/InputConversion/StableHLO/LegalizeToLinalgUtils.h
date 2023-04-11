@@ -62,6 +62,11 @@ Value getEmptyTensor(OpBuilder& b, Location loc, ShapedType type,
 Value getEmptyTensorFor(OpBuilder& b, Location loc, ShapedType resultType,
                         Operation* op, ValueRange operands);
 
+/// Ensures a tensor has the same shape (not including the element type) as
+/// another.
+Value coerceTensorShape(OpBuilder& builder, Location loc,
+                        TypedValue<ShapedType> value, ShapedType targetType);
+
 /// Sparsifies a (block of) operation(s) that cannot be handled directly
 /// by the sparse compiler but has well-known semi-ring semantics.
 ///
