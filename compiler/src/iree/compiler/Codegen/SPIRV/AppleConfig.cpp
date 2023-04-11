@@ -49,19 +49,12 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAppleMatmulConfig(linalgOp, limits);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [limits](auto op) { return setAppleMatmulConfig(op, limits); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            return setConvOpConfig(op, subgroupSize,
-                                   /*bestTilingFactor=*/16);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        return setConvOpConfig(op, subgroupSize,
-                               /*bestTilingFactor=*/16);
-      })
-      .Default([](Operation *) { return failure(); });
+  if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
+    return setConvOpConfig(rootOp, subgroupSize,
+                           /*bestTilingFactor=*/16);
+  }
+
+  return failure();
 }
 
 }  // namespace detail

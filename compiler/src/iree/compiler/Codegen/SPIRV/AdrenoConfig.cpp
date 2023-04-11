@@ -49,19 +49,14 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAdrenoMatmulConfig(linalgOp, limits);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [limits](auto op) { return setAdrenoMatmulConfig(op, limits); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            return setConvOpConfig(op, subgroupSize,
-                                   /*bestTilingFactor=*/32);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        return setConvOpConfig(op, subgroupSize,
-                               /*bestTilingFactor=*/16);
-      })
-      .Default([](Operation *) { return failure(); });
+  if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
+    linalg::detail::ConvolutionDimensions convDims;
+    linalg::detail::isConvolutionInterfaceImpl(rootOp, &convDims);
+    const int bestTilingFactor = convDims.depth.empty() ? 32 : 16;
+    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+  }
+
+  return failure();
 }
 
 }  // namespace detail
