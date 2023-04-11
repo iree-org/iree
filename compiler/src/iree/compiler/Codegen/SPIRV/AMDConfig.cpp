@@ -81,9 +81,8 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAMDMatmulConfig(linalgOp, targetEnv);
   }
 
-  if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
-    bool hasPaddedInput =
-        rootOp->getOperand(0).template getDefiningOp<tensor::PadOp>();
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
     int bestTilingFactor = hasPaddedInput ? 16 : 32;
     return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
   }

@@ -52,9 +52,8 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setMaliMatmulConfig(linalgOp, limits);
   }
 
-  if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
-    bool hasPaddedInput =
-        rootOp->getOperand(0).template getDefiningOp<tensor::PadOp>();
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
     int bestTilingFactor = hasPaddedInput ? 8 : 16;
     return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
   }
