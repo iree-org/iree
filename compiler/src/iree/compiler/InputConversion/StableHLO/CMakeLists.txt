@@ -83,7 +83,6 @@ iree_cc_library(
     MLIRVectorDialect
     StablehloBroadcastUtils
     StablehloOps
-    iree::compiler::InputConversion::Common
   PUBLIC
 )
 
