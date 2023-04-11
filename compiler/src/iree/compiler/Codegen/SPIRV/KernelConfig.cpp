@@ -161,13 +161,6 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   assert(isa<linalg::ConvolutionOpInterface>(*linalgOp));
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as convolution...\n");
 
-  if (isa<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-          linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-          linalg::PoolingNhwcMinUnsignedOp>(*linalgOp)) {
-    // TODO(antiagainst): Enable configuration for pooling op.
-    return failure();
-  }
-
   Type inputType = linalgOp.getDpsInputOperand(0)->get().getType();
   ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
   Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
@@ -207,12 +200,17 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   if (!convDims.outputChannel.empty()) {
     assert(convDims.outputChannel.size() == 1);
     ocIndex = convDims.outputChannel.front();
-  } else {
+  } else if (!convDims.depth.empty()) {
     // For depthwise convolution ops with multipler 1, we have the same
     // input/filter/output channel size, which is being categorized as the
     // multipler.
     assert(convDims.depth.size() == 1);
     ocIndex = convDims.depth.front();
+  } else {
+    // For pooling ops, the input/output channel size will be categorized
+    // as the additional batch dimension.
+    assert(convDims.batch.size() == 2);
+    ocIndex = convDims.batch.back();
   }
   const int64_t oc = loopRanges[ocIndex];
   // We may not have an input channel dimension in the case of depthwise

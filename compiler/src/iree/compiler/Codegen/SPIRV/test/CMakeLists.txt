@@ -51,6 +51,7 @@ iree_lit_test_suite(
     "tile_and_vectorize_batch_matmul.mlir"
     "tile_and_vectorize_conv.mlir"
     "tile_and_vectorize_matmul.mlir"
+    "tile_and_vectorize_pooling.mlir"
     "tile_and_vectorize_to_cooperative_ops.mlir"
     "tile_linalg_ops.mlir"
     "vectorize_conv.mlir"
