@@ -9,6 +9,7 @@
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/EncodingInfo.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -33,9 +34,10 @@ namespace Codegen {
 static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
                                                   Operation *op,
                                                   StringRef fnName,
-                                                  TypeRange callArgumentTypes,
                                                   TypeRange callReturnTypes,
-                                                  ValueRange callOperands) {
+                                                  ValueRange callArguments) {
+  SmallVector<Type> callArgumentTypes = llvm::to_vector(llvm::map_range(
+      callArguments, [](Value v) -> Type { return v.getType(); }));
   FunctionType functionType =
       rewriter.getFunctionType(callArgumentTypes, callReturnTypes);
 
@@ -62,7 +64,7 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
   }
 
   // Insert the function call.
-  return rewriter.create<func::CallOp>(loc, fnDecl, callOperands);
+  return rewriter.create<func::CallOp>(loc, fnDecl, callArguments);
 }
 
 //===---------------------------------------------------------------------===//
@@ -74,163 +76,92 @@ std::pair<int64_t, int64_t> UKernelGenericOp::getDpsInitsPositionRange() {
   return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
-/// Map type of operand of a `iree_codegen.ukernel.generic` operation to
-/// the type(s) of the function call arguments(s) it lowers to.
-static LogicalResult lowerToPointerTypes(MLIRContext *context,
-                                         Type microKernelOpOperandType,
-                                         SmallVector<Type> &callOperandTypes) {
-  return TypeSwitch<Type, LogicalResult>(microKernelOpOperandType)
-      .Case<FloatType, IndexType, IntegerType>(
-          [&](auto scalarType) { return success(); })
-      .Case<MemRefType>([&](MemRefType memrefType) {
-        // 0D memref lowers to a 0D memref operand type. Other nD memrefs
-        // lower to 0D memref, offset, and n-1 strides.
-
-        // Base ptr.
-        callOperandTypes.push_back(MemRefType::get(
-            ArrayRef<int64_t>{}, memrefType.getElementType(),
-            MemRefLayoutAttrInterface{}, memrefType.getMemorySpace()));
-        auto indexType = IndexType::get(context);
-        // Offset
-        callOperandTypes.push_back(indexType);
-        return success();
-      })
-      .Default([&](Type t) { return failure(); });
-}
-static LogicalResult lowerToNonPointerTypes(
-    MLIRContext *context, Type microKernelOpOperandType,
-    SmallVector<Type> &callOperandTypes) {
-  return TypeSwitch<Type, LogicalResult>(microKernelOpOperandType)
-      .Case<FloatType, IndexType, IntegerType>([&](auto scalarType) {
-        callOperandTypes.push_back(scalarType);
-        return success();
-      })
-      .Case<MemRefType>([&](MemRefType memrefType) {
-        // 0D memref lowers to a 0D memref operand type. Other nD memrefs
-        // lower to 0D memref, offset, and n-1 strides.
-        if (memrefType.getRank() == 0) return success();
-
-        auto indexType = IndexType::get(context);
-        // Strides.
-        callOperandTypes.resize(
-            callOperandTypes.size() + memrefType.getRank() - 1, indexType);
-        return success();
-      })
-      .Default([&](Type t) { return failure(); });
+LogicalResult appendUkernelGenericBufferAndOffsetArgs(
+    RewriterBase &rewriter, Location loc, ValueRange values,
+    SmallVector<Value> &outArgs) {
+  for (Value value : values) {
+    Type type = value.getType();
+    if (type.isa<FloatType>() || type.isa<IndexType>() ||
+        type.isa<IntegerType>()) {
+      // do nothing.
+    } else if (MemRefType memrefType = type.dyn_cast<MemRefType>()) {
+      auto extractStridedMetadataOp =
+          rewriter.create<memref::ExtractStridedMetadataOp>(loc, value);
+      // Base ptr.
+      outArgs.push_back(extractStridedMetadataOp.getBaseBuffer());
+      // Offset.
+      outArgs.push_back(extractStridedMetadataOp.getOffset());
+    } else {
+      return rewriter.notifyMatchFailure(
+          loc, llvm::formatv("unhandled operand type {0}", type));
+    }
+  }
+  return success();
 }
 
-static LogicalResult lowerToPointerOperands(Location loc,
-                                            RewriterBase &rewriter,
-                                            Value operand,
-                                            SmallVector<Value> &callOperands) {
-  return TypeSwitch<Type, LogicalResult>(operand.getType())
-      .Case<FloatType, IndexType, IntegerType>(
-          [&](auto scalarType) { return success(); })
-      .Case<MemRefType>([&](MemRefType memrefType) {
-        auto extractStridedMetadataOp =
-            rewriter.create<memref::ExtractStridedMetadataOp>(loc, operand);
-        // Base ptr.
-        callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
-        // Offset.
-        callOperands.push_back(extractStridedMetadataOp.getOffset());
-        return success();
-      })
-      .Default([](Type) { return failure(); });
-}
-
-static LogicalResult lowerToNonPointerOperands(
-    Location loc, RewriterBase &rewriter, Value operand,
-    SmallVector<Value> &callOperands) {
-  return TypeSwitch<Type, LogicalResult>(operand.getType())
-      .Case<FloatType, IndexType, IntegerType>([&](auto scalarType) {
-        callOperands.push_back(operand);
-        return success();
-      })
-      .Case<MemRefType>([&](MemRefType memrefType) {
-        auto extractStridedMetadataOp =
-            rewriter.create<memref::ExtractStridedMetadataOp>(loc, operand);
-        if (memrefType.getRank() == 0) {
-          return success();
+LogicalResult appendUkernelGenericNonBufferAndOffsetArgs(
+    RewriterBase &rewriter, Location loc, ValueRange values,
+    SmallVector<Value> &outArgs) {
+  for (Value value : values) {
+    Type type = value.getType();
+    if (type.isa<FloatType>() || type.isa<IndexType>() ||
+        type.isa<IntegerType>()) {
+      outArgs.push_back(value);
+    } else if (type.isa<MemRefType>()) {
+      auto extractStridedMetadataOp =
+          rewriter.create<memref::ExtractStridedMetadataOp>(loc, value);
+      // Strides
+      const auto &strides = extractStridedMetadataOp.getStrides();
+      if (strides.size() >= 1) {
+        for (unsigned i = 0; i < strides.size() - 1; ++i) {
+          outArgs.push_back(strides[i]);
         }
-        // Strides.
-        for (auto stride : extractStridedMetadataOp.getStrides().drop_back()) {
-          callOperands.push_back(stride);
-        }
-        return success();
-      })
-      .Default([](Type) { return failure(); });
+      }
+    } else {
+      return rewriter.notifyMatchFailure(
+          loc, llvm::formatv("unhandled operand type {0}", type));
+    }
+  }
+  return success();
+}
+
+LogicalResult appendUkernelGenericReturnTypes(RewriterBase &rewriter,
+                                              Location loc, TypeRange types,
+                                              SmallVector<Type> &outTypes) {
+  for (Type type : types) {
+    if (type.isa<FloatType>() || type.isa<IndexType>() ||
+        type.isa<IntegerType>()) {
+      outTypes.push_back(type);
+    } else {
+      return rewriter.notifyMatchFailure(
+          loc, llvm::formatv("unhandled return type {0}", type));
+    }
+  }
+  return success();
 }
 
 FailureOr<func::CallOp> UKernelGenericOp::lowerToFunctionCall(
     RewriterBase &rewriter) {
-  // Create the function type based on the operands and results.
-  SmallVector<Type> callArgumentTypes;
-  for (auto microKernelOpOperandType : getInputs().getTypes()) {
-    if (failed(lowerToPointerTypes(rewriter.getContext(),
-                                   microKernelOpOperandType,
-                                   callArgumentTypes))) {
-      return rewriter.notifyMatchFailure(
-          getOperation(), llvm::formatv("failed to lower operand type {0}",
-                                        microKernelOpOperandType));
-    }
+  Location loc = getLoc();
+  SmallVector<Value> callArguments;
+  if (failed(appendUkernelGenericBufferAndOffsetArgs(
+          rewriter, loc, getOperands(), callArguments))) {
+    return rewriter.notifyMatchFailure(getOperation(),
+                                       "failed to lower operands");
   }
-  for (auto microKernelOpOperandType : getOutputs().getTypes()) {
-    if (failed(lowerToPointerTypes(rewriter.getContext(),
-                                   microKernelOpOperandType,
-                                   callArgumentTypes))) {
-      return rewriter.notifyMatchFailure(
-          getOperation(), llvm::formatv("failed to lower operand type {0}",
-                                        microKernelOpOperandType));
-    }
-  }
-  for (auto microKernelOpOperandType : getOperation()->getOperandTypes()) {
-    if (failed(lowerToNonPointerTypes(rewriter.getContext(),
-                                      microKernelOpOperandType,
-                                      callArgumentTypes))) {
-      return rewriter.notifyMatchFailure(
-          getOperation(), llvm::formatv("failed to lower operand type {0}",
-                                        microKernelOpOperandType));
-    }
+  if (failed(appendUkernelGenericNonBufferAndOffsetArgs(
+          rewriter, loc, getOperands(), callArguments))) {
+    return rewriter.notifyMatchFailure(getOperation(),
+                                       "failed to lower operands");
   }
   SmallVector<Type> callResultTypes;
-  for (auto resultType : getResultTypes()) {
-    if (resultType.isa<ShapedType>()) {
-      return rewriter.notifyMatchFailure(
-          getOperation(),
-          "cannot lower a `ShapedType` return value to function call");
-    }
-    if (failed(lowerToNonPointerTypes(rewriter.getContext(), resultType,
-                                      callResultTypes))) {
-      return rewriter.notifyMatchFailure(
-          getOperation(),
-          llvm::formatv("failed to lower result type {0}", resultType));
-    }
-  }
-
-  // Get the operands for the function call.
-  SmallVector<Value> callOperands;
-  Location loc = getLoc();
-  for (auto operand : getInputs()) {
-    if (failed(lowerToPointerOperands(loc, rewriter, operand, callOperands))) {
-      return rewriter.notifyMatchFailure(
-          getOperation(), "failed to lower operands to function call operands");
-    }
-  }
-  for (auto operand : getOutputs()) {
-    if (failed(lowerToPointerOperands(loc, rewriter, operand, callOperands))) {
-      return rewriter.notifyMatchFailure(
-          getOperation(), "failed to lower operands to function call operands");
-    }
-  }
-  for (auto operand : getOperands()) {
-    if (failed(
-            lowerToNonPointerOperands(loc, rewriter, operand, callOperands))) {
-      return rewriter.notifyMatchFailure(
-          getOperation(), "failed to lower operands to function call operands");
-    }
+  if (failed(appendUkernelGenericReturnTypes(rewriter, loc, getResultTypes(),
+                                             callResultTypes))) {
+    return rewriter.notifyMatchFailure(getOperation(),
+                                       "failed to lower result types");
   }
   return createFunctionCall(rewriter, getOperation(), getUKernelFnName(),
-                            callArgumentTypes, callResultTypes, callOperands);
+                            callResultTypes, callArguments);
 }
 
 //===---------------------------------------------------------------------===//
@@ -242,120 +173,28 @@ std::pair<int64_t, int64_t> UKernelMmt4DOp::getDpsInitsPositionRange() {
   return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
 }
 
-static FailureOr<SmallVector<Type>> getFunctionArgTypesForUKernelMmt4D(
-    MLIRContext *context, UKernelMmt4DOp mmt4dUKernelOp) {
-  SmallVector<Type> callArgumentTypes;
-  auto indexType = IndexType::get(context);
-
-  auto processMemrefTypeOperandPointerArg =
-      [&](Value memRefValue) -> LogicalResult {
-    auto memRefType = memRefValue.getType().dyn_cast<MemRefType>();
-    if (!memRefType) {
-      return mmt4dUKernelOp->emitOpError(
-          llvm::formatv("unable to lower {0} to function call argument types",
-                        memRefValue.getType()));
+LogicalResult appendUkernelMmt4DNonBufferAndOffsetArgs(
+    RewriterBase &rewriter, Location loc, ValueRange values,
+    SmallVector<Value> &outArgs) {
+  for (Value value : values) {
+    Type type = value.getType();
+    if (type.isa<FloatType>() || type.isa<IndexType>() ||
+        type.isa<IntegerType>()) {
+      outArgs.push_back(value);
+    } else if (type.isa<MemRefType>()) {
+      auto extractStridedMetadataOp =
+          rewriter.create<memref::ExtractStridedMetadataOp>(loc, value);
+      // Strides[0]
+      const auto &strides = extractStridedMetadataOp.getStrides();
+      if (strides.size() >= 1) {
+        outArgs.push_back(strides[0]);
+      }
+    } else {
+      return rewriter.notifyMatchFailure(
+          loc, llvm::formatv("unhandled operand type {0}", type));
     }
-    // base-ptr
-    callArgumentTypes.push_back(MemRefType::get(
-        /*shape=*/{}, memRefType.getElementType(), MemRefLayoutAttrInterface{},
-        memRefType.getMemorySpace()));
-    // offset
-    callArgumentTypes.push_back(indexType);
-    return success();
-  };
-  auto processMemrefTypeOperandNonPointerArgs =
-      [&](Value memRefValue) -> LogicalResult {
-    auto memRefType = memRefValue.getType().dyn_cast<MemRefType>();
-    if (!memRefType) {
-      return mmt4dUKernelOp->emitOpError(
-          llvm::formatv("unable to lower {0} to function call argument types",
-                        memRefValue.getType()));
-    }
-    // stride[0]
-    callArgumentTypes.push_back(indexType);
-    return success();
-  };
-  /// LHS, RHS, Out pointer args
-  if (failed(processMemrefTypeOperandPointerArg(mmt4dUKernelOp.getLhs())) ||
-      failed(processMemrefTypeOperandPointerArg(mmt4dUKernelOp.getRhs())) ||
-      failed(processMemrefTypeOperandPointerArg(mmt4dUKernelOp.getOutput()))) {
-    return failure();
   }
-  /// LHS, RHS, Out non-pointer args
-  if (failed(processMemrefTypeOperandNonPointerArgs(mmt4dUKernelOp.getLhs())) ||
-      failed(processMemrefTypeOperandNonPointerArgs(mmt4dUKernelOp.getRhs())) ||
-      failed(
-          processMemrefTypeOperandNonPointerArgs(mmt4dUKernelOp.getOutput()))) {
-    return failure();
-  }
-  // m, n, k
-  callArgumentTypes.resize(callArgumentTypes.size() + 3, indexType);
-  // m0, n0, k0
-  auto i32Type = IntegerType::get(context, 32);
-  callArgumentTypes.resize(callArgumentTypes.size() + 3, i32Type);
-  // flags
-  callArgumentTypes.push_back(i32Type);
-  return callArgumentTypes;
-}
-
-static FailureOr<SmallVector<Value>> getFunctionArgValuesForUKernelMmt4D(
-    RewriterBase &rewriter, Location loc, UKernelMmt4DOp mmt4dUKernelOp) {
-  SmallVector<Value> callOperands;
-  auto processMemrefTypeOperandPointerArg = [&](Value memRefValue) {
-    auto extractStridedMetadataOp =
-        rewriter.create<memref::ExtractStridedMetadataOp>(loc, memRefValue);
-    // Base ptr.
-    callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
-    // offset.
-    callOperands.push_back(extractStridedMetadataOp.getOffset());
-  };
-  auto processMemrefTypeOperandNonPointerArgs = [&](Value memRefValue) {
-    auto extractStridedMetadataOp =
-        rewriter.create<memref::ExtractStridedMetadataOp>(loc, memRefValue);
-    // strides.
-    callOperands.push_back(extractStridedMetadataOp.getStrides().front());
-  };
-  auto getDimAsI32 = [&](Value value, int dim) {
-    auto dimValue = rewriter.create<memref::DimOp>(loc, value, dim);
-    auto asI32 = rewriter.create<arith::IndexCastOp>(loc, rewriter.getI32Type(),
-                                                     dimValue);
-    callOperands.push_back(asI32);
-  };
-  // LHS pointer
-  processMemrefTypeOperandPointerArg(mmt4dUKernelOp.getLhs());
-  // RHS pointer
-  processMemrefTypeOperandPointerArg(mmt4dUKernelOp.getRhs());
-  // Out pointer
-  processMemrefTypeOperandPointerArg(mmt4dUKernelOp.getOutput());
-  // LHS offset and stride
-  processMemrefTypeOperandNonPointerArgs(mmt4dUKernelOp.getLhs());
-  // RHS offset and stride
-  processMemrefTypeOperandNonPointerArgs(mmt4dUKernelOp.getRhs());
-  // Out offset and stride
-  processMemrefTypeOperandNonPointerArgs(mmt4dUKernelOp.getOutput());
-  // M
-  callOperands.push_back(
-      rewriter.create<memref::DimOp>(loc, mmt4dUKernelOp.getLhs(), 0));
-  // N
-  callOperands.push_back(
-      rewriter.create<memref::DimOp>(loc, mmt4dUKernelOp.getRhs(), 0));
-  // K
-  callOperands.push_back(
-      rewriter.create<memref::DimOp>(loc, mmt4dUKernelOp.getLhs(), 1));
-  // M0
-  getDimAsI32(mmt4dUKernelOp.getLhs(), 2);
-  // N0
-  getDimAsI32(mmt4dUKernelOp.getRhs(), 2);
-  // K0
-  getDimAsI32(mmt4dUKernelOp.getLhs(), 3);
-  // Flags;
-  int flags = 0;
-  if (mmt4dUKernelOp.getAccumulate()) {
-    flags |= IREE_UK_FLAG_ACCUMULATE;
-  }
-  callOperands.push_back(rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI32IntegerAttr(flags)));
-  return callOperands;
+  return success();
 }
 
 FailureOr<func::CallOp> UKernelMmt4DOp::lowerToFunctionCall(
@@ -385,23 +224,45 @@ FailureOr<func::CallOp> UKernelMmt4DOp::lowerToFunctionCall(
       break;
   }
 
-  // Create the function type.
-  FailureOr<SmallVector<Type>> fnArgTypes =
-      getFunctionArgTypesForUKernelMmt4D(rewriter.getContext(), *this);
-  if (failed(fnArgTypes)) {
-    return emitOpError(
-        "unable to get function type to lower micro kernel op to");
+  SmallVector<Value> callArguments;
+  Location loc = getLoc();
+  if (failed(appendUkernelGenericBufferAndOffsetArgs(
+          rewriter, loc, getOperands(), callArguments))) {
+    return rewriter.notifyMatchFailure(getOperation(),
+                                       "failed to lower operands");
   }
-  // Create the function call operands.
-  FailureOr<SmallVector<Value>> fnCallOperands =
-      getFunctionArgValuesForUKernelMmt4D(rewriter, getLoc(), *this);
-  if (failed(fnCallOperands)) {
-    return emitOpError(
-        "unable to get the function call operands to lower micro kernel op");
+  if (failed(appendUkernelMmt4DNonBufferAndOffsetArgs(
+          rewriter, loc, {getLhs(), getRhs(), getOutput()}, callArguments))) {
+    return rewriter.notifyMatchFailure(getOperation(),
+                                       "failed to lower operands");
   }
-  return createFunctionCall(
-      rewriter, getOperation(), fnName, fnArgTypes.value(),
-      /*callReturnTypes=*/TypeRange{}, fnCallOperands.value());
+  // M
+  callArguments.push_back(rewriter.create<memref::DimOp>(loc, getLhs(), 0));
+  // N
+  callArguments.push_back(rewriter.create<memref::DimOp>(loc, getRhs(), 0));
+  // K
+  callArguments.push_back(rewriter.create<memref::DimOp>(loc, getLhs(), 1));
+  auto getDimAsI32 = [](RewriterBase &rewriter, Location loc, Value value,
+                        int dim) -> Value {
+    auto dimValue = rewriter.create<memref::DimOp>(loc, value, dim);
+    return rewriter.create<arith::IndexCastOp>(loc, rewriter.getI32Type(),
+                                               dimValue);
+  };
+  // M0
+  callArguments.push_back(getDimAsI32(rewriter, loc, getLhs(), 2));
+  // N0
+  callArguments.push_back(getDimAsI32(rewriter, loc, getRhs(), 2));
+  // K0
+  callArguments.push_back(getDimAsI32(rewriter, loc, getLhs(), 3));
+  // Flags;
+  int flags = 0;
+  if (getAccumulate()) {
+    flags |= IREE_UK_FLAG_ACCUMULATE;
+  }
+  callArguments.push_back(rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI32IntegerAttr(flags)));
+  return createFunctionCall(rewriter, getOperation(), fnName,
+                            /*callReturnTypes=*/TypeRange{}, callArguments);
 }
 }  // namespace Codegen
 }  // namespace IREE
