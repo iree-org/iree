@@ -441,8 +441,7 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);
 
-/// Populates the passes needed to do two-level tile + vectorize of linalg ops
-/// using the Codegen drivers from sandbox.
+/// Populates the passes needed to do two-level tile + vectorize of linalg ops.
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
@@ -455,7 +454,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
                                           bool enableVectorMasking);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
-// convolution ops using the Codegen drivers from sandbox.
+// convolution ops.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,

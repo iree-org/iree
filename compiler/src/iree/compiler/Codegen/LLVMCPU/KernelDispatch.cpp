@@ -1016,9 +1016,9 @@ static LogicalResult setRootConfig(
                        << vecPreProcStrategy << "\n");
 
   if (usePaddingPipeline) {
-    // It's inspired from Sandbox configuration. Sandbox has
-    // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
-    // 288/12*8=192
+    // It's inspired from https://github.com/iree-org/iree-llvm-sandbox repo.
+    // Sandbox has [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192
+    // because 288/12*8=192
     if (numLoops == 3) {
       maxTileSizes[0] = 192;
       maxTileSizes[1] = 128;

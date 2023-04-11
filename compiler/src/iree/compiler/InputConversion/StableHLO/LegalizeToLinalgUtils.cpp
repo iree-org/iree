@@ -88,6 +88,29 @@ Value coerceTensorShape(OpBuilder& builder, Location loc,
       value);
 }
 
+LogicalResult verifyHloOpBufferOrTensorSemantics(Operation* op) {
+  auto isRankedTensor = [](Value val) {
+    return isa<RankedTensorType>(val.getType());
+  };
+  if (!llvm::all_of(op->getOperands(), isRankedTensor)) return failure();
+  return success(llvm::all_of(op->getResults(), isRankedTensor));
+}
+
+Value fillTensorWithZeros(OpBuilder& builder, Location loc, Value tensor) {
+  auto type = cast<ShapedType>(tensor.getType());
+  Value zero;
+  // Complex numbers are a special case.
+  if (auto complexType = type.getElementType().dyn_cast<ComplexType>()) {
+    auto zeroElement = builder.getZeroAttr(complexType.getElementType());
+    auto zeroAttr = builder.getArrayAttr({zeroElement, zeroElement});
+    zero = builder.create<complex::ConstantOp>(loc, complexType, zeroAttr);
+  } else {
+    auto zeroAttr = builder.getZeroAttr(type.getElementType());
+    zero = builder.create<arith::ConstantOp>(loc, zeroAttr);
+  }
+  return builder.create<linalg::FillOp>(loc, zero, tensor).result();
+}
+
 Value preSparsify(Operation* op, llvm::SmallVector<Value, 2>& values, Type rtp,
                   OpBuilder* b) {
   // Apply for semi-ring operations that lower to elaborate code

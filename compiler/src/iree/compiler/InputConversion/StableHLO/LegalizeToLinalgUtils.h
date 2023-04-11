@@ -67,6 +67,14 @@ Value getEmptyTensorFor(OpBuilder& b, Location loc, ShapedType resultType,
 Value coerceTensorShape(OpBuilder& builder, Location loc,
                         TypedValue<ShapedType> value, ShapedType targetType);
 
+/// Verifies |op|'s semantics by checking if all operands and results have
+/// ranged tensor types.
+LogicalResult verifyHloOpBufferOrTensorSemantics(Operation* op);
+
+/// Fills |tensor| with a zero constant of the matching type. Returns the new
+/// value.
+Value fillTensorWithZeros(OpBuilder& builder, Location loc, Value tensor);
+
 /// Sparsifies a (block of) operation(s) that cannot be handled directly
 /// by the sparse compiler but has well-known semi-ring semantics.
 ///
