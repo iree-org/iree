@@ -106,7 +106,7 @@ jobs:
   test:
     needs: cross_compile
     # TODO: Uncomment before submit.
-    # if: ! fromJson(inputs.is-pr)
+    # if: ! inputs.is-pr
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ inputs.runner-group }}
