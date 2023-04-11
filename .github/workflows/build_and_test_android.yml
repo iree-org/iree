@@ -121,7 +121,7 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Downloading target build archive"
         run: |
-          wget -O "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR_GCS_ARTIFACT/'gs://'/'https://storage.googleapis.com/'}"
+          gcloud storage cp "${TARGET_BUILD_DIR_GCS_ARTIFACT}" "${TARGET_BUILD_DIR_ARCHIVE}"
       - name: "Extracting target build dir archive"
         run: tar -xf "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR}"
       - name: "Running tests"
