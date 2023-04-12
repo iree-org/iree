@@ -1,5 +1,5 @@
 // RUN: iree-opt %s --iree-stablehlo-to-linalg --split-input-file \
-// RUN:   --canonicalize | FileCheck --enable-var-scope=false %s
+// RUN:   --canonicalize | FileCheck %s
 
 // CHECK-LABEL:   func @concatenate(
 // CHECK-SAME:   %[[VAL_0:[a-zA-Z0-9_]*]]
@@ -227,7 +227,7 @@ func.func @einsum_dynamic_size_broadcast_dot(%arg0: tensor<?x?x4xf32>, %arg1: te
 
 // CHECK-DAG: #[[OPERAND_MAP:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d0, 0)>
 // CHECK-DAG: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-// CHECK-LABEL: func @broadcast_in_dim
+// CHECK: func @broadcast_in_dim
 func.func @broadcast_in_dim(%operand: tensor<5x7x1xf32>) -> tensor<7x10x6x4x5xf32> {
   %0 = "stablehlo.broadcast_in_dim"(%operand)
          {broadcast_dimensions = dense<[4,0,2]> : tensor<3xi64>}
@@ -251,7 +251,7 @@ func.func @broadcast_in_dim(%operand: tensor<5x7x1xf32>) -> tensor<7x10x6x4x5xf3
 
 // CHECK-DAG: #[[OPERAND_MAP:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d0, 0)>
 // CHECK-DAG: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-// CHECK-LABEL: func @broadcast_in_dim_ui32
+// CHECK: func @broadcast_in_dim_ui32
 func.func @broadcast_in_dim_ui32(%operand: tensor<5x7x1xui32>) -> tensor<7x10x6x4x5xui32> {
   %0 = "stablehlo.broadcast_in_dim"(%operand)
          {broadcast_dimensions = dense<[4,0,2]> : tensor<3xi64>}
@@ -278,7 +278,7 @@ func.func @broadcast_in_dim_ui32(%operand: tensor<5x7x1xui32>) -> tensor<7x10x6x
 
 // CHECK-DAG: #[[OPERAND_MAP:.+]] = affine_map<(d0, d1) -> (d0)>
 // CHECK-DAG: #[[RESULT_MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @broadcast_in_dim_with_one_to_one
+// CHECK: func @broadcast_in_dim_with_one_to_one
 func.func @broadcast_in_dim_with_one_to_one(
          %operand: tensor<1xf32>) -> tensor<1x5xf32> {
   %0 = "stablehlo.broadcast_in_dim"(%operand)
@@ -301,7 +301,7 @@ func.func @broadcast_in_dim_with_one_to_one(
 
 // CHECK-DAG: #[[OPERAND_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d0, d1)>
 // CHECK-DAG: #[[RESULT_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK-LABEL: func @broadcast_in_dim_with_transpose
+// CHECK: func @broadcast_in_dim_with_transpose
 func.func @broadcast_in_dim_with_transpose(
          %operand: tensor<2x3x4xf32>) -> tensor<3x4x2x5xf32> {
   %0 = "stablehlo.broadcast_in_dim"(%operand)
@@ -326,7 +326,7 @@ func.func @broadcast_in_dim_with_transpose(
 
 // CHECK-DAG: #[[OPERAND_MAP:.*]] = affine_map<(d0, d1, d2) -> ()>
 // CHECK-DAG: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-LABEL: func @broadcast_in_dim_scalar
+// CHECK: func @broadcast_in_dim_scalar
 func.func @broadcast_in_dim_scalar(%operand: tensor<f32>) -> tensor<7x10x6xf32> {
   %0 = "stablehlo.broadcast_in_dim"(%operand)
         {broadcast_dimensions = dense<[]> : tensor<0xi64>}
@@ -347,7 +347,7 @@ func.func @broadcast_in_dim_scalar(%operand: tensor<f32>) -> tensor<7x10x6xf32> 
 
 // CHECK-DAG: #[[OPERAND_MAP:.+]] = affine_map<(d0, d1, d2) -> ()>
 // CHECK-DAG: #[[RESULT_MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-LABEL: func @broadcast_scalar
+// CHECK: func @broadcast_scalar
 func.func @broadcast_scalar(%arg: tensor<f32>) -> tensor<4x2x1xf32> {
   %0 = "stablehlo.broadcast"(%arg) {broadcast_sizes = dense<[4, 2, 1]> : tensor<3xi64>} : (tensor<f32>) -> tensor<4x2x1xf32>
   func.return %0: tensor<4x2x1xf32>
@@ -368,7 +368,7 @@ func.func @broadcast_scalar(%arg: tensor<f32>) -> tensor<4x2x1xf32> {
 
 // CHECK-DAG: #[[OPERAND_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>
 // CHECK-DAG: #[[RESULT_MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
-// CHECK-LABEL: func @broadcast
+// CHECK: func @broadcast
 func.func @broadcast(%arg: tensor<4x?x16xf32>) -> tensor<4x2x1x4x?x16xf32> {
   %0 = "stablehlo.broadcast"(%arg) {broadcast_sizes = dense<[4, 2, 1]> : tensor<3xi64>} : (tensor<4x?x16xf32>) -> tensor<4x2x1x4x?x16xf32>
   func.return %0: tensor<4x2x1x4x?x16xf32>
@@ -390,7 +390,7 @@ func.func @broadcast(%arg: tensor<4x?x16xf32>) -> tensor<4x2x1x4x?x16xf32> {
 // -----
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @iota_f32
+// CHECK: func @iota_f32
 func.func @iota_f32() -> tensor<7x10xf32> {
   %result = "stablehlo.iota"() {iota_dimension = 1 : i64, someattr} : () -> (tensor<7x10xf32>)
   func.return %result : tensor<7x10xf32>
@@ -417,7 +417,7 @@ func.func @iota_f32() -> tensor<7x10xf32> {
 // -----
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @iota_i32
+// CHECK: func @iota_i32
 func.func @iota_i32() -> tensor<7x10xi32> {
   %result = "stablehlo.iota"() {iota_dimension = 1 : i64} : () -> (tensor<7x10xi32>)
   func.return %result : tensor<7x10xi32>
@@ -433,7 +433,7 @@ func.func @iota_i32() -> tensor<7x10xi32> {
 // -----
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @iota_ui32
+// CHECK: func @iota_ui32
 func.func @iota_ui32() -> tensor<7x10xui32> {
   %result = "stablehlo.iota"() {iota_dimension = 1 : i64} : () -> (tensor<7x10xui32>)
   func.return %result : tensor<7x10xui32>
@@ -450,7 +450,7 @@ func.func @iota_ui32() -> tensor<7x10xui32> {
 // -----
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @iota_complexf32
+// CHECK: func @iota_complexf32
 func.func @iota_complexf32() -> tensor<7x10xcomplex<f32>> {
   %result = "stablehlo.iota"() {iota_dimension = 1 : i64} : () -> (tensor<7x10xcomplex<f32>>)
   func.return %result : tensor<7x10xcomplex<f32>>
@@ -469,7 +469,7 @@ func.func @iota_complexf32() -> tensor<7x10xcomplex<f32>> {
 // -----
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-LABEL: func @dynamic_iota_f32
+// CHECK: func @dynamic_iota_f32
 // CHECK-SAME: %[[SHAPE:.*]]: tensor<?xi32>
 func.func @dynamic_iota_f32(%shape: tensor<?xi32>) -> tensor<?x?x8xf32> {
   %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<?xi32>) -> (tensor<?x?x8xf32>)
@@ -491,7 +491,7 @@ func.func @dynamic_iota_f32(%shape: tensor<?xi32>) -> tensor<?x?x8xf32> {
 // -----
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-LABEL: func @dyanmic_iota_ui32
+// CHECK: func @dyanmic_iota_ui32
 // CHECK-SAME: %[[SHAPE:.*]]: tensor<?xi32>
 func.func @dyanmic_iota_ui32(%shape: tensor<?xi32>) -> tensor<?x?x8xui32> {
   %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<?xi32>) -> (tensor<?x?x8xui32>)
@@ -704,7 +704,7 @@ func.func @set_dimension_size(
 
 // CHECK-DAG: #[[OPERAND_MAP:.*]] = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3, d2)>
 // CHECK-DAG: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK-LABEL: func @transpose
+// CHECK: func @transpose
 func.func @transpose(%arg0: tensor<2x3x9x5xi32>) -> tensor<3x2x5x9xi32> {
   %0 = "stablehlo.transpose"(%arg0) {permutation = dense<[1, 0, 3, 2]> : tensor<4xi64>}
         : (tensor<2x3x9x5xi32>) -> tensor<3x2x5x9xi32>
@@ -719,7 +719,7 @@ func.func @transpose(%arg0: tensor<2x3x9x5xi32>) -> tensor<3x2x5x9xi32> {
 
 // CHECK-DAG: #[[OPERAND_MAP:.*]] = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3, d2)>
 // CHECK-DAG: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK-LABEL: func @transpose_dynamic
+// CHECK: func @transpose_dynamic
 func.func @transpose_dynamic(%arg0: tensor<?x?x9x?xi32>) -> tensor<?x?x?x9xi32> {
   %0 = "stablehlo.transpose"(%arg0) {permutation = dense<[1, 0, 3, 2]> : tensor<4xi64>, someattr}
         : (tensor<?x?x9x?xi32>) -> tensor<?x?x?x9xi32>
@@ -749,6 +749,8 @@ func.func @transpose_dynamic(%arg0: tensor<?x?x9x?xi32>) -> tensor<?x?x?x9xi32> 
 // CHECK-PRIMITIVE-SAME: outs(%[[INIT]] : tensor<?x?x?x9xi32>)
 // CHECK-PRIMITIVE-SAME: permutation = [1, 0, 3, 2]
 // CHECK-PRIMITIVE-SAME: {someattr}
+
+// -----
 
 func.func @transpose_unsigned(%arg0: tensor<2x2xui32>) -> tensor<2x2xui32> {
   %0 = "stablehlo.transpose"(%arg0) {

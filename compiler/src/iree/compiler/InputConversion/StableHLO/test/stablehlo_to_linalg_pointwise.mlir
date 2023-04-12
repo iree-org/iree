@@ -1,9 +1,9 @@
 // RUN: iree-opt %s --iree-stablehlo-to-linalg --split-input-file \
-// RUN:   --canonicalize | FileCheck --enable-var-scope=false %s
+// RUN:   --canonicalize | FileCheck %s
 
 // RUN: iree-opt %s --iree-stablehlo-to-linalg="enable-primitive-ops=true" \
 // RUN:   --split-input-file --canonicalize | \
-// RUN:   FileCheck %s --enable-var-scope=false --check-prefix=CHECK-PRIMITIVE
+// RUN:   FileCheck %s --check-prefix=CHECK-PRIMITIVE
 
 // CHECK: #map = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-LABEL: func @float_add
@@ -875,7 +875,7 @@ func.func @select(%pred: tensor<2x2xi1>, %lhs: tensor<2x2xf32>,
 
 // CHECK-DAG:   #[[SCALAR_MAP:.*]] = affine_map<(d0, d1) -> ()>
 // CHECK-DAG:   #[[ID_MAP:.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @select_scalar_pred_dyn
+// CHECK:     func @select_scalar_pred_dyn
 // CHECK-SAME:  (%[[PRED:.*]]: tensor<i1>, %[[LHS:.*]]: tensor<2x?xf32>, %[[RHS:.*]]: tensor<2x?xf32>)
 func.func @select_scalar_pred_dyn(%pred : tensor<i1>, %lhs: tensor<2x?xf32>, %rhs: tensor<2x?xf32>) -> tensor<2x?xf32> {
   %0 = "stablehlo.select"(%pred, %lhs, %rhs) {someattr} : (tensor<i1>, tensor<2x?xf32>, tensor<2x?xf32>) -> (tensor<2x?xf32>)
@@ -954,7 +954,7 @@ func.func @bitcast_convert_dynamic(%input: tensor<?x?xi32>) -> tensor<?x?xf32> {
 
 // CHECK: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0)>
 // CHECK: #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @bitcast_convert_expand
+// CHECK: func @bitcast_convert_expand
 func.func @bitcast_convert_expand(%input: tensor<6xi32>) -> tensor<6x4xi8> {
   %result = "stablehlo.bitcast_convert"(%input) : (tensor<6xi32>) -> tensor<6x4xi8>
   func.return %result : tensor<6x4xi8>
@@ -979,7 +979,7 @@ func.func @bitcast_convert_expand(%input: tensor<6xi32>) -> tensor<6x4xi8> {
 
 // CHECK: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0)>
-// CHECK-LABEL: func @bitcast_convert_contract
+// CHECK: func @bitcast_convert_contract
 func.func @bitcast_convert_contract(%input: tensor<7x4xi8>) -> tensor<7xi32> {
   %result = "stablehlo.bitcast_convert"(%input) : (tensor<7x4xi8>) -> tensor<7xi32>
   func.return %result : tensor<7xi32>
@@ -1118,7 +1118,7 @@ func.func @shift_right_logical(%lhs: tensor<2x2xi32>,
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
-// CHECK-LABEL: func @einsum_basic
+// CHECK: func @einsum_basic
 func.func @einsum_basic(%arg0: tensor<3x4x5xf32>, %arg1: tensor<3x5x6xf32>) -> tensor<3x4x6xf32> {
   %0 = "stablehlo.einsum"(%arg0, %arg1) {einsum_config = "ijk,ikm->ijm", someattr}: (tensor<3x4x5xf32>, tensor<3x5x6xf32>) -> tensor<3x4x6xf32>
   func.return %0 : tensor<3x4x6xf32>
@@ -1141,7 +1141,7 @@ func.func @einsum_basic(%arg0: tensor<3x4x5xf32>, %arg1: tensor<3x5x6xf32>) -> t
 // -----
 
 // CHECK: #map = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @float_pow
+// CHECK: func @float_pow
 func.func @float_pow(%lhs: tensor<2x2xf32>,
                 %rhs: tensor<2x2xf32>) -> tensor<2x2xf32> {
   // CHECK: linalg.generic
@@ -1174,10 +1174,10 @@ func.func @complex_pow(%lhs: tensor<2x2xcomplex<f32>>,
 // -----
 
 // CHECK: #map = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @integer_pow
+// CHECK: func @integer_pow
 func.func @integer_pow(%lhs: tensor<2x2xi32>,
                   %rhs: tensor<2x2xi32>) -> tensor<2x2xi32> {
-                    // CHECK: linalg.generic
+  // CHECK: linalg.generic
   // CHECK: ^{{[a-z0-9_]*}}
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: i32
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: i32
@@ -1475,13 +1475,13 @@ func.func @integer_not(%arg: tensor<2x2xi32>) -> tensor<2x2xi32> {
 // CHECK-PRIMITIVE-LABEL: func @float_complex
 // CHECK-PRIMITIVE-SAME:    (%[[LHS:.+]]: tensor<2x2xf32>, %[[RHS:.+]]: tensor<2x2xf32>)
 func.func @float_complex(%lhs: tensor<2x2xf32>, %rhs: tensor<2x2xf32>) -> tensor<2x2xcomplex<f32>> {
-  // CHECK:      %[[INIT]] = tensor.empty() : tensor<2x2xcomplex<f32>>
+  // CHECK:      %[[INIT:.+]] = tensor.empty() : tensor<2x2xcomplex<f32>>
   // CHECK:      linalg.generic
   // CHECK-SAME: ins(%[[LHS]], %[[RHS]]
   // CHECK:      (%[[IN0:.+]]: f32, %[[IN1:.+]]: f32, %{{.+}}: complex<f32>
   // CHECK:      %[[RES:.+]] = complex.create %[[IN0]], %[[IN1]] : complex<f32>
   // CHECK:      linalg.yield %[[RES]] : complex<f32>
-  // CHECK-PRIMITIVE:      %[[INIT]] = tensor.empty() : tensor<2x2xcomplex<f32>>
+  // CHECK-PRIMITIVE:      %[[INIT:.+]] = tensor.empty() : tensor<2x2xcomplex<f32>>
   // CHECK-PRIMITIVE:      linalg.map { complex.create } ins(%[[LHS]], %[[RHS]] : tensor<2x2xf32>, tensor<2x2xf32>)
   // CHECK-PRIMITIVE-SAME: outs(%[[INIT]] : tensor<2x2xcomplex<f32>>)
   %0 = "stablehlo.complex"(%lhs, %rhs) : (tensor<2x2xf32>, tensor<2x2xf32>) -> tensor<2x2xcomplex<f32>>
