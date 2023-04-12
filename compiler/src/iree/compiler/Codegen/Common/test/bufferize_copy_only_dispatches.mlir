@@ -78,11 +78,11 @@ builtin.module {
     return
   }
 }
-//      CHECK: memref.global "private" constant @[[CONST:.+]] : memref<2x3xi32> = dense<0>
-//      CHECK: func.func @concatenate_cst()
-//  CHECK-DAG:   %[[CONST_PTR:.+]] = memref.get_global @[[CONST]] : memref<2x3xi32>
-//  CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan
-//  CHECK-DAG:   %[[SUBVIEW:.+]] = memref.subview %[[DEST_BINDING]][0, 2] [2, 3]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       ins(%[[CONST_PTR]] :
-// CHECK-SAME:       outs(%[[SUBVIEW]] :
+// CHECK-LABEL: func.func @concatenate_cst()
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0> : tensor<2x3xi32>
+//   CHECK-DAG:   %[[ZERO:.+]] = bufferization.to_memref %[[CST]] : memref<2x3xi32
+//   CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan
+//   CHECK-DAG:   %[[SUBVIEW:.+]] = memref.subview %[[DEST_BINDING]][0, 2] [2, 3]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[ZERO]] :
+//  CHECK-SAME:       outs(%[[SUBVIEW]] :

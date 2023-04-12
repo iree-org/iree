@@ -118,10 +118,6 @@ static void addBufferizePasses(OpPassManager &passManager) {
   addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
                                       memcpyFn);
 
-  // Handled tensor-type constants.
-  passManager.addPass(arith::createConstantBufferizePass());
-  passManager.addPass(createFoldTensorExtractOpPass());
-
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.addNestedPass<func::FuncOp>(
@@ -642,6 +638,10 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // Handled tensor-type constants.
+  passManager.addPass(arith::createConstantBufferizePass());
+  passManager.addPass(createFoldTensorExtractOpPass());
 
   // Handle complex operation conversion.
   passManager.addPass(createConvertComplexToStandardPass());
