@@ -807,5 +807,17 @@ transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
+//===---------------------------------------------------------------------===//
+// ReorderTransposeOp
+//===---------------------------------------------------------------------===//
+DiagnosedSilenceableFailure transform_dialect::ReorderTransposeOp::applyToOne(
+    func::FuncOp target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(getContext());
+  iree_compiler::reorderTranspose(rewriter, cast<func::FuncOp>(target));
+  results.push_back(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.cpp.inc"
