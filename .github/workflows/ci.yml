@@ -409,7 +409,7 @@ jobs:
       - name: "Running TF integrations tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:800c9bbefc2f396f99b91a29bead233d85b746fa1effa7845a4336c9b6106dd6 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -451,7 +451,7 @@ jobs:
             --env IREE_LLVM_CPU_DISABLE=1 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/frontends-nvidia@sha256:fa85a37e3834fe62813608aa3b368578ce17e50620e257e0f5a85c6a425ee0dd \
+            gcr.io/iree-oss/frontends-nvidia@sha256:b0df86dff8bfcf5f43eedb70d178703b4538f31a2bf45e3b2eb035724a7f6a42 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
