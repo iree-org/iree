@@ -14,7 +14,6 @@ bazel build iree_tf_compiler:importer-binaries
 
 # Or individuals:
 bazel build iree_tf_compiler:iree-import-tflite
-bazel build iree_tf_compiler:iree-import-xla
 bazel build iree_tf_compiler:iree-import-tf
 ```
 
@@ -40,7 +39,6 @@ Test installed:
 
 ```
 iree-import-tflite -help
-iree-import-xla -help
 iree-import-tf -help
 ```
 

@@ -14,7 +14,6 @@ filegroup(
     name = "importer-binaries",
     srcs = [
         ":iree-import-tflite",
-        ":iree-import-xla",
     ],
 )
 
@@ -63,28 +62,5 @@ cc_binary(
         "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",
-    ],
-)
-
-cc_binary(
-    name = "iree-import-xla",
-    srcs = ["iree-import-xla-main.cpp"],
-    deps = [
-        "//iree_tf_compiler/MHLO",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:BytecodeWriter",
-        "@llvm-project//mlir:FuncDialect",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:MathDialect",
-        "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Support",
-        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:all_passes",
-        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:hlo_dialect_registration",
-        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_parser",
-        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_proto_cc",
-        "@org_tensorflow//tensorflow/compiler/xla/translate/hlo_to_mhlo:hlo_to_mlir_hlo",
-        "@org_tensorflow//tensorflow/core:lib",
     ],
 )
