@@ -61,7 +61,7 @@ ENV BLIS_DIR="/opt/blis"
 ######## MMPERF ########
 COPY build_tools/docker/context/setup_mmperf.sh /usr/local/bin
 
-ARG MMPERF_SHA="8032334e77a2153bee42ead2ef181d58cdf28d7c"
+ARG MMPERF_SHA="5b4e242597f7367660d7454d654a33472308683d"
 
 # Generate a version of mmperf for CPU.
 RUN mkdir -p "/usr/local/src/mmperf" \
