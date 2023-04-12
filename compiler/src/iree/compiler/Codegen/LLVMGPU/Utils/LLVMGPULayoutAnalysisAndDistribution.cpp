@@ -309,6 +309,12 @@ static void propagateLayoutToReduceBroadcastTranspose(
   Value transposedResult = transposeOp.getResult();
   layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
   layoutMap.at(transposedResult).debugPrint("transposed");
+  // Propagate 2D layout to 1D accumulator
+  Value acc = reductionOp.getAcc();
+  if (layoutMap.count(acc)) return;
+  Layout accLayout = layoutMap.at(reductionSrc);
+  accLayout.rank = 1;
+  layoutMap.try_emplace(acc, accLayout);
 }
 
 static std::tuple<vector::BroadcastOp, vector::TransposeOp>
@@ -751,10 +757,7 @@ static void distributeReductionBroadcastTranspose(
   std::array<int, 4> reductionOrder = layout.order[reductionDim];
   std::array<int, 4> parallelOrder = layout.order[!reductionDim];
   Value acc = reductionOp.getAcc();
-  // TODO: Should be able to handle any accumulator type here without
-  // too many problems
-  APFloat floatValue(0.0);
-  if (!matchPattern(acc, m_ConstantFloat(&floatValue))) return;
+  if (!simdToSimtMap.count(acc)) return;
   SmallVector<int64_t> vecShape{
       layout.shape[DimType::Batch0], layout.shape[DimType::Batch1],
       layout.shape[DimType::VecIdZ] * layout.shape[DimType::VecIdY],
@@ -780,8 +783,7 @@ static void distributeReductionBroadcastTranspose(
   }
 
   bodyType loopBody = [&](std::array<int, DimType::NumDims> &state) {
-    Value result = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getFloatAttr(elementType, floatValue));
+    Value result;
 
     auto reduce = [&](std::array<int, DimType::NumDims> &state) {
       Value vector = simdToSimtMap.at(source);
@@ -814,6 +816,13 @@ static void distributeReductionBroadcastTranspose(
         vector = makeArithReduction(rewriter, loc, combiningKind, unpacked,
                                     vector, mask);
       }
+
+      // Since this is a broadcasted tensor, we only need to extract the 0th
+      // element
+      result = rewriter.create<vector::ExtractOp>(
+          loc, simdToSimtMap.at(acc),
+          SmallVector<int64_t>{state[DimType::Batch0], state[DimType::Batch1],
+                               vectorOffset, 0});
 
       for (int i = 0; i < vShape[0]; i++) {
         Value v = rewriter.create<vector::ExtractOp>(loc, vector,
