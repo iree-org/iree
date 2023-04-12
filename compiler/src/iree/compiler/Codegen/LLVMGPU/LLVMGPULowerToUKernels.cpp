@@ -161,40 +161,46 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
         combinedOps, strTypes[0], strTypes[1], strTypes[2], tiles[0], tiles[1],
         tiles[2], stages.value(), hasFill, !hasConsumer);
 
-    // Step 7. Allocate shared memory for output
-    const int shmemSizeOut = tiles[0] * tiles[1];
-    Value shmemBufferOut = rewriter.create<bufferization::AllocTensorOp>(
-        loc, RankedTensorType::get({tiles[0], tiles[1]}, resElementType),
-        ValueRange{});
-
-    // Step 8. Allocate shared memory for inputs. Here we reuse outputs shared
-    // memory, so we allocate only the remaining.
-    Value shmemBufferRemaining = out;
-    const int shmemSizeTotal =
-        ((tiles[0] * tiles[2]) + (tiles[1] * tiles[2])) * stages.value();
-    const int shmemSizeRemaining = shmemSizeTotal - shmemSizeOut;
-    if (shmemSizeRemaining > 0) {
-      shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
-          loc, RankedTensorType::get({shmemSizeRemaining}, resElementType),
+    // Step 7. Allocate shared memory
+    Optional<Value> shmemBufferOut = std::nullopt;
+    Optional<Value> shmemBufferRemaining = std::nullopt;
+    int shmemSizeTotal = 0;
+    if (!out.getDefiningOp<tensor::EmptyOp>()) {
+      // Step 7.1 For output
+      int shmemSizeOut = tiles[0] * tiles[1];
+      shmemBufferOut = rewriter.create<bufferization::AllocTensorOp>(
+          loc, RankedTensorType::get({tiles[0], tiles[1]}, resElementType),
           ValueRange{});
-    } else {
+
+      // Step 7.2 For inputs: Here we reuse outputs shared memory, but if the
+      // inputs needs large space, we allocate the remaining.
+      shmemSizeTotal =
+          ((tiles[0] * tiles[2]) + (tiles[1] * tiles[2])) * stages.value();
+      const int shmemSizeRemaining = shmemSizeTotal - shmemSizeOut;
+      if (shmemSizeRemaining > 0) {
+        shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
+            loc, RankedTensorType::get({shmemSizeRemaining}, resElementType),
+            ValueRange{});
+      }
+    }
+    if (!shmemBufferOut.has_value()) shmemBufferOut = out;
+    if (!shmemBufferRemaining.has_value()) {
       // Just pass something to match the ABI
       shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
           loc, RankedTensorType::get({0}, resElementType), ValueRange{});
     }
-    //  todo(guray) Verify that we have sufficient shared memory here
 
     // Step 9. Fill the operands
     SmallVector<Value> ins = {lhs, rhs};
     SmallVector<Value> others, outs;
     if (hasConsumer) {
       ins.push_back(out);
-      outs.push_back(shmemBufferOut);
+      outs.push_back(shmemBufferOut.value());
     } else {
       outs.push_back(out);
-      others.push_back(shmemBufferOut);
+      others.push_back(shmemBufferOut.value());
     }
-    others.push_back(shmemBufferRemaining);
+    others.push_back(shmemBufferRemaining.value());
     others.push_back(fillValue.value());
 
     // Step 10. Generate the op
@@ -203,7 +209,7 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
         others);
 
     LLVM_DEBUG({
-      llvm::dbgs() << "Calling Microkernel `" << fnName << "`, needs "
+      llvm::dbgs() << "Calling Microkernel `" << fnName << "`, allocated "
                    << shmemSizeTotal * lhsElementType.getIntOrFloatBitWidth() /
                           8 / 1024
                    << " Kb Shared Memory \n";
