@@ -27,9 +27,10 @@ add_mlir_library(IREELinalgTransformDialect
   MLIRLinalgTransforms
   MLIRMemRefTransforms
   MLIRReconcileUnrealizedCasts
+  MLIRTensorTransformOps
   MLIRTransforms
   MLIRVectorToSCF
-  
+
   # Conversions
   MLIRAsyncToLLVM
   MLIRIndexToLLVM
