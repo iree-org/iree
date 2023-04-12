@@ -137,7 +137,7 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
   // We can have more than 3 dimensions being tiled (e.g., for convolutions with
   // non-1 batch). But only the innermost 3 dimensions are distributed.
   for (auto [dim, loop] : zip(llvm::seq(0, 3), llvm::reverse(loops))) {
-    loop->setAttr(attrName, rewriter.getIndexAttr(dim++));
+    loop->setAttr(attrName, rewriter.getIndexAttr(dim));
   }
   return success();
 }
