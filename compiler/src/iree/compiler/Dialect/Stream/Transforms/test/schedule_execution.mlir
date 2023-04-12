@@ -271,8 +271,8 @@ func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
   %updated = stream.async.store %load, %download[%c0] : i8 -> !stream.resource<staging>{%c1}
 
   // CHECK: stream.async.execute
-  // CHECK-NEXT: stream.async.splat
   // CHECK-NEXT: stream.async.transfer
+  // CHECK-NEXT: stream.async.splat
   %upload = stream.async.transfer %updated : !stream.resource<staging>{%c1} -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.dispatch
   %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%upload[%c0 to %c1 for %c1], %splat[%c0 to %c1 for %c1]) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
