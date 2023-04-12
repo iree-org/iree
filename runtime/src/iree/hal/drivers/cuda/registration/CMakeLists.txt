@@ -10,28 +10,6 @@
 
 iree_add_all_subdirs()
 
-if(IREE_USE_MPI)
-iree_cc_library(
-  NAME
-    registration
-  HDRS
-    "driver_module.h"
-  SRCS
-    "driver_module.c"
-  DEPS
-    iree::base
-    iree::base::core_headers
-    iree::base::internal::flags
-    iree::base::tracing
-    iree::hal
-    iree::hal::drivers::cuda
-    mpi::headers_and_libs
-  DEFINES
-    "IREE_HAVE_HAL_CUDA_DRIVER_MODULE=1"
-    "IREE_USE_MPI=1"
-  PUBLIC
-)
-else()
 iree_cc_library(
   NAME
     registration
@@ -50,6 +28,5 @@ iree_cc_library(
     "IREE_HAVE_HAL_CUDA_DRIVER_MODULE=1"
   PUBLIC
 )
-endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

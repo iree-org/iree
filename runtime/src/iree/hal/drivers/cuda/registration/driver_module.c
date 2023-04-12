@@ -13,10 +13,8 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/api.h"
-
-#if IREE_USE_MPI
-#include "mpi.h"
-#endif  // IREE_USE_MPI
+#include "iree/hal/drivers/cuda/cuda_device.h"
+#include "iree/hal/drivers/cuda/status_util.h"
 
 // Force using CUDA streams until we support command buffer caching to avoid the
 // overhead of graph creation.
@@ -49,13 +47,28 @@ static iree_status_t iree_hal_cuda_nccl_query_group_params(
     iree_hal_channel_params_t* params) {
   IREE_ASSERT_EQ(id_storage.data_length, sizeof(iree_hal_cuda_nccl_id_t));
 
-#if IREE_USE_MPI
-  if (params->rank == IREE_HAL_CHANNEL_RANK_DEFAULT) {
-    MPI_Comm_rank(MPI_COMM_WORLD, &params->rank);
+  iree_hal_cuda_dynamic_symbols_t* syms =
+      iree_hal_cuda_get_dynamic_symbols(device);
+
+  if (!syms->mpi_library) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "MPI should be loaded to use NCCL collective operations.");
   }
-  if (params->count == IREE_HAL_CHANNEL_COUNT_DEFAULT) {
-    MPI_Comm_size(MPI_COMM_WORLD, &params->count);
-  }
+
+  // Until we have multi channel support, we only creates the default channel.
+  IREE_ASSERT_EQ(params->rank, IREE_HAL_CHANNEL_RANK_DEFAULT);
+  IREE_ASSERT_EQ(params->count, IREE_HAL_CHANNEL_COUNT_DEFAULT);
+
+  // Update the rank and count.
+  MPI_RETURN_IF_ERROR(
+      syms, MPI_Comm_rank((MPI_Comm)(syms->ompi_mpi_comm_world), &params->rank),
+      "MPI_Comm_rank");
+  MPI_RETURN_IF_ERROR(
+      syms,
+      MPI_Comm_size((MPI_Comm)(syms->ompi_mpi_comm_world), &params->count),
+      "MPI_Comm_size");
+  ;
 
   iree_hal_cuda_nccl_id_t* id = (iree_hal_cuda_nccl_id_t*)id_storage.data;
   if (params->rank == 0) {
@@ -64,40 +77,12 @@ static iree_status_t iree_hal_cuda_nccl_query_group_params(
     IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
   }
 
-  int mpi_status =
-      MPI_Bcast(id, id_storage.data_length, MPI_BYTE, 0, MPI_COMM_WORLD);
-  if (mpi_status != MPI_SUCCESS) {
-    return iree_make_status(IREE_STATUS_INTERNAL, "MPI_Bcast() returned %d",
-                            mpi_status);
-  }
+  MPI_RETURN_IF_ERROR(
+      syms,
+      MPI_Bcast(id, id_storage.data_length, (MPI_Datatype)syms->ompi_mpi_byte,
+                0, (MPI_Comm)(syms->ompi_mpi_comm_world)),
+      "MPI_Bcast");
   params->id = iree_const_cast_byte_span(id_storage);
-#else
-  // Users can either specify a specific rank or allow this device
-  // implementation to decide. This allows us to run the same programs acting as
-  // different ranks by setting flags/environment variables/API options/etc.
-  if (params->rank == IREE_HAL_CHANNEL_RANK_DEFAULT) {
-    params->rank = FLAG_cuda_nccl_default_rank;
-  }
-  if (params->count == IREE_HAL_CHANNEL_COUNT_DEFAULT) {
-    params->count = FLAG_cuda_nccl_default_count;
-  }
-
-  // Let NCCL configure itself and return the ID to use.
-  //
-  // HACK: this may not be correct and should only be used for testing.
-  // TODO(benvanik): a string form we can use and a flag.
-  if (iree_const_byte_span_is_empty(params->id)) {
-    if (!getenv("NCCL_COMM_ID")) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "the NCCL_COMM_ID environment variable must be set "
-          "when using the default NCCL configuration");
-    }
-    iree_hal_cuda_nccl_id_t* id = (iree_hal_cuda_nccl_id_t*)id_storage.data;
-    IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
-    params->id = iree_const_cast_byte_span(id_storage);
-  }
-#endif  // IREE_USE_MPI
 
   return iree_ok_status();
 }
@@ -135,36 +120,16 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   }
   default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
   default_params.stream_tracing = FLAG_cuda_tracing;
-
-#if IREE_USE_MPI
-  MPI_Init(NULL, NULL);
-  // Only setup channels if we're running collectives. Setting this will require
-  // NCCL to be available at runtime.
   default_params.channel_provider = (iree_hal_channel_provider_t){
       .self = NULL,
       .query_group_params = iree_hal_cuda_nccl_query_group_params,
   };
-#else
-  // Only setup channels if we're running collectives. Setting this will require
-  // NCCL to be available at runtime.
-  if (FLAG_cuda_nccl_default_count != 0) {
-    default_params.channel_provider = (iree_hal_channel_provider_t){
-        .self = NULL,
-        .query_group_params = iree_hal_cuda_nccl_query_group_params,
-    };
-  }
-#endif  // IREE_USE_MPI
 
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);
-#if IREE_USE_MPI
-  // use the rank as the cuda device index.
-  int rank = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  driver_options.default_device_index = rank;
-#else
   driver_options.default_device_index = FLAG_cuda_default_index;
-#endif  // IREE_USE_MPI
+  driver_options.default_rank = FLAG_cuda_nccl_default_rank;
+  driver_options.default_count = FLAG_cuda_nccl_default_count;
 
   iree_status_t status =
       iree_hal_cuda_driver_create(driver_name, &default_params, &driver_options,

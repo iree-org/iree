@@ -88,6 +88,10 @@ typedef struct iree_hal_cuda_driver_options_t {
   // Index of the default CUDA device to use within the list of available
   // devices.
   int default_device_index;
+  // The rank in the default collective channel.
+  int default_rank;
+  // The count of the default collective channel.
+  int default_count;
 } iree_hal_cuda_driver_options_t;
 
 IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(

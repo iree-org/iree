@@ -118,6 +118,9 @@ class TargetConverter:
         "@mlir-hlo//:stablehlo_legalize_to_hlo_pass": ["StablehloToMhlo",],
         "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
 
+        # MPI
+        "@mpi//:headers": ["mpi::headers",],
+
         # NCCL
         "@nccl//:headers": ["nccl::headers",],
 

@@ -14,7 +14,6 @@
 #include "iree/hal/drivers/cuda/cuda_device.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/status_util.h"
-#include "mpi.h"
 
 // Maximum device name length we support.
 #define IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH 128
@@ -47,6 +46,26 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
     iree_hal_cuda_driver_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->default_device_index = 0;
+  out_options->default_rank = 0;
+  out_options->default_count = 0;
+}
+
+// Get the MPI world sizefrom the environmental variable. Return 0 if the
+// variable is not set.
+iree_status_t iree_hal_cuda_get_mpi_comm_world_size_from_env(int32_t* size) {
+  *size = 0;
+
+  const char* comm_world_size_str = getenv("OMPI_COMM_WORLD_SIZE");
+  if (!comm_world_size_str) {
+    return iree_ok_status();
+  }
+
+  if (!iree_string_view_atoi_uint32(iree_make_cstring_view(comm_world_size_str),
+                                    size)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "OMPI_COMM_WORLD_SIZE=%s", comm_world_size_str);
+  }
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_driver_create_internal(
@@ -71,12 +90,31 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
   iree_status_t status =
       iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
 
-  // Initialize NCCL too if a channel provider is defined or any default
-  // collective group values.
+  int comm_world_size = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cuda_get_mpi_comm_world_size_from_env(&comm_world_size);
+  }
+
+  // Initialize NCCL too if MPI is used or default_count is set.
   if (iree_status_is_ok(status) &&
-      default_params->channel_provider.query_group_params) {
+      (comm_world_size > 0 || options->default_count > 0)) {
     status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
                                                            &driver->syms);
+    if (comm_world_size > 0) {
+      status = iree_hal_mpi_dynamic_symbols_initialize(host_allocator,
+                                                       &driver->syms);
+      if (iree_status_is_ok(status)) {
+        MPI_RETURN_IF_ERROR(&driver->syms, MPI_Init(NULL, NULL), "MPI_Init");
+
+        // Override the device index with the MPI rank.
+        int rank = 0;
+        MPI_RETURN_IF_ERROR(
+            &driver->syms,
+            MPI_Comm_rank((MPI_Comm)(driver->syms.ompi_mpi_comm_world), &rank),
+            "MPI_Comm_rank");
+        driver->default_device_index = rank;
+      }
+    }
   }
 
   if (iree_status_is_ok(status)) {
@@ -91,7 +129,9 @@ static void iree_hal_cuda_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_hal_cuda_driver_t* driver = iree_hal_cuda_driver_cast(base_driver);
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
-  MPI_Finalize();
+  if (driver->syms.mpi_library) {
+    MPI_IGNORE_ERROR(&driver->syms, MPI_Finalize());
+  }
   iree_hal_cuda_dynamic_symbols_deinitialize(&driver->syms);
   iree_allocator_free(host_allocator, driver);
 

@@ -198,6 +198,13 @@ iree_status_t iree_hal_cuda_device_get_context(iree_hal_device_t* base_device,
   return iree_ok_status();
 }
 
+iree_hal_cuda_dynamic_symbols_t* iree_hal_cuda_get_dynamic_symbols(
+    iree_hal_device_t* base_device) {
+  IREE_ASSERT_ARGUMENT(base_device);
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return device->context_wrapper.syms;
+}
+
 static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);

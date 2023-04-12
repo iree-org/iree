@@ -4,18 +4,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-find_package(MPI REQUIRED)
+set(MPI_SOURCE_DIR "${IREE_SOURCE_DIR}/third_party/mpi")
 
 external_cc_library(
   PACKAGE
     mpi
   NAME
-    headers_and_libs
+    headers
   ROOT
-    "${IREE_SOURCE_DIR}/third_party/mpi/"
+    "${MPI_SOURCE_DIR}"
   INCLUDES
-    "${MPI_CXX_INCLUDE_PATH}"
-  DEPS
-    "${MPI_CXX_LIBRARIES}"
+    "${MPI_SOURCE_DIR}"
   PUBLIC
 )
