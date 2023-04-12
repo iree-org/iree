@@ -601,6 +601,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUPackSharedMemoryAlloc();
 
+/// Checks GPU backend specific IR constraints such as shared memory limits.
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMGPUCheckIRBeforeLLVMConversionPass();
+
 //------------------------------------------------------------------------------
 // SPIR-V Passes
 //------------------------------------------------------------------------------

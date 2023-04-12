@@ -504,6 +504,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   addLowerAndOptimzeAddressComputation(pm);
   // THIS NEEDS TO RUN BEFORE SCF ->CF OFF
 
+  // Run checks on shared memory usage.
+  pm.addPass(createLLVMGPUCheckIRBeforeLLVMConversionPass());
+
   // SCF -> STD
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());

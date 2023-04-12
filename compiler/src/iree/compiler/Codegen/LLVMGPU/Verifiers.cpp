@@ -167,9 +167,6 @@ LogicalResult verifyGPUMatmulPipeline(
            << pipelineName;
   }
 
-  // Verify shared memory usage is within the limit.
-  // TODO(KoolJBlack): working on adding check shared memory usage.
-
   // Return success for SIMT/CUDA cores.
   if (pipeline.getValue() ==
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt)

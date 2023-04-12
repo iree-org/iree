@@ -733,6 +733,12 @@ def LLVMGPUTensorPad :
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorPadPass()";
 }
 
+def LLVMGPUCheckIRBeforeLLVMConversion :
+    Pass<"iree-llvmgpu-check-ir-before-llvm-conversion", "ModuleOp"> {
+  let summary = "Checks GPU backend specific IR constraints such as shared memory limits";
+  let constructor = "mlir::iree_compiler::createLLVMGPUCheckIRBeforeLLVMConversionPass()";
+}
+
 //------------------------------------------------------------------------------
 // SPIR-V
 //------------------------------------------------------------------------------
