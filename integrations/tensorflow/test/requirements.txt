@@ -1,15 +1,5 @@
 # Requirements for running TF tests
-tensorflow>=2.7.1
+# Temporarily pinning to nightly until TF 2.13 is released
+tf-nightly==2.13.0.dev20230406
 keras>=2.7.0
 Pillow>=9.2.0
-
-# NOTE: 2022-05-27: protobuf 4.21.0, released on May 25, 2022 is incompatible
-# with prior releases. Specifically implicated are the above versions of
-# tensorflow, which seem to include it without a version pin and therefore
-# break out of the box. The next time the above versions are upgraded,
-# try removing this line and then, within the docker image, run:
-#   python3 -c "import tensorflow"
-# If that fails with a stack trace, put this line back.
-# On behalf of Google, we are sorry for the live at head philosophy
-# and shoddy version management leaking into everything. We're victims too.
-protobuf>=3.20.1, <4
