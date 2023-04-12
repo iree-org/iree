@@ -46,7 +46,7 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   InitLLVM y(argc, argv);
 
   // Register any command line options.
-  MlirOptMainConfig::registerCLOptions();
+  MlirOptMainConfig::registerCLOptions(registry);
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
   registerPassManagerCLOptions();
