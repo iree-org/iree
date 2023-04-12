@@ -22,10 +22,9 @@ set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_BUILD_BENCHMARKS_DIR:-build-benchmarks}}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
-IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_local_python.sh
+source build_tools/cmake/setup_tf_python.sh
 
 echo "Configuring to build benchmarks"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
@@ -37,8 +36,7 @@ echo "Configuring to build benchmarks"
   -DIREE_BUILD_MICROBENCHMARKS=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_BUILD_TESTS=OFF \
-  -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite"
+  -DIREE_BUILD_TESTS=OFF
 
 echo "Building benchmark artifacts"
 "${CMAKE_BIN}" \
