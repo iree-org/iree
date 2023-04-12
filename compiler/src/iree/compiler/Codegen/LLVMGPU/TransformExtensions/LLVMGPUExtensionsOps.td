@@ -521,17 +521,22 @@ def ReorderTransposeOp :
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Targets the whole func op and does the following:
+    Targets the whole func op and finds transpose ops whose source
+    comes from an elementwise op. For each of those transpose ops,
+    it moves the transpose before the elementwise op by first
+    transposing the operands of the elementwise op and then redoing
+    the elementwise op using the transposed operands. It then
+    replaces all uses of the original transpose op with the result
+    of the new elementwise op.
 
-    Given IR that looks like
-        %0 = arith.subf %a, %b : vector<16x8xf16>
-        %1 = vector.transpose %0 [1, 0] : vector<16x8xf16> to vector<8x16xf16>
+    More specifically, given IR that looks like below,
+      %0 = arith.subf %a, %b : vector<16x8xf16>
+      %1 = vector.transpose %0 [1, 0] : vector<16x8xf16> to vector<8x16xf16>
 
     It moves the transpose before the elementwise op to produce
-        %transposed_a = vector.transpose %a [1, 0] : vector<16x8xf16> to vector<8x16xf16>
-        %transposed_b = vector.transpose %b [1, 0] : vector<16x8xf16> to vector<8x16xf16>
-        %0 = arith.subf %transposed_a, %transposed_b : vector<8x16xf16>
-
+      %transposed_a = vector.transpose %a [1, 0] : vector<16x8xf16> to vector<8x16xf16>
+      %transposed_b = vector.transpose %b [1, 0] : vector<16x8xf16> to vector<8x16xf16>
+      %0 = arith.subf %transposed_a, %transposed_b : vector<8x16xf16>
   }];
 
   let arguments = (ins PDL_Operation:$target);

@@ -192,5 +192,37 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
   }
 }
 
+void reorderTranspose(IRRewriter& rewriter, func::FuncOp funcOp) {
+  SmallVector<vector::TransposeOp> transposeOps;
+  funcOp.walk([&](Operation* op) {
+    if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
+      Operation* definingOp = transposeOp.getVector().getDefiningOp();
+      if (OpTrait::hasElementwiseMappableTraits(definingOp)) {
+        transposeOps.push_back(transposeOp);
+      }
+    }
+    return WalkResult::advance();
+  });
+
+  for (auto transposeOp : transposeOps) {
+    OpBuilder::InsertionGuard g(rewriter);
+    Operation* op = transposeOp.getVector().getDefiningOp();
+    rewriter.setInsertionPoint(op);
+    SmallVector<int64_t> perm;
+    transposeOp.getTransp(perm);
+    SmallVector<Value> transposedOperands;
+    for (auto operand : op->getOperands()) {
+      Value transposed =
+          rewriter.create<vector::TransposeOp>(op->getLoc(), operand, perm);
+      transposedOperands.push_back(transposed);
+    }
+    SmallVector<Type> resultTypes{transposedOperands.front().getType()};
+    Operation* newOp =
+        rewriter.create(op->getLoc(), op->getName().getIdentifier(),
+                        transposedOperands, resultTypes, op->getAttrs());
+    rewriter.replaceAllUsesWith(transposeOp.getResult(), newOp->getResult(0));
+  }
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
