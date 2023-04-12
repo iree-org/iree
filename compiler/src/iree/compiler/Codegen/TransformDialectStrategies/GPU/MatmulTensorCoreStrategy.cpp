@@ -53,8 +53,8 @@ using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
 
 using iree_compiler::buildSelectFirstNonEmpty;
-using iree_compiler::buildTileFuseDistToForallAndWorkgroupCountWithTileSizes;
 using iree_compiler::buildTileFuseDistToForallWithNumThreads;
+using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
@@ -490,7 +490,7 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
   //     buildSelectFirstNonEmpty(b, maybeTrailingH, matmulH);
   MatmulStrategy::MappingInfo blockMapping = strategy.getBlockMapping();
   TileToForallAndFuseAndDistributeResult tileResult =
-      buildTileFuseDistToForallAndWorkgroupCountWithTileSizes(
+      buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
           /*isolatedParentOpH=*/variantH,
           /*rootH=*/matmulH,

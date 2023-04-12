@@ -37,6 +37,14 @@ LogicalResult verifyLoweringConfiguration(
 // Misc/common conversions
 //------------------------------------------------------------------------------
 
+/// Passes that are done on all backends before target-specific code-generation
+/// kicks in.
+// TODO(#12933): Because of regressions in CUDA backend, there is an
+// option to keep a legacy mode of not representing the offset in the
+// type. Remove once the bug is fixed.
+void addCommonTargetExecutablePreprocessingPasses(
+    OpPassManager &passManager, bool embedSubspanOffsetIntoMemRefType = true);
+
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
 /// CleanupBufferAllocView).
@@ -54,6 +62,10 @@ void addIREEComprehensiveBufferizePasses(
         std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
     bool embedSubspanOffsetIntoMemRefType = true);
+
+/// Pass to bubble up ordinal operations to allow workgroup count computation
+/// based on slices to correlate back to workload computation.
+std::unique_ptr<Pass> createBubbleUpOrdinalOpsPass();
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.

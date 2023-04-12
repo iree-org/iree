@@ -13,6 +13,11 @@ include "mlir/Pass/PassBase.td"
 // Common/misc passes
 //------------------------------------------------------------------------------
 
+def BubbleUpOrdinalOps : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
+  let summary = "Bubbles op ordinal ops to allow for workgroup count computation";
+  let constructor = "mlir::iree_compiler::createBubbleUpOrdinalOpsPass()";
+}
+
 def CleanupBufferAllocView :
     Pass<"iree-codegen-cleanup-buffer-alloc-view", "func::FuncOp"> {
   let summary =

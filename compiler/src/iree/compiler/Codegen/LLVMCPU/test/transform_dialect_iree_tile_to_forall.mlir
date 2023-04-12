@@ -1,8 +1,8 @@
 // RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
 
 // Check that we can specify `num_threads` when lowering
-// `workgroup_count_from_dag_root` using
-// `transform.iree.tile_to_forall_and_workgroup_count_region`
+// `workgroup_count_from_body_slice` using
+// `transform.iree.populate_workgroup_count_region_using_num_threads_slice`
 
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
@@ -20,8 +20,8 @@ hal.executable private @matmul_static_dispatch_0 {
     // CHECK-DAG: %[[C32:.*]] = arith.constant 32 : index
     // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
     // CHECK: hal.return %[[C32]], %[[C1]], %[[C1]] : index, index, index
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
       hal.return %x, %y, %z : index, index, index
     }
 
@@ -53,12 +53,11 @@ transform.sequence failures(propagate) {
     : (!pdl.operation) -> !pdl.operation
 
   %forall, %matmul =
-    transform.iree.tile_to_forall_and_workgroup_count_region %original_matmul
-      num_threads [32]
+    transform.structured.tile_to_forall_op %original_matmul num_threads [32]
       ( mapping = [#gpu.block<x>] )
 
   // Late canonicalizations to cleanup and pass the checks.
   // Needs to occur on the whole variant to perform cse on the workgroup_count region
-  transform.iree.apply_patterns %variant_op
-    { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
+    : (!pdl.operation) -> ()
 }

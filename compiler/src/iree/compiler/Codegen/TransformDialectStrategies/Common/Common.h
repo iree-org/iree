@@ -147,27 +147,9 @@ TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithTileSizes(
     ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
     ArrayAttr threadDimMapping);
 
-/// Version of `buildTileFuseDistToForallWithTileSizes` that is aware of
-/// IREE's `workgroup_count` region and should be used for the block-level
-/// tiling in a dispatch region.
-TileToForallAndFuseAndDistributeResult
-buildTileFuseDistToForallAndWorkgroupCountWithTileSizes(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
-    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
-    ArrayAttr threadDimMapping);
-
 /// Similar to `buildTileFuseDistWithTileSizes` but using `numThreads` instead
 /// of `tileSizes`.
 TileToForallAndFuseAndDistributeResult buildTileFuseDistToForallWithNumThreads(
-    ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
-    ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
-    ArrayAttr threadDimMapping);
-
-/// Version of `buildTileFuseDistToForallWithNumThreads` that is aware of
-/// IREE's `workgroup_count` region and should be used for the block-level
-/// tiling in a dispatch region.
-TileToForallAndFuseAndDistributeResult
-buildTileFuseDistToForallAndWorgroupCountWithNumThreads(
     ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
     ValueRange opsHToFuse, ArrayRef<OpFoldResult> numThreads,
     ArrayAttr threadDimMapping);

@@ -236,14 +236,14 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
   return newRegionOp;
 }
 
-Flow::DispatchRegionOp Flow::makeDispatchRegionWithWorkload(
-    OpBuilder &builder, Location loc, SmallVector<Value> workload) {
+Flow::DispatchRegionOp Flow::makeEmptyDispatchRegion(OpBuilder &builder,
+                                                     Location loc) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
   auto regionOp = builder.create<Flow::DispatchRegionOp>(
       loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(),
-      /*workload=*/workload);
+      /*workload=*/ValueRange());
   Block &body = regionOp.getBody().emplaceBlock();
   builder.setInsertionPointToStart(&body);
   builder.create<Flow::ReturnOp>(loc, ValueRange());
@@ -345,40 +345,15 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
 }
 
 FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
-    RewriterBase &rewriter, Operation *op,
-    std::optional<Flow::WorkloadBuilder> workloadBuilder) {
-  SmallVector<Value> workload;
-
+    RewriterBase &rewriter, Operation *op) {
   OpBuilder::InsertionGuard g(rewriter);
-  if (workloadBuilder) {
-    rewriter.setInsertionPoint(op);
-    FailureOr<SmallVector<Value>> maybeWorkload =
-        getWorkloadForRootOp(rewriter, op);
-    if (failed(maybeWorkload)) {
-      return op->emitOpError("failed to compute workload for op");
-    }
-    workload = *maybeWorkload;
-  }
 
   rewriter.setInsertionPointAfter(op);
   Flow::DispatchRegionOp regionOp =
-      Flow::makeDispatchRegionWithWorkload(rewriter, op->getLoc(), workload);
+      Flow::makeEmptyDispatchRegion(rewriter, op->getLoc());
 
   // Move the op into the dispatch region.
   auto newRegionOp = movePrecedingOpIntoDispatchRegion(rewriter, op, regionOp);
-
-  // Generate workload_count region
-  if (succeeded(newRegionOp) && workloadBuilder.has_value()) {
-    Region &workgroupCountRegion = newRegionOp->getWorkgroupCount();
-    Block *body = rewriter.createBlock(&workgroupCountRegion);
-    SmallVector<BlockArgument> workloadArgs;
-    Location loc = newRegionOp->getLoc();
-    for (Value v : workload) {
-      workloadArgs.push_back(body->addArgument(v.getType(), loc));
-    }
-    rewriter.setInsertionPointToStart(body);
-    workloadBuilder->regionBuilder(rewriter, loc, workloadArgs);
-  }
 
   return newRegionOp;
 }

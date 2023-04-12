@@ -11,7 +11,9 @@ transform.sequence failures(propagate) {
   // Step 2. Tile the matmul and fuse the fill
   // ===========================================================================
   %forall_grid, %grid_reduction =
-  transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [16] ( mapping = [#gpu.block<x>] )
+  transform.structured.tile_to_forall_op %matmul tile_sizes [16] ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
+
   transform.structured.fuse_into_containing_op %fill into %forall_grid
 
   // Promote operands in order to test loading from shared memory.
