@@ -111,19 +111,22 @@ def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
     Where `OP` is a concrete operation name as defined in ukernel/elementwise.h
   }];
   let arguments = (ins
+    // Input buffers
+    VMVX_Buffer:$lhs_buffer,
+    VMVX_Index:$lhs_offset,
+    VMVX_Buffer:$rhs_buffer,
+    VMVX_Index:$rhs_offset,
+    // Output buffers
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
+    // Other operands
     // Corresponds to lower-cased opcode suffix of a ukernel binary op.
     StrAttr:$opcode,
     // LHS.
-    VMVX_Buffer:$lhs_buffer,
-    VMVX_Index:$lhs_offset,
     Variadic<VMVX_Index>:$lhs_strides,
     // RHS.
-    VMVX_Buffer:$rhs_buffer,
-    VMVX_Index:$rhs_offset,
     Variadic<VMVX_Index>:$rhs_strides,
     // OUT.
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
     Variadic<VMVX_Index>:$out_strides,
 
     // Dimensions.
@@ -146,13 +149,15 @@ def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
 def VMVX_CopyOp : VMVX_Op<"copy", [SameVariadicOperandSize]> {
   let summary = "Copy from one buffer to another";
   let arguments = (ins
-    // LHS.
+    // Input buffers
     VMVX_Buffer:$in_buffer,
     VMVX_Index:$in_offset,
-    Variadic<VMVX_Index>:$in_strides,
-    // OUT.
+    // Output buffers
     VMVX_Buffer:$out_buffer,
     VMVX_Index:$out_offset,
+    // Other operands
+    Variadic<VMVX_Index>:$in_strides,
+    // OUT.
     Variadic<VMVX_Index>:$out_strides,
 
     // Dimensions.
@@ -176,9 +181,12 @@ def VMVX_Fill2DOp : VMVX_Op<"fill2d"> {
     Fills a tile with dimensions [m, n] with a scalar.
   }];
   let arguments = (ins
-    VMVX_ElementType:$scalar,
+    // Input buffers (none)
+    // Output buffers
     VMVX_Buffer:$out_buffer,
     VMVX_Index:$out_offset,
+    // Other operands
+    VMVX_ElementType:$scalar,
     VMVX_Index:$out_row_stride,
 
     // Dimensions.
@@ -244,14 +252,17 @@ def VMVX_UnpackOp : VMVX_Op<"unpack"> {
     4D-to-2D unpacking op mirroring linalg_ext.unpack
   }];
   let arguments = (ins
-    // In buffer.
+    // Input buffers
     VMVX_Buffer:$in_buffer,
     VMVX_Index:$in_offset,
+    // Output buffers
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
+    // Other operands
+    // In buffer.
     VMVX_Index:$in_stride0,
 
     // Out buffer.
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
     VMVX_Index:$out_stride0,
 
     // In dimensions.
@@ -287,14 +298,18 @@ def VMVX_PackOp : VMVX_Op<"pack"> {
     2D-to-4D packing op mirroring linalg_ext.pack
   }];
   let arguments = (ins
-    // In buffer.
+    // Input buffers
     VMVX_Buffer:$in_buffer,
     VMVX_Index:$in_offset,
+    // Output buffers
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
+    // Other operands
+
+    // In buffer.
     VMVX_Index:$in_stride0,
 
     // Out buffer.
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
     VMVX_Index:$out_stride0,
 
     // In dimensions.
@@ -338,15 +353,19 @@ def VMVX_UnaryOp : VMVX_Op<"unary", [SameVariadicOperandSize]> {
     Where `OP` is a concrete operation name as defined in ukernel/elementwise.h
   }];
   let arguments = (ins
+    // Input buffers
+    VMVX_Buffer:$in_buffer,
+    VMVX_Index:$in_offset,
+    // Output buffers
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
+    // Other operands
+
     // Corresponds to lower-cased opcode suffix of a ukernel unary op.
     StrAttr:$opcode,
     // IN.
-    VMVX_Buffer:$in_buffer,
-    VMVX_Index:$in_offset,
     Variadic<VMVX_Index>:$in_strides,
     // OUT.
-    VMVX_Buffer:$out_buffer,
-    VMVX_Index:$out_offset,
     Variadic<VMVX_Index>:$out_strides,
 
     // Dimensions.

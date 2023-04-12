@@ -13,11 +13,10 @@ func.func @add_2d_f32(
     %arg12 : index, %arg13 : index) {
 
   //      CHECK: vm.call @vmvx.add.2d.f32(
-  // CHECK-SAME:   %arg0, %arg1, %arg2, %arg3,
-  // CHECK-SAME:   %arg4, %arg5, %arg6, %arg7,
-  // CHECK-SAME:   %arg8, %arg9, %arg10, %arg11,
+  // CHECK-SAME:   %arg0, %arg1, %arg4, %arg5, %arg8, %arg9,
+  // CHECK-SAME:   %arg2, %arg3, %arg6, %arg7, %arg10, %arg11,
   // CHECK-SAME:   %arg12, %arg13)
-  // CHECK-SAME: : (!vm.buffer, i64, i64, i64, !vm.buffer, i64, i64, i64, !vm.buffer, i64, i64, i64, i64, i64) -> ()
+  // CHECK-SAME: : (!vm.buffer, i64, !vm.buffer, i64, !vm.buffer, i64, i64, i64, i64, i64, i64, i64, i64, i64) -> ()
   vmvx.binary op("add" : f32)
            lhs(%arg0 offset %arg1 strides[%arg2, %arg3] : !util.buffer)
            rhs(%arg4 offset %arg5 strides[%arg6, %arg7] : !util.buffer)
