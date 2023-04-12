@@ -4,14 +4,14 @@ func.func @ukernel_generic_scalar_types(%arg0: i32, %arg1 : f64, %arg2 : index, 
   iree_codegen.ukernel.generic "scalar_fn" ins(%arg0, %arg1, %arg2 : i32, f64, index) outs(%arg3 : memref<f32>)
   return
 }
-//      CHECK: func.func private @scalar_fn(i32, f64, index, memref<f32>)
+//      CHECK: func.func private @scalar_fn(i32, f64, index, memref<f32>, index)
 //      CHECK: func.func @ukernel_generic_scalar_types
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: i32
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: f64
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: memref<f32>
 //      CHECK:   %[[BASE:.+]], %[[OFFSET:.+]] = memref.extract_strided_metadata %[[ARG3]]
-//      CHECK:   call @scalar_fn(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[BASE]])
+//      CHECK:   call @scalar_fn(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[BASE]], %[[OFFSET]])
 
 // -----
 
@@ -85,14 +85,14 @@ func.func @ukernel_generic_raw_scalar_types(%arg0: i32, %arg1 : f64, %arg2 : ind
   iree_codegen.ukernel.generic_raw "scalar_fn" ins(%arg0, %arg1, %arg2 : i32, f64, index) outs(%arg3 : memref<f32>)
   return
 }
-//      CHECK: func.func private @scalar_fn(i32, f64, index, memref<f32>)
+//      CHECK: func.func private @scalar_fn(i32, f64, index, memref<f32>, index)
 //      CHECK: func.func @ukernel_generic_raw_scalar_types
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: i32
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: f64
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: memref<f32>
 //      CHECK:   %[[BASE:.+]], %[[OFFSET:.+]] = memref.extract_strided_metadata %[[ARG3]]
-//      CHECK:   call @scalar_fn(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[BASE]])
+//      CHECK:   call @scalar_fn(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[BASE]], %[[OFFSET]])
 
 // -----
 

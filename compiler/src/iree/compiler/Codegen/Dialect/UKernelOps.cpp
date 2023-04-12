@@ -99,15 +99,13 @@ static LogicalResult getCallOpType(MLIRContext *context,
         callOperandTypes.push_back(MemRefType::get(
             ArrayRef<int64_t>{}, memrefType.getElementType(),
             MemRefLayoutAttrInterface{}, memrefType.getMemorySpace()));
-        if (memrefType.getRank() == 0) return success();
-
-        auto indexType = IndexType::get(context);
         // Offset
+        auto indexType = IndexType::get(context);
         callOperandTypes.push_back(indexType);
-
-        if (bufferPassingStyle ==
-            BufferPassingStyle::kBufferAndOffsetAndNm1Strides) {
-          // Strides.
+        // Strides.
+        if (memrefType.getRank() >= 1 &&
+            bufferPassingStyle ==
+                BufferPassingStyle::kBufferAndOffsetAndNm1Strides) {
           callOperandTypes.resize(
               callOperandTypes.size() + memrefType.getRank() - 1, indexType);
         }
@@ -132,14 +130,12 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
             rewriter.create<memref::ExtractStridedMetadataOp>(loc, operand);
         // Base ptr.
         callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
-        if (memrefType.getRank() == 0) {
-          return success();
-        }
         // Offset.
         callOperands.push_back(extractStridedMetadataOp.getOffset());
         // Strides.
-        if (bufferPassingStyle ==
-            BufferPassingStyle::kBufferAndOffsetAndNm1Strides) {
+        if (memrefType.getRank() >= 1 &&
+            bufferPassingStyle ==
+                BufferPassingStyle::kBufferAndOffsetAndNm1Strides) {
           for (auto stride :
                extractStridedMetadataOp.getStrides().drop_back()) {
             callOperands.push_back(stride);
