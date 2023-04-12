@@ -279,11 +279,12 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
 /// reduces arithmatic in microkernel
 static void makeDimYPrimaryWarp(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
-  for (auto tile : tileSizes) {
-    tile.tileSize[1] =
-        (tile.tileSize[0] * tile.tileSize[1] * tile.tileSize[2]) / cudaWarpSize;
-    tile.tileSize[0] = cudaWarpSize;
-    tile.tileSize[2] = 1;
+  for (auto &tile : tileSizes) {
+    tile.workgroupSize[1] = (tile.workgroupSize[0] * tile.workgroupSize[1] *
+                             tile.workgroupSize[2]) /
+                            cudaWarpSize;
+    tile.workgroupSize[0] = cudaWarpSize;
+    tile.workgroupSize[2] = 1;
   }
 }
 
