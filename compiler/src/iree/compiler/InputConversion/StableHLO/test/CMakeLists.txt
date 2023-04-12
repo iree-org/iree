@@ -15,6 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "stablehlo_to_linalg.mlir"
+    "stablehlo_to_linalg_dot_prod.mlir"
+    "stablehlo_to_linalg_pointwise.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -18,6 +18,8 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "stablehlo_to_linalg_dot_prod.mlir",
+            "stablehlo_to_linalg_pointwise.mlir",
             "stablehlo_to_linalg.mlir",
         ],
         include = ["*.mlir"],
