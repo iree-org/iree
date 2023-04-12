@@ -29,7 +29,7 @@ IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_local_python.sh
+source build_tools/cmake/setup_tf_python.sh
 
 echo "Configuring to build e2e test artifacts"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
