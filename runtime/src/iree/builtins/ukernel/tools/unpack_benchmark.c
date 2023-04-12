@@ -48,7 +48,7 @@ static iree_status_t iree_uk_benchmark_unpack(
       FLAG_working_set_size / (in_type_size + out_type_size);
   int target_product_of_outer_sizes_0_1 =
       target_matrix_size_in_elems / (in_size2 * in_size3);
-  while (target_product_of_outer_sizes_0_1 >= 4) {
+  while (target_product_of_outer_sizes_0_1 % 4 == 0) {
     target_product_of_outer_sizes_0_1 /= 4;
     in_size0 *= 2;
     in_size1 *= 2;
