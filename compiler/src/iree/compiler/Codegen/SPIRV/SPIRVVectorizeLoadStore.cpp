@@ -511,11 +511,6 @@ struct ProcessSubgroupMMALoad final
     auto vectorMemrefType =
         adaptor.getSrcMemref().getType().dyn_cast<MemRefType>();
 
-    if (!vectorMemrefType.getLayout().isIdentity()) {
-      return rewriter.notifyMatchFailure(loadOp,
-                                         "non-identity memref unsupported");
-    }
-
     Location loc = loadOp.getLoc();
     auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
                                  adaptor.getIndices(), rewriter, loc);
@@ -548,11 +543,6 @@ struct ProcessSubgroupMMAStore final
         storeOp.getDstMemref().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType =
         adaptor.getDstMemref().getType().dyn_cast<MemRefType>();
-
-    if (!vectorMemrefType.getLayout().isIdentity()) {
-      return rewriter.notifyMatchFailure(storeOp,
-                                         "non-identity memref unsupported");
-    }
 
     Location loc = storeOp.getLoc();
     auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
