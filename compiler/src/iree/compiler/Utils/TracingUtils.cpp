@@ -137,14 +137,14 @@ std::unique_ptr<OperationPass<ModuleOp>> createTraceFrameMarkEndPass(
 // https://www.cppstories.com/2019/08/newnew-align/#custom-overloads
 // Note: always disable exceptions, so no `if (!ptr) throw std::bad_alloc{};`
 
-#include "iree/base/target_platform.h"
-
 // Avoid potential sharp edge by making allocation tracking and sanitizers
 // mutually exclusive. They _might_ work together, but here's a warning anyway.
-#if defined(IREE_SANITIZER_ADDRESS) || defined(IREE_SANITIZER_MEMORY) || \
-    defined(IREE_SANITIZER_THREAD)
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(memory_sanitizer) || \
+    __has_feature(thread_sanitizer)
 #error Compiler IREE_TRACING_FEATURE_ALLOCATION_TRACKING not compatible with sanitizers
-#endif  // IREE_SANITIZER_*
+#endif  // __has_feature(*_sanitizer)
+#endif  // defined(__has_feature)
 
 #include <new>
 
