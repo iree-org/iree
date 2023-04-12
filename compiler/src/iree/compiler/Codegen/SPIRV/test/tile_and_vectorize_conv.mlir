@@ -456,3 +456,104 @@ hal.executable private @nchw_conv_static_shape_f32 {
 // CHECK-COUNT-16: vector.transfer_write
 
 //  CHECK-COUNT-3: scf.yield %{{.+}} : tensor<2x16x8x8xf32>
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 64, 64], [1, 1, 8, 8], [0, 0, 0, 0, 1, 1, 8], [0, 1, 0, 0]]>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
+
+hal.executable private @nhwc_conv_static_shape_f16_batch2 {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+    hal.executable.export @nhwc_conv_static_shape_f16_batch2 layout(#pipeline_layout) attributes {
+      workgroup_size = [8: index, 8: index, 1: index],
+      translation_info = #translation
+    }
+    builtin.module  {
+      func.func @nhwc_conv_static_shape_f16_batch2() {
+        %c64 = arith.constant 64 : index
+        %c320 = arith.constant 320 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x66x66x320xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<3x3x320x320xf16>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x64x64x320xf16>>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x64x64x320xf16>>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        scf.for %arg0 = %workgroup_id_z to %c64 step %workgroup_count_z {
+          %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
+          %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
+          scf.for %arg1 = %4 to %c64 step %5 {
+            %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+            %7 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+            scf.for %arg2 = %6 to %c320 step %7 {
+              %8 = flow.dispatch.tensor.load %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x64x64x320xf16>> -> tensor<2x1x64x64xf16>
+              %9 = flow.dispatch.tensor.load %0, offsets = [0, %arg0, %arg1, 0], sizes = [2, 3, 66, 320], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x66x66x320xf16>> -> tensor<2x3x66x320xf16>
+              %10 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 320, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x320x320xf16>> -> tensor<3x3x320x64xf16>
+              %11 = linalg.fill {lowering_config = #config}
+                ins(%cst : f16) outs(%8 : tensor<2x1x64x64xf16>) -> tensor<2x1x64x64xf16>
+              %12 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<1> : tensor<2xi64>}
+                ins(%9, %10 : tensor<2x3x66x320xf16>, tensor<3x3x320x64xf16>) outs(%11 : tensor<2x1x64x64xf16>) -> tensor<2x1x64x64xf16>
+              %13 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x64x64x320xf16>> -> tensor<2x1x64x64xf16>
+              %14 = linalg.generic {
+                  indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+                ins(%13 : tensor<2x1x64x64xf16>) outs(%12 : tensor<2x1x64x64xf16>) attrs =  {lowering_config = #config} {
+              ^bb0(%in: f16, %out: f16):
+                %15 = arith.divf %out, %in : f16
+                linalg.yield %15 : f16
+              } -> tensor<2x1x64x64xf16>
+              flow.dispatch.tensor.store %14, %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 64, 64], strides = [1, 1, 1, 1] : tensor<2x1x64x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x64x64x320xf16>>
+            }
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @nhwc_conv_static_shape_f16_batch2()
+
+// No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
+// CHECK-NOT: vector.transfer
+
+// Check additional loops generated from tiling along N dimension
+// CHECK: scf.for %{{.+}} = %c0 to %c2 step %c1
+
+// Tiling and distribution to threads
+// CHECK:   scf.for %{{.+}} = %c0 to %c64 step %c8
+// CHECK:     scf.for %{{.+}} = %c0 to %c64 step %c8
+
+// Check tiling loop along filter height/width and input channel
+//      CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
+// CHECK-SAME:     -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
+//      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
+// CHECK-SAME:       -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
+//      CHECK:     scf.for %{{.*}} = %c0 to %c320 step %c8
+// CHECK-SAME:         -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
+
+//   CHECK-COUNT-8: vector.transfer_read {{.+}} : tensor<2x3x66x320xf16>, vector<8xf16>
+//   CHECK-COUNT-8: vector.transfer_read {{.+}} : tensor<3x3x320x64xf16>, vector<8xf16>
+// CHECK-COUNT-128: vector.fma
+
+// CHECK-COUNT-3: scf.yield
+
+//  CHECK-COUNT-8: vector.transfer_read {{.+}} : tensor<2x1x64x64xf16>, vector<8xf16>
+// CHECK-COUNT-16: arith.divf {{.+}} : vector<4xf16>
+//  CHECK-COUNT-8: vector.transfer_write {{.+}} : vector<8xf16>, tensor<2x1x64x64xf16>
+
+// CHECK-COUNT-2: scf.yield

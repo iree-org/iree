@@ -49,10 +49,14 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAdrenoMatmulConfig(linalgOp, limits);
   }
 
-  if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    auto type = cast<ShapedType>(convOp.image().getType());
+    const int bitwidth = type.getElementTypeBitWidth();
+    if (bitwidth > 32) return failure();
+    const int multipler = 32 / bitwidth;
     linalg::detail::ConvolutionDimensions convDims;
     linalg::detail::isConvolutionInterfaceImpl(rootOp, &convDims);
-    const int bestTilingFactor = convDims.depth.empty() ? 32 : 16;
+    const int bestTilingFactor = (convDims.depth.empty() ? 32 : 16) * multipler;
     return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
   }
 

@@ -49,9 +49,13 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAppleMatmulConfig(linalgOp, limits);
   }
 
-  if (isa<linalg::ConvolutionOpInterface>(rootOp)) {
-    return setConvOpConfig(rootOp, subgroupSize,
-                           /*bestTilingFactor=*/16);
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    auto type = cast<ShapedType>(convOp.image().getType());
+    const int bitwidth = type.getElementTypeBitWidth();
+    if (bitwidth > 32) return failure();
+    const int multipler = 32 / bitwidth;
+    const int bestTilingFactor = 16 * multipler;
+    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
   }
 
   return failure();

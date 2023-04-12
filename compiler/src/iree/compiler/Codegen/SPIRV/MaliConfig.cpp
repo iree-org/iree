@@ -53,8 +53,12 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
   }
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    auto type = cast<ShapedType>(convOp.image().getType());
+    const int bitwidth = type.getElementTypeBitWidth();
+    if (bitwidth > 32) return failure();
+    const int multipler = 32 / bitwidth;
     bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
-    int bestTilingFactor = hasPaddedInput ? 8 : 16;
+    const int bestTilingFactor = (hasPaddedInput ? 8 : 16) * multipler;
     return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
   }
 

@@ -96,16 +96,16 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
 /// - `wgDimSize` will be updated with the decided workgroup dimension size.
 /// - `wgTileSize` will be updated with the decided workgroup tile size.
 static bool tileConvOneDim(const int64_t inputDim, const bool isInnerMostDim,
-                           int64_t &residualThreads,
+                           int vectorSize, int64_t &residualThreads,
                            int64_t &residualTilingFactor, int64_t &wgDimSize,
                            int64_t &wgTileSize) {
   const int64_t lb = isInnerMostDim ? 2 : 1;
   for (int64_t dim = residualThreads; dim >= lb; dim >>= 1) {
     int64_t chosenTileSize = 0;
     if (isInnerMostDim) {
-      // Handle 4 elements per thread for the innermost dimension. We need
-      // this for vectorized load.
-      chosenTileSize = 4;
+      // Handle `vectorSize` elements per thread for the innermost dimension.
+      // We need this for the best utilization of memory.
+      chosenTileSize = vectorSize;
       if (inputDim % (dim * chosenTileSize) != 0) continue;
     } else {
       for (int64_t t = residualTilingFactor; t >= 1; t >>= 1)
@@ -226,9 +226,12 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     return failure();
   }
 
-  // The conversion pipeline requires the input channel dimension to be some
-  // multipler of four, or less than four.
-  if (ic && !(*ic % 4 == 0 || *ic < 4)) return failure();
+  const int bitwidth = outputType.cast<ShapedType>().getElementTypeBitWidth();
+  const int vectorSize = kMaxVectorNumBits / bitwidth;
+
+  // We use `vectorSize` as the tile size along IC dimension. If smaller than
+  // 4, it will be unrolled into size 1.
+  if (ic && !(*ic % vectorSize == 0 || *ic < 4)) return failure();
 
   // The core idea is to distribute the convolution dimensions to the workgroup
   // Z/Y/X dimensions, with each thread in a workgroup handling multiple vector
@@ -244,21 +247,21 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   const bool isNCHW = ocIndex < ohIndex;
   if (isNCHW) {
     // OW -> x, OH -> y, OC -> z
-    if (!tileConvOneDim(ow, /*isInnerMostDim=*/true, residualThreads,
-                        residualTilingFactor, workgroupSize[0],
+    if (!tileConvOneDim(ow, /*isInnerMostDim=*/true, vectorSize,
+                        residualThreads, residualTilingFactor, workgroupSize[0],
                         workgroupTileSizes[3]) ||
-        !tileConvOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
-                        residualTilingFactor, workgroupSize[1],
+        !tileConvOneDim(oh, /*isInnerMostDim=*/false, vectorSize,
+                        residualThreads, residualTilingFactor, workgroupSize[1],
                         workgroupTileSizes[2]) ||
-        !tileConvOneDim(oc, /*isInnerMostDim=*/false, residualThreads,
-                        residualTilingFactor, workgroupSize[2],
+        !tileConvOneDim(oc, /*isInnerMostDim=*/false, vectorSize,
+                        residualThreads, residualTilingFactor, workgroupSize[2],
                         workgroupTileSizes[1])) {
       return failure();
     }
   } else {
     // OC -> x
-    if (!tileConvOneDim(oc, /*isInnerMostDim=*/true, residualThreads,
-                        residualTilingFactor, workgroupSize[0],
+    if (!tileConvOneDim(oc, /*isInnerMostDim=*/true, vectorSize,
+                        residualThreads, residualTilingFactor, workgroupSize[0],
                         workgroupTileSizes[3]))
       return failure();
 
@@ -273,18 +276,19 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     // Otherwise treat OW and OH separately to allow them to have different
     // number of threads and tiling size.
     if (!tileToSquare) {
-      if (!tileConvOneDim(ow, /*isInnerMostDim=*/false, residualThreads,
-                          residualTilingFactor, workgroupSize[1],
-                          workgroupTileSizes[2]) ||
-          !tileConvOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
-                          residualTilingFactor, workgroupSize[2],
-                          workgroupTileSizes[1])) {
+      if (!tileConvOneDim(ow, /*isInnerMostDim=*/false, vectorSize,
+                          residualThreads, residualTilingFactor,
+                          workgroupSize[1], workgroupTileSizes[2]) ||
+          !tileConvOneDim(oh, /*isInnerMostDim=*/false, vectorSize,
+                          residualThreads, residualTilingFactor,
+                          workgroupSize[2], workgroupTileSizes[1])) {
         return failure();
       }
     }
   }
 
   SmallVector<int64_t> threadTileSizes(4, 0);
+  threadTileSizes[0] = 1;  // Tile along the N dimension with size 1
   for (int i = 1; i <= 3; ++i) {
     threadTileSizes[i] = workgroupTileSizes[i] / workgroupSize[3 - i];
   }
@@ -303,7 +307,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   if (ic) {
     // Tile input channel dimension with size 4 to avoid code bloat in
     // vectorization later.
-    reductionTileSizes[convDims.inputChannel.front()] = 4;
+    reductionTileSizes[convDims.inputChannel.front()] = vectorSize;
   }
   tileSizes.push_back(reductionTileSizes);
 
@@ -1447,12 +1451,16 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         return setDefaultOpConfig(limits, op);
       })
       .Case<linalg::ConvolutionOpInterface>([limits](auto op) {
-        // Try to tile and vectorize first. It's common to see 32 threads
-        // per subgroup for GPUs.
-        auto result = detail::setConvOpConfig(cast<linalg::LinalgOp>(*op),
-                                              /*subgroupSize=*/32,
-                                              /*bestTilingFactor=*/32);
-        if (succeeded(result)) return success();
+        auto type = cast<ShapedType>(op.image().getType());
+        const int bitwidth = type.getElementTypeBitWidth();
+        if (bitwidth <= 32) {
+          const int multipler = 32 / bitwidth;
+          const int bestTilingFactor = 32 * multipler;
+          const int subgroupSize = 32;
+          auto result = detail::setConvOpConfig(cast<linalg::LinalgOp>(*op),
+                                                subgroupSize, bestTilingFactor);
+          if (succeeded(result)) return success();
+        }
 
         // If unsuccessful, try to tile and distribute/vectorize.
         return setDefaultOpConfig(limits, op);

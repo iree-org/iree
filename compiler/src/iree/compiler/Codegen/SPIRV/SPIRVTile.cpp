@@ -133,10 +133,11 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
   // after bufferization. So add attributes to the tiled loop nest to
   // indicate that they should be distributed to invocations.
   ArrayRef<scf::ForOp> loops = tileAndFuseResult.value().loops;
-  assert(loops.size() <= kNumGPUDims);
   const char *attrName = getSPIRVDistributeAttrName();
-  for (int i = loops.size() - 1, dim = 0; i >= 0; --i) {
-    loops[i]->setAttr(attrName, rewriter.getIndexAttr(dim++));
+  // We can have more than 3 dimensions being tiled (e.g., for convolutions with
+  // non-1 batch). But only the innermost 3 dimensions are distributed.
+  for (auto [dim, loop] : zip(llvm::seq(0, 3), llvm::reverse(loops))) {
+    loop->setAttr(attrName, rewriter.getIndexAttr(dim++));
   }
   return success();
 }
