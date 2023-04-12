@@ -112,7 +112,7 @@ jobs:
         # TODO(#9855): Add Pixel-6-Pro and XT2201-2
         target:
           - device_name: Pixel-4
-          - label_exclude: vulkan
+            label_exclude: vulkan
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ inputs.runner-group }}
@@ -132,7 +132,7 @@ jobs:
         run: tar -xf "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR}"
       - name: "Running tests"
         env:
-          LABEL_EXCLUDE: ${{ martrix.target.label_exclude }}
+          LABEL_EXCLUDE: ${{ matrix.target.label_exclude }}
         run: |
           ctest -j 4 \
             --test-dir "${TARGET_BUILD_DIR}" \
