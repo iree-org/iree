@@ -178,9 +178,7 @@ Good luck!
 
 #### Strategy 2: Sync everything to a Google/TensorFlow commit
 
-TODO: Add a script for this. Also note that there is a forked copy of
-`iree-dialects` in integrations/tensorflow. When bumping that dependency,
-the main-project version should be copied over the integrations version.
+TODO: Add a script for this.
 
 ```
 cd ~/src

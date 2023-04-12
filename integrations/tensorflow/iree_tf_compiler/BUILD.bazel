@@ -22,30 +22,6 @@ filegroup(
     name = "opt-binaries",
     srcs = [
         ":iree-opt-tflite",
-        ":iree-tf-opt",
-    ],
-)
-
-cc_binary(
-    name = "iree-tf-opt",
-    srcs = ["iree-tf-opt-main.cpp"],
-    deps = [
-        "//iree-dialects:IREEInputDialect",
-        "//iree_tf_compiler/MHLO",
-        "//iree_tf_compiler/TF",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:MlirOptLib",
-        "@llvm-project//mlir:ShapeTransforms",
-        "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
-        "@org_tensorflow//tensorflow/compiler/mlir/tf2xla:xla_legalize_tf",
-        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_passes",
-        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_tfl_passes",
-        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
-        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo",
-        "@stablehlo//:chlo_ops",
     ],
 )
 
