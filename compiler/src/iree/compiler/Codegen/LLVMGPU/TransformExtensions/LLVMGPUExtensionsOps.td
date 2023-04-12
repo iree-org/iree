@@ -514,4 +514,48 @@ def LayoutAnalysisAndDistributionOp :
 
 }
 
+def ReorderTransposeOp :
+  Op<Transform_Dialect, "iree.reorder_transpose",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    Targets the whole func op and finds transpose ops whose source
+    comes from an elementwise op. For each of those transpose ops,
+    it moves the transpose before the elementwise op by first
+    transposing the operands of the elementwise op and then redoing
+    the elementwise op using the transposed operands. It then
+    replaces all uses of the original transpose op with the result
+    of the new elementwise op.
+
+    More specifically, given IR that looks like below,
+      %0 = arith.subf %a, %b : vector<16x8xf16>
+      %1 = vector.transpose %0 [1, 0] : vector<16x8xf16> to vector<8x16xf16>
+
+    It moves the transpose before the elementwise op to produce
+      %transposed_a = vector.transpose %a [1, 0] : vector<16x8xf16> to vector<8x16xf16>
+      %transposed_b = vector.transpose %b [1, 0] : vector<16x8xf16> to vector<8x16xf16>
+      %0 = arith.subf %transposed_a, %transposed_b : vector<8x16xf16>
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs Variadic<PDL_Operation>:$result);
+
+  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+
+}
+
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
