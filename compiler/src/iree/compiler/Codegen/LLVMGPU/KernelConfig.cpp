@@ -640,9 +640,9 @@ static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 }
 
 /// Set configuration for reduction transform dialect based strategy.
-static LogicalResult setReductionTransformDialectConfig(
-    func::FuncOp entryPoint, linalg::LinalgOp op,
-    const TargetInfo &targetInfo) {
+static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
+                                               Operation *op,
+                                               const TargetInfo &targetInfo) {
   if (!clGPUCodegenTransformDialectFileName.empty() &&
       clGPUEnableTransformDialectJit) {
     return entryPoint.emitError()
@@ -654,7 +654,6 @@ static LogicalResult setReductionTransformDialectConfig(
       clGPUCodegenTransformDialectFileName.empty()) {
     return failure();
   }
-  if (!targetInfo.hasWarpShuffle) return failure();
 
   // Transform script file provided, use it.
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
@@ -664,11 +663,12 @@ static LogicalResult setReductionTransformDialectConfig(
     return setTranslationInfo(entryPoint, translationInfo);
   }
 
+  // TODO: unify the target informations into one structure.
   iree_compiler::gpu::GPUModel gpuModel;
-  if (failed(iree_compiler::gpu::matchAndSetReductionStrategy(entryPoint, op,
+  gpuModel.hasWarpShuffle = targetInfo.hasWarpShuffle;
+  if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
                                                               gpuModel)))
     return failure();
-
   return setTranslationInfo(entryPoint, translationInfo);
 }
 
@@ -986,11 +986,12 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     // bypass the heuristic.
     return setUserConfig(entryPointFn, computeOp, compilationInfo);
   }
+  // First try to see if there is a transform dialect configuration existing.
+  if (succeeded(
+          setTransformDialectConfig(entryPointFn, computeOp, targetInfo))) {
+    return success();
+  }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (succeeded(setReductionTransformDialectConfig(entryPointFn, linalgOp,
-                                                     targetInfo))) {
-      return success();
-    }
     if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
       return success();
     }
