@@ -1451,7 +1451,8 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         return setDefaultOpConfig(limits, op);
       })
       .Case<linalg::ConvolutionOpInterface>([limits](auto op) {
-        auto type = cast<ShapedType>(op.image().getType());
+        // Use the result type in case of larger bitwidth for accumulators.
+        auto type = cast<ShapedType>(op->getResult(0).getType());
         const int bitwidth = type.getElementTypeBitWidth();
         if (bitwidth <= 32) {
           const int multipler = 32 / bitwidth;

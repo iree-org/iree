@@ -50,7 +50,8 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
   }
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
-    auto type = cast<ShapedType>(convOp.image().getType());
+    // Use the result type in case of larger bitwidth for accumulators.
+    auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
     if (bitwidth > 32) return failure();
     const int multipler = 32 / bitwidth;
