@@ -59,6 +59,7 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::cuda_executable_def_c_fbs
+    mpi::headers_and_libs
     nccl::headers
   PUBLIC
 )

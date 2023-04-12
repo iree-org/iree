@@ -137,6 +137,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   default_params.stream_tracing = FLAG_cuda_tracing;
 
 #if IREE_USE_MPI
+  MPI_Init(NULL, NULL);
   // Only setup channels if we're running collectives. Setting this will require
   // NCCL to be available at runtime.
   default_params.channel_provider = (iree_hal_channel_provider_t){

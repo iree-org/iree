@@ -24,10 +24,6 @@
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 
-#if IREE_USE_MPI
-#include "mpi.h"
-#endif  // IREE_USE_MPI
-
 IREE_FLAG(string, function, "",
           "Name of a function contained in the module specified by --module= "
           "to run.");
@@ -217,10 +213,6 @@ iree_status_t Run(int* out_exit_code) {
 }  // namespace
 
 extern "C" int main(int argc, char** argv) {
-#if IREE_USE_MPI
-  MPI_Init(&argc, &argv);
-#endif  // IREE_USE_MPI
-
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   if (argc > 1) {
     // Avoid iree-run-module spinning endlessly on stdin if the user uses single
@@ -229,9 +221,6 @@ extern "C" int main(int argc, char** argv) {
         "[ERROR] unexpected positional argument (expected none)."
         " Did you use pass a flag with a single dash ('-')?"
         " Use '--' instead.\n");
-#if IREE_USE_MPI
-    MPI_Finalize();
-#endif  // IREE_USE_MPI
     return 1;
   }
 
@@ -240,15 +229,9 @@ extern "C" int main(int argc, char** argv) {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);
-#if IREE_USE_MPI
-    MPI_Finalize();
-#endif  // IREE_USE_MPI
     return EXIT_FAILURE;
   }
 
-#if IREE_USE_MPI
-  MPI_Finalize();
-#endif  // IREE_USE_MPI
   return exit_code;
 }
 
