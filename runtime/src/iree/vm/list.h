@@ -157,11 +157,11 @@ IREE_API_EXPORT iree_status_t iree_vm_list_set_value(
 IREE_API_EXPORT iree_status_t
 iree_vm_list_push_value(iree_vm_list_t* list, const iree_vm_value_t* value);
 
-// Returns a dereferenced pointer to the given type if the element at the given
-// index matches the type. Returns NULL on error.
-IREE_API_EXPORT void* iree_vm_list_get_ref_deref(
-    const iree_vm_list_t* list, iree_host_size_t i,
-    const iree_vm_ref_type_descriptor_t* type_descriptor);
+// Returns a dereferenced pointer to the given type if the element at the
+// given index |i| matches the |type|. Returns NULL on error.
+IREE_API_EXPORT void* iree_vm_list_get_ref_deref(const iree_vm_list_t* list,
+                                                 iree_host_size_t i,
+                                                 iree_vm_ref_type_t type);
 
 // Returns the ref value of the element at the given index.
 // The ref will not be retained and must be retained by the caller to extend

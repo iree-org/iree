@@ -70,11 +70,9 @@ static bool iree_vm_bytecode_module_resolve_type(
       // all we have registered.
       type_name = iree_make_cstring_view("vm.list");
     }
-    const iree_vm_ref_type_descriptor_t* type_descriptor =
-        iree_vm_instance_lookup_type(instance, type_name);
-    if (type_descriptor) {
-      *out_type =
-          iree_vm_make_ref_type_def((iree_vm_ref_type_t)type_descriptor);
+    iree_vm_ref_type_t type = iree_vm_instance_lookup_type(instance, type_name);
+    if (type) {
+      *out_type = iree_vm_make_ref_type_def(type);
       return true;
     }
   }

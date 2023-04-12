@@ -391,13 +391,11 @@ Value ireeOkStatus(OpBuilder builder, Location location) {
 Value ireeVmInstanceLookupType(OpBuilder builder, Location location,
                                Value instance, Value stringView) {
   auto ctx = builder.getContext();
-  Type typeDescriptorType = emitc::PointerType::get(
-      emitc::OpaqueType::get(ctx, "const iree_vm_ref_type_descriptor_t"));
-
+  Type refType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
   return builder
       .create<emitc::CallOp>(
           /*location=*/location,
-          /*type=*/typeDescriptorType,
+          /*type=*/refType,
           /*callee=*/StringAttr::get(ctx, "iree_vm_instance_lookup_type"),
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},

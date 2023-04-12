@@ -308,9 +308,8 @@ std::optional<Value> createVmTypeDefPtr(
   } else if (elementType.isa<IREE::VM::RefType>()) {
     Type objType = elementType.cast<IREE::VM::RefType>().getObjectType();
 
-    Type descriptorType = emitc::PointerType::get(
-        emitc::OpaqueType::get(ctx, "const iree_vm_ref_type_descriptor_t"));
-    Type descriptorArrayType = emitc::PointerType::get(descriptorType);
+    Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
+    Type typeRefArrayType = emitc::PointerType::get(typeRefType);
     Optional<size_t> typeIndex = typeConverter.lookupType(objType);
     if (!typeIndex.has_value()) {
       moduleOp.emitError("type index lookup failed");
@@ -318,16 +317,9 @@ std::optional<Value> createVmTypeDefPtr(
     }
 
     Value typeArray = emitc_builders::structPtrMember(
-        rewriter, loc, descriptorArrayType, "types", moduleArg);
-    Value typeDescriptor = emitc_builders::arrayElement(
-        rewriter, loc, descriptorType, typeIndex.value(), typeArray);
-    auto refType =
-        rewriter
-            .create<emitc::CastOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-                /*operand=*/typeDescriptor)
-            .getResult();
+        rewriter, loc, typeRefArrayType, "types", moduleArg);
+    Value refType = emitc_builders::arrayElement(rewriter, loc, typeRefType,
+                                                 typeIndex.value(), typeArray);
 
     elementTypeValue =
         rewriter
@@ -1104,12 +1096,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     attachAttribute(moduleOp, "vm.num_types",
                     builder.getI32IntegerAttr(typeTable.size()));
     if (!typeTable.empty()) {
-      Type typeDescriptorType = emitc::PointerType::get(
-          emitc::OpaqueType::get(ctx, "const iree_vm_ref_type_descriptor_t"));
-      Type typeDescriptorArrayType =
-          emitc::PointerType::get(typeDescriptorType);
+      Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
+      Type typeRefArrayType = emitc::PointerType::get(typeRefType);
       Value moduleTypes = emitc_builders::structPtrMember(
-          builder, loc, typeDescriptorArrayType, "types", module);
+          builder, loc, typeRefArrayType, "types", module);
 
       std::string listType = "!vm.list";
       for (auto [index, typeDef] : llvm::enumerate(typeTable)) {
@@ -1128,10 +1118,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
         Value stringView =
             emitc_builders::ireeMakeCstringView(builder, loc, typeName);
-        Value refTypeDescriptor = emitc_builders::ireeVmInstanceLookupType(
+        Value refType = emitc_builders::ireeVmInstanceLookupType(
             builder, loc, instanceArg, stringView);
         emitc_builders::arrayElementAssign(builder, loc, moduleTypes, index,
-                                           refTypeDescriptor);
+                                           refType);
       }
     }
 

@@ -57,44 +57,50 @@ static iree_vm_ref_t MakeRef(InstancePtr& instance, const char* type_name) {
   // Safe to do multiple times, so we do it to ensure the tests don't care what
   // order they run in/don't need to preregister types.
   static iree_vm_ref_type_descriptor_t descriptor = {0};
+  static iree_vm_ref_type_t registration = 0;
   descriptor.type_name = iree_make_cstring_view(type_name);
   descriptor.offsetof_counter = T::offsetof_counter();
   descriptor.destroy = T::DirectDestroy;
-  IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor));
-  T::kTypeID = (iree_vm_ref_type_t)&descriptor;
+  IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor,
+                                               &registration));
+  T::kTypeID = registration;
 
   iree_vm_ref_t ref = {0};
   IREE_CHECK_OK(iree_vm_ref_wrap_assign(new T(), T::kTypeID, &ref));
   return ref;
 }
 
+// WARNING: this is an implementation detail and must never be relied on - it's
+// only here to test the expected behavior.
 static int32_t ReadCounter(iree_vm_ref_t* ref) {
-  return iree_atomic_load_int32(
-      (iree_atomic_ref_count_t*)ref->ptr + ref->offsetof_counter,
-      iree_memory_order_seq_cst);
+  return iree_atomic_load_int32((iree_atomic_ref_count_t*)ref->ptr +
+                                    (ref->type & IREE_VM_REF_TYPE_TAG_BIT_MASK),
+                                iree_memory_order_seq_cst);
 }
 
 static iree_vm_ref_type_t kCTypeID = IREE_VM_REF_TYPE_NULL;
 static void RegisterTypeC(InstancePtr& instance) {
   static iree_vm_ref_type_descriptor_t descriptor = {0};
+  static iree_vm_ref_type_t registration = 0;
   descriptor.type_name = iree_make_cstring_view("CType");
   descriptor.offsetof_counter = offsetof(ref_object_c_t, ref_object.counter) /
                                 IREE_VM_REF_COUNTER_ALIGNMENT;
   descriptor.destroy =
       +[](void* ptr) { delete reinterpret_cast<ref_object_c_t*>(ptr); };
-  IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor));
-  kCTypeID = (iree_vm_ref_type_t)&descriptor;
+  IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor,
+                                               &registration));
+  kCTypeID = registration;
 }
 
 // Tests type registration and lookup.
 TEST(VMRefTest, TypeRegistration) {
   auto instance = MakeInstance();
   RegisterTypeC(instance);
-  ASSERT_NE(nullptr, iree_vm_instance_lookup_type(
-                         instance.get(), iree_make_cstring_view("CType")));
-  ASSERT_EQ(nullptr, iree_vm_instance_lookup_type(
-                         instance.get(),
-                         iree_make_cstring_view("asodjfaoisdjfaoisdfj")));
+  ASSERT_NE(0, iree_vm_instance_lookup_type(instance.get(),
+                                            iree_make_cstring_view("CType")));
+  ASSERT_EQ(
+      0, iree_vm_instance_lookup_type(
+             instance.get(), iree_make_cstring_view("asodjfaoisdjfaoisdfj")));
 }
 
 // Tests wrapping a simple C struct.
@@ -122,17 +128,19 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
 
   auto instance = MakeInstance();
 
-  static iree_vm_ref_type_descriptor_t descriptor;
+  static iree_vm_ref_type_descriptor_t descriptor = {0};
+  static iree_vm_ref_type_t registration = 0;
   descriptor.type_name = iree_make_cstring_view("BaseType");
   descriptor.offsetof_counter = BaseType::offsetof_counter();
   descriptor.destroy = BaseType::DirectDestroy;
-  IREE_ASSERT_OK(iree_vm_instance_register_type(instance.get(), &descriptor));
+  IREE_ASSERT_OK(iree_vm_instance_register_type(instance.get(), &descriptor,
+                                                &registration));
 
   allocated_derived_types = 0;
 
   iree_vm_ref_t ref = {0};
-  IREE_EXPECT_OK(iree_vm_ref_wrap_assign(
-      new DerivedType(), (iree_vm_ref_type_t)&descriptor, &ref));
+  IREE_EXPECT_OK(
+      iree_vm_ref_wrap_assign(new DerivedType(), registration, &ref));
   EXPECT_EQ(1, ReadCounter(&ref));
   EXPECT_EQ(1, allocated_derived_types);
 

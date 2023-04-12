@@ -480,19 +480,16 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
           {
               .type = iree_vm_buffer_type(),
               .ptr = &local_memory_buffer,
-              .offsetof_counter = 0,
           },
       .constants =
           {
               .type = iree_vm_buffer_type(),
               .ptr = &constants_buffer,
-              .offsetof_counter = 0,
           },
       .bindings =
           {
               .type = iree_vm_list_type(),
               .ptr = binding_list,
-              .offsetof_counter = 0,
           },
       .workgroup_id_x = workgroup_state->workgroup_id_x,
       .workgroup_id_y = workgroup_state->workgroup_id_y,

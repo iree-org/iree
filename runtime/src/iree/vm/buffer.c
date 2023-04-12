@@ -123,11 +123,11 @@ static void iree_vm_buffer_destroy(void* ptr) {
 }
 
 IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer) {
-  iree_vm_ref_object_retain(buffer, iree_vm_buffer_descriptor);
+  iree_vm_ref_object_retain(buffer, iree_vm_buffer_type());
 }
 
 IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer) {
-  iree_vm_ref_object_release(buffer, iree_vm_buffer_descriptor);
+  iree_vm_ref_object_release(buffer, iree_vm_buffer_type());
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
@@ -321,6 +321,6 @@ iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
       .offsetof_counter = offsetof(iree_vm_buffer_t, ref_object.counter) /
                           IREE_VM_REF_COUNTER_ALIGNMENT,
   };
-  iree_vm_buffer_descriptor = &descriptor;
-  return iree_vm_instance_register_type(instance, &descriptor);
+  return iree_vm_instance_register_type(instance, &descriptor,
+                                        &iree_vm_buffer_registration);
 }

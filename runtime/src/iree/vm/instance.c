@@ -97,13 +97,25 @@ iree_vm_instance_allocator(iree_vm_instance_t* instance) {
   return instance->allocator;
 }
 
-IREE_API_EXPORT iree_status_t iree_vm_instance_register_type(
-    iree_vm_instance_t* instance,
-    const iree_vm_ref_type_descriptor_t* descriptor) {
+IREE_API_EXPORT iree_status_t
+iree_vm_instance_register_type(iree_vm_instance_t* instance,
+                               const iree_vm_ref_type_descriptor_t* descriptor,
+                               iree_vm_ref_type_t* out_registration) {
+  IREE_ASSERT_ARGUMENT(instance);
+  IREE_ASSERT_ARGUMENT(descriptor);
+  IREE_ASSERT_ARGUMENT(out_registration);
+  *out_registration = 0;
+
   if ((((uintptr_t)descriptor) & IREE_VM_REF_TYPE_TAG_BIT_MASK) != 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "type descriptors must be aligned to %d bytes",
                             (1 << IREE_VM_REF_TYPE_TAG_BITS));
+  }
+
+  if (descriptor->offsetof_counter & ~IREE_VM_REF_TYPE_TAG_BIT_MASK) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "types must have offsets within the first few "
+                            "words of their structures");
   }
 
   iree_slim_mutex_lock(&instance->type_mutex);
@@ -117,6 +129,8 @@ IREE_API_EXPORT iree_status_t iree_vm_instance_register_type(
       // register/unregister set.
       ++type->registration_count;
       iree_slim_mutex_unlock(&instance->type_mutex);
+      *out_registration = (iree_vm_ref_type_t)descriptor |
+                          (iree_vm_ref_type_t)descriptor->offsetof_counter;
       return iree_ok_status();
     }
   }
@@ -139,6 +153,9 @@ IREE_API_EXPORT iree_status_t iree_vm_instance_register_type(
   };
 
   iree_slim_mutex_unlock(&instance->type_mutex);
+
+  *out_registration = (iree_vm_ref_type_t)descriptor |
+                      (iree_vm_ref_type_t)descriptor->offsetof_counter;
   return iree_ok_status();
 }
 
@@ -169,9 +186,8 @@ IREE_API_EXPORT void iree_vm_instance_unregister_type(
 // NOTE: this does a linear scan over the type descriptors even though they are
 // likely in a random order. Type lookup should be done once and reused so this
 // shouldn't really matter.
-IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*
-iree_vm_instance_lookup_type(iree_vm_instance_t* instance,
-                             iree_string_view_t full_name) {
+IREE_API_EXPORT iree_vm_ref_type_t iree_vm_instance_lookup_type(
+    iree_vm_instance_t* instance, iree_string_view_t full_name) {
   const iree_vm_ref_type_descriptor_t* descriptor = NULL;
   iree_slim_mutex_lock(&instance->type_mutex);
   for (iree_host_size_t i = 0; i < instance->type_count; ++i) {
@@ -182,5 +198,7 @@ iree_vm_instance_lookup_type(iree_vm_instance_t* instance,
     }
   }
   iree_slim_mutex_unlock(&instance->type_mutex);
-  return descriptor;
+  if (!descriptor) return 0;
+  return (iree_vm_ref_type_t)descriptor |
+         (iree_vm_ref_type_t)descriptor->offsetof_counter;
 }

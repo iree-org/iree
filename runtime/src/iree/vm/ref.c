@@ -18,50 +18,65 @@ static void iree_vm_ref_trace(const char* msg, iree_vm_ref_t* ref) {
   fprintf(stderr, "%s %.*s 0x%p %d\n", msg, (int)name.size, name.data, ref->ptr,
           counter->__val);
 }
+static void iree_vm_ref_ptr_trace(const char* msg, void* ptr,
+                                  iree_vm_ref_type_t type) {
+  volatile iree_atomic_ref_count_t* counter =
+      iree_vm_get_raw_counter_ptr(ptr, type);
+  iree_string_view_t name = iree_vm_ref_type_name(type);
+  fprintf(stderr, "%s %.*s 0x%p %d\n", msg, (int)name.size, name.data, ptr,
+          counter->__val);
+}
 #else
 #define iree_vm_ref_trace(...)
+#define iree_vm_ref_ptr_trace(...)
 #endif  // 0
 
 IREE_API_EXPORT iree_string_view_t
 iree_vm_ref_type_name(iree_vm_ref_type_t type) {
   IREE_VM_REF_ASSERT(type);
-  return ((const iree_vm_ref_type_descriptor_t*)type)->type_name;
+  return iree_vm_ref_type_descriptor(type)->type_name;
 }
 
 static inline volatile iree_atomic_ref_count_t* iree_vm_get_raw_counter_ptr(
-    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
+    void* ptr, iree_vm_ref_type_t type) {
   IREE_VM_REF_ASSERT(ptr);
   IREE_VM_REF_ASSERT(type_descriptor);
   return (volatile iree_atomic_ref_count_t*)ptr +
-         type_descriptor->offsetof_counter;
+         (type & IREE_VM_REF_TYPE_TAG_BIT_MASK);
 }
 
 static inline volatile iree_atomic_ref_count_t* iree_vm_get_ref_counter_ptr(
     iree_vm_ref_t* ref) {
   IREE_VM_REF_ASSERT(ref);
   IREE_VM_REF_ASSERT(ref->ptr);
-  return (volatile iree_atomic_ref_count_t*)ref->ptr + ref->offsetof_counter;
+  return (volatile iree_atomic_ref_count_t*)ref->ptr +
+         (ref->type & IREE_VM_REF_TYPE_TAG_BIT_MASK);
 }
 
-IREE_API_EXPORT void iree_vm_ref_object_retain(
-    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
+IREE_API_EXPORT void iree_vm_ref_object_retain(void* ptr,
+                                               iree_vm_ref_type_t type) {
   if (!ptr) return;
-  IREE_VM_REF_ASSERT(type_descriptor);
+  IREE_VM_REF_ASSERT(type);
   volatile iree_atomic_ref_count_t* counter =
-      iree_vm_get_raw_counter_ptr(ptr, type_descriptor);
+      iree_vm_get_raw_counter_ptr(ptr, type);
   iree_atomic_ref_count_inc(counter);
+  iree_vm_ref_ptr_trace("RETAIN", ptr, type);
 }
 
-IREE_API_EXPORT void iree_vm_ref_object_release(
-    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
+IREE_API_EXPORT void iree_vm_ref_object_release(void* ptr,
+                                                iree_vm_ref_type_t type) {
   if (!ptr) return;
-  IREE_VM_REF_ASSERT(type_descriptor);
+  IREE_VM_REF_ASSERT(type);
+  iree_vm_ref_ptr_trace("RELEASE", ptr, type);
   volatile iree_atomic_ref_count_t* counter =
-      iree_vm_get_raw_counter_ptr(ptr, type_descriptor);
+      iree_vm_get_raw_counter_ptr(ptr, type);
   if (iree_atomic_ref_count_dec(counter) == 1) {
-    if (type_descriptor->destroy) {
+    const iree_vm_ref_type_descriptor_t* descriptor =
+        iree_vm_ref_type_descriptor(type);
+    if (descriptor->destroy) {
       // NOTE: this makes us not re-entrant, but I think that's OK.
-      type_descriptor->destroy(ptr);
+      iree_vm_ref_ptr_trace("DESTROY", ptr, type);
+      descriptor->destroy(ptr);
     }
   }
 }
@@ -72,12 +87,7 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_wrap_assign(void* ptr,
   IREE_VM_REF_ASSERT(ptr);
   IREE_VM_REF_ASSERT(type);
   IREE_VM_REF_ASSERT(out_ref);
-  const iree_vm_ref_type_descriptor_t* type_descriptor =
-      (const iree_vm_ref_type_descriptor_t*)type;
-  if (!type_descriptor) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "type not registered");
-  }
+  IREE_VM_REF_ASSERT(iree_vm_ref_type_descriptor(type));
 
   if (out_ref->ptr != NULL && out_ref->ptr != ptr) {
     // Release existing value.
@@ -87,7 +97,6 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_wrap_assign(void* ptr,
   // NOTE: we do not manipulate the counter here as we assume it starts at 1
   // or it's already coming in with some references.
   out_ref->ptr = ptr;
-  out_ref->offsetof_counter = type_descriptor->offsetof_counter;
   out_ref->type = type;
 
   iree_vm_ref_trace("WRAP ASSIGN", out_ref);
@@ -190,12 +199,12 @@ IREE_API_EXPORT void iree_vm_ref_release(iree_vm_ref_t* ref) {
   iree_vm_ref_trace("RELEASE", ref);
   volatile iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(ref);
   if (iree_atomic_ref_count_dec(counter) == 1) {
-    const iree_vm_ref_type_descriptor_t* type_descriptor =
-        (const iree_vm_ref_type_descriptor_t*)ref->type;
-    if (type_descriptor->destroy) {
+    const iree_vm_ref_type_descriptor_t* descriptor =
+        iree_vm_ref_type_descriptor(ref->type);
+    if (descriptor->destroy) {
       // NOTE: this makes us not re-entrant, but I think that's OK.
       iree_vm_ref_trace("DESTROY", ref);
-      type_descriptor->destroy(ref->ptr);
+      descriptor->destroy(ref->ptr);
     }
   }
 

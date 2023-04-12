@@ -269,11 +269,11 @@ iree_vm_list_clone(iree_vm_list_t* source, iree_allocator_t host_allocator,
 }
 
 IREE_API_EXPORT void iree_vm_list_retain(iree_vm_list_t* list) {
-  iree_vm_ref_object_retain(list, iree_vm_list_descriptor);
+  iree_vm_ref_object_retain(list, iree_vm_list_type());
 }
 
 IREE_API_EXPORT void iree_vm_list_release(iree_vm_list_t* list) {
-  iree_vm_ref_object_release(list, iree_vm_list_descriptor);
+  iree_vm_ref_object_release(list, iree_vm_list_type());
 }
 
 IREE_API_EXPORT iree_vm_type_def_t
@@ -780,15 +780,15 @@ iree_vm_list_push_value(iree_vm_list_t* list, const iree_vm_value_t* value) {
   return iree_vm_list_set_value(list, i, value);
 }
 
-IREE_API_EXPORT void* iree_vm_list_get_ref_deref(
-    const iree_vm_list_t* list, iree_host_size_t i,
-    const iree_vm_ref_type_descriptor_t* type_descriptor) {
+IREE_API_EXPORT void* iree_vm_list_get_ref_deref(const iree_vm_list_t* list,
+                                                 iree_host_size_t i,
+                                                 iree_vm_ref_type_t type) {
   iree_vm_ref_t value = {0};
   iree_status_t status = iree_vm_list_get_ref_assign(list, i, &value);
   if (!iree_status_is_ok(iree_status_consume_code(status))) {
     return NULL;
   }
-  status = iree_vm_ref_check(value, (iree_vm_ref_type_t)type_descriptor);
+  status = iree_vm_ref_check(value, type);
   if (!iree_status_is_ok(iree_status_consume_code(status))) {
     return NULL;
   }
@@ -1055,6 +1055,6 @@ iree_status_t iree_vm_list_register_types(iree_vm_instance_t* instance) {
       .offsetof_counter = offsetof(iree_vm_list_t, ref_object.counter) /
                           IREE_VM_REF_COUNTER_ALIGNMENT,
   };
-  iree_vm_list_descriptor = &descriptor;
-  return iree_vm_instance_register_type(instance, &descriptor);
+  return iree_vm_instance_register_type(instance, &descriptor,
+                                        &iree_vm_list_registration);
 }

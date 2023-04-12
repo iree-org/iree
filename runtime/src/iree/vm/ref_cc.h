@@ -33,7 +33,6 @@ namespace vm {
 
 template <typename T>
 struct ref_type_descriptor {
-  static const iree_vm_ref_type_descriptor_t* get();
   static iree_vm_ref_type_t type();
 };
 
@@ -41,14 +40,12 @@ struct ref_type_descriptor {
 // access their registered type ID at runtime.
 template <typename T>
 static inline void ref_type_retain(T* p) {
-  IREE_VM_REF_ASSERT(ref_type_descriptor<T>::get());
-  iree_vm_ref_object_retain(p, ref_type_descriptor<T>::get());
+  iree_vm_ref_object_retain(p, ref_type_descriptor<T>::type());
 }
 
 template <typename T>
 static inline void ref_type_release(T* p) {
-  IREE_VM_REF_ASSERT(ref_type_descriptor<T>::get());
-  iree_vm_ref_object_release(p, ref_type_descriptor<T>::get());
+  iree_vm_ref_object_release(p, ref_type_descriptor<T>::type());
 }
 
 // Base class for reference counted objects.
@@ -227,11 +224,11 @@ class RefObject {
 // Compatible only with types that implement the following methods:
 //   ref_type_retain(T*)
 //   ref_type_release(T*)
-//   ref_type_descriptor<T>::get()
+//   ref_type_descriptor<T>::type()
 //
-// If you get link errors pertaining to ref_type_descriptor then ensure that you
-// have included the header file containing the IREE_VM_DECLARE_TYPE_ADAPTERS
-// for the given type.
+// If you get link errors pertaining to ref_type_registration then ensure that
+// you have included the header file containing the
+// IREE_VM_DECLARE_TYPE_ADAPTERS for the given type.
 //
 // TODO(benvanik): reconcile RefObject, iree_vm_ref_t, and this.
 template <typename T>
@@ -249,11 +246,8 @@ class ref {
   IREE_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept {}
   IREE_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept {
     if (!p) return;
-    const auto* type_descriptor = ref_type_descriptor<T>::get();
-    IREE_VM_REF_ASSERT(type_descriptor);
     ref_.ptr = p;
-    ref_.offsetof_counter = type_descriptor->offsetof_counter;
-    ref_.type = (iree_vm_ref_type_t)type_descriptor;
+    ref_.type = ref_type_descriptor<T>::type();
   }
   // TODO(benvanik): use the offsetof_counter we already have locally here and
   // below. In theory the compiler may be able to optimize some of this based on
@@ -281,7 +275,6 @@ class ref {
   template <typename U>
   ref(ref<U>&& rhs) noexcept {  // NOLINT
     ref_.ptr = static_cast<T*>(rhs.release());
-    ref_.offsetof_counter = rhs.ref_.offsetof_counter;
     ref_.type = rhs.ref_.type;
   }
   template <typename U>
@@ -316,11 +309,8 @@ class ref {
   // not be incremented.
   IREE_ATTRIBUTE_ALWAYS_INLINE void assign(T* value) noexcept {
     reset();
-    const auto* type_descriptor = ref_type_descriptor<T>::get();
-    IREE_VM_REF_ASSERT(type_descriptor);
     ref_.ptr = value;
-    ref_.offsetof_counter = type_descriptor->offsetof_counter;
-    ref_.type = (iree_vm_ref_type_t)type_descriptor;
+    ref_.type = ref_type_descriptor<T>::type();
   }
 
   // Gets the pointer referenced by this instance.

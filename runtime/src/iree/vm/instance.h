@@ -69,11 +69,15 @@ iree_vm_instance_allocator(iree_vm_instance_t* instance);
 // Once registered the descriptor must stay valid until all ref types created
 // using it have expired and the type is unregistered from the instance.
 //
+// Upon successful registration |out_registration| will be set to the canonical
+// iree_vm_ref_type_t that should be used when interacting with the type.
+//
 // NOTE: the name is not retained and must be kept live by the caller. Ideally
 // it is stored in static read-only memory in the binary.
 IREE_API_EXPORT iree_status_t
 iree_vm_instance_register_type(iree_vm_instance_t* instance,
-                               const iree_vm_ref_type_descriptor_t* descriptor);
+                               const iree_vm_ref_type_descriptor_t* descriptor,
+                               iree_vm_ref_type_t* out_registration);
 
 // Unregisters a user-defined type with the IREE C ref system.
 // No iree_vm_ref_t instances must be live in the program referencing the type.
@@ -82,9 +86,8 @@ IREE_API_EXPORT void iree_vm_instance_unregister_type(
     const iree_vm_ref_type_descriptor_t* descriptor);
 
 // Returns the registered type descriptor for the given type, if found.
-IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*
-iree_vm_instance_lookup_type(iree_vm_instance_t* instance,
-                             iree_string_view_t full_name);
+IREE_API_EXPORT iree_vm_ref_type_t iree_vm_instance_lookup_type(
+    iree_vm_instance_t* instance, iree_string_view_t full_name);
 
 #ifdef __cplusplus
 }  // extern "C"

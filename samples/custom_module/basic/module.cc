@@ -77,9 +77,9 @@ iree_status_t iree_custom_module_basic_register_types(
   iree_custom_string_descriptor_storage.offsetof_counter =
       offsetof(iree_custom_string_t, ref_object.counter) /
       IREE_VM_REF_COUNTER_ALIGNMENT;
-  iree_custom_string_descriptor = &iree_custom_string_descriptor_storage;
   return iree_vm_instance_register_type(instance,
-                                        &iree_custom_string_descriptor_storage);
+                                        &iree_custom_string_descriptor_storage,
+                                        &iree_custom_string_registration);
 }
 
 static void iree_custom_module_basic_unregister_types(

@@ -116,8 +116,7 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
 
   output << "struct " << moduleName << "_t {\n";
   output << "iree_allocator_t allocator;\n";
-  output << "const iree_vm_ref_type_descriptor_t* types["
-         << countOrEmpty(numTypes) << "];\n";
+  output << "iree_vm_ref_type_t types[" << countOrEmpty(numTypes) << "];\n";
   output << "};\n";
 
   output << "struct " << moduleName << "_state_t {\n";

@@ -128,20 +128,19 @@ using ::iree::testing::status::StatusIs;
 using testing::Eq;
 
 template <typename T>
-static void RegisterRefType(
-    iree_vm_instance_t* instance, const char* type_name,
-    const iree_vm_ref_type_descriptor_t** out_descriptor) {
+static void RegisterRefType(iree_vm_instance_t* instance, const char* type_name,
+                            iree_vm_ref_type_t* out_registration) {
   static iree_vm_ref_type_descriptor_t storage = {0};
   storage.type_name = iree_make_cstring_view(type_name);
   storage.offsetof_counter = T::offsetof_counter();
   storage.destroy = T::DirectDestroy;
-  *out_descriptor = &storage;
-  IREE_CHECK_OK(iree_vm_instance_register_type(instance, &storage));
+  IREE_CHECK_OK(
+      iree_vm_instance_register_type(instance, &storage, out_registration));
 }
 
 static void RegisterRefTypes(iree_vm_instance_t* instance) {
-  RegisterRefType<A>(instance, "AType", &test_a_descriptor);
-  RegisterRefType<B>(instance, "BType", &test_b_descriptor);
+  RegisterRefType<A>(instance, "AType", &test_a_registration);
+  RegisterRefType<B>(instance, "BType", &test_b_registration);
 }
 
 template <typename T, typename V>
@@ -150,7 +149,7 @@ static iree_vm_ref_t MakeRef(V value) {
   auto* obj = new T();
   obj->set_data(value);
   IREE_CHECK_OK(iree_vm_ref_wrap_assign(
-      obj, (iree_vm_ref_type_t)iree::vm::ref_type_descriptor<T>::get(), &ref));
+      obj, iree::vm::ref_type_descriptor<T>::type(), &ref));
   return ref;
 }
 
