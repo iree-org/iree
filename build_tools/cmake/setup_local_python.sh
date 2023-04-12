@@ -15,3 +15,8 @@ export PATH="$PYTHON_SCRIPTS_DIR:$PATH"
 # Install local source-only Python packages. These do not have a build step
 # but export important binaries onto the path.
 "${IREE_PYTHON3_EXECUTABLE}" -m pip install integrations/tensorflow/python_projects/iree_tf
+
+# TODO(#13061): We should install from the local source-only Python packages
+# like iree-tools-tf, once we switch to Pyhton API based tflite importer.
+# Install pinned version of iree-tools-tflite.
+"${IREE_PYTHON3_EXECUTABLE}" -m pip install iree-tools-tflite=="20230412.487" -f https://openxla.github.io/iree/pip-release-links.html

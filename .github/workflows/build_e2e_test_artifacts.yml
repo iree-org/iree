@@ -28,15 +28,6 @@ on:
       build-dir-gcs-artifact:
         required: true
         type: string
-      tf-binaries-dir:
-        required: true
-        type: string
-      tf-binaries-archive:
-        required: true
-        type: string
-      tf-binaries-gcs-artifact:
-        required: true
-        type: string
     outputs:
       e2e-test-artifacts-dir:
         description: |
@@ -75,9 +66,6 @@ jobs:
       HOST_BUILD_DIR: ${{ inputs.build-dir }}
       HOST_BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
       HOST_BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
-      TF_BINARIES_DIR: ${{ inputs.tf-binaries-dir }}
-      TF_BINARIES_ARCHIVE: ${{ inputs.tf-binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ inputs.tf-binaries-gcs-artifact }}
     outputs:
       e2e-test-artifacts-dir: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
       e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
@@ -92,17 +80,12 @@ jobs:
         run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
         run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
-      - name: "Downloading TF binaries archive"
-        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-      - name: "Extracting TF binaries archive"
-        run: tar -xf "${TF_BINARIES_ARCHIVE}"
       - name: "Building e2e test artifacts"
         id: build
         env:
           BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
         run: |
           build_tools/github_actions/docker_run.sh \
-            --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
             gcr.io/iree-oss/frontends@sha256:f7c5a863e3478a66aff8f3f527b5587666d3e84fe974e3f179a84eee11d79fd2 \
             build_tools/cmake/build_e2e_test_artifacts.sh \

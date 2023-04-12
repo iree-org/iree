@@ -40,8 +40,7 @@ echo "Configuring to build e2e test artifacts"
   -DIREE_BUILD_E2E_TEST_ARTIFACTS=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_BUILD_TESTS=OFF \
-  -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite"
+  -DIREE_BUILD_TESTS=OFF
 
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
