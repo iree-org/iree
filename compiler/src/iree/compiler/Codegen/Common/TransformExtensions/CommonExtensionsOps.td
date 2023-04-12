@@ -92,7 +92,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       - expand_memref_strided_metadata: adds patterns that expand memref
       operations into extract_strided_metadata operations and a materialization
       of their effect on the metadata (sizes, offset, strides).
-      - extract_address_computations: adds patterns for anchoring subview 
+      - extract_address_computations: adds patterns for anchoring subview
       accessing operations at [0, ... 0].
       - fold_memref_aliases: adds patterns for folding ops such as
       memref.subview.
@@ -102,7 +102,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       case it is the only use of extract.
       - fold_tensor_subsets: adds patterns for folding tensor subset ops into
       their producer and consumers.
-      - licm: additionally apply loop-independent code motion and single 
+      - licm: additionally apply loop-independent code motion and single
       iteration loop promotion. This is not a set of patterns per se but is still
       very convenient to apply it close to canonicalization and other greedy
       pattern applications.
@@ -112,11 +112,9 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       with minor identity permutations.
       - lower_vector_masks: Lower vector.mask ops away.
       - prepare_vector_to_mma: pre-process vector.contract op to set it in a form
-      that can be mapped to nvgpu.mma operations. 
+      that can be mapped to nvgpu.mma operations.
       - rank_reducing_linalg: adds patterns that results in rank-reducing
       behavior on subset-based linalg operations using insert/extract slices.
-      - rank_reducing_linalg_via_reshapes: adds patterns that results in rank-reducing
-      behavior on subset-based linalg operations using expand/collapse shape ops.
       - rank_reducing_vector: adds patterns that results in rank-reducing
       behavior on subset-based vector operations.
       adopts the upstream version.
@@ -171,7 +169,6 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
                        UnitAttr:$lower_vector_masks,
                        UnitAttr:$prepare_vector_to_mma,
                        UnitAttr:$rank_reducing_linalg,
-                       UnitAttr:$rank_reducing_linalg_via_reshapes,
                        UnitAttr:$rank_reducing_vector,
                        UnitAttr:$swap_padding_elide_conditional,
                        UnitAttr:$swapping_patterns,

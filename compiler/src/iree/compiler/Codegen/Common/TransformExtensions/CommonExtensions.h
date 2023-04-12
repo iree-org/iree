@@ -54,7 +54,6 @@ struct ApplyPatternsOpPatterns {
   bool lowerVectorMasks = false;
   bool prepareVectorToMma = false;
   bool rankReducingLinalg = false;
-  bool rankReducingLinalgViaReshapes = false;
   bool rankReducingVector = false;
   bool swapPaddingElideConditional = false;
   bool swappingPatterns = false;
