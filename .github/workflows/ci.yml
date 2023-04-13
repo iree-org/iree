@@ -1058,6 +1058,7 @@ jobs:
 
       # Crosscompilation
       - cross_compile_and_test
+      - build_and_test_android
 
       # Artifacts for e2e testing and benchmarking
       - build_benchmark_tools
