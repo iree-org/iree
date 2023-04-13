@@ -780,10 +780,10 @@ struct MatchedConvolutionCaptures {
 
 /// Creates a group of matchers for:
 ///
-///     trailing(convolution(leading(), fill()))
+///     trailing(convolution(input, filter, fill()))
 ///
-/// where fill is a FillOp and trailing is elementwise operations whose presence
-/// is optional. Each matcher will capture the corresponding operation.
+/// where fill is a FillOp and trailing is an elementwise operation, both of
+/// which is optional. Each matcher will capture the corresponding operation.
 void makeConvolutionMatcher(transform_ext::MatcherContext &context,
                             StructuredOpMatcher *&convolutionCapture,
                             StructuredOpMatcher *&fillCapture,

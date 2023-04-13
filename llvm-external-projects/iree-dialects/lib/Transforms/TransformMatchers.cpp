@@ -338,13 +338,15 @@ transform_ext::StructuredOpMatcher::dim(AllDims tag, CaptureDims captures) {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::convolutionDims(CaptureConvDims convDims) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
-    LLVM_DEBUG(DBGS() << "capture convolution dimensions");
-    if (!linalg::detail::getMatchConvolutionMessage(
-             mlir::linalg::detail::isConvolutionInterfaceImpl(linalgOp,
-                                                              &convDims.value))
-             .empty())
-      return false;
-    return true;
+    LLVM_DEBUG(DBGS() << "capture convolution dimensions\n");
+    StringRef convMessage = linalg::detail::getMatchConvolutionMessage(
+        mlir::linalg::detail::isConvolutionInterfaceImpl(linalgOp,
+                                                         &convDims.value));
+    if (convMessage.empty())
+      return true;
+    LLVM_DEBUG(DBGS() << "capture convolution dimensions failed: "
+                      << convMessage << "\n");
+    return false;
   });
   return *this;
 }
@@ -1216,12 +1218,9 @@ void transform_ext::makeConvolutionMatcher(
     transform_ext::StructuredOpMatcher *&trailingCapture,
     MatchedConvolutionCaptures &captures) {
   // The core part of the matcher is anchored on a particular convolution op.
-  auto &nchwConvolution =
-      m_StructuredOp<linalg::Conv2DNchwFchwOp>(matcherContext);
-  auto &nhwcConvolution =
-      m_StructuredOp<linalg::Conv2DNhwcHwcfOp>(matcherContext);
   auto &convolution =
-      m_StructuredOp_Or(matcherContext, nchwConvolution, nhwcConvolution)
+      m_StructuredOp<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
+          matcherContext)
           // Capture convolution dim classifications.
           .convolutionDims(CaptureConvDims(captures.convolutionDims))
           // Capture op sizes.
