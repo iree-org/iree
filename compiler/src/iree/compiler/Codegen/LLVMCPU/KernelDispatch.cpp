@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/PackStrategy.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -1126,9 +1127,32 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
   return workgroupTileSizes;
 }
 
+static LogicalResult setTransformStrategyRootConfig(func::FuncOp entryPointFn,
+                                                    tensor::PackOp op) {
+  if (!clCPUEnableTransformDialectJit) return failure();
+
+  // TODO(hanchung): Move the checks to matchAndSetPackStrategy. We can't move
+  // them to the method because of cyclic deps.
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (!isX86_64(targetAttr)) return failure();
+
+  cpu::PackConfig packConfig{.lowerToAVX2 = hasAVX2Feature(targetAttr)};
+  if (failed(cpu::matchAndSetPackStrategy(entryPointFn, op, packConfig)))
+    return failure();
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
+  return setTranslationInfo(entryPointFn, translationInfo);
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
+
+  if (succeeded(setTransformStrategyRootConfig(entryPointFn, op))) {
+    return success();
+  }
+
   SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()));
 

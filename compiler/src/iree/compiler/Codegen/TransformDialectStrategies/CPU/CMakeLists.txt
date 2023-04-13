@@ -15,9 +15,11 @@ iree_cc_library(
     TransformDialectStrategies
   HDRS
     "Common.h"
+    "PackStrategy.h"
     "ReductionStrategy.h"
   SRCS
     "Common.cpp"
+    "PackStrategy.cpp"
     "ReductionStrategy.cpp"
   DEPS
     IREEDialectsTransforms

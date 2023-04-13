@@ -16,10 +16,12 @@ iree_compiler_cc_library(
     name = "TransformDialectStrategies",
     srcs = [
         "Common.cpp",
+        "PackStrategy.cpp",
         "ReductionStrategy.cpp",
     ],
     hdrs = [
         "Common.h",
+        "PackStrategy.h",
         "ReductionStrategy.h",
     ],
     deps = [

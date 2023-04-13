@@ -40,6 +40,7 @@ iree_lit_test_suite(
     "peel.mlir"
     "peel_and_vectorize.mlir"
     "pipeline_tests.mlir"
+    "set_transform_strategy.mlir"
     "split_reduction_pipeline_tests.mlir"
     "synchronize_symbol_visibility.mlir"
     "tensor_pad.mlir"

@@ -30,9 +30,6 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
-using iree_compiler::cpu::CPUModel;
-using iree_compiler::cpu::ReductionConfig;
-using iree_compiler::cpu::ReductionStrategy;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using transform::ApplyTransferPermutationPatternsOp;
@@ -52,6 +49,10 @@ using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::ShapeKind;
 using transform_ext::StructuredOpMatcher;
 using vector::VectorContractLoweringAttr;
+
+namespace mlir {
+namespace iree_compiler {
+namespace cpu {
 
 //===----------------------------------------------------------------------===//
 // Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
@@ -89,7 +90,7 @@ static Value buildDefaultVectorLoweringStrategy(
 /// bufferize and map to blocks).
 /// Return the handles to the updated variant and the func::FuncOp ops under
 /// the variant op.
-std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
+std::pair<Value, Value> buildCommonTrailingStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const vector::LowerVectorsOptions &lowerVectorsOpts) {
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
@@ -150,8 +151,9 @@ static ReductionConfig getReductionConfig(
   return ReductionConfig{16};
 }
 
-LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
-    func::FuncOp entryPoint, linalg::LinalgOp op, const CPUModel &cpuModel) {
+LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
+                                           linalg::LinalgOp op,
+                                           const CPUModel &cpuModel) {
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
@@ -173,3 +175,30 @@ LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
 
   return success();
 }
+
+LogicalResult matchAndSetPackStrategy(func::FuncOp entryPoint,
+                                      tensor::PackOp op,
+                                      const PackConfig &config) {
+  // TODO(hanchung): Support pipeline for padding cases.
+  if (op.getPaddingValue()) return failure();
+
+  // Only packing LHS is supported.
+  auto innerDimPos = op.getInnerDimsPos();
+  if (innerDimPos.size() != 2 || innerDimPos[0] != 0 || innerDimPos[1] != 1)
+    return failure();
+  auto outerDimsPerm = op.getOuterDimsPerm();
+  if (!outerDimsPerm.empty()) return failure();
+
+  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+    LLVM_DEBUG(DBGS() << "use CPU pack strategy\n");
+    return buildPackStrategy(b, variant, config);
+  };
+
+  createTransformRegion(entryPoint, strategyBuilder);
+
+  return success();
+}
+
+}  // namespace cpu
+}  // namespace iree_compiler
+}  // namespace mlir

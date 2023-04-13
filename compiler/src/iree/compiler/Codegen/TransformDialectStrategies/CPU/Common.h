@@ -7,8 +7,10 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_
 
+#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/PackStrategy.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -53,6 +55,11 @@ struct CPUModel {
 LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
                                            linalg::LinalgOp op,
                                            const CPUModel& cpuModel);
+
+LogicalResult matchAndSetPackStrategy(func::FuncOp entryPoint,
+                                      tensor::PackOp op,
+                                      const PackConfig& config);
+
 }  // namespace cpu
 }  // namespace iree_compiler
 }  // namespace mlir
