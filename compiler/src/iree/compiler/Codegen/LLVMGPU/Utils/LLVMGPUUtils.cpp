@@ -70,7 +70,6 @@ static Value getMask(Operation* op) {
   auto transferRead = dyn_cast<vector::TransferReadOp>(op);
   if (!transferRead || !transferRead.getMask()) return Value();
   auto maskOp = transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
-  maskOp.dump();
   return maskOp.getOperand(0);
 }
 
