@@ -121,6 +121,7 @@ using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
 static void addCleanupPatterns(OpPassManager &passManager) {
   // Standard MLIR cleanup.
+  passManager.addPass(mlir::createCSEPass());
   passManager.addPass(mlir::createCanonicalizerPass());
   passManager.addPass(mlir::createCSEPass());
 

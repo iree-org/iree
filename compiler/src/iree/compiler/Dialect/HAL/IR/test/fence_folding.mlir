@@ -13,6 +13,18 @@ func.func @fence_create_unused(%device: !hal.device) {
 
 // -----
 
+// Tests that a fence join with 1 operand folds into that operand.
+
+// CHECK-LABEL: @fence_join_one
+// CHECK-SAME: %[[ARG:.+]]: !hal.fence
+func.func @fence_join_one(%arg: !hal.fence) -> !hal.fence {
+  %join = hal.fence.join at([%arg]) -> !hal.fence
+  // CHECK: return %[[ARG]]
+  return %join : !hal.fence
+}
+
+// -----
+
 // Tests that a fence join with no operands folds into a util.null.
 
 // CHECK-LABEL: @fence_join_empty
@@ -28,12 +40,12 @@ func.func @fence_join_empty() -> !hal.fence {
 // Tests that known null fences are dropped from joins.
 
 // CHECK-LABEL: @fence_join_null
-// CHECK-SAME: %[[ARG:.+]]: !hal.fence
-func.func @fence_join_null(%arg: !hal.fence) -> !hal.fence {
+// CHECK-SAME: (%[[ARG0:.+]]: !hal.fence, %[[ARG1:.+]]: !hal.fence)
+func.func @fence_join_null(%arg0: !hal.fence, %arg1: !hal.fence) -> !hal.fence {
   // CHECK-NOT: util.null
   %null = util.null : !hal.fence
-  // CHECK: %[[JOIN:.+]] = hal.fence.join at([%[[ARG]]]) -> !hal.fence
-  %join = hal.fence.join at([%arg, %null]) -> !hal.fence
+  // CHECK: %[[JOIN:.+]] = hal.fence.join at([%[[ARG0]], %[[ARG1]]]) -> !hal.fence
+  %join = hal.fence.join at([%arg0, %null, %arg1]) -> !hal.fence
   // CHECK: return %[[JOIN]]
   return %join : !hal.fence
 }
@@ -50,6 +62,46 @@ func.func @fence_join_duplicate_fences(%fence0: !hal.fence, %fence1: !hal.fence)
   // CHECK: return %[[JOIN]]
   return %join : !hal.fence
 }
+
+// -----
+
+// Elides fences that are immediately signaled on the host.
+// This requires that there are no ops using the fence value between the time it
+// is created and the time it is signaled.
+
+// CHECK-LABEL: @fence_elide_signaled
+func.func @fence_elide_signaled(%device: !hal.device) -> !hal.fence {
+  // CHECK-NOT: hal.fence.create
+  %fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
+  // Ok to have other things inbetween so long as they don't touch the fence.
+  // CHECK: call @external_nop_call
+  call @external_nop_call() : () -> ()
+  // CHECK-NOT: hal.fence.signal
+  hal.fence.signal<%fence : !hal.fence>
+  // CHECK: %[[FENCE:.+]] = util.null : !hal.fence
+  // CHECK: return %[[FENCE]]
+  return %fence : !hal.fence
+}
+func.func private @external_nop_call()
+
+// -----
+
+// Ensures that immediate fence signals aren't elided if the fence may be waited
+// on between when it is created and when it is signaled.
+
+// CHECK-LABEL: @fence_cannot_elide_signaled
+func.func @fence_cannot_elide_signaled(%device: !hal.device) -> !hal.fence {
+  // CHECK: hal.fence.create
+  %fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
+  // Block the elision as the external call may wait on the fence.
+  // CHECK: call @external_wait_call
+  call @external_wait_call(%fence) : (!hal.fence) -> ()
+  // CHECK: hal.fence.signal
+  hal.fence.signal<%fence : !hal.fence>
+  // CHECK: return
+  return %fence : !hal.fence
+}
+func.func private @external_wait_call(!hal.fence)
 
 // -----
 

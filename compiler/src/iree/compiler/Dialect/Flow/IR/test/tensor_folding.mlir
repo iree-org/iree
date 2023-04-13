@@ -234,9 +234,27 @@ func.func @storeConstScalar() -> tensor<i32> {
 
 // -----
 
+// CHECK-LABEL: @allocDims
+//  CHECK-SAME: (%[[DIM:.+]]: index)
+func.func @allocDims(%dim: index) -> (index, index, index) {
+  // CHECK-NOT: flow.tensor.alloc
+  %0 = flow.tensor.alloc : tensor<4x?x0xf32>{%dim}
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %d0 = tensor.dim %0, %c0 : tensor<4x?x0xf32>
+  %d1 = tensor.dim %0, %c1 : tensor<4x?x0xf32>
+  %d2 = tensor.dim %0, %c2 : tensor<4x?x0xf32>
+  // CHECK: return %c4, %[[DIM]], %c0
+  return %d0, %d1, %d2 : index, index, index
+}
+
+// -----
+
 // CHECK-LABEL: @emptyDims
 //  CHECK-SAME: (%[[DIM:.+]]: index)
 func.func @emptyDims(%dim: index) -> (index, index, index) {
+  // CHECK-NOT: flow.tensor.empty
   %0 = flow.tensor.empty : tensor<4x?x0xf32>{%dim}
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

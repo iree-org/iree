@@ -41,6 +41,20 @@ namespace Flow {
 // Folding utilities
 //===----------------------------------------------------------------------===//
 
+// Erases an op if it has no uses.
+// This is to support ops that are "pure" but can't be marked as such because
+// the MLIR CSE pass would deduplicate them.
+template <typename Op>
+struct ElideUnusedOp : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.use_empty()) return failure();
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 // Returns true if |value| is definitely empty at runtime.
 static bool isTensorZeroElements(Value value) {
   auto type = value.getType().dyn_cast<ShapedType>();
@@ -508,6 +522,10 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
   return true;
 }
 
+//===----------------------------------------------------------------------===//
+// flow.tensor.constant
+//===----------------------------------------------------------------------===//
+
 OpFoldResult TensorConstantOp::fold(FoldAdaptor operands) {
   auto dynamicType = getType();
   if (dynamicType.getNumDynamicDims() == 0) {
@@ -550,6 +568,10 @@ void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ExpandDynamicShapeConstant>(context);
 }
 
+//===----------------------------------------------------------------------===//
+// flow.tensor.tie_shape
+//===----------------------------------------------------------------------===//
+
 OpFoldResult TensorTieShapeOp::fold(FoldAdaptor operands) {
   if (getDynamicDims().empty()) {
     return getOperand();
@@ -562,6 +584,10 @@ void TensorTieShapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ReplaceOpIfTensorOperandZeroElements<TensorTieShapeOp, 0>>(
       context);
 }
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.reshape
+//===----------------------------------------------------------------------===//
 
 OpFoldResult TensorReshapeOp::fold(FoldAdaptor operands) {
   auto sourceType = getSource().getType().cast<ShapedType>();
@@ -692,10 +718,9 @@ void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ResolveShapedDim>(context);
 }
 
-void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                               MLIRContext *context) {
-  results.insert<FoldSplatLoadIntoPrimitive>(context);
-}
+//===----------------------------------------------------------------------===//
+// flow.tensor.load
+//===----------------------------------------------------------------------===//
 
 OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
   if (auto source = operands.getSource().dyn_cast_or_null<ElementsAttr>()) {
@@ -709,6 +734,15 @@ OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
   }
   return {};
 }
+
+void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<FoldSplatLoadIntoPrimitive>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.store
+//===----------------------------------------------------------------------===//
 
 OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
   auto value = operands.getValue();
@@ -733,10 +767,27 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
   return {};
 }
 
+//===----------------------------------------------------------------------===//
+// flow.tensor.alloc
+//===----------------------------------------------------------------------===//
+
+void TensorAllocOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
+  results.insert<ElideUnusedOp<TensorAllocOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.empty
+//===----------------------------------------------------------------------===//
+
 void TensorEmptyOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   // TODO(benvanik): fold static shapes into dims.
 }
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.splat
+//===----------------------------------------------------------------------===//
 
 void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
@@ -745,6 +796,10 @@ void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
   results.insert<FoldSplatReshapeIntoSplat>(context);
 }
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.clone
+//===----------------------------------------------------------------------===//
 
 OpFoldResult TensorCloneOp::fold(FoldAdaptor operands) {
   if (auto operand = operands.getOperand()) {
@@ -771,6 +826,10 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
   results.insert<ReplaceOpIfTensorOperandEmpty<TensorCloneOp, 0, 0>>(context);
 }
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.slice
+//===----------------------------------------------------------------------===//
 
 // Slices tensor from start to (start + length) exclusively at dim.
 static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
@@ -829,6 +888,10 @@ void TensorSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
   results.insert<ReplaceOpIfTensorOperandEmpty<TensorSliceOp, 0, 0>>(context);
 }
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.update
+//===----------------------------------------------------------------------===//
 
 static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
                                  ArrayRef<Attribute> startIndicesAttrs) {

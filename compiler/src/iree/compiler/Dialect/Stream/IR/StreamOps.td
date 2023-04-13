@@ -3147,6 +3147,8 @@ def Stream_TimepointChainExternalOp :
     `(` $external_values `:` type($external_values) `)`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [

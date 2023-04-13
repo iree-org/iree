@@ -27,12 +27,10 @@ iree_lit_test_suite(
             "resource_ops.mlir",
             "tensor_folding.mlir",
             "tensor_ops.mlir",
-            # TODO(#11251): Enable the test.
-            # "timepoint_folding.mlir",
+            "timepoint_folding.mlir",
             "timepoint_ops.mlir",
         ],
         include = ["*.mlir"],
-        exclude = ["timepoint_folding.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
