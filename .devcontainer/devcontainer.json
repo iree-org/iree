@@ -1,0 +1,45 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.245.2/containers/docker-existing-dockerfile
+{
+    "name": "IREE Development Container",
+    "dockerComposeFile": [
+        "docker-compose.yml"
+    ],
+    "service": "iree-dev",
+    "remoteUser": "iree",
+    "workspaceFolder": "/workspaces/iree",
+    "customizations": {
+        "vscode": {
+            "extensions": [             
+                // LLVM & MLIR
+                "llvm-vs-code-extensions.vscode-clangd",
+                "llvm-vs-code-extensions.vscode-mlir",
+                "jakob-erzar.llvm-tablegen",
+                // CPP
+                "ms-vscode.cpptools-extension-pack",
+                // Python
+                "ms-python.python",
+                // Build Tools
+                "ms-azuretools.vscode-docker",
+                "ms-vscode.makefile-tools",
+                "ms-vscode.cmake-tools",
+                // Git & Github
+                "GitHub.vscode-pull-request-github"
+            ]
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "username": "iree",
+            "uid": "automatic",
+            "gid": "automatic",
+            "installZsh": true,
+            "installOhMyZsh": true,
+            "configureZshAsDefaultShell": false,
+            "upgradePackages": true
+        },
+        "ghcr.io/devcontainers/features/git:1": {
+            "version": "latest"
+        }
+    }
+}
