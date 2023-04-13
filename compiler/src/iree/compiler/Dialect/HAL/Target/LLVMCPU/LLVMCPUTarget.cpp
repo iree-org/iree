@@ -39,6 +39,14 @@
 
 #define DEBUG_TYPE "iree-llvm-cpu-target"
 
+// TODO(ravishankarm): This is redundant w.r.t `iree-vmvx-enable-microkernels`
+// flag. Fold these into either a single flag, or not have the flag at all.
+static llvm::cl::opt<bool> clEnableCPUMicrokernels(
+    "iree-llvmcpu-enable-microkernels",
+    llvm::cl::desc(
+        "Enables microkernel lowering for llvmcpu backend (experimental)"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -749,6 +757,9 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // build the TTI the right way.
     addConfig("native_vector_size",
               IntegerAttr::get(IndexType::get(context), config_.vectorSize));
+
+    // Check if microkernels are to be enabled.
+    addConfig("ukernels", BoolAttr::get(context, clEnableCPUMicrokernels));
 
     return IREE::HAL::ExecutableTargetAttr::get(
         context, StringAttr::get(context, "llvm-cpu"),

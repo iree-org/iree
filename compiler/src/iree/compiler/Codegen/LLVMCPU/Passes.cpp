@@ -117,6 +117,7 @@ static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
   addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
                                       memcpyFn);
+
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.addNestedPass<func::FuncOp>(
@@ -550,7 +551,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   }
 }
 
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
+                                      bool enableMicrokernels) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -559,16 +561,26 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUVectorizationPass());
+  if (enableMicrokernels) {
+    nestedModulePM.addPass(createLLVMCPULowerToUKernelsPass());
+  } else {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorizationPass());
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   addBufferizePasses(nestedModulePM);
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUMmt4dVectorLoweringPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass(/*flatten=*/true));
+  if (enableMicrokernels) {
+    nestedModulePM.addPass(createLowerUKernelOpsToCallsPass());
+  } else {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUMmt4dVectorLoweringPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createOptimizeVectorTransferPass(/*flatten=*/true));
+  }
 }
 
 void addCPUDataTilingPipeline(OpPassManager &passManager) {
@@ -643,6 +655,12 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   passManager.addNestedPass<func::FuncOp>(
       createHoistStaticallyBoundAllocationsPass());
+
+  // Resolve get_buffer_descriptor ops. All structural buffer manipulations
+  // must conclude before this point.
+  passManager.addNestedPass<func::FuncOp>(
+      createIREEExpandStridedMetadataPass());
+  passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
 
   // Checking stack allocation before converting to CF dialect is easier.
   if (clCheckIRBeforeLLVMConversion) {
