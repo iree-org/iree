@@ -85,12 +85,14 @@ static Operation* replaceOpWithPredicatedOp(RewriterBase& rewriter,
 
   // Create srcElement Value based on the pred.
   // The next few lins generate the below code:
-  // srcElement = (pred) ?  dstElements : 0;
+  // srcElement = (pred) ?  prevSrcElements : 0;
   Value dstElements =
       rewriter.create<arith::ConstantOp>(loc, asyncCopyOp.getDstElementsAttr());
+  Value originalSrcElement =
+      asyncCopyOp.getSrcElements() ? asyncCopyOp.getSrcElements() : dstElements;
   Value c0Index = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   auto srcElements =
-      rewriter.create<arith::SelectOp>(loc, pred, dstElements, c0Index);
+      rewriter.create<arith::SelectOp>(loc, pred, originalSrcElement, c0Index);
   auto asyncCopyZfillOp = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
       loc, nvgpu::DeviceAsyncTokenType::get(asyncCopyOp.getContext()),
       asyncCopyOp.getDst(), asyncCopyOp.getDstIndices(), asyncCopyOp.getSrc(),
