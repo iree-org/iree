@@ -1,6 +1,10 @@
 // RUN: iree-opt %s --iree-stablehlo-to-linalg --split-input-file \
 // RUN:   --canonicalize | FileCheck %s
 
+// RUN: iree-opt %s --iree-stablehlo-to-linalg="enable-primitive-ops=true" \
+// RUN:   --split-input-file --canonicalize | \
+// RUN:   FileCheck %s --check-prefix=CHECK-PRIMITIVE
+
 // CHECK-LABEL: func @bitcast_convert
 func.func @bitcast_convert(%input: tensor<2x2xi32>) -> tensor<2x2xf32> {
   %result = "stablehlo.bitcast_convert"(%input) : (tensor<2x2xi32>) -> tensor<2x2xf32>
