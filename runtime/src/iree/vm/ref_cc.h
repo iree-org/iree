@@ -354,6 +354,15 @@ class ref {
   mutable iree_vm_ref_t ref_;
 };
 
+// Constructs an object of type T and wraps it in a reference.
+//
+// Usage:
+//   ref<MyType> a = make_ref<MyType>(...);
+template <typename T, typename... Args>
+inline ref<T> make_ref(Args&&... args) {
+  return ref<T>(new T(std::forward<Args>(args)...));
+}
+
 // Adds a reference to the given ref and returns the same ref.
 //
 // Usage:
