@@ -65,7 +65,7 @@ rm -rf ./shark_tmp
 rm -rf ~/.local/shark_tank
 
 declare -a args=(
-  --benchmark=native
+  --benchmark=all
   --forked
   --update_tank
   --maxfail=500
