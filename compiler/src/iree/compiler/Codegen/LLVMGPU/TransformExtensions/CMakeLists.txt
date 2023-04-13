@@ -49,6 +49,7 @@ iree_cc_library(
     MLIRPDLDialect
     MLIRPass
     MLIRSCFDialect
+    MLIRTensorTransformOps
     MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect

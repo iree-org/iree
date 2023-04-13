@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALG_TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H
 #define IREE_DIALECTS_DIALECT_LINALG_TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H
 
+#include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
@@ -45,15 +46,16 @@ auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
   return std::tuple_cat(a);
 }
 
-class TrackingListener : public RewriterBase::Listener,
-                         public transform::TransformState::Extension {
+/// A tracking listener for tensor IR that checks for payload replacement
+/// errors.
+class ErrorCheckingTrackingListener : public tensor::TrackingListener {
 public:
-  explicit TrackingListener(transform::TransformState &state)
-      : transform::TransformState::Extension(state) {}
+  using tensor::TrackingListener::TrackingListener;
 
-  ~TrackingListener() override {
+  ~ErrorCheckingTrackingListener() override {
 #ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-    assert(errorStateChecked && "must check listener error state");
+    assert((errorStateChecked || !hadErrors) &&
+           "must check listener error state");
 #endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
   }
 
@@ -62,7 +64,6 @@ public:
       return emitDefiniteFailure(loc, "listener failed");
     return DiagnosedSilenceableFailure::success();
   }
-
   DiagnosedSilenceableFailure check(Location loc,
                                     DiagnosedSilenceableFailure &&diag) {
     if (failed(checkErrorState())) {
@@ -77,10 +78,6 @@ public:
     return std::move(diag);
   }
 
-  void notifyOperationReplaced(Operation *op, ValueRange newValues) override;
-
-  void notifyOperationRemoved(Operation *op) override;
-
   LogicalResult checkErrorState() const {
 #ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
     errorStateChecked = true;
@@ -88,22 +85,9 @@ public:
     return failure(hadErrors);
   }
 
-  /// Remove the mappings between the given operation and any handle that may be
-  /// associated with it in the transform op.
-  void removeMappings(Operation *op);
-
 private:
-  InFlightDiagnostic emitError(Operation *op, const llvm::Twine &message = {}) {
-    mayFail(failure());
-    return op->emitError(message);
-  }
-
-  void mayFail(LogicalResult result) {
-    hadErrors |= result.failed();
-#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
-    errorStateChecked = false;
-#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
-  }
+  void notifyPayloadReplacementNotFound(Operation *op,
+                                        ValueRange values) override;
 
   bool hadErrors = false;
 

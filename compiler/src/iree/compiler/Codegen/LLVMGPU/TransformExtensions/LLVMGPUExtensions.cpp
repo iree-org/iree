@@ -93,7 +93,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
@@ -337,7 +337,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
   rewriter.setInsertionPoint(target);
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
   FailureOr<VectorDistributionResult> vectorDistributionResult =
       rewriteScfIfAsWarpExecuteOnLane0(rewriter, loc, target, workgroupSizeX,
@@ -607,7 +607,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   vector::ShapeCastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
   vector::BroadcastOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
   vector::ExtractOp::getCanonicalizationPatterns(preProcessingPatterns, ctx);
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   auto checkErrors = llvm::make_scope_exit([&]() {
     // The TrackingListener API makes checking for errors mandatory. It is safe
     // to drop payload ops during this transform, so we can ignore all errors.
@@ -678,7 +678,7 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   }
 
   MLIRContext *ctx = target->getContext();
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   GreedyRewriteConfig config;
   config.listener = &listener;
 
@@ -786,7 +786,7 @@ DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
     transform::TransformState &state) {
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
   iree_compiler::createAsyncGroups(rewriter, cast<func::FuncOp>(target),
                                    getUseMmaSync());
