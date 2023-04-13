@@ -301,6 +301,50 @@ IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_get_unique_id(
                                                        out_id);
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_query_group_params(
+    void* self, iree_hal_device_t* device,
+    iree_hal_queue_affinity_t queue_affinity, iree_byte_span_t id_storage,
+    iree_hal_channel_params_t* params) {
+  IREE_ASSERT_EQ(id_storage.data_length, sizeof(iree_hal_cuda_nccl_id_t));
+
+  iree_hal_cuda_dynamic_symbols_t* syms =
+      iree_hal_cuda_get_dynamic_symbols(device);
+
+  if (!syms->mpi_library) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "MPI should be loaded to use NCCL collective operations.");
+  }
+
+  // Until we have multi channel support, we only creates the default channel.
+  IREE_ASSERT_EQ(params->rank, IREE_HAL_CHANNEL_RANK_DEFAULT);
+  IREE_ASSERT_EQ(params->count, IREE_HAL_CHANNEL_COUNT_DEFAULT);
+
+  // Update the rank and count.
+  MPI_RETURN_IF_ERROR(syms,
+                      MPI_Comm_rank(syms->ompi_mpi_comm_world, &params->rank),
+                      "MPI_Comm_rank");
+  MPI_RETURN_IF_ERROR(syms,
+                      MPI_Comm_size(syms->ompi_mpi_comm_world, &params->count),
+                      "MPI_Comm_size");
+  ;
+
+  iree_hal_cuda_nccl_id_t* id = (iree_hal_cuda_nccl_id_t*)id_storage.data;
+  if (params->rank == 0) {
+    // The root process of the group creates the unique ID and broadcasts it
+    // to the others.
+    IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
+  }
+
+  MPI_RETURN_IF_ERROR(syms,
+                      MPI_Bcast(id, id_storage.data_length, syms->ompi_mpi_byte,
+                                0, syms->ompi_mpi_comm_world),
+                      "MPI_Bcast");
+  params->id = iree_const_cast_byte_span(id_storage);
+
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_cuda_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {

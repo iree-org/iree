@@ -13,8 +13,6 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/api.h"
-#include "iree/hal/drivers/cuda/cuda_device.h"
-#include "iree/hal/drivers/cuda/status_util.h"
 
 // Force using CUDA streams until we support command buffer caching to avoid the
 // overhead of graph creation.
@@ -37,53 +35,6 @@ IREE_FLAG(int32_t, cuda_nccl_default_rank, 0,
           "Participant rank within the default collective group.");
 IREE_FLAG(int32_t, cuda_nccl_default_count, 0,
           "Participant count of the default collective group");
-
-// Default implementation of the collective channel provider that just uses the
-// NCCL_COMM_ID environment variable for configuration. Hosting layers would
-// want to use their own implementation to exchange IDs.
-static iree_status_t iree_hal_cuda_nccl_query_group_params(
-    void* self, iree_hal_device_t* device,
-    iree_hal_queue_affinity_t queue_affinity, iree_byte_span_t id_storage,
-    iree_hal_channel_params_t* params) {
-  IREE_ASSERT_EQ(id_storage.data_length, sizeof(iree_hal_cuda_nccl_id_t));
-
-  iree_hal_cuda_dynamic_symbols_t* syms =
-      iree_hal_cuda_get_dynamic_symbols(device);
-
-  if (!syms->mpi_library) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "MPI should be loaded to use NCCL collective operations.");
-  }
-
-  // Until we have multi channel support, we only creates the default channel.
-  IREE_ASSERT_EQ(params->rank, IREE_HAL_CHANNEL_RANK_DEFAULT);
-  IREE_ASSERT_EQ(params->count, IREE_HAL_CHANNEL_COUNT_DEFAULT);
-
-  // Update the rank and count.
-  MPI_RETURN_IF_ERROR(syms,
-                      MPI_Comm_rank(syms->ompi_mpi_comm_world, &params->rank),
-                      "MPI_Comm_rank");
-  MPI_RETURN_IF_ERROR(syms,
-                      MPI_Comm_size(syms->ompi_mpi_comm_world, &params->count),
-                      "MPI_Comm_size");
-  ;
-
-  iree_hal_cuda_nccl_id_t* id = (iree_hal_cuda_nccl_id_t*)id_storage.data;
-  if (params->rank == 0) {
-    // The root process of the group creates the unique ID and broadcasts it
-    // to the others.
-    IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
-  }
-
-  MPI_RETURN_IF_ERROR(syms,
-                      MPI_Bcast(id, id_storage.data_length, syms->ompi_mpi_byte,
-                                0, syms->ompi_mpi_comm_world),
-                      "MPI_Bcast");
-  params->id = iree_const_cast_byte_span(id_storage);
-
-  return iree_ok_status();
-}
 
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,

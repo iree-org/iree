@@ -79,6 +79,13 @@ IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
 IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_get_unique_id(
     iree_hal_device_t* device, iree_hal_cuda_nccl_id_t* out_id);
 
+// Default implementation of the collective channel provider that uses MPI.
+// Hosting layers would want to use their own implementation to exchange IDs.
+IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_query_group_params(
+    void* self, iree_hal_device_t* device,
+    iree_hal_queue_affinity_t queue_affinity, iree_byte_span_t id_storage,
+    iree_hal_channel_params_t* params);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda_driver_t
 //===----------------------------------------------------------------------===//
