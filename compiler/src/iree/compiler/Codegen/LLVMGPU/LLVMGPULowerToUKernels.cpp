@@ -23,6 +23,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -150,10 +151,15 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
     if (!existuCUDAKernel(tiles[0], tiles[1], tiles[2], stages.value(),
                           strTypes[0].str(), strTypes[1].str(),
                           strTypes[2].str())) {
-      llvm::errs() << "Requested microkernel does not exist, maybe forget to "
-                      "pre-compile it. Add a microkernel contract in "
-                      "`uGPUContract.h`\n";
-      return failure();
+      return matmulOp->emitError()
+             << "Requested microkernel [Tile = " << tiles[0] << "x" << tiles[1]
+             << "x" << tiles[2] << ", stages = " << stages.value()
+             << ", lhs = " << strTypes[0].str()
+             << ", rhs = " << strTypes[1].str()
+             << ", result = " << strTypes[2].str()
+             << "] does not exist, maybe forget to "
+                "pre-compile it. Add a microkernel contract in "
+                "`uGPUContract.h`\n";
     }
 
     // Step 6. Generate a name for microkernel
