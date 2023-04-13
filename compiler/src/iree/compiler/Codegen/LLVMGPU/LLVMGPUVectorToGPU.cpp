@@ -85,6 +85,13 @@ struct LLVMGPUVectorToGPUPass
     createAsyncGroups(rewriter, funcOp, targetMmaSync);
 
     if (targetMmaSync) {
+      // Fold subview on memory copy to enable the application of shared memory
+      // swizzling optimization.
+      RewritePatternSet pattern(funcOp.getContext());
+      memref::populateFoldMemRefAliasOpPatterns(pattern);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(pattern)))) {
+        return signalPassFailure();
+      }
       swizzleSharedMemory(funcOp);
     }
   }
