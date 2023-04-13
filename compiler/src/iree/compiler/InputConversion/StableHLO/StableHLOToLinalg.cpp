@@ -2695,11 +2695,11 @@ struct ConvertStableHloToLinalg
     target.addLegalOp<UnrealizedConversionCastOp>();
 
     auto typeConverter = createStableHloToLinalgTypeConverter();
-    auto func = getOperation();
-    // TODO: Port `populateScalarHloToArithmeticConversionPatterns`.
+    ModuleOp module = getOperation();
+
     populateStableHloToLinalgConversionPatterns(&ctx, *typeConverter, &patterns,
                                                 this->enablePrimitiveOps);
-    if (failed(applyPartialConversion(func, target, std::move(patterns)))) {
+    if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
   }
@@ -2741,7 +2741,7 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       DynamicBroadcastInDimOpToBroadcastConverter,
       IotaToMapConverter<stablehlo::IotaOp>,
       IotaToMapConverter<stablehlo::DynamicIotaOp>,
-      MapOpToMapConverter,        // TODO(#12678): Add tests.
+      MapOpToMapConverter,
       ReduceOpToReduceConverter,  // TODO(#12678): Add tests.
       TransposeOpToTransposeConverter
     >(typeConverter, context);
@@ -2752,7 +2752,7 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       IotaConverter<stablehlo::DynamicIotaOp>,
       HloBroadcastInDimConverter,
       HloDynamicBroadcastInDimConverter,
-      MapOpToGenericConverter,     // TODO(#12678): Add tests.
+      MapOpToGenericConverter,
       ReduceOpToGenericConverter,  // TODO(#12678): Add tests.
       TransposeConverter<stablehlo::TransposeOp>
     >(typeConverter, context);
@@ -2764,6 +2764,8 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
 
   detail::populateStableHloDotProdToLinalgConversionPatterns(
       context, typeConverter, patterns);
+  detail::populateScalarHloToArithConversionPatterns(
+      context, typeConverter, patterns, isInBodyOfLinalgOps);
   linalg::populateEraseUnusedOperandsAndResultsPatterns(*patterns);
 }
 

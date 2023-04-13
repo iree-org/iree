@@ -33,6 +33,11 @@ void populateStableHloDotProdToLinalgConversionPatterns(
     MLIRContext* context, TypeConverter& typeConverter,
     RewritePatternSet* patterns);
 
+/// Populates the patterns that convert scalar StableHLO ops to Arith ops.
+void populateScalarHloToArithConversionPatterns(
+    MLIRContext* context, TypeConverter& typeConverter,
+    RewritePatternSet* patterns,
+    llvm::function_ref<bool(Operation*)> filterFn = nullptr);
 }  // namespace detail
 
 }  // namespace mlir::iree_compiler::stablehlo

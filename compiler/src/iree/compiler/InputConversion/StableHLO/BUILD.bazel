@@ -48,6 +48,7 @@ iree_compiler_cc_library(
     srcs = [
         "LegalizeToLinalgUtils.cpp",
         "Passes.cpp",
+        "StableHLOToArith.cpp",
         "StableHLOToLinalg.cpp",
         "StableHLOToLinalgDotProd.cpp",
         "StableHLOToLinalgPointwise.cpp",
