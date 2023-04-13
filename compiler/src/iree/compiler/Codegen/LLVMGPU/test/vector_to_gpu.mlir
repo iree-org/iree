@@ -180,3 +180,29 @@ func.func @copies_to_asyncs_mask(%a: memref<1024x1024xf32>, %i: index) {
   // CHECK-NOT: nvgpu.device_async_copy
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @copies_to_asyncs_mask_2d
+//  CHECK-SAME: , %[[I:[0-9a-zA-Z]+]]: index
+//  CHECK-SAME: , %[[J:[0-9a-zA-Z]+]]: index)
+func.func @copies_to_asyncs_mask_2d(%a: memref<1024x1024xf32>, %i: index, %j: index) {
+  %0 = memref.alloc() : memref<4x32x16xf32, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %mask = vector.create_mask %i, %j : vector<4x4xi1>
+
+  // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[c2:.*]] = arith.constant 2 : index
+  //     CHECK: %[[CMP:.*]] = arith.cmpi sgt, %[[I]], %[[c2]] : index
+  //     CHECK: %[[CNT:.*]] = arith.select %[[CMP]], %[[J]], %[[c0]] : index
+  //     CHECK: %[[CP0:.*]] = nvgpu.device_async_copy {{.*}}, {{.*}}, 4, %[[CNT]]
+  %submask = vector.extract %mask[2] : vector<4x4xi1>
+  %1 = vector.transfer_read %a[%c0, %c0], %cst_0, %submask {in_bounds = [true]} : memref<1024x1024xf32>, vector<4xf32>
+  vector.transfer_write %1, %0[%c0, %c0, %c0] {in_bounds = [true]} : vector<4xf32>, memref<4x32x16xf32, #gpu.address_space<workgroup>>
+  //     CHECK: %[[G:.*]] = nvgpu.device_async_create_group %[[CP0]]
+  //     CHECK: nvgpu.device_async_wait %[[G]]
+
+  return
+}
