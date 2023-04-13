@@ -329,7 +329,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
   {
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
-    options.vectorizeGatherAccesses = true;
+    // TODO(#13036): Re-enable once debugged.
+    options.vectorizeGatherAccesses = false;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -367,7 +368,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
+    // TODO(#13036): Re-enable once debugged.
+    options.vectorizeGatherAccesses = false;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -464,7 +466,8 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
-    options.vectorizeGatherAccesses = true;
+    // TODO(#13036): Re-enable once debugged.
+    options.vectorizeGatherAccesses = false;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -521,7 +524,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
+    // TODO(#13036): Re-enable once debugged.
+    options.vectorizeGatherAccesses = false;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
