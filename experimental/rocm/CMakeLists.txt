@@ -4,6 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(IREE_PACKAGE_ROOT_DIR ${CMAKE_CURRENT_LIST_DIR}/../..)
+# Canonicalize path.
+cmake_path(ABSOLUTE_PATH IREE_PACKAGE_ROOT_DIR
+  BASE_DIRECTORY ${IREE_PACKAGE_ROOT_DIR}
+  NORMALIZE
+  OUTPUT_VARIABLE IREE_PACKAGE_ROOT_DIR)
+set(IREE_PACKAGE_ROOT_PREFIX iree)
+
 iree_add_all_subdirs()
 
 if(NOT ROCM_HEADERS_API_ROOT)
