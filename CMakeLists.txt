@@ -6,6 +6,8 @@
 
 cmake_minimum_required(VERSION 3.21...3.24)
 
+# DO NOT SUBMIT: Change that affects CI
+
 # LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
 # New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
