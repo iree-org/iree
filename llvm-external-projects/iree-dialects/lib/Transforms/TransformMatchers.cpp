@@ -1102,7 +1102,6 @@ static void matchdivBroadcast(transform_ext::MatcherContext &matcherContext,
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
           .singleOpWithCanonicaleArgs<arith::DivFOp>()
           .dim(AllDims(), utils::IteratorType::parallel)
-          // Capture convolution dim classifications.
           .input(NumEqualsTo(2))
           .input(0, IsIdentity())
           .input(1, IsIdentity())
