@@ -77,7 +77,7 @@ static iree_status_t iree_hal_vmvx_executable_set_constants(
   uint8_t input_storage[64] = {0};
   iree_vm_list_t* inputs = NULL;
   iree_vm_type_def_t element_type =
-      iree_vm_type_def_make_ref_type(iree_vm_buffer_type_id());
+      iree_vm_make_ref_type_def(iree_vm_buffer_type());
   status = iree_vm_list_initialize(
       iree_make_byte_span(input_storage, sizeof(input_storage)), &element_type,
       1, &inputs);
@@ -388,7 +388,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   // The list would only need to be constructed once and we could avoid the
   // extraneous retain/releases and mappings.
   iree_vm_type_def_t buffer_type =
-      iree_vm_type_def_make_ref_type(iree_vm_buffer_type_id());
+      iree_vm_make_ref_type_def(iree_vm_buffer_type());
   iree_host_size_t binding_list_size =
       iree_vm_list_storage_size(&buffer_type, dispatch_state->binding_count);
   void* binding_list_storage = iree_alloca(binding_list_size);
@@ -415,7 +415,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
         iree_allocator_null(), binding_buffer);
     iree_vm_ref_t ref = {0};
     status =
-        iree_vm_ref_wrap_assign(binding_buffer, iree_vm_buffer_type_id(), &ref);
+        iree_vm_ref_wrap_assign(binding_buffer, iree_vm_buffer_type(), &ref);
     if (!iree_status_is_ok(status)) break;
     status = iree_vm_list_push_ref_retain(binding_list, &ref);
     if (!iree_status_is_ok(status)) break;
@@ -478,21 +478,18 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   } call_args = {
       .local_memory =
           {
-              .type = iree_vm_buffer_type_id(),
+              .type = iree_vm_buffer_type(),
               .ptr = &local_memory_buffer,
-              .offsetof_counter = 0,
           },
       .constants =
           {
-              .type = iree_vm_buffer_type_id(),
+              .type = iree_vm_buffer_type(),
               .ptr = &constants_buffer,
-              .offsetof_counter = 0,
           },
       .bindings =
           {
-              .type = iree_vm_list_type_id(),
+              .type = iree_vm_list_type(),
               .ptr = binding_list,
-              .offsetof_counter = 0,
           },
       .workgroup_id_x = workgroup_state->workgroup_id_x,
       .workgroup_id_y = workgroup_state->workgroup_id_y,
@@ -623,7 +620,8 @@ iree_status_t iree_hal_vmvx_module_loader_create_isolated(
 
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_instance_create(host_allocator, &instance));
+      z0, iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT, host_allocator,
+                                  &instance));
 
   iree_status_t status = iree_hal_vmvx_module_loader_create(
       instance, user_module_count, user_modules, host_allocator,

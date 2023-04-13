@@ -361,11 +361,11 @@ cmake_dependent_option(IREE_OUTPUT_FORMAT_C "Enables the 'vm-c' output format, u
 if(IREE_BUILD_COMPILER)
   message(STATUS "IREE compiler output formats:")
   if(IREE_OUTPUT_FORMAT_C)
-    message(STATUS "  - C source module")
+    message(STATUS "  - 'vm-c': textual C source module")
   endif()
   # The 'vm-bytecode' and 'vm-asm' formats are always enabled.
-  message(STATUS "  - VM Bytecode")
-  message(STATUS "  - VM MLIR Assembly")
+  message(STATUS "  - 'vm-bytecode': VM bytecode")
+  message(STATUS "  - 'vm-asm': VM MLIR assembly")
 endif()
 
 #-------------------------------------------------------------------------------

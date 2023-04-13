@@ -132,10 +132,10 @@
   }
 
 static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
-    const iree_vm_type_def_t* type_def, iree_string_builder_t* b) {
+    iree_vm_type_def_t type_def, iree_string_builder_t* b) {
   if (iree_vm_type_def_is_value(type_def)) {
     const char* type_name;
-    switch (type_def->value_type) {
+    switch (iree_vm_type_def_as_value(type_def)) {
       case IREE_VM_VALUE_TYPE_I8:
         type_name = "i8";
         break;
@@ -160,7 +160,8 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
     }
     return iree_string_builder_append_cstring(b, type_name);
   } else if (iree_vm_type_def_is_ref(type_def)) {
-    iree_string_view_t type_name = iree_vm_ref_type_name(type_def->ref_type);
+    iree_string_view_t type_name =
+        iree_vm_ref_type_name(iree_vm_type_def_as_ref(type_def));
     return iree_string_builder_append_format(b, "%.*s", (int)type_name.size,
                                              type_name.data);
   } else {
@@ -522,7 +523,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, GlobalLoadRef) {
       uint32_t global = VM_ParseGlobalAttr("global");
-      const iree_vm_type_def_t* type_def = VM_ParseTypeOf("value");
+      const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("value", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -536,7 +537,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, GlobalStoreRef) {
       uint32_t global = VM_ParseGlobalAttr("global");
-      const iree_vm_type_def_t* type_def = VM_ParseTypeOf("value");
+      const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
       bool value_is_move;
       uint16_t value_reg = VM_ParseOperandRegRef("value", &value_is_move);
       IREE_RETURN_IF_ERROR(
@@ -551,7 +552,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, GlobalLoadIndirectRef) {
       uint16_t global_reg = VM_ParseOperandRegI32("global");
-      const iree_vm_type_def_t* type_def = VM_ParseTypeOf("value");
+      const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("value", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -569,7 +570,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, GlobalStoreIndirectRef) {
       uint16_t global_reg = VM_ParseOperandRegI32("global");
-      const iree_vm_type_def_t* type_def = VM_ParseTypeOf("value");
+      const iree_vm_type_def_t type_def = VM_ParseTypeOf("value");
       bool value_is_move;
       uint16_t value_reg = VM_ParseOperandRegRef("value", &value_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
@@ -1026,7 +1027,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     //===------------------------------------------------------------------===//
 
     DISASM_OP(CORE, ListAlloc) {
-      const iree_vm_type_def_t* element_type_def =
+      const iree_vm_type_def_t element_type_def =
           VM_ParseTypeOf("element_type");
       uint16_t initial_capacity_reg = VM_ParseOperandRegI32("initial_capacity");
       bool result_is_move;
@@ -1155,7 +1156,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       bool list_is_move;
       uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
       uint16_t index_reg = VM_ParseOperandRegI32("index");
-      const iree_vm_type_def_t* type_def = VM_ParseTypeOf("result");
+      const iree_vm_type_def_t type_def = VM_ParseTypeOf("result");
       bool result_is_move;
       uint16_t result_reg = VM_ParseResultRegRef("result", &result_is_move);
       EMIT_REF_REG_NAME(result_reg);
@@ -1233,7 +1234,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, SelectRef) {
       uint16_t condition_reg = VM_ParseOperandRegI32("condition");
-      const iree_vm_type_def_t* type_def = VM_ParseTypeOf("true_value");
+      const iree_vm_type_def_t type_def = VM_ParseTypeOf("true_value");
       bool true_value_is_move;
       uint16_t true_value_reg =
           VM_ParseOperandRegRef("true_value", &true_value_is_move);

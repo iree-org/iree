@@ -277,7 +277,8 @@ int main(int argc, char** argv) {
 
   // Setup shared instance used for each benchmark.
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(host_allocator, &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        host_allocator, &instance));
 
   // Parse all of stdin right away. The traces we run may source things from it
   // and because we're running in a benchmark loop it'll quickly drain. To

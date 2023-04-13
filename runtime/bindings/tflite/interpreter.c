@@ -91,7 +91,7 @@ static iree_status_t _TfLiteInterpreterShapeFrameInitialize(
     _TfLiteInterpreterShapeFrame* frame) {
   // [int32...] storage for the shape dimension inputs/outputs.
   iree_vm_type_def_t dim_type =
-      iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
+      iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
   IREE_RETURN_IF_ERROR(iree_vm_list_initialize(
       iree_make_byte_span(frame->shape_list_storage,
                           IREE_ARRAYSIZE(frame->shape_list_storage)),
@@ -107,7 +107,7 @@ static iree_status_t _TfLiteInterpreterShapeFrameInitialize(
   // Arg 1 is always the shape list for all I/O, so do that once here.
   iree_vm_ref_t shape_list_ref = {0};
   IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-      frame->shape_list, iree_vm_list_type_id(), &shape_list_ref));
+      frame->shape_list, iree_vm_list_type(), &shape_list_ref));
   IREE_RETURN_IF_ERROR(
       iree_vm_list_set_ref_retain(frame->arg_list, 1, &shape_list_ref));
 
@@ -233,7 +233,7 @@ static iree_host_size_t _TfLiteInterpreterCalculateSize(
       iree_host_align(sizeof(TfLiteInterpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
-      iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());
+      iree_vm_make_ref_type_def(iree_hal_buffer_type());
   total_size +=
       iree_vm_list_storage_size(&buffer_view_type_def, model->input_count);
   total_size +=
@@ -264,7 +264,7 @@ static iree_status_t _TfLiteInterpreterAllocate(
                iree_host_align(sizeof(*interpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
-      iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());
+      iree_vm_make_ref_type_def(iree_hal_buffer_type());
 
   iree_byte_span_t input_list_storage = iree_make_byte_span(
       p, iree_vm_list_storage_size(&buffer_view_type_def, model->input_count));
@@ -588,8 +588,8 @@ static iree_status_t _TfLiteInterpreterInvoke(TfLiteInterpreter* interpreter) {
   // NOTE: we could defer the mapping unless requested and ensure state buffers
   // remain where they currently are for the next invocation.
   for (iree_host_size_t i = 0; i < interpreter->model->output_count; ++i) {
-    iree_hal_buffer_t* buffer = (iree_hal_buffer_t*)iree_vm_list_get_ref_deref(
-        interpreter->output_list, i, &iree_hal_buffer_descriptor);
+    iree_hal_buffer_t* buffer =
+        iree_vm_list_get_buffer_assign(interpreter->output_list, i);
     TfLiteTensor* tensor = &interpreter->output_tensors[i];
     IREE_RETURN_IF_ERROR(_TfLiteTensorBind(tensor, buffer));
   }

@@ -96,6 +96,8 @@ class NativeModule {
 
   virtual ~NativeModule() { iree_vm_instance_release(instance_); }
 
+  iree_vm_instance_t* instance() const { return instance_; }
+
   // C API module interface bound to this NativeModule instance.
   iree_vm_module_t* interface() { return &interface_; }
 

@@ -48,15 +48,16 @@ iree_status_t iree_trace_replay_initialize(
 
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->inputs);
+    status = iree_vm_list_create(iree_vm_make_undefined_type_def(), 8u,
+                                 host_allocator, &out_replay->inputs);
   }
   if (iree_status_is_ok(status)) {
-    status =
-        iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->outputs);
+    status = iree_vm_list_create(iree_vm_make_undefined_type_def(), 8u,
+                                 host_allocator, &out_replay->outputs);
   }
   if (iree_status_is_ok(status)) {
-    status =
-        iree_vm_list_create(NULL, 8u, host_allocator, &out_replay->blackboard);
+    status = iree_vm_list_create(iree_vm_make_undefined_type_def(), 8u,
+                                 host_allocator, &out_replay->blackboard);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -689,7 +690,7 @@ static iree_status_t iree_trace_replay_parse_vm_list(
       document, value_node, IREE_SV("items"), &items_node));
 
   iree_vm_list_t* list = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/NULL,
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                            /*initial_capacity=*/8,
                                            replay->host_allocator, &list));
 
@@ -1252,8 +1253,9 @@ iree_status_t iree_trace_replay_event_call_prepare(
                                      &args_node));
   iree_vm_list_t* input_list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
-                              replay->host_allocator, &input_list));
+      z0, iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                              /*initial_capacity=*/8, replay->host_allocator,
+                              &input_list));
   iree_status_t status = iree_trace_replay_parse_item_sequence(
       replay, document, args_node, input_list);
   if (iree_status_is_ok(status)) {
@@ -1299,9 +1301,9 @@ iree_status_t iree_trace_replay_event_call(
                                                &function, &input_list));
 
   iree_vm_list_t* output_list = NULL;
-  iree_status_t status =
-      iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
-                          replay->host_allocator, &output_list);
+  iree_status_t status = iree_vm_list_create(
+      iree_vm_make_undefined_type_def(), /*initial_capacity=*/8,
+      replay->host_allocator, &output_list);
 
   if (iree_status_is_ok(status) && hooks && hooks->before) {
     status = hooks->before(hooks->user_data, replay, document, event_node,
@@ -1373,8 +1375,8 @@ static iree_status_t iree_trace_replay_event_blackboard_assign(
 
   iree_vm_list_t* list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_create(/*element_type=*/NULL, 8u, replay->host_allocator,
-                              &list));
+      z0, iree_vm_list_create(iree_vm_make_undefined_type_def(), 8u,
+                              replay->host_allocator, &list));
 
   iree_status_t status =
       iree_trace_replay_parse_item_sequence(replay, document, from_node, list);

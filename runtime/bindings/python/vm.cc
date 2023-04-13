@@ -59,7 +59,8 @@ VmInstance VmInstance::Create() {
   IREE_TRACE_SCOPE0("VmInstance::Create");
 
   iree_vm_instance_t* instance = NULL;
-  auto status = iree_vm_instance_create(iree_allocator_system(), &instance);
+  auto status = iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance);
   CheckApiStatus(status, "Error creating instance");
 
   // The python bindings assume the HAL is always available for use.
@@ -182,7 +183,7 @@ std::optional<iree_vm_function_t> VmModule::LookupFunction(
 
 const char* const VmRef::kRefAttr = "__iree_vm_ref__";
 const char* const VmRef::kCastAttr = "__iree_vm_cast__";
-const char* const VmRef::kTypeIdAttr = "__iree_vm_type_id__";
+const char* const VmRef::kTypeAttr = "__iree_vm_type__";
 
 py::object VmRef::Deref(py::object ref_object_class, bool optional) {
   py::object casted = ref_object_class.attr(kCastAttr)(*this);
@@ -193,9 +194,8 @@ py::object VmRef::Deref(py::object ref_object_class, bool optional) {
 }
 
 bool VmRef::IsInstance(py::object ref_object_class) {
-  auto type_id =
-      py::cast<iree_vm_ref_type_t>(ref_object_class.attr(kTypeIdAttr)());
-  return type_id == ref_.type;
+  auto type = py::cast<iree_vm_ref_type_t>(ref_object_class.attr(kTypeAttr)());
+  return type == ref_.type;
 }
 
 std::string VmRef::ToString() {
@@ -257,9 +257,11 @@ py::object VmVariantList::GetVariant(int index) {
   iree_vm_variant_t v = iree_vm_variant_empty();
   CheckApiStatus(iree_vm_list_get_variant_assign(raw_ptr(), index, &v),
                  "Could not access list element");
-  if (iree_vm_type_def_is_value(&v.type)) {
+  if (iree_vm_variant_is_empty(v)) {
+    return py::none();
+  } else if (iree_vm_variant_is_value(v)) {
     // Convert a value type.
-    switch (v.type.value_type) {
+    switch (iree_vm_type_def_as_value(v.type)) {
       case IREE_VM_VALUE_TYPE_I8:
         return py::cast(v.i8);
       case IREE_VM_VALUE_TYPE_I16:
@@ -275,8 +277,6 @@ py::object VmVariantList::GetVariant(int index) {
       default:
         throw RaiseValueError("Unsupported VM value type conversion");
     }
-  } else if (v.type.ref_type == IREE_VM_REF_TYPE_NULL) {
-    return py::none();
   } else if (iree_vm_variant_is_ref(v)) {
     VmRef ref;
     iree_vm_ref_retain(&v.ref, &ref.ref());
@@ -290,10 +290,14 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
   iree_vm_variant_t v = iree_vm_variant_empty();
   CheckApiStatus(iree_vm_list_get_variant_assign(raw_ptr(), index, &v),
                  "Could not access list element");
-  if (iree_vm_type_def_is_value(&v.type)) {
+  if (iree_vm_variant_is_empty(v)) {
+    py::dict record;
+    record["type"] = "null";
+    return std::move(record);
+  } else if (iree_vm_variant_is_value(v)) {
     // Convert a value type.
     py::dict record;
-    switch (v.type.value_type) {
+    switch (iree_vm_type_def_as_value(v.type)) {
       case IREE_VM_VALUE_TYPE_I8:
         record["i8"] = py::cast(v.i8);
         break;
@@ -317,11 +321,7 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
     }
     record["type"] = py::cast("value");
     return std::move(record);
-  } else if (v.type.ref_type == IREE_VM_REF_TYPE_NULL) {
-    py::dict record;
-    record["type"] = "null";
-    return std::move(record);
-  } else if (iree_vm_type_def_is_ref(&v.type)) {
+  } else if (iree_vm_variant_is_ref(v)) {
     // Convert reference type.
     if (iree_vm_list_isa(v.ref)) {
       py::dict record;
@@ -442,7 +442,7 @@ void AppendListContents(std::string& out, iree_vm_list_t* list,
 
     if (iree_vm_variant_is_value(variant)) {
       // Convert a value type to a string.
-      switch (variant.type.value_type) {
+      switch (iree_vm_type_def_as_value(variant.type)) {
         case IREE_VM_VALUE_TYPE_I8: {
           out += std::to_string(variant.i8);
           break;
@@ -501,7 +501,8 @@ void AppendListContents(std::string& out, iree_vm_list_t* list,
         }
         out.append("]");
       } else {
-        out += "Unknown(" + std::to_string(variant.type.ref_type) + ")";
+        out += "Unknown(" +
+               std::to_string(iree_vm_type_def_as_ref(variant.type)) + ")";
       }
     } else {
       out.append("None");
@@ -534,7 +535,7 @@ void SetupVmBindings(pybind11::module m) {
       .export_values();
 
   auto vm_buffer = py::class_<VmBuffer>(m, "VmBuffer", py::buffer_protocol());
-  VmRef::BindRefProtocol(vm_buffer, iree_vm_buffer_type_id,
+  VmRef::BindRefProtocol(vm_buffer, iree_vm_buffer_type,
                          iree_vm_buffer_retain_ref, iree_vm_buffer_deref,
                          iree_vm_buffer_isa);
   vm_buffer
@@ -574,7 +575,7 @@ void SetupVmBindings(pybind11::module m) {
 
   // Mutation and inspection of the variant list is mostly opaque to python.
   auto vm_list = py::class_<VmVariantList>(m, "VmVariantList");
-  VmRef::BindRefProtocol(vm_list, iree_vm_list_type_id, iree_vm_list_retain_ref,
+  VmRef::BindRefProtocol(vm_list, iree_vm_list_type, iree_vm_list_retain_ref,
                          iree_vm_list_deref, iree_vm_list_isa);
   vm_list
       // User Methods.

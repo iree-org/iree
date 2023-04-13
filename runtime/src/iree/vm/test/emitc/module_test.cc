@@ -119,7 +119,8 @@ class VMCModuleTest : public ::testing::Test,
   virtual void SetUp() {
     const auto& test_params = GetParam();
 
-    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
 
     iree_vm_module_t* module_ = nullptr;
     IREE_CHECK_OK(test_params.create_function(

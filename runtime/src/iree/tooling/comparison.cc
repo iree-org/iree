@@ -42,7 +42,7 @@ static iree_status_t iree_vm_append_variant_type_string(
     return iree_string_builder_append_string(builder, IREE_SV("empty"));
   } else if (iree_vm_variant_is_value(variant)) {
     const char* type = NULL;
-    switch (variant.type.value_type) {
+    switch (iree_vm_type_def_as_value(variant.type)) {
       case IREE_VM_VALUE_TYPE_I8:
         type = "i8";
         break;
@@ -68,7 +68,7 @@ static iree_status_t iree_vm_append_variant_type_string(
     return iree_string_builder_append_cstring(builder, type);
   } else if (iree_vm_variant_is_ref(variant)) {
     return iree_string_builder_append_string(
-        builder, iree_vm_ref_type_name(variant.type.ref_type));
+        builder, iree_vm_ref_type_name(iree_vm_type_def_as_ref(variant.type)));
   } else {
     return iree_string_builder_append_string(builder, IREE_SV("unknown"));
   }
@@ -78,9 +78,9 @@ static bool iree_tooling_compare_values(int result_index,
                                         iree_vm_variant_t expected_variant,
                                         iree_vm_variant_t actual_variant,
                                         iree_string_builder_t* builder) {
-  IREE_ASSERT_EQ(expected_variant.type.value_type,
-                 actual_variant.type.value_type);
-  switch (expected_variant.type.value_type) {
+  IREE_ASSERT_TRUE(
+      iree_vm_type_def_equal(expected_variant.type, actual_variant.type));
+  switch (iree_vm_type_def_as_value(expected_variant.type)) {
     case IREE_VM_VALUE_TYPE_I8:
       if (expected_variant.i8 != actual_variant.i8) {
         IREE_CHECK_OK(iree_string_builder_append_format(
@@ -200,7 +200,7 @@ static bool iree_tooling_compare_variants(int result_index,
     return true;  // both empty
   } else if (iree_vm_variant_is_value(actual_variant) &&
              iree_vm_variant_is_value(expected_variant)) {
-    if (expected_variant.type.value_type != actual_variant.type.value_type) {
+    if (!iree_vm_type_def_equal(expected_variant.type, actual_variant.type)) {
       return iree_tooling_compare_values(result_index, expected_variant,
                                          actual_variant, builder);
     }

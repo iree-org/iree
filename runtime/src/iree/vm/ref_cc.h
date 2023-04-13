@@ -33,19 +33,19 @@ namespace vm {
 
 template <typename T>
 struct ref_type_descriptor {
-  static const iree_vm_ref_type_descriptor_t* get();
+  static iree_vm_ref_type_t type();
 };
 
 // Users may override this with their custom types to allow the packing code to
 // access their registered type ID at runtime.
 template <typename T>
 static inline void ref_type_retain(T* p) {
-  iree_vm_ref_object_retain(p, ref_type_descriptor<T>::get());
+  iree_vm_ref_object_retain(p, ref_type_descriptor<T>::type());
 }
 
 template <typename T>
 static inline void ref_type_release(T* p) {
-  iree_vm_ref_object_release(p, ref_type_descriptor<T>::get());
+  iree_vm_ref_object_release(p, ref_type_descriptor<T>::type());
 }
 
 // Base class for reference counted objects.
@@ -163,7 +163,9 @@ class RefObject {
   // If the type has virtual methods (dtors/etc) then it should be 4 or 8
   // (depending on pointer width). It may be other things, and instead of too
   // much crazy magic we just rely on offsetof doing the right thing here.
-  static constexpr size_t offsetof_counter() { return offsetof(T, counter_); }
+  static constexpr size_t offsetof_counter() {
+    return offsetof(T, counter_) / IREE_VM_REF_COUNTER_ALIGNMENT;
+  }
 
  protected:
   RefObject() { ref_ptr_add_ref(static_cast<T*>(this)); }
@@ -222,11 +224,11 @@ class RefObject {
 // Compatible only with types that implement the following methods:
 //   ref_type_retain(T*)
 //   ref_type_release(T*)
-//   ref_type_descriptor<T>::get()
+//   ref_type_descriptor<T>::type()
 //
-// If you get link errors pertaining to ref_type_descriptor then ensure that you
-// have included the header file containing the IREE_VM_DECLARE_TYPE_ADAPTERS
-// for the given type.
+// If you get link errors pertaining to ref_type_registration then ensure that
+// you have included the header file containing the
+// IREE_VM_DECLARE_TYPE_ADAPTERS for the given type.
 //
 // TODO(benvanik): reconcile RefObject, iree_vm_ref_t, and this.
 template <typename T>
@@ -236,27 +238,20 @@ class ref {
 
  public:
   IREE_ATTRIBUTE_ALWAYS_INLINE iree_vm_ref_type_t type() const noexcept {
-    return ref_type_descriptor<T>::get()->type;
+    IREE_VM_REF_ASSERT(ref_type_descriptor<T>::type());
+    return ref_type_descriptor<T>::type();
   }
 
-  IREE_ATTRIBUTE_ALWAYS_INLINE ref() noexcept
-      : ref_({
-            0,
-            ref_type_descriptor<T>::get()->offsetof_counter,
-            ref_type_descriptor<T>::get()->type,
-        }) {}
-  IREE_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept  // NOLINT
-      : ref_({
-            0,
-            ref_type_descriptor<T>::get()->offsetof_counter,
-            ref_type_descriptor<T>::get()->type,
-        }) {}
-  IREE_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept  // NOLINT
-      : ref_({
-            p,
-            ref_type_descriptor<T>::get()->offsetof_counter,
-            ref_type_descriptor<T>::get()->type,
-        }) {}
+  IREE_ATTRIBUTE_ALWAYS_INLINE ref() noexcept : ref_(iree_vm_ref_null()) {}
+  IREE_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept {}
+  IREE_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept {
+    if (!p) return;
+    ref_.ptr = p;
+    ref_.type = ref_type_descriptor<T>::type();
+  }
+  // TODO(benvanik): use the offsetof_counter we already have locally here and
+  // below. In theory the compiler may be able to optimize some of this based on
+  // pointer equality but investigation is required.
   IREE_ATTRIBUTE_ALWAYS_INLINE ~ref() noexcept { ref_type_release<T>(get()); }
 
   // Don't use implicit ref copying; use retain_ref instead to make things more
@@ -280,7 +275,6 @@ class ref {
   template <typename U>
   ref(ref<U>&& rhs) noexcept {  // NOLINT
     ref_.ptr = static_cast<T*>(rhs.release());
-    ref_.offsetof_counter = rhs.ref_.offsetof_counter;
     ref_.type = rhs.ref_.type;
   }
   template <typename U>
@@ -296,7 +290,7 @@ class ref {
   // deleting it.
   void reset() noexcept {
     ref_type_release<T>(get());
-    ref_.ptr = nullptr;
+    ref_ = iree_vm_ref_null();
   }
 
   // Releases a pointer.
@@ -306,7 +300,7 @@ class ref {
   // To re-wrap in a ref use either ref<T>(value) or assign().
   IREE_ATTRIBUTE_ALWAYS_INLINE T* release() noexcept {
     T* p = get();
-    ref_.ptr = nullptr;
+    ref_ = iree_vm_ref_null();
     return p;
   }
 
@@ -316,6 +310,7 @@ class ref {
   IREE_ATTRIBUTE_ALWAYS_INLINE void assign(T* value) noexcept {
     reset();
     ref_.ptr = value;
+    ref_.type = ref_type_descriptor<T>::type();
   }
 
   // Gets the pointer referenced by this instance.
@@ -340,7 +335,7 @@ class ref {
   constexpr bool operator!() const noexcept { return !get(); }
 
   // Swap support.
-  void swap(ref& rhs) { std::swap(ref_.ptr, rhs.ref_.ptr); }
+  void swap(ref& rhs) { std::swap(ref_, rhs.ref_); }
 
   // Allows directly passing the ref to a C-API function for creation.
   // Example:
@@ -351,7 +346,7 @@ class ref {
   }
 
  private:
-  mutable iree_vm_ref_t ref_;
+  mutable iree_vm_ref_t ref_ = {0};
 };
 
 // Constructs an object of type T and wraps it in a reference.
@@ -482,23 +477,18 @@ class opaque_ref {
 // dynamic type registration mechanism and that can be wrapped in an
 // iree_vm_ref_t.
 
-#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)                \
-  namespace iree {                                             \
-  namespace vm {                                               \
-  template <>                                                  \
-  struct ref_type_descriptor<T> {                              \
-    static inline const iree_vm_ref_type_descriptor_t* get() { \
-      return &name##_descriptor;                               \
-    }                                                          \
-  };                                                           \
-  }                                                            \
+#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)                               \
+  namespace iree {                                                            \
+  namespace vm {                                                              \
+  template <>                                                                 \
+  struct ref_type_descriptor<T> {                                             \
+    static inline const iree_vm_ref_type_descriptor_t* get() {                \
+      return reinterpret_cast<iree_vm_ref_type_descriptor_t*>(name##_type()); \
+    }                                                                         \
+    static inline iree_vm_ref_type_t type() { return name##_type(); }         \
+  };                                                                          \
+  }                                                                           \
   }
-
-#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)  \
-  descriptor.type_name = iree_make_cstring_view(name);    \
-  descriptor.offsetof_counter = type::offsetof_counter(); \
-  descriptor.destroy = type::DirectDestroy;               \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
 
 //===----------------------------------------------------------------------===//
 // ref-type registration and declaration for core VM types
@@ -527,7 +517,7 @@ class opaque_ref {
     IREE_ATTRIBUTE_ALWAYS_INLINE ref() noexcept : ptr_(nullptr) {}        \
     IREE_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept             \
         : ptr_(nullptr) {}                                                \
-    IREE_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept : ptr_(nullptr) {}    \
+    IREE_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept : ptr_(p) {}          \
     IREE_ATTRIBUTE_ALWAYS_INLINE ~ref() noexcept {                        \
       ref_type_release<T>(get());                                         \
     }                                                                     \

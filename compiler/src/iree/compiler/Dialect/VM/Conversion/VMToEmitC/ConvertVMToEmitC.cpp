@@ -267,10 +267,11 @@ std::optional<std::string> buildVariadicFunctionName(
   return result;
 }
 
-std::optional<emitc::ApplyOp> createVmTypeDefPtr(
-    ConversionPatternRewriter &rewriter, Operation *srcOp, Type elementType) {
-  auto ctx = srcOp->getContext();
-  auto loc = srcOp->getLoc();
+std::optional<Value> createVmTypeDefPtr(
+    ConversionPatternRewriter &rewriter, Location loc,
+    IREE::VM::EmitCTypeConverter &typeConverter, IREE::VM::ModuleOp moduleOp,
+    BlockArgument moduleArg, Type elementType) {
+  auto ctx = rewriter.getContext();
 
   // Map from type to enum values of type iree_vm_value_type_t and
   // iree_vm_ref_type_t
@@ -287,81 +288,64 @@ std::optional<emitc::ApplyOp> createVmTypeDefPtr(
        {"IREE_VM_VALUE_TYPE_F32", "IREE_VM_REF_TYPE_NULL"}},
       {Float64Type::get(ctx),
        {"IREE_VM_VALUE_TYPE_F64", "IREE_VM_REF_TYPE_NULL"}},
-      {IREE::VM::OpaqueType::get(ctx),
-       {"IREE_VM_VALUE_TYPE_NONE", "IREE_VM_REF_TYPE_NULL"}},
   };
-  Value elementTypeValue = emitc_builders::allocateVariable(
-      rewriter, loc, emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"));
-
-  Value elementTypePtr =
-      emitc_builders::addressOf(rewriter, loc, elementTypeValue);
-
-  if (failed(clearStruct(rewriter, elementTypePtr))) {
-    return std::nullopt;
-  }
+  Value elementTypeValue;
 
   auto ptr = valueTypeMap.find((elementType));
   if (ptr != valueTypeMap.end()) {
-    emitc_builders::structMemberAssign(rewriter, loc,
-                                       /*memberName=*/"value_type",
-                                       /*operand=*/elementTypeValue,
-                                       /*value=*/ptr->second.first);
-
-    emitc_builders::structMemberAssign(rewriter, loc,
-                                       /*memberName=*/"ref_type",
-                                       /*operand=*/elementTypeValue,
-                                       /*value=*/ptr->second.second);
-  } else {
-    if (!elementType.isa<IREE::VM::RefType>()) {
-      return std::nullopt;
-    }
+    elementTypeValue =
+        rewriter
+            .create<emitc::CallOp>(
+                /*location=*/loc,
+                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
+                /*callee=*/StringAttr::get(ctx, "iree_vm_make_value_type_def"),
+                /*args=*/
+                ArrayAttr::get(
+                    ctx, {emitc::OpaqueAttr::get(ctx, ptr->second.first)}),
+                /*templateArgs=*/ArrayAttr{},
+                /*operands=*/ArrayRef<Value>{})
+            .getResult(0);
+  } else if (elementType.isa<IREE::VM::RefType>()) {
     Type objType = elementType.cast<IREE::VM::RefType>().getObjectType();
 
-    std::string typeName;
-
-    if (objType.isa<IREE::VM::ListType>()) {
-      typeName = "!vm.list";
-    } else {
-      llvm::raw_string_ostream sstream(typeName);
-      objType.print(sstream);
-      sstream.flush();
+    Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
+    Type typeRefArrayType = emitc::PointerType::get(typeRefType);
+    Optional<size_t> typeIndex = typeConverter.lookupType(objType);
+    if (!typeIndex.has_value()) {
+      moduleOp.emitError("type index lookup failed");
+      return std::nullopt;
     }
 
-    // Remove leading '!' and wrap in quotes
-    typeName = std::string("\"") + typeName.substr(1) + std::string("\"");
+    Value typeArray = emitc_builders::structPtrMember(
+        rewriter, loc, typeRefArrayType, "types", moduleArg);
+    Value refType = emitc_builders::arrayElement(rewriter, loc, typeRefType,
+                                                 typeIndex.value(), typeArray);
 
-    auto typeNameCStringView = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_string_view_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_make_cstring_view"),
-        /*args=*/ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, typeName)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{});
-
-    auto typeDescriptor = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/
-        emitc::PointerType::get(
-            emitc::OpaqueType::get(ctx, "const iree_vm_ref_type_descriptor_t")),
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_lookup_registered_type"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{typeNameCStringView.getResult(0)});
-
-    // TODDO(simon-camp) typeDescriptor might be NULL
-    auto typeDescriptorType = emitc_builders::structPtrMember(
-        rewriter, loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-        /*memberName=*/"type",
-        /*operand=*/typeDescriptor.getResult(0));
-
-    emitc_builders::structMemberAssign(rewriter, loc,
-                                       /*memberName=*/"ref_type",
-                                       /*operand=*/elementTypeValue,
-                                       /*value=*/typeDescriptorType);
+    elementTypeValue =
+        rewriter
+            .create<emitc::CallOp>(
+                /*location=*/loc,
+                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
+                /*callee=*/StringAttr::get(ctx, "iree_vm_make_ref_type_def"),
+                /*args=*/ArrayAttr{},
+                /*templateArgs=*/ArrayAttr{},
+                /*operands=*/ArrayRef<Value>{refType})
+            .getResult(0);
+  } else if (elementType.isa<IREE::VM::OpaqueType>()) {
+    elementTypeValue =
+        rewriter
+            .create<emitc::CallOp>(
+                /*location=*/loc,
+                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
+                /*callee=*/
+                StringAttr::get(ctx, "iree_vm_make_undefined_type_def"),
+                /*args=*/ArrayAttr{},
+                /*templateArgs=*/ArrayAttr{},
+                /*operands=*/ArrayRef<Value>{})
+            .getResult(0);
   }
 
-  return cast<emitc::ApplyOp>(elementTypePtr.getDefiningOp());
+  return elementTypeValue;
 }
 
 /// Move multiple refs from one set of variables to another set. As these two
@@ -1108,6 +1092,38 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                                           /*memberName=*/"allocator",
                                           /*operand=*/module,
                                           /*value=*/allocatorArg);
+    auto &typeTable = typeConverter.typeTable;
+    attachAttribute(moduleOp, "vm.num_types",
+                    builder.getI32IntegerAttr(typeTable.size()));
+    if (!typeTable.empty()) {
+      Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
+      Type typeRefArrayType = emitc::PointerType::get(typeRefType);
+      Value moduleTypes = emitc_builders::structPtrMember(
+          builder, loc, typeRefArrayType, "types", module);
+
+      std::string listType = "!vm.list";
+      for (auto [index, typeDef] : llvm::enumerate(typeTable)) {
+        std::string typeName = typeDef.full_name;
+        typeConverter.mapType(typeDef.type, index);
+        std::string listPrefix = typeName.substr(0, listType.size());
+        if (listType == listPrefix) {
+          typeName = listPrefix;
+        }
+
+        // Remove leading '!' and wrap in quotes
+        if (typeName[0] == '!') {
+          typeName = typeName.substr(1);
+        }
+        typeName = std::string("\"") + typeName + std::string("\"");
+
+        Value stringView =
+            emitc_builders::ireeMakeCstringView(builder, loc, typeName);
+        Value refType = emitc_builders::ireeVmInstanceLookupType(
+            builder, loc, instanceArg, stringView);
+        emitc_builders::arrayElementAssign(builder, loc, moduleTypes, index,
+                                           refType);
+      }
+    }
 
     Value vmModule = emitc_builders::allocateVariable(
         builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_module_t"));
@@ -2795,7 +2811,7 @@ class ConstRefRodataOpConversion
     auto typeIdOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-        /*callee=*/StringAttr::get(ctx, "iree_vm_buffer_type_id"),
+        /*callee=*/StringAttr::get(ctx, "iree_vm_buffer_type"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
@@ -3184,24 +3200,18 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       releaseRefs(rewriter, loc, funcOp, *typeConverter);
 
-      std::string message = std::string("\"") +
-                            op.getMessage().value_or("").str() +
-                            std::string("\"");
+      std::string messageStr = std::string("\"") +
+                               op.getMessage().value_or("").str() +
+                               std::string("\"");
 
-      auto messageOp = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_string_view_t"),
-          /*callee=*/StringAttr::get(ctx, "iree_make_cstring_view"),
-          /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, message)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
+      Value message =
+          emitc_builders::ireeMakeCstringView(rewriter, loc, messageStr);
 
       auto messageSizeOp = emitc_builders::structMember(
           rewriter, loc,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
           /*memberName=*/"size",
-          /*operand=*/messageOp.getResult(0));
+          /*operand=*/message);
 
       auto messageSizeIntOp = rewriter.create<emitc::CastOp>(
           /*location=*/loc,
@@ -3213,7 +3223,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
           /*type=*/
           emitc::PointerType::get(emitc::OpaqueType::get(ctx, "const char")),
           /*memberName=*/"data",
-          /*operand=*/messageOp.getResult(0));
+          /*operand=*/message);
 
       auto status = rewriter.create<emitc::CallOp>(
           /*location=*/loc,
@@ -3368,19 +3378,29 @@ class GlobalLoadStoreRefOpConversion
         /*index=*/rewriter.getUI32IntegerAttr(globalOrdinal),
         /*operand=*/refs);
 
+    auto moduleOp = op->getParentOfType<IREE::VM::ModuleOp>();
+    auto parentFuncOp = op->getParentOfType<mlir::func::FuncOp>();
+    const BlockArgument moduleArg =
+        parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE);
     Type elementType = localValue.getType();
 
-    auto elementTypePtrOp = createVmTypeDefPtr(rewriter, op, elementType);
+    auto elementTypePtr =
+        createVmTypeDefPtr(rewriter, op->getLoc(), *typeConverter, moduleOp,
+                           moduleArg, elementType);
 
-    if (!elementTypePtrOp.has_value()) {
+    if (!elementTypePtr.has_value()) {
       return op->emitError() << "generating iree_vm_type_def_t* failed";
     }
 
-    auto typedefRefType = emitc_builders::structPtrMember(
-        rewriter, loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-        /*memberName=*/"ref_type",
-        /*operand=*/elementTypePtrOp.value().getResult());
+    auto typedefAsRef =
+        rewriter
+            .create<emitc::CallOp>(
+                /*location=*/loc,
+                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+                /*callee=*/StringAttr::get(ctx, "iree_vm_type_def_as_ref"),
+                /*args=*/ArrayAttr{}, /*templateArgs=*/ArrayAttr{},
+                /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
+            .getResult(0);
 
     Value srcRef = isLoad ? stateRef : localRef.value();
     Value destRef = isLoad ? localRef.value() : stateRef;
@@ -3395,7 +3415,7 @@ class GlobalLoadStoreRefOpConversion
         ArrayAttr::get(ctx,
                        {rewriter.getBoolAttr(move), rewriter.getIndexAttr(0),
                         rewriter.getIndexAttr(1), rewriter.getIndexAttr(2)}),
-        /*operands=*/ArrayRef<Value>{srcRef, typedefRefType, destRef},
+        /*operands=*/ArrayRef<Value>{srcRef, typedefAsRef, destRef},
         /*typeConverter=*/*typeConverter);
 
     if (isLoad) {
@@ -3727,13 +3747,13 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
 
   std::optional<CNames> extractCNames(SrcOpTy op) const {
     if (isa<IREE::VM::ListAllocOp>(op)) {
-      return CNames{"iree_vm_list_t", "iree_vm_list_type_id",
+      return CNames{"iree_vm_list_t", "iree_vm_list_type",
                     "iree_vm_list_create"};
     } else if (isa<IREE::VM::BufferAllocOp>(op)) {
-      return CNames{"iree_vm_buffer_t", "iree_vm_buffer_type_id",
+      return CNames{"iree_vm_buffer_t", "iree_vm_buffer_type",
                     "iree_vm_buffer_create"};
     } else if (isa<IREE::VM::BufferCloneOp>(op)) {
-      return CNames{"iree_vm_buffer_t", "iree_vm_buffer_type_id",
+      return CNames{"iree_vm_buffer_t", "iree_vm_buffer_type",
                     "iree_vm_buffer_clone"};
     }
     return std::nullopt;
@@ -3745,16 +3765,24 @@ class ContainerAllocOpConversion : public OpConversionPattern<SrcOpTy> {
       Value allocator) const {
     SmallVector<Value> result;
 
-    std::optional<emitc::ApplyOp> elementTypePtrOp =
-        createVmTypeDefPtr(rewriter, op.getOperation(), elementType);
+    IREE::VM::EmitCTypeConverter *typeConverter =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
+    auto moduleOp = op.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
+    auto parentFuncOp =
+        op.getOperation()->getParentOfType<mlir::func::FuncOp>();
+    const BlockArgument moduleArg =
+        parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE);
+    auto elementTypePtr =
+        createVmTypeDefPtr(rewriter, op.getLoc(), *typeConverter, moduleOp,
+                           moduleArg, elementType);
 
-    if (!elementTypePtrOp.has_value()) {
+    if (!elementTypePtr.has_value()) {
       return std::nullopt;
     }
 
     Value capacity = adaptor.getOperands()[0];
 
-    result.push_back(elementTypePtrOp.value().getResult());
+    result.push_back(elementTypePtr.value());
     result.push_back(capacity);
     result.push_back(allocator);
     result.push_back(containerPtr);
@@ -3971,57 +3999,83 @@ class ListGetRefOpConversion
                         ref.value()},
         /*typeConverter=*/*typeConverter);
 
+    auto moduleOp = getOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
+    auto parentFuncOp =
+        getOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
+    const BlockArgument moduleArg =
+        parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE);
+
     Type elementType = getOp.getResult().getType();
 
-    auto elementTypePtrOp =
-        createVmTypeDefPtr(rewriter, getOp.getOperation(), elementType);
+    auto elementTypePtr =
+        createVmTypeDefPtr(rewriter, getOp.getLoc(), *typeConverter, moduleOp,
+                           moduleArg, elementType);
 
-    if (!elementTypePtrOp.has_value()) {
+    if (!elementTypePtr.has_value()) {
       return getOp.emitError() << "generating iree_vm_type_def_t* failed";
     }
 
     // Build the following expression:
     // (ref->type != IREE_VM_REF_TYPE_NULL &&
     // (iree_vm_type_def_is_value(type_def) || ref->type !=
-    // type_def->ref_type))
+    // iree_vm_type_def_as_ref(type_def)))
     Value invalidType;
     {
+      // ref->type
       auto refType = emitc_builders::structPtrMember(
           rewriter, loc,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
           /*memberName=*/"type",
           /*operand=*/ref.value());
 
-      auto refTypeNull = rewriter.create<emitc::ConstantOp>(
-          /*location=*/loc,
-          /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-          /*value=*/emitc::OpaqueAttr::get(ctx, "IREE_VM_REF_TYPE_NULL"));
+      // IREE_VM_REF_TYPE_NULL
+      auto refTypeNull =
+          rewriter
+              .create<emitc::ConstantOp>(
+                  /*location=*/loc,
+                  /*resultType=*/
+                  emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+                  /*value=*/
+                  emitc::OpaqueAttr::get(ctx, "IREE_VM_REF_TYPE_NULL"))
+              .getResult();
 
-      auto typedefIsValue = rewriter.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/rewriter.getI1Type(),
-          /*callee=*/StringAttr::get(ctx, "iree_vm_type_def_is_value"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/
-          ArrayRef<Value>{elementTypePtrOp.value().getResult()});
-
-      auto typedefRefType = emitc_builders::structPtrMember(
-          rewriter, loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-          /*memberName=*/"ref_type",
-          /*operand=*/elementTypePtrOp.value().getResult());
-
+      // ref->type != IREE_VM_REF_TYPE_NULL
       auto refTypeIsNotNull = emitc_builders::binaryOperator(
           rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
-          refTypeNull.getResult(), rewriter.getI1Type());
+          refTypeNull, rewriter.getI1Type());
+
+      // (iree_vm_type_def_is_value(type_def)
+      auto typedefIsValue =
+          rewriter
+              .create<emitc::CallOp>(
+                  /*location=*/loc,
+                  /*type=*/rewriter.getI1Type(),
+                  /*callee=*/StringAttr::get(ctx, "iree_vm_type_def_is_value"),
+                  /*args=*/ArrayAttr{},
+                  /*templateArgs=*/ArrayAttr{},
+                  /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
+              .getResult(0);
+
+      // iree_vm_type_def_as_ref(type_def)
+      auto typedefAsRef =
+          rewriter
+              .create<emitc::CallOp>(
+                  /*location=*/loc,
+                  /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+                  /*callee=*/StringAttr::get(ctx, "iree_vm_type_def_as_ref"),
+                  /*args=*/ArrayAttr{},
+                  /*templateArgs=*/ArrayAttr{},
+                  /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
+              .getResult(0);
+
+      // ref->type != iree_vm_type_def_as_ref(type_def)
       auto refTypesDontMatch = emitc_builders::binaryOperator(
           rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
-          typedefRefType, rewriter.getI1Type());
+          typedefAsRef, rewriter.getI1Type());
 
       auto invalidRefType = emitc_builders::binaryOperator(
           rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_OR,
-          typedefIsValue.getResult(0), refTypesDontMatch, rewriter.getI1Type());
+          typedefIsValue, refTypesDontMatch, rewriter.getI1Type());
 
       invalidType = emitc_builders::binaryOperator(
           rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_AND,
@@ -4665,6 +4719,7 @@ class ConvertVMToEmitCPass
 
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter;
+    typeConverter.cacheTypeTable(module);
 
     // Convert vm.func ops to std.func with the calling convention used by
     // EmitC. We convert these upfront to make sure vm.call ops always

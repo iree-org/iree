@@ -75,6 +75,10 @@ IREE_API_EXPORT void iree_vm_context_retain(iree_vm_context_t* context);
 // Releases the given |context| from the caller.
 IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context);
 
+// Returns the instance this context was created within.
+IREE_API_EXPORT iree_vm_instance_t* iree_vm_context_instance(
+    const iree_vm_context_t* context);
+
 // Returns a process-unique ID for the |context|.
 IREE_API_EXPORT iree_vm_context_id_t
 iree_vm_context_id(const iree_vm_context_t* context);

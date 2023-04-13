@@ -721,7 +721,7 @@ void SetupHalBindings(pybind11::module m) {
       .def("__repr__", &HalBuffer::Repr);
 
   auto hal_buffer_view = py::class_<HalBufferView>(m, "HalBufferView");
-  VmRef::BindRefProtocol(hal_buffer_view, iree_hal_buffer_view_type_id,
+  VmRef::BindRefProtocol(hal_buffer_view, iree_hal_buffer_view_type,
                          iree_hal_buffer_view_retain_ref,
                          iree_hal_buffer_view_deref, iree_hal_buffer_view_isa);
   hal_buffer_view.def("map", HalMappedMemory::Create, py::keep_alive<0, 1>())
