@@ -25,7 +25,7 @@ namespace iree_compiler {
 static bool isContiguousStore(Operation* write) {
   if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(write)) {
     if (!transferWrite.getPermutationMap().isMinorIdentity() ||
-        !transferWrite.isDimInBounds(0)) {
+        !transferWrite.isDimInBounds(0) || transferWrite.getMask()) {
       return false;
     }
     return true;
@@ -64,6 +64,13 @@ static Value getMemrefOperand(Operation* op) {
     return loadOp.getBase();
   }
   return Value();
+}
+
+static Value getMask(Operation* op) {
+  auto transferRead = dyn_cast<vector::TransferReadOp>(op);
+  if (!transferRead || !transferRead.getMask()) return Value();
+  auto maskOp = transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
+  return maskOp.getOperand(0);
 }
 
 static Value getValueStored(Operation* writeOp) {
@@ -115,6 +122,25 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
     if (readOp == nullptr || !isContiguousRead(readOp)) {
       LLVM_DEBUG(DBGS() << "----no readOp defining the writeOp -> Skip \n");
       return WalkResult::advance();
+    }
+
+    if (auto transferRead = dyn_cast<vector::TransferReadOp>(readOp)) {
+      if (transferRead.getMask()) {
+        auto paddingCst =
+            transferRead.getPadding().getDefiningOp<arith::ConstantFloatOp>();
+        if (!paddingCst || !paddingCst.value().isZero()) {
+          LLVM_DEBUG(DBGS() << "----read padding value is not 0.f -> Skip \n");
+          return WalkResult::advance();
+        }
+        auto maskOp =
+            transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
+        if (!maskOp) {
+          LLVM_DEBUG(
+              DBGS()
+              << "----read mask is not a vector.create_mask op -> Skip \n");
+          return WalkResult::advance();
+        }
+      }
     }
 
     VectorType vecType = vectorVal.getType().cast<VectorType>();
@@ -171,13 +197,14 @@ void createAsyncGroups(RewriterBase& rewriter, func::FuncOp funcOp,
       Operation* readOp = vectorVal.getDefiningOp();
       Value storeBase = getMemrefOperand(writeOp);
       Value loadBase = getMemrefOperand(readOp);
+      Value mask = getMask(readOp);
       Value token = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
           writeOp->getLoc(),
           nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
           getIndices(writeOp), loadBase, getIndices(readOp),
           rewriter.getIndexAttr(
               vectorVal.getType().cast<VectorType>().getNumElements()),
-          Value(),
+          mask,
           /*bypassL1=*/useMMASync ? rewriter.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
     }
