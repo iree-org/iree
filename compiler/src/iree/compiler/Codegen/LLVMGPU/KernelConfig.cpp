@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/WithColor.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -122,9 +123,9 @@ static LogicalResult findMicrokernel(
                        elementTypeC->str())) {
     return success();
   }
-
-  llvm::errs() << "Requested microkernel does not exist, maybe forget to "
-                  "pre-compile it. Add a contract in `uGPUContract.h`\n";
+  llvm::WithColor::error()
+      << "Requested microkernel does not exist, maybe forget to "
+         "pre-compile it. Add a contract in `uGPUContract.h`\n";
 
   return failure();
 }
