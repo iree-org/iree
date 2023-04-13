@@ -1180,6 +1180,42 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   let hasFolder = 1;
 }
 
+def FLOW_TensorAllocOp : FLOW_Op<"tensor.alloc", [
+  Util_ShapeAwareOp,
+  MemoryEffects<[MemAlloc]>,
+]> {
+  let summary = [{an empty tensor allocation with undefined contents}];
+  let description = [{
+    Returns a new transient tensor allocation with undefined contents.
+    Subsequent writes must populate any ranges of the tensor that are later
+    read. The resulting tensor may be long-lived and allocated as part of a
+    dedicated allocation. Prefer using `flow.tensor.empty` whenever possible as
+    this op disables nearly all allocation-related optimizations performed by
+    the compiler. The presence of this op is often an indication of an improper
+    lowering.
+  }];
+
+  let arguments = (ins
+    FLOW_ShapeDynamicDims:$result_dims
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    `:` type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
+}
+
 def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
   FLOW_StreamableOp,
   Util_ShapeAwareOp,

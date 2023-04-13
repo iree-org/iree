@@ -1465,6 +1465,8 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
     `:` custom<SizeAwareType>(type($result), $result_size)
     attr-dict-with-keyword
   }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
@@ -1495,6 +1497,8 @@ def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
     `buffer` `(` $buffer `:` type($buffer) `)`
     attr-dict-with-keyword
   }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
@@ -1524,7 +1528,13 @@ def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
     attr-dict-with-keyword
   }];
 
+  let extraClassDeclaration = [{
+    // Returns true if the execution represents a barrier.
+    bool isBarrier() { return getCommandBuffers().empty(); }
+  }];
+
   let hasCanonicalizer = 1;
+  let hasVerifier = 1;
 }
 
 def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
@@ -2524,6 +2534,7 @@ def HAL_FenceJoinOp : HAL_Op<"fence.join", [
     attr-dict-with-keyword
   }];
 
+  let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -2564,6 +2575,8 @@ def HAL_FenceSignalOp : HAL_Op<"fence.signal"> {
     `<` $fence `:` type($fence) `>`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_FenceFailOp : HAL_Op<"fence.fail"> {

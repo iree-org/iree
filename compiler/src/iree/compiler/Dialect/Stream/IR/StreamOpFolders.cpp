@@ -896,7 +896,7 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
         constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.getResultEncoding()),
         constantOp.getResultEncodingDims(), constantOp.getAffinityAttr());
-    rewriter.replaceOpWithNewOp<TensorEmptyOp>(
+    rewriter.replaceOpWithNewOp<IREE::Stream::TensorEmptyOp>(
         constantOp, constantOp.getResult().getType(),
         constantOp.getResultEncoding(), constantOp.getResultEncodingDims(),
         resultSize, constantOp.getAffinityAttr());
@@ -2375,6 +2375,82 @@ LogicalResult TimepointExportOp::fold(FoldAdaptor operands,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.timepoint.chain_external
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Elides a timepoint chaining operation when the chained timepoint is directly
+// usable from imported external values. This covers the common case where an
+// imported fence is chained with a new fence - since fences are single-shot the
+// new fence can be replaced with the imported fence. We rely on MemAlloc to
+// detect when the external fence is one created for chaining vs an argument/etc
+// that we may not be able to elide.
+//
+// Example:
+//  %timepoint = stream.timepoint.import %arg_fence
+//  %chained_fence = hal.fence.create
+//  stream.timepoint.chain_external %timepoint => (%chained_fence : !hal.fence)
+// ->
+//  %chained_fence = %arg_fence
+struct PassThroughChainExternal
+    : public OpRewritePattern<TimepointChainExternalOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TimepointChainExternalOp op,
+                                PatternRewriter &rewriter) const override {
+    // Try to get the original external values that we want to chain.
+    auto importOp = dyn_cast_or_null<IREE::Stream::TimepointImportOp>(
+        op.getAwaitTimepoint().getDefiningOp());
+    if (!importOp) {
+      return rewriter.notifyMatchFailure(
+          op, "timepoint not imported from an external value");
+    }
+
+    // The imported external values must match the types of the chained external
+    // values as we'll be doing a SSA value replacement and can't change types.
+    if (!llvm::all_of_zip(importOp.getOperands(), op.getExternalValues(),
+                          [](Value importValue, Value chainValue) {
+                            return importValue.getType() ==
+                                   chainValue.getType();
+                          })) {
+      return rewriter.notifyMatchFailure(
+          op,
+          "can only chain when external value types match between the import "
+          "and chain op");
+    }
+
+    // We can only replace external values that are locally allocated as this
+    // pattern is effectively just killing the allocation - if it comes from
+    // above/globals/external functions then we can't change things.
+    //
+    // TODO(benvanik): improve this to handle more external value types; for now
+    // only !hal.fence is used in practice and that is MemAlloc.
+    for (auto externalValue : op.getExternalValues()) {
+      auto definingOp = dyn_cast_or_null<MemoryEffectOpInterface>(
+          externalValue.getDefiningOp());
+      if (!definingOp || !definingOp.hasEffect<MemoryEffects::Allocate>()) {
+        return rewriter.notifyMatchFailure(
+            op, "external chained value is not locally allocated");
+      }
+    }
+
+    // Should be safe to now replace the allocated external values with the
+    // original imported ones.
+    rewriter.replaceAllUsesWith(op.getExternalValues(), importOp.getOperands());
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
+
+}  // namespace
+
+void TimepointChainExternalOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<PassThroughChainExternal>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // stream.timepoint.join
 //===----------------------------------------------------------------------===//
 
@@ -2483,6 +2559,45 @@ void TimepointJoinOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
+// Extremely basic check for whether a source |resource| is immediately resolved
+// or may be part of a timeline sequence.
+static bool isSourceImmediatelyResolved(Value resource) {
+  // TODO(benvanik): data flow analysis/at least walk up tied ops. For now we
+  // err on the conservative side and only check for a few common scenarios.
+  auto *definingOp = resource.getDefiningOp();
+  if (!definingOp) return false;
+  return TypeSwitch<Operation *, bool>(definingOp)
+      .Case<IREE::Stream::ResourceAllocOp, IREE::Stream::TensorImportOp>(
+          [](auto op) { return true; })
+      .Default([](auto op) { return false; });
+}
+
+// Elides barriers that source their operands from immediate operations.
+// These barriers are implicitly resolved and need not be modeled.
+//
+// Example:
+//  %r0a = stream.resource.alloc
+//  %r0b, %r0ready = stream.timepoint.barrier %r0a
+// ->
+//  %r0a = stream.resource.alloc
+//  %r0b = %r0a
+//  %r0ready = stream.timepoint.immediate
+struct ElideImmediateBarrier : public OpRewritePattern<TimepointBarrierOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TimepointBarrierOp barrierOp,
+                                PatternRewriter &rewriter) const override {
+    if (!isSourceImmediatelyResolved(barrierOp.getResource())) {
+      // Could not analyze or found to be a timeline op.
+      return failure();
+    }
+    auto immediateTimepoint =
+        rewriter.create<IREE::Stream::TimepointImmediateOp>(barrierOp.getLoc());
+    rewriter.replaceOp(barrierOp,
+                       {barrierOp.getResource(), immediateTimepoint});
+    return success();
+  }
+};
+
 // Walks up the tied op SSA def chain to find a stream.timepoint.await op that
 // produces the resource. Returns nullptr if no await op is found or local
 // analysis cannot determine the source (spans across a branch, etc).
@@ -2543,6 +2658,7 @@ struct ChainTimepoints : public OpRewritePattern<TimepointBarrierOp> {
 
 void TimepointBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                      MLIRContext *context) {
+  results.insert<ElideImmediateBarrier>(context);
   results.insert<ChainTimepoints>(context);
 }
 

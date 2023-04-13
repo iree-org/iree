@@ -640,6 +640,28 @@ Value DeviceQueueAllocaOp::getResultSize(unsigned idx) {
   return getResultSize();
 }
 
+static LogicalResult verifyDeviceQueueFences(Operation *queueOp,
+                                             Value waitFence,
+                                             Value signalFence) {
+  if (waitFence == signalFence) {
+    return queueOp->emitOpError() << "device queue operations cannot wait and "
+                                     "signal on the same fence";
+  }
+  return success();
+}
+
+LogicalResult DeviceQueueAllocaOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueDeallocaOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueExecuteOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
 //===----------------------------------------------------------------------===//
 // hal.executable
 //===----------------------------------------------------------------------===//

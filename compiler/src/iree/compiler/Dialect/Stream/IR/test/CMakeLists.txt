@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "resource_ops.mlir"
     "tensor_folding.mlir"
     "tensor_ops.mlir"
+    "timepoint_folding.mlir"
     "timepoint_ops.mlir"
   TOOLS
     FileCheck
