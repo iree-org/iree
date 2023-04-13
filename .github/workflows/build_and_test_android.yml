@@ -92,7 +92,10 @@ jobs:
           TARGET_BUILD_DIR: ${{ steps.build.outputs.target-build-dir }}
           TARGET_BUILD_DIR_ARCHIVE: build-android-arm_64.tar
         run: |
-          tar -cf "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR}"
+          tar -cf "${TARGET_BUILD_DIR_ARCHIVE}" \
+            --exclude="*.o" \
+            --exclude="*.a" \
+            "${TARGET_BUILD_DIR}"
           echo "target-build-dir-archive=${TARGET_BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading target build dir archive"
         id: upload
