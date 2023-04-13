@@ -967,7 +967,7 @@ builtin.module {
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    %reordered_func = transform.iree.reorder_transpose %top_level_func : (!pdl.operation) -> !pdl.operation
+    %reordered_func = transform.iree.layout_preprocessing %top_level_func : (!pdl.operation) -> !pdl.operation
     transform.iree.apply_patterns %reordered_func { cse } : (!pdl.operation) -> ()
   }
 }
@@ -1032,19 +1032,19 @@ builtin.module {
 // CHECK:        %[[SUBVIEW:.+]] = memref.subview %[[D6]][%[[D7]], 0] [16, 8] [1, 1] : memref<16x8xf16> to
 // CHECK-SAME:     memref<16x8xf16, strided<[8, 1], offset: ?>>
 // CHECK:        %[[D25:.+]] = vector.broadcast %[[D16]] : vector<16xf16> to vector<8x16xf16>
-// CHECK:        %[[D26:.+]] = vector.broadcast %[[D21]] : vector<16xf16> to vector<8x16xf16>
+// CHECK:        %[[D26:.+]] = vector.extract_strided_slice %[[D23]] {offsets = [0, 0], sizes = [16, 8], strides = [1,
+// CHECK-SAME:     1]} : vector<16x16xf16> to vector<16x8xf16>
 // CHECK:        %[[D27:.+]] = vector.transfer_read %[[D5]][%[[D7]], %[[C0]]], %[[CST_0]] {in_bounds = [true, true]} :
 // CHECK-SAME:     memref<16x8xf16>, vector<16x8xf16>
 // CHECK:        %[[D28:.+]] = vector.transpose %[[D25]], [1, 0] : vector<8x16xf16> to vector<16x8xf16>
-// CHECK:        %[[D29:.+]] = vector.transpose %[[D26]], [1, 0] : vector<8x16xf16> to vector<16x8xf16>
-// CHECK:        %[[D30:.+]] = arith.divf %[[D28]], %[[D29]] : vector<16x8xf16>
-// CHECK:        %[[D31:.+]] = arith.mulf %[[D30]], %[[D27]] : vector<16x8xf16>
-// CHECK:        %[[D32:.+]] = vector.transfer_read %[[D4]][%[[C0]], %[[C0]]], %[[CST_0]] {in_bounds = [true, true],
+// CHECK:        %[[D29:.+]] = arith.divf %[[D28]], %[[D26]] : vector<16x8xf16>
+// CHECK:        %[[D30:.+]] = arith.mulf %[[D29]], %[[D27]] : vector<16x8xf16>
+// CHECK:        %[[D31:.+]] = vector.transfer_read %[[D4]][%[[C0]], %[[C0]]], %[[CST_0]] {in_bounds = [true, true],
 // CHECK-SAME:     permutation_map = #[[MAP1]]} : memref<16x8xf16>, vector<8x16xf16>
-// CHECK:        %[[D33:.+]] = vector.contract {indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]], iterator_types =
-// CHECK-SAME:     ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>} %[[D24]], %[[D32]], %[[D31]] :
+// CHECK:        %[[D32:.+]] = vector.contract {indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]], iterator_types =
+// CHECK-SAME:     ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>} %[[D24]], %[[D31]], %[[D30]] :
 // CHECK-SAME:     vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf16>
-// CHECK:        vector.transfer_write %[[D33]], %[[SUBVIEW]][%[[C0]], %[[C0]]] {in_bounds = [true, true]} :
+// CHECK:        vector.transfer_write %[[D32]], %[[SUBVIEW]][%[[C0]], %[[C0]]] {in_bounds = [true, true]} :
 // CHECK-SAME:     vector<16x8xf16>, memref<16x8xf16, strided<[8, 1], offset: ?>>
 // CHECK:        return
 // CHECK:      }

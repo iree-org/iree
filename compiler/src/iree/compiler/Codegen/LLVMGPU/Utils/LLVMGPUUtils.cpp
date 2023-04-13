@@ -224,5 +224,106 @@ void reorderTranspose(IRRewriter& rewriter, func::FuncOp funcOp) {
   }
 }
 
+SmallVector<std::tuple<vector::BroadcastOp, vector::TransposeOp>>
+getReductionBroadcastPairs(vector::MultiDimReductionOp reductionOp) {
+  SmallVector<std::tuple<vector::BroadcastOp, vector::TransposeOp>> pairs;
+  vector::BroadcastOp broadcastOp{nullptr};
+  vector::TransposeOp transposeOp{nullptr};
+  for (Operation* user : reductionOp.getResult().getUsers()) {
+    if (auto broadcast = dyn_cast<vector::BroadcastOp>(user)) {
+      for (Operation* bUser : broadcast.getResult().getUsers()) {
+        if (auto transpose = dyn_cast<vector::TransposeOp>(bUser)) {
+          transposeOp = transpose;
+          break;
+        }
+      }
+      broadcastOp = broadcast;
+      pairs.push_back(std::make_tuple(broadcastOp, transposeOp));
+    }
+  }
+  return pairs;
+}
+
+bool compatibleBroadcastReductionShapes(vector::MultiDimReductionOp reductionOp,
+                                        vector::BroadcastOp broadcastOp,
+                                        vector::TransposeOp transposeOp) {
+  // Get the reduction dims
+  Value reductionSrc = reductionOp.getSource();
+  auto reductionDims = llvm::to_vector<4>(
+      reductionOp.getReductionDims().getAsRange<IntegerAttr>());
+  // Get the transpose permutation
+  SmallVector<int64_t> perm;
+  transposeOp.getTransp(perm);
+  // Don't support dim-1 broadcasted dims
+  llvm::SetVector<int64_t> dimOneBroadcastedDims =
+      broadcastOp.computeBroadcastedUnitDims();
+  if (dimOneBroadcastedDims.size() > 0) return false;
+  Value broadcastSource = broadcastOp.getSource();
+  Value broadcastResult = broadcastOp.getResult();
+  int64_t broadcastSourceRank =
+      broadcastSource.getType().cast<VectorType>().getRank();
+  int64_t broadcastResultRank =
+      broadcastResult.getType().cast<VectorType>().getRank();
+  int64_t rankDiff = broadcastResultRank - broadcastSourceRank;
+  llvm::SetVector<int64_t> broadcastedDims;
+  for (int64_t i = 0; i < rankDiff; i++) broadcastedDims.insert(i);
+  ArrayRef<int64_t> broadcastShape =
+      broadcastResult.getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> srcShape =
+      reductionSrc.getType().cast<ShapedType>().getShape();
+  // Check that the same number of dims are reduced and broadcasted
+  if (reductionDims.size() != broadcastedDims.size()) return false;
+  // Check that transpose(reductionDim) == broadcastDim
+  // and that the shapes match
+  for (IntegerAttr dimAttr : reductionDims) {
+    int64_t dim = dimAttr.getInt();
+    int64_t transposedDim = perm[dim];
+    if (!broadcastedDims.contains(transposedDim)) return false;
+    if (srcShape[dim] < broadcastShape[transposedDim]) return false;
+  }
+  return true;
+}
+
+void createExtractSliceAfterReductionBroadcastTranspose(IRRewriter& rewriter,
+                                                        func::FuncOp funcOp) {
+  SmallVector<std::tuple<vector::MultiDimReductionOp, vector::BroadcastOp,
+                         vector::TransposeOp>>
+      candidates;
+  funcOp.walk([&](Operation* op) {
+    if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
+      auto pairs = getReductionBroadcastPairs(reductionOp);
+      for (auto [broadcastOp, transposeOp] : pairs) {
+        if (compatibleBroadcastReductionShapes(reductionOp, broadcastOp,
+                                               transposeOp)) {
+          candidates.push_back(
+              std::make_tuple(reductionOp, broadcastOp, transposeOp));
+        }
+      }
+    }
+    return WalkResult::advance();
+  });
+
+  for (auto [reductionOp, broadcastOp, transposeOp] : candidates) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(broadcastOp);
+    Location loc = broadcastOp.getLoc();
+    VectorType vectorType =
+        reductionOp.getSource().getType().cast<VectorType>();
+    Value broadcasted = rewriter.create<vector::BroadcastOp>(
+        loc, vectorType, reductionOp.getResult());
+    SmallVector<int64_t> perm;
+    transposeOp.getTransp(perm);
+    Value transposed =
+        rewriter.create<vector::TransposeOp>(loc, broadcasted, perm);
+    auto sliceShape =
+        transposeOp.getResult().getType().cast<ShapedType>().getShape();
+    SmallVector<int64_t> strides(sliceShape.size(), 1);
+    SmallVector<int64_t> offsets(sliceShape.size(), 0);
+    Value slice = rewriter.create<vector::ExtractStridedSliceOp>(
+        loc, transposed, offsets, sliceShape, strides);
+    transposeOp.getResult().replaceAllUsesWith(slice);
+  }
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

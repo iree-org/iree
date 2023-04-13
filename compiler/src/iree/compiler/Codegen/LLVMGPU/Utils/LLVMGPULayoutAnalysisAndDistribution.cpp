@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -273,39 +274,9 @@ static void propagateLayoutToReduceBroadcastTranspose(
   if (!transposeOp) return;
   Value reductionSrc = reductionOp.getSource();
   if (!layoutMap.count(reductionSrc)) return;
-  // Get the reduction dims
-  auto reductionDims = llvm::to_vector<4>(
-      reductionOp.getReductionDims().getAsRange<IntegerAttr>());
-  // Get the transpose permutation
-  SmallVector<int64_t> perm;
-  transposeOp.getTransp(perm);
-  // Don't support dim-1 broadcasted dims
-  llvm::SetVector<int64_t> dimOneBroadcastedDims =
-      broadcastOp.computeBroadcastedUnitDims();
-  if (dimOneBroadcastedDims.size() > 0) return;
-  Value broadcastSource = broadcastOp.getSource();
-  Value broadcastResult = broadcastOp.getResult();
-  int64_t broadcastSourceRank =
-      broadcastSource.getType().cast<VectorType>().getRank();
-  int64_t broadcastResultRank =
-      broadcastResult.getType().cast<VectorType>().getRank();
-  int64_t rankDiff = broadcastResultRank - broadcastSourceRank;
-  llvm::SetVector<int64_t> broadcastedDims;
-  for (int64_t i = 0; i < rankDiff; i++) broadcastedDims.insert(i);
-  ArrayRef<int64_t> broadcastShape =
-      broadcastResult.getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> srcShape =
-      reductionSrc.getType().cast<ShapedType>().getShape();
-  // Check that the same number of dims are reduced and broadcasted
-  if (reductionDims.size() != broadcastedDims.size()) return;
-  // Check that transpose(reductionDim) == broadcastDim
-  // and that the shapes match
-  for (IntegerAttr dimAttr : reductionDims) {
-    int64_t dim = dimAttr.getInt();
-    int64_t transposedDim = perm[dim];
-    if (!broadcastedDims.contains(transposedDim)) return;
-    if (srcShape[dim] != broadcastShape[transposedDim]) return;
-  }
+  if (!compatibleBroadcastReductionShapes(reductionOp, broadcastOp,
+                                          transposeOp))
+    return;
   Value transposedResult = transposeOp.getResult();
   layoutMap.try_emplace(transposedResult, layoutMap.at(reductionSrc));
   layoutMap.at(transposedResult).debugPrint("transposed");
@@ -376,10 +347,16 @@ static void propagateLayoutToElementwiseOp(Operation *op,
 
 static void propagateLayout(Operation *op, DenseMap<Value, Layout> &layoutMap) {
   if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
-    auto [broadcastOp, transposeOp] =
-        checkForReduceBroadcastTranspose(reductionOp);
-    propagateLayoutToReduceBroadcastTranspose(reductionOp, broadcastOp,
-                                              transposeOp, layoutMap);
+    auto pairs = getReductionBroadcastPairs(reductionOp);
+    Value result;
+    for (auto [broadcastOp, transposeOp] : pairs) {
+      if (!result) {
+        propagateLayoutToReduceBroadcastTranspose(reductionOp, broadcastOp,
+                                                  transposeOp, layoutMap);
+        result = transposeOp.getResult();
+      }
+      layoutMap.try_emplace(transposeOp.getResult(), layoutMap.at(result));
+    }
   }
   if (auto forOp = dyn_cast<scf::ForOp>(op)) {
     propagateLayoutToFor(forOp, layoutMap);
@@ -740,6 +717,7 @@ static void distributeReductionBroadcastTranspose(
   if (!layoutMap.count(source)) return;
   if (!simdToSimtMap.count(source)) return;
   if (!broadcastOp) return;
+  if (!transposeOp) return;
   Location loc = reductionOp.getLoc();
   Layout layout = layoutMap.at(source);
   auto reductionDims = llvm::to_vector<4>(
@@ -845,14 +823,11 @@ static void distributeReductionBroadcastTranspose(
   state.fill(0);
   iterate(0, parallelOrder, state, layout, loopBody);
 
-  if (transposeOp)
-    simdToSimtMap.try_emplace(transposeOp.getResult(), output);
-  else
-    simdToSimtMap.try_emplace(broadcastOp.getResult(), output);
+  simdToSimtMap.try_emplace(transposeOp.getResult(), output);
 
   ops.insert(reductionOp);
   ops.insert(broadcastOp);
-  if (transposeOp) ops.insert(transposeOp);
+  ops.insert(transposeOp);
 }
 
 static void replaceForOpWithNewSignature(RewriterBase &rewriter,
@@ -1085,11 +1060,18 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter,
                                opsToErase);
     }
     if (auto reductionOp = dyn_cast<vector::MultiDimReductionOp>(op)) {
-      auto [broadcastOp, transposeOp] =
-          checkForReduceBroadcastTranspose(reductionOp);
-      distributeReductionBroadcastTranspose(
-          reductionOp, broadcastOp, transposeOp, layoutMap, simdToSimtMap,
-          rewriter, opsToErase);
+      auto pairs = getReductionBroadcastPairs(reductionOp);
+      Value result;
+      for (auto [broadcastOp, transposeOp] : pairs) {
+        if (!result) {
+          distributeReductionBroadcastTranspose(
+              reductionOp, broadcastOp, transposeOp, layoutMap, simdToSimtMap,
+              rewriter, opsToErase);
+          result = transposeOp.getResult();
+        }
+        simdToSimtMap.try_emplace(transposeOp.getResult(),
+                                  simdToSimtMap.at(result));
+      }
     }
     if (auto forOp = dyn_cast<scf::ForOp>(op)) {
       distributeFor(forOp, layoutMap, simdToSimtMap, rewriter, opsToErase);

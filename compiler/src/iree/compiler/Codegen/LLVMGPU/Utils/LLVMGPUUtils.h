@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_LLVMGPU_UTILS_LLVMGPUUTILS_H_
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
@@ -23,6 +24,21 @@ void doLayoutAnalysisAndDistribution(IRRewriter &rewriter, func::FuncOp funcOp);
 
 /// Function to reorder transposes and elementwise ops.
 void reorderTranspose(IRRewriter &rewriter, func::FuncOp funcOp);
+
+/// Function to create extract slice after reduction + broadcast + transpose
+/// when the broadcast size is less than that of the reduction source.
+void createExtractSliceAfterReductionBroadcastTranspose(IRRewriter &rewriter,
+                                                        func::FuncOp funcOp);
+
+/// Find broadcast and transpose ops that use the given reduction op.
+SmallVector<std::tuple<vector::BroadcastOp, vector::TransposeOp>>
+getReductionBroadcastPairs(vector::MultiDimReductionOp reductionOp);
+
+/// Checks to see if the result of the reduction, broadcast and transpose op
+/// has dimensions that are the same or smaller shape than the reduction source.
+bool compatibleBroadcastReductionShapes(vector::MultiDimReductionOp reductionOp,
+                                        vector::BroadcastOp broadcastOp,
+                                        vector::TransposeOp transposeOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir

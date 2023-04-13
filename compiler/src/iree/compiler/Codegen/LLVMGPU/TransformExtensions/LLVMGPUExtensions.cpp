@@ -810,11 +810,14 @@ transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
 //===---------------------------------------------------------------------===//
 // ReorderTransposeOp
 //===---------------------------------------------------------------------===//
-DiagnosedSilenceableFailure transform_dialect::ReorderTransposeOp::applyToOne(
+DiagnosedSilenceableFailure
+transform_dialect::LayoutPreprocessingOp::applyToOne(
     func::FuncOp target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(getContext());
   iree_compiler::reorderTranspose(rewriter, cast<func::FuncOp>(target));
+  iree_compiler::createExtractSliceAfterReductionBroadcastTranspose(
+      rewriter, cast<func::FuncOp>(target));
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }

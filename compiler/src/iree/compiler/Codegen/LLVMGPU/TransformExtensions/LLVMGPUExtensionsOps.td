@@ -514,18 +514,21 @@ def LayoutAnalysisAndDistributionOp :
 
 }
 
-def ReorderTransposeOp :
-  Op<Transform_Dialect, "iree.reorder_transpose",
+def LayoutPreprocessingOp :
+  Op<Transform_Dialect, "iree.layout_preprocessing",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Targets the whole func op and finds transpose ops whose source
-    comes from an elementwise op. For each of those transpose ops,
-    it moves the transpose before the elementwise op by first
-    transposing the operands of the elementwise op and then redoing
-    the elementwise op using the transposed operands. It then
+    Targets the whole func op and does a series of preprocessing
+    transforms for layout analysis. The transforms are listed
+    below.
+
+    1. Finds transpose ops whose source comes from an elementwise op.
+    For each of those transpose ops, it moves the transpose before the
+    elementwise op by first transposing the operands of the elementwise op
+    and then redoing the elementwise op using the transposed operands. It then
     replaces all uses of the original transpose op with the result
     of the new elementwise op.
 
@@ -537,6 +540,13 @@ def ReorderTransposeOp :
       %transposed_a = vector.transpose %a [1, 0] : vector<16x8xf16> to vector<8x16xf16>
       %transposed_b = vector.transpose %b [1, 0] : vector<16x8xf16> to vector<8x16xf16>
       %0 = arith.subf %transposed_a, %transposed_b : vector<8x16xf16>
+
+    2. Searches for reductions + inner broadcasts (broadcast + transpose) where
+       the final shape is smaller than that of the original reduction source. It
+       then creates new broadcast + transpose ops so that the final shape after
+       the transpose is the same as that of the reduction source. Finally, it
+       adds an extract strided slice op to extract the relevant slice.
+
   }];
 
   let arguments = (ins PDL_Operation:$target);
