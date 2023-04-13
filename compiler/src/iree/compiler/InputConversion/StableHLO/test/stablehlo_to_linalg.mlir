@@ -636,6 +636,8 @@ func.func @dyanmic_iota_ui32(%shape: tensor<?xi32>) -> tensor<?x?x8xui32> {
 
 // -----
 
+// CHECK-LABEL: @map_mixed
+// CHECK-PRIMITIVE-LABEL: @map_mixed
 func.func @map_mixed(%arg0: tensor<?xf32>,
                      %arg1: tensor<4xf32>) -> tensor<?xf32> {
   %0 = "stablehlo.map"(%arg0, %arg1) ({
@@ -647,14 +649,16 @@ func.func @map_mixed(%arg0: tensor<?xf32>,
   func.return %0 : tensor<?xf32>
 }
 
-// CHECK-LABEL: @map_mixed
 // CHECK: linalg.generic
+// CHECK:   %[[ADD:.+]] = arith.addf
+// CHECK:   linalg.yield %[[ADD]] : f32
 
-// CHECK-PRIMITIVE-LABEL: @map_mixed
-// CHECK-PRIMITIVE: linalg.map
+// CHECK-PRIMITIVE: linalg.map { arith.addf }
 
 // -----
 
+// CHECK-LABEL: @map_one_arg
+// CHECK-PRIMITIVE-LABEL: @map_one_arg
 func.func @map_one_arg(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   %0 = "stablehlo.map"(%arg0) ({
   ^bb0(%arg2: tensor<f32>):
@@ -665,11 +669,61 @@ func.func @map_one_arg(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   func.return %0 : tensor<?xf32>
 }
 
-// CHECK-LABEL: @map_one_arg
 // CHECK: linalg.generic
+// CHECK:   %[[ADD:.+]] = arith.addf
+// CHECK:   linalg.yield %[[ADD]] : f32
 
-// CHECK-PRIMITIVE-LABEL: @map_one_arg
 // CHECK-PRIMITIVE: linalg.map
+// CHECK-PRIMITIVE:   %[[ADD:.+]] = arith.addf
+// CHECK-PRIMITIVE:   linalg.yield %[[ADD]] : f32
+
+// -----
+
+// CHECK-LABEL: @map_compare
+// CHECK-SAME: %[[ARG0:.*]]: tensor<?xcomplex<f32>>,
+// CHECK-SAME: %[[ARG1:.*]]: tensor<?xcomplex<f32>>)
+// CHECK-PRIMITIVE-LABEL: @map_compare
+// CHECK-PRIMITIVE-SAME: %[[ARG0:.*]]: tensor<?xcomplex<f32>>,
+// CHECK-PRIMITIVE-SAME: %[[ARG1:.*]]: tensor<?xcomplex<f32>>)
+func.func @map_compare(%arg0: tensor<?xcomplex<f32>>,
+                       %arg1: tensor<?xcomplex<f32>>) -> tensor<?xi1> {
+  %0 = "stablehlo.map"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<complex<f32>>, %arg3: tensor<complex<f32>>):
+    %1 = stablehlo.real %arg2 : (tensor<complex<f32>>) -> tensor<f32>
+    %2 = stablehlo.real %arg3 : (tensor<complex<f32>>) -> tensor<f32>
+    %3 = "stablehlo.compare"(%1, %2)
+       {comparison_direction = #stablehlo<comparison_direction EQ>}
+       : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    "stablehlo.return"(%3) : (tensor<i1>) -> ()
+  }) {dimensions = dense<0> : tensor<1xi64>}
+  : (tensor<?xcomplex<f32>>, tensor<?xcomplex<f32>>) -> tensor<?xi1>
+  func.return %0 : tensor<?xi1>
+}
+
+// CHECK: %[[INIT:.+]] = tensor.empty
+// CHECK: %[[MAP:.+]] = linalg.generic
+// CHECK-SAME: iterator_types = ["parallel"]}
+// CHECK-SAME: ins(%[[ARG0]], %[[ARG1]]
+// CHECK-SAME: outs(%[[INIT]] : tensor<?xi1>) {
+// CHECK:  ^bb0(%[[A:.+]]: complex<f32>, %[[B:.+]]: complex<f32>, %{{.+}}: i1):
+// CHECK: %[[RE1:.+]] = complex.re %[[A]] : complex<f32>
+// CHECK: %[[RE2:.+]] = complex.re %[[B]] : complex<f32>
+// CHECK: %[[CMP:.+]] = arith.cmpf oeq, %[[RE1]], %[[RE2]] : f32
+// CHECK: linalg.yield %[[CMP]] : i1
+// CHECK: }
+// CHECK: return %[[MAP]] : tensor<?xi1>
+
+// CHECK-PRIMITIVE: %[[INIT:.+]] = tensor.empty
+// CHECK-PRIMITIVE: %[[MAP:.+]] = linalg.map
+// CHECK-PRIMITIVE-SAME: ins(%[[ARG0]], %[[ARG1]]
+// CHECK-PRIMITIVE-SAME: outs(%[[INIT]] : tensor<?xi1>)
+// CHECK-PRIMITIVE-NEXT: (%[[A:.+]]: complex<f32>, %[[B:.+]]: complex<f32>) {
+// CHECK-PRIMITIVE: %[[RE1:.+]] = complex.re %[[A]] : complex<f32>
+// CHECK-PRIMITIVE: %[[RE2:.+]] = complex.re %[[B]] : complex<f32>
+// CHECK-PRIMITIVE: %[[CMP:.+]] = arith.cmpf oeq, %[[RE1]], %[[RE2]] : f32
+// CHECK-PRIMITIVE: linalg.yield %[[CMP]] : i1
+// CHECK-PRIMITIVE: }
+// CHECK-PRIMITIVE: return %[[MAP]] : tensor<?xi1>
 
 // -----
 
