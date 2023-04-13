@@ -8,6 +8,5 @@
 #define IREE_HAL_DRIVERS_CUDA_CUDA_HEADERS_H_
 
 #include "cuda.h"                   // IWYU pragma: export
-#include "third_party/mpi/mpi.h"    // IWYU pragma: export
 #include "third_party/nccl/nccl.h"  // IWYU pragma: export
 #endif                              // IREE_HAL_DRIVERS_CUDA_CUDA_HEADERS_H_

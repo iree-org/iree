@@ -110,7 +110,7 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
         int rank = 0;
         MPI_RETURN_IF_ERROR(
             &driver->syms,
-            MPI_Comm_rank((MPI_Comm)(driver->syms.ompi_mpi_comm_world), &rank),
+            MPI_Comm_rank(driver->syms.ompi_mpi_comm_world, &rank),
             "MPI_Comm_rank");
         driver->default_device_index = rank;
       }

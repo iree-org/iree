@@ -838,7 +838,6 @@ endif()
 add_subdirectory(build_tools/third_party/flatcc)
 
 if(IREE_HAL_DRIVER_CUDA)
-  add_subdirectory(build_tools/third_party/mpi EXCLUDE_FROM_ALL)
   add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
 endif()
 

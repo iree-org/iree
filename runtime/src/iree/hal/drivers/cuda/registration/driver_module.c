@@ -61,13 +61,12 @@ static iree_status_t iree_hal_cuda_nccl_query_group_params(
   IREE_ASSERT_EQ(params->count, IREE_HAL_CHANNEL_COUNT_DEFAULT);
 
   // Update the rank and count.
-  MPI_RETURN_IF_ERROR(
-      syms, MPI_Comm_rank((MPI_Comm)(syms->ompi_mpi_comm_world), &params->rank),
-      "MPI_Comm_rank");
-  MPI_RETURN_IF_ERROR(
-      syms,
-      MPI_Comm_size((MPI_Comm)(syms->ompi_mpi_comm_world), &params->count),
-      "MPI_Comm_size");
+  MPI_RETURN_IF_ERROR(syms,
+                      MPI_Comm_rank(syms->ompi_mpi_comm_world, &params->rank),
+                      "MPI_Comm_rank");
+  MPI_RETURN_IF_ERROR(syms,
+                      MPI_Comm_size(syms->ompi_mpi_comm_world, &params->count),
+                      "MPI_Comm_size");
   ;
 
   iree_hal_cuda_nccl_id_t* id = (iree_hal_cuda_nccl_id_t*)id_storage.data;
@@ -77,11 +76,10 @@ static iree_status_t iree_hal_cuda_nccl_query_group_params(
     IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
   }
 
-  MPI_RETURN_IF_ERROR(
-      syms,
-      MPI_Bcast(id, id_storage.data_length, (MPI_Datatype)syms->ompi_mpi_byte,
-                0, (MPI_Comm)(syms->ompi_mpi_comm_world)),
-      "MPI_Bcast");
+  MPI_RETURN_IF_ERROR(syms,
+                      MPI_Bcast(id, id_storage.data_length, syms->ompi_mpi_byte,
+                                0, syms->ompi_mpi_comm_world),
+                      "MPI_Bcast");
   params->id = iree_const_cast_byte_span(id_storage);
 
   return iree_ok_status();

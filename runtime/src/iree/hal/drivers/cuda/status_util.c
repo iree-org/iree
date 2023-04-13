@@ -75,7 +75,7 @@ iree_status_t iree_hal_mpi_result_to_status(
   iree_status_code_t code;
 
   switch (result) {
-    case MPI_SUCCESS:
+    case 0:  // MPI_SUCCESS
       return iree_ok_status();
     default:
       code = IREE_STATUS_INTERNAL;
