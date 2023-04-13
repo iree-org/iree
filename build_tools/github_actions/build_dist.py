@@ -38,7 +38,6 @@ a directory and:
   source .venv/bin/activate
 
   python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
 
@@ -197,7 +196,7 @@ def build_py_tf_compiler_tools_pkg():
                  check=True)
   os.makedirs(BINDIST_DIR, exist_ok=True)
 
-  for project in ["iree_tflite", "iree_tf", "iree_xla"]:
+  for project in ["iree_tflite", "iree_tf"]:
     print(f"*** Building wheel for {project} ***")
     subprocess.run(
         [
