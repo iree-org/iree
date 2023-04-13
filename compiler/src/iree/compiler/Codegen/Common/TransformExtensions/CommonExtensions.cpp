@@ -377,7 +377,8 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
         patterns, [](OpOperand *) { return true; });
   }
   if (getBubblePackUnPack())
-    linalg::populateDataLayoutPropagationPatterns(patterns);
+    linalg::populateDataLayoutPropagationPatterns(
+        patterns, [](Operation *op) { return true; });
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);

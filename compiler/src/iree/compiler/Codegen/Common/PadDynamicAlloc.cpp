@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -45,7 +46,9 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
     }
     Value dim = allocOp.getDynamicSizes()[dynamicDimIdx++];
     dim = skipAffineMaxZero(dim);
-    auto ub = linalg::getConstantUpperBoundForIndex(dim);
+    auto ub = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::UB, dim, /*dim=*/std::nullopt,
+        /*stopCondition=*/nullptr, /*closedUB=*/true);
     if (failed(ub)) {
       return allocOp.emitOpError(
           "unexpected allocation without upper bound shapes");

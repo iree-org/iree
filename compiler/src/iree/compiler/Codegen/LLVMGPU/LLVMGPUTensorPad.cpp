@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-tensor-pad"
@@ -32,7 +33,10 @@ static FailureOr<SmallVector<int64_t>> getPaddedShapeFromTensorLoad(
       paddedShape[index] = cst.value();
     } else {
       FailureOr<int64_t> upperBound =
-          linalg::getConstantUpperBoundForIndex(size.get<Value>());
+          ValueBoundsConstraintSet::computeConstantBound(
+              presburger::BoundType::UB, size.get<Value>(),
+              /*dim=*/std::nullopt,
+              /*stopCondition=*/nullptr, /*closedUB=*/true);
       if (failed(upperBound)) return failure();
       paddedShape[index] = *upperBound;
     }
