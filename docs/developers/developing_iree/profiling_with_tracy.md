@@ -108,7 +108,7 @@ A CMake-based build system for Tracy is maintained as part of IREE. In your IREE
 desktop build directory, set the following CMake option:
 
 ```shell
-$ cmake -DIREE_BUILD_TRACY=ON .
+$ cmake -DIREE_BUILD_TRACY=ON -DIREE_ENABLE_LLD=ON .
 ```
 
 That enables building the Tracy server tools, `iree-tracy-profiler` and
