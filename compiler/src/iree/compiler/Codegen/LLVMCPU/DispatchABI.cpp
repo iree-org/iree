@@ -340,7 +340,6 @@ LLVM::LLVMStructType HALDispatchABI::getEnvironmentType(
       context, "iree_hal_executable_environment_v0_t");
   if (structType.isInitialized()) return structType;
 
-  // auto int8Type = IntegerType::get(context, 8);
   auto uint32Type = IntegerType::get(context, 32);
   auto opaquePtrType = LLVM::LLVMPointerType::get(context);
   SmallVector<Type, 4> fieldTypes;
@@ -917,24 +916,18 @@ std::pair<Value, Value> HALDispatchABI::loadImportFunc(Operation *forOp,
   auto loc = forOp->getLoc();
   auto funcPtrsValue =
       loadFieldValue(forOp, EnvironmentField::import_funcs, builder);
-  auto int8Type = IntegerType::get(context, 8);
-  auto uint32Type = IntegerType::get(context, 32);
-  auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
-  auto importFuncsType = LLVM::LLVMFunctionType::get(
-      uint32Type, {int8PtrType, int8PtrType, int8PtrType});
-
+  auto opaquePtrType = LLVM::LLVMPointerType::get(builder.getContext());
   auto funcPtrValue =
-      builder.create<LLVM::GEPOp>(loc, funcPtrsValue.getType(), importFuncsType,
+      builder.create<LLVM::GEPOp>(loc, funcPtrsValue.getType(), opaquePtrType,
                                   funcPtrsValue, importOrdinal);
-
   auto contextPtrsValue =
       loadFieldValue(forOp, EnvironmentField::import_contexts, builder);
-  auto contextPtrValue =
-      builder.create<LLVM::GEPOp>(loc, contextPtrsValue.getType(), int8Type,
-                                  contextPtrsValue, importOrdinal);
+  auto contextPtrValue = builder.create<LLVM::GEPOp>(
+      loc, contextPtrsValue.getType(), opaquePtrType, contextPtrsValue,
+      importOrdinal);
   return std::make_pair(
-      builder.create<LLVM::LoadOp>(loc, importFuncsType, funcPtrValue),
-      builder.create<LLVM::LoadOp>(loc, int8Type, contextPtrValue));
+      builder.create<LLVM::LoadOp>(loc, opaquePtrType, funcPtrValue),
+      builder.create<LLVM::LoadOp>(loc, opaquePtrType, contextPtrValue));
 }
 
 Value HALDispatchABI::isImportFuncAvailable(Operation *forOp,

@@ -69,7 +69,7 @@ iree_hal_sync_device_params_t params;
 iree_hal_sync_device_params_initialize(&params);
 iree_hal_executable_loader_t* loader = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_embedded_elf_loader_create(
-      iree_hal_executable_import_provider_null(), iree_allocator_system(),
+      /*plugin_manager=*/NULL, iree_allocator_system(),
       &loader));
 
 iree_string_view_t identifier = iree_make_cstring_view("local-sync");

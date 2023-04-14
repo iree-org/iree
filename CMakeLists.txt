@@ -204,6 +204,13 @@ set(IREE_EXTERNAL_HAL_DRIVERS "" CACHE STRING "")
 # generate the registration from that via a configure file.
 set(IREE_HAL_EXECUTABLE_LOADER_EXTRA_DEPS "" CACHE STRING "")
 
+# Additional executable import provider deps to add dependent libraries to any
+# target using the default executable import registration utilities.
+# TODO(benvanik): extend the deps to encompass the built-in imports too so that
+# we have one flag. We could also support a list of deps and automatically
+# generate the registration from that via a configure file.
+set(IREE_HAL_EXECUTABLE_PLUGIN_EXTRA_DEPS "" CACHE STRING "")
+
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 
 # CUDA support is enabled by default if the platform supports the CUDA SDK and
@@ -231,29 +238,40 @@ set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER
 set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
 set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
 
+option(IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS "Sets the default value for all runtime HAL executable plugin mechanisms" ON)
+set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF_DEFAULT ${IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS})
+set(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY_DEFAULT ${IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS})
+
 # Emscripten builds don't support embedded ELF libraries.
 if(EMSCRIPTEN)
   set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT OFF)
+  set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF_DEFAULT OFF)
 endif()
 
 # If forcing system libraries (for TSAN/debugging tools/etc) then ensure the
 # system library loader is linked in.
 if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
   set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ON)
+  set(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY_DEFAULT ON)
 endif()
 
-# If no local driver is enabled then we force all the loaders off; this allows
-# for simpler checks that don't need to see if both the driver and loader is
-# available.
+# If no local driver is enabled then we force all the loaders/imports off; this
+# allows for simpler checks that don't need to see if both the driver and
+# feature is available.
 if(NOT IREE_HAL_DRIVER_LOCAL_SYNC AND NOT IREE_HAL_DRIVER_LOCAL_TASK)
   set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT OFF)
   set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT OFF)
   set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT OFF)
+  set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF_DEFAULT OFF)
+  set(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY_DEFAULT OFF)
 endif()
 
 option(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF "Enables the embedded dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT})
 option(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY "Enables the system dynamic library loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT})
 option(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE "Enables the VMVX module loader for local HAL drivers" ${IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE_DEFAULT})
+
+option(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF "Enables the embedded dynamic library plugin mechanism for local HAL drivers" ${IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF_DEFAULT})
+option(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY "Enables the system dynamic library plugin mechanism for local HAL drivers" ${IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY_DEFAULT})
 
 if(IREE_BUILD_COMPILER)
   # The compiler requires the local task driver with the VMVX loader.
@@ -287,6 +305,14 @@ if(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY)
 endif()
 if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
   message(STATUS "  - vmvx-module")
+endif()
+
+message(STATUS "IREE HAL local executable plugin mechanisms:")
+if(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF)
+  message(STATUS "  - embedded-elf")
+endif()
+if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
+  message(STATUS "  - system-library")
 endif()
 
 #-------------------------------------------------------------------------------
