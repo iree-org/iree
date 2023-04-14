@@ -182,7 +182,7 @@ static void getTensorCoreConfig(
             TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
       } else if (clGPUShmemSizeKb >= 64) {
         tileSizes.push_back(
-            TileWorkgroupSizePair({{128, 128, 32}, {128, 1, 1}, 2}));
+            TileWorkgroupSizePair({{128, 128, 32}, {128, 1, 1}, 3}));
       } else if (clGPUShmemSizeKb >= 48) {
         tileSizes.push_back(
             TileWorkgroupSizePair({{64, 64, 32}, {32, 1, 1}, 2}));
