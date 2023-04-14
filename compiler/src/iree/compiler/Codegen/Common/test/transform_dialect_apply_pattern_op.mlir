@@ -89,3 +89,152 @@ transform.sequence failures(propagate) {
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
   transform.iree.apply_patterns %0 { bubble_expand } : (!pdl.operation) -> ()
 }
+
+// -----
+
+// CHECK-LABEL: @pad_fill_to_fill
+func.func @pad_fill_to_fill(%arg0: tensor<31x62xf32>) -> tensor<32x64xf32> {
+  // Check that a pad of a fill with the same constant is replaced by a
+  // bigger fill.
+  // CHECK-DAG: %[[FILL_CST:.*]] = arith.constant 0.0{{0*e\+00}} : f32
+  // CHECK-DAG: %[[EMPTY:.*]] = tensor.empty() : tensor<32x64xf32>
+  // CHECK: %[[PADDED_FILL:.*]] = linalg.fill ins(%[[FILL_CST]] : f32) outs(%[[EMPTY]] : tensor<32x64xf32>) -> tensor<32x64xf32>
+  // CHECK: return %[[PADDED_FILL]]
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %fill = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<31x62xf32>) -> tensor<31x62xf32>
+  %padded = tensor.pad %fill low[%c0, %c0] high[%c1, %c2] {
+    ^bb0(%arg3: index, %arg4: index):
+      tensor.yield %cst : f32
+  } : tensor<31x62xf32> to tensor<32x64xf32>
+  return %padded : tensor<32x64xf32>
+}
+
+transform.sequence failures(propagate) {
+^bb1(%arg1: !pdl.operation):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+}
+
+// -----
+
+// CHECK-LABEL: @pad_fill_different_ssa_value_but_same_cst
+func.func @pad_fill_different_ssa_value_but_same_cst(%arg0: tensor<31x62xf32>) -> tensor<32x64xf32> {
+  // Check that a pad of a fill with the same constant is replaced by a
+  // bigger fill even when the constant comes from different ssa value.
+  // CHECK-DAG: %[[FILL_CST:.*]] = arith.constant 0.0{{0*e\+00}} : f32
+  // CHECK-DAG: %[[EMPTY:.*]] = tensor.empty() : tensor<32x64xf32>
+  // CHECK: %[[PADDED_FILL:.*]] = linalg.fill ins(%[[FILL_CST]] : f32) outs(%[[EMPTY]] : tensor<32x64xf32>) -> tensor<32x64xf32>
+  // CHECK: return %[[PADDED_FILL]]
+  %cst = arith.constant 0.0 : f32
+  %cst2 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %fill = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<31x62xf32>) -> tensor<31x62xf32>
+  %padded = tensor.pad %fill low[%c0, %c0] high[%c1, %c2] {
+    ^bb0(%arg3: index, %arg4: index):
+      tensor.yield %cst2 : f32
+  } : tensor<31x62xf32> to tensor<32x64xf32>
+  return %padded : tensor<32x64xf32>
+}
+
+transform.sequence failures(propagate) {
+^bb1(%arg1: !pdl.operation):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+}
+
+// -----
+
+// CHECK-LABEL: @pad_extract_fill_to_fill
+func.func @pad_extract_fill_to_fill(%arg0: tensor<31x62xf32>,
+    %size0 : index, %size1 : index,
+    %high0 : index, %high1 : index) -> tensor<32x64xf32> {
+  // Check that a pad of a fill with the same constant is replaced by a
+  // bigger fill even when the fill is hidden behind an extract_slice.
+  // CHECK-DAG: %[[FILL_CST:.*]] = arith.constant 0.0{{0*e\+00}} : f32
+  // CHECK-DAG: %[[EMPTY:.*]] = tensor.empty() : tensor<32x64xf32>
+  // CHECK: %[[PADDED_FILL:.*]] = linalg.fill ins(%[[FILL_CST]] : f32) outs(%[[EMPTY]] : tensor<32x64xf32>) -> tensor<32x64xf32>
+  // CHECK: return %[[PADDED_FILL]]
+  %cst = arith.constant 0.0 : f32
+  %cst2 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %fill = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<31x62xf32>) -> tensor<31x62xf32>
+  %extracted_slice = tensor.extract_slice %fill[0, 0] [%size0, %size1] [1, 1] : tensor<31x62xf32> to tensor<?x?xf32>
+  %padded = tensor.pad %extracted_slice low[%c0, %c0] high[%high0, %high1] {
+    ^bb0(%arg3: index, %arg4: index):
+      tensor.yield %cst2 : f32
+  } : tensor<?x?xf32> to tensor<32x64xf32>
+  return %padded : tensor<32x64xf32>
+}
+
+transform.sequence failures(propagate) {
+^bb1(%arg1: !pdl.operation):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+}
+
+// -----
+
+// CHECK-LABEL: @pad_extract_extract_fill_to_fill
+func.func @pad_extract_extract_fill_to_fill(%arg0: tensor<31x62xf32>,
+    %size0a : index, %size1a : index,
+    %size0b : index, %size1b : index,
+    %high0 : index, %high1 : index) -> tensor<32x64xf32> {
+  // Check that a pad of a fill with the same constant is replaced by a
+  // bigger fill even when the fill is hidden behind a few `extract_slice`s.
+  // CHECK-DAG: %[[FILL_CST:.*]] = arith.constant 0.0{{0*e\+00}} : f32
+  // CHECK-DAG: %[[EMPTY:.*]] = tensor.empty() : tensor<32x64xf32>
+  // CHECK: %[[PADDED_FILL:.*]] = linalg.fill ins(%[[FILL_CST]] : f32) outs(%[[EMPTY]] : tensor<32x64xf32>) -> tensor<32x64xf32>
+  // CHECK: return %[[PADDED_FILL]]
+  %cst = arith.constant 0.0 : f32
+  %cst2 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %fill = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<31x62xf32>) -> tensor<31x62xf32>
+  %extracted_sliceA = tensor.extract_slice %fill[0, 0] [%size0a, %size1a] [1, 1] : tensor<31x62xf32> to tensor<?x?xf32>
+  %extracted_sliceB = tensor.extract_slice %extracted_sliceA[0, 0] [%size0b, %size1b] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+  %padded = tensor.pad %extracted_sliceB low[%c0, %c0] high[%high0, %high1] {
+    ^bb0(%arg3: index, %arg4: index):
+      tensor.yield %cst2 : f32
+  } : tensor<?x?xf32> to tensor<32x64xf32>
+  return %padded : tensor<32x64xf32>
+}
+
+transform.sequence failures(propagate) {
+^bb1(%arg1: !pdl.operation):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+}
+
+// -----
+
+// CHECK-LABEL: @pad_extract_bigger_fill_to_fill
+func.func @pad_extract_bigger_fill_to_fill(%arg0: tensor<253x123xf32>,
+    %size0 : index, %size1 : index,
+    %high0 : index, %high1 : index) -> tensor<32x64xf32> {
+  // Check that a pad of a bigger fill with the same constant is replaced by a
+  // fill of the right size.
+  // CHECK-DAG: %[[FILL_CST:.*]] = arith.constant 0.0{{0*e\+00}} : f32
+  // CHECK-DAG: %[[EMPTY:.*]] = tensor.empty() : tensor<32x64xf32>
+  // CHECK: %[[PADDED_FILL:.*]] = linalg.fill ins(%[[FILL_CST]] : f32) outs(%[[EMPTY]] : tensor<32x64xf32>) -> tensor<32x64xf32>
+  // CHECK: return %[[PADDED_FILL]]
+  %cst = arith.constant 0.0 : f32
+  %cst2 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %fill = linalg.fill ins(%cst : f32) outs(%arg0 : tensor<253x123xf32>) -> tensor<253x123xf32>
+  %extracted_slice = tensor.extract_slice %fill[0, 0] [%size0, %size1] [1, 1] : tensor<253x123xf32> to tensor<?x?xf32>
+  %padded = tensor.pad %extracted_slice low[%c0, %c0] high[%high0, %high1] {
+    ^bb0(%arg3: index, %arg4: index):
+      tensor.yield %cst2 : f32
+  } : tensor<?x?xf32> to tensor<32x64xf32>
+  return %padded : tensor<32x64xf32>
+}
+
+transform.sequence failures(propagate) {
+^bb1(%arg1: !pdl.operation):
+  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
+  transform.iree.apply_patterns %0 { tiling_canonicalization } : (!pdl.operation) -> ()
+}
