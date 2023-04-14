@@ -9,6 +9,7 @@
 #include "iree/compiler/InputConversion/Common/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -64,7 +65,7 @@ struct QuantizedMatmulToMatmul
     }
     // Create the result. No need to zero-fill it as we will overwrite it.
     ShapedType accType = acc.getType().cast<ShapedType>();
-    auto accDynShape = linalg::getDynOperands(loc, acc, rewriter);
+    auto accDynShape = linalg::createDynamicDimensions(rewriter, loc, acc);
     Value initResult = builder.create<tensor::EmptyOp>(
         accType.getShape(), accType.getElementType(), accDynShape);
     // Create the indexing maps for the generic.
