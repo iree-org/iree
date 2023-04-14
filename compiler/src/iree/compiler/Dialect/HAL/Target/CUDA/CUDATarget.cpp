@@ -602,7 +602,7 @@ class CUDATargetBackend final : public TargetBackend {
         llvm::Triple triple("nvptx64-nvidia-cuda");
         std::string targetChip = clTargetChip;
         // PTX version is backward compatible
-        std::string features = "+ptx77";
+        std::string features = "+ptx76";
         std::string error;
         const llvm::Target *target =
             llvm::TargetRegistry::lookupTarget("", triple, error);
