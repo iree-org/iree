@@ -62,8 +62,8 @@ CUDA_ENTRY void TEMPLATE(
 
 #ifdef DEBUG
   if (threadIdx.x == 0)
-    printf("<<< (%d,%d), %d >>> %p[%lld] %p[%lld] %p[%lld] %p \t --- %p %p %p\n", 
-           blockIdx.x, blockIdx.y, threadIdx.y, 
+    printf("<<< (%d,%d), (%d,%d) >>> %p[%ld] %p[%ld] %p[%ld] %p \t --- %p %p %p\n", 
+           blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, 
            lhs_base, lhs_start, rhs_base, rhs_start, res_base, res_start, shm_base,
            lhs_begin, rhs_begin, res_begin);
 #endif

@@ -124,6 +124,7 @@ struct uGPUContracts {
       generateVariant(t, t, OutT, {128, 128, 32}, {64, 64}, {16, 8, 8}, st);
 
       st = 3;
+      generateVariant(t, t, OutT, {64, 64, 32}, {64, 64}, {16, 8, 8}, st);
       generateVariant(t, t, OutT, {128, 128, 16}, {64, 64}, {16, 8, 8}, st);
       generateVariant(t, t, OutT, {128, 128, 32}, {64, 64}, {16, 8, 8}, st);
       generateVariant(t, t, OutT, {128, 256, 32}, {64, 64}, {16, 8, 8}, st);

@@ -6,7 +6,7 @@ set -e
 NVCC="${NVCC:-nvcc}"
 IREE_SRC_DIR="$(git rev-parse --show-toplevel)"
 LLVMDIR=/usr/local/google/home/gurayozen/work/llvm-project/build/bin
-# CLANG=$IREE_SRC_DIR/build/llvm-project/bin/
+# LLVMDIR=$IREE_SRC_DIR/build/llvm-project/bin/
 LLVMAS=${LLVMDIR}/llvm-as
 OPT=${LLVMDIR}/opt
 LLVMDIS=${LLVMDIR}/llvm-dis
@@ -27,7 +27,7 @@ function make_arch_bc {
   ${CLANG?} \
       -O1 \
       --cuda-device-only \
-      -std=c++17 \
+      -std=c++20 \
       -Xclang -fcuda-allow-variadic-functions \
       --cuda-gpu-arch=sm_${SM} \
       -D__CUDACC_VER_MAJOR__=11 \
@@ -38,7 +38,6 @@ function make_arch_bc {
       -I"${CUTLASS}"/include \
       -I"${CUTLASS}"/tools/util/include/ \
       "${SRC}/${SOURCE_FILE}" \
-      -w \
       -fcuda-approx-transcendentals \
       -fcuda-short-ptr \
       -ffp-contract=fast \
@@ -48,7 +47,6 @@ function make_arch_bc {
   # todo(guray) bad hack
   sed -i 's/local_unnamed_addr #0/local_unnamed_addr alwaysinline #0/g' $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll
   $OPT $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll -o ukernels-cuda-nvptx64-nvidia-cuda-sm_${SM}.bc
-  mv $SOURCE-cuda-nvptx64-nvidia-cuda-sm_${SM}.ll microkernels.ll
 }
 
 function make_arch_nvcc_ptx {
@@ -115,7 +113,7 @@ function generate_ukernels {
   
   # Generate microkernels
   make_arch_nvcc_ptx $SM $GENERATOR_FILE
-  make_arch_nvcc_lineinfo_ptx $SM $GENERATOR_FILE
+  # make_arch_nvcc_lineinfo_ptx $SM $GENERATOR_FILE
   make_arch_bc $SM $GENERATOR_FILE
 
   # # Remove the temps
