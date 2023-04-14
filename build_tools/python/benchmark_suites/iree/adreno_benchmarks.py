@@ -19,20 +19,20 @@ class Android_Adreno_Benchmarks(object):
 
   ADRENO_GPU_COMPILE_TARGET = iree_definitions.CompileTarget(
       target_backend=iree_definitions.TargetBackend.VULKAN_SPIRV,
-      target_architecture=common_definitions.DeviceArchitecture.ADRENO_GENERIC,
+      target_architecture=common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
       target_abi=iree_definitions.TargetABI.VULKAN_ANDROID31)
   DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
-      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ADRENO_GENERIC_DEFAULTS,
+      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_DEFAULTS,
       tags=["default-flags"],
       compile_targets=[ADRENO_GPU_COMPILE_TARGET])
   FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
-      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ADRENO_GENERIC_FUSE_PADDING,
+      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_FUSE_PADDING,
       tags=["experimental-flags", "fuse-padding"],
       compile_targets=[ADRENO_GPU_COMPILE_TARGET],
       extra_flags=["--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"])
   FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.
-      IREE_COMPILE_CONFIG_ANDROID_ADRENO_GENERIC_FUSE_PADDING_REPEATED_KERNEL,
+      IREE_COMPILE_CONFIG_ANDROID_QUALCOMM_ADRENO_FUSE_PADDING_REPEATED_KERNEL,
       tags=["experimental-flags", "fuse-padding", "repeated-kernel"],
       compile_targets=[ADRENO_GPU_COMPILE_TARGET],
       extra_flags=FUSE_PADDING_COMPILE_CONFIG.extra_flags +
@@ -75,7 +75,7 @@ class Android_Adreno_Benchmarks(object):
     ]
 
     adreno_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-        architecture=common_definitions.DeviceArchitecture.ADRENO_GENERIC,
+        architecture=common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=default_gen_configs,

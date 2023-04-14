@@ -28,6 +28,6 @@ LITTLE_CORES = common_definitions.DeviceSpec.build(
 GPU = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_6_PRO + "-gpu",
     device_name=DEVICE_NAME,
-    architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
+    architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
     tags=["gpu"])
