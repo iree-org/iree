@@ -18,6 +18,8 @@
 
 // CHECK-SYSTEM: EXEC @mixed_invocation
 // simple_mul_workgroup
+// CHECK-SYSTEM: processor_id=
+// CHECK-SYSTEM: processor_data[0]=
 // CHECK-SYSTEM: mul[0](2 * 4 = 8)
 // CHECK-SYSTEM: mul[1](2 * 4 = 8)
 // CHECK-SYSTEM: mul[2](2 * 4 = 8)
@@ -51,7 +53,12 @@ module @example {
 
     builtin.module {
       // External function declaration using a user-chosen calling convention.
-      func.func private @simple_mul_workgroup(%binding0: memref<?xf32>, %binding1: memref<?xf32>, %binding2: memref<?xf32>, %dim: index, %tid: index)
+      func.func private @simple_mul_workgroup(%binding0: memref<?xf32>, %binding1: memref<?xf32>, %binding2: memref<?xf32>, %dim: index, %tid: index) attributes {
+        // We can include some additional fields on the parameters struct as
+        // needed. Here we request which processor is executing the call and
+        // its data fields as defined by runtime/src/iree/schemas/cpu_data.h.
+        hal.import.fields = ["processor_id", "processor_data"]
+      }
 
       // IREE exported function using stream bindings and operands.
       // Compiler passes will be able to optimize across this interface and
