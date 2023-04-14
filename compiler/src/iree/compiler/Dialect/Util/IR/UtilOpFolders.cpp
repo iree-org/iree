@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -819,6 +820,69 @@ OpFoldResult BufferLoadOp::fold(FoldAdaptor operands) {
   // TODO(benvanik): if source is a constant then perform the load.
   return {};
 }
+
+//===----------------------------------------------------------------------===//
+// util.reinterpret
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds subspan ranges into storage ranges.
+//
+// Example:
+//  %0 = util.buffer.subspan %src[%subspan_offset] ... -> {%subspan_length}
+//  %storage, %offset = util.buffer.storage %0
+// ->
+//  %storage, %raw_offset = util.buffer.storage %src
+//  %offset = arith.addi %raw_offset, %subspan_offset
+struct ReinterpretReinterpretOptimization : public OpRewritePattern<ReinterpretOp> {
+  using OpRewritePattern<ReinterpretOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ReinterpretOp op,
+                                PatternRewriter &rewriter) const override {
+    Value input = op.getInput();
+    Operation *definingOp = input.getDefiningOp();
+    if (!definingOp)
+      return failure();
+
+    if (ReinterpretOp reinterpretOp = dyn_cast<ReinterpretOp>(definingOp)) {
+      rewriter.replaceOpWithNewOp<ReinterpretOp>(
+          op, op.getType(), reinterpretOp.getInput());
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+struct StreamExportReinterpretOptimization : public OpRewritePattern<ReinterpretOp> {
+  using OpRewritePattern<ReinterpretOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ReinterpretOp op,
+                                PatternRewriter &rewriter) const override {
+    Value input = op.getInput();
+    Operation *definingOp = input.getDefiningOp();
+    if (!definingOp)
+      return failure();
+
+    if (IREE::Stream::TensorExportOp exportOp = dyn_cast<IREE::Stream::TensorExportOp>(definingOp)) {
+      // TODO(trevor-m): only if reinterpret output type is a stream resource?
+      rewriter.replaceOp(op, exportOp.getSource());
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+}  // namespace
+
+void ReinterpretOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
+  results.insert<ReinterpretReinterpretOptimization>(context);
+  results.insert<StreamExportReinterpretOptimization>(context);
+}
+
 
 }  // namespace Util
 }  // namespace IREE

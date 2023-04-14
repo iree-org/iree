@@ -71,7 +71,7 @@ static std::optional<Value> materializeCast(OpBuilder &builder, Type toType,
 
     if (castType != fromType)
       fromValue =
-          builder.create<UnrealizedConversionCastOp>(loc, castType, fromValue)
+          builder.create<IREE::Util::ReinterpretOp>(loc, castType, fromValue)
               ->getResult(0);
   }
 
@@ -597,7 +597,7 @@ struct ConvertMHLOToLinalgExtPass
         });
     // We deliberately allow unrealized casts to persist. These should fall away
     // when the rest of MHLO is converted.
-    target.addLegalOp<UnrealizedConversionCastOp>();
+    target.addLegalOp<IREE::Util::ReinterpretOp>();
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {

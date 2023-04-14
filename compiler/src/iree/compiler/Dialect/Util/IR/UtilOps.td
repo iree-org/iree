@@ -15,6 +15,7 @@ include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -1216,6 +1217,28 @@ def Util_StatusCheckOkOp : Util_Op<"status.check_ok"> {
         message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
     }]>,
   ];
+}
+
+//===----------------------------------------------------------------------===//
+// ReinterpretOp
+//===----------------------------------------------------------------------===//
+
+def ReinterpretOp : Util_Op<"reinterpret", [
+  DeclareOpInterfaceMethods<CastOpInterface>,
+  Pure
+]> {
+  let summary = "An reinterpret conversion from one type to another";
+  let description = [{
+    A cast.
+  }];
+
+  let arguments = (ins AnyType:$input);
+  let results = (outs AnyType:$output);
+  let assemblyFormat = [{
+    $input `:` type($input) `to` type($output) attr-dict
+  }];
+
+  let hasCanonicalizer = 1;
 }
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_OPS

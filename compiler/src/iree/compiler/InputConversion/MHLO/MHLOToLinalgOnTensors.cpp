@@ -357,6 +357,42 @@ std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
       .getResult();
 }
 
+std::optional<Value> materializeReinterpret(OpBuilder& builder, Type resultType,
+                               ValueRange inputs,
+                               Location loc) {
+  if (inputs.size() != 1)
+    return std::nullopt;
+  // if (getElementTypeOrSelf(inputs.front().getType()).isUnsignedInteger() ||
+  //     getElementTypeOrSelf(resultType).isUnsignedInteger())
+  return builder.create<IREE::Util::ReinterpretOp>(loc, resultType, inputs)
+    .getResult();
+}
+
+std::optional<Value> materializeCastFromIllegal(OpBuilder& builder, Type type,
+                                                ValueRange inputs,
+                                                Location loc) {
+  Type fromType = getElementTypeOrSelf(inputs[0].getType());
+  Type toType = getElementTypeOrSelf(type);
+  if ((!fromType.isSignedInteger() && !fromType.isUnsignedInteger()) ||
+      !toType.isSignlessInteger())
+    return std::nullopt;
+  // Use reinterpet to do signless->signful conversions.
+  return builder.create<IREE::Util::ReinterpretOp>(loc, type, inputs[0])
+      ->getResult(0);
+}
+
+std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
+                                              ValueRange inputs, Location loc) {
+  Type fromType = getElementTypeOrSelf(inputs[0].getType());
+  Type toType = getElementTypeOrSelf(type);
+  if (!fromType.isSignlessInteger() ||
+      (!toType.isSignedInteger() && !toType.isUnsignedInteger()))
+    return std::nullopt;
+  // Use reinterpet to do signless->signful conversions.
+  return builder.create<IREE::Util::ReinterpretOp>(loc, type, inputs[0])
+      ->getResult(0);
+}
+
 struct ConvertMHLOToLinalgOnTensorsPass
     : public ConvertMHLOToLinalgOnTensorsBase<
           ConvertMHLOToLinalgOnTensorsPass> {
@@ -372,7 +408,11 @@ struct ConvertMHLOToLinalgOnTensorsPass
     MLIRContext *context = &getContext();
 
     auto typeConverter = mhlo::createHloToLinalgTypeConverter();
+    //auto typeConverter = std::make_unique<LinalgTypeConverter>();
     typeConverter->addArgumentMaterialization(scalarToTensor);
+    typeConverter->addArgumentMaterialization(materializeReinterpret);
+    typeConverter->addTargetMaterialization(materializeReinterpret);
+    typeConverter->addSourceMaterialization(materializeReinterpret);
     // NOTE: not using corresponding setupMHLOToFlowPatterns because the entire
     // MHLO dialects are marked illegal by this pass.
     // TODO: Collapse/rework all of these patterns once the consolidation
@@ -419,6 +459,11 @@ struct ConvertMHLOToLinalgOnTensorsPass
     ConversionTarget target(getContext());
 
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
+    auto isIllegalFuncType = [&](Type t) {
+      // Allows unsigned integers for function inputs and outputs.
+      return !typeConverter->isLegal(t) &&
+             !getElementTypeOrSelf(t).isUnsignedInteger();
+    };
     auto isLegallyTypedOp = [&](Operation *op) -> bool {
       for (Type type : op->getResultTypes()) {
         if (isIllegalType(type)) return false;
@@ -435,17 +480,22 @@ struct ConvertMHLOToLinalgOnTensorsPass
     // Functions must have legal types.
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
       for (Type type : funcOp.getFunctionType().getInputs()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalFuncType(type)) return false;
       }
       for (Type type : funcOp.getFunctionType().getResults()) {
-        if (isIllegalType(type)) return false;
+        if (isIllegalFuncType(type)) return false;
       }
       for (Block &block : funcOp.getFunctionBody()) {
         for (Type type : block.getArgumentTypes()) {
-          if (isIllegalType(type)) return false;
+          if (isIllegalFuncType(type)) return false;
         }
       }
       return true;
+    });
+    target.addDynamicallyLegalOp<func::ReturnOp>([&](func::ReturnOp op) {
+      return llvm::all_of(op.getOperandTypes(), [&](Type type) {
+          return !isIllegalFuncType(type);
+        });
     });
     target.addDynamicallyLegalOp<ml_program::GlobalOp>(
         [&](ml_program::GlobalOp op) {
@@ -455,6 +505,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();
     target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect>();
+    target.addLegalOp<IREE::Util::ReinterpretOp>();
     target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
     if (failed(applyPartialConversion(getOperation(), target,

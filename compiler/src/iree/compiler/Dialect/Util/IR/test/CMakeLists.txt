@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "numeric_ops.mlir"
     "range_folding.mlir"
     "range_ops.mlir"
+    "reinterpret_folding.mlir"
     "structural_folding.mlir"
     "structural_ops.mlir"
   TOOLS

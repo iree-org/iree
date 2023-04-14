@@ -33,6 +33,9 @@ void populateUtilConversionPatterns(MLIRContext *context,
   patterns
       .insert<GenericConvertTypesPattern<IREE::Util::OptimizationBarrierOp>>(
           typeConverter, context);
+  patterns
+      .insert<GenericConvertTypesPattern<IREE::Util::ReinterpretOp>>(
+          typeConverter, context);
 
   typeConverter.addConversion([&](IREE::Util::PtrType type,
                                   SmallVectorImpl<Type> &results) {
