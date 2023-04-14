@@ -619,7 +619,7 @@ static void distributeContracts(vector::ContractionOp contractOp,
         Value aMatrix = rewriter.create<vector::ExtractOp>(
             loc, simdToSimtMap.at(lhs), SmallVector<int64_t>{i, k});
         Value bMatrix = rewriter.create<vector::ExtractOp>(
-            loc, simdToSimtMap.at(rhs), SmallVector<int64_t>{k, j});
+            loc, simdToSimtMap.at(rhs), SmallVector<int64_t>{j, k});
         cMatrix = rewriter.create<nvgpu::MmaSyncOp>(
             loc, aMatrix, bMatrix, cMatrix,
             rewriter.getI64ArrayAttr({canonicalM, canonicalN, canonicalK}));
@@ -819,10 +819,11 @@ static void distributeReductionBroadcastTranspose(
 
       // Since this is a broadcasted tensor, we only need to extract the 0th
       // element
-      result = rewriter.create<vector::ExtractOp>(
-          loc, simdToSimtMap.at(acc),
-          SmallVector<int64_t>{state[DimType::Batch0], state[DimType::Batch1],
-                               vectorOffset, 0});
+      if (!result)
+        result = rewriter.create<vector::ExtractOp>(
+            loc, simdToSimtMap.at(acc),
+            SmallVector<int64_t>{state[DimType::Batch0], state[DimType::Batch1],
+                                 vectorOffset, 0});
 
       for (int i = 0; i < vShape[0]; i++) {
         Value v = rewriter.create<vector::ExtractOp>(loc, vector,
