@@ -619,7 +619,7 @@ static void distributeContracts(vector::ContractionOp contractOp,
         Value aMatrix = rewriter.create<vector::ExtractOp>(
             loc, simdToSimtMap.at(lhs), SmallVector<int64_t>{i, k});
         Value bMatrix = rewriter.create<vector::ExtractOp>(
-            loc, simdToSimtMap.at(rhs), SmallVector<int64_t>{k, j});
+            loc, simdToSimtMap.at(rhs), SmallVector<int64_t>{j, k});
         cMatrix = rewriter.create<nvgpu::MmaSyncOp>(
             loc, aMatrix, bMatrix, cMatrix,
             rewriter.getI64ArrayAttr({canonicalM, canonicalN, canonicalK}));
