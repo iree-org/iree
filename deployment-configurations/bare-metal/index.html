@@ -1378,6 +1378,9 @@ model execution is in a single-thread synchronous fashion.</p>
   loaders by default, then enable the CPU codegen and VMVX loaders with
   <code>set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)</code> and
   <code>set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)</code></li>
+<li><code>set(IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS OFF)</code>: Disable HAL executable plugins
+  by default, then enable the embedded ELF loader with
+  <code>set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF ON)</code></li>
 <li><code>set(IREE_BUILD_TESTS OFF)</code>: Disable tests until IREE supports running them
   on bare-metal platforms</li>
 <li><code>set(IREE_BUILD_SAMPLES ON)</code>: Build
