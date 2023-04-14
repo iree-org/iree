@@ -123,9 +123,17 @@ static LogicalResult findMicrokernel(
                        elementTypeC->str())) {
     return success();
   }
-  llvm::WithColor::error()
-      << "Requested microkernel does not exist, maybe forget to "
-         "pre-compile it. Add a contract in `uGPUContract.h`\n";
+  llvm::WithColor::error() << "Requested microkernel [Tile = "
+                           << tileSizes.front().tileSize[0] << "x"
+                           << tileSizes.front().tileSize[1] << "x"
+                           << tileSizes.front().tileSize[2]
+                           << ", stages = " << tileSizes.front().pipelineDepth
+                           << ", lhs = " << elementTypeA->str()
+                           << ", rhs = " << elementTypeB->str()
+                           << ", result = " << elementTypeC->str()
+                           << "] does not exist, maybe forget to "
+                              "pre-compile it. Add a microkernel contract in "
+                              "`uGPUContract.h`\n";
 
   return failure();
 }
