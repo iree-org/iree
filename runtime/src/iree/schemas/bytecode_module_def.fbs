@@ -246,7 +246,7 @@ table BytecodeModuleDef {
   // Features required to load and run bytecode from the module.
   // Some functions may have additional requirements for when there are multiple
   // variants selected based on runtime feature detection.
-  requirements:FeatureBits = EXT_32;
+  requirements:FeatureBits = EXT_F32;
 
   // Module-level attributes, if any.
   attrs:[AttrDef];
