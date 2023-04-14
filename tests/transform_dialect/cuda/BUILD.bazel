@@ -28,8 +28,6 @@ iree_lit_test_suite(
     srcs = [
         "mma.mlir",
         "mma_elemwise_layout_analysis.mlir",
-        "mma_reduction_layout_analysis.mlir",
-        "mma_using_layout_analysis.mlir",
         "reduction.mlir",
         "reduction_eltwise.mlir",
         "reduction_v2.mlir",
@@ -72,6 +70,37 @@ iree_lit_test_suite(
         "notsan",
         "noubsan",
         "requires-gpu-nvidia",
+        "driver=cuda",
+    ],
+    tools = [
+        "//tools:iree-compile",
+        "//tools:iree-opt",
+        "//tools:iree-run-module",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+iree_lit_test_suite(
+    name = "sm80_lit",
+    srcs = [
+        "mma_reduction_layout_analysis.mlir",
+        "mma_using_layout_analysis.mlir",
+    ],
+    cfg = "//tests:lit.cfg.py",
+    # transform dialect spec files are MLIR files that specify a transformation,
+    # they need to be included as data.
+    data = [
+        "mma_reduction_layout_analysis_codegen_spec.mlir",
+        "mma_reduction_layout_analysis_dispatch_spec.mlir",
+        "mma_using_layout_analysis_codegen_spec.mlir",
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-sm80",
         "driver=cuda",
     ],
     tools = [
