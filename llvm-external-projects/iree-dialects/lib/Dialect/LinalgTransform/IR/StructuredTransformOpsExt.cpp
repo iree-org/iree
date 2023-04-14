@@ -718,6 +718,64 @@ convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+/// Match callback for a matmul with fill and optional trailing
+/// elementwise operations. Matches *the first* occurrence of such a convolution
+/// within an op associated with the given handle.
+///
+/// Input handles:
+///
+///   - container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - the "fill" op preceding the convolution, if present;
+///   - convolution op;
+///   - trailing elementwise op, if any.
+static DiagnosedSilenceableFailure
+matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
+               const mlir::transform::TransformState &state,
+               ValueRange handles) {
+  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_ext::StructuredOpMatcher *pattern, *fill, *trailing;
+  transform_ext::MatchedMatmulCaptures ignore;
+  transform_ext::MatcherContext matcherContext;
+  makeMatmulMatcher(matcherContext, pattern, fill, trailing, ignore);
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = state.getPayloadOps(handles[0])[0];
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    pattern->resetCapture();
+    if (!matchPattern(op, *pattern))
+      return WalkResult::advance();
+
+    // TODO: notify properly.
+    LLVM_DEBUG({
+      DBGS() << "fill:\n";
+      if (fill->getCaptured())
+        DBGS() << fill->getCaptured() << "\n";
+      DBGS() << "pattern: " << pattern->getCaptured() << "\n";
+      DBGS() << "trailing:\n";
+      if (trailing->getCaptured())
+        DBGS() << trailing->getCaptured() << "\n";
+    });
+
+    res.addPayloadGroup({fill->getCaptured()});
+    res.addPayloadGroup({pattern->getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailing->getCaptured());
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
 DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
     mlir::transform::TransformResults &results,
     mlir::transform::TransformState &state) {
@@ -729,6 +787,7 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
                             testValueMatcherCallback);
   registry.registerCallback("reduction", reductionCallback);
   registry.registerCallback("convolution", convolutionCallback);
+  registry.registerCallback("matmul", matmulCallback);
   return DiagnosedSilenceableFailure::success();
 }
 

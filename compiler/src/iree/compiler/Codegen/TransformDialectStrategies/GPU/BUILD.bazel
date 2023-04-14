@@ -16,12 +16,14 @@ iree_compiler_cc_library(
     name = "TransformDialectStrategies",
     srcs = [
         "Common.cpp",
+        "MatmulTensorCoreStrategy.cpp",
         "SmallReductionStrategy.cpp",
         "StagedReductionStrategy.cpp",
     ],
     hdrs = [
         "AbstractReductionStrategy.h",
         "Common.h",
+        "MatmulTensorCoreStrategy.h",
         "SmallReductionStrategy.h",
         "StagedReductionStrategy.h",
     ],

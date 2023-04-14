@@ -16,10 +16,12 @@ iree_cc_library(
   HDRS
     "AbstractReductionStrategy.h"
     "Common.h"
+    "MatmulTensorCoreStrategy.h"
     "SmallReductionStrategy.h"
     "StagedReductionStrategy.h"
   SRCS
     "Common.cpp"
+    "MatmulTensorCoreStrategy.cpp"
     "SmallReductionStrategy.cpp"
     "StagedReductionStrategy.cpp"
   DEPS

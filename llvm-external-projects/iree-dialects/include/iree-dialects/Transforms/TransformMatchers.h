@@ -740,6 +740,10 @@ struct MatchedReductionCaptures {
   int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
 };
 
+struct MatchedMatmulCaptures {
+  SmallVector<int64_t> matmulSize = {};
+};
+
 /// Creates a group of matchers for:
 ///
 ///     trailing(reduction(leading(), fill()))
@@ -755,6 +759,15 @@ void makeReductionMatcher(transform_ext::MatcherContext &context,
 void makeReductionMatcher(transform_ext::MatcherContext &context,
                           StructuredOpMatcher *&reductionCapture,
                           MatchedReductionCaptures &captures);
+
+void makeMatmulMatcher(transform_ext::MatcherContext &matcherContext,
+                       StructuredOpMatcher *&matmulCapture,
+                       StructuredOpMatcher *&fillCapture,
+                       StructuredOpMatcher *&trailingCapture,
+                       MatchedMatmulCaptures &captures);
+void makeMatmulMatcher(transform_ext::MatcherContext &context,
+                       StructuredOpMatcher *&reductionCapture,
+                       MatchedMatmulCaptures &captures);
 
 /// Create a group of matchers for a different code sequence of operations
 /// matching exactly a softmax operation.
