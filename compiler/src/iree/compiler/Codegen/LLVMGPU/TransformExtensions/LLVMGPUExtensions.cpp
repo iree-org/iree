@@ -713,7 +713,7 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                           nvgpu::MmaSyncF32Lowering::TF32);
   if (failed(applyPatternsAndFoldGreedily(
-          getOperation(), std::move(f32ToTF32patterns), config))) {
+          funcOp, std::move(f32ToTF32patterns), config))) {
     target->emitOpError("vector to mma F32ToTF32 patterns failed to apply");
     return listener.check(loc, emitDefaultDefiniteFailure(target));
   }
