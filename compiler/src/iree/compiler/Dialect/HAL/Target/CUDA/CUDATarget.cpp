@@ -592,9 +592,10 @@ class CUDATargetBackend final : public TargetBackend {
         // Mark the entry point as a kernel.
         setMetadataValueI32("kernel", 1);
         // Set the maximum number of threads in the thread block (CTA).
-        setMetadataValueI32("maxntidx", workgroupSize[0]);
-        setMetadataValueI32("maxntidy", workgroupSize[1]);
-        setMetadataValueI32("maxntidz", workgroupSize[2]);
+        //todo(guray) Cause bad performance with microkernels
+        // setMetadataValueI32("maxntidx", workgroupSize[0]);
+        // setMetadataValueI32("maxntidy", workgroupSize[1]);
+        // setMetadataValueI32("maxntidz", workgroupSize[2]);
       }
 
       std::unique_ptr<llvm::TargetMachine> targetMachine;
