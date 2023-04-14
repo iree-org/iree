@@ -21,8 +21,8 @@ void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
   // prefetch-ahead offset of 128*sizeof(float) in the loop was empirically
   // determined. Similar prefetches did not produce any benefit in other
   // kernels, even though they are very similar to this one.
-  _mm_prefetch(lhs_ptr, _MM_HINT_T0);
-  _mm_prefetch(rhs_ptr, _MM_HINT_T0);
+  _mm_prefetch((const char*)lhs_ptr, _MM_HINT_T0);
+  _mm_prefetch((const char*)rhs_ptr, _MM_HINT_T0);
   __m512 acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7;
   __m512 acc8, acc9, acc10, acc11, acc12, acc13, acc14, acc15;
   if (flags & IREE_UK_FLAG_ACCUMULATE) {
@@ -62,7 +62,7 @@ void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
   }
   for (iree_uk_int32_t k = 0; k < K; ++k) {
     __m512 rhs = _mm512_loadu_ps(rhs_ptr);
-    _mm_prefetch(rhs_ptr + 128, _MM_HINT_T0);
+    _mm_prefetch((const char*)(rhs_ptr + 128), _MM_HINT_T0);
     rhs_ptr += 16;
     acc0 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[0]), rhs, acc0);
     acc1 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[1]), rhs, acc1);
@@ -80,7 +80,7 @@ void iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base(
     acc13 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[13]), rhs, acc13);
     acc14 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[14]), rhs, acc14);
     acc15 = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[15]), rhs, acc15);
-    _mm_prefetch(lhs_ptr + 128, _MM_HINT_T0);
+    _mm_prefetch((const char*)(lhs_ptr + 128), _MM_HINT_T0);
     lhs_ptr += 16;
   }
   _mm512_storeu_ps(out_ptr + 0 * 16, acc0);
