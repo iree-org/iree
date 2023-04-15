@@ -50,8 +50,10 @@ namespace iree_compiler {
 namespace {
 
 int getComputeVectorSize(int64_t size) {
-  // Try to use 4 first, and then 2, and then 1.
-  return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 1);
+  for (int i : {4, 3, 2}) {
+    if (size % i == 0) return i;
+  }
+  return 1;
 }
 
 int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
@@ -336,6 +338,25 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After peephole optimization ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    // High dimension contraction can appear after vectorizing ops like 1-D
+    // convolution. Those 1-D convolution ops typically have a leading unit
+    // batch dimension. Try to drop that to map to matmul dimensions better.
+    SmallVector<vector::ContractionOp> contractOps;
+    funcOp.walk([&](vector::ContractionOp op) {
+      if (op.getIteratorTypes().size() > 3) contractOps.push_back(op);
+    });
+    for (vector::ContractionOp op : contractOps) {
+      OpBuilder builder(op);
+      IRRewriter rewriter(builder);
+      (void)vector::castAwayContractionLeadingOneDim(op, rewriter);
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After trimming contract leading unit dims ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
