@@ -335,10 +335,10 @@ if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
 if(NOT ANDROID AND IREE_ENABLE_THREADING)
-  iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
-    CLANG_OR_GCC
-      "-lpthread"
-  )
+  set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+  set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+  find_package(Threads REQUIRED)
+  link_libraries(Threads::Threads)
 else()
   # Android provides its own pthreads support with no linking required.
 endif()
@@ -370,7 +370,6 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-lm"
-    ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
