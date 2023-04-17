@@ -21,5 +21,5 @@ GCP_A2_HIGHGPU_1G = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_GCP_A2_HIGHGPU_1G,
     device_name="a2-highgpu-1g",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
-    architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
+    architecture=common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
     tags=["gpu"])

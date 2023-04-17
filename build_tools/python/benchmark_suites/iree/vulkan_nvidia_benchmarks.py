@@ -68,14 +68,14 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in models
     ]
-    sm80_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
+    ampere_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         # We use the same cloud NVIDIA GPU for Vulkan and CUDA.
-        architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
+        architecture=common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
     run_module_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=gen_configs,
         module_execution_configs=[execution_config],
-        device_specs=sm80_devices,
+        device_specs=ampere_devices,
         tags=run_tags)
 
     return (gen_configs, run_module_configs)
