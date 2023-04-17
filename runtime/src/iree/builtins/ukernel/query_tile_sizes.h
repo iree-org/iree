@@ -13,7 +13,10 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Parameters for a query_tile_sizes operation.
+//===----------------------------------------------------------------------===//
+// Public entry points
+//===----------------------------------------------------------------------===//
+
 typedef struct iree_uk_query_tile_sizes_2d_params_t {
   iree_uk_uint32_t flags;
   iree_uk_ssize_t size0;
@@ -25,6 +28,14 @@ typedef struct iree_uk_query_tile_sizes_2d_out_params_t {
   iree_uk_ssize_t tile_size0;
   iree_uk_ssize_t tile_size1;
 } iree_uk_query_tile_sizes_2d_out_params_t;
+
+IREE_UK_EXPORT void iree_uk_query_tile_sizes_2d(
+    const iree_uk_query_tile_sizes_2d_params_t* params,
+    iree_uk_query_tile_sizes_2d_out_params_t* out_params);
+
+//===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
 
 static inline iree_uk_uint32_t iree_uk_query_tile_sizes_operand_role(
     iree_uk_uint32_t flags) {
@@ -41,11 +52,6 @@ static inline iree_uk_uint32_t iree_uk_query_tile_sizes_operation(
 typedef struct iree_uk_matmul_tile_sizes_t {
   int M, K, N;
 } iree_uk_matmul_tile_sizes_t;
-
-// Main entry point.
-IREE_UK_EXPORT void iree_uk_query_tile_sizes_2d(
-    const iree_uk_query_tile_sizes_2d_params_t* params,
-    iree_uk_query_tile_sizes_2d_out_params_t* out_params);
 
 #ifdef __cplusplus
 }  // extern "C"

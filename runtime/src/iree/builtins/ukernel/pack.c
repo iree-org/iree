@@ -236,3 +236,66 @@ IREE_UK_EXPORT void iree_uk_pack(const iree_uk_pack_params_t* params) {
   iree_uk_pack_tile_func_t tile_func = iree_uk_pack_select_tile_func(params);
   iree_uk_pack_using_tile_func(params, tile_func);
 }
+
+IREE_UK_EXPORT void iree_uk_pack_f32f32(
+    const iree_uk_pack_f32f32_params_t* params) {
+  iree_uk_pack_params_t p = {
+      .type = iree_uk_pack_type_f32f32,
+      .in_buffer = params->in_buffer_base + params->in_buffer_offset,
+      .out_buffer = params->out_buffer_base + params->out_buffer_offset,
+      .in_stride0 = params->in_stride0,
+      .out_stride0 = params->out_stride0,
+      .in_size0 = params->in_size0,
+      .in_size1 = params->in_size1,
+      .out_size0 = params->out_size0,
+      .out_size1 = params->out_size1,
+      .out_size2 = params->out_size2,
+      .out_size3 = params->out_size3,
+      .padding_value = &params->padding_value,
+      .flags = params->flags,
+      .cpu_data = params->cpu_data,
+  };
+  iree_uk_pack(&p);
+}
+
+IREE_UK_EXPORT void iree_uk_pack_i8i8(
+    const iree_uk_pack_i8i8_params_t* params) {
+  iree_uk_pack_params_t p = {
+      .type = iree_uk_pack_type_i8i8,
+      .in_buffer = params->in_buffer_base + params->in_buffer_offset,
+      .out_buffer = params->out_buffer_base + params->out_buffer_offset,
+      .in_stride0 = params->in_stride0,
+      .out_stride0 = params->out_stride0,
+      .in_size0 = params->in_size0,
+      .in_size1 = params->in_size1,
+      .out_size0 = params->out_size0,
+      .out_size1 = params->out_size1,
+      .out_size2 = params->out_size2,
+      .out_size3 = params->out_size3,
+      .padding_value = &params->padding_value,
+      .flags = params->flags,
+      .cpu_data = params->cpu_data,
+  };
+  iree_uk_pack(&p);
+}
+
+IREE_UK_EXPORT void iree_uk_pack_i32i32(
+    const iree_uk_pack_i32i32_params_t* params) {
+  iree_uk_pack_params_t p = {
+      .type = iree_uk_pack_type_i32i32,
+      .in_buffer = params->in_buffer_base + params->in_buffer_offset,
+      .out_buffer = params->out_buffer_base + params->out_buffer_offset,
+      .in_stride0 = params->in_stride0,
+      .out_stride0 = params->out_stride0,
+      .in_size0 = params->in_size0,
+      .in_size1 = params->in_size1,
+      .out_size0 = params->out_size0,
+      .out_size1 = params->out_size1,
+      .out_size2 = params->out_size2,
+      .out_size3 = params->out_size3,
+      .padding_value = &params->padding_value,
+      .flags = params->flags,
+      .cpu_data = params->cpu_data,
+  };
+  iree_uk_pack(&p);
+}

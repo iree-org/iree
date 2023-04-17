@@ -55,6 +55,67 @@ static void iree_pack_reference(const iree_uk_pack_params_t* params) {
   }
 }
 
+static void iree_pack_actual(const iree_uk_pack_params_t* params,
+                             bool typed_entry_point) {
+  if (!typed_entry_point) {
+    iree_uk_pack(params);
+  } else if (params->type == iree_uk_pack_type_f32f32) {
+    iree_uk_pack_f32f32_params_t p = {
+        .in_buffer_base = ((const float*)params->in_buffer) - 1,
+        .in_buffer_offset = 1,
+        .out_buffer_base = ((float*)params->out_buffer) - 2,
+        .out_buffer_offset = 2,
+        .in_stride0 = params->in_stride0,
+        .out_stride0 = params->out_stride0,
+        .in_size0 = params->in_size0,
+        .in_size1 = params->in_size1,
+        .out_size0 = params->out_size0,
+        .out_size1 = params->out_size1,
+        .out_size2 = params->out_size2,
+        .out_size3 = params->out_size3,
+        .padding_value = *(const float*)params->padding_value,
+        .flags = params->flags,
+        .cpu_data = params->cpu_data};
+    iree_uk_pack_f32f32(&p);
+  } else if (params->type == iree_uk_pack_type_i8i8) {
+    iree_uk_pack_i8i8_params_t p = {
+        .in_buffer_base = ((const iree_uk_int8_t*)params->in_buffer) - 1,
+        .in_buffer_offset = 1,
+        .out_buffer_base = ((iree_uk_int8_t*)params->out_buffer) - 2,
+        .out_buffer_offset = 2,
+        .in_stride0 = params->in_stride0,
+        .out_stride0 = params->out_stride0,
+        .in_size0 = params->in_size0,
+        .in_size1 = params->in_size1,
+        .out_size0 = params->out_size0,
+        .out_size1 = params->out_size1,
+        .out_size2 = params->out_size2,
+        .out_size3 = params->out_size3,
+        .padding_value = *(const iree_uk_int8_t*)params->padding_value,
+        .flags = params->flags,
+        .cpu_data = params->cpu_data};
+    iree_uk_pack_i8i8(&p);
+  } else if (params->type == iree_uk_pack_type_i32i32) {
+    iree_uk_pack_i32i32_params_t p = {
+        .in_buffer_base = ((const iree_uk_int32_t*)params->in_buffer) - 1,
+        .in_buffer_offset = 1,
+        .out_buffer_base = ((iree_uk_int32_t*)params->out_buffer) - 2,
+        .out_buffer_offset = 2,
+        .in_stride0 = params->in_stride0,
+        .out_stride0 = params->out_stride0,
+        .in_size0 = params->in_size0,
+        .in_size1 = params->in_size1,
+        .out_size0 = params->out_size0,
+        .out_size1 = params->out_size1,
+        .out_size2 = params->out_size2,
+        .out_size3 = params->out_size3,
+        .padding_value = *(const iree_uk_int32_t*)params->padding_value,
+        .flags = params->flags,
+        .cpu_data = params->cpu_data};
+    iree_uk_pack_i32i32(&p);
+  }
+}
+
 static void iree_uk_test_pack_for_shape_params(
     iree_uk_test_t* test, const iree_uk_pack_params_t* src_params) {
   iree_uk_pack_params_t params;
@@ -87,7 +148,7 @@ static void iree_uk_test_pack_for_shape_params(
                               out_type, engine);
 
   iree_pack_reference(&reference_params);
-  iree_uk_pack(&actual_params);
+  iree_pack_actual(&actual_params, iree_uk_random_engine_get_0_1(engine));
 
   if (memcmp(actual_params.out_buffer, reference_params.out_buffer,
              out_buffer_size)) {

@@ -1042,9 +1042,6 @@ struct LinalgExtUnpackConversion
     if (inElType.isF32() && outElType.isF32()) {
       return true;
     }
-    if (inElType.isSignlessInteger(8) && inElType.isSignlessInteger(8)) {
-      return true;
-    }
     if (inElType.isSignlessInteger(32) && inElType.isSignlessInteger(32)) {
       return true;
     }

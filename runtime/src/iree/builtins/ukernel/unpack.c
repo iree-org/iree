@@ -44,7 +44,6 @@ static void iree_uk_unpack_validate(const iree_uk_unpack_params_t* params) {
       IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER | IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
   IREE_UK_ASSERT(params->type == iree_uk_unpack_type_f32f32 ||
-                 params->type == iree_uk_unpack_type_i8i8 ||
                  params->type == iree_uk_unpack_type_i32i32);
   IREE_UK_ASSERT(params->in_stride0 >= 0);
   IREE_UK_ASSERT(params->out_stride0 >= 0);
@@ -196,4 +195,44 @@ IREE_UK_EXPORT void iree_uk_unpack(const iree_uk_unpack_params_t* params) {
   // Select a target-specific tile_func and use that with generic outer loops.
   iree_uk_unpack_tile_func_t func = iree_uk_unpack_select_tile_func(params);
   iree_uk_unpack_using_tile_func(params, func);
+}
+
+IREE_UK_EXPORT void iree_uk_unpack_f32f32(
+    const iree_uk_unpack_f32f32_params_t* params) {
+  iree_uk_unpack_params_t p = {
+      .type = iree_uk_unpack_type_f32f32,
+      .in_buffer = params->in_buffer_base + params->in_buffer_offset,
+      .out_buffer = params->out_buffer_base + params->out_buffer_offset,
+      .in_stride0 = params->in_stride0,
+      .out_stride0 = params->out_stride0,
+      .in_size0 = params->in_size0,
+      .in_size1 = params->in_size1,
+      .in_size2 = params->in_size2,
+      .in_size3 = params->in_size3,
+      .out_size0 = params->out_size0,
+      .out_size1 = params->out_size1,
+      .flags = params->flags,
+      .cpu_data = params->cpu_data,
+  };
+  iree_uk_unpack(&p);
+}
+
+IREE_UK_EXPORT void iree_uk_unpack_i32i32(
+    const iree_uk_unpack_i32i32_params_t* params) {
+  iree_uk_unpack_params_t p = {
+      .type = iree_uk_unpack_type_i32i32,
+      .in_buffer = params->in_buffer_base + params->in_buffer_offset,
+      .out_buffer = params->out_buffer_base + params->out_buffer_offset,
+      .in_stride0 = params->in_stride0,
+      .out_stride0 = params->out_stride0,
+      .in_size0 = params->in_size0,
+      .in_size1 = params->in_size1,
+      .in_size2 = params->in_size2,
+      .in_size3 = params->in_size3,
+      .out_size0 = params->out_size0,
+      .out_size1 = params->out_size1,
+      .flags = params->flags,
+      .cpu_data = params->cpu_data,
+  };
+  iree_uk_unpack(&p);
 }

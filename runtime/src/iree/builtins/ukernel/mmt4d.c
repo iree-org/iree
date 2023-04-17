@@ -121,3 +121,47 @@ IREE_UK_EXPORT void iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_tile_func_t tile_func = iree_uk_mmt4d_select_tile_func(params);
   iree_uk_mmt4d_using_tile_func(params, tile_func);
 }
+
+IREE_UK_EXPORT void iree_uk_mmt4d_f32f32f32(
+    const iree_uk_mmt4d_f32f32f32_params_t* params) {
+  iree_uk_mmt4d_params_t p = {
+      .type = iree_uk_mmt4d_type_f32f32f32,
+      .lhs_buffer = params->lhs_buffer_base + params->lhs_buffer_offset,
+      .rhs_buffer = params->rhs_buffer_base + params->rhs_buffer_offset,
+      .out_buffer = params->out_buffer_base + params->out_buffer_offset,
+      .lhs_stride = params->lhs_stride,
+      .rhs_stride = params->rhs_stride,
+      .out_stride = params->out_stride,
+      .M = params->M,
+      .N = params->N,
+      .K = params->K,
+      .M0 = params->M0,
+      .N0 = params->N0,
+      .K0 = params->K0,
+      .flags = params->flags,
+      .cpu_data = params->cpu_data,
+  };
+  iree_uk_mmt4d(&p);
+}
+
+IREE_UK_EXPORT void iree_uk_mmt4d_i8i8i32(
+    const iree_uk_mmt4d_i8i8i32_params_t* params) {
+  iree_uk_mmt4d_params_t p = {
+      .type = iree_uk_mmt4d_type_i8i8i32,
+      .lhs_buffer = params->lhs_buffer_base + params->lhs_buffer_offset,
+      .rhs_buffer = params->rhs_buffer_base + params->rhs_buffer_offset,
+      .out_buffer = params->out_buffer_base + params->out_buffer_offset,
+      .lhs_stride = params->lhs_stride,
+      .rhs_stride = params->rhs_stride,
+      .out_stride = params->out_stride,
+      .M = params->M,
+      .N = params->N,
+      .K = params->K,
+      .M0 = params->M0,
+      .N0 = params->N0,
+      .K0 = params->K0,
+      .flags = params->flags,
+      .cpu_data = params->cpu_data,
+  };
+  iree_uk_mmt4d(&p);
+}

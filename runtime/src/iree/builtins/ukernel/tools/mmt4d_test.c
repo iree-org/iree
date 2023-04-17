@@ -83,6 +83,55 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
   }
 }
 
+static void iree_mmt4d_actual(const iree_uk_mmt4d_params_t* params,
+                              bool typed_entry_point) {
+  if (!typed_entry_point) {
+    iree_uk_mmt4d(params);
+  } else if (params->type == iree_uk_mmt4d_type_f32f32f32) {
+    iree_uk_mmt4d_f32f32f32_params_t p = {
+        .lhs_buffer_base = ((const float*)params->lhs_buffer) - 1,
+        .lhs_buffer_offset = 1,
+        .rhs_buffer_base = ((const float*)params->rhs_buffer) - 2,
+        .rhs_buffer_offset = 2,
+        .out_buffer_base = ((float*)params->out_buffer) - 3,
+        .out_buffer_offset = 3,
+        .lhs_stride = params->lhs_stride,
+        .rhs_stride = params->rhs_stride,
+        .out_stride = params->out_stride,
+        .M = params->M,
+        .N = params->N,
+        .K = params->K,
+        .M0 = params->M0,
+        .N0 = params->N0,
+        .K0 = params->K0,
+        .flags = params->flags,
+        .cpu_data = params->cpu_data};
+    iree_uk_mmt4d_f32f32f32(&p);
+  } else if (params->type == iree_uk_mmt4d_type_i8i8i32) {
+    iree_uk_mmt4d_i8i8i32_params_t p = {
+        .lhs_buffer_base = ((const iree_uk_int8_t*)params->lhs_buffer) - 1,
+        .lhs_buffer_offset = 1,
+        .rhs_buffer_base = ((const iree_uk_int8_t*)params->rhs_buffer) - 2,
+        .rhs_buffer_offset = 2,
+        .out_buffer_base = ((iree_uk_int32_t*)params->out_buffer) - 3,
+        .out_buffer_offset = 3,
+        .lhs_stride = params->lhs_stride,
+        .rhs_stride = params->rhs_stride,
+        .out_stride = params->out_stride,
+        .M = params->M,
+        .N = params->N,
+        .K = params->K,
+        .M0 = params->M0,
+        .N0 = params->N0,
+        .K0 = params->K0,
+        .flags = params->flags,
+        .cpu_data = params->cpu_data};
+    iree_uk_mmt4d_i8i8i32(&p);
+  } else {
+    IREE_UK_ASSERT(false && "unhandled type");
+  }
+}
+
 static void iree_uk_test_mmt4d_for_shape_params(
     iree_uk_test_t* test, const iree_uk_mmt4d_params_t* src_params) {
   iree_uk_mmt4d_params_t params;
@@ -109,23 +158,25 @@ static void iree_uk_test_mmt4d_for_shape_params(
   params.lhs_buffer = lhs_buffer;
   params.rhs_buffer = rhs_buffer;
 
-  iree_uk_mmt4d_params_t reference_params;
-  memcpy(&reference_params, &params, sizeof params);
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params.type);
   iree_uk_ssize_t out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params.M, params.out_stride);
+  void* init_out_buffer = malloc(out_buffer_size);
+  iree_uk_write_random_buffer(init_out_buffer, out_buffer_size, out_type,
+                              engine);
+
+  iree_uk_mmt4d_params_t reference_params;
+  memcpy(&reference_params, &params, sizeof params);
   reference_params.out_buffer = malloc(out_buffer_size);
-  iree_uk_write_random_buffer(reference_params.out_buffer, out_buffer_size,
-                              out_type, engine);
+  memcpy(reference_params.out_buffer, init_out_buffer, out_buffer_size);
 
   iree_uk_mmt4d_params_t actual_params;
   memcpy(&actual_params, &params, sizeof params);
   actual_params.out_buffer = malloc(out_buffer_size);
-  memcpy(actual_params.out_buffer, reference_params.out_buffer,
-         out_buffer_size);
+  memcpy(actual_params.out_buffer, init_out_buffer, out_buffer_size);
 
   iree_mmt4d_reference(&reference_params);
-  iree_uk_mmt4d(&actual_params);
+  iree_mmt4d_actual(&actual_params, iree_uk_random_engine_get_0_1(engine));
 
   // For now we use exact comparisons, even for float, even though the reference
   // code accumulates in a different order compared to the actual code. This
@@ -141,6 +192,7 @@ static void iree_uk_test_mmt4d_for_shape_params(
 
   free(reference_params.out_buffer);
   free(actual_params.out_buffer);
+  free(init_out_buffer);
   free(lhs_buffer);
   free(rhs_buffer);
 }
