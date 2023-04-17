@@ -441,8 +441,7 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);
 
-/// Populates the passes needed to do two-level tile + vectorize of linalg ops
-/// using the Codegen drivers from sandbox.
+/// Populates the passes needed to do two-level tile + vectorize of linalg ops.
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
@@ -455,7 +454,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
                                           bool enableVectorMasking);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
-// convolution ops using the Codegen drivers from sandbox.
+// convolution ops.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
@@ -468,7 +467,8 @@ void addTransformDialectPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager);
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
+                                      bool enableMicrokernels);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
@@ -601,6 +601,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
 // usage.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUPackSharedMemoryAlloc();
+
+/// Checks GPU backend specific IR constraints such as shared memory limits.
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMGPUCheckIRBeforeLLVMConversionPass();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes

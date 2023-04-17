@@ -30,8 +30,10 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/IndexingUtils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
@@ -42,6 +44,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -107,7 +110,7 @@ transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
   vector::transferOpflowOpt(rewriter, target);
   eraseDeadAllocAndStores(rewriter, target);
@@ -240,6 +243,50 @@ struct FoldTensorEmptyExtract
     return success();
   }
 };
+
+/// Fold `tensor.pad(cst, tensor.extract*(linalg.fill(cst)))` into
+/// `linalg.fill(cst, empty)` when the padding constant and the fill constant
+/// are the same.
+/// This seems generally desirable as a folding but may be too intrusive, so we
+/// only apply it selectively for now.
+// TODO: atm hardcoded on linalg.fill but we could take any result of any
+// generic that yields a constant in that result.
+struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const final {
+    Operation *currentOp = padOp.getSource().getDefiningOp();
+    auto maybeExtractSlice =
+        dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+    while (currentOp && maybeExtractSlice) {
+      currentOp = maybeExtractSlice.getSource().getDefiningOp();
+      maybeExtractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+    }
+    auto fillOp = dyn_cast_or_null<linalg::FillOp>(currentOp);
+    if (!fillOp) {
+      return rewriter.notifyMatchFailure(
+          padOp, "not coming from a linalg.fill op via tensor.extract_slice*");
+    }
+
+    Value padValue = padOp.getConstantPaddingValue();
+    RankedTensorType resultType = padOp.getResultType();
+    if (!padValue ||
+        getAsOpFoldResult(padValue) !=
+            getAsOpFoldResult(fillOp.getDpsInputOperand(0)->get())) {
+      return rewriter.notifyMatchFailure(
+          padOp, "not a constant value matching the fill value");
+    }
+
+    Location loc = padOp.getLoc();
+    auto emptyOp = rewriter.create<tensor::EmptyOp>(
+        loc, resultType,
+        linalg::createDynamicDimensions(rewriter, loc, padOp.getResult()));
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
+                                                emptyOp.getResult());
+
+    return success();
+  }
+};
 }  // namespace
 
 static void addLowerTransferOpPermutationsPatterns(
@@ -269,6 +316,8 @@ static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
 
 static void addFoldTensorSubsetsPatterns(RewritePatternSet &patterns) {
   tensor::populateFoldTensorSubsetOpPatterns(patterns);
+  // TODO: upstream should move these to populateFoldTensorSubsetOpPatterns.
+  tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
 }
 
 static void addEraseUnnecessaryTensorOperandsPatterns(
@@ -307,6 +356,9 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
 static void addTilingCanonicalizationPatterns(RewritePatternSet &patterns) {
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
+  /// This seems generally desirable as a folding but may be too intrusive, so
+  /// we only apply it selectively for now.
+  patterns.add<FoldFillIntoPad>(patterns.getContext());
 }
 
 static std::optional<SmallVector<int64_t>>
@@ -377,7 +429,8 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
         patterns, [](OpOperand *) { return true; });
   }
   if (getBubblePackUnPack())
-    linalg::populateDataLayoutPropagationPatterns(patterns);
+    linalg::populateDataLayoutPropagationPatterns(
+        patterns, [](Operation *op) { return true; });
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
@@ -408,7 +461,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
 
   Location loc = target->getLoc();
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   GreedyRewriteConfig config;
   config.listener = &listener;
   // Manually gather list of ops because the other GreedyPatternRewriteDriver
@@ -488,7 +541,7 @@ DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
     transform::TransformState &state) {
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
       rewriter, target);
@@ -782,7 +835,7 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
   Location loc = target->getLoc();
   IRRewriter rewriter(topLevelForallOp->getContext());
   rewriter.setInsertionPoint(topLevelForallOp);
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
   if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp, exportOp))) {
     return listener.check(loc, mlir::emitDefiniteFailure(
@@ -1261,7 +1314,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 
   Operation *target = payload.front();
   Location loc = target->getLoc();
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
   {
     RewritePatternSet patterns(getContext());
@@ -1342,7 +1395,7 @@ transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
     ::mlir::transform::TransformState &state) {
   Location loc = target->getLoc();
   IRRewriter rewriter(target->getContext());
-  TrackingListener listener(state);
+  ErrorCheckingTrackingListener listener(state, *this);
   rewriter.setListener(&listener);
   if (failed(
           eliminateEmptyTensors(rewriter, target, getBufferizationOptions()))) {

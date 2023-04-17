@@ -551,6 +551,7 @@ cc_library(
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:ReconcileUnrealizedCasts",
         "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:TensorTransformOps",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorToSCF",
 

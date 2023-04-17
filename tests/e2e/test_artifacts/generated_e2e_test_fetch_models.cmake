@@ -290,6 +290,66 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
+    "model-50a7aece-73f9-47f4-a93a-4a1178f45407"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_50a7aece-73f9-47f4-a93a-4a1178f45407_matmul_3456x1024x2048_f16t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-a55afe1c-9410-47a6-b417-04b0d75ee5f4"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_3456x1024x2048_f32t_f32t_f32t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_a55afe1c-9410-47a6-b417-04b0d75ee5f4_matmul_3456x1024x2048_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-81cebaaf-e23d-4a32-89dc-9fc7adc37a8f"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_2560x2560x2560_f16t_f16t_f16t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_81cebaaf-e23d-4a32-89dc-9fc7adc37a8f_matmul_2560x2560x2560_f16t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-579b77ea-76bd-4eb3-bd85-067c25a89eff"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_2560x2560x2560_f32t_f32t_f32t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_579b77ea-76bd-4eb3-bd85-067c25a89eff_matmul_2560x2560x2560_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-699fd533-02a9-49f0-bf26-1902d8dbb5af"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f16t_f16t_f16t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_699fd533-02a9-49f0-bf26-1902d8dbb5af_matmul_128x256x8192_f16t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-a6c2b812-0a71-45e7-9ea5-f3d8529213ef"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f32t_f32t_f32t_tile_config_default.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_a6c2b812-0a71-45e7-9ea5-f3d8529213ef_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
     "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-8"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680486104/RESNET50/batch_8/tf-model.tar.gz"

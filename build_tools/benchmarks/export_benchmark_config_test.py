@@ -49,7 +49,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_b = common_definitions.DeviceSpec.build(
         id="dev_a_gpu",
         device_name="dev_a_gpu",
-        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
+        architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         tags=[])
     device_spec_c = common_definitions.DeviceSpec.build(
@@ -103,13 +103,13 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_b = common_definitions.DeviceSpec.build(
         id="dev_a_gpu",
         device_name="dev_a_gpu",
-        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
+        architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         tags=[])
     device_spec_c = common_definitions.DeviceSpec.build(
         id="dev_a_second_gpu",
         device_name="dev_a_gpu",
-        architecture=common_definitions.DeviceArchitecture.ADRENO_GENERIC,
+        architecture=common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         tags=[])
     run_config_a = iree_definitions.E2EModelRunConfig.build(
@@ -151,7 +151,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_b = common_definitions.DeviceSpec.build(
         id="dev_b",
         device_name="dev_b",
-        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
+        architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         tags=[])
     run_config_a = iree_definitions.E2EModelRunConfig.build(
@@ -214,7 +214,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_b = common_definitions.DeviceSpec.build(
         id="dev_b",
         device_name="dev_b",
-        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
+        architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
         tags=[])
     run_config_a = iree_definitions.E2EModelRunConfig.build(

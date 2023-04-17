@@ -92,7 +92,8 @@ class ModuleLoader {
 Status RunModule(const IreeModuleInvocation& invocation) {
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance),
+      iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                              iree_allocator_system(), &instance),
       "creating instance");
   IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(instance),
                        "registering HAL types");
@@ -145,8 +146,9 @@ Status RunModule(const IreeModuleInvocation& invocation) {
       iree_allocator_system(), &inputs));
 
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
-                                           iree_allocator_system(), &outputs));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                           16, iree_allocator_system(),
+                                           &outputs));
 
   LOGI("Execute @%s", function_name.c_str());
   IREE_RETURN_IF_ERROR(

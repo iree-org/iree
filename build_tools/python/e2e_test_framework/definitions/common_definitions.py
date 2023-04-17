@@ -23,10 +23,15 @@ class _ArchitectureInfo(object):
   """Architecture information."""
   type: ArchitectureType
   architecture: str
-  microarchitecture: str
+  microarchitecture: str = ""
+  vendor: str = ""
 
   def __str__(self):
-    return f"{self.architecture}-{self.microarchitecture}"
+    parts = [
+        part for part in (self.vendor, self.architecture,
+                          self.microarchitecture) if len(part) != 0
+    ]
+    return "-".join(parts)
 
 
 class DeviceArchitecture(_ArchitectureInfo, Enum):
@@ -47,8 +52,8 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   RV32_GENERIC = (ArchitectureType.CPU, "riscv_32", "generic")
 
   # Mobile GPUs
-  VALHALL_MALI = (ArchitectureType.GPU, "valhall", "mali")
-  ADRENO_GENERIC = (ArchitectureType.GPU, "adreno", "generic")
+  QUALCOMM_ADRENO = (ArchitectureType.GPU, "adreno", "", "qualcomm")
+  ARM_VALHALL = (ArchitectureType.GPU, "valhall", "", "arm")
 
   # CUDA GPUs
   CUDA_SM70 = (ArchitectureType.GPU, "cuda", "sm_70")

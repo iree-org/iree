@@ -166,6 +166,7 @@ builtin.module {
 // CHECK:      func.func @matmul_reduction() {
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2x2xf16>
+// CHECK-DAG:    %[[CST_0:.+]] = arith.constant dense<-1.000000e+04> : vector<1x1x2x2xf16>
 // CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
 // CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
 // CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x16xf16>
@@ -178,14 +179,14 @@ builtin.module {
 // CHECK-DAG:    %[[D3:.+]] = gpu.thread_id  x
 // CHECK-DAG:    %[[D4:.+]] = gpu.thread_id  y
 // CHECK-DAG:    %[[D5:.+]] = gpu.thread_id  z
-// CHECK-DAG:    %[[CST_0:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4x2xf16>
+// CHECK-DAG:    %[[CST_1:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4x2xf16>
 // CHECK-DAG:    %[[D6:.+]] = affine.apply #[[MAP]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK-DAG:    %[[D7:.+]] = affine.apply #[[MAP1]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D8:.+]] = arith.addi %[[D6]], %[[C0]] : index
 // CHECK:        %[[D9:.+]] = arith.addi %[[D7]], %[[C0]] : index
 // CHECK:        %[[D10:.+]] = memref.load %[[D0]][%[[D8]], %[[D9]]] : memref<16x16xf16>
 // CHECK:        %[[D11:.+]] = vector.broadcast %[[D10]] : f16 to vector<1xf16>
-// CHECK:        %[[D12:.+]] = vector.insert_strided_slice %[[D11]], %[[CST_0]] {offsets = [0, 0, 0, 0], strides = [1]}
+// CHECK:        %[[D12:.+]] = vector.insert_strided_slice %[[D11]], %[[CST_1]] {offsets = [0, 0, 0, 0], strides = [1]}
 // CHECK-SAME:     : vector<1xf16> into vector<1x1x4x2xf16>
 // CHECK-DAG:    %[[D13:.+]] = affine.apply #[[MAP2]](%[[D3]], %[[D4]], %[[D5]])
 // CHECK:        %[[D14:.+]] = arith.addi %[[D13]], %[[C0]] : index
@@ -247,7 +248,6 @@ builtin.module {
 // CHECK:        %[[D59:.+]] = nvgpu.mma.sync(%[[D57]], %[[D58]], %[[D56]]) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>,
 // CHECK-SAME:     vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
 // CHECK:        %[[D60:.+]] = vector.insert %[[D59]], %[[CST]] [0, 0] : vector<2x2xf16> into vector<1x1x2x2xf16>
-// CHECK-DAG:    %[[CST_1:.+]] = arith.constant -1.000000e+04 : f16
 // CHECK:        %[[D61:.+]] = vector.extract %[[D60]][0, 0, 0] : vector<1x1x2x2xf16>
 // CHECK:        %[[D62:.+]] = vector.bitcast %[[D61]] : vector<2xf16> to vector<1xi32>
 // CHECK:        %[[D63:.+]] = vector.extract %[[D62]][0] : vector<1xi32>
@@ -264,39 +264,41 @@ builtin.module {
 // CHECK:        %[[D69:.+]] = vector.broadcast %[[SHUFFLERESULT_2]] : i32 to vector<1xi32>
 // CHECK:        %[[D70:.+]] = vector.bitcast %[[D69]] : vector<1xi32> to vector<2xf16>
 // CHECK:        %[[D71:.+]] = arith.maxf %[[D70]], %[[D66]] : vector<2xf16>
-// CHECK:        %[[D72:.+]] = vector.extract %[[D71]][0] : vector<2xf16>
-// CHECK:        %[[D73:.+]] = arith.maxf %[[CST_1]], %[[D72]] : f16
-// CHECK:        %[[D74:.+]] = vector.extract %[[D71]][1] : vector<2xf16>
-// CHECK:        %[[D75:.+]] = arith.maxf %[[D73]], %[[D74]] : f16
-// CHECK:        %[[D76:.+]] = vector.insert %[[D75]], %[[CST]] [0, 0, 0, 0] : f16 into vector<1x1x2x2xf16>
-// CHECK:        %[[D77:.+]] = vector.insert %[[D75]], %[[D76]] [0, 0, 0, 1] : f16 into vector<1x1x2x2xf16>
-// CHECK:        %[[D78:.+]] = vector.extract %[[D60]][0, 0, 1] : vector<1x1x2x2xf16>
-// CHECK:        %[[D79:.+]] = vector.bitcast %[[D78]] : vector<2xf16> to vector<1xi32>
-// CHECK:        %[[D80:.+]] = vector.extract %[[D79]][0] : vector<1xi32>
-// CHECK:        %[[SHUFFLERESULT_4:.+]], %[[VALID_5:.+]] = gpu.shuffle  xor %[[D80]], %[[C1_I32]], %[[C32_I32]] : i32
-// CHECK:        %[[D81:.+]] = vector.broadcast %[[SHUFFLERESULT_4]] : i32 to vector<1xi32>
-// CHECK:        %[[D82:.+]] = vector.bitcast %[[D81]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D83:.+]] = arith.maxf %[[D82]], %[[D78]] : vector<2xf16>
-// CHECK:        %[[D84:.+]] = vector.bitcast %[[D83]] : vector<2xf16> to vector<1xi32>
-// CHECK:        %[[D85:.+]] = vector.extract %[[D84]][0] : vector<1xi32>
-// CHECK:        %[[SHUFFLERESULT_6:.+]], %[[VALID_7:.+]] = gpu.shuffle  xor %[[D85]], %[[C2_I32]], %[[C32_I32]] : i32
-// CHECK:        %[[D86:.+]] = vector.broadcast %[[SHUFFLERESULT_6]] : i32 to vector<1xi32>
-// CHECK:        %[[D87:.+]] = vector.bitcast %[[D86]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D88:.+]] = arith.maxf %[[D87]], %[[D83]] : vector<2xf16>
-// CHECK:        %[[D89:.+]] = vector.extract %[[D88]][0] : vector<2xf16>
-// CHECK:        %[[D90:.+]] = arith.maxf %[[CST_1]], %[[D89]] : f16
-// CHECK:        %[[D91:.+]] = vector.extract %[[D88]][1] : vector<2xf16>
+// CHECK:        %[[D72:.+]] = vector.extract %[[CST_0]][0, 0, 0, 0] : vector<1x1x2x2xf16>
+// CHECK:        %[[D73:.+]] = vector.extract %[[D71]][0] : vector<2xf16>
+// CHECK:        %[[D74:.+]] = arith.maxf %[[D72]], %[[D73]] : f16
+// CHECK:        %[[D75:.+]] = vector.extract %[[D71]][1] : vector<2xf16>
+// CHECK:        %[[D76:.+]] = arith.maxf %[[D74]], %[[D75]] : f16
+// CHECK:        %[[D77:.+]] = vector.insert %[[D76]], %[[CST]] [0, 0, 0, 0] : f16 into vector<1x1x2x2xf16>
+// CHECK:        %[[D78:.+]] = vector.insert %[[D76]], %[[D77]] [0, 0, 0, 1] : f16 into vector<1x1x2x2xf16>
+// CHECK:        %[[D79:.+]] = vector.extract %[[D60]][0, 0, 1] : vector<1x1x2x2xf16>
+// CHECK:        %[[D80:.+]] = vector.bitcast %[[D79]] : vector<2xf16> to vector<1xi32>
+// CHECK:        %[[D81:.+]] = vector.extract %[[D80]][0] : vector<1xi32>
+// CHECK:        %[[SHUFFLERESULT_4:.+]], %[[VALID_5:.+]] = gpu.shuffle  xor %[[D81]], %[[C1_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D82:.+]] = vector.broadcast %[[SHUFFLERESULT_4]] : i32 to vector<1xi32>
+// CHECK:        %[[D83:.+]] = vector.bitcast %[[D82]] : vector<1xi32> to vector<2xf16>
+// CHECK:        %[[D84:.+]] = arith.maxf %[[D83]], %[[D79]] : vector<2xf16>
+// CHECK:        %[[D85:.+]] = vector.bitcast %[[D84]] : vector<2xf16> to vector<1xi32>
+// CHECK:        %[[D86:.+]] = vector.extract %[[D85]][0] : vector<1xi32>
+// CHECK:        %[[SHUFFLERESULT_6:.+]], %[[VALID_7:.+]] = gpu.shuffle  xor %[[D86]], %[[C2_I32]], %[[C32_I32]] : i32
+// CHECK:        %[[D87:.+]] = vector.broadcast %[[SHUFFLERESULT_6]] : i32 to vector<1xi32>
+// CHECK:        %[[D88:.+]] = vector.bitcast %[[D87]] : vector<1xi32> to vector<2xf16>
+// CHECK:        %[[D89:.+]] = arith.maxf %[[D88]], %[[D84]] : vector<2xf16>
+// CHECK:        %[[D90:.+]] = vector.extract %[[CST_0]][0, 0, 1, 0] : vector<1x1x2x2xf16>
+// CHECK:        %[[D91:.+]] = vector.extract %[[D89]][0] : vector<2xf16>
 // CHECK:        %[[D92:.+]] = arith.maxf %[[D90]], %[[D91]] : f16
-// CHECK:        %[[D93:.+]] = vector.insert %[[D92]], %[[D77]] [0, 0, 1, 0] : f16 into vector<1x1x2x2xf16>
-// CHECK:        %[[D94:.+]] = vector.insert %[[D92]], %[[D93]] [0, 0, 1, 1] : f16 into vector<1x1x2x2xf16>
-// CHECK:        %[[D95:.+]] = vector.extract %[[D94]][0, 0, 0, 0] : vector<1x1x2x2xf16>
-// CHECK:        memref.store %[[D95]], %[[D2]][%[[D8]], %[[D9]]] : memref<16x8xf16>
-// CHECK:        %[[D96:.+]] = vector.extract %[[D94]][0, 0, 0, 1] : vector<1x1x2x2xf16>
-// CHECK:        memref.store %[[D96]], %[[D2]][%[[D8]], %[[D14]]] : memref<16x8xf16>
-// CHECK:        %[[D97:.+]] = vector.extract %[[D94]][0, 0, 1, 0] : vector<1x1x2x2xf16>
-// CHECK:        memref.store %[[D97]], %[[D2]][%[[D29]], %[[D9]]] : memref<16x8xf16>
-// CHECK:        %[[D98:.+]] = vector.extract %[[D94]][0, 0, 1, 1] : vector<1x1x2x2xf16>
-// CHECK:        memref.store %[[D98]], %[[D2]][%[[D29]], %[[D14]]] : memref<16x8xf16>
+// CHECK:        %[[D93:.+]] = vector.extract %[[D89]][1] : vector<2xf16>
+// CHECK:        %[[D94:.+]] = arith.maxf %[[D92]], %[[D93]] : f16
+// CHECK:        %[[D95:.+]] = vector.insert %[[D94]], %[[D78]] [0, 0, 1, 0] : f16 into vector<1x1x2x2xf16>
+// CHECK:        %[[D96:.+]] = vector.insert %[[D94]], %[[D95]] [0, 0, 1, 1] : f16 into vector<1x1x2x2xf16>
+// CHECK:        %[[D97:.+]] = vector.extract %[[D96]][0, 0, 0, 0] : vector<1x1x2x2xf16>
+// CHECK:        memref.store %[[D97]], %[[D2]][%[[D8]], %[[D9]]] : memref<16x8xf16>
+// CHECK:        %[[D98:.+]] = vector.extract %[[D96]][0, 0, 0, 1] : vector<1x1x2x2xf16>
+// CHECK:        memref.store %[[D98]], %[[D2]][%[[D8]], %[[D14]]] : memref<16x8xf16>
+// CHECK:        %[[D99:.+]] = vector.extract %[[D96]][0, 0, 1, 0] : vector<1x1x2x2xf16>
+// CHECK:        memref.store %[[D99]], %[[D2]][%[[D29]], %[[D9]]] : memref<16x8xf16>
+// CHECK:        %[[D100:.+]] = vector.extract %[[D96]][0, 0, 1, 1] : vector<1x1x2x2xf16>
+// CHECK:        memref.store %[[D100]], %[[D2]][%[[D29]], %[[D14]]] : memref<16x8xf16>
 // CHECK:        return
 // CHECK:      }
 
@@ -822,5 +824,229 @@ builtin.module {
 // CHECK:        memref.store %[[D78]], %[[SUBVIEW]][%[[D30]], %[[D10]]] : memref<16x8xf16, strided<[8, 1], offset: ?>>
 // CHECK:        %[[D79:.+]] = vector.extract %[[D75]][0, 0, 1, 1] : vector<1x1x2x2xf16>
 // CHECK:        memref.store %[[D79]], %[[SUBVIEW]][%[[D30]], %[[D15]]] : memref<16x8xf16, strided<[8, 1], offset: ?>>
+// CHECK:        return
+// CHECK:      }
+
+// -----
+
+builtin.module {
+  func.func @matmul_dispatch_0_matmul_16x8x16_shared() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
+    %cst_0 = arith.constant 0.000000e+00 : f16
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x16xf16, #gpu.address_space<workgroup>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<8x16xf16, #gpu.address_space<workgroup>>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<16x8xf16>
+    memref.assume_alignment %2, 64 : memref<16x8xf16>
+    %3 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16, #gpu.address_space<workgroup>>, vector<16x16xf16>
+    %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {permutation_map = affine_map<(d0, d1) -> (d1, d0)>, in_bounds = [true, true]} : memref<8x16xf16, #gpu.address_space<workgroup>>, vector<8x16xf16>
+    %5 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %3, %4, %cst : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf16>
+    vector.transfer_write %5, %2[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
+    return
+  }
+  transform.sequence failures(propagate) {
+  ^bb1(%variant_op: !pdl.operation):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+    %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!pdl.operation) -> (!pdl.operation)
+  }
+}
+
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> ((d0 + d1 * 4) mod 8)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 8)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16 + 8)>
+// CHECK-DAG: #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 8)>
+// CHECK-DAG: #[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2 + 1)>
+    // CHECK: func.func @matmul_dispatch_0_matmul_16x8x16_shared() {
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:   %[[TX:.+]] = gpu.thread_id  x
+// CHECK-DAG:   %[[TY:.+]] = gpu.thread_id  y
+// CHECK-DAG:   %[[VECOFF0:.+]] = affine.apply #[[MAP0]](%[[C0]], %[[C0]], %[[C0]])
+// CHECK-DAG:   %[[VECOFF1:.+]] = affine.apply #[[MAP1]](%[[C0]], %[[C0]], %[[C0]])
+// CHECK-DAG:   %[[LANEID:.+]] = affine.apply #[[MAP2]](%[[TX]], %[[TY]])
+// CHECK-DAG:   %[[LANEOFF0:.+]] = affine.apply #[[MAP0]](%[[C0]], %[[LANEID]], %[[C0]])
+// CHECK-DAG:   %[[LANEOFF1:.+]] = affine.apply #[[MAP1]](%[[C0]], %[[LANEID]], %[[C0]])
+// CHECK-DAG:   %[[OFF0:.+]] = arith.addi %[[VECOFF0]], %[[C0]] : index
+// CHECK-DAG:   %[[OFF1:.+]] = arith.addi %[[LANEOFF0]], %[[OFF0]] : index
+// CHECK-DAG:   %[[OFF2:.+]] = arith.addi %[[VECOFF1]], %[[C0]] : index
+// CHECK-DAG:   %[[OFF3:.+]] = arith.addi %[[LANEOFF1]], %[[OFF2]] : index
+//     CHECK:   %[[LD0:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF1]], %[[OFF3]]] {numTiles = 1 : i32, transpose = false} : memref<16x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V0:.+]] = vector.insert_strided_slice %[[LD0]], %{{.*}} {offsets = [0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x4x2xf16>
+//     CHECK:   %[[VECOFF2:.+]] = affine.apply #[[MAP3]](%[[C0]], %[[C0]], %[[C0]])
+//     CHECK:   %[[OFF4:.+]] = arith.addi %[[VECOFF2]], %[[C0]] : index
+//     CHECK:   %[[OFF5:.+]] = arith.addi %[[LANEOFF1]], %[[OFF4]] : index
+//     CHECK:   %[[LD1:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF1]], %[[OFF5]]] {numTiles = 1 : i32, transpose = false} : memref<16x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V1:.+]] = vector.insert_strided_slice %[[LD1]], %[[V0]] {offsets = [0, 0, 2, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x4x2xf16>
+//     CHECK:   %[[VECOFF3:.+]] = affine.apply #[[MAP4]](%[[C0]], %[[C0]], %[[C0]])
+//     CHECK:   %[[OFF6:.+]] = arith.addi %[[VECOFF3]], %[[C0]] : index
+//     CHECK:   %[[OFF7:.+]] = arith.addi %[[LANEOFF0]], %[[OFF6]] : index
+//     CHECK:   %[[LD2:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF7]], %[[OFF3]]] {numTiles = 1 : i32, transpose = false} : memref<16x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V2:.+]] = vector.insert_strided_slice %[[LD2]], %[[V1]] {offsets = [0, 0, 1, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x4x2xf16>
+//     CHECK:   %[[LD3:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF7]], %[[OFF5]]] {numTiles = 1 : i32, transpose = false} : memref<16x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V3:.+]] = vector.insert_strided_slice %[[LD3]], %[[V2]] {offsets = [0, 0, 3, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x4x2xf16>
+// CHECK-DAG:   %[[VECOFF2:.+]] = affine.apply #[[MAP5]](%[[C0]], %[[C0]], %[[C0]])
+// CHECK-DAG:   %[[LANEOFF2:.+]] = affine.apply #[[MAP5]](%[[C0]], %[[LANEID]], %[[C0]])
+// CHECK-DAG:   %[[OFF8:.+]] = arith.addi %[[VECOFF2]], %[[C0]] : index
+// CHECK-DAG:   %[[OFF9:.+]] = arith.addi %[[LANEOFF1]], %[[OFF8]] : index
+// CHECK-DAG:   %[[OFF10:.+]] = arith.addi %[[LANEOFF2]], %[[OFF2]] : index
+//     CHECK:   %[[LD3:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF10]], %[[OFF9]]] {numTiles = 1 : i32, transpose = true} : memref<8x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V4:.+]] = vector.insert_strided_slice %[[LD3]], %{{.*}} {offsets = [0, 0, 0, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x2x2xf16>
+//     CHECK:   %[[OFF11:.+]] = arith.addi %[[LANEOFF2]], %[[OFF4]] : index
+//     CHECK:   %[[LD4:.+]] = nvgpu.ldmatrix %{{.*}}[%[[OFF11]], %[[OFF9]]] {numTiles = 1 : i32, transpose = true} : memref<8x16xf16, #gpu.address_space<workgroup>> -> vector<1x2xf16>
+//     CHECK:   %[[V5:.+]] = vector.insert_strided_slice %[[LD4]], %[[V4]] {offsets = [0, 0, 1, 0], strides = [1, 1]} : vector<1x2xf16> into vector<1x1x2x2xf16>
+//     CHECK:   %[[A:.+]] = vector.extract %[[V3]][0, 0] : vector<1x1x4x2xf16>
+//     CHECK:   %[[B:.+]] = vector.extract %[[V5]][0, 0] : vector<1x1x2x2xf16>
+//     CHECK:   nvgpu.mma.sync(%[[A]], %[[B]], %{{.*}}) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
+
+// -----
+
+#map = affine_map<(d0) -> (d0 * 16)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
+builtin.module {
+  func.func @matmul_dispatch_0_matmul_16x16x16_f16() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<16x16xf16>
+    %c0_0 = arith.constant 0 : index
+    %cst_1 = arith.constant 0.000000e+00 : f16
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x16xf16>
+    memref.assume_alignment %0, 64 : memref<16x16xf16>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x16xf16>
+    memref.assume_alignment %1, 64 : memref<16x16xf16>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16xf16>
+    memref.assume_alignment %2, 64 : memref<16xf16>
+    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16xf16>
+    memref.assume_alignment %3, 64 : memref<16xf16>
+    %4 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x8xf16>
+    memref.assume_alignment %4, 64 : memref<16x8xf16>
+    %5 = hal.interface.binding.subspan set(0) binding(5) type(storage_buffer) alignment(64) offset(%c0_0) flags(ReadOnly) : memref<16x8xf16>
+    memref.assume_alignment %5, 64 : memref<16x8xf16>
+    %6 = hal.interface.binding.subspan set(0) binding(6) type(storage_buffer) alignment(64) offset(%c0_0) : memref<16x8xf16>
+    memref.assume_alignment %6, 64 : memref<16x8xf16>
+    %c1 = arith.constant 1 : index
+    %c1_2 = arith.constant 1 : index
+    %c1_3 = arith.constant 1 : index
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_count_x = hal.interface.workgroup.count[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %workgroup_count_y = hal.interface.workgroup.count[1] : index
+    %workgroup_id_z = hal.interface.workgroup.id[2] : index
+    %workgroup_count_z = hal.interface.workgroup.count[2] : index
+    %c1_4 = arith.constant 1 : index
+    %7 = affine.apply #map(%workgroup_id_x)
+    %8 = vector.transfer_read %0[%7, %c0_0], %cst_1 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
+    %9 = vector.transfer_read %1[%c0_0, %c0_0], %cst_1 {in_bounds = [true, true], permutation_map = #map1} : memref<16x16xf16>, vector<16x16xf16>
+    %10 = vector.contract {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %8, %9, %cst : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf16>
+    %11 = vector.transfer_read %2[%7], %cst_1 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
+    %12 = vector.multi_reduction <maxf>, %10, %11 [1] : vector<16x16xf16> to vector<16xf16>
+    %13 = vector.transfer_read %3[%7], %cst_1 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
+    %14 = arith.subf %11, %12 : vector<16xf16>
+    %15 = math.exp %14 : vector<16xf16>
+    %16 = arith.mulf %15, %13 : vector<16xf16>
+    %17 = vector.broadcast %12 : vector<16xf16> to vector<16x16xf16>
+    %18 = vector.transpose %17, [1, 0] : vector<16x16xf16> to vector<16x16xf16>
+    %19 = arith.subf %10, %18 : vector<16x16xf16>
+    %20 = math.exp %19 : vector<16x16xf16>
+    %21 = vector.multi_reduction <add>, %20, %16 [1] : vector<16x16xf16> to vector<16xf16>
+    %22 = vector.broadcast %21 : vector<16xf16> to vector<16x16xf16>
+    %23 = vector.transpose %22, [1, 0] : vector<16x16xf16> to vector<16x16xf16>
+    %24 = arith.divf %20, %23 : vector<16x16xf16>
+    %subview = memref.subview %6[%7, 0] [16, 8] [1, 1] : memref<16x8xf16> to memref<16x8xf16, strided<[8, 1], offset: ?>>
+    %25 = vector.broadcast %16 : vector<16xf16> to vector<8x16xf16>
+    %26 = vector.broadcast %21 : vector<16xf16> to vector<8x16xf16>
+    %27 = vector.transfer_read %5[%7, %c0_0], %cst_1 {in_bounds = [true, true]} : memref<16x8xf16>, vector<16x8xf16>
+    %28 = arith.divf %25, %26 : vector<8x16xf16>
+    %29 = vector.transpose %28, [1, 0] : vector<8x16xf16> to vector<16x8xf16>
+    %30 = arith.mulf %29, %27 : vector<16x8xf16>
+    %31 = vector.transfer_read %4[%c0_0, %c0_0], %cst_1 {in_bounds = [true, true], permutation_map = #map1} : memref<16x8xf16>, vector<8x16xf16>
+    %32 = vector.contract {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %24, %31, %30 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf16>
+    vector.transfer_write %32, %subview[%c0_0, %c0_0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16, strided<[8, 1], offset: ?>>
+    return
+  }
+  transform.sequence failures(propagate) {
+  ^bb1(%variant_op: !pdl.operation):
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+    %reordered_func = transform.iree.reorder_transpose %top_level_func : (!pdl.operation) -> !pdl.operation
+    transform.iree.apply_patterns %reordered_func { cse } : (!pdl.operation) -> ()
+  }
+}
+
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 16)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG:  #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK:      func.func @matmul_dispatch_0_matmul_16x16x16_f16() {
+// CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf16>
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[CST_0:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK:        %[[D0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64)
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
+// CHECK:        memref.assume_alignment %[[D0]], 64 : memref<16x16xf16>
+// CHECK:        %[[D1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64)
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x16xf16>
+// CHECK:        memref.assume_alignment %[[D1]], 64 : memref<16x16xf16>
+// CHECK:        %[[D2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64)
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16xf16>
+// CHECK:        memref.assume_alignment %[[D2]], 64 : memref<16xf16>
+// CHECK:        %[[D3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64)
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16xf16>
+// CHECK:        memref.assume_alignment %[[D3]], 64 : memref<16xf16>
+// CHECK:        %[[D4:.+]] = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64)
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x8xf16>
+// CHECK:        memref.assume_alignment %[[D4]], 64 : memref<16x8xf16>
+// CHECK:        %[[D5:.+]] = hal.interface.binding.subspan set(0) binding(5) type(storage_buffer) alignment(64)
+// CHECK-SAME:     offset(%[[C0]]) flags(ReadOnly) : memref<16x8xf16>
+// CHECK:        memref.assume_alignment %[[D5]], 64 : memref<16x8xf16>
+// CHECK:        %[[D6:.+]] = hal.interface.binding.subspan set(0) binding(6) type(storage_buffer) alignment(64)
+// CHECK-SAME:     offset(%[[C0]]) : memref<16x8xf16>
+// CHECK:        memref.assume_alignment %[[D6]], 64 : memref<16x8xf16>
+// CHECK:        %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
+// CHECK-DAG:    %[[D7:.+]] = affine.apply #[[MAP]](%[[WORKGROUP_ID_X]])
+// CHECK:        %[[D8:.+]] = vector.transfer_read %[[D0]][%[[D7]], %[[C0]]], %[[CST_0]] {in_bounds = [true, true]} :
+// CHECK-SAME:     memref<16x16xf16>, vector<16x16xf16>
+// CHECK:        %[[D9:.+]] = vector.transfer_read %[[D1]][%[[C0]], %[[C0]]], %[[CST_0]] {in_bounds = [true, true],
+// CHECK-SAME:     permutation_map = #[[MAP1]]} : memref<16x16xf16>, vector<16x16xf16>
+// CHECK:        %[[D10:.+]] = vector.contract {indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]], iterator_types =
+// CHECK-SAME:     ["parallel", "parallel", "reduction"], kind = #[[VECTOR:.+]].kind<add>} %[[D8]], %[[D9]], %[[CST]] :
+// CHECK-SAME:     vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf16>
+// CHECK:        %[[D11:.+]] = vector.transfer_read %[[D2]][%[[D7]]], %[[CST_0]] {in_bounds = [true]} : memref<16xf16>,
+// CHECK-SAME:     vector<16xf16>
+// CHECK:        %[[D12:.+]] = vector.multi_reduction <maxf>, %[[D10]], %[[D11]] [1] : vector<16x16xf16> to
+// CHECK-SAME:     vector<16xf16>
+// CHECK:        %[[D13:.+]] = vector.transfer_read %[[D3]][%[[D7]]], %[[CST_0]] {in_bounds = [true]} : memref<16xf16>,
+// CHECK-SAME:     vector<16xf16>
+// CHECK:        %[[D14:.+]] = arith.subf %[[D11]], %[[D12]] : vector<16xf16>
+// CHECK:        %[[D15:.+]] = math.exp %[[D14]] : vector<16xf16>
+// CHECK:        %[[D16:.+]] = arith.mulf %[[D15]], %[[D13]] : vector<16xf16>
+// CHECK:        %[[D17:.+]] = vector.broadcast %[[D12]] : vector<16xf16> to vector<16x16xf16>
+// CHECK:        %[[D18:.+]] = vector.transpose %[[D17]], [1, 0] : vector<16x16xf16> to vector<16x16xf16>
+// CHECK:        %[[D19:.+]] = arith.subf %[[D10]], %[[D18]] : vector<16x16xf16>
+// CHECK:        %[[D20:.+]] = math.exp %[[D19]] : vector<16x16xf16>
+// CHECK:        %[[D21:.+]] = vector.multi_reduction <add>, %[[D20]], %[[D16]] [1] : vector<16x16xf16> to
+// CHECK-SAME:     vector<16xf16>
+// CHECK:        %[[D22:.+]] = vector.broadcast %[[D21]] : vector<16xf16> to vector<16x16xf16>
+// CHECK:        %[[D23:.+]] = vector.transpose %[[D22]], [1, 0] : vector<16x16xf16> to vector<16x16xf16>
+// CHECK:        %[[D24:.+]] = arith.divf %[[D20]], %[[D23]] : vector<16x16xf16>
+// CHECK:        %[[SUBVIEW:.+]] = memref.subview %[[D6]][%[[D7]], 0] [16, 8] [1, 1] : memref<16x8xf16> to
+// CHECK-SAME:     memref<16x8xf16, strided<[8, 1], offset: ?>>
+// CHECK:        %[[D25:.+]] = vector.broadcast %[[D16]] : vector<16xf16> to vector<8x16xf16>
+// CHECK:        %[[D26:.+]] = vector.broadcast %[[D21]] : vector<16xf16> to vector<8x16xf16>
+// CHECK:        %[[D27:.+]] = vector.transfer_read %[[D5]][%[[D7]], %[[C0]]], %[[CST_0]] {in_bounds = [true, true]} :
+// CHECK-SAME:     memref<16x8xf16>, vector<16x8xf16>
+// CHECK:        %[[D28:.+]] = vector.transpose %[[D25]], [1, 0] : vector<8x16xf16> to vector<16x8xf16>
+// CHECK:        %[[D29:.+]] = vector.transpose %[[D26]], [1, 0] : vector<8x16xf16> to vector<16x8xf16>
+// CHECK:        %[[D30:.+]] = arith.divf %[[D28]], %[[D29]] : vector<16x8xf16>
+// CHECK:        %[[D31:.+]] = arith.mulf %[[D30]], %[[D27]] : vector<16x8xf16>
+// CHECK:        %[[D32:.+]] = vector.transfer_read %[[D4]][%[[C0]], %[[C0]]], %[[CST_0]] {in_bounds = [true, true],
+// CHECK-SAME:     permutation_map = #[[MAP1]]} : memref<16x8xf16>, vector<8x16xf16>
+// CHECK:        %[[D33:.+]] = vector.contract {indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]], iterator_types =
+// CHECK-SAME:     ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>} %[[D24]], %[[D32]], %[[D31]] :
+// CHECK-SAME:     vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf16>
+// CHECK:        vector.transfer_write %[[D33]], %[[SUBVIEW]][%[[C0]], %[[C0]]] {in_bounds = [true, true]} :
+// CHECK-SAME:     vector<16x8xf16>, memref<16x8xf16, strided<[8, 1], offset: ?>>
 // CHECK:        return
 // CHECK:      }

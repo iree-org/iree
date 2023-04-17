@@ -92,6 +92,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::hal::local::loaders::registration
+    iree::hal::local::plugins::registration
     iree::modules::hal
     iree::modules::hal::inline
     iree::modules::hal::loader

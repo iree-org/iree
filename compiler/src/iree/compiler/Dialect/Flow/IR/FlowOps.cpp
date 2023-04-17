@@ -1395,82 +1395,6 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.clone
-//===----------------------------------------------------------------------===//
-
-LogicalResult TensorCloneOp::verify() {
-  if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
-                                 getArgumentDims())) ||
-      failed(verifyOpDynamicDims(getOperation(), {getResult()},
-                                 getArgumentDims()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.tensor.empty
-//===----------------------------------------------------------------------===//
-
-LogicalResult TensorEmptyOp::verify() {
-  if (failed(verifyOpDynamicDims(getOperation(), {getResult()},
-                                 getResultDims()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.tensor.load
-//===----------------------------------------------------------------------===//
-
-LogicalResult TensorLoadOp::verify() {
-  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
-                                 getSourceDims()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.tensor.slice
-//===----------------------------------------------------------------------===//
-
-LogicalResult TensorSliceOp::verify() {
-  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
-                                 getSourceDims())) ||
-      failed(verifyOpDynamicDims(getOperation(), {getResult()},
-                                 getResultDims()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.tensor.splat
-//===----------------------------------------------------------------------===//
-
-LogicalResult TensorSplatOp::verify() {
-  if (failed(verifyOpDynamicDims(getOperation(), {getResult()},
-                                 getResultDims()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.tensor.store
-//===----------------------------------------------------------------------===//
-
-LogicalResult TensorStoreOp::verify() {
-  if (failed(verifyOpDynamicDims(getOperation(), {getTarget()},
-                                 getTargetDims()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // flow.tensor.tie_shape
 //===----------------------------------------------------------------------===//
 
@@ -1523,6 +1447,94 @@ Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
 
 SmallVector<int64_t, 4> TensorReshapeOp::getTiedResultOperandIndices() {
   return {0};  // source
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorLoadOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
+                                 getSourceDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.store
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorStoreOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getTarget()},
+                                 getTargetDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.alloc
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorAllocOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 getResultDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.empty
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorEmptyOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 getResultDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.splat
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorSplatOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 getResultDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.clone
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorCloneOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
+                                 getArgumentDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 getArgumentDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.slice
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorSliceOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
+                                 getSourceDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 getResultDims()))) {
+    return failure();
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

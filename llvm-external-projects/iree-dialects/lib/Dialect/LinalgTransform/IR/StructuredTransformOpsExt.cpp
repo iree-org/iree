@@ -321,189 +321,21 @@ mlir::transform_ext::StructuredTransformOpsExtension::
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.cpp.inc"
 
 //===----------------------------------------------------------------------===//
-// TrackingListener
+// ErrorCheckingTrackingListener
 //===----------------------------------------------------------------------===//
 
-/// Find the linalg op that defines all values in range, potentially
-/// transitively through tensor casts.
-static FailureOr<linalg::LinalgOp>
-findSingleLinalgOpDefiningAll(ValueRange range) {
-  LLVM_DEBUG(DBGS() << "Start findSingleLinalgOpDefiningAll\n");
-  linalg::LinalgOp sourceOp = nullptr;
-  for (Value value : range) {
-    // See through tensor casts and reshape ops.
-    //
-    // TODO: we may need some generalization (interfaces?) of this for other
-    // operations, especially multi-operand ones to understand which of their
-    // operands may be coming from a Linalg op. Or a completely different
-    // mechanism of tracking op replacement at creation, or even different
-    // patterns that identify the "main" result of a transformation.
-    while (isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::ExpandShapeOp,
-               tensor::InsertSliceOp>(value.getDefiningOp())) {
-      value = llvm::TypeSwitch<Operation *, Value>(value.getDefiningOp())
-                  .Case([](tensor::CastOp op) { return op.getSource(); })
-                  .Case([](tensor::CollapseShapeOp op) { return op.getSrc(); })
-                  .Case([](tensor::ExpandShapeOp op) { return op.getSrc(); })
-                  .Case([](tensor::InsertSliceOp op) { return op.getSource(); })
-                  .Default([](Operation *) {
-                    llvm_unreachable("Wrong op type");
-                    return Value();
-                  });
-    }
-
-    if (auto currentSourceOp = value.getDefiningOp<linalg::LinalgOp>()) {
-      if (!sourceOp || sourceOp == currentSourceOp) {
-        sourceOp = currentSourceOp;
-        continue;
-      }
-
-      LLVM_DEBUG(
-          DBGS() << "--different source linalg ops for replacing one op: \n"
-                 << sourceOp << "\n"
-                 << currentSourceOp << "\n");
-      return failure();
-    }
-    LLVM_DEBUG(DBGS() << "--replacing linalg op with unknown non-linalg op:\n"
-                      << *value.getDefiningOp() << "\n");
-    return failure();
-  }
-  return sourceOp;
-}
-
-/// Find the scf "for" op that defines all values in the range.
-/// Take into account the the op may just disappear when it is replaced by its
-/// body, in the case od a single iteration loop.
-// It is unclear atm how to account for this properly.
-static FailureOr<Operation *> findSingleForOpDefiningAll(ValueRange range) {
-  LLVM_DEBUG(DBGS() << "Start findSingleForOpDefiningAll\n");
-  Operation *forOp = nullptr;
-  for (Value value : range) {
-    LLVM_DEBUG(DBGS() << "--find for: " << value << "\n");
-    // Block arguments are just dropped.
-    auto currentSourceOp = value.getDefiningOp();
-    if (!currentSourceOp) {
-      LLVM_DEBUG(DBGS() << "--replacing tracked op with bbarg -> SKIP\n");
-      continue;
-    }
-    auto currentForOp = dyn_cast<scf::ForOp>(currentSourceOp);
-    if (!forOp || (currentForOp && forOp == currentForOp)) {
-      forOp = currentSourceOp;
-      continue;
-    }
-    LLVM_DEBUG(DBGS() << "---no single scf.for replacement found -> SKIP\n");
-    LLVM_DEBUG(
-        DBGS() << "---WARNING: this will drop tracking of the scf.for\n");
-    return nullptr;
-  }
-  return forOp;
-}
-
-/// Find the op that defines all values in the range.
-static FailureOr<Operation *> findSingleOpDefiningAll(ValueRange range) {
-  Operation *op = nullptr;
-  for (Value value : range) {
-    // Block arguments are just dropped.
-    auto currentSourceOp = value.getDefiningOp();
-    if (!currentSourceOp) {
-      LLVM_DEBUG(DBGS() << "replacing tracked op with bbarg\n");
-      continue;
-    }
-
-    if (!op || op == currentSourceOp) {
-      op = currentSourceOp;
-      continue;
-    }
-
-    LLVM_DEBUG(DBGS() << "different source op when replacing one op\n");
-    return failure();
-  }
-  return op;
-}
-
-// Find a single op that defines all values in the range, optionally
-// transitively through other operations in an op-specific way.
-static FailureOr<Operation *> findSingleDefiningOp(Operation *replacedOp,
-                                                   ValueRange range) {
-  return llvm::TypeSwitch<Operation *, FailureOr<Operation *>>(replacedOp)
-      .Case<linalg::LinalgOp>([&](linalg::LinalgOp) -> FailureOr<Operation *> {
-        auto op = findSingleLinalgOpDefiningAll(range);
-        if (failed(op))
-          return failure();
-        return op->getOperation();
-      })
-      .Case<scf::ForOp>([&](scf::ForOp) -> FailureOr<Operation *> {
-        return findSingleForOpDefiningAll(range);
-      })
-      .Default([&](Operation *) -> FailureOr<Operation *> {
-        return findSingleOpDefiningAll(range);
-      });
-}
-
-void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
-                                                     ValueRange newValues) {
-  // Bail out if in error state.
-  if (hadErrors)
-    return;
-
-  // Exit early if the op is not tracked.
-  SmallVector<Value> handles;
-  if (failed(getTransformState().getHandlesForPayloadOp(op, handles))) {
-    LLVM_DEBUG(DBGS() << "no tracking handle to remove\n");
+void ErrorCheckingTrackingListener::notifyPayloadReplacementNotFound(
+    Operation *op, ValueRange values) {
+  // Certain ops can dropped safely.
+  if (isa<scf::ForOp>(op)) {
+    LLVM_DEBUG(DBGS() << "Silently dropping scf.for op mapping\n");
     return;
   }
 
-  FailureOr<Operation *> replacement = findSingleDefiningOp(op, newValues);
-  if (failed(replacement)) {
-    LLVM_DEBUG(DBGS() << "could not find replacement for tracked op\n");
-    emitError(op) << "could not find replacement for tracked op";
-    return;
-  }
-
-  // If this would cause an error with replacement, drop instead.
-  if (*replacement && (*replacement)->getNumResults() != op->getNumResults()) {
-    LLVM_DEBUG(DBGS() << "failsafe error tracking activated due to mismatched "
-                         "number of results for op: "
-                      << op << " and replacement " << *replacement << "\n");
-    replacement = nullptr;
-  }
-
-  if (*replacement == nullptr) {
-    // TODO: Check if the handle is dead. Otherwise, the op should not be
-    // dropped. This needs a change in the transform dialect interpreter.
-    LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
-  } else {
-    LLVM_DEBUG(DBGS() << "replacing tracked @" << op << " : " << *op << " with "
-                      << **replacement << "\n");
-  }
-  mayFail(replacePayloadOp(op, *replacement));
-}
-
-void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
-  // Bail out if in error state.
-  if (hadErrors)
-    return;
-
-  // TODO: Walk can be removed when D144193 has landed.
-  op->walk([&](Operation *op) {
-    // Exit early if the op is not tracked.
-    SmallVector<Value> handles;
-    if (failed(getTransformState().getHandlesForPayloadOp(op, handles))) {
-      LLVM_DEBUG(DBGS() << "no tracking handle to remove\n");
-      return;
-    }
-    LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
-    mayFail(replacePayloadOp(op, nullptr));
-  });
-}
-
-void mlir::TrackingListener::removeMappings(Operation *op) {
-  // Bail out if in error state.
-  if (hadErrors)
-    return;
-
-  // Replacing the tracked op with null will stop the tracking.
-  LLVM_DEBUG(DBGS() << "removing mappings @" << op << " : " << *op << "\n");
-  mayFail(replacePayloadOp(op, nullptr));
+  hadErrors = true;
+#ifdef LLVM_ENABLE_ABI_BREAKING_CHECKS
+  errorStateChecked = false;
+#endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
 }
 
 //===----------------------------------------------------------------------===//
@@ -828,6 +660,64 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
+/// Match callback for a convolution with optional fill and trailing
+/// elementwise operations. Matches *the first* occurrence of such a convolution
+/// within an op associated with the given handle.
+///
+/// Input handles:
+///
+///   - container op, must be associated with one operation.
+///
+/// Output handles:
+///
+///   - the "fill" op preceding the convolution, if present;
+///   - convolution op;
+///   - trailing elementwise op, if any.
+static DiagnosedSilenceableFailure
+convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
+                    const mlir::transform::TransformState &state,
+                    ValueRange handles) {
+  if (handles.size() != 1 || state.getPayloadOps(handles[0]).size() != 1) {
+    return emitSilenceableFailure(loc)
+           << "expected one handle to one operation";
+  }
+
+  transform_ext::StructuredOpMatcher *pattern, *fill, *trailing;
+  transform_ext::MatchedConvolutionCaptures ignore;
+  transform_ext::MatcherContext matcherContext;
+  makeConvolutionMatcher(matcherContext, pattern, fill, trailing, ignore);
+
+  // TODO: need a mechanism for this to go around the entire IR,
+  // potentially with list matches for each group.
+  Operation *root = state.getPayloadOps(handles[0])[0];
+
+  WalkResult walkResult = root->walk([&](Operation *op) {
+    pattern->resetCapture();
+    if (!matchPattern(op, *pattern))
+      return WalkResult::advance();
+
+    // TODO: notify properly.
+    LLVM_DEBUG({
+      DBGS() << "fill:\n";
+      if (fill->getCaptured())
+        DBGS() << fill->getCaptured() << "\n";
+      DBGS() << "pattern: " << pattern->getCaptured() << "\n";
+      DBGS() << "trailing:\n";
+      if (trailing->getCaptured())
+        DBGS() << trailing->getCaptured() << "\n";
+    });
+
+    res.addPotentiallyEmptyPayloadGroup(fill->getCaptured());
+    res.addPayloadGroup({pattern->getCaptured()});
+    res.addPotentiallyEmptyPayloadGroup(trailing->getCaptured());
+    return WalkResult::interrupt();
+  });
+
+  if (walkResult.wasInterrupted())
+    return DiagnosedSilenceableFailure::success();
+  return emitSilenceableFailure(loc) << "failed to match";
+}
+
 DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
     mlir::transform::TransformResults &results,
     mlir::transform::TransformState &state) {
@@ -838,6 +728,7 @@ DiagnosedSilenceableFailure transform_ext::RegisterMatchCallbacksOp::apply(
   registry.registerCallback("_test_value_matcher_callback",
                             testValueMatcherCallback);
   registry.registerCallback("reduction", reductionCallback);
+  registry.registerCallback("convolution", convolutionCallback);
   return DiagnosedSilenceableFailure::success();
 }
 

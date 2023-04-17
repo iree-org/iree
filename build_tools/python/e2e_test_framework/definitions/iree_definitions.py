@@ -413,8 +413,10 @@ def _generate_compile_flags(compile_config: CompileConfig,
 def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
   arch_info = target.target_architecture
   if target.target_backend == TargetBackend.VULKAN_SPIRV:
+    gpu_arch = arch_info.microarchitecture if len(
+        arch_info.microarchitecture) != 0 else arch_info.architecture
     return [
-        f"--iree-vulkan-target-triple={arch_info.architecture}-unknown-{target.target_abi.value}",
+        f"--iree-vulkan-target-triple={gpu_arch}-unknown-{target.target_abi.value}",
     ]
 
   if arch_info.architecture == "x86_64":

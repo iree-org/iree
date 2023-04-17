@@ -117,6 +117,7 @@ static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
   addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
                                       memcpyFn);
+
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.addNestedPass<func::FuncOp>(
@@ -181,7 +182,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   }
 
   if (loweringConfig.getTileSizes().size() !=
-      static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
+      static_cast<unsigned>(TilingLevel::NumTileLevels)) {
     return op->emitOpError("expected three tiling sizes, got ")
            << loweringConfig.getTileSizes().size();
   }
@@ -197,7 +198,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
 
     SmallVector<int64_t> secondLevelTileSizes = loweringConfig.getTileSizeVals(
-        static_cast<unsigned>(StrategyTilingLevel::ParallelTiles));
+        static_cast<unsigned>(TilingLevel::ParallelTiles));
     for (auto [index, tileSize] : llvm::enumerate(secondLevelTileSizes)) {
       if (tileSize != 0 && !pLoopsSet.contains(index)) {
         return op->emitOpError(
@@ -208,7 +209,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
 
     SmallVector<int64_t> thirdLevelTileSizes = loweringConfig.getTileSizeVals(
-        static_cast<unsigned>(StrategyTilingLevel::ReductionTiles));
+        static_cast<unsigned>(TilingLevel::ReductionTiles));
     for (auto [index, tileSize] : llvm::enumerate(thirdLevelTileSizes)) {
       if (tileSize != 0 && pLoopsSet.contains(index)) {
         return op->emitOpError(
@@ -248,7 +249,7 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
   if (loweringConfig.getTileSizes().size() !=
-      static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
+      static_cast<unsigned>(TilingLevel::NumTileLevels)) {
     return op->emitOpError("expected three tiling sizes, got ")
            << loweringConfig.getTileSizes().size();
   }
@@ -323,13 +324,14 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
   // Skip tiling reduction loops because this is expected to apply on copy ops
   // only.
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ParallelTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   {
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
-    options.vectorizeGatherAccesses = true;
+    // TODO(#13036): Re-enable once debugged.
+    options.vectorizeGatherAccesses = false;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -355,11 +357,11 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
+      static_cast<int64_t>(TilingLevel::ParallelTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ParallelDims));
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(StrategyTilingLevel::ReductionTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ReductionDims));
 
@@ -367,7 +369,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
+    // TODO(#13036): Re-enable once debugged.
+    options.vectorizeGatherAccesses = false;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -464,7 +467,8 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
-    options.vectorizeGatherAccesses = true;
+    // TODO(#13036): Re-enable once debugged.
+    options.vectorizeGatherAccesses = false;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -497,15 +501,15 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   // along reduction dim again, which needs them to be Linalg ops form.
 
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
+      static_cast<int64_t>(TilingLevel::ParallelTiles)));
   if (clEnablePadConsumerFusion) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createFuseTensorPadWithConsumerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
         createConcretizePadResultShapePass());
   }
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(StrategyTilingLevel::ReductionTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposeConvolutionToLowerDimOpsPass());
 
@@ -521,7 +525,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     LLVMCPUVectorizationPassOptions options;
     options.enableVectorMasking = enableVectorMasking;
     options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
+    // TODO(#13036): Re-enable once debugged.
+    options.vectorizeGatherAccesses = false;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -546,25 +551,36 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   }
 }
 
-void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager) {
+void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
+                                      bool enableMicrokernels) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(StrategyTilingLevel::ParallelTiles)));
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(StrategyTilingLevel::ReductionTiles)));
+      static_cast<int64_t>(TilingLevel::ParallelTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUVectorizationPass());
+  if (enableMicrokernels) {
+    nestedModulePM.addPass(createLLVMCPULowerToUKernelsPass());
+  } else {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorizationPass());
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   addBufferizePasses(nestedModulePM);
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUMmt4dVectorLoweringPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass(/*flatten=*/true));
+  if (enableMicrokernels) {
+    nestedModulePM.addPass(createLowerUKernelOpsToCallsPass());
+  } else {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUMmt4dVectorLoweringPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createOptimizeVectorTransferPass(/*flatten=*/true));
+  }
 }
 
 void addCPUDataTilingPipeline(OpPassManager &passManager) {
@@ -639,6 +655,12 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   passManager.addNestedPass<func::FuncOp>(
       createHoistStaticallyBoundAllocationsPass());
+
+  // Resolve get_buffer_descriptor ops. All structural buffer manipulations
+  // must conclude before this point.
+  passManager.addNestedPass<func::FuncOp>(
+      createIREEExpandStridedMetadataPass());
+  passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
 
   // Checking stack allocation before converting to CF dialect is easier.
   if (clCheckIRBeforeLLVMConversion) {

@@ -45,11 +45,8 @@ int main(int argc, char** argv) {
 
   // Create the root isolated VM instance that we can create contexts within.
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(allocator, &instance));
-
-  // Ensure custom types are registered before loading modules that use them.
-  // This only needs to be done once.
-  IREE_CHECK_OK(iree_custom_module_basic_register_types(instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        allocator, &instance));
 
   // Create the custom module that can be reused across contexts.
   iree_vm_module_t* custom_module = NULL;

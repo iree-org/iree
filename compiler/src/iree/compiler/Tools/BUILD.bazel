@@ -38,6 +38,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/InputConversion/Common",
         "//compiler/src/iree/compiler/InputConversion/MHLO",
+        "//compiler/src/iree/compiler/InputConversion/StableHLO",
         "//compiler/src/iree/compiler/InputConversion/TMTensor",
         "//compiler/src/iree/compiler/InputConversion/TOSA",
         "@llvm-project//mlir:ConversionPasses",

@@ -240,6 +240,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTransformDialect
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms

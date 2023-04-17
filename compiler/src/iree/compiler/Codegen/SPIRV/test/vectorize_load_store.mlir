@@ -419,3 +419,24 @@ func.func @complex_memref(%x: index, %y: index) -> complex<f32> {
   %1 = memref.load %0[%x, %y] : memref<8x32xcomplex<f32>>
   return %1: complex<f32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @vectorize_mma_load_store_non_identity_memref
+//  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
+func.func @vectorize_mma_load_store_non_identity_memref(%i0: index, %i1: index) {
+  %c0 = arith.constant 0 : index
+  %span0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>>
+  %span1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>>
+  %val = gpu.subgroup_mma_load_matrix %span0[%i0, %i1] {leadDimension = 1280 : index} : memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %val, %span1[%i0, %i1] {leadDimension = 1280 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[SPAN0:.+]] = hal.interface.binding.subspan {{.+}} offset(%[[C0]]) flags(ReadOnly) : memref<32x160xvector<4xf32>, strided<[160, 1], offset: 1480>, #hal.descriptor_type<storage_buffer>>
+// CHECK: %[[SPAN1:.+]] = hal.interface.binding.subspan {{.+}} offset(%[[C0]]) : memref<32x160xvector<4xf32>, strided<[160, 1], offset: 1480>, #hal.descriptor_type<storage_buffer>>
+// CHECK: %[[APPLY:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[I1]]]
+// CHECK: %[[VAL:.+]] = gpu.subgroup_mma_load_matrix %[[SPAN0]][%[[I0]], %[[APPLY]]] {leadDimension = 160 : index}
+// CHECK: gpu.subgroup_mma_store_matrix %[[VAL]], %[[SPAN1]][%[[I0]], %[[APPLY]]] {leadDimension = 160 : index}
+

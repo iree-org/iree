@@ -25,39 +25,39 @@ static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,
 
 // Resolves a type through either builtin rules or the ref registered types.
 static bool iree_vm_bytecode_module_resolve_type(
-    iree_vm_TypeDef_table_t type_def, iree_vm_type_def_t* out_type) {
+    iree_vm_instance_t* instance, iree_vm_TypeDef_table_t type_def,
+    iree_vm_type_def_t* out_type) {
   memset(out_type, 0, sizeof(*out_type));
   flatbuffers_string_t full_name = iree_vm_TypeDef_full_name(type_def);
   if (!flatbuffers_string_len(full_name)) {
     return false;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i8")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_I8;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I8);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i16")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_I16;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I16);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i32")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_I32;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i64")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_I64;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I64);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("f32")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_F32;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F32);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("f64")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_F64;
+    *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F64);
     return true;
   } else if (iree_vm_flatbuffer_strcmp(
                  full_name, iree_make_cstring_view("!vm.opaque")) == 0) {
-    out_type->value_type = IREE_VM_VALUE_TYPE_NONE;
-    out_type->ref_type = IREE_VM_REF_TYPE_NULL;
+    *out_type = iree_vm_make_undefined_type_def();
     return true;
   } else if (full_name[0] == '!') {
     // Note that we drop the ! prefix:
@@ -70,10 +70,9 @@ static bool iree_vm_bytecode_module_resolve_type(
       // all we have registered.
       type_name = iree_make_cstring_view("vm.list");
     }
-    const iree_vm_ref_type_descriptor_t* type_descriptor =
-        iree_vm_ref_lookup_registered_type(type_name);
-    if (type_descriptor) {
-      out_type->ref_type = type_descriptor->type;
+    iree_vm_ref_type_t type = iree_vm_instance_lookup_type(instance, type_name);
+    if (type) {
+      *out_type = iree_vm_make_ref_type_def(type);
       return true;
     }
   }
@@ -84,12 +83,14 @@ static bool iree_vm_bytecode_module_resolve_type(
 // |type_table| can be omitted to just perform verification that all types are
 // registered.
 static iree_status_t iree_vm_bytecode_module_resolve_types(
-    iree_vm_TypeDef_vec_t type_defs, iree_vm_type_def_t* type_table) {
+    iree_vm_instance_t* instance, iree_vm_TypeDef_vec_t type_defs,
+    iree_vm_type_def_t* type_table) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
     iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
-    if (!iree_vm_bytecode_module_resolve_type(type_def, &type_table[i])) {
+    if (!iree_vm_bytecode_module_resolve_type(instance, type_def,
+                                              &type_table[i])) {
       status = iree_make_status(IREE_STATUS_NOT_FOUND,
                                 "no type registered with name '%s'",
                                 iree_vm_TypeDef_full_name(type_def));
@@ -882,8 +883,8 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->def = module_def;
 
   module->type_count = iree_vm_TypeDef_vec_len(type_defs);
-  iree_status_t resolve_status =
-      iree_vm_bytecode_module_resolve_types(type_defs, module->type_table);
+  iree_status_t resolve_status = iree_vm_bytecode_module_resolve_types(
+      instance, type_defs, module->type_table);
   if (!iree_status_is_ok(resolve_status)) {
     iree_allocator_free(allocator, module);
     IREE_TRACE_ZONE_END(z0);

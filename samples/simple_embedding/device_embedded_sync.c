@@ -35,7 +35,7 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
 
   iree_hal_executable_loader_t* loader = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_embedded_elf_loader_create(
-      iree_hal_executable_import_provider_null(), host_allocator, &loader));
+      /*plugin_manager=*/NULL, host_allocator, &loader));
 
   iree_string_view_t identifier = iree_make_cstring_view("local-sync");
 

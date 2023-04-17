@@ -47,6 +47,7 @@ cc_binary_benchmark(
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local/loaders/registration",
+        "//runtime/src/iree/hal/local/plugins/registration",
         "//runtime/src/iree/testing:benchmark",
     ],
 )
@@ -68,6 +69,21 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "executable_library_util",
+    srcs = ["executable_library_util.c"],
+    hdrs = ["executable_library_util.h"],
+    deps = [
+        ":executable_environment",
+        ":executable_library",
+        ":executable_loader",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "executable_loader",
     srcs = [
         "executable_loader.c",
@@ -83,6 +99,26 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "executable_plugin",
+    hdrs = ["executable_plugin.h"],
+)
+
+iree_runtime_cc_library(
+    name = "executable_plugin_manager",
+    srcs = ["executable_plugin_manager.c"],
+    hdrs = ["executable_plugin_manager.h"],
+    deps = [
+        ":executable_loader",
+        ":executable_plugin",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:synchronization",
         "//runtime/src/iree/hal",
     ],
 )

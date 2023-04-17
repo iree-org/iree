@@ -114,6 +114,7 @@ class TargetConverter:
             "MhloPasses",
         ],
         "@mlir-hlo//stablehlo:chlo_ops": ["ChloOps",],
+        "@mlir-hlo//stablehlo:stablehlo_ops": ["StablehloOps",],
         "@mlir-hlo//:stablehlo_legalize_to_hlo_pass": ["StablehloToMhlo",],
         "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
 

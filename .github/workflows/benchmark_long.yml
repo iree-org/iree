@@ -34,15 +34,6 @@ jobs:
       runner-env: ${{ needs.setup.outputs.runner-env }}
       write-caches: ${{ needs.setup.outputs.write-caches }}
 
-  build_tf_integrations:
-    needs: setup
-    if: fromJson(needs.setup.outputs.should-run)
-    uses: ./.github/workflows/build_tf_integrations.yml
-    with:
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-      write-caches: ${{ needs.setup.outputs.write-caches }}
-
   build_benchmark_tools:
     needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
@@ -55,7 +46,7 @@ jobs:
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
 
   build_e2e_test_artifacts:
-    needs: [setup, build_all, build_tf_integrations]
+    needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
     uses: ./.github/workflows/build_e2e_test_artifacts.yml
     with:
@@ -64,9 +55,6 @@ jobs:
       build-dir: ${{ needs.build_all.outputs.build-dir }}
       build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      tf-binaries-dir: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-      tf-binaries-archive: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      tf-binaries-gcs-artifact: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
@@ -102,7 +90,6 @@ jobs:
     needs:
       - setup
       - build_all
-      - build_tf_integrations
       - build_benchmark_tools
       - build_e2e_test_artifacts
       - compilation_benchmarks

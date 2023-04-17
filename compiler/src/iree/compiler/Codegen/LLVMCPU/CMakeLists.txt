@@ -96,6 +96,7 @@ iree_cc_library(
     MLIRTosaToArith
     MLIRTransformDialect
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToLLVM
     MLIRVectorToSCF

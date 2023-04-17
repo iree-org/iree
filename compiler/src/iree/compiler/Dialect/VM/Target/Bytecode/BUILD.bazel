@@ -35,6 +35,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Transforms",
         "//compiler/src/iree/compiler/Dialect/VM/Utils:CallingConvention",
+        "//compiler/src/iree/compiler/Dialect/VM/Utils:TypeTable",
         "//compiler/src/iree/compiler/Utils",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
         "@llvm-project//llvm:Support",

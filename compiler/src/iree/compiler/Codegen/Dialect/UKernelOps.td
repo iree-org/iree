@@ -65,6 +65,32 @@ def IREECodegen_UKernelGenericOp :
   }];
 }
 
+def IREECodegen_UKernelGenericRawOp :
+    IREECodegen_UKernelOp<"ukernel.generic_raw", [
+      AttrSizedOperandSegments]> {
+  let summary = "Generic Microkernel operator, with only base address for memref operands";
+
+  let description = [{
+    Same as `ukernel.generic`, except that tensor/memref operands get lowered to
+    just the buffer and offset needed to obtain the buffer address, no strides.
+    This is meant to leave it up to each use case to manually pick which strides
+    to pass.
+  }];
+
+  let arguments = (ins
+    StrAttr:$u_kernel_fn_name,
+    Variadic<AnyType>:$inputs,
+    Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+    Variadic<AnyType>:$other_operands);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict $u_kernel_fn_name
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    (`outs` `(` $outputs^  `:` type($outputs) `)`)?
+    (`(` $other_operands^ `:` type($other_operands) `)`)? (`->` type($results)^)?
+  }];
+}
+
 def IREECodegen_UKernelMmt4DOp :
     IREECodegen_UKernelOp<"ukernel.mmt4d", []>  {
   let summary = "Mmt4D Microkernel operator";

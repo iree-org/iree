@@ -400,8 +400,19 @@ static ReductionConfig getReductionConfig(
   return ReductionConfig{maxNumThreads, vectorSize, ReductionStrategy::Staged};
 }
 
-LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
-    func::FuncOp entryPoint, linalg::LinalgOp op, const GPUModel &gpuModel) {
+/// Map an N-D parallel, 1-D reduction operation with optional leading and
+/// optional trailing elementwise operations.
+/// The 1-D reduction dimension must be in the most minor dimension.
+/// The innermost dimensions of the leading and trailing operations must be
+/// most minor along all accesses. Return failure if matching fails. On a
+/// successful match, configure a reduction strategy based on a proxy model of
+/// the hardware and construct transform dialect IR that implements the
+/// reduction strategy. The transform dialect IR is added in a top-level
+/// ModuleOp after the `entryPoint` func::FuncOp.
+static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
+                                                  linalg::LinalgOp op,
+                                                  const GPUModel &gpuModel) {
+  if (!gpuModel.hasWarpShuffle) return failure();
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
@@ -428,7 +439,18 @@ LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
   };
 
   // 3. Build strategy embedded into the IR.
-  createTransformRegion(entryPoint, strategyBuilder);
+  mlir::iree_compiler::createTransformRegion(entryPoint, strategyBuilder);
 
   return success();
+}
+
+LogicalResult mlir::iree_compiler::gpu::matchAndSetTransformStrategy(
+    func::FuncOp entryPoint, Operation *op, const GPUModel &gpuModel) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) return failure();
+  if (succeeded(matchAndSetReductionStrategy(entryPoint, linalgOp, gpuModel)))
+    return success();
+  // TODO: Add more transform dialect strategy for other kind of dispatch
+  // regions.
+  return failure();
 }

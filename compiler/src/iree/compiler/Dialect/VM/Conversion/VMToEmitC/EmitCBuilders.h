@@ -82,11 +82,17 @@ void memcpy(OpBuilder builder, Location location, Value dest, Value src,
 void memset(OpBuilder builder, Location location, Value dest, int ch,
             Value count);
 
+Value arrayElement(OpBuilder builder, Location location, Type type,
+                   size_t index, Value operand);
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand);
 
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           Value index, Value operand);
+
+void arrayElementAssign(OpBuilder builder, Location location, Value array,
+                        size_t index, Value value);
 
 void structDefinition(OpBuilder builder, Location location,
                       StringRef structName, ArrayRef<StructField> fields);
@@ -106,7 +112,13 @@ Value structPtrMember(OpBuilder builder, Location location, Type type,
 void structPtrMemberAssign(OpBuilder builder, Location location,
                            StringRef memberName, Value operand, Value data);
 
+Value ireeMakeCstringView(OpBuilder builder, Location location,
+                          std::string str);
+
 Value ireeOkStatus(OpBuilder builder, Location location);
+
+Value ireeVmInstanceLookupType(OpBuilder builder, Location location,
+                               Value instance, Value stringView);
 
 void ireeVmRefRelease(OpBuilder builder, Location location, Value operand);
 

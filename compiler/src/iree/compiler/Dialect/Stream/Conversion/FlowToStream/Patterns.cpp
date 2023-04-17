@@ -67,6 +67,22 @@ struct ConvertTensorReshapeOp
   }
 };
 
+struct ConvertTensorAllocOp
+    : public OpConversionPattern<IREE::Flow::TensorAllocOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Flow::TensorAllocOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    Type unknownType = IREE::Stream::ResourceType::get(getContext());
+    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
+                                        op.getResultDims(), rewriter);
+    rewriter.replaceOpWithNewOp<IREE::Stream::ResourceAllocOp>(
+        op, unknownType, resultSize,
+        /*uninitialized*/ true, getAffinityFor(op));
+    return success();
+  }
+};
+
 struct ConvertTensorEmptyOp
     : public OpConversionPattern<IREE::Flow::TensorEmptyOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -733,11 +749,12 @@ struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
 void populateFlowToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet &patterns) {
-  patterns.insert<
-      ConvertTensorReshapeOp, ConvertTensorEmptyOp, ConvertTensorSplatOp,
-      ConvertTensorCloneOp, ConvertTensorSliceOp, ConvertTensorUpdateOp,
-      ConvertTensorLoadOp, ConvertTensorStoreOp, ConvertTensorTraceOp>(
-      typeConverter, context);
+  patterns
+      .insert<ConvertTensorReshapeOp, ConvertTensorAllocOp,
+              ConvertTensorEmptyOp, ConvertTensorSplatOp, ConvertTensorCloneOp,
+              ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
+              ConvertTensorStoreOp, ConvertTensorTraceOp>(typeConverter,
+                                                          context);
   patterns.insert<ConvertChannelCountOp, ConvertChannelDefaultOp,
                   ConvertChannelRankOp>(typeConverter, context);
   patterns

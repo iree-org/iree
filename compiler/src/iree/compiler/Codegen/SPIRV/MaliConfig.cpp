@@ -52,23 +52,18 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setMaliMatmulConfig(linalgOp, limits);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [limits](auto op) { return setMaliMatmulConfig(op, limits); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            bool hasPaddedInput =
-                op.image().template getDefiningOp<tensor::PadOp>();
-            int bestTilingFactor = hasPaddedInput ? 8 : 16;
-            return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        bool hasPaddedInput =
-            op.image().template getDefiningOp<tensor::PadOp>();
-        int bestTilingFactor = hasPaddedInput ? 8 : 16;
-        return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-      })
-      .Default([](Operation *) { return failure(); });
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    // Use the result type in case of larger bitwidth for accumulators.
+    auto type = cast<ShapedType>(convOp->getResult(0).getType());
+    const int bitwidth = type.getElementTypeBitWidth();
+    if (bitwidth > 32) return failure();
+    const int multipler = 32 / bitwidth;
+    bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
+    const int bestTilingFactor = (hasPaddedInput ? 8 : 16) * multipler;
+    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+  }
+
+  return failure();
 }
 
 }  // namespace detail

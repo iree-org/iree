@@ -172,7 +172,7 @@ IREE_FLAG_CALLBACK(
     "Lists all available HAL devices from all drivers or a specific driver.\n"
     "Examples:\n"
     "  Show all devices from all drivers: --list_devices\n"
-    "  Show all devices from a particular driver: --list_devices=vulkan\n");
+    "  Show all devices from a particular driver: --list_devices=vulkan");
 
 static iree_status_t iree_hal_flags_dump_driver_device(
     iree_string_view_t driver_name, iree_hal_driver_t* driver,
@@ -279,7 +279,7 @@ IREE_FLAG_CALLBACK(
     " or a specific driver.\n"
     "Examples:\n"
     "  Show all devices from all drivers: --dump_devices\n"
-    "  Show all devices from a particular driver: --dump_devices=vulkan\n");
+    "  Show all devices from a particular driver: --dump_devices=vulkan");
 
 //===----------------------------------------------------------------------===//
 // Allocator configuration

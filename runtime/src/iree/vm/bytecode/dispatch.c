@@ -782,23 +782,24 @@ static iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP(CORE, GlobalLoadRef, {
       uint32_t global = VM_DecGlobalAttr("global");
       IREE_ASSERT(global < module_state->global_ref_count);
-      const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
+      const iree_vm_type_def_t type_def = VM_DecTypeOf("value");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-          result_is_move, global_ref, type_def->ref_type, result));
+          result_is_move, global_ref, iree_vm_type_def_as_ref(type_def),
+          result));
     });
 
     DISPATCH_OP(CORE, GlobalStoreRef, {
       uint32_t global = VM_DecGlobalAttr("global");
       IREE_ASSERT(global < module_state->global_ref_count);
-      const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
+      const iree_vm_type_def_t type_def = VM_DecTypeOf("value");
       bool value_is_move;
       iree_vm_ref_t* value = VM_DecOperandRegRef("value", &value_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-          value_is_move, value, type_def->ref_type, global_ref));
+          value_is_move, value, iree_vm_type_def_as_ref(type_def), global_ref));
     });
 
     DISPATCH_OP(CORE, GlobalLoadIndirectRef, {
@@ -809,12 +810,13 @@ static iree_status_t iree_vm_bytecode_dispatch(
             "global ref ordinal out of range: %d (table=%zu)", global,
             module_state->global_ref_count);
       }
-      const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
+      const iree_vm_type_def_t type_def = VM_DecTypeOf("value");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-          result_is_move, global_ref, type_def->ref_type, result));
+          result_is_move, global_ref, iree_vm_type_def_as_ref(type_def),
+          result));
     });
 
     DISPATCH_OP(CORE, GlobalStoreIndirectRef, {
@@ -825,12 +827,12 @@ static iree_status_t iree_vm_bytecode_dispatch(
             "global ref ordinal out of range: %d (table=%zu)", global,
             module_state->global_ref_count);
       }
-      const iree_vm_type_def_t* type_def = VM_DecTypeOf("value");
+      const iree_vm_type_def_t type_def = VM_DecTypeOf("value");
       bool value_is_move;
       iree_vm_ref_t* value = VM_DecOperandRegRef("value", &value_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-          value_is_move, value, type_def->ref_type, global_ref));
+          value_is_move, value, iree_vm_type_def_as_ref(type_def), global_ref));
     });
 
     //===------------------------------------------------------------------===//
@@ -872,7 +874,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_retain(
           &module_state->rodata_ref_table[rodata_ordinal],
-          iree_vm_buffer_type_id(), result));
+          iree_vm_buffer_type(), result));
     });
 
     //===------------------------------------------------------------------===//
@@ -888,8 +890,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_RETURN_IF_ERROR(iree_vm_buffer_create(
           IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST,
           length, alignment, module_state->allocator, &buffer));
-      IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-          buffer, iree_vm_buffer_type_id(), result_ref));
+      IREE_RETURN_IF_ERROR(
+          iree_vm_ref_wrap_assign(buffer, iree_vm_buffer_type(), result_ref));
     });
 
     DISPATCH_OP(CORE, BufferClone, {
@@ -909,8 +911,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_RETURN_IF_ERROR(iree_vm_buffer_clone(
           IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST,
           source, offset, length, alignment, module_state->allocator, &result));
-      IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-          result, iree_vm_buffer_type_id(), result_ref));
+      IREE_RETURN_IF_ERROR(
+          iree_vm_ref_wrap_assign(result, iree_vm_buffer_type(), result_ref));
     });
 
     DISPATCH_OP(CORE, BufferLength, {
@@ -1179,7 +1181,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
     //===------------------------------------------------------------------===//
 
     DISPATCH_OP(CORE, ListAlloc, {
-      const iree_vm_type_def_t* element_type_def = VM_DecTypeOf("element_type");
+      const iree_vm_type_def_t element_type_def = VM_DecTypeOf("element_type");
       uint32_t initial_capacity = VM_DecOperandRegI32("initial_capacity");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
@@ -1187,7 +1189,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_RETURN_IF_ERROR(iree_vm_list_create(
           element_type_def, initial_capacity, module_state->allocator, &list));
       IREE_RETURN_IF_ERROR(
-          iree_vm_ref_wrap_assign(list, iree_vm_list_type_id(), result));
+          iree_vm_ref_wrap_assign(list, iree_vm_list_type(), result));
     });
 
     DISPATCH_OP(CORE, ListReserve, {
@@ -1287,14 +1289,14 @@ static iree_status_t iree_vm_bytecode_dispatch(
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
       uint32_t index = VM_DecOperandRegI32("index");
-      const iree_vm_type_def_t* type_def = VM_DecTypeOf("result");
+      const iree_vm_type_def_t type_def = VM_DecTypeOf("result");
       bool result_is_move;
       iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
       // TODO(benvanik): use result_is_move with a _retain_or_move.
       IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_retain(list, index, result));
       if (result->type != IREE_VM_REF_TYPE_NULL &&
           (iree_vm_type_def_is_value(type_def) ||
-           result->type != type_def->ref_type)) {
+           result->type != iree_vm_type_def_as_ref(type_def))) {
         // Type mismatch; put null in the register instead.
         // TODO(benvanik): return an error here and make a query type method?
         iree_vm_ref_release(result);
@@ -1342,7 +1344,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       int32_t condition = VM_DecOperandRegI32("condition");
       // TODO(benvanik): remove the type_id and use either LHS/RHS (if both are
       // null then output is always null so no need to know the type).
-      const iree_vm_type_def_t* type_def = VM_DecTypeOf("true_value");
+      const iree_vm_type_def_t type_def = VM_DecTypeOf("true_value");
       bool true_value_is_move;
       iree_vm_ref_t* true_value =
           VM_DecOperandRegRef("true_value", &true_value_is_move);
@@ -1354,14 +1356,16 @@ static iree_status_t iree_vm_bytecode_dispatch(
       if (condition) {
         // Select LHS.
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-            true_value_is_move, true_value, type_def->ref_type, result));
+            true_value_is_move, true_value, iree_vm_type_def_as_ref(type_def),
+            result));
         if (false_value_is_move && false_value != result) {
           iree_vm_ref_release(false_value);
         }
       } else {
         // Select RHS.
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-            false_value_is_move, false_value, type_def->ref_type, result));
+            false_value_is_move, false_value, iree_vm_type_def_as_ref(type_def),
+            result));
         if (true_value_is_move && true_value != result) {
           iree_vm_ref_release(true_value);
         }
@@ -1396,7 +1400,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, SwitchRef, {
       int32_t index = VM_DecOperandRegI32("index");
-      const iree_vm_type_def_t* type_def = VM_DecTypeOf("result");
+      const iree_vm_type_def_t type_def = VM_DecTypeOf("result");
       bool default_is_move;
       iree_vm_ref_t* default_value =
           VM_DecOperandRegRef("default_value", &default_is_move);
@@ -1410,10 +1414,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
         iree_vm_ref_t* new_value = &regs_ref[value_reg_list->registers[index] &
                                              IREE_REF_REGISTER_MASK];
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-            is_move, new_value, type_def->ref_type, result));
+            is_move, new_value, iree_vm_type_def_as_ref(type_def), result));
       } else {
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-            default_is_move, default_value, type_def->ref_type, result));
+            default_is_move, default_value, iree_vm_type_def_as_ref(type_def),
+            result));
       }
     });
 

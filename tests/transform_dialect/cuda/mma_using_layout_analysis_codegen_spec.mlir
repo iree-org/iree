@@ -14,6 +14,13 @@ transform.sequence failures(propagate) {
   transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [16] ( mapping = [#gpu.block<x>] )
   transform.structured.fuse_into_containing_op %fill into %forall_grid
 
+  // Promote operands in order to test loading from shared memory.
+  %matmul_2 = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+  %promoted_matmul, %alloc_0, %alloc_1 =
+    transform.iree.promote_operands %matmul_2 [0, 1] 
+      : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
+
+
   // Step 3. Vectorize
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation

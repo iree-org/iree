@@ -322,7 +322,7 @@ static iree_status_t iree_vm_native_module_issue_call(
       &module->descriptor->functions[function_ordinal];
   iree_status_t status =
       function_ptr->shim(stack, flags, args_storage, rets_storage,
-                         function_ptr->target, module, module_state);
+                         function_ptr->target, module->self, module_state);
   if (iree_status_is_deferred(status)) {
     // Call deferred; bail and return to the scheduler.
     // Note that we preserve the stack.

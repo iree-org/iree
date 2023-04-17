@@ -124,7 +124,7 @@ for instructions for CMake setup and building from source.
     files.
 
 2. Compile the [example module](./example_stream.mlir) to a .vmfb file and pass
-   the path to the build directory so the .spv files can be found:
+   the path to the build directory so the .o files can be found:
 
     ```
     iree-compile \

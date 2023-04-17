@@ -346,7 +346,133 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
 // hal.device.queue.execute
 //===----------------------------------------------------------------------===//
 
+// Returns true if |before| is always executed by the time |after| is reached.
+// NOTE: this is currently very conservative and only looks for ops in the
+// same basic block. We need an abstract interpreter to do much more as we'd
+// need to track conditionals/branching logic.
+static bool isOpAlwaysExecutedWith(Operation *before, Operation *after) {
+  if (before == after) return true;
+  if (before->getBlock() != after->getBlock()) return false;
+  return before->isBeforeInBlock(after);
+}
+
+// Returns true if |op| was hoisted before |insertBefore| without breaking
+// SSA invariants. Returns false if no IR modifications were made.
+static bool tryHoistOpBeforeUser(Operation *op, Operation *insertBefore) {
+  if (op == insertBefore) return false;
+
+  // Currently conservative - should be doing a domination check.
+  if (op->getBlock() != insertBefore->getBlock()) {
+    // Today only doing within the same block.
+    return false;
+  }
+
+  // Ensure all operands are defined above the insertion target.
+  // TODO(benvanik): hoist dependent ops too (constants are common).
+  if (!llvm::all_of(op->getOperands(), [&](Value operand) {
+        auto *definingOp = operand.getDefiningOp();
+        if (!definingOp || definingOp->getBlock() != insertBefore->getBlock()) {
+          // Function/block args or values defined outside the insertion block
+          // are ok since we are limiting to 1 block.
+          return true;
+        }
+        return definingOp->isBeforeInBlock(insertBefore);
+      })) {
+    return false;
+  }
+
+  // Should be safe to hoist the op 🤞.
+  op->moveBefore(insertBefore);
+  return true;
+}
+
 namespace {
+
+/// Swaps a device queue barrier with an immediate host fence signal when the
+/// wait fence is immediately resolved (null).
+struct ImmediatelyResolveDeviceQueueBarrier
+    : public OpRewritePattern<DeviceQueueExecuteOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
+                                PatternRewriter &rewriter) const override {
+    // Only looking for ops performing basic barriers.
+    if (!barrierOp.isBarrier()) return failure();
+
+    // Check for whether we know the wait fence is immediately resolved in the
+    // local scope. A more involved data flow analysis would let us handle more
+    // cases (function calls, block edges, etc) that commonly arise.
+    if (!isa_and_nonnull<IREE::Util::NullOp>(
+            barrierOp.getWaitFence().getDefiningOp())) {
+      return failure();
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::HAL::FenceSignalOp>(
+        barrierOp, barrierOp.getSignalFence());
+    return success();
+  }
+};
+
+/// Aliases a signal fence to a wait fence when there's a direct execution
+/// dependency through the barrier. This only checks the local scope but could
+/// be extended across CFG boundaries.
+///
+/// Example:
+///  %fence0 = hal.fence.create
+///  hal.device.queue.execute signal(%fence0)
+///  hal.device.queue.execute wait(%fence0) signal(%fence1)
+/// ->
+///  hal.device.queue.execute signal(%fence1)
+struct HoistDeviceQueueBarrierChain
+    : public OpRewritePattern<DeviceQueueExecuteOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
+                                PatternRewriter &rewriter) const override {
+    // Only looking for ops performing basic barriers.
+    if (!barrierOp.isBarrier()) return failure();
+
+    // See if we can observe the original fence creation in the local scope.
+    auto waitFence = barrierOp.getWaitFence();
+    auto createOp =
+        dyn_cast_or_null<IREE::HAL::FenceCreateOp>(waitFence.getDefiningOp());
+    if (!createOp) {
+      return rewriter.notifyMatchFailure(barrierOp,
+                                         "cannot analyze wait fence creation");
+    }
+
+    // Today this simple pattern only deals with the local block. We should
+    // extend this to support a must-be-executed context such that we can deal
+    // with the common case of some basic control flow handling errors/etc.
+    if (createOp->getBlock() != barrierOp->getBlock()) {
+      return rewriter.notifyMatchFailure(
+          barrierOp,
+          "create and barrier are in different blocks; analysis TBD");
+    }
+
+    // To ensure we don't break SSA invariants we need to only hoist if the
+    // signal fence is or can be defined before all users of the waitFence we
+    // are replacing. Note that because we are only matching on ops within
+    // the same block if we don't have the defining op it means it's a block
+    // argument and is always available.
+    auto signalFence = barrierOp.getSignalFence();
+    auto signalDefiningOp = signalFence.getDefiningOp();
+    if (signalDefiningOp) {
+      // Try to hoist up to the defining op.
+      if (!tryHoistOpBeforeUser(signalDefiningOp, createOp)) {
+        return rewriter.notifyMatchFailure(
+            barrierOp, "signal defining op cannot be hoisted");
+      }
+    }
+
+    // Replace the original fence with the new one and drop the create.
+    rewriter.replaceAllUsesWith(waitFence, signalFence);
+    rewriter.eraseOp(createOp);
+
+    // Drop the barrier now that it is a no-op.
+    rewriter.eraseOp(barrierOp);
+
+    return success();
+  }
+};
 
 /// Elides queue barriers that are used for sequencing fences when the operation
 /// could be performed by way of the originating queue operation.
@@ -361,9 +487,8 @@ struct ElideDeviceQueueBarrierOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DeviceQueueExecuteOp barrierOp,
                                 PatternRewriter &rewriter) const override {
-    // Only looking for ops performing basic barriers - ones executing commands
-    // are only ever fixed up.
-    if (!barrierOp.getCommandBuffers().empty()) return failure();
+    // Only looking for ops performing basic barriers.
+    if (!barrierOp.isBarrier()) return failure();
 
     // We're looking at the wait fence on the barrier back up to the signal
     // operation on that fence.
@@ -437,16 +562,6 @@ struct ElideDeviceQueueBarrierOp
         .Default([](Operation *op) { return false; });
   }
 
-  // Returns true if |before| is always executed by the time |after| is reached.
-  // NOTE: this is currently very conservative and only looks for ops in the
-  // same basic block. We need an abstract interpreter to do much more as we'd
-  // need to track conditionals/branching logic.
-  static bool isOpAlwaysExecutedWith(Operation *before, Operation *after) {
-    if (before == after) return true;
-    if (before->getBlock() != after->getBlock()) return false;
-    return before->isBeforeInBlock(after);
-  }
-
   // Updates |op| to signal |fence|.
   static LogicalResult updateOpToSignalFence(Operation *op, Value fence) {
     // For now we have a limited set of these ops but we should add an interface
@@ -472,6 +587,8 @@ struct ElideDeviceQueueBarrierOp
 
 void DeviceQueueExecuteOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ImmediatelyResolveDeviceQueueBarrier>(context);
+  results.insert<HoistDeviceQueueBarrierChain>(context);
   results.insert<ElideDeviceQueueBarrierOp>(context);
 }
 
@@ -757,6 +874,11 @@ void FenceCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // hal.fence.join
 //===----------------------------------------------------------------------===//
 
+OpFoldResult FenceJoinOp::fold(FoldAdaptor operands) {
+  if (getFences().size() == 1) return getFences().front();
+  return {};
+}
+
 namespace {
 
 /// Replaces a fence join with no operands with a null value.
@@ -808,6 +930,70 @@ void FenceJoinOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<ElideEmptyFenceJoin>(context);
   results.insert<DeduplicateFenceJoinFences>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.fence.signal
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Replaces a fence that is immediately signaled on the host with a null fence.
+/// This is only safe if there are no users of the fence between where it is
+/// created and where it is signaled. We keep things in the local block scope
+/// but a larger data flow analysis pass would be useful for propagating across
+/// block/function boundaries (common in larger loops/call trees where signal
+/// fences are passed as arguments).
+///
+/// Example:
+///  %fence = hal.fence.create
+///  hal.fence.signal<%fence : !hal.fence>
+/// ->
+///  %fence = util.null : !hal.fence
+struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(FenceSignalOp signalOp,
+                                PatternRewriter &rewriter) const override {
+    auto fence = signalOp.getFence();
+    auto createOp =
+        dyn_cast_or_null<IREE::HAL::FenceCreateOp>(fence.getDefiningOp());
+    if (!createOp) return failure();
+
+    // TODO(benvanik): broader analysis - likely in a dedicated fence elision
+    // pass so we can do IPO. For now block-only.
+    if (createOp->getBlock() != signalOp->getBlock()) {
+      return rewriter.notifyMatchFailure(
+          signalOp,
+          "fence create and signal are in different blocks; analysis TBD");
+    }
+
+    // Ensure there are no uses between the create and the signal.
+    // There are probably some uses we could allow (selects, etc) but we'll
+    // reserve that for a larger analysis.
+    for (auto userOp : fence.getUsers()) {
+      if (userOp->getBlock() == signalOp->getBlock() &&
+          userOp->isBeforeInBlock(signalOp)) {
+        return rewriter.notifyMatchFailure(
+            signalOp, "interleaved fence usage; cannot elide");
+      }
+    }
+
+    // Safe to elide.
+    Value nullFence = rewriter.create<IREE::Util::NullOp>(
+        rewriter.getFusedLoc({createOp.getLoc(), signalOp.getLoc()}),
+        fence.getType());
+    rewriter.replaceAllUsesWith(fence, nullFence);
+    rewriter.eraseOp(signalOp);
+
+    return success();
+  }
+};
+
+}  // namespace
+
+void FenceSignalOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
+  results.insert<ElideSignaledFence>(context);
 }
 
 //===----------------------------------------------------------------------===//

@@ -164,12 +164,15 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Enables optional HAL features. Each of these may add several KB to the final
 // binary when linked dynamically.
 
-// To use an import provider in the built-in CPU drivers define a function like:
-//   iree_hal_executable_import_provider_t my_provider(void) { ... }
+// To register local executable import plugins define a function like:
+// iree_status_t register_my_plugins(
+//    iree_hal_executable_plugin_manager_t* manager,
+//    iree_allocator_t host_allocator);
 // And define it:
-//   -DIREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN=my_provider
-// This will only work for default drivers and otherwise users can explicitly
-// specify the provider when creating the executable loaders themselves.
+//   -DIREE_HAL_EXECUTABLE_PLUGIN_REGISTRATION_FN=register_my_plugins
+// Alternatively when creating drivers explicitly (vs using the driver modules
+// and automatic registry) the plugin manager can be used to register both
+// stateful plugins and lightweight import providers.
 
 #if !defined(IREE_HAL_VERBOSE_TRACING_ENABLE)
 // Whether to enable additional HAL tracing that is known to have non-trivial

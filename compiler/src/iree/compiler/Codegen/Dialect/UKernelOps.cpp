@@ -28,6 +28,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace Codegen {
 
+//===---------------------------------------------------------------------===//
+// Helpers
+//===---------------------------------------------------------------------===//
+
 /// Helper method to generate a function declaration at a module scope,
 /// and a call to that function
 static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
@@ -53,7 +57,11 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
     // TODO(#12327): Based on description in the issue, add an attribute
     // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
     // backend (obviously), but is enough to unblock while the proper fix lands.
+    // For now there are a bunch of attributes set on the function, but this
+    // should be made more controllable based on the backend.
     fnDecl->setAttr("vm.import.module", rewriter.getStringAttr("vmvx"));
+    fnDecl->setAttr("llvm.bareptr", rewriter.getBoolAttr(true));
+    fnDecl->setAttr("hal.import.static", rewriter.getBoolAttr(true));
   } else if (fnDecl.getFunctionType() != functionType) {
     return rewriter.notifyMatchFailure(
         op, llvm::formatv("mismatch in function type computed during lowering "
@@ -65,19 +73,23 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
   return rewriter.create<func::CallOp>(loc, fnDecl, callOperands);
 }
 
-//===---------------------------------------------------------------------===//
-// UKernelGenericOp
-//===---------------------------------------------------------------------===//
-
-std::pair<int64_t, int64_t> UKernelGenericOp::getDpsInitsPositionRange() {
-  auto [pos, size] = getODSOperandIndexAndLength(1);
-  return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
-}
+/// Enum to describe what function arguments to pass to the ukernel target
+/// function for each memref operand of the ukernel op.
+enum class BufferPassingStyle {
+  // Pass only the base buffer and offset, the bare minimum for the callee to be
+  // able to compute the effective buffer address. Used by ukernel.generic_raw.
+  kBufferAndOffset,
+  // Also pass the N-1 first strides for a rank-N memref, i.e. all but the
+  // inner-most stride. Used by ukernel.generic.
+  // TODO(#13096): Let ukernel.generic pass N strides, change this enum value.
+  kBufferAndOffsetAndNm1Strides
+};
 
 /// Map type of operand of a `iree_codegen.ukernel.generic` operation to
 /// the type(s) of the function call arguments(s) it lowers to.
 static LogicalResult getCallOpType(MLIRContext *context,
                                    Type microKernelOpOperandType,
+                                   BufferPassingStyle bufferPassingStyle,
                                    SmallVector<Type> &callOperandTypes) {
   return TypeSwitch<Type, LogicalResult>(microKernelOpOperandType)
       .Case<FloatType, IndexType, IntegerType>([&](auto scalarType) {
@@ -92,15 +104,16 @@ static LogicalResult getCallOpType(MLIRContext *context,
         callOperandTypes.push_back(MemRefType::get(
             ArrayRef<int64_t>{}, memrefType.getElementType(),
             MemRefLayoutAttrInterface{}, memrefType.getMemorySpace()));
-        if (memrefType.getRank() == 0) return success();
-
-        auto indexType = IndexType::get(context);
         // Offset
+        auto indexType = IndexType::get(context);
         callOperandTypes.push_back(indexType);
-
         // Strides.
-        callOperandTypes.resize(
-            callOperandTypes.size() + memrefType.getRank() - 1, indexType);
+        if (memrefType.getRank() >= 1 &&
+            bufferPassingStyle ==
+                BufferPassingStyle::kBufferAndOffsetAndNm1Strides) {
+          callOperandTypes.resize(
+              callOperandTypes.size() + memrefType.getRank() - 1, indexType);
+        }
         return success();
       })
       .Default([&](Type t) { return failure(); });
@@ -110,6 +123,7 @@ static LogicalResult getCallOpType(MLIRContext *context,
 /// the function call it lowers to.
 static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
                                          Value operand,
+                                         BufferPassingStyle bufferPassingStyle,
                                          SmallVector<Value> &callOperands) {
   return TypeSwitch<Type, LogicalResult>(operand.getType())
       .Case<FloatType, IndexType, IntegerType>([&](auto scalarType) {
@@ -121,58 +135,94 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
             rewriter.create<memref::ExtractStridedMetadataOp>(loc, operand);
         // Base ptr.
         callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
-        if (memrefType.getRank() == 0) {
-          return success();
-        }
         // Offset.
         callOperands.push_back(extractStridedMetadataOp.getOffset());
         // Strides.
-        for (auto stride : extractStridedMetadataOp.getStrides().drop_back()) {
-          callOperands.push_back(stride);
+        if (memrefType.getRank() >= 1 &&
+            bufferPassingStyle ==
+                BufferPassingStyle::kBufferAndOffsetAndNm1Strides) {
+          for (auto stride :
+               extractStridedMetadataOp.getStrides().drop_back()) {
+            callOperands.push_back(stride);
+          }
         }
         return success();
       })
       .Default([](Type) { return failure(); });
 }
 
-FailureOr<func::CallOp> UKernelGenericOp::lowerToFunctionCall(
-    RewriterBase &rewriter) {
+/// Shared implementation of
+///   {UKernelGenericOp, UKernelGenericRawOp}::lowerToFunctionCall
+/// which differ only in the bufferPassingStyle.
+static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
+    RewriterBase &rewriter, Operation *op, StringRef fnName,
+    BufferPassingStyle bufferPassingStyle) {
   // Create the function type based on the operands and results.
   SmallVector<Type> callArgumentTypes;
-  for (auto microKernelOpOperandType : getOperation()->getOperandTypes()) {
+  for (auto microKernelOpOperandType : op->getOperandTypes()) {
     if (failed(getCallOpType(rewriter.getContext(), microKernelOpOperandType,
-                             callArgumentTypes))) {
+                             bufferPassingStyle, callArgumentTypes))) {
       return rewriter.notifyMatchFailure(
-          getOperation(), llvm::formatv("failed to lower operand type {0}",
-                                        microKernelOpOperandType));
+          op, llvm::formatv("failed to lower operand type {0}",
+                            microKernelOpOperandType));
     }
   }
   SmallVector<Type> callResultTypes;
-  for (auto resultType : getResultTypes()) {
+  for (auto resultType : op->getResultTypes()) {
     if (resultType.isa<ShapedType>()) {
       return rewriter.notifyMatchFailure(
-          getOperation(),
-          "cannot lower a `ShapedType` return value to function call");
+          op, "cannot lower a `ShapedType` return value to function call");
     }
     if (failed(getCallOpType(rewriter.getContext(), resultType,
-                             callResultTypes))) {
+                             bufferPassingStyle, callResultTypes))) {
       return rewriter.notifyMatchFailure(
-          getOperation(),
-          llvm::formatv("failed to lower result type {0}", resultType));
+          op, llvm::formatv("failed to lower result type {0}", resultType));
     }
   }
 
   // Get the operands for the function call.
   SmallVector<Value> callOperands;
-  Location loc = getLoc();
-  for (auto operand : getOperands()) {
-    if (failed(lowerToCallOperands(loc, rewriter, operand, callOperands))) {
+  for (auto operand : op->getOperands()) {
+    if (failed(lowerToCallOperands(op->getLoc(), rewriter, operand,
+                                   bufferPassingStyle, callOperands))) {
       return rewriter.notifyMatchFailure(
-          getOperation(), "failed to lower operands to function call operands");
+          op, "failed to lower operands to function call operands");
     }
   }
-  return createFunctionCall(rewriter, getOperation(), getUKernelFnName(),
-                            callArgumentTypes, callResultTypes, callOperands);
+  return createFunctionCall(rewriter, op, fnName, callArgumentTypes,
+                            callResultTypes, callOperands);
+}
+
+//===---------------------------------------------------------------------===//
+// UKernelGenericOp
+//===---------------------------------------------------------------------===//
+
+std::pair<int64_t, int64_t> UKernelGenericOp::getDpsInitsPositionRange() {
+  auto [pos, size] = getODSOperandIndexAndLength(1);
+  return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
+}
+
+FailureOr<func::CallOp> UKernelGenericOp::lowerToFunctionCall(
+    RewriterBase &rewriter) {
+  return lowerUKernelGenericToFunctionCall(
+      rewriter, getOperation(), getUKernelFnName(),
+      BufferPassingStyle::kBufferAndOffsetAndNm1Strides);
+}
+
+//===---------------------------------------------------------------------===//
+// UKernelGenericRawOp
+//===---------------------------------------------------------------------===//
+
+std::pair<int64_t, int64_t> UKernelGenericRawOp::getDpsInitsPositionRange() {
+  auto [pos, size] = getODSOperandIndexAndLength(1);
+  return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
+}
+
+FailureOr<func::CallOp> UKernelGenericRawOp::lowerToFunctionCall(
+    RewriterBase &rewriter) {
+  return lowerUKernelGenericToFunctionCall(
+      rewriter, getOperation(), getUKernelFnName(),
+      BufferPassingStyle::kBufferAndOffset);
 }
 
 //===---------------------------------------------------------------------===//
@@ -202,14 +252,30 @@ static FailureOr<SmallVector<Type>> getFunctionArgTypesForUKernelMmt4D(
         memRefType.getMemorySpace()));
     // offset
     callArgumentTypes.push_back(indexType);
+    return success();
+  };
+  auto processMemrefTypeOperandStride0 =
+      [&](Value memRefValue) -> LogicalResult {
+    auto memRefType = memRefValue.getType().dyn_cast<MemRefType>();
+    if (!memRefType) {
+      return mmt4dUKernelOp->emitOpError(
+          llvm::formatv("unable to lower {0} to function call argument types",
+                        memRefValue.getType()));
+    }
     // stride[0]
     callArgumentTypes.push_back(indexType);
     return success();
   };
-  /// LHS, RHS, Out
+  /// LHS, RHS, Out buffer+offset
   if (failed(processMemrefTypeOperand(mmt4dUKernelOp.getLhs())) ||
       failed(processMemrefTypeOperand(mmt4dUKernelOp.getRhs())) ||
       failed(processMemrefTypeOperand(mmt4dUKernelOp.getOutput()))) {
+    return failure();
+  }
+  /// LHS, RHS, Out stride[0]
+  if (failed(processMemrefTypeOperandStride0(mmt4dUKernelOp.getLhs())) ||
+      failed(processMemrefTypeOperandStride0(mmt4dUKernelOp.getRhs())) ||
+      failed(processMemrefTypeOperandStride0(mmt4dUKernelOp.getOutput()))) {
     return failure();
   }
   // m, n, k
@@ -232,7 +298,11 @@ static FailureOr<SmallVector<Value>> getFunctionArgValuesForUKernelMmt4D(
     callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
     // offset.
     callOperands.push_back(extractStridedMetadataOp.getOffset());
-    // strides.
+  };
+  auto processMemrefTypeOperandStride0 = [&](Value memRefValue) {
+    auto extractStridedMetadataOp =
+        rewriter.create<memref::ExtractStridedMetadataOp>(loc, memRefValue);
+    // stride[0].
     callOperands.push_back(extractStridedMetadataOp.getStrides().front());
   };
   auto getDimAsI32 = [&](Value value, int dim) {
@@ -241,12 +311,14 @@ static FailureOr<SmallVector<Value>> getFunctionArgValuesForUKernelMmt4D(
                                                      dimValue);
     callOperands.push_back(asI32);
   };
-  // LHS
+  // LHS, RHS, Out buffer+offset
   processMemrefTypeOperand(mmt4dUKernelOp.getLhs());
-  // RHS
   processMemrefTypeOperand(mmt4dUKernelOp.getRhs());
-  // Out
   processMemrefTypeOperand(mmt4dUKernelOp.getOutput());
+  // LHS, RHS, Out stride[0]
+  processMemrefTypeOperandStride0(mmt4dUKernelOp.getLhs());
+  processMemrefTypeOperandStride0(mmt4dUKernelOp.getRhs());
+  processMemrefTypeOperandStride0(mmt4dUKernelOp.getOutput());
   // M
   callOperands.push_back(
       rewriter.create<memref::DimOp>(loc, mmt4dUKernelOp.getLhs(), 0));

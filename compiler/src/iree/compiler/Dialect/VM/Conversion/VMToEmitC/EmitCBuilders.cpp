@@ -203,6 +203,22 @@ void memset(OpBuilder builder, Location location, Value dest, int ch,
       ArrayRef<Value>{dest, count});
 }
 
+Value arrayElement(OpBuilder builder, Location location, Type type,
+                   size_t index, Value operand) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/location,
+          /*type=*/type,
+          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT"),
+          /*args=*/
+          ArrayAttr::get(
+              ctx, {builder.getIndexAttr(0), builder.getI32IntegerAttr(index)}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{operand})
+      .getResult(0);
+}
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand) {
   auto ctx = builder.getContext();
@@ -232,6 +248,21 @@ Value arrayElementAddress(OpBuilder builder, Location location, Type type,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{operand, index})
       .getResult(0);
+}
+
+void arrayElementAssign(OpBuilder builder, Location location, Value array,
+                        size_t index, Value value) {
+  auto ctx = builder.getContext();
+  builder.create<emitc::CallOp>(
+      /*location=*/location,
+      /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ASSIGN"),
+      /*args=*/
+      ArrayAttr::get(ctx,
+                     {builder.getIndexAttr(0), builder.getI32IntegerAttr(index),
+                      builder.getIndexAttr(1)}),
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/ArrayRef<Value>{array, value});
 }
 
 void structDefinition(OpBuilder builder, Location location,
@@ -329,6 +360,21 @@ void structPtrMemberAssign(OpBuilder builder, Location location,
       /*operands=*/ArrayRef<Value>{operand, data});
 }
 
+Value ireeMakeCstringView(OpBuilder builder, Location location,
+                          std::string str) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/location,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_string_view_t"),
+          /*callee=*/StringAttr::get(ctx, "iree_make_cstring_view"),
+          /*args=*/
+          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, str)}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{})
+      .getResult(0);
+}
+
 Value ireeOkStatus(OpBuilder builder, Location location) {
   auto ctx = builder.getContext();
   return builder
@@ -339,6 +385,21 @@ Value ireeOkStatus(OpBuilder builder, Location location) {
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{})
+      .getResult(0);
+}
+
+Value ireeVmInstanceLookupType(OpBuilder builder, Location location,
+                               Value instance, Value stringView) {
+  auto ctx = builder.getContext();
+  Type refType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/location,
+          /*type=*/refType,
+          /*callee=*/StringAttr::get(ctx, "iree_vm_instance_lookup_type"),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{instance, stringView})
       .getResult(0);
 }
 

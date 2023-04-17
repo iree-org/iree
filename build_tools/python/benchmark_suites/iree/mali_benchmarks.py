@@ -17,18 +17,18 @@ import benchmark_suites.iree.utils
 class Android_Mali_Benchmarks(object):
   """Benchmarks on Android devices with Mali GPU."""
 
-  VALHALL_MALI_GPU_TARGET = iree_definitions.CompileTarget(
+  ARM_VALHALL_GPU_TARGET = iree_definitions.CompileTarget(
       target_backend=iree_definitions.TargetBackend.VULKAN_SPIRV,
-      target_architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
+      target_architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
       target_abi=iree_definitions.TargetABI.VULKAN_ANDROID31)
   DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
-      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_VALHALL_MALI_DEFAULTS,
+      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_DEFAULTS,
       tags=["default-flags"],
-      compile_targets=[VALHALL_MALI_GPU_TARGET])
+      compile_targets=[ARM_VALHALL_GPU_TARGET])
   FUSE_PADDING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
-      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_VALHALL_MALI_FUSE_PADDING,
+      id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_FUSE_PADDING,
       tags=["experimental-flags", "fuse-padding"],
-      compile_targets=[VALHALL_MALI_GPU_TARGET],
+      compile_targets=[ARM_VALHALL_GPU_TARGET],
       extra_flags=["--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"])
   # Kernel execution
   # Note that for kernel-execution benchmarks batch_size/repeat-count need to be
@@ -40,9 +40,9 @@ class Android_Mali_Benchmarks(object):
   # ```
   FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.
-      IREE_COMPILE_CONFIG_ANDROID_VALHALL_MALI_FUSE_PADDING_REPEATED_KERNEL,
+      IREE_COMPILE_CONFIG_ANDROID_ARM_VALHALL_FUSE_PADDING_REPEATED_KERNEL,
       tags=["experimental-flags", "fuse-padding", "repeated-kernel"],
-      compile_targets=[VALHALL_MALI_GPU_TARGET],
+      compile_targets=[ARM_VALHALL_GPU_TARGET],
       extra_flags=FUSE_PADDING_COMPILE_CONFIG.extra_flags +
       ["--iree-hal-benchmark-dispatch-repeat-count=32"])
   FUSE_PADDING_REPEATED_KERNEL_RUN_FLAGS = ["--batch_size=32"]
@@ -83,7 +83,7 @@ class Android_Mali_Benchmarks(object):
         quant_models=self.QUANT_MODELS)
 
     mali_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-        architecture=common_definitions.DeviceArchitecture.VALHALL_MALI,
+        architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
         host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A)
     run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=default_gen_configs +

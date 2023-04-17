@@ -60,7 +60,7 @@ func.func @mma_sync(%a: memref<16x16xf32>, %b: memref<16x16xf32>, %c: memref<16x
   %vc = vector.transfer_read %c[%c0, %c0], %cst: memref<16x16xf32>, vector<16x16xf32>
 
   // CHECK-NOT: vector.contract
-  //     CHECK: nvgpu.mma.sync
+  //     CHECK: nvgpu.mma.sync{{.*}} tf32Enabled}
   %vres = vector.contract #matmat_trait %va, %vb, %vc
     : vector<16x16xf32>, vector<16x16xf32> into vector<16x16xf32>
   vector.transfer_write %vres, %c[%c0, %c0]: vector<16x16xf32>, memref<16x16xf32>

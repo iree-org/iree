@@ -37,7 +37,8 @@ static void ParseToVariantList(iree_hal_allocator_t* device_allocator,
 class ComparisonTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_ASSERT_OK(iree_vm_instance_create(host_allocator_, &instance_));
+    IREE_ASSERT_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                           host_allocator_, &instance_));
     IREE_ASSERT_OK(iree_hal_module_register_all_types(instance_));
     IREE_ASSERT_OK(iree_hal_allocator_create_heap(
         IREE_SV("heap"), host_allocator_, host_allocator_, &device_allocator_));

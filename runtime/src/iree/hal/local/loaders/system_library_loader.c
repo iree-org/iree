@@ -14,6 +14,8 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
+#include "iree/hal/local/executable_library_util.h"
+#include "iree/hal/local/executable_plugin_manager.h"
 #include "iree/hal/local/local_executable.h"
 
 //===----------------------------------------------------------------------===//
@@ -199,9 +201,7 @@ static iree_status_t iree_hal_system_executable_query_library(
   }
 
   executable->identifier = iree_make_cstring_view(header->name);
-
   executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
-
   return iree_ok_status();
 }
 
@@ -209,52 +209,6 @@ static int iree_hal_system_executable_import_thunk_v0(
     iree_hal_executable_import_v0_t fn_ptr, void* context, void* params,
     void* reserved) {
   return fn_ptr(context, params, reserved);
-}
-
-// Resolves all of the imports declared by the executable using the given
-// |import_provider|.
-static iree_status_t iree_hal_system_executable_resolve_imports(
-    iree_hal_system_executable_t* executable,
-    const iree_hal_executable_import_provider_t import_provider) {
-  const iree_hal_executable_import_table_v0_t* import_table =
-      &executable->library.v0->imports;
-  if (!import_table->count) return iree_ok_status();
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Pass all imports right through.
-  executable->base.environment.import_thunk =
-      iree_hal_system_executable_import_thunk_v0;
-
-  // Allocate storage for the imports.
-  // TODO(benvanik): allocate both as one block.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(
-              executable->base.host_allocator,
-              import_table->count *
-                  sizeof(*executable->base.environment.import_funcs),
-              (void**)&executable->base.environment.import_funcs));
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(
-              executable->base.host_allocator,
-              import_table->count *
-                  sizeof(*executable->base.environment.import_contexts),
-              (void**)&executable->base.environment.import_contexts));
-
-  // Try to resolve each import.
-  // NOTE: imports are sorted alphabetically and if we cared we could use this
-  // information to more efficiently resolve the symbols from providers (O(n)
-  // walk vs potential O(nlogn)/O(n^2)).
-  for (uint32_t i = 0; i < import_table->count; ++i) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_hal_executable_import_provider_resolve(
-            import_provider, iree_make_cstring_view(import_table->symbols[i]),
-            (void**)&executable->base.environment.import_funcs[i],
-            (void**)&executable->base.environment.import_contexts[i]));
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_system_executable_create(
@@ -285,61 +239,43 @@ static iree_status_t iree_hal_system_executable_create(
         executable_params->pipeline_layout_count,
         executable_params->pipeline_layouts, &executable->layouts[0],
         host_allocator, &executable->base);
-
-    // Copy executable constants so we own them.
-    if (executable_params->constant_count > 0) {
-      uint32_t* target_constants =
-          (uint32_t*)((uint8_t*)executable + sizeof(*executable) +
-                      executable_params->pipeline_layout_count *
-                          sizeof(*executable->layouts));
-      memcpy(target_constants, executable_params->constants,
-             executable_params->constant_count *
-                 sizeof(*executable_params->constants));
-      executable->base.environment.constants = target_constants;
-    }
   }
+
+  // Copy executable constants so we own them.
+  if (iree_status_is_ok(status) && executable_params->constant_count > 0) {
+    uint32_t* target_constants =
+        (uint32_t*)((uint8_t*)executable + sizeof(*executable) +
+                    executable_params->pipeline_layout_count *
+                        sizeof(*executable->layouts));
+    memcpy(target_constants, executable_params->constants,
+           executable_params->constant_count *
+               sizeof(*executable_params->constants));
+    executable->base.environment.constants = target_constants;
+  }
+
+  // Attempt to extract the embedded library and load it.
   if (iree_status_is_ok(status)) {
-    // Attempt to extract the embedded library and load it.
     status = iree_hal_system_executable_load(
         executable, executable_params->executable_data, host_allocator);
   }
+
+  // Query metadata and get the entry point function pointers.
   if (iree_status_is_ok(status)) {
-    // Query metadata and get the entry point function pointers.
     status = iree_hal_system_executable_query_library(executable);
   }
+
+  // Resolve imports, if any.
   if (iree_status_is_ok(status)) {
-    // Resolve imports, if any.
-    status =
-        iree_hal_system_executable_resolve_imports(executable, import_provider);
+    status = iree_hal_executable_library_initialize_imports(
+        &executable->base.environment, import_provider,
+        &executable->library.v0->imports,
+        iree_hal_system_executable_import_thunk_v0, host_allocator);
   }
 
-  // TODO(benvanik): move alloc and verification to an executable_library_util.
-  const bool disable_verification =
-      iree_all_bits_set(executable_params->caching_mode,
-                        IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION);
-  if (iree_status_is_ok(status) &&
-      (!disable_verification && executable_params->pipeline_layout_count > 0)) {
-    // NOTE: pipeline layouts are optional but if provided must be consistent.
-    if (executable->library.v0->exports.count !=
-        executable_params->pipeline_layout_count) {
-      status =
-          iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                           "executable provides %u entry points but caller "
-                           "provided %zu; must match",
-                           executable->library.v0->exports.count,
-                           executable_params->pipeline_layout_count);
-    }
-  }
-  if (iree_status_is_ok(status) && !disable_verification) {
-    // Check to make sure that the constant table has values for all constants.
-    if (executable->library.v0->constants.count !=
-        executable_params->constant_count) {
-      status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                                "executable requires %u constants but caller "
-                                "provided %zu; must match",
-                                executable->library.v0->constants.count,
-                                executable_params->constant_count);
-    }
+  // Verify that the library matches the executable params.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_executable_library_verify(executable_params,
+                                                executable->library.v0);
   }
 
   if (iree_status_is_ok(status)) {
@@ -360,14 +296,8 @@ static void iree_hal_system_executable_destroy(
 
   iree_dynamic_library_release(executable->handle);
 
-  if (executable->base.environment.import_funcs != NULL) {
-    iree_allocator_free(host_allocator,
-                        (void*)executable->base.environment.import_funcs);
-  }
-  if (executable->base.environment.import_contexts != NULL) {
-    iree_allocator_free(host_allocator,
-                        (void*)executable->base.environment.import_contexts);
-  }
+  iree_hal_executable_library_deinitialize_imports(
+      &executable->base.environment, host_allocator);
 
   iree_hal_local_executable_deinitialize(
       (iree_hal_local_executable_t*)base_executable);
@@ -390,42 +320,10 @@ static iree_status_t iree_hal_system_executable_issue_call(
                             "entry point ordinal out of bounds");
   }
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  iree_string_view_t entry_point_name = iree_string_view_empty();
-  if (library->exports.names != NULL) {
-    entry_point_name = iree_make_cstring_view(library->exports.names[ordinal]);
-  }
-  if (iree_string_view_is_empty(entry_point_name)) {
-    entry_point_name = iree_make_cstring_view("unknown_dylib_call");
-  }
-  const char* source_file = NULL;
-  size_t source_file_length = 0;
-  uint32_t source_line;
-  if (library->exports.src_locs != NULL) {
-    // We have source location data, so use it.
-    source_file = library->exports.src_locs[ordinal].path;
-    source_file_length = library->exports.src_locs[ordinal].path_length;
-    source_line = library->exports.src_locs[ordinal].line;
-  } else {
-    // No source location data, so make do with what we have.
-    source_file = executable->identifier.data;
-    source_file_length = executable->identifier.size;
-    source_line = ordinal;
-  }
-  IREE_TRACE_ZONE_BEGIN_EXTERNAL(z0, source_file, source_file_length,
-                                 source_line, entry_point_name.data,
-                                 entry_point_name.size, NULL, 0);
-  if (library->exports.tags != NULL) {
-    const char* tag = library->exports.tags[ordinal];
-    if (tag) {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, tag);
-    }
-  }
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
+  IREE_HAL_EXECUTABLE_LIBRARY_CALL_TRACE_ZONE_BEGIN(z0, executable->identifier,
+                                                    library, ordinal);
   int ret = library->exports.ptrs[ordinal](&base_executable->environment,
                                            dispatch_state, workgroup_state);
-
   IREE_TRACE_ZONE_END(z0);
 
   return ret == 0 ? iree_ok_status()
@@ -451,13 +349,14 @@ static const iree_hal_local_executable_vtable_t
 typedef struct iree_hal_system_library_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
+  iree_hal_executable_plugin_manager_t* plugin_manager;
 } iree_hal_system_library_loader_t;
 
 static const iree_hal_executable_loader_vtable_t
     iree_hal_system_library_loader_vtable;
 
 iree_status_t iree_hal_system_library_loader_create(
-    iree_hal_executable_import_provider_t import_provider,
+    iree_hal_executable_plugin_manager_t* plugin_manager,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
   IREE_ASSERT_ARGUMENT(out_executable_loader);
@@ -469,9 +368,13 @@ iree_status_t iree_hal_system_library_loader_create(
       host_allocator, sizeof(*executable_loader), (void**)&executable_loader);
   if (iree_status_is_ok(status)) {
     iree_hal_executable_loader_initialize(
-        &iree_hal_system_library_loader_vtable, import_provider,
+        &iree_hal_system_library_loader_vtable,
+        iree_hal_executable_plugin_manager_provider(plugin_manager),
         &executable_loader->base);
     executable_loader->host_allocator = host_allocator;
+    executable_loader->plugin_manager = plugin_manager;
+    iree_hal_executable_plugin_manager_retain(
+        executable_loader->plugin_manager);
     *out_executable_loader = (iree_hal_executable_loader_t*)executable_loader;
   }
 
@@ -486,6 +389,7 @@ static void iree_hal_system_library_loader_destroy(
   iree_allocator_t host_allocator = executable_loader->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_executable_plugin_manager_release(executable_loader->plugin_manager);
   iree_allocator_free(host_allocator, executable_loader);
 
   IREE_TRACE_ZONE_END(z0);

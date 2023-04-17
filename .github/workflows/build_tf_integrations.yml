@@ -70,7 +70,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:800c9bbefc2f396f99b91a29bead233d85b746fa1effa7845a4336c9b6106dd6 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc \
             build_tools/cmake/build_tf_binaries.sh
           echo "binaries-dir=${IREE_TF_BINARIES_OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
       - name: "Creating archive of binaries"

@@ -49,6 +49,12 @@ namespace IREE = mlir::iree_compiler::IREE;
 // Utils.
 //===----------------------------------------------------------------------===//
 
+static Type getComplexElementTypeOrSelf(Type ty) {
+  if (auto complex = dyn_cast_or_null<ComplexType>(ty))
+    return complex.getElementType();
+  return ty;
+}
+
 static void getEffectsImpl(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects,
@@ -186,8 +192,9 @@ LogicalResult ScatterOp::verify() {
                                      updateType.getRank()))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) >
-        originalType.getDimSize(originalDim)) {
+    if (!originalType.isDynamicDim(originalDim) &&
+        updateType.getDimSize(updateDim) >
+            originalType.getDimSize(originalDim)) {
       return op->emitOpError("shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim;
     }
@@ -200,8 +207,9 @@ LogicalResult ScatterOp::verify() {
            llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) >
-        originalType.getDimSize(originalDim)) {
+    if (!originalType.isDynamicDim(originalDim) &&
+        updateType.getDimSize(updateDim) >
+            originalType.getDimSize(originalDim)) {
       return op->emitOpError("indexed shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim
              << " " << updateType.getDimSize(updateDim) << " "
@@ -216,7 +224,8 @@ LogicalResult ScatterOp::verify() {
   }
   Type arg0Type = body->getArgument(0).getType();
   Type arg1Type = body->getArgument(1).getType();
-  if (!arg0Type.isIntOrFloat() || !arg1Type.isIntOrFloat()) {
+  if (!getComplexElementTypeOrSelf(arg0Type).isIntOrFloat() ||
+      !getComplexElementTypeOrSelf(arg1Type).isIntOrFloat()) {
     return op->emitOpError(
         "expected region to have scalar argument of integer or float types");
   }

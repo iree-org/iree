@@ -25,9 +25,3 @@ iree_py_test(
     "compiler_tflite_test.py"
 )
 
-iree_py_test(
-  NAME
-    compiler_xla_test
-  SRCS
-    "compiler_xla_test.py"
-)

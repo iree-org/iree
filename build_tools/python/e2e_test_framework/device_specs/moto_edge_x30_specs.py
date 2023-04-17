@@ -28,6 +28,6 @@ LITTLE_CORES = common_definitions.DeviceSpec.build(
 GPU = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_MOBILE_MOTO_EDGE_X30 + "-gpu",
     device_name=DEVICE_NAME,
-    architecture=common_definitions.DeviceArchitecture.ADRENO_GENERIC,
+    architecture=common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
     tags=["gpu"])
