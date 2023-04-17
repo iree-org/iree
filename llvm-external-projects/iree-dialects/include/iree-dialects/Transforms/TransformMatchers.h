@@ -741,7 +741,8 @@ struct MatchedReductionCaptures {
 };
 
 struct MatchedMatmulCaptures {
-  SmallVector<int64_t> matmulSize = {};
+  Type lhsType, rhsType, outputType;
+  SmallVector<int64_t> matmulOpSizes = {};
 };
 
 /// Creates a group of matchers for:
@@ -760,13 +761,16 @@ void makeReductionMatcher(transform_ext::MatcherContext &context,
                           StructuredOpMatcher *&reductionCapture,
                           MatchedReductionCaptures &captures);
 
+/// Creates a group of matchers for:
+///
+///     trailing(matmul(*, *, fill()))
+///
+/// where trailing and leading are elementwise operations whose presence is
+/// optional. Each matcher will capture the corresponding operation.
 void makeMatmulMatcher(transform_ext::MatcherContext &matcherContext,
                        StructuredOpMatcher *&matmulCapture,
                        StructuredOpMatcher *&fillCapture,
                        StructuredOpMatcher *&trailingCapture,
-                       MatchedMatmulCaptures &captures);
-void makeMatmulMatcher(transform_ext::MatcherContext &context,
-                       StructuredOpMatcher *&reductionCapture,
                        MatchedMatmulCaptures &captures);
 
 /// Create a group of matchers for a different code sequence of operations

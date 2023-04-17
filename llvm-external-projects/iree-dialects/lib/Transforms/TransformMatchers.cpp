@@ -1032,8 +1032,9 @@ void transform_ext::makeMatmulMatcher(
     transform_ext::StructuredOpMatcher *&fillCapture,
     transform_ext::StructuredOpMatcher *&trailingCapture,
     transform_ext::MatchedMatmulCaptures &captures) {
-  auto &matmul =
-      transform_ext::m_StructuredOp<linalg::MatmulOp>(matcherContext);
+  auto &matmul = transform_ext::m_StructuredOp<linalg::MatmulOp>(matcherContext)
+                     // Capture op sizes.
+                     .dim(AllDims(), CaptureDims(captures.matmulOpSizes));
   matmulCapture = &matmul;
   // Mandatory FillOp must create the unique output of the reduction.
   auto &fill = transform_ext::m_StructuredOp<linalg::FillOp>(matcherContext);
@@ -1054,14 +1055,6 @@ void transform_ext::makeReductionMatcher(transform_ext::MatcherContext &context,
   StructuredOpMatcher *trailing;
   makeReductionMatcher(context, reductionCapture, fill, leading, trailing,
                        captures);
-}
-
-void transform_ext::makeMatmulMatcher(transform_ext::MatcherContext &context,
-                                      StructuredOpMatcher *&matmulCapture,
-                                      MatchedMatmulCaptures &captures) {
-  StructuredOpMatcher *fill;
-  StructuredOpMatcher *trailing;
-  makeMatmulMatcher(context, matmulCapture, fill, trailing, captures);
 }
 
 /// Match sum(%src, broadcast(%reduction))
