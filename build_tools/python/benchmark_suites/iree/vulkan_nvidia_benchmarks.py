@@ -26,25 +26,32 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.VULKAN_SPIRV,
       target_abi=iree_definitions.TargetABI.VULKAN_LINUX)
 
-  COMPILE_EXTRA_FLAGS = [
-      "--iree-stream-resource-index-bits=64", "--iree-vm-target-index-bits=64",
-      "--iree-preprocessing-pass-pipeline=builtin.module(func.func("
-      "iree-flow-detach-elementwise-from-named-ops,"
-      "iree-preprocessing-convert-conv2d-to-img2col,"
-      "iree-flow-convert-1x1-filter-conv2d-to-matmul,"
-      "iree-preprocessing-pad-linalg-ops{pad-size=32}))"
-  ]
-
   SIMT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_VULKAN_SD_SIMT,
       tags=["simt"],
       compile_targets=[PASCAL_TARGET],
-      extra_flags=COMPILE_EXTRA_FLAGS)
+      extra_flags=Linux_Vulkan_NVIDIA_Benchmarks._get_compile_flag())
   TENSORCORE_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_VULKAN_SD_TENSORCORE,
       tags=["tensorcore"],
       compile_targets=[AMPERE_TARGET],
-      extra_flags=COMPILE_EXTRA_FLAGS)
+      extra_flags=Linux_Vulkan_NVIDIA_Benchmarks._get_compile_flag())
+
+  @staticmethod
+  def _get_compile_flag():
+    preprocess_passes = [
+        "iree-flow-detach-elementwise-from-named-ops"
+        "iree-preprocessing-convert-conv2d-to-img2col"
+        "iree-flow-convert-1x1-filter-conv2d-to-matmul"
+        "iree-preprocessing-pad-linalg-ops{pad-size=32}"
+    ]
+    preprocess_flag_template = \
+      "--iree-preprocessing-pass-pipeline=builtin.module(func.func({}))"
+    return [
+        "--iree-stream-resource-index-bits=64",
+        "--iree-vm-target-index-bits=64",
+        preprocess_flag_template.format(",".join(preprocess_passes))
+    ]
 
   def _generate_configs(
       self,
