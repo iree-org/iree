@@ -22,6 +22,7 @@
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Tensor/Transforms/Passes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -137,6 +138,8 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   // tensor to memref
@@ -170,6 +173,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   // tensor to memref
@@ -239,6 +244,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorCoreVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
@@ -300,6 +307,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType::MMA_SYNC));
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
@@ -350,6 +359,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
@@ -389,6 +400,8 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   addBufferizePasses(nestedModulePM);

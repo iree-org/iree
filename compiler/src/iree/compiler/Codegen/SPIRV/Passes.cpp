@@ -36,6 +36,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
+#include "mlir/Dialect/Tensor/Transforms/Passes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -201,6 +202,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Perform optimizations that need to across the scf.for region boundary.
   pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   pm.addPass(createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(tensor::createFoldTensorSubsetOpsPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 
@@ -283,6 +285,8 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addPass(createCSEPass());
 
   // Bufferize and distribute.
@@ -413,6 +417,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldMemRefAliasOpsPass());
@@ -499,6 +505,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   // vectors down to native machine size.
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
   nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addPass(createCSEPass());
 }
 
@@ -524,6 +532,8 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addPass(createCSEPass());
 
   // Bufferize and distribute.

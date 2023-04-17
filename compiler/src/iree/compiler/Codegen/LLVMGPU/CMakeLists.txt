@@ -86,6 +86,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTransformDialect
     MLIRTransforms
     MLIRValueBoundsOpInterface

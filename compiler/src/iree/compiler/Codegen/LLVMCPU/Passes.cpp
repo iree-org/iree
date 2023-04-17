@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Tensor/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -335,6 +336,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        tensor::createFoldTensorSubsetOpsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
@@ -374,6 +377,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        tensor::createFoldTensorSubsetOpsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
@@ -472,6 +477,8 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        tensor::createFoldTensorSubsetOpsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
@@ -530,6 +537,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        tensor::createFoldTensorSubsetOpsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
@@ -569,6 +578,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   }
 
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   addBufferizePasses(nestedModulePM);
@@ -594,6 +605,8 @@ void addCPUDataTilingPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUVectorizationPass(options));
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      tensor::createFoldTensorSubsetOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   addBufferizePasses(nestedModulePM);
