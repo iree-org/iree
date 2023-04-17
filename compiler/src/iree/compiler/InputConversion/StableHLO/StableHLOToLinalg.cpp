@@ -2727,7 +2727,7 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       PadOpConversion,
       PadOpNegativePaddingConversion,
       TorchIndexSelectOpConversion,
-      SelectAndScatterNoOverlapConverter,  // TODO(#12678): Add tests.
+      SelectAndScatterNoOverlapConverter,
       ReduceRegionReturnOpConversion
       >(typeConverter, context);
 
