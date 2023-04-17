@@ -55,7 +55,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
     device_spec_c = common_definitions.DeviceSpec.build(
         id="dev_c",
         device_name="dev_c",
-        architecture=common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
+        architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
         tags=[])
     matched_run_config_a = iree_definitions.E2EModelRunConfig.build(

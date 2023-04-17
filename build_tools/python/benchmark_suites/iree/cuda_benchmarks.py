@@ -18,7 +18,7 @@ class Linux_CUDA_Benchmarks(object):
   """Benchmarks on CUDA Linux devices."""
 
   SM_80_GPU_TARGET = iree_definitions.CompileTarget(
-      target_architecture=common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
+      target_architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
       target_backend=iree_definitions.TargetBackend.CUDA,
       target_abi=iree_definitions.TargetABI.LINUX_GNU)
   SM_80_COMPILE_CONFIG = iree_definitions.CompileConfig.build(

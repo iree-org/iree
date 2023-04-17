@@ -58,7 +58,8 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   NVIDIA_PASCAL = (ArchitectureType.GPU, "pascal", "", "nvidia")
 
   # CUDA GPUs
-  NVIDIA_AMPERE = (ArchitectureType.GPU, "cuda", "sm_80")
+  CUDA_SM70 = (ArchitectureType.GPU, "cuda", "sm_70")
+  CUDA_SM80 = (ArchitectureType.GPU, "cuda", "sm_80")
 
 
 @dataclass(frozen=True)
