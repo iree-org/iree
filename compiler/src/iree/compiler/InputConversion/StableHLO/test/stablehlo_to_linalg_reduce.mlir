@@ -355,3 +355,419 @@ func.func @variadic_diff_type_reduce(%arg0: tensor<128x10xf32>, %arg1: tensor<12
 // CHECK-PRIMITIVE-NEXT:      %[[RES0:.*]] = arith.select %[[B0]], %[[RHS0]], %[[LHS0]] : f32
 // CHECK-PRIMITIVE-NEXT:      %[[RES1:.*]] = arith.select %[[B0]], %[[RHS1]], %[[LHS1]] : i32
 // CHECK-PRIMITIVE-NEXT:      linalg.yield %[[RES0]], %[[RES1]] : f32, i32
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_min_nhwc
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_min_nhwc(%arg0: tensor<1x17x17x64xf32>,
+                             %arg1: tensor<f32>) -> tensor<1x8x8x64xf32>{
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>):
+    %1 = stablehlo.minimum %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
+      window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>,
+      someattr} : (tensor<1x17x17x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
+  func.return %0 : tensor<1x8x8x64xf32>
+}
+// CHECK:         %[[WINDOW:.+]] = tensor.empty() : tensor<3x3xf32>
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<1x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[INIT_VAL]] : f32) outs(%[[INIT]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_min
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       someattr,
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x17x17x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_max_nhwc
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_max_nhwc(%arg0: tensor<1x17x17x64xf32>,
+                             %arg1: tensor<f32>) -> tensor<1x8x8x64xf32>{
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>):
+    %1 = stablehlo.maximum %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
+      window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>} : (tensor<1x17x17x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
+  func.return %0 : tensor<1x8x8x64xf32>
+}
+// CHECK:         %[[WINDOW:.+]] = tensor.empty() : tensor<3x3xf32>
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<1x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[INIT_VAL]] : f32) outs(%[[INIT]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_max
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x17x17x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_sum_nhwc
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_sum_nhwc(%arg0: tensor<1x17x17x64xf32>,
+                             %arg1: tensor<f32>) -> tensor<1x8x8x64xf32>{
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
+      window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>} : (tensor<1x17x17x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
+  func.return %0 : tensor<1x8x8x64xf32>
+}
+// CHECK:         %[[WINDOW:.+]] = tensor.empty() : tensor<3x3xf32>
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<1x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[INIT_VAL]] : f32) outs(%[[INIT]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_sum
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x17x17x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_max_nhwc_with_cst
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+func.func @reduce_window_max_nhwc_with_cst(%arg0: tensor<1x17x17x64xf32>) -> tensor<1x8x8x64xf32> {
+  %0 = arith.constant dense<0xFF800000> : tensor<f32>
+  %1 = "stablehlo.reduce_window"(%arg0, %0) ({
+  ^bb0(%arg1: tensor<f32>, %arg2 : tensor<f32>):
+    %2 = stablehlo.maximum %arg1, %arg2 : tensor<f32>
+    "stablehlo.return"(%2) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
+      window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>} : (tensor<1x17x17x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
+  func.return %1 : tensor<1x8x8x64xf32>
+}
+
+// CHECK-DAG:     %[[CST:.+]] = arith.constant 0xFF800000
+// CHECK:         %[[WINDOW:.+]] = tensor.empty() : tensor<3x3xf32>
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<1x8x8x64xf32
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[INIT]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_max
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x17x17x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_sum_max_nhwc
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_sum_max_nhwc(%arg0: tensor<1x17x17x64xf32>,
+                             %arg1: tensor<f32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>) {
+  %0:2 = "stablehlo.reduce_window"(%arg0, %arg0, %arg1, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>, %arg4: tensor<f32>, %arg5 : tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg4 : tensor<f32>
+    %2 = stablehlo.maximum %arg3, %arg5 : tensor<f32>
+    "stablehlo.return"(%1, %2) : (tensor<f32>, tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
+      window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>} : (tensor<1x17x17x64xf32>, tensor<1x17x17x64xf32>, tensor<f32>, tensor<f32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>)
+  func.return %0#0, %0#1 : tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>
+}
+
+// CHECK:         %[[WINDOW0:.+]] = tensor.empty() : tensor<3x3xf32>
+// CHECK:         %[[INIT0:.+]] = tensor.empty() : tensor<1x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL0:.+]] = linalg.fill ins(%[[INIT_VAL]] : f32) outs(%[[INIT0]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES0:.+]] = linalg.pooling_nhwc_sum
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW0]] : tensor<1x17x17x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL0]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+// CHECK:         %[[WINDOW1:.+]] = tensor.empty() : tensor<3x3xf32>
+// CHECK:         %[[INIT1:.+]] = tensor.empty() : tensor<1x8x8x64xf32>
+// CHECK:         %[[INIT_VAL1:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL1:.+]] = linalg.fill ins(%[[INIT_VAL1]] : f32) outs(%[[INIT1]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+// CHECK:         %[[RES1:.+]] = linalg.pooling_nhwc_max
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW1]] : tensor<1x17x17x64xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL1]] : tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xf32>
+// CHECK:         return %[[RES0]], %[[RES1]]
+
+// -----
+
+// Just check that this lowers successfully.
+// CHECK-LABEL: func @reduce_window_unsigned
+func.func @reduce_window_unsigned(%arg0: tensor<1x1xui32>) -> tensor<1x1xui32> {
+  %0 = stablehlo.constant dense<0> : tensor<ui32>
+  %1 = "stablehlo.reduce_window"(%arg0, %0) ({
+  ^bb0(%arg1: tensor<ui32>, %arg2: tensor<ui32>):
+    stablehlo.return %arg1 : tensor<ui32>
+  }) {
+    window_dimensions = dense<[1, 1]> : tensor<2xi64>,
+    window_strides = dense<[1, 1]> : tensor<2xi64>
+  } : (tensor<1x1xui32>, tensor<ui32>) -> tensor<1x1xui32>
+  return %1 : tensor<1x1xui32>
+}
+
+// -----
+
+// CHECK-LABEL: func @dynamic_reduce_window_sum_nhwc
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @dynamic_reduce_window_sum_nhwc(%arg0: tensor<?x?x?x?xf32>,
+                                      %arg1: tensor<f32>) -> tensor<?x?x?x?xf32>{
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
+      window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>} : (tensor<?x?x?x?xf32>, tensor<f32>) -> tensor<?x?x?x?xf32>
+  func.return %0 : tensor<?x?x?x?xf32>
+}
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
+// CHECK:         %[[WINDOW:.+]] = tensor.empty() : tensor<3x3xf32>
+// CHECK:         %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?x?x?xf32>
+// CHECK:         %[[T1:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?x?x?xf32>
+// CHECK:         %[[T2:.+]] = arith.subi %[[T1]], %[[C3]]
+// CHECK:         %[[T3:.+]] = arith.divui %[[T2]], %[[C2]]
+// CHECK:         %[[D1:.+]] = arith.addi %[[T3]], %[[C1]]
+// CHECK:         %[[T1:.+]] = tensor.dim %[[ARG0]], %[[C2]] : tensor<?x?x?x?xf32>
+// CHECK:         %[[T2:.+]] = arith.subi %[[T1]], %[[C3]]
+// CHECK:         %[[T3:.+]] = arith.divui %[[T2]], %[[C2]]
+// CHECK:         %[[D2:.+]] = arith.addi %[[T3]], %[[C1]]
+// CHECK:         %[[D3:.+]] = tensor.dim %[[ARG0]], %[[C3]] : tensor<?x?x?x?xf32>
+// CHECK:         %[[INIT:.+]] = tensor.empty(%[[D0]], %[[D1]], %[[D2]], %[[D3]]) : tensor<?x?x?x?xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[INIT_VAL]] : f32) outs(%[[INIT]] : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_nhwc_sum
+// CHECK-SAME:      {dilations = dense<1> : vector<2xi64>
+// CHECK-SAME:       strides = dense<2> : vector<2xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<?x?x?x?xf32>, tensor<3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_min_ndhwc
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_min_ndhwc(%arg0: tensor<1x17x17x17x64xf32>,
+                              %arg1: tensor<f32>) -> tensor<1x8x8x8x64xf32>{
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>):
+    %1 = stablehlo.minimum %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 3, 1]> : tensor<5xi64>,
+      window_strides = dense<[1, 2, 2, 2, 1]> : tensor<5xi64>} : (tensor<1x17x17x17x64xf32>, tensor<f32>) -> tensor<1x8x8x8x64xf32>
+  func.return %0 : tensor<1x8x8x8x64xf32>
+}
+// CHECK:         %[[WINDOW:.+]] = tensor.empty() : tensor<3x3x3xf32>
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<1x8x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[INIT_VAL]] : f32) outs(%[[INIT]] : tensor<1x8x8x8x64xf32>) -> tensor<1x8x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_ndhwc_min
+// CHECK-SAME:      {dilations = dense<1> : vector<3xi64>
+// CHECK-SAME:       strides = dense<2> : vector<3xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x17x17x17x64xf32>, tensor<3x3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x8x64xf32>) -> tensor<1x8x8x8x64xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_max_ndhwc
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_max_ndhwc(%arg0: tensor<1x17x17x17x64xf32>,
+                              %arg1: tensor<f32>) -> tensor<1x8x8x8x64xf32>{
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>):
+    %1 = stablehlo.maximum %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 3, 1]> : tensor<5xi64>,
+      window_strides = dense<[1, 2, 2, 2, 1]> : tensor<5xi64>} : (tensor<1x17x17x17x64xf32>, tensor<f32>) -> tensor<1x8x8x8x64xf32>
+  func.return %0 : tensor<1x8x8x8x64xf32>
+}
+// CHECK:         %[[WINDOW:.+]] = tensor.empty() : tensor<3x3x3xf32>
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<1x8x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[INIT_VAL]] : f32) outs(%[[INIT]] : tensor<1x8x8x8x64xf32>) -> tensor<1x8x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_ndhwc_max
+// CHECK-SAME:      {dilations = dense<1> : vector<3xi64>
+// CHECK-SAME:       strides = dense<2> : vector<3xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x17x17x17x64xf32>, tensor<3x3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x8x64xf32>) -> tensor<1x8x8x8x64xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_sum_ndhwc
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_sum_ndhwc(%arg0: tensor<1x17x17x17x64xf32>,
+                              %arg1: tensor<f32>) -> tensor<1x8x8x8x64xf32>{
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 3, 1]> : tensor<5xi64>,
+      window_strides = dense<[1, 2, 2, 2, 1]> : tensor<5xi64>} : (tensor<1x17x17x17x64xf32>, tensor<f32>) -> tensor<1x8x8x8x64xf32>
+  func.return %0 : tensor<1x8x8x8x64xf32>
+}
+// CHECK:         %[[WINDOW:.+]] = tensor.empty() : tensor<3x3x3xf32>
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<1x8x8x8x64xf32>
+// CHECK:         %[[INIT_VAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK:         %[[FILL:.+]] = linalg.fill ins(%[[INIT_VAL]] : f32) outs(%[[INIT]] : tensor<1x8x8x8x64xf32>) -> tensor<1x8x8x8x64xf32>
+// CHECK:         %[[RES:.+]] = linalg.pooling_ndhwc_sum
+// CHECK-SAME:      {dilations = dense<1> : vector<3xi64>
+// CHECK-SAME:       strides = dense<2> : vector<3xi64>}
+// CHECK-SAME:      ins(%[[ARG0]], %[[WINDOW]] : tensor<1x17x17x17x64xf32>, tensor<3x3x3xf32>)
+// CHECK-SAME:      outs(%[[FILL]] : tensor<1x8x8x8x64xf32>) -> tensor<1x8x8x8x64xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_sum_ndhwc_dilated_base
+// CHECK: linalg.generic
+func.func @reduce_window_sum_ndhwc_dilated_base(
+    %arg0: tensor<1x17x17x17x64xf32>,
+    %arg1: tensor<f32>) -> tensor<1x8x8x16x64xf32>{
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3 : tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {base_dilations = dense<[1, 1, 1, 2, 1]> : tensor<5xi64>,
+      window_dimensions = dense<[1, 3, 3, 3, 1]> : tensor<5xi64>,
+      window_strides = dense<[1, 2, 2, 2, 1]> : tensor<5xi64>} : (tensor<1x17x17x17x64xf32>, tensor<f32>) -> tensor<1x8x8x16x64xf32>
+  func.return %0 : tensor<1x8x8x16x64xf32>
+}
+
+// -----
+
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> ()>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2, d1 + d2 * 2)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d2)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// CHECK:      func @reduce_window_generic
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_generic(%arg0: tensor<4x6xf32>, %arg1: tensor<f32>) -> tensor<4x7xf32> {
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {base_dilations = dense<1> : tensor<2xi64>, padding = dense<[[0, 3], [1, 2]]> : tensor<2x2xi64>, window_dilations = dense<[1, 2]> : tensor<2xi64>, window_dimensions = dense<[1, 2]> : tensor<2xi64>, window_strides = dense<[2, 1]> : tensor<2xi64>} : (tensor<4x6xf32>, tensor<f32>) -> tensor<4x7xf32>
+  func.return %0 : tensor<4x7xf32>
+}
+// CHECK: %[[INIT:.+]] = tensor.empty() : tensor<4x7xf32>
+// CHECK: %[[FILL:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]]], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<f32>) outs(%[[INIT]] : tensor<4x7xf32>)
+// CHECK: ^{{[a-z0-9_]*}}
+// CHECK-SAME: %[[IN:[a-zA-Z0-9_]*]]: f32
+// CHECK-SAME: %[[OUT:[a-zA-Z0-9_]*]]: f32
+// CHECK:   linalg.yield %[[IN]] : f32
+
+// CHECK: %[[PADVAL:.+]] = tensor.extract %arg1[] : tensor<f32>
+// CHECK: %[[PAD:.+]] = tensor.pad %arg0 low[0, 1] high[3, 2]
+// CHECK: ^{{[a-z0-9_]*}}
+// CHECK-SAME: %{{[a-zA-Z0-9_]*}}: index
+// CHECK-SAME: %{{[a-zA-Z0-9_]*}}: index
+// CHECK:   tensor.yield %[[PADVAL]] : f32
+
+// CHECK: %[[WINDOW:.+]] = tensor.empty() : tensor<2xf32>
+// CHECK: %[[REDUCE:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]], iterator_types = ["parallel", "parallel", "reduction"]} ins(%[[PAD]], %[[WINDOW]] : tensor<7x9xf32>, tensor<2xf32>) outs(%[[FILL]] : tensor<4x7xf32>) {
+// CHECK: ^{{[a-z0-9_]*}}
+// CHECK-SAME: %[[IN:[a-zA-Z0-9_]*]]: f32
+// CHECK-SAME: %[[IN2:[a-zA-Z0-9_]*]]: f32
+// CHECK-SAME: %[[OUT:[a-zA-Z0-9_]*]]: f32
+// CHECK:   %[[ADD:.+]] = arith.addf %[[OUT]], %[[IN]] : f32
+// CHECK:   linalg.yield %[[ADD]]
+
+// CHECK: return %[[REDUCE]]
+// -----
+
+// CHECK-LABEL: func @reduce_window_generic_captured_constant
+func.func @reduce_window_generic_captured_constant(%arg0: tensor<4x6xf32>, %arg1: tensor<f32>) -> tensor<4x7xf32> {
+  %c2 = stablehlo.constant dense<2.0> : tensor<f32>
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    %2 = stablehlo.multiply %1, %c2 : tensor<f32>
+    "stablehlo.return"(%2) : (tensor<f32>) -> ()
+  }) {base_dilations = dense<1> : tensor<2xi64>, padding = dense<[[0, 3], [1, 2]]> : tensor<2x2xi64>, window_dilations = dense<[1, 2]> : tensor<2xi64>, window_dimensions = dense<[1, 2]> : tensor<2xi64>, window_strides = dense<[2, 1]> : tensor<2xi64>} : (tensor<4x6xf32>, tensor<f32>) -> tensor<4x7xf32>
+  func.return %0 : tensor<4x7xf32>
+}
+
+// CHECK: %[[C2:.*]] = arith.constant 2.0
+// CHECK: linalg.generic
+// CHECK: %[[SUM:.*]] = arith.addf
+// CHECK: %[[PROD:.*]] = arith.mulf %[[SUM]], %[[C2]]
+// CHECK: linalg.yield %[[PROD]]
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_generic_padding
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_generic_padding(%arg0: tensor<3x6xf32>, %arg1: tensor<f32>) -> tensor<3x7xf32> {
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {padding = dense<[[0, 3], [1, 2]]> : tensor<2x2xi64>, window_dilations = dense<[1, 2]> : tensor<2xi64>, window_dimensions = dense<[1, 2]> : tensor<2xi64>, window_strides = dense<[2, 1]> : tensor<2xi64>} : (tensor<3x6xf32>, tensor<f32>) -> tensor<3x7xf32>
+  func.return %0 : tensor<3x7xf32>
+}
+// CHECK: %[[PADVAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK: %[[PAD:.+]] = tensor.pad %[[ARG0]] low[0, 1] high[3, 2]
+// CHECK: tensor.yield %[[PADVAL]] : f32
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_generic_base_dilation
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_generic_base_dilation(%arg0: tensor<3x6xf32>, %arg1: tensor<f32>) -> tensor<3x4xf32> {
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {base_dilations = dense<[2, 1]> : tensor<2xi64>, window_dilations = dense<[1, 2]> : tensor<2xi64>, window_dimensions = dense<[1, 2]> : tensor<2xi64>, window_strides = dense<[2, 1]> : tensor<2xi64>} : (tensor<3x6xf32>, tensor<f32>) -> tensor<3x4xf32>
+  func.return %0 : tensor<3x4xf32>
+}
+// CHECK: %[[PADVAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK: %[[INIT:.+]] = tensor.empty() : tensor<5x6xf32>
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%[[PADVAL]] : f32) outs(%[[INIT]] : tensor<5x6xf32>) -> tensor<5x6xf32>
+// CHECK: %[[PAD:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][0, 0] [3, 6] [2, 1] : tensor<3x6xf32> into tensor<5x6xf32>
+
+// -----
+
+// CHECK-LABEL: func @reduce_window_generic_padding_base_dilation
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]*]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]*]]
+func.func @reduce_window_generic_padding_base_dilation(%arg0: tensor<3x6xf32>, %arg1: tensor<f32>) -> tensor<4x7xf32> {
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {base_dilations = dense<[2, 1]> : tensor<2xi64>, padding = dense<[[0, 3], [1, 2]]> : tensor<2x2xi64>, window_dilations = dense<[1, 2]> : tensor<2xi64>, window_dimensions = dense<[1, 2]> : tensor<2xi64>, window_strides = dense<[2, 1]> : tensor<2xi64>} : (tensor<3x6xf32>, tensor<f32>) -> tensor<4x7xf32>
+  func.return %0 : tensor<4x7xf32>
+}
+// CHECK: %[[PADVAL:.+]] = tensor.extract %[[ARG1]][] : tensor<f32>
+// CHECK: %[[INIT:.+]] = tensor.empty() : tensor<8x9xf32>
+// CHECK: %[[FILL:.+]] = linalg.fill ins(%[[PADVAL]] : f32) outs(%[[INIT]] : tensor<8x9xf32>) -> tensor<8x9xf32>
+// CHECK: %[[PAD:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][0, 1] [3, 6] [2, 1] : tensor<3x6xf32> into tensor<8x9xf32>
+
+// -----
+
+// CHECK: #[[MAP:.+]] = affine_map<() -> ()>
+// CHECK: func @reduce_window_generic_scalar
+func.func @reduce_window_generic_scalar(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
+  %0 = "stablehlo.reduce_window"(%arg0, %arg1) ({
+  ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):
+    %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
+    "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {base_dilations = dense<> : tensor<0xi64>, padding = dense<> : tensor<0x2xi64>, window_dilations = dense<> : tensor<0xi64>, window_dimensions = dense<> : tensor<0xi64>, window_strides = dense<> : tensor<0xi64>} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  func.return %0 : tensor<f32>
+}
+// CHECK: linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]]

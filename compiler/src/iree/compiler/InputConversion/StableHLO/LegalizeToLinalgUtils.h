@@ -100,6 +100,14 @@ bool allOperandsAreScalarTensors(Operation* op);
 /// Returns true if parent op is linalg.
 bool isInBodyOfLinalgOps(Operation* op);
 
+/// Extracts integer values from the attribute |elements|.
+SmallVector<int64_t, 4> extract1DVector(DenseIntElementsAttr elements);
+
+/// Returns true if the given |attr| is a splat of the given |value|.
+inline bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
+  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
+}
+
 }  // namespace mlir::iree_compiler::stablehlo
 
 #endif  // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_LEGALIZE_TO_LINALG_UTILS_H_
