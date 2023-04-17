@@ -81,8 +81,9 @@ ABI, wires them up and links them in their runtime binary, declares the
 externally available functions in IR, and emits calls to the functions in IR
 interleaved with other IR.
 
-**Workflow**:
+**Workflows**:
 
+Statically-linked into the hosting runtime:
 ```
                      +--------------+   +--------------+
                      | example.mlir |   | runtime srcs | -+
@@ -95,9 +96,48 @@ interleaved with other IR.
                      +--------------+
 ```
 
+Dynamically-linked into the hosting runtime via system libraries:
+```
++----------+    +---------------+      +--------------+
+| plugin.c | -> | plugin.so/dll |-+    | example.mlir |
++----------+    +---------------+ |    +--------------+
+                                  |           v
+                                  |      iree-compile
+                                  |           v
+                                  |    +--------------+
+                                  |    | example.vmfb | (non-hermetic)
+                                  |    +--------------+
+                                  |           |
+                                  +-----+-----+
+                                        v
+                               +-----------------+
+                               | iree-run-module |
+                               +-----------------+
+```
+
+Dynamically-linked into the hosting runtime via portable embedded ELFs:
+
+```
++----------+      +-------------------+       +--------------+
+| plugin.c | -+-> | plugin_aarch64.so | -+    | example.mlir |
++----------+  |   +-------------------+  |    +--------------+
+              |   +-------------------+  |           v
+              +-> | plugin_x86_64.so  | -+      iree-compile
+                  +-------------------+  |           v
+                       +------------+    |    +--------------+
+                       | plugin.sos | <--+    | example.vmfb | (non-hermetic)
+                       +------------+         +--------------+
+                             |                       |
+                             +----------+------------+
+                                        v
+                               +-----------------+
+                               | iree-run-module |
+                               +-----------------+
+```
+
 **Samples**:
 
-* TBD CPU dynamic imports (supported but requires build goo)
+* CPU (plugins): [custom_dispatch/cpu/plugin/](./cpu/plugin/) (.c -> .so/.sos)
 
 Unlike the other approaches this requires runtime device support for dynamic
 linking and introduces complexity to the user as they must be careful to version

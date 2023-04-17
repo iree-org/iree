@@ -45,12 +45,14 @@
 // ]>
 // With a workgroup size of 64x1x1.
 void simple_mul_workgroup(
+    // vvvv simplification pending (buffer + offset)
     const float* restrict binding0, const float* restrict binding0_aligned,
     size_t binding0_offset, size_t binding0_size, size_t binding0_stride,
     const float* restrict binding1, const float* restrict binding1_aligned,
     size_t binding1_offset, size_t binding1_size, size_t binding1_stride,
     float* restrict binding2, float* restrict binding2_aligned,
     size_t binding2_offset, size_t binding2_size, size_t binding2_stride,
+    // ^^^^ simplification pending (buffer + offset)
     size_t dim, size_t tid) {
   size_t end = tid + 64;
   if (end > dim) end = dim;
@@ -70,10 +72,12 @@ void simple_mul_workgroup(
 // ]>
 // With a workgroup size of 64x1x1.
 void simple_mul_inplace_workgroup(
+    // vvvv simplification pending (buffer + offset)
     const float* restrict binding0, const float* restrict binding0_aligned,
     size_t binding0_offset, size_t binding0_size, size_t binding0_stride,
     float* restrict binding1, float* restrict binding1_aligned,
     size_t binding1_offset, size_t binding1_size, size_t binding1_stride,
+    // ^^^^ simplification pending (buffer + offset)
     size_t dim, size_t tid) {
   size_t end = tid + 64;
   if (end > dim) end = dim;

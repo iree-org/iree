@@ -35,6 +35,7 @@ android {
                         "-DIREE_HAL_DRIVER_LOCAL_TASK=ON",
                         "-DIREE_HAL_EXECUTABLE_LOADER_DEFAULTS=OFF",
                         "-DIREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=ON",
+                        "-DIREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS=OFF",
 
                         // Disable all but the runtime components needed for the
                         // java bindings.
@@ -86,6 +87,7 @@ task cmakeConfigureHost(type: Exec) {
             "-DIREE_HAL_DRIVER_LOCAL_TASK=ON",
             "-DIREE_HAL_EXECUTABLE_LOADER_DEFAULTS=OFF",
             "-DIREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=ON",
+            "-DIREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS=OFF",
             "-DIREE_BUILD_COMPILER=OFF",
             "-DIREE_BUILD_TESTS=OFF ",
             "-DIREE_BUILD_SAMPLES=OFF",

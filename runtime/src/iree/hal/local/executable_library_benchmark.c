@@ -19,6 +19,7 @@
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_pipeline_layout.h"
+#include "iree/hal/local/plugins/registration/init.h"
 #include "iree/testing/benchmark.h"
 
 IREE_FLAG(string, executable_format, "",
@@ -137,13 +138,14 @@ static iree_status_t iree_hal_executable_library_run(
     const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
   iree_allocator_t host_allocator = benchmark_state->host_allocator;
+  iree_hal_executable_plugin_manager_t* plugin_manager =
+      (iree_hal_executable_plugin_manager_t*)benchmark_def->user_data;
 
   // Register the loader used to load (or find) the executable.
   iree_hal_executable_loader_t* executable_loader = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_create_executable_loader_by_name(
-      iree_make_cstring_view(FLAG_executable_format),
-      iree_hal_executable_import_provider_default(), host_allocator,
-      &executable_loader));
+      iree_make_cstring_view(FLAG_executable_format), plugin_manager,
+      host_allocator, &executable_loader));
 
   // Setup the specification used to perform the executable load.
   // This information is normally used to select the appropriate loader but in
@@ -303,6 +305,10 @@ int main(int argc, char** argv) {
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   iree_benchmark_initialize(&argc, argv);
 
+  iree_hal_executable_plugin_manager_t* plugin_manager = NULL;
+  IREE_CHECK_OK(iree_hal_executable_plugin_manager_create_from_flags(
+      iree_allocator_system(), &plugin_manager));
+
   // TODO(benvanik): override these with our own flags.
   iree_benchmark_def_t benchmark_def = {
       .flags = IREE_BENCHMARK_FLAG_MEASURE_PROCESS_CPU_TIME |
@@ -311,9 +317,12 @@ int main(int argc, char** argv) {
       .minimum_duration_ns = 0,
       .iteration_count = 0,
       .run = iree_hal_executable_library_run,
+      .user_data = plugin_manager,
   };
   iree_benchmark_register(iree_make_cstring_view("dispatch"), &benchmark_def);
 
   iree_benchmark_run_specified();
+
+  iree_hal_executable_plugin_manager_release(plugin_manager);
   return 0;
 }

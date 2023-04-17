@@ -153,7 +153,8 @@ iree_cc_binary(
 # Only enable fatelf tool when we're compiling it in.
 # Currently it requires that the host and target both support embedded ELFs as
 # the ELF implementation is only compiled when the target supports it.
-if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF OR
+   IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF)
 iree_cc_binary(
   NAME
     iree-fatelf

@@ -48,7 +48,7 @@ static inline iree_string_view_t iree_make_string_view(
 // Returns a string view initialized with a reference to the given
 // NUL-terminated string literal.
 static inline iree_string_view_t iree_make_cstring_view(const char* str) {
-  iree_string_view_t v = {str, strlen(str)};
+  iree_string_view_t v = {str, str ? strlen(str) : 0};
   return v;
 }
 

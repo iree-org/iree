@@ -188,7 +188,11 @@ typedef struct iree_hal_executable_import_table_v0_t {
   uint32_t count;
 
   // Import symbol name encoding the name and whether it is weak.
-  // Example: `mylib_some_fn_v2?`
+  // Example: `?mylib_some_fn_v2`
+  //   `?`:
+  //     Indicates when an import is optional. If the import of the specified
+  //     version is not found the table entry will be NULL. When omitted if the
+  //     import is unavailable loading will fail.
   //   `mylib_...`:
   //     Prefix indicating the owner of the function; symbols have a global
   //     namespace and this is used to reduce collisions.
@@ -200,10 +204,6 @@ typedef struct iree_hal_executable_import_table_v0_t {
   //     to be imported. For backward compatibility one could import both
   //     `some_fn_v1?` and `some_fn_v2?` and use whichever is available.
   //     Note that this is just a convention for the suffix and can be anything.
-  //   `?`:
-  //     Indicates when an import is optional. If the import of the specified
-  //     version is not found the table entry will be NULL. When omitted if the
-  //     import is unavailable loading will fail.
   //
   // The symbol table is sorted ascending alphabetical (by strcmp).
   const char* const* symbols;
