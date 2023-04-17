@@ -135,7 +135,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       : options(std::make_shared<CompileOptions>()),
         compilePipeline("builtin.module") {
     // Invoke IREE compilation flow.
-    options->executableOptions.targets.push_back("vmvx");
+    options->executableOptions.targets.push_back("llvm-cpu");
     options->targetOptions.f32Extension = true;
     options->targetOptions.f64Extension = false;  // not yet implemented
 
