@@ -24,6 +24,7 @@
 // arbitrary threads concurrently. Be very careful and prefer standalone plugins
 // instead except when debugging/profiling.
 
+#include <inttypes.h>
 #include <stdio.h>
 
 // The only header required from IREE:
@@ -83,8 +84,12 @@ static int simple_mul_workgroup(void* context, void* params_ptr,
     // ^^^^ simplification pending (buffer + offset)
     size_t dim;
     size_t tid;
+    uint32_t processor_id;
+    const uint64_t* restrict processor_data;
   } params_t;
   const params_t* params = (const params_t*)params_ptr;
+  fprintf(plugin->file, "processor_id=%u\nprocessor_data[0]=%" PRIX64 "\n",
+          params->processor_id, params->processor_data[0]);
   size_t end = params->tid + 64;
   if (end > params->dim) end = params->dim;
   for (size_t i = params->tid; i < end; ++i) {

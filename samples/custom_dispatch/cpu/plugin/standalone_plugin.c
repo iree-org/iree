@@ -65,6 +65,8 @@ static int simple_mul_workgroup(void* context, void* params_ptr,
     // ^^^^ simplification pending (buffer + offset)
     size_t dim;
     size_t tid;
+    uint32_t processor_id;
+    const uint64_t* restrict processor_data;
   } params_t;
   const params_t* params = (const params_t*)params_ptr;
   size_t end = params->tid + 64;

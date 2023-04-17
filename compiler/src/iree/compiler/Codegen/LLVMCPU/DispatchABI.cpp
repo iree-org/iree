@@ -673,11 +673,10 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
   auto loc = forOp->getLoc();
   auto constantsPtrValue =
       loadFieldValue(forOp, DispatchStateField::push_constants, builder);
-  auto offsetValue = getIndexValue(loc, offset, builder);
   auto pushConstantType = IntegerType::get(context, 32);
   Value constantPtrValue = builder.create<LLVM::GEPOp>(
       loc, constantsPtrValue.getType(), pushConstantType, constantsPtrValue,
-      offsetValue);
+      LLVM::GEPArg(int32_t(offset)));
   Value constantValue =
       builder.create<LLVM::LoadOp>(loc, pushConstantType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
@@ -702,11 +701,10 @@ Value HALDispatchABI::loadBindingPtr(Operation *forOp, int64_t ordinal,
   auto loc = forOp->getLoc();
   auto ptrsPtrValue =
       loadFieldValue(forOp, DispatchStateField::binding_ptrs, builder);
-  auto ordinalValue = getIndexValue(loc, ordinal, builder);
   auto elementPtrValue = builder.create<LLVM::GEPOp>(
       loc, ptrsPtrValue.getType(),
       mlir::LLVM::LLVMPointerType::get(builder.getContext()), ptrsPtrValue,
-      ordinalValue);
+      LLVM::GEPArg(int32_t(ordinal)));
   auto elementValue = builder.create<LLVM::LoadOp>(
       loc, mlir::LLVM::LLVMPointerType::get(builder.getContext()),
       elementPtrValue);
@@ -721,10 +719,10 @@ Value HALDispatchABI::loadBindingLength(Operation *forOp, int64_t ordinal,
   auto loc = forOp->getLoc();
   auto lengthsPtrValue =
       loadFieldValue(forOp, DispatchStateField::binding_lengths, builder);
-  auto ordinalValue = getIndexValue(loc, ordinal, builder);
   auto indexType = typeConverter->convertType(IndexType::get(context));
   auto elementPtrValue = builder.create<LLVM::GEPOp>(
-      loc, lengthsPtrValue.getType(), indexType, lengthsPtrValue, ordinalValue);
+      loc, lengthsPtrValue.getType(), indexType, lengthsPtrValue,
+      LLVM::GEPArg(int32_t(ordinal)));
   auto elementValue =
       builder.create<LLVM::LoadOp>(loc, indexType, elementPtrValue);
   return buildValueDI(
@@ -830,6 +828,30 @@ Value HALDispatchABI::loadProcessorID(Operation *forOp, OpBuilder &builder) {
       loadFieldValue(forOp, WorkgroupStateField::processor_id, builder);
   return buildValueDI(forOp, resultValue, "processor_id",
                       di.getBasicType(resultValue.getType()), builder);
+}
+
+Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
+  // To get a pointer to the processor data we need to track pointers all the
+  // way from the environment argument. This is redundant with loadFieldValue
+  // but that returns values instead.
+  auto loc = forOp->getLoc();
+  auto environmentPtrValue =
+      buildArgDI(forOp, /*argNum=*/0, getLocalArgument(forOp, 0), "environment",
+                 di.getPtrOf(di.getConstOf(di.getEnvironmentV0T())), builder);
+  Value processorPtrValue = builder.create<LLVM::GEPOp>(
+      loc, LLVM::LLVMPointerType::get(context),
+      LLVM::LLVMPointerType::get(environmentType), environmentPtrValue,
+      LLVM::GEPArg(int32_t(EnvironmentField::processor)),
+      /*inbounds=*/true);
+  Value processorDataPtrValue = builder.create<LLVM::GEPOp>(
+      loc, LLVM::LLVMPointerType::get(context),
+      LLVM::LLVMPointerType::get(processorType), processorPtrValue,
+      LLVM::GEPArg(int32_t(ProcessorField::data)),
+      /*inbounds=*/true);
+  return buildValueDI(forOp, processorDataPtrValue, "processor_data",
+                      di.getPtrOf(di.getConstOf(di.getArrayOf(
+                          di.getUint64T(), ProcessorDataCapacity))),
+                      builder);
 }
 
 Value HALDispatchABI::loadProcessorData(Operation *forOp, int64_t index,
@@ -973,7 +995,7 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
 
 SmallVector<Value> HALDispatchABI::wrapAndCallImport(
     Operation *forOp, StringRef importName, bool weak, TypeRange resultTypes,
-    ValueRange args, OpBuilder &builder) {
+    ValueRange args, ArrayRef<StringRef> extraFields, OpBuilder &builder) {
   auto loc = forOp->getLoc();
   auto context = builder.getContext();
 
@@ -982,6 +1004,14 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
   types.reserve(resultTypes.size() + args.size());
   for (Value arg : args) {
     types.push_back(typeConverter->convertType(arg.getType()));
+  }
+
+  // Query any extra fields that were requested and append them to the struct.
+  SmallVector<Value> extraFieldValues;
+  for (auto extraField : extraFields) {
+    auto extraFieldValue = getExtraField(forOp, extraField, builder);
+    extraFieldValues.push_back(extraFieldValue);
+    types.push_back(extraFieldValue.getType());
   }
 
   // Pack parameter structure.
@@ -1001,6 +1031,11 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
     for (int64_t i = 0, e = args.size(); i < e; ++i) {
       structVal = builder.create<LLVM::InsertValueOp>(loc, structVal, args[i],
                                                       i + resultTypes.size());
+    }
+    for (int64_t i = 0, e = extraFieldValues.size(); i < e; ++i) {
+      structVal = builder.create<LLVM::InsertValueOp>(
+          loc, structVal, extraFieldValues[i],
+          i + resultTypes.size() + args.size());
     }
     // Store into the alloca'ed descriptor.
     builder.create<LLVM::StoreOp>(loc, structVal, paramsPtr);
@@ -1105,6 +1140,18 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp,
       builder.create<LLVM::LoadOp>(loc, workgroupStateType, statePtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
   return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
+}
+
+Value HALDispatchABI::getExtraField(Operation *forOp, StringRef extraField,
+                                    OpBuilder &builder) {
+  if (extraField == "processor_id") {
+    return loadProcessorID(forOp, builder);
+  } else if (extraField == "processor_data") {
+    return loadProcessorData(forOp, builder);
+  } else {
+    assert(false && "unhandled extra field");
+    return {};
+  }
 }
 
 }  // namespace iree_compiler

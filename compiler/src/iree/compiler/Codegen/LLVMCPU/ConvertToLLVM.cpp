@@ -707,13 +707,30 @@ struct RewriteExternCallOpToDynamicImportCallOp
                                          "and does not need an import wrapper");
     }
 
+    // Allow multiple imports to alias by having their name explicitly
+    // specified.
+    StringRef importName = flatSymbol.getValue();
+    if (auto importNameAttr =
+            calleeOp->getAttrOfType<StringAttr>("hal.import.name")) {
+      importName = importNameAttr.getValue();
+    }
+
     // TODO(benvanik): way to determine if weak (maybe via linkage?).
     bool weak = false;
 
+    // The call may need some additional internal fields appended.
+    SmallVector<StringRef> extraFields;
+    if (auto extraFieldsAttr =
+            calleeOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
+      for (auto extraFieldAttr : extraFieldsAttr) {
+        extraFields.push_back(extraFieldAttr.cast<StringAttr>().getValue());
+      }
+    }
+
     // Rewrite the call to a dynamic import call.
     SmallVector<Value> results = abi.wrapAndCallImport(
-        callOp, flatSymbol.getValue(), weak, callOp->getResultTypes(),
-        callOp->getOperands(), rewriter);
+        callOp, importName, weak, callOp->getResultTypes(),
+        callOp->getOperands(), extraFields, rewriter);
 
     rewriter.replaceOp(callOp, results);
     return success();
