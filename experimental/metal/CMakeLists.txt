@@ -27,8 +27,6 @@ iree_cc_library(
     "metal_buffer.m"
     "metal_device.m"
     "metal_driver.m"
-    "metal_fence.h"
-    "metal_fence.m"
     "metal_kernel_library.h"
     "metal_kernel_library.m"
     "metal_shared_event.h"

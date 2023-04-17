@@ -17,5 +17,8 @@ iree_hal_cts_test_suite(
     "\"MTLE\""
   DEPS
     iree::experimental::metal::registration
+  EXCLUDED_TESTS
+    # HAL event is unimplemented for Metal right now.
+    "event"
 )
 
