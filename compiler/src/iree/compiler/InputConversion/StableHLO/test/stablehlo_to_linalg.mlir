@@ -727,39 +727,6 @@ func.func @map_compare(%arg0: tensor<?xcomplex<f32>>,
 
 // -----
 
-// CHECK-LABEL: @reduce_add_unranked
-// CHECK-PRIMITIVE-LABEL: @reduce_add_unranked
-func.func @reduce_add_unranked(%arg0: tensor<*xi32>, %arg1: tensor<i32>) -> tensor<*xi32> {
-  %0 = "stablehlo.reduce"(%arg0, %arg1) ({
-  ^bb0(%arg3: tensor<i32>, %arg4 : tensor<i32>):
-    %1 = stablehlo.add %arg3, %arg4 : tensor<i32>
-    "stablehlo.return"(%1) : (tensor<i32>) -> ()
-  }) {dimensions = dense<1> : tensor<1xi64>, someattr} : (tensor<*xi32>, tensor<i32>) -> tensor<*xi32>
-  func.return %0 : tensor<*xi32>
-}
-// CHECK: stablehlo.reduce
-// CHECK-PRIMITIVE: stablehlo.reduce
-
-// -----
-
-func.func @reduce_dynamic_output(%arg0: tensor<5x4xi32>, %arg1: tensor<i32>) -> tensor<?xi32> {
-  %0 = "stablehlo.reduce"(%arg0, %arg1) ({
-  ^bb0(%arg3: tensor<i32>, %arg4 : tensor<i32>):
-    %1 = stablehlo.maximum %arg3, %arg4 : tensor<i32>
-    "stablehlo.return"(%1) : (tensor<i32>) -> ()
-  }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5x4xi32>, tensor<i32>) -> tensor<?xi32>
-  func.return %0 : tensor<?xi32>
-}
-
-// Regression test: just check that this lowers successfully.
-// CHECK-LABEL: @reduce_dynamic_output
-// CHECK: linalg.generic
-
-// CHECK-PRIMITIVE-LABEL: @reduce_dynamic_output
-// CHECK-PRIMITIVE: linalg.reduce
-
-// -----
-
 func.func @pad_cst(%arg0: tensor<12x4xf32>) -> tensor<18x12xf32> {
   %0 = arith.constant dense<0.0> : tensor<f32>
   %1 = "stablehlo.pad"(%arg0, %0) {

@@ -2728,7 +2728,7 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       PadOpNegativePaddingConversion,
       TorchIndexSelectOpConversion,
       SelectAndScatterNoOverlapConverter,  // TODO(#12678): Add tests.
-      ReduceRegionReturnOpConversion       // TODO(#12678): Add tests.
+      ReduceRegionReturnOpConversion
       >(typeConverter, context);
 
   detail::populatePointwiseStableHloToLinalgConversionPatterns(
@@ -2742,7 +2742,7 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       IotaToMapConverter<stablehlo::IotaOp>,
       IotaToMapConverter<stablehlo::DynamicIotaOp>,
       MapOpToMapConverter,
-      ReduceOpToReduceConverter,  // TODO(#12678): Add tests.
+      ReduceOpToReduceConverter,
       TransposeOpToTransposeConverter
     >(typeConverter, context);
   } else {
@@ -2753,7 +2753,7 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       HloBroadcastInDimConverter,
       HloDynamicBroadcastInDimConverter,
       MapOpToGenericConverter,
-      ReduceOpToGenericConverter,  // TODO(#12678): Add tests.
+      ReduceOpToGenericConverter,
       TransposeConverter<stablehlo::TransposeOp>
     >(typeConverter, context);
   }
