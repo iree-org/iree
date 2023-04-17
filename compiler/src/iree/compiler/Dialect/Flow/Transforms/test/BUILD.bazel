@@ -32,6 +32,7 @@ iree_lit_test_suite(
             "expand_tensor_shapes.mlir",
             "export_benchmark_funcs.mlir",
             "form_dispatch_regions.mlir",
+            "form_dispatch_workgroups.mlir",
             "fusion_of_tensor_ops.mlir",
             "infer_numeric_narrowing.mlir",
             "initialize_empty_tensors.mlir",

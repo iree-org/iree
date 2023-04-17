@@ -47,6 +47,42 @@ iree_lit_test_suite(
     "hostonly"
 )
 
+
+
+add_library(iree_samples_custom_dispatch_cpu_system_ukernel SHARED
+  system_ukernel.c
+)
+target_include_directories(iree_samples_custom_dispatch_cpu_system_ukernel
+  PRIVATE
+    ${IREE_SOURCE_DIR}/runtime/src/
+)
+
+# NOTE: this is only required because we want this sample to run on all
+# platforms without needing to change the library name (libfoo.so/foo.dll).
+set_target_properties(iree_samples_custom_dispatch_cpu_system_ukernel
+  PROPERTIES
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+    PREFIX ""
+    OUTPUT_NAME "system_ukernel"
+)
+
+add_dependencies(iree-sample-deps iree_samples_custom_dispatch_cpu_system_ukernel)
+
+iree_lit_test_suite(
+  NAME
+    system_ukernel_example
+  SRCS
+    "system_ukernel.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_system_ukernel
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
 endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 
 # embedded-elf plugin mechanism for standalone portable ELFs.
@@ -67,13 +103,13 @@ if(MSVC)
   return()
 endif()
 
-function(standalone_plugin_library _ARCH)
-  set(_NAME iree_samples_custom_dispatch_cpu_standalone_plugin_${_ARCH})
+function(plugin_library _PREFIX _ARCH)
+  set(_NAME iree_samples_custom_dispatch_cpu_${_PREFIX}_${_ARCH})
   add_custom_command(
     OUTPUT
-      standalone_plugin_${_ARCH}.o
+      ${_PREFIX}_${_ARCH}.o
     DEPENDS
-      standalone_plugin.c
+      ${_PREFIX}.c
       ${IREE_CLANG_TARGET}
     COMMAND ${IREE_CLANG_TARGET}
       -target ${_ARCH}-unknown-unknown-eabi-elf
@@ -89,15 +125,15 @@ function(standalone_plugin_library _ARCH)
       -ffunction-sections
       -funique-section-names
       -I ${IREE_SOURCE_DIR}/runtime/src/
-      -c ${CMAKE_CURRENT_SOURCE_DIR}/standalone_plugin.c
-      -o ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.o
+      -c ${CMAKE_CURRENT_SOURCE_DIR}/${_PREFIX}.c
+      -o ${CMAKE_CURRENT_BINARY_DIR}/${_PREFIX}_${_ARCH}.o
     VERBATIM
   )
   add_custom_command(
     OUTPUT
-      standalone_plugin_${_ARCH}.so
+      ${_PREFIX}_${_ARCH}.so
     DEPENDS
-      standalone_plugin_${_ARCH}.o
+      ${_PREFIX}_${_ARCH}.o
       ${IREE_LLD_TARGET}
     COMMAND ${IREE_LLD_TARGET}
       -flavor gnu
@@ -117,18 +153,18 @@ function(standalone_plugin_library _ARCH)
       --ignore-function-address-equality
       --hash-style=sysv
       --strip-debug
-      ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.o
-      -o ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.so
+      ${CMAKE_CURRENT_BINARY_DIR}/${_PREFIX}_${_ARCH}.o
+      -o ${CMAKE_CURRENT_BINARY_DIR}/${_PREFIX}_${_ARCH}.so
     VERBATIM
   )
   add_custom_target(${_NAME} DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.so
+    ${CMAKE_CURRENT_BINARY_DIR}/${_PREFIX}_${_ARCH}.so
   )
 endfunction()
 
 # Build the standalone_plugin_*.so files for each architecture we target.
-standalone_plugin_library(aarch64)
-standalone_plugin_library(x86_64)
+plugin_library(standalone_plugin aarch64)
+plugin_library(standalone_plugin x86_64)
 
 add_custom_command(
   OUTPUT
@@ -156,6 +192,41 @@ iree_lit_test_suite(
     "standalone_example.mlir"
   DATA
     standalone_plugin.sos
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
+plugin_library(standalone_ukernel x86_64)
+
+add_custom_command(
+  OUTPUT
+    standalone_ukernel.sos
+  DEPENDS
+    ${CMAKE_CURRENT_BINARY_DIR}/standalone_ukernel_x86_64.so
+    iree-fatelf
+  COMMAND iree-fatelf join
+    ${CMAKE_CURRENT_BINARY_DIR}/standalone_ukernel_x86_64.so
+    > ${CMAKE_CURRENT_BINARY_DIR}/standalone_ukernel.sos
+  VERBATIM
+)
+add_custom_target(iree_samples_custom_dispatch_cpu_standalone_ukernel DEPENDS
+  ${CMAKE_CURRENT_BINARY_DIR}/standalone_ukernel.sos
+)
+
+add_dependencies(iree-sample-deps iree_samples_custom_dispatch_cpu_standalone_ukernel)
+
+iree_lit_test_suite(
+  NAME
+    standalone_ukernel
+  SRCS
+    "standalone_ukernel.mlir"
+  DATA
+    standalone_ukernel.sos
   TOOLS
     FileCheck
     iree-compile

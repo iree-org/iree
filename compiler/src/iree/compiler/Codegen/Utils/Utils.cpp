@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -507,8 +508,10 @@ SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
     forOps = body->getOps<scf::ForOp>();
   }
   SmallVector<Operation *> computeOps;
-  for (auto op : body->getOps<TilingInterface>()) {
-    computeOps.push_back(op);
+  for (Operation &op : *body) {
+    if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(&op)) {
+      computeOps.push_back(&op);
+    }
   }
   return computeOps;
 }

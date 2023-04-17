@@ -2015,27 +2015,30 @@ static LogicalResult setTranslationInfoAndRootConfig(
   if (failed(rootOp)) return failure();
   Operation *rootOperation = rootOp.value();
 
-  if (rootOperation) {
-    auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-    if (isVMVXBackend(targetAttr)) {
-      if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation))) {
-        return failure();
-      }
-    } else {
-      auto targetMLTransInfo =
-          TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
-      if (failed(setRootConfigImpl(entryPointFn, rootOperation,
-                                   targetMLTransInfo))) {
+  // Handle the case with no known root operation.
+  if (!rootOperation) {
+    // If there is no translation info set, just set it to default.
+    if (!getTranslationInfo(entryPointFn)) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
+      // Fall back, just set the translation to CPUDefault.
+      if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
         return failure();
       }
     }
+    return success();
   }
 
-  if (!getTranslationInfo(entryPointFn)) {
-    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
-    // Fall back, just set the translation to CPUDefault.
-    if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (isVMVXBackend(targetAttr)) {
+    if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation))) {
+      return failure();
+    }
+  } else {
+    auto targetMLTransInfo =
+        TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
+    if (failed(setRootConfigImpl(entryPointFn, rootOperation,
+                                 targetMLTransInfo))) {
       return failure();
     }
   }
