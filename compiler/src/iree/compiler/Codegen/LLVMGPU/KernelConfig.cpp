@@ -916,7 +916,7 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
   int64_t residualTilingFactor = bestTilingFactor;
 
   SmallVector<int64_t, 3> workgroupSize(3, 1);  // (X, Y, Z)
-  SmallVector<int64_t> workgroupTileSizes(4, 0);
+  SmallVector<int64_t> workgroupTileSizes(4, 1);
 
   if (isNCHW) {
     // OW -> x, OH -> y, OC -> z

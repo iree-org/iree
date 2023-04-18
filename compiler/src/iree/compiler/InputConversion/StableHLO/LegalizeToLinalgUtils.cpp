@@ -159,4 +159,12 @@ bool isInBodyOfLinalgOps(Operation* op) {
          parentOp->getContext()->getLoadedDialect<linalg::LinalgDialect>();
 }
 
+SmallVector<int64_t, 4> extract1DVector(DenseIntElementsAttr elements) {
+  SmallVector<int64_t, 4> ret;
+  for (const APInt& element : elements) {
+    ret.push_back(element.getLimitedValue());
+  }
+  return ret;
+}
+
 }  // namespace mlir::iree_compiler::stablehlo

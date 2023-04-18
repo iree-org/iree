@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/drivers/local_task/task_driver.h"
 #include "iree/hal/local/loaders/registration/init.h"
+#include "iree/hal/local/plugins/registration/init.h"
 #include "iree/task/api.h"
 
 static iree_status_t iree_hal_local_task_driver_factory_enumerate(
@@ -51,12 +52,18 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
       host_allocator, IREE_ARRAYSIZE(executor_storage), executors,
       &executor_count));
 
+  iree_hal_executable_plugin_manager_t* plugin_manager = NULL;
+  iree_status_t status = iree_hal_executable_plugin_manager_create_from_flags(
+      host_allocator, &plugin_manager);
+
   // Create all executable loaders linked into the binary.
   iree_hal_executable_loader_t* loaders[8] = {NULL};
   iree_host_size_t loader_count = 0;
-  iree_status_t status = iree_hal_create_all_available_executable_loaders(
-      iree_hal_executable_import_provider_default(), IREE_ARRAYSIZE(loaders),
-      &loader_count, loaders, host_allocator);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_create_all_available_executable_loaders(
+        plugin_manager, IREE_ARRAYSIZE(loaders), &loader_count, loaders,
+        host_allocator);
+  }
 
   // TODO(benvanik): allow this to be injected to share across drivers.
   iree_hal_allocator_t* device_allocator = NULL;
@@ -80,6 +87,7 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
   for (iree_host_size_t i = 0; i < loader_count; ++i) {
     iree_hal_executable_loader_release(loaders[i]);
   }
+  iree_hal_executable_plugin_manager_release(plugin_manager);
   iree_hal_allocator_release(device_allocator);
   return status;
 }

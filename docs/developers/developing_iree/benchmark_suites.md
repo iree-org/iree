@@ -33,7 +33,7 @@ and
 Configure IREE with `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON`:
 
 ```sh
-cmake -GNinja -B "${IREE_BUILD_DIR}" -S "${IREE_REPO}" \
+cmake -GNinja -B "${IREE_BUILD_DIR?}" -S "${IREE_REPO?}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
@@ -44,9 +44,10 @@ cmake -GNinja -B "${IREE_BUILD_DIR}" -S "${IREE_REPO}" \
 Build the benchmark suites and tools:
 
 ```sh
-cmake --build "${IREE_BUILD_DIR}" --target \
+cmake --build "${IREE_BUILD_DIR?}" --target \
   iree-e2e-test-artifacts \
   iree-benchmark-module
+export E2E_TEST_ARTIFACTS_DIR="${IREE_BUILD_DIR?}/e2e_test_artifacts"
 ```
 
 ### Run Benchmarks
@@ -54,22 +55,22 @@ cmake --build "${IREE_BUILD_DIR}" --target \
 Export the execution benchmark config:
 
 ```sh
-build_tools/benchmarks/export_benchmark_config.py execution > exec_config.json
+build_tools/benchmarks/export_benchmark_config.py execution > "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
 ```
 
 Run benchmarks (currently only support running on a Linux host):
 
 ```sh
 build_tools/benchmarks/run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir="${IREE_BUILD_DIR}/tools" \
-  --e2e_test_artifacts_dir="${IREE_BUILD_DIR}/e2e_test_artifacts" \
-  --execution_benchmark_config=exec_config.json \
+  --normal_benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
+  --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
+  --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
   --target_device_name="<target_device_name, e.g. c2-standard-16>" \
-  --output=benchmark_results.json \
+  --output="${E2E_TEST_ARTIFACTS_DIR?}/benchmark_results.json" \
   --verbose \
   --cpu_uarch="<host CPU uarch, e.g. CascadeLake>"
 # Traces can be collected by adding:
-# --traced_benchmark_tool_dir="${IREE_TRACED_BUILD_DIR}/tools" \
+# --traced_benchmark_tool_dir="${IREE_TRACED_BUILD_DIR?}/tools" \
 # --trace_capture_tool=/path/to/iree-tracy-capture \
 # --capture_tarball=captured_tracy_files.tar.gz
 ```
@@ -91,11 +92,11 @@ Filters can be used to select the benchmarks:
 
 ```sh
 build_tools/benchmarks/run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir="${IREE_BUILD_DIR}/tools" \
-  --e2e_test_artifacts_dir="${IREE_BUILD_DIR}/e2e_test_artifacts" \
-  --execution_benchmark_config=exec_config.json \
+  --normal_benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
+  --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
+  --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
   --target_device_name="c2-standard-16" \
-  --output=benchmark_results.json \
+  --output="${E2E_TEST_ARTIFACTS_DIR?}/benchmark_results.json" \
   --verbose \
   --cpu_uarch="CascadeLake" \
   --model_name_regex="MobileBert*" \
@@ -108,7 +109,7 @@ build_tools/benchmarks/run_benchmarks_on_linux.py \
 Export the compilation benchmark config:
 
 ```sh
-build_tools/benchmarks/export_benchmark_config.py compilation > comp_config.json
+build_tools/benchmarks/export_benchmark_config.py compilation > "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
 Generate the compilation statistics:
@@ -117,9 +118,9 @@ Generate the compilation statistics:
 build_tools/benchmarks/collect_compilation_statistics.py \
   alpha \
   --compilation_benchmark_config=comp_config.json \
-  --e2e_test_artifacts_dir="${IREE_BUILD_DIR}/e2e_test_artifacts" \
-  --build_log="${IREE_BUILD_DIR}/.ninja_log" \
-  --output=compile_stats_results.json
+  --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
+  --build_log="${IREE_BUILD_DIR?}/.ninja_log" \
+  --output="${E2E_TEST_ARTIFACTS_DIR?}/compile_stats_results.json"
 ```
 
 Note that you need to use [Ninja](https://ninja-build.org/) to build the
@@ -146,7 +147,7 @@ benchmark ID at:
     `diff_local_benchmarks.py`, each benchmark has the link to its
     https://perf.iree.dev URL, which includes the benchmark ID.
 
-If you don't have aritfacts locally, see
+If you don't have artifacts locally, see
 [Fetching Benchmark Artifacts from CI](#fetching-benchmark-artifacts-from-ci) to
 find the GCS directory of the CI artifacts. Then fetch the needed files:
 
@@ -155,21 +156,21 @@ export GCS_URL="gs://iree-github-actions-<presubmit|postsubmit>-artifacts/<run_i
 export E2E_TEST_ARTIFACTS_DIR="e2e_test_artifacts"
 
 # Download all artifacts
-mkdir "${E2E_TEST_ARTIFACTS_DIR}"
-gcloud storage cp -r "${GCS_URL}/e2e-test-artifacts" "${E2E_TEST_ARTIFACTS_DIR}"
+mkdir "${E2E_TEST_ARTIFACTS_DIR?}"
+gcloud storage cp -r "${GCS_URL?}/e2e-test-artifacts" "${E2E_TEST_ARTIFACTS_DIR?}"
 
 # Download benchmark configs
-gcloud storage cp "${GCS_URL}/benchmark-config.json" exec_config.json
-gcloud storage cp "${GCS_URL}/compilation-config.json" comp_config.json
+gcloud storage cp "${GCS_URL?}/benchmark-config.json" "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
+gcloud storage cp "${GCS_URL?}/compilation-config.json" "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
 Run the helper tool to dump benchmark commands from benchmark configs:
 
 ```sh
 build_tools/benchmarks/benchmark_helper.py dump-cmds \
-  --execution_benchmark_config=exec_config.json \
-  --compilation_benchmark_config=comp_config.json \
-  --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
+  --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
+  --compilation_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json" \
+  --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --benchmark_id="<benchmark_id>"
 ```
 
@@ -179,11 +180,11 @@ The commands below output the full list of execution and compilation benchmarks,
 including the benchmark names and their flags:
 
 ```sh
-build_tools/benchmarks/export_benchmark_config.py execution > exec_config.json
-build_tools/benchmarks/export_benchmark_config.py compilation > comp_config.json
+build_tools/benchmarks/export_benchmark_config.py execution > "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
+build_tools/benchmarks/export_benchmark_config.py compilation > "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 build_tools/benchmarks/benchmark_helper.py dump-cmds \
-  --execution_benchmark_config=exec_config.json \
-  --compilation_benchmark_config=comp_config.json
+  --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
+  --compilation_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
 ## Fetching Benchmark Artifacts from CI
@@ -227,29 +228,29 @@ export GCS_URL="gs://iree-github-actions-<presubmit|postsubmit>-artifacts/<run_i
 Download artifacts:
 
 ```sh
-# The GCS directory has the same structure as your local ${IREE_BUILD_DIR}/e2e_test_artifacts.
-gcloud storage ls "${GCS_URL}/e2e-test-artifacts"
+# The GCS directory has the same structure as your local ${IREE_BUILD_DIR?}/e2e_test_artifacts.
+gcloud storage ls "${GCS_URL?}/e2e-test-artifacts"
 
 # Download all source and imported MLIR files:
-gcloud storage cp "${GCS_URL}/e2e-test-artifacts/*.mlir" "<target_dir>"
+gcloud storage cp "${GCS_URL?}/e2e-test-artifacts/*.mlir" "<target_dir>"
 ```
 
 Execution and compilation benchmark configs can be downloaded at:
 
 ```sh
 # Execution benchmark config:
-gcloud storage cp "${GCS_URL}/benchmark-config.json" exec_config.json
+gcloud storage cp "${GCS_URL?}/benchmark-config.json" "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
 
 # Compilation benchmark config:
-gcloud storage cp "${GCS_URL}/compilation-config.json" comp_config.json
+gcloud storage cp "${GCS_URL?}/compilation-config.json" "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
 Benchmark raw results and traces can be downloaded at:
 
 ```sh
 # Benchmark raw results
-gcloud storage cp "${GCS_URL}/benchmark-results/benchmark-results-*.json" .
+gcloud storage cp "${GCS_URL?}/benchmark-results/benchmark-results-*.json" .
 
 # Benchmark traces
-gcloud storage cp "${GCS_URL}/benchmark-results/benchmark-traces-*.tar.gz" .
+gcloud storage cp "${GCS_URL?}/benchmark-results/benchmark-traces-*.tar.gz" .
 ```

@@ -339,7 +339,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ImportTable(
     for (auto &import : imports) {
       auto symbolName = import.symbol_name;
       if (import.weak) {
-        symbolName += "?";
+        symbolName = "?" + symbolName;
       }
       symbolNameValues.push_back(getStringConstant(symbolName, module));
     }

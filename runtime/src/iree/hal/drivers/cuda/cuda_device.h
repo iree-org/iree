@@ -28,6 +28,10 @@ iree_status_t iree_hal_cuda_device_create(
 iree_status_t iree_hal_cuda_device_get_context(iree_hal_device_t* base_device,
                                                CUcontext* out_context);
 
+// Returns the dynamic symbol table from the device's context.
+iree_hal_cuda_dynamic_symbols_t* iree_hal_cuda_get_dynamic_symbols(
+    iree_hal_device_t* base_device);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

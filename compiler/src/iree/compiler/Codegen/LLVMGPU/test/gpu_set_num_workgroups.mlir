@@ -772,3 +772,62 @@ hal.executable @inner_unit_dim {
 //      CHECK: func.func @inner_unit_dim
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.export @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 layout(#pipeline_layout)
+  builtin.module {
+    func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32() {
+        %c0 = arith.constant 0 : index
+        %c162508800 = arith.constant 162508800 : index
+        %cst = arith.constant 1.001000e-05 : f32
+        %cst_0 = arith.constant 0.000000e+00 : f32
+        %cst_1 = arith.constant dense_resource<__elided__> : tensor<64xf32>
+        %cst_2 = arith.constant dense_resource<__elided__> : tensor<64xf32>
+        %cst_3 = arith.constant dense_resource<__elided__> : tensor<64xf32>
+        %cst_4 = arith.constant dense_resource<__elided__> : tensor<64xf32>
+        %cst_5 = arith.constant dense_resource<__elided__> : tensor<64xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x230x230x3xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<7x7x3x64xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c162508800) : !flow.dispatch.tensor<writeonly:tensor<256x112x112x64xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [256, 230, 230, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<256x230x230x3xf32>> -> tensor<256x230x230x3xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [7, 7, 3, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<7x7x3x64xf32>> -> tensor<7x7x3x64xf32>
+        %5 = tensor.empty() : tensor<256x112x112x64xf32>
+        %6 = linalg.fill ins(%cst_0 : f32) outs(%5 : tensor<256x112x112x64xf32>) -> tensor<256x112x112x64xf32>
+        %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%3, %4 : tensor<256x230x230x3xf32>, tensor<7x7x3x64xf32>) outs(%6 : tensor<256x112x112x64xf32>) -> tensor<256x112x112x64xf32>
+        %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%7, %cst_1, %cst_2, %cst_3, %cst_4, %cst_5 : tensor<256x112x112x64xf32>, tensor<64xf32>, tensor<64xf32>, tensor<64xf32>, tensor<64xf32>, tensor<64xf32>) outs(%5 : tensor<256x112x112x64xf32>) {
+        ^bb0(%in: f32, %in_6: f32, %in_7: f32, %in_8: f32, %in_9: f32, %in_10: f32, %out: f32):
+        %9 = arith.addf %in_9, %cst : f32
+        %10 = math.sqrt %9 : f32
+        %11 = arith.addf %in, %in_6 : f32
+        %12 = arith.subf %11, %in_7 : f32
+        %13 = arith.mulf %12, %in_8 : f32
+        %14 = arith.divf %13, %10 : f32
+        %15 = arith.addf %14, %in_10 : f32
+        %16 = arith.maxf %15, %cst_0 : f32
+        linalg.yield %16 : f32
+        } -> tensor<256x112x112x64xf32>
+        flow.dispatch.tensor.store %8, %2, offsets = [0, 0, 0, 0], sizes = [256, 112, 112, 64], strides = [1, 1, 1, 1] : tensor<256x112x112x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<256x112x112x64xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 8, 64, 1, 1, 4], [0, 1, 0, 0]{{\]}}
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize>
+//      CHECK: hal.executable.export public @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// CHECK-SAME:     workgroup_size = [16 : index, 2 : index, 1 : index]
+//      CHECK: func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]

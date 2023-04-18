@@ -51,6 +51,7 @@ iree_cc_binary_benchmark(
     iree::base::tracing
     iree::hal
     iree::hal::local::loaders::registration
+    iree::hal::local::plugins::registration
     iree::testing::benchmark
   TESTONLY
 )
@@ -72,6 +73,24 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    executable_library_util
+  HDRS
+    "executable_library_util.h"
+  SRCS
+    "executable_library_util.c"
+  DEPS
+    ::executable_environment
+    ::executable_library
+    ::executable_loader
+    iree::base
+    iree::base::internal
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     executable_loader
   HDRS
     "executable_loader.h"
@@ -84,6 +103,34 @@ iree_cc_library(
     ::executable_library
     iree::base
     iree::base::internal
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable_plugin
+  HDRS
+    "executable_plugin.h"
+  DEPS
+
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable_plugin_manager
+  HDRS
+    "executable_plugin_manager.h"
+  SRCS
+    "executable_plugin_manager.c"
+  DEPS
+    ::executable_loader
+    ::executable_plugin
+    iree::base
+    iree::base::internal
+    iree::base::internal::synchronization
     iree::base::tracing
     iree::hal
   PUBLIC
