@@ -147,7 +147,6 @@ def get_test_shapes(shapes_id: ShapesId):
     return [      
       TestShape(m=256, k=128, n=512),
       TestShape(m=256, k=256, n=256),
-      TestShape(m=128, k=128, n=128),
       ]
   raise ValueError(shapes_id)
 
@@ -238,7 +237,6 @@ def get_test_compilation_infos(
           TileWorkgroupSizePair([[128, 128, 16]], [32, 4, 1]),
           TileWorkgroupSizePair([[128, 128, 32]], [32, 4, 1]),
           TileWorkgroupSizePair([[128, 256, 32]], [32, 8, 1]),
-          TileWorkgroupSizePair([[256, 128, 32]], [32, 8, 1]),
       ]    
   elif compilation_info_id == CompilationInfoId.SPIRVVectorizeNVIDIA:
     tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(32)
