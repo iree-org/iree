@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
