@@ -19,81 +19,82 @@ namespace mlir::iree_compiler::stablehlo {
 namespace {
 namespace stablehlo = mlir::stablehlo;
 
-class ArithOp {
+class ArithOpBuilder {
  public:
-  ArithOp(OpBuilder b, Location l, Value v) : builder(b), loc(l), value(v) {}
+  ArithOpBuilder(OpBuilder b, Location l, Value v)
+      : builder(b), loc(l), value(v) {}
 
   explicit operator Value() { return value; }
   Value val() { return value; }
 
-  ArithOp constantI(int64_t value, int64_t bits) {
+  ArithOpBuilder constantI(int64_t value, int64_t bits) {
     Value val = builder.create<arith::ConstantOp>(
         loc, builder.getIntegerAttr(builder.getIntegerType(bits), value));
-    return ArithOp(builder, loc, val);
+    return ArithOpBuilder(builder, loc, val);
   }
 
-  ArithOp extendUI(int32_t bits) {
+  ArithOpBuilder extendUI(int32_t bits) {
     Value ext = builder.create<arith::ExtUIOp>(
         loc, builder.getIntegerType(bits), value);
-    return ArithOp(builder, loc, ext);
+    return ArithOpBuilder(builder, loc, ext);
   }
 
-  ArithOp truncI(int64_t bits) {
+  ArithOpBuilder truncI(int64_t bits) {
     if (value.getType().getIntOrFloatBitWidth() == bits) return *this;
     Value trunc = builder.create<arith::TruncIOp>(
         loc, builder.getIntegerType(bits), value);
-    return ArithOp(builder, loc, trunc);
+    return ArithOpBuilder(builder, loc, trunc);
   }
 
-  ArithOp linalgIndex(int32_t index) {
+  ArithOpBuilder linalgIndex(int32_t index) {
     Value val = builder.create<linalg::IndexOp>(loc, index);
-    return ArithOp(builder, loc, val);
+    return ArithOpBuilder(builder, loc, val);
   }
 
-  ArithOp indexCast(int32_t bitwidth) {
+  ArithOpBuilder indexCast(int32_t bitwidth) {
     if (isa<IntegerType>(value.getType())) {
       Value cast = builder.create<arith::IndexCastOp>(
           loc, builder.getIndexType(), value);
-      return ArithOp(builder, loc, cast);
+      return ArithOpBuilder(builder, loc, cast);
     }
 
     Value cast = builder.create<arith::IndexCastOp>(
         loc, builder.getIntegerType(bitwidth), value);
-    return ArithOp(builder, loc, cast);
+    return ArithOpBuilder(builder, loc, cast);
   }
 
-  ArithOp rotateLeft(int32_t rotation) {
+  ArithOpBuilder rotateLeft(int32_t rotation) {
     int32_t bits = value.getType().getIntOrFloatBitWidth();
-    ArithOp cLeft = constantI(rotation, bits);
-    ArithOp cRight = constantI(bits - rotation, bits);
-    ArithOp rLeft = (*this << cLeft);
-    ArithOp rRight = (*this >> cRight);
+    ArithOpBuilder cLeft = constantI(rotation, bits);
+    ArithOpBuilder cRight = constantI(bits - rotation, bits);
+    ArithOpBuilder rLeft = (*this << cLeft);
+    ArithOpBuilder rRight = (*this >> cRight);
     return rLeft | rRight;
   }
 
-  ArithOp operator+(ArithOp &rhs) {
+  ArithOpBuilder operator+(ArithOpBuilder &rhs) {
     Value res = builder.create<arith::AddIOp>(loc, value, rhs.value);
-    return ArithOp(builder, loc, res);
+    return ArithOpBuilder(builder, loc, res);
   }
 
-  ArithOp operator|(ArithOp &rhs) {
+  ArithOpBuilder operator|(ArithOpBuilder &rhs) {
     Value res = builder.create<arith::OrIOp>(loc, value, rhs.value);
-    return ArithOp(builder, loc, res);
+    return ArithOpBuilder(builder, loc, res);
   }
 
-  ArithOp operator^(ArithOp &rhs) {
+  ArithOpBuilder operator^(ArithOpBuilder &rhs) {
     Value res = builder.create<arith::XOrIOp>(loc, value, rhs.value);
-    return ArithOp(builder, loc, res);
+    return ArithOpBuilder(builder, loc, res);
   }
 
-  ArithOp operator<<(ArithOp &rhs) {
+  ArithOpBuilder operator<<(ArithOpBuilder &rhs) {
     Value shl = builder.create<arith::ShLIOp>(loc, value, rhs.value);
-    return ArithOp(builder, loc, shl);
+    return ArithOpBuilder(builder, loc, shl);
   }
 
-  ArithOp operator>>(ArithOp &rhs) {
+  ArithOpBuilder operator>>(ArithOpBuilder &rhs) {
     Value shr = builder.create<arith::ShRUIOp>(loc, value, rhs.value);
-    return ArithOp(builder, loc, shr);
+    return ArithOpBuilder(builder, loc, shr);
   }
 
  private:
@@ -102,14 +103,14 @@ class ArithOp {
   Value value;
 };
 
-std::pair<ArithOp, ArithOp> splitI64(ArithOp i64) {
+std::pair<ArithOpBuilder, ArithOpBuilder> splitI64(ArithOpBuilder i64) {
   auto low = i64.truncI(32);
   auto c32 = i64.constantI(/*value=*/32, /*bits=*/64);
   auto high = (i64 >> c32).truncI(32);
   return {low, high};
 }
 
-ArithOp fuseI32s(ArithOp low, ArithOp high) {
+ArithOpBuilder fuseI32s(ArithOpBuilder low, ArithOpBuilder high) {
   auto c32 = high.constantI(/*value=*/32, /*bits=*/64);
   high = high.extendUI(64) << c32;
   low = low.extendUI(64);
@@ -119,25 +120,25 @@ ArithOp fuseI32s(ArithOp low, ArithOp high) {
 // Implements the ThreeFry counter-based PRNG algorithm.
 // Salmon et al. SC 2011. Parallel random numbers: as easy as 1, 2, 3.
 // http://www.thesalmons.org/john/random123/papers/random123sc11.pdf
-std::pair<ArithOp, ArithOp> runThreeFry2xi32(ArithOp key0, ArithOp key1,
-                                             ArithOp initialState) {
-  ArithOp index = initialState.linalgIndex(0);
+std::pair<ArithOpBuilder, ArithOpBuilder> runThreeFry2xi32(
+    ArithOpBuilder key0, ArithOpBuilder key1, ArithOpBuilder initialState) {
+  ArithOpBuilder index = initialState.linalgIndex(0);
   index = index.indexCast(64);
   index = index + initialState;
 
   // Split into the 2xi32 used for threefry.
-  std::pair<ArithOp, ArithOp> input = splitI64(index);
-  ArithOp input0 = input.first;
-  ArithOp input1 = input.second;
+  std::pair<ArithOpBuilder, ArithOpBuilder> input = splitI64(index);
+  ArithOpBuilder input0 = input.first;
+  ArithOpBuilder input1 = input.second;
 
   // Magic number and rotation distances specified by the Threefry2x32
   // algorithm.
   llvm::SmallVector<int32_t, 8> rotations = {13, 15, 26, 6, 17, 29, 16, 24};
-  ArithOp magic = key0.constantI(/*value=*/0x1bd11bda, /*bits=*/32);
+  ArithOpBuilder magic = key0.constantI(/*value=*/0x1bd11bda, /*bits=*/32);
 
-  ArithOp key2 = magic ^ key0 ^ key1;
-  std::array<ArithOp, 3> ks{key0, key1, key2};
-  std::array<ArithOp, 2> x{input0 + key0, input1 + key1};
+  ArithOpBuilder key2 = magic ^ key0 ^ key1;
+  std::array<ArithOpBuilder, 3> ks{key0, key1, key2};
+  std::array<ArithOpBuilder, 2> x{input0 + key0, input1 + key1};
 
   // Performs a single round of the Threefry2x32 algorithm, with a rotation
   // amount 'rotation'.
@@ -152,13 +153,13 @@ std::pair<ArithOp, ArithOp> runThreeFry2xi32(ArithOp key0, ArithOp key1,
       x[1] = x[0] ^ x[1];
     }
 
-    ArithOp c = x[0].constantI(/*value=*/i + 1, /*bits=*/32);
+    ArithOpBuilder c = x[0].constantI(/*value=*/i + 1, /*bits=*/32);
     x[0] = x[0] + ks[k1];
     x[1] = x[1] + ks[k2];
     x[1] = x[1] + c;
   }
 
-  return std::pair<ArithOp, ArithOp>(x[0], x[1]);
+  return std::pair<ArithOpBuilder, ArithOpBuilder>(x[0], x[1]);
 }
 
 // Extract and potentially reconstruct the i32 key-pair as necessary.
@@ -185,7 +186,7 @@ std::pair<Value, Value> extractKey32(OpBuilder &builder, Location loc,
     Value idx1 = builder.create<arith::ConstantIndexOp>(loc, 0);
     Value state = builder.create<tensor::ExtractOp>(loc, store, idx1);
     Value cast = builder.create<arith::BitcastOp>(loc, i64Ty, state);
-    auto pair = splitI64(ArithOp(builder, loc, cast));
+    auto pair = splitI64(ArithOpBuilder(builder, loc, cast));
     return std::pair<Value, Value>(pair.first, pair.second);
   }
 
@@ -214,8 +215,8 @@ Value extractState64(OpBuilder &builder, Location loc, Value store) {
     Value low = builder.create<tensor::ExtractOp>(loc, store, idx2);
     Value high = builder.create<tensor::ExtractOp>(loc, store, idx3);
 
-    ArithOp i64 =
-        fuseI32s(ArithOp(builder, loc, high), ArithOp(builder, loc, low));
+    ArithOpBuilder i64 = fuseI32s(ArithOpBuilder(builder, loc, high),
+                                  ArithOpBuilder(builder, loc, low));
     return builder.create<arith::BitcastOp>(loc, i64Ty, i64.val());
   }
 
@@ -238,7 +239,8 @@ Value setState64(OpBuilder &b, Location loc, Value store, Value state) {
   if (storeTy.getDimSize(0) == 4 && storeETy.isInteger(32)) {
     Value idx2 = b.create<arith::ConstantIndexOp>(loc, 2);
     Value idx3 = b.create<arith::ConstantIndexOp>(loc, 3);
-    std::pair<ArithOp, ArithOp> states = splitI64(ArithOp(b, loc, state));
+    std::pair<ArithOpBuilder, ArithOpBuilder> states =
+        splitI64(ArithOpBuilder(b, loc, state));
     Value state0 =
         b.create<arith::BitcastOp>(loc, storeETy, states.first.val());
     Value state1 =
@@ -321,8 +323,8 @@ LogicalResult generateLinalgThreeFry32(OpBuilder &builder, Location loc,
   std::pair<Value, Value> keys = extractKey32(builder, loc, store);
   if (!keys.first || !keys.second) return failure();
 
-  ArithOp key0(builder, loc, keys.first);
-  ArithOp key1(builder, loc, keys.second);
+  ArithOpBuilder key0(builder, loc, keys.first);
+  ArithOpBuilder key1(builder, loc, keys.second);
 
   // Compute the intermediate type we use to compute three fry values, including
   // the dimension that was halved.
@@ -354,8 +356,8 @@ LogicalResult generateLinalgThreeFry32(OpBuilder &builder, Location loc,
       /*indexingMaps=*/indexingMaps, iterators,
       [&](OpBuilder &b, Location nestedLoc, ValueRange) {
         // Grab three fry results and write to each array.
-        auto split =
-            runThreeFry2xi32(key0, key1, ArithOp(b, nestedLoc, initialState));
+        auto split = runThreeFry2xi32(
+            key0, key1, ArithOpBuilder(b, nestedLoc, initialState));
         auto first = split.first.truncI(resultETy.getIntOrFloatBitWidth());
         auto second = split.second.truncI(resultETy.getIntOrFloatBitWidth());
         b.create<linalg::YieldOp>(loc, ValueRange{first.val(), second.val()});
@@ -412,8 +414,8 @@ LogicalResult generateLinalgThreeFry64(OpBuilder &builder, Location loc,
   std::pair<Value, Value> keys = extractKey32(builder, loc, store);
   if (!keys.first || !keys.second) return failure();
 
-  ArithOp key0(builder, loc, keys.first);
-  ArithOp key1(builder, loc, keys.second);
+  ArithOpBuilder key0(builder, loc, keys.first);
+  ArithOpBuilder key1(builder, loc, keys.second);
 
   // Compute the number of random i64s generated and increment state.
   Value countVal =
@@ -435,8 +437,8 @@ LogicalResult generateLinalgThreeFry64(OpBuilder &builder, Location loc,
       [&](OpBuilder &b, Location nestedLoc, ValueRange) {
         // Generate three fry results, fuse, and return an
         // i64.
-        auto split =
-            runThreeFry2xi32(key0, key1, ArithOp(b, nestedLoc, initialState));
+        auto split = runThreeFry2xi32(
+            key0, key1, ArithOpBuilder(b, nestedLoc, initialState));
         Value result = fuseI32s(split.first, split.second).val();
         b.create<linalg::YieldOp>(nestedLoc, result);
       });
