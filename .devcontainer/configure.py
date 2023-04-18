@@ -60,7 +60,7 @@ def is_nvidia_gpu_available():
   if docker_executable is None:
     raise RuntimeError("Docker is not installed or in the user path.")
 
-  command_str = f"{docker_executable} info --format '{{{{json .}}}}'"
+  command_str = f"'{docker_executable}' info --format '{{{{json .}}}}'"
   data = json.loads(run_shell(command_str))
 
   if "nvidia" not in data["Runtimes"].keys():
