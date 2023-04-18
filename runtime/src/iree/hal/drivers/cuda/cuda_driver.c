@@ -50,9 +50,10 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
   out_options->default_count = 0;
 }
 
-// Get the MPI world sizefrom the environmental variable. Return 0 if the
-// variable is not set.
-iree_status_t iree_hal_cuda_get_mpi_comm_world_size_from_env(int32_t* size) {
+// Gets the MPI world size from the environmental variable.
+// Returns 0 if the variable is not set.
+static iree_status_t iree_hal_cuda_get_mpi_comm_world_size_from_env(
+    int32_t* size) {
   *size = 0;
 
   const char* comm_world_size_str = getenv("OMPI_COMM_WORLD_SIZE");
@@ -100,7 +101,7 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
       (comm_world_size > 0 || options->default_count > 0)) {
     status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
                                                            &driver->syms);
-    if (comm_world_size > 0) {
+    if (iree_status_is_ok(status) && comm_world_size > 0) {
       status = iree_hal_mpi_dynamic_symbols_initialize(host_allocator,
                                                        &driver->syms);
       if (iree_status_is_ok(status)) {

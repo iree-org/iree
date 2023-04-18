@@ -84,7 +84,7 @@ IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_get_unique_id(
 IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_query_group_params(
     void* self, iree_hal_device_t* device,
     iree_hal_queue_affinity_t queue_affinity, iree_byte_span_t id_storage,
-    iree_hal_channel_params_t* params);
+    iree_hal_channel_params_t* out_params);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda_driver_t
