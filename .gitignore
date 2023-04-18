@@ -78,6 +78,8 @@ iree/builtins/**/bin/*.ll
 !.devcontainer/configure.py
 !.devcontainer/devcontainer.json
 !.devcontainer/docker-compose.base.yml
+!.devcontainer/docs_data/
+!.devcontainer/docs_data/*.png
 
 # Local cache files
 llvm-external-projects/iree-dialects/.cache
