@@ -5,7 +5,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""configure script to get build parameters from user."""
+"""Configure script to setup VSCode DevContainer Environment."""
 
 from importlib.machinery import SourceFileLoader
 import inspect
@@ -26,14 +26,8 @@ CURRENT_DIR = os.path.dirname(
     os.path.abspath(inspect.getfile(inspect.currentframe())))
 
 DOCKER_IMAGE_SHORTNAME_DICT = {
-    "base": {
-        "latest": "base-bleeding-edge",
-        "stable": "base"
-    },
-    "nvidia": {
-        "latest": "nvidia-bleeding-edge",
-        "stable": "nvidia"
-    }
+    "base": "base-bleeding-edge",
+    "nvidia": "nvidia-bleeding-edge",
 }
 
 
@@ -52,7 +46,7 @@ def run_shell(cmd, allow_non_zero=False, stderr=None):
 
 
 def is_nvidia_gpu_available():
-  """This function verifies NVIDIA Docker runtime is installed and 
+  """This function verifies NVIDIA Docker runtime is installed and
   available. It also checks NVIDIA GPU are available and the driver
   is installed."""
 
@@ -64,7 +58,10 @@ def is_nvidia_gpu_available():
   data = json.loads(run_shell(command_str))
 
   if "nvidia" not in data["Runtimes"].keys():
-    return False, "NVIDIA Docker Runtime is not available"
+    return (
+        False, "NVIDIA Docker Runtime is not available. Please see: "
+        "https://developer.nvidia.com/nvidia-container-runtime for additional "
+        "information.")
 
   nvidia_smi_executable = which('nvidia-smi')
   if nvidia_smi_executable is None:
@@ -117,11 +114,6 @@ if __name__ == "__main__":
       default_answer="y",
       accepted_answers=["y", "n"]) == "y"
 
-  use_bleeding = get_input(
-      "Do you wish to use the bleeding-edge container (might be unstable) [Y/n]?",
-      default_answer="y",
-      accepted_answers=["y", "n"]) == "y"
-
   use_nvidia_gpu = False
   nvidia_gpu_available, err_msg = is_nvidia_gpu_available()
   if nvidia_gpu_available:
@@ -132,8 +124,7 @@ if __name__ == "__main__":
     print(f"NVIDIA GPUs are not available for use: {err_msg}")
 
   docker_img_shortname = DOCKER_IMAGE_SHORTNAME_DICT[
-      "nvidia" if use_nvidia_gpu else "base"][
-          "latest" if use_bleeding else "stable"]
+      "nvidia" if use_nvidia_gpu else "base"]
 
   if use_official_img:
     del docker_config["services"]["iree-dev"]["build"]
@@ -156,5 +147,7 @@ if __name__ == "__main__":
   if not use_nvidia_gpu:
     del docker_config["services"]["iree-dev"]["deploy"]
 
-  with open(os.path.join(CURRENT_DIR, "docker-compose.yml"), "w") as f:
+  docker_compose_filepath = os.path.join(CURRENT_DIR, "docker-compose.yml")
+  with open(docker_compose_filepath, "w") as f:
     json.dump(docker_config, f, indent=2)
+  print(f"Success! Wrote Docker Compose file to `{docker_compose_filepath}`.")
