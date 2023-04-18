@@ -61,7 +61,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
-// RUN: iree-run-module --function=reduce --device=cuda --input="8x64xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 // Check that all generics ended up in the same region.

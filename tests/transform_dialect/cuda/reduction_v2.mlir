@@ -31,11 +31,11 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_v2_codegen_spec.mlir | \
-// RUN: iree-run-module --function=reduce --device=cuda --input="33x1024xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=cuda --input="33x1024xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda | \
-// RUN: iree-run-module --function=reduce --device=cuda --input="33x1024xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=cuda --input="33x1024xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 

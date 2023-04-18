@@ -219,6 +219,17 @@ iree_string_view_t iree_file_path_extension(iree_string_view_t path) {
   return extension;
 }
 
+// We could limit this to only those libraries supported on the current platform
+// or to accept special library suffixes (.so.1, etc). For now most of the
+// libraries we produce and follow the cmake defaults which match these.
+bool iree_file_path_is_dynamic_library(iree_string_view_t path) {
+  iree_string_view_t ext = iree_file_path_extension(path);
+  return iree_string_view_equal(ext, IREE_SV("dll")) ||
+         iree_string_view_equal(ext, IREE_SV("dylib")) ||
+         iree_string_view_equal(ext, IREE_SV("so")) ||
+         iree_string_view_equal(ext, IREE_SV("sos"));
+}
+
 void iree_uri_split(iree_string_view_t uri, iree_string_view_t* out_schema,
                     iree_string_view_t* out_path,
                     iree_string_view_t* out_params) {

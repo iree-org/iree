@@ -256,6 +256,7 @@ Status PrepareModule(std::string target_backend,
 
   mlir::MLIRContext context;
   context.appendDialectRegistry(registry);
+  context.allowUnregisteredDialects();
 
   // Parse input MLIR module.
   llvm::SourceMgr source_mgr;
@@ -409,6 +410,13 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
                          const std::string& flatbuffer_data) {
   IREE_TRACE_SCOPE0("EvaluateFunctions");
 
+  // Load any custom modules the user may have explicitly specified and then
+  // append the module we compiled.
+  iree_tooling_module_list_t module_list;
+  iree_tooling_module_list_initialize(&module_list);
+  IREE_RETURN_IF_ERROR(iree_tooling_load_modules_from_flags(
+      instance, iree_allocator_system(), &module_list));
+
   // Load the bytecode module from the flatbuffer data.
   // We do this first so that if we fail validation we know prior to dealing
   // with devices.
@@ -418,10 +426,13 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
       iree_make_const_byte_span((void*)flatbuffer_data.data(),
                                 flatbuffer_data.size()),
       iree_allocator_null(), iree_allocator_system(), &main_module));
+  IREE_RETURN_IF_ERROR(
+      iree_tooling_module_list_push_back(&module_list, main_module.get()));
 
   if (!run_flag) {
     // Just wanted verification; return without running.
     main_module.reset();
+    iree_tooling_module_list_reset(&module_list);
     return OkStatus();
   }
 
@@ -448,7 +459,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     vm::ref<iree_hal_device_t> device;
     vm::ref<iree_hal_allocator_t> device_allocator;
     IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
-        instance, /*user_module_count=*/1, /*user_modules=*/&main_module,
+        instance, module_list.count, module_list.values,
         iree_make_string_view(default_device_uri.data(),
                               default_device_uri.size()),
         iree_allocator_system(), &context, &device, &device_allocator));
@@ -480,6 +491,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   }
 
   main_module.reset();
+  iree_tooling_module_list_reset(&module_list);
 
   return evaluate_status;
 }
