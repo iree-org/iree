@@ -36,16 +36,15 @@ def IREECodegen_UKernelGenericOp :
     match directly into a function call with the arguments to the
     function call being the `ins`, `outs` and `other_operands`.
     
-    The operands of `memref` type are expected to lower to the following
-    argument sequence.
-    - `memref<f32> lowers to base_ptr.
-    - `memref<?xf32, <strides = [s0, 1], offsets = f>>
-          lowers to (base_ptr, f, index s0)
-    - `memref<?x?xf32, <strides = [s1, s0, 1], offsets = f>>
-          lowers to (base_ptr, f, s1, s0)
-    and so on....
+    The operands of `memref` type are expected to lower to this sequence of
+    function arguments:
+      `base_pointer, offset, stride0, stride1, stride2, ...`
+    By default, all N strides are passed for each memref of rank N. This can be
+    overridden by the optional `strided_outer_dims` attribute: if set, its value
+    is how many strides (started from the outer-most dimension) are passed for
+    each memref. For memrefs of rank less than the value of
+    `strided_outer_dims`, all strides are passed.
 
-    Innermost stride of `memref`s are expected to be 1.
     All other operands are expected to be scalar types.
     TODO: `vector` types can be supported as well, but needs better
     ABI specification.
@@ -55,39 +54,15 @@ def IREECodegen_UKernelGenericOp :
     StrAttr:$u_kernel_fn_name,
     Variadic<AnyType>:$inputs,
     Variadic<AnyRankedTensorOrMemRefType>:$outputs,
-    Variadic<AnyType>:$other_operands);
+    Variadic<AnyType>:$other_operands,
+    OptionalAttr<IndexAttr>:$strided_outer_dims);
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict $u_kernel_fn_name
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     (`outs` `(` $outputs^  `:` type($outputs) `)`)?
     (`(` $other_operands^ `:` type($other_operands) `)`)? (`->` type($results)^)?
-  }];
-}
-
-def IREECodegen_UKernelGenericRawOp :
-    IREECodegen_UKernelOp<"ukernel.generic_raw", [
-      AttrSizedOperandSegments]> {
-  let summary = "Generic Microkernel operator, with only base address for memref operands";
-
-  let description = [{
-    Same as `ukernel.generic`, except that tensor/memref operands get lowered to
-    just the buffer and offset needed to obtain the buffer address, no strides.
-    This is meant to leave it up to each use case to manually pick which strides
-    to pass.
-  }];
-
-  let arguments = (ins
-    StrAttr:$u_kernel_fn_name,
-    Variadic<AnyType>:$inputs,
-    Variadic<AnyRankedTensorOrMemRefType>:$outputs,
-    Variadic<AnyType>:$other_operands);
-  let results = (outs Variadic<AnyRankedTensor>:$results);
-  let assemblyFormat = [{
-    attr-dict $u_kernel_fn_name
-    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    (`outs` `(` $outputs^  `:` type($outputs) `)`)?
-    (`(` $other_operands^ `:` type($other_operands) `)`)? (`->` type($results)^)?
+    (`strided_outer_dims` `(` $strided_outer_dims^ `)`)?
   }];
 }
 

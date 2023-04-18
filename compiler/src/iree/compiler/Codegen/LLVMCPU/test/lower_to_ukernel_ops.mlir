@@ -20,6 +20,7 @@ func.func @matmul(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[D0]], %[[D1]], %[[D2]], %[[FLAGS]] :
+// CHECK-SAME:       strided_outer_dims(1)
 //      CHECK:   return %[[MICRO_KERNEL]] : tensor<?x?xf32>
 
 // -----
@@ -50,6 +51,7 @@ func.func @matmul_fill(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tens
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[EMPTY]] :
 // CHECK-SAME:       (%[[D0]], %[[D1]], %[[D2]], %[[FLAGS]] :
+// CHECK-SAME:       strided_outer_dims(1)
 //      CHECK:   return %[[MICRO_KERNEL]] : tensor<?x?xf32>
 
 // -----
@@ -74,6 +76,7 @@ func.func @matmul_i8i8i32(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?xi8>,
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[D0]], %[[D1]], %[[D2]], %[[FLAGS]] :
+// CHECK-SAME:       strided_outer_dims(1)
 //      CHECK:   return %[[MICRO_KERNEL]]
 
 // -----
