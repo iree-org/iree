@@ -143,9 +143,12 @@ class InlineExecutablesPass
                         dispatchFuncOp);
 
       // Map from what the stream.cmd.dispatch ops is using to the new function.
-      auto exportTargetAttr =
-          SymbolRefAttr::get(executableOp.getNameAttr(),
-                             {SymbolRefAttr::get(exportOp.getNameAttr())});
+      auto exportTargetAttr = SymbolRefAttr::get(
+          executableOp.getNameAttr(),
+          {
+              FlatSymbolRefAttr::get(variantOp.getNameAttr()),
+              FlatSymbolRefAttr::get(exportOp.getNameAttr()),
+          });
       exportToFuncMap[exportTargetAttr] = dispatchFuncOp.getNameAttr();
     }
 
