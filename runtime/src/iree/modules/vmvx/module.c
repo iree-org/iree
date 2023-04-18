@@ -180,13 +180,13 @@ static iree_host_size_t iree_vmvx_cast_host_size(int64_t value,
 #define IREE_VMVX_ABI_DEFINE_SHIM(arg_types, ret_types) \
   static IREE_VM_ABI_DEFINE_SHIM(arg_types, ret_types)
 
-IREE_VMVX_ABI_FIXED_STRUCT(unary2d, rIrIIIIIII, {
+IREE_VMVX_ABI_FIXED_STRUCT(unary2d, rIIIrIIIII, {
   iree_vm_ref_t in_ref;
   int64_t in_offset;
-  iree_vm_ref_t out_ref;
-  int64_t out_offset;
   int64_t in_stride0;
   int64_t in_stride1;
+  iree_vm_ref_t out_ref;
+  int64_t out_offset;
   int64_t out_stride0;
   int64_t out_stride1;
   int64_t size0;
@@ -194,17 +194,17 @@ IREE_VMVX_ABI_FIXED_STRUCT(unary2d, rIrIIIIIII, {
 });
 IREE_VMVX_ABI_DEFINE_SHIM(unary2d, v);
 
-IREE_VMVX_ABI_FIXED_STRUCT(binary2d, rIrIrIIIIIIIII, {
+IREE_VMVX_ABI_FIXED_STRUCT(binary2d, rIIIrIIIrIIIII, {
   iree_vm_ref_t lhs_ref;
   int64_t lhs_offset;
-  iree_vm_ref_t rhs_ref;
-  int64_t rhs_offset;
-  iree_vm_ref_t out_ref;
-  int64_t out_offset;
   int64_t lhs_stride0;
   int64_t lhs_stride1;
+  iree_vm_ref_t rhs_ref;
+  int64_t rhs_offset;
   int64_t rhs_stride0;
   int64_t rhs_stride1;
+  iree_vm_ref_t out_ref;
+  int64_t out_offset;
   int64_t out_stride0;
   int64_t out_stride1;
   int64_t size0;
@@ -217,17 +217,17 @@ IREE_VMVX_ABI_DEFINE_SHIM(binary2d, v);
 // to a low level ukernel target function.
 //===----------------------------------------------------------------------===//
 
-IREE_VMVX_ABI_FIXED_STRUCT(ukernel_x32b_2d, rIrIrIIIIIIIII, {
+IREE_VMVX_ABI_FIXED_STRUCT(ukernel_x32b_2d, rIIIrIIIrIIIII, {
   iree_vm_ref_t lhs_ref;
   int64_t lhs_offset;
-  iree_vm_ref_t rhs_ref;
-  int64_t rhs_offset;
-  iree_vm_ref_t out_ref;
-  int64_t out_offset;
   int64_t lhs_stride0;
   int64_t lhs_stride1;
+  iree_vm_ref_t rhs_ref;
+  int64_t rhs_offset;
   int64_t rhs_stride0;
   int64_t rhs_stride1;
+  iree_vm_ref_t out_ref;
+  int64_t out_offset;
   int64_t out_stride0;
   int64_t out_stride1;
   int64_t size0;
@@ -290,13 +290,13 @@ static iree_status_t iree_vm_shim_ukernel_x32b_2d_v(
                                 "illegal x32b ukernel return code (%d)", ret);
 }
 
-IREE_VMVX_ABI_FIXED_STRUCT(ukernel_x32u_2d, rIrIIIIIII, {
+IREE_VMVX_ABI_FIXED_STRUCT(ukernel_x32u_2d, rIIIrIIIII, {
   iree_vm_ref_t in_ref;
   int64_t in_offset;
-  iree_vm_ref_t out_ref;
-  int64_t out_offset;
   int64_t in_stride0;
   int64_t in_stride1;
+  iree_vm_ref_t out_ref;
+  int64_t out_offset;
   int64_t out_stride0;
   int64_t out_stride1;
   int64_t size0;
@@ -470,10 +470,10 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_copy2d_x64, unary2d, v) {
 // Exported fill function definitions
 //===----------------------------------------------------------------------===//
 
-IREE_VMVX_ABI_FIXED_STRUCT(fill2d_x32, riIIII, {
+IREE_VMVX_ABI_FIXED_STRUCT(fill2d_x32, irIIII, {
+  int32_t fill_value;
   iree_vm_ref_t out_ref;
   int64_t out_offset;
-  int32_t fill_value;
   int64_t out_row_stride;
   int64_t size0;
   int64_t size1;
@@ -629,15 +629,15 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_i8i8i32, matmul, v) {
 // Exported mmt4d function definitions
 //===----------------------------------------------------------------------===//
 
-IREE_VMVX_ABI_FIXED_STRUCT(mmt4d, rIrIrIIIIIIIiiii, {
+IREE_VMVX_ABI_FIXED_STRUCT(mmt4d, rIIrIIrIIIIIiiii, {
   iree_vm_ref_t lhs_ref;
   int64_t lhs_offset;
+  int64_t lhs_row_stride;
   iree_vm_ref_t rhs_ref;
   int64_t rhs_offset;
+  int64_t rhs_row_stride;
   iree_vm_ref_t out_ref;
   int64_t out_offset;
-  int64_t lhs_row_stride;
-  int64_t rhs_row_stride;
   int64_t out_row_stride;
   int64_t m;
   int64_t n;
@@ -725,12 +725,12 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
 // Exported pack function definitions
 //===----------------------------------------------------------------------===//
 
-IREE_VMVX_ABI_FIXED_STRUCT(pack_f, rIrIIIIIIIIIIfi, {
+IREE_VMVX_ABI_FIXED_STRUCT(pack_f, rIIIrIIIIIIIIfi, {
   iree_vm_ref_t in_ref;
   int64_t in_offset;
+  int64_t in_stride0;
   iree_vm_ref_t out_ref;
   int64_t out_offset;
-  int64_t in_stride0;
   int64_t out_stride0;
   int64_t in_size0;
   int64_t in_size1;
@@ -743,12 +743,12 @@ IREE_VMVX_ABI_FIXED_STRUCT(pack_f, rIrIIIIIIIIIIfi, {
 });
 IREE_VMVX_ABI_DEFINE_SHIM(pack_f, v);
 
-IREE_VMVX_ABI_FIXED_STRUCT(pack_i, rIrIIIIIIIIIIii, {
+IREE_VMVX_ABI_FIXED_STRUCT(pack_i, rIIIrIIIIIIIIii, {
   iree_vm_ref_t in_ref;
   int64_t in_offset;
+  int64_t in_stride0;
   iree_vm_ref_t out_ref;
   int64_t out_offset;
-  int64_t in_stride0;
   int64_t out_stride0;
   int64_t in_size0;
   int64_t in_size1;
@@ -861,12 +861,12 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i32i32, pack_i, v) {
 // Exported unpack function definitions
 //===----------------------------------------------------------------------===//
 
-IREE_VMVX_ABI_FIXED_STRUCT(unpack, rIrIIIIIIIIIIi, {
+IREE_VMVX_ABI_FIXED_STRUCT(unpack, rIIIrIIIIIIIIi, {
   iree_vm_ref_t in_ref;
   int64_t in_offset;
+  int64_t in_stride0;
   iree_vm_ref_t out_ref;
   int64_t out_offset;
-  int64_t in_stride0;
   int64_t out_stride0;
   int64_t in_size0;
   int64_t in_size1;
