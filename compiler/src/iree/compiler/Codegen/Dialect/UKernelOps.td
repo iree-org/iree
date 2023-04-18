@@ -39,13 +39,11 @@ def IREECodegen_UKernelGenericOp :
     The operands of `memref` type are expected to lower to this sequence of
     function arguments:
       `base_pointer, offset, stride0, stride1, stride2, ...`
-    where the number of strides passed as arguments is given by the optional
-    `strided_outer_dims` attribute if it is greater than or equal to the memref
-    rank. If `strided_outer_dims` is unspecified or if the memref rank is less
-    than it, then all strides are passed. As  `strided_outer_dims` is currently
-    an integer attribute, when specified, the same number of strides is passed
-    for all memref operands. This is intended to be generalized as needed in the
-    future.
+    By default, all N strides are passed for each memref of rank N. This can be
+    overridden by the optional `strided_outer_dims` attribute: if set, its value
+    is how many strides (started from the outer-most dimension) are passed for
+    each memref. For memrefs of rank less than the value of
+    `strided_outer_dims`, all strides are passed.
 
     All other operands are expected to be scalar types.
     TODO: `vector` types can be supported as well, but needs better
