@@ -49,6 +49,7 @@ iree_cc_library(
     "StableHLOToLinalg.cpp"
     "StableHLOToLinalgDotProd.cpp"
     "StableHLOToLinalgPointwise.cpp"
+    "StableHLOToLinalgRandom.cpp"
     "StableHLOToLinalgReduce.cpp"
     "TypeConversion.cpp"
   DEPS

@@ -12,9 +12,9 @@
 namespace mlir::iree_compiler::stablehlo {
 
 /// Populates the patterns that convert from StableHLO to Linalg on tensors.
-void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
-                                                 TypeConverter& typeConverter,
-                                                 RewritePatternSet* patterns,
+void populateStableHloToLinalgConversionPatterns(MLIRContext *context,
+                                                 TypeConverter &typeConverter,
+                                                 RewritePatternSet *patterns,
                                                  bool enablePrimitiveOps);
 
 //===----------------------------------------------------------------------===//
@@ -24,14 +24,20 @@ namespace detail {
 /// Populates the patterns that convert from elementwise StableHLO ops to Linalg
 /// on tensors.
 void populatePointwiseStableHloToLinalgConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns, bool enablePrimitiveOps);
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns, bool enablePrimitiveOps);
 
 /// Populates the patterns that convert from dot product StableHLO ops to Linalg
 /// on tensors.
 void populateStableHloDotProdToLinalgConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns);
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
+
+/// Populates the patterns that convert from random number generation StableHLO
+/// ops to Linalg on tensors.
+void populateStableHloRandomToLinalgConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
 
 /// Populates the patterns that convert from reduction StableHLO ops to Linalg
 /// on tensors.
@@ -41,9 +47,9 @@ void populateStableHloReductionToLinalgConversionPatterns(
 
 /// Populates the patterns that convert scalar StableHLO ops to Arith ops.
 void populateScalarHloToArithConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns,
-    llvm::function_ref<bool(Operation*)> filterFn = nullptr);
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns,
+    llvm::function_ref<bool(Operation *)> filterFn = nullptr);
 }  // namespace detail
 
 }  // namespace mlir::iree_compiler::stablehlo

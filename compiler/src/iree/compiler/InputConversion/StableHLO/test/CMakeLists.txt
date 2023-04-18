@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "stablehlo_to_linalg.mlir"
     "stablehlo_to_linalg_dot_prod.mlir"
     "stablehlo_to_linalg_pointwise.mlir"
+    "stablehlo_to_linalg_random.mlir"
     "stablehlo_to_linalg_reduce.mlir"
   TOOLS
     FileCheck
