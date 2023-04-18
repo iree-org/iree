@@ -861,6 +861,12 @@ jobs:
     strategy:
       matrix:
         target:
+          - platform: android
+            arch: armv8.2-a
+            abi: arm64-v8a
+            docker_image: "gcr.io/iree-oss/android@sha256:3f641d25786b1e5e430ee4cacb8bfe57540fda5ecaa7ca2802c179c26e77ce09"
+            build_script: "./build_tools/cmake/build_android.sh"
+            test_on_real_devices: true
           - platform: linux
             arch: riscv_64
             abi: lp64d
@@ -921,7 +927,7 @@ jobs:
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
             "${DOCKER_IMAGE}" \
             "${BUILD_SCRIPT}"
-      - name: "Test cross-compiling target"
+      - name: "Testing on emulator"
         if: ${{ matrix.target.test_script }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -931,19 +937,79 @@ jobs:
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
             "${TEST_SCRIPT}"
+      # Upload the artifacts to run on real devices, if required.
+      - name: "Creating archive of target build dir"
+        if: ${{ matrix.target.test_on_real_devices }}
+        id: archive
+        env:
+          TARGET_BUILD_DIR_ARCHIVE: build-${{ env.PLATFORM }}-${{ env.ARCH }}.tar
+        run: |
+          tar -cf "${TARGET_BUILD_DIR_ARCHIVE}" \
+            --exclude="*.o" \
+            --exclude="*.a" \
+            "${TARGET_BUILD_DIR}"
+          echo "target-build-dir-archive=${TARGET_BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading target build dir archive"
+        if: ${{ matrix.target.test_on_real_devices }}
+        id: upload
+        env:
+          TARGET_BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.target-build-dir-archive }}
+          TARGET_BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.target-build-dir-archive }}
+        run: |
+          gcloud storage cp "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR_GCS_ARTIFACT}"
+          echo "target-build-dir-gcs-artifact=${TARGET_BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
-  build_and_test_android:
-    needs: [setup, build_all]
-    if: fromJson(needs.setup.outputs.should-run)
-    uses: ./.github/workflows/build_and_test_android.yml
-    with:
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-      write-caches: ${{ needs.setup.outputs.write-caches }}
-      is-pr: ${{ fromJson(needs.setup.outputs.is-pr) }}
-      build-dir: ${{ needs.build_all.outputs.build-dir }}
-      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+  # Test the cross-compiled binaries on real devices instead of emulators.
+  test_on_real_devices:
+    needs: [setup, cross_compile_and_test]
+    strategy:
+      matrix:
+        # TODO(#9855): Add Pixel-6-Pro and XT2201-2
+        target:
+          - platform: android
+            arch: armv8.2-a
+            device_name: Pixel-4
+            # Pixel 4 ships an old Adreno GPU driver. There are quite a few bugs
+            # triggered by our tests. Disable running tests entirely on Pixel 4.
+            # Moto Edge X30 gets us covered on Adreno GPU.
+            test_script: "IREE_LABEL_EXCLUDE=vulkan ./build_tools/cmake/test_android.sh"
+            test_on_pr: false
+    if: |
+      fromJson(needs.setup.outputs.should-run)
+    # TODO: Uncomment before submit.
+    #    && (matrix.target.test_on_pr || ! fromJson(needs.setup.outputs.is-pr))
+    # Show the concise name of matrix job.
+    name: test_${{ matrix.target.platform }}_${{ matrix.target.arch }}_on_${{ matrix.target.device_name }}
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - machine-type=${{ matrix.target.device_name }}
+    env:
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCH: ${{ matrix.target.arch }}
+      # We can't collect all outputs from the matrix job cross_compile_and_test
+      # due to Github's limitation (https://github.com/orgs/community/discussions/17245),
+      # so the artifact names are reconstructed here.
+      TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
+      TARGET_BUILD_DIR_ARCHIVE: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}.tar
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Downloading target build archive"
+        env:
+          TARGET_BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ env.TARGET_BUILD_DIR_ARCHIVE }}
+        run: gcloud storage cp "${TARGET_BUILD_DIR_GCS_ARTIFACT}" "${TARGET_BUILD_DIR_ARCHIVE}"
+      - name: "Extracting target build dir archive"
+        run: tar -xf "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR}"
+      - name: "Testing on device"
+        if: ${{ matrix.target.device_name }}
+        env:
+          IREE_TARGET_PLATFORM: ${{ env.PLATFORM }}
+          IREE_TARGET_ARCH: ${{ env.ARCH }}
+          IREE_TARGET_BUILD_DIR: ${{ env.TARGET_BUILD_DIR }}
+          TEST_SCRIPT: ${{ matrix.target.test_script }}
+        run: bash -euo pipefail -c "${TEST_SCRIPT}"
 
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
@@ -1058,7 +1124,7 @@ jobs:
 
       # Crosscompilation
       - cross_compile_and_test
-      - build_and_test_android
+      - test_on_real_devices
 
       # Artifacts for e2e testing and benchmarking
       - build_benchmark_tools
