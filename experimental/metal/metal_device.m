@@ -406,7 +406,8 @@ static iree_status_t iree_hal_metal_device_queue_execute(
 
 static iree_status_t iree_hal_metal_device_queue_flush(iree_hal_device_t* base_device,
                                                        iree_hal_queue_affinity_t queue_affinity) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplmented queue flush");
+  // Nothing to do for now given we immediately release workload to the GPU on queue execute.
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_device_wait_semaphores(
