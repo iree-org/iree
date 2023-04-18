@@ -125,7 +125,8 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, outType, fnName, ValueRange{lhs, rhs}, out,
-      ValueRange{m, n, k, flagsVal});
+      ValueRange{m, n, k, flagsVal},
+      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
