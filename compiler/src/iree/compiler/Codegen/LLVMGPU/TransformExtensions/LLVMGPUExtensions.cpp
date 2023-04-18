@@ -9,7 +9,9 @@
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -47,7 +49,7 @@ iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
   // CreateAsyncGroupsOp depends on the following two dialects.
   declareGeneratedDialect<gpu::GPUDialect>();
   declareGeneratedDialect<nvgpu::NVGPUDialect>();
-
+  declareGeneratedDialect<IREE::Codegen::IREECodegenDialect>();
   registerTransformOps<
 #define GET_OP_LIST
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.cpp.inc"
@@ -790,6 +792,51 @@ transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
   iree_compiler::doLayoutAnalysisAndDistribution(rewriter,
                                                  cast<func::FuncOp>(target));
   results.push_back(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// MicrokernelOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::MicrokernelOp::applyToOne(
+    ::mlir::Operation *target, transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  if (!isa<linalg::MatmulOp>(target)) {
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(), "expects a linalg:MatmulOp as the target op");
+  }
+  if (getTileK() <= 0) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Tile K must be positive integer");
+  }
+  if (getStages() <= 0) {
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(), "Pipeline stages must be positive integer");
+  }
+
+  auto matmulOp = cast<linalg::MatmulOp>(target);
+
+  // Step 1. Fill the tile
+  Value out = matmulOp.getDpsInitOperand(0)->get();
+  TensorType outTensorType = out.getType().cast<TensorType>();
+  if (outTensorType.getNumDynamicDims() > 0) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Dynamic sizes are not supported");
+  }
+  SmallVector<int64_t> tiles = {outTensorType.getDimSize(0),
+                                outTensorType.getDimSize(1),
+                                static_cast<int64_t>(getTileK())};
+
+  // Step 2. Lower matmul into microkernel op
+  IRRewriter rewriter(getContext());
+  rewriter.setInsertionPoint(matmulOp);
+  FailureOr<Operation *> ukernelOp =
+      mlir::iree_compiler::lowerMatmulToMicrokernel(rewriter, matmulOp, tiles,
+                                                    getStages());
+  if (failed(ukernelOp)) return emitDefaultSilenceableFailure(matmulOp);
+  results.push_back(ukernelOp.value());
+
   return DiagnosedSilenceableFailure::success();
 }
 

@@ -59,10 +59,9 @@ static std::string generateMicrokernelName(ArrayRef<Operation *> combinedOps,
 }
 
 static LogicalResult returnCtypes(Type lhsType, Type rhsType, Type resType,
-                                  SmallVectorImpl<StringRef> &types,
-                                  bool hasTf32) {
+                                  SmallVectorImpl<StringRef> &types) {
   if (lhsType.isF32() && rhsType.isF32() && resType.isF32()) {
-    if (hasTf32 && clGPUTF32) {
+    if (clGPUTF32) {
       types.push_back("tf32"); /* lhs */
       types.push_back("tf32"); /* rhs */
     } else {
@@ -71,10 +70,142 @@ static LogicalResult returnCtypes(Type lhsType, Type rhsType, Type resType,
     }
     types.push_back("float"); /* output */
     return success();
-  }
+  }  // other types are not implemented yet
   return failure();
 }
+}  // namespace
 
+FailureOr<Operation *> lowerMatmulToMicrokernel(RewriterBase &rewriter,
+                                                linalg::LinalgOp matmulOp,
+                                                ArrayRef<int64_t> tiles,
+                                                int64_t stages) {
+  SmallVector<Operation *> combinedOps = {matmulOp};
+  Location loc = matmulOp.getLoc();
+
+  Value lhs = matmulOp.getDpsInputOperand(0)->get();
+  Value rhs = matmulOp.getDpsInputOperand(1)->get();
+  Value out = matmulOp.getDpsInitOperand(0)->get();
+
+  Type lhsElementType = lhs.getType().cast<TensorType>().getElementType();
+  Type rhsElementType = rhs.getType().cast<TensorType>().getElementType();
+  Type resElementType = out.getType().cast<TensorType>().getElementType();
+
+  SmallVector<StringRef, 3> strTypes;
+  LogicalResult maybeStrTypes =
+      returnCtypes(lhsElementType, rhsElementType, resElementType, strTypes);
+  if (maybeStrTypes.failed())
+    return rewriter.notifyMatchFailure(matmulOp, "Not supported data type");
+
+  // Step 1. Find out the tile sizes
+  if (tiles.size() < 2)
+    return rewriter.notifyMatchFailure(matmulOp, "Tiling is not sufficient");
+
+  // Step 2. Make sure pipeline stages is valid
+  if (stages <= 0) {
+    return matmulOp->emitError("Expects software pipeline depth\n");
+  }
+
+  // Step 3. Fuse linalg.fill with matmul
+  Optional<Value> fillValue = std::nullopt;
+  auto fillOp = dyn_cast<linalg::FillOp>(out.getDefiningOp());
+  bool hasFill;
+  if (fillOp) {
+    hasFill = true;
+    fillValue = fillOp.getDpsInputOperand(0)->get();
+    out = fillOp.getDpsInitOperand(0)->get();
+  } else {
+    hasFill = false;
+    fillValue = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(resElementType), resElementType);
+  }
+
+  // Step 4. Find out if there is any consumer. Consumer needs the result, so
+  // microkernel stores it back to the shared memory, otherwise, it could
+  // store to global memory for performance reasons
+  bool hasConsumer = true;
+  if (matmulOp->use_empty()) hasConsumer = false;
+  if (matmulOp->hasOneUse()) {
+    if (isa<IREE::Flow::DispatchTensorStoreOp>(
+            matmulOp->getUses().begin()->getOwner()))
+      hasConsumer = false;
+  }
+
+  // Step 5. Check the microkernel exists
+  if (!existuCUDAKernel(tiles[0], tiles[1], tiles[2], stages, strTypes[0].str(),
+                        strTypes[1].str(), strTypes[2].str())) {
+    return matmulOp->emitError()
+           << "Requested microkernel [Tile = " << tiles[0] << "x" << tiles[1]
+           << "x" << tiles[2] << ", stages = " << stages
+           << ", lhs = " << strTypes[0].str() << ", rhs = " << strTypes[1].str()
+           << ", result = " << strTypes[2].str()
+           << "] does not exist, maybe forget to "
+              "pre-compile it. Add a microkernel contract in "
+              "`uGPUContract.h`\n";
+  }
+
+  // Step 6. Generate a name for microkernel
+  auto fnName = generateMicrokernelName(
+      combinedOps, strTypes[0], strTypes[1], strTypes[2], tiles[0], tiles[1],
+      tiles[2], stages, hasFill, !hasConsumer);
+
+  // Step 7. Allocate shared memory
+  Optional<Value> shmemBufferOut = std::nullopt;
+  Optional<Value> shmemBufferRemaining = std::nullopt;
+  int shmemSizeTotal = 0;
+  if (!out.getDefiningOp<tensor::EmptyOp>()) {
+    // Step 7.1 For output
+    int shmemSizeOut = tiles[0] * tiles[1];
+    shmemBufferOut = rewriter.create<bufferization::AllocTensorOp>(
+        loc, RankedTensorType::get({tiles[0], tiles[1]}, resElementType),
+        ValueRange{});
+
+    // Step 7.2 For inputs: Here we reuse outputs shared memory, but if the
+    // inputs needs large space, we allocate the remaining.
+    shmemSizeTotal = ((tiles[0] * tiles[2]) + (tiles[1] * tiles[2])) * stages;
+    const int shmemSizeRemaining = shmemSizeTotal - shmemSizeOut;
+    if (shmemSizeRemaining > 0) {
+      shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
+          loc, RankedTensorType::get({shmemSizeRemaining}, resElementType),
+          ValueRange{});
+    }
+  }
+  if (!shmemBufferOut.has_value()) shmemBufferOut = out;
+  if (!shmemBufferRemaining.has_value()) {
+    // Just pass something to match the ABI
+    shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
+        loc, RankedTensorType::get({0}, resElementType), ValueRange{});
+  }
+
+  // Step 9. Fill the operands
+  SmallVector<Value> ins = {lhs, rhs};
+  SmallVector<Value> others, outs;
+  if (hasConsumer) {
+    ins.push_back(out);
+    outs.push_back(shmemBufferOut.value());
+  } else {
+    outs.push_back(out);
+    others.push_back(shmemBufferOut.value());
+  }
+  others.push_back(shmemBufferRemaining.value());
+  others.push_back(fillValue.value());
+
+  // Step 10. Generate the op
+  Operation *ukernelOp =
+      rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
+          matmulOp, matmulOp->getResultTypes(), StringRef(fnName), ins, outs,
+          others);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Calling Microkernel `" << fnName << "`, allocated "
+                 << shmemSizeTotal * lhsElementType.getIntOrFloatBitWidth() /
+                        8 / 1024
+                 << " Kb Shared Memory \n";
+  });
+
+  return ukernelOp;
+}
+
+namespace {
 /// Lowers linalg's matmul op into micro kernel call op.
 struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -88,142 +219,16 @@ struct MatmulConversion : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    SmallVector<Operation *> combinedOps = {matmulOp};
-    Location loc = matmulOp.getLoc();
-
-    Value lhs = matmulOp.getDpsInputOperand(0)->get();
-    Value rhs = matmulOp.getDpsInputOperand(1)->get();
-    Value out = matmulOp.getDpsInitOperand(0)->get();
-
-    Type lhsElementType = lhs.getType().cast<TensorType>().getElementType();
-    Type rhsElementType = rhs.getType().cast<TensorType>().getElementType();
-    Type resElementType = out.getType().cast<TensorType>().getElementType();
-
-    FailureOr<TargetInfo> tinfo =
-        mlir::iree_compiler::getTargetInfoFromAnyOp(matmulOp);
-    if (failed(tinfo))
-      return rewriter.notifyMatchFailure(matmulOp,
-                                         "Could not find target information");
-
-    SmallVector<StringRef, 3> strTypes;
-    LogicalResult maybeStrTypes =
-        returnCtypes(lhsElementType, rhsElementType, resElementType, strTypes,
-                     tinfo->hasTF32TensorCore);
-    if (maybeStrTypes.failed())
-      return rewriter.notifyMatchFailure(matmulOp, "Not supported data type");
-
     // Step 1. Find out the tile sizes
     SmallVector<int64_t> tiles = getTileSizes(matmulOp, 0);
-    if (tiles.size() < 2)
-      return rewriter.notifyMatchFailure(matmulOp, "Tiling is not sufficient");
 
-    // Step 2. Find out and make sure pipeline stages is present
-    if (!stages.has_value()) {
+    // Step 2. Find out the tile sizes
+    if (!stages.has_value())
       return matmulOp->emitError("Expects software pipeline depth\n");
-    }
 
-    // Step 3. Fuse linalg.fill with matmul
-    Optional<Value> fillValue = std::nullopt;
-    auto fillOp = dyn_cast<linalg::FillOp>(out.getDefiningOp());
-    bool hasFill;
-    if (fillOp) {
-      hasFill = true;
-      fillValue = fillOp.getDpsInputOperand(0)->get();
-      out = fillOp.getDpsInitOperand(0)->get();
-    } else {
-      hasFill = false;
-      fillValue = rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getZeroAttr(resElementType), resElementType);
-    }
-
-    // Step 4. Find out if there is any consumer. Consumer needs the result, so
-    // microkernel stores it back to the shared memory, otherwise, it could
-    // store to global memory for performance reasons
-    bool hasConsumer = true;
-    if (matmulOp->use_empty()) hasConsumer = false;
-    if (matmulOp->hasOneUse()) {
-      if (isa<IREE::Flow::DispatchTensorStoreOp>(
-              matmulOp->getUses().begin()->getOwner()))
-        hasConsumer = false;
-    }
-
-    // Step 5. Check the microkernel exists
-    if (!existuCUDAKernel(tiles[0], tiles[1], tiles[2], stages.value(),
-                          strTypes[0].str(), strTypes[1].str(),
-                          strTypes[2].str())) {
-      return matmulOp->emitError()
-             << "Requested microkernel [Tile = " << tiles[0] << "x" << tiles[1]
-             << "x" << tiles[2] << ", stages = " << stages.value()
-             << ", lhs = " << strTypes[0].str()
-             << ", rhs = " << strTypes[1].str()
-             << ", result = " << strTypes[2].str()
-             << "] does not exist, maybe forget to "
-                "pre-compile it. Add a microkernel contract in "
-                "`uGPUContract.h`\n";
-    }
-
-    // Step 6. Generate a name for microkernel
-    auto fnName = generateMicrokernelName(
-        combinedOps, strTypes[0], strTypes[1], strTypes[2], tiles[0], tiles[1],
-        tiles[2], stages.value(), hasFill, !hasConsumer);
-
-    // Step 7. Allocate shared memory
-    Optional<Value> shmemBufferOut = std::nullopt;
-    Optional<Value> shmemBufferRemaining = std::nullopt;
-    int shmemSizeTotal = 0;
-    if (!out.getDefiningOp<tensor::EmptyOp>()) {
-      // Step 7.1 For output
-      int shmemSizeOut = tiles[0] * tiles[1];
-      shmemBufferOut = rewriter.create<bufferization::AllocTensorOp>(
-          loc, RankedTensorType::get({tiles[0], tiles[1]}, resElementType),
-          ValueRange{});
-
-      // Step 7.2 For inputs: Here we reuse outputs shared memory, but if the
-      // inputs needs large space, we allocate the remaining.
-      shmemSizeTotal =
-          ((tiles[0] * tiles[2]) + (tiles[1] * tiles[2])) * stages.value();
-      const int shmemSizeRemaining = shmemSizeTotal - shmemSizeOut;
-      if (shmemSizeRemaining > 0) {
-        shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
-            loc, RankedTensorType::get({shmemSizeRemaining}, resElementType),
-            ValueRange{});
-      }
-    }
-    if (!shmemBufferOut.has_value()) shmemBufferOut = out;
-    if (!shmemBufferRemaining.has_value()) {
-      // Just pass something to match the ABI
-      shmemBufferRemaining = rewriter.create<bufferization::AllocTensorOp>(
-          loc, RankedTensorType::get({0}, resElementType), ValueRange{});
-    }
-
-    // Step 9. Fill the operands
-    SmallVector<Value> ins = {lhs, rhs};
-    SmallVector<Value> others, outs;
-    if (hasConsumer) {
-      ins.push_back(out);
-      outs.push_back(shmemBufferOut.value());
-    } else {
-      outs.push_back(out);
-      others.push_back(shmemBufferOut.value());
-    }
-    others.push_back(shmemBufferRemaining.value());
-    others.push_back(fillValue.value());
-
-    // Step 10. Generate the op
-    rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
-        matmulOp, matmulOp.getResultTypes(), StringRef(fnName), ins, outs,
-        others);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "Calling Microkernel `" << fnName << "`, allocated "
-                   << shmemSizeTotal * lhsElementType.getIntOrFloatBitWidth() /
-                          8 / 1024
-                   << " Kb Shared Memory \n";
-    });
-    return success();
+    return lowerMatmulToMicrokernel(rewriter, matmulOp, tiles, stages.value());
   }
 };
-
 }  // namespace
 
 void LLVMGPULowerToUKernelsPass::runOnOperation() {
@@ -249,5 +254,4 @@ createLLVMGPULowerToUKernelsPass() {
 }
 
 }  // namespace iree_compiler
-
 }  // namespace mlir

@@ -578,6 +578,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPULowerToUKernelsPass();
 
+FailureOr<Operation *> lowerMatmulToMicrokernel(RewriterBase &rewriter,
+                                                linalg::LinalgOp matmulOp,
+                                                ArrayRef<int64_t> tiles,
+                                                int64_t stages);
+
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();

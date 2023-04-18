@@ -514,4 +514,39 @@ def LayoutAnalysisAndDistributionOp :
 
 }
 
+def MicrokernelOp : Op<
+    Transform_Dialect, "iree.microkernel", [
+      FunctionalStyleTransformOpTrait,
+      MemoryEffectsOpInterface,
+      TransformEachOpTrait,
+      TransformOpInterface]> {
+
+  let description = [{
+    Transforms `linalg.matmul` Op to the `ukernel.generic` Op.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          I64Attr:$tile_k,
+          I64Attr:$stages
+  );
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = "$target `,` `stages` `=` $stages `,` `tile_k` `=` $tile_k attr-dict `:` functional-type($target, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+      OpBuilder<(ins "Value":$target,
+                   "int64_t":$tile_k,
+                   "int64_t":$stages)>
+  ];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
