@@ -49,6 +49,7 @@ iree_cc_library(
     "StableHLOToLinalg.cpp"
     "StableHLOToLinalgDotProd.cpp"
     "StableHLOToLinalgPointwise.cpp"
+    "StableHLOToLinalgReduce.cpp"
     "TypeConversion.cpp"
   DEPS
     ::PassHeaders

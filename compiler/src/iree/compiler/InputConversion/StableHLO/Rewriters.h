@@ -33,6 +33,12 @@ void populateStableHloDotProdToLinalgConversionPatterns(
     MLIRContext* context, TypeConverter& typeConverter,
     RewritePatternSet* patterns);
 
+/// Populates the patterns that convert from reduction StableHLO ops to Linalg
+/// on tensors.
+void populateStableHloReductionToLinalgConversionPatterns(
+    MLIRContext* context, TypeConverter& typeConverter,
+    RewritePatternSet* patterns, bool enablePrimitiveOps);
+
 /// Populates the patterns that convert scalar StableHLO ops to Arith ops.
 void populateScalarHloToArithConversionPatterns(
     MLIRContext* context, TypeConverter& typeConverter,

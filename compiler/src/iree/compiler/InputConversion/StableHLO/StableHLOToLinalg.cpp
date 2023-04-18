@@ -66,38 +66,6 @@ ShapedType getHloOpResultType(Operation* op) {
   return getResultValue(op).getType().cast<ShapedType>();
 }
 
-SmallVector<int64_t, 4> extract1DVector(DenseIntElementsAttr elements) {
-  SmallVector<int64_t, 4> ret;
-  for (const APInt& element : elements) {
-    ret.push_back(element.getLimitedValue());
-  }
-  return ret;
-}
-
-/// Returns a permutation AffineMap that puts all reduction dimensions to the
-/// last. The order of parallel loops and reduction loops are all sorted. E.g.,
-/// if `rank` is 4 and `reductionDims` is {1, 3}, then
-/// "(d0, d1, d2, d3) -> (d0, d2, d1, d3)" is used. The inverse permutation of
-/// the AffineMap is returned.
-AffineMap getTransposeMapForReduction(MLIRContext* context, int rank,
-                                      ArrayRef<int64_t> reductionDims) {
-  llvm::SmallSetVector<int, 4> s;
-  for (auto dim : reductionDims) s.insert(dim);
-
-  SmallVector<unsigned, 4> permutation;
-  for (int i = 0; i < rank; ++i)
-    if (!s.count(i)) permutation.push_back(i);
-  for (auto dim : reductionDims) permutation.push_back(dim);
-
-  auto map = AffineMap::getPermutationMap(permutation, context);
-  return inversePermutation(map);
-}
-
-/// Returns true if the given `attr` is a splat of the given `value`.
-bool isSplatValue(DenseIntElementsAttr attr, uint64_t value) {
-  return attr.isSplat() && attr.getSplatValue<uint64_t>() == value;
-}
-
 /// Extracts an element from a tensor and optionally converts it to an index
 /// type, based on the tensor's pre-type conversion type.
 Value extractIndexFromTensor(OpBuilder& builder, Location loc, Value tensor,
@@ -1787,251 +1755,6 @@ class MapOpToMapConverter : public OpConversionPattern<stablehlo::MapOp> {
   }
 };
 
-SmallVector<Value, 8> getReduceOpEmptyTensorDynSizes(
-    OpBuilder& b, Location loc, Value arg, ShapedType resultType,
-    ArrayRef<int64_t> reductionDims) {
-  llvm::SmallSetVector<int, 4> s;
-  for (auto dim : reductionDims) s.insert(dim);
-
-  SmallVector<unsigned, 4> parallelDims;
-  SmallVector<Value, 8> dynShape;
-  int rank = arg.getType().cast<RankedTensorType>().getRank();
-  for (int i = 0, j = 0; i < rank; ++i) {
-    if (s.count(i)) continue;
-    if (!resultType.isDynamicDim(j++)) continue;
-    dynShape.push_back(b.create<tensor::DimOp>(loc, arg, i));
-  }
-
-  return dynShape;
-}
-
-class ReduceRegionReturnOpConversion
-    : public OpConversionPattern<stablehlo::ReturnOp> {
- public:
-  using OpConversionPattern<stablehlo::ReturnOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      stablehlo::ReturnOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
-    if (!isInBodyOfLinalgOps(op)) {
-      return failure();
-    }
-    SmallVector<Value, 4> operands(adaptor.getOperands());
-    for (size_t i = 0; i < operands.size(); ++i) {
-      if (operands[i].getType().isa<ShapedType>()) {
-        auto loc = operands[i].getLoc();
-        operands[i] = rewriter.create<tensor::ExtractOp>(loc, operands[i]);
-      }
-    }
-    rewriter.replaceOpWithNewOp<linalg::YieldOp>(op, operands);
-    return success();
-  }
-};
-
-class ReduceOpToGenericConverter
-    : public OpConversionPattern<stablehlo::ReduceOp> {
- public:
-  using OpConversionPattern<stablehlo::ReduceOp>::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      stablehlo::ReduceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
-    Location loc = op.getLoc();
-
-    int numOperands = static_cast<int>(adaptor.getInputs().size());
-
-    if (llvm::any_of(adaptor.getInputs(), [](Value v) {
-          return !v.getType().isa<RankedTensorType>();
-        })) {
-      return rewriter.notifyMatchFailure(op, "expects known-rank args");
-    }
-    auto srcRank =
-        adaptor.getInputs()[0].getType().cast<ShapedType>().getRank();
-
-    SmallVector<int64_t, 4> reductionDims = extract1DVector(op.getDimensions());
-
-    SmallVector<Type> resultTypes;
-    if (failed(typeConverter->convertTypes(op.getResultTypes(), resultTypes)))
-      return failure();
-
-    SmallVector<Value> outputs;
-    SmallVector<AffineMap, 3> indexingMaps;
-    for (auto [operand, initValue, resultType] :
-         llvm::zip(adaptor.getInputs(), adaptor.getInitValues(), resultTypes)) {
-      // Check if init_value is constant. If so, inline the value into the
-      // region.
-      initValue = rewriter.createOrFold<tensor::ExtractOp>(loc, initValue);
-
-      SmallVector<Value, 8> dynShape = getReduceOpEmptyTensorDynSizes(
-          rewriter, loc, operand, resultType, reductionDims);
-      auto emptyTensor = getEmptyTensor(rewriter, loc, resultType, dynShape);
-      Value filledTensor =
-          rewriter.create<linalg::FillOp>(loc, initValue, emptyTensor).result();
-      outputs.push_back(filledTensor);
-    }
-
-    // Prepare indexing maps for linalg generic op. The elements are for src
-    // and dst. Transpose `src` to make the reduction loops be the innermost,
-    // because it's easier to fully utilize processors.
-    indexingMaps.append(
-        numOperands, getTransposeMapForReduction(rewriter.getContext(),
-                                                 (int)srcRank, reductionDims));
-
-    // The indexing map of `dst` should drop the reduction loops. Since the
-    // reduction loops now are all in the innermost, drops
-    // `reduction_dims.size()` dimensions. We don't need an inverse
-    // permutation here because they are the same.
-    SmallVector<AffineExpr, 4> exprs;
-    for (int i = 0, e = srcRank - reductionDims.size(); i < e; ++i)
-      exprs.push_back(rewriter.getAffineDimExpr(i));
-    indexingMaps.append(numOperands,
-                        AffineMap::get(srcRank, /*symbolCount=*/0, exprs,
-                                       rewriter.getContext()));
-
-    auto linalgOp = rewriter.create<linalg::GenericOp>(
-        loc, /*resultTensorTypes=*/resultTypes, adaptor.getInputs(),
-        /*outputBuffers=*/ValueRange{outputs}, indexingMaps,
-        getParallelAndReductionIterators(srcRank, reductionDims.size()),
-        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
-
-    // Convert the signature of the body. The reduce op region apply function
-    // has a signature (lhs, rhs) -> output, all of the same tensor type t.
-    // This is converted to a function with the same signature but with
-    // element types. E.g., "(tensor<f32>, tensor<f32>) -> tensor<f32>" will
-    // be converted to "(f32, f32, f32)".
-    Region& region = linalgOp.getRegion();
-    rewriter.inlineRegionBefore(op.getBody(), region, region.end());
-    TypeConverter::SignatureConversion signatureConverter(numOperands * 2);
-
-    // The mhlo ReduceOp requires that the seed be used as a LHS operand inside
-    // the region, and the seed is encoded in linalg in the intial out value, so
-    // modify the signature of the block and the value mappings, so the output
-    // args will correlate with the original LHS and the inputs correlate with
-    // the original RHS.
-    for (const auto& [idx, val] : llvm::enumerate(op.getInputs())) {
-      signatureConverter.addInputs(
-          /*origInputNo=*/idx + numOperands,
-          // type for the new operand number 'idx'.
-          typeConverter->convertType(
-              val.getType().cast<ShapedType>().getElementType()));
-    }
-    for (const auto& [idx, val] : llvm::enumerate(op.getInitValues())) {
-      signatureConverter.addInputs(
-          /*origInputNo=*/idx,
-          // type for the new operand number 'idx' + 'numOperands'.
-          typeConverter->convertType(
-              val.getType().cast<ShapedType>().getElementType()));
-    }
-
-    rewriter.applySignatureConversion(&region, signatureConverter,
-                                      getTypeConverter());
-    rewriter.replaceOp(op, linalgOp.getResults());
-    return success();
-  }
-};
-
-struct ReduceOpToReduceConverter
-    : public OpConversionPattern<stablehlo::ReduceOp> {
-  using OpConversionPattern<stablehlo::ReduceOp>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      stablehlo::ReduceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
-    auto reductionDims =
-        llvm::to_vector(op.getDimensions().getValues<int64_t>());
-    // mhlo.reduce doesn't specify the order of the reduction dimensions.
-    llvm::sort(reductionDims);
-
-    auto toRankedTensor = [](Value v) -> RankedTensorType {
-      return v.getType().dyn_cast<RankedTensorType>();
-    };
-
-    SmallVector<Value> outputs;
-    SmallVector<RankedTensorType> operandTypes, initTypes;
-    SmallVector<Type> resultTypes;
-    if (failed(typeConverter->convertTypes(op.getResultTypes(), resultTypes)))
-      return failure();
-
-    Location loc = op.getLoc();
-    for (auto [operand, initValue, resultType] :
-         llvm::zip(adaptor.getInputs(), adaptor.getInitValues(), resultTypes)) {
-      auto initType = toRankedTensor(initValue);
-      if (!initType)
-        return rewriter.notifyMatchFailure(op,
-                                           "expects known-rank init values");
-      initTypes.push_back(initType);
-      auto operandType = toRankedTensor(operand);
-      if (!operandType)
-        return rewriter.notifyMatchFailure(op, "expects known-rank operands");
-      operandTypes.push_back(operandType);
-      initValue = rewriter.createOrFold<tensor::ExtractOp>(loc, initValue);
-      auto tensorResultType = resultType.cast<RankedTensorType>();
-      // For linalg.reduce, the result type's dimensions must match the input's
-      // dimensions, whereas MHLO allows replacing static dimensions with
-      // dynamic ones.
-      SmallVector<int64_t> resultShape;
-      SmallVector<Value, 8> dynShape;
-      for (auto [index, dim] :
-           llvm::enumerate(operand.getType().cast<ShapedType>().getShape())) {
-        if (!llvm::is_contained(reductionDims, index)) {
-          resultShape.push_back(dim);
-          if (ShapedType::isDynamic(dim)) {
-            dynShape.push_back(
-                rewriter.create<tensor::DimOp>(loc, operand, index));
-          }
-        }
-      }
-
-      Value emptyTensor = rewriter.create<tensor::EmptyOp>(
-          loc, resultShape, tensorResultType.getElementType(), dynShape);
-      Value filledTensor =
-          rewriter.create<linalg::FillOp>(loc, initValue, emptyTensor).result();
-      outputs.push_back(filledTensor);
-    }
-
-    auto linalgOp = rewriter.create<linalg::ReduceOp>(
-        loc, adaptor.getInputs(), outputs, reductionDims,
-        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
-
-    Region& region = linalgOp.getRegion();
-    rewriter.inlineRegionBefore(op.getBody(), region, region.end());
-
-    // Convert the signature of the body. The reduce op 'computation' region
-    // apply function has a signature with tensor types, this is converted to a
-    // function with element types. E.g. the signature "(tensor<f32>,
-    // tensor<f32>) -> tensor<f32>" will be converted to "(f32, f32) -> f32".
-    // Also, we need to swap the operands of the function. The mhlo.reduce op
-    // expects the init values to be the first parameters of the apply function,
-    // while the linalg.reduction op expects the init values as the last
-    // parameters of the 'combiner' region apply function.
-    TypeConverter::SignatureConversion signatureConverter(
-        linalgOp.getNumDpsInputs() * 2);
-    assert(linalgOp.getNumDpsInputs() == linalgOp.getNumDpsInits());
-    for (const auto& [idx, val] : llvm::enumerate(operandTypes)) {
-      signatureConverter.addInputs(
-          /*origInputNo=*/idx + linalgOp.getNumDpsInputs(),
-          // type for new operand number 'idx'.
-          typeConverter->convertType(val.getElementType()));
-    }
-    for (const auto& [idx, val] : llvm::enumerate(initTypes)) {
-      signatureConverter.addInputs(
-          /*origInputNo=*/idx,
-          // type for new operand number 'idx' + linalgOp.getNumInputs()
-          typeConverter->convertType(val.getElementType()));
-    }
-    rewriter.applySignatureConversion(&region, signatureConverter,
-                                      getTypeConverter());
-
-    // Cast the result to the correct type.
-    SmallVector<Value> results;
-    for (auto [result, resultType] :
-         llvm::zip(linalgOp.getResults(), resultTypes)) {
-      results.push_back(
-          rewriter.createOrFold<tensor::CastOp>(loc, resultType, result));
-    }
-    rewriter.replaceOp(op, results);
-    return success();
-  }
-};
-
 /// Converts xla-hlo.select_and_scatter op to a sequence of linalg.generics ops.
 /// The current version computes the scattered index and populates the correct
 /// value for each tile. It does not currently handle overlapping tiles.
@@ -2727,8 +2450,7 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       PadOpConversion,
       PadOpNegativePaddingConversion,
       TorchIndexSelectOpConversion,
-      SelectAndScatterNoOverlapConverter,
-      ReduceRegionReturnOpConversion
+      SelectAndScatterNoOverlapConverter
       >(typeConverter, context);
 
   detail::populatePointwiseStableHloToLinalgConversionPatterns(
@@ -2742,7 +2464,6 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       IotaToMapConverter<stablehlo::IotaOp>,
       IotaToMapConverter<stablehlo::DynamicIotaOp>,
       MapOpToMapConverter,
-      ReduceOpToReduceConverter,
       TransposeOpToTransposeConverter
     >(typeConverter, context);
   } else {
@@ -2753,17 +2474,18 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       HloBroadcastInDimConverter,
       HloDynamicBroadcastInDimConverter,
       MapOpToGenericConverter,
-      ReduceOpToGenericConverter,
       TransposeConverter<stablehlo::TransposeOp>
     >(typeConverter, context);
   }
 
   // clang-format on
 
-  // TODO(#12678): Handle the convolution and reduce_window ops.
+  // TODO(#12678): Handle the convolution.
 
   detail::populateStableHloDotProdToLinalgConversionPatterns(
       context, typeConverter, patterns);
+  detail::populateStableHloReductionToLinalgConversionPatterns(
+      context, typeConverter, patterns, enablePrimitiveOps);
   detail::populateScalarHloToArithConversionPatterns(
       context, typeConverter, patterns, isInBodyOfLinalgOps);
   linalg::populateEraseUnusedOperandsAndResultsPatterns(*patterns);
