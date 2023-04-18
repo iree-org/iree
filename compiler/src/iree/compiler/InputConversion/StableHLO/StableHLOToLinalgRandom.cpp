@@ -17,8 +17,6 @@
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
-namespace stablehlo = mlir::stablehlo;
-
 class ArithOpBuilder {
  public:
   ArithOpBuilder(OpBuilder b, Location l, Value v)
@@ -375,7 +373,7 @@ LogicalResult generateLinalgThreeFry32(OpBuilder &builder, Location loc,
       reshapeToTarget(builder, loc, intermediateType, generic.getResult(0));
   Value random1 =
       reshapeToTarget(builder, loc, intermediateType, generic.getResult(1));
-  Value concatenate = builder.create<stablehlo::ConcatenateOp>(
+  Value concatenate = builder.create<mlir::stablehlo::ConcatenateOp>(
       loc, ValueRange{random0, random1},
       builder.getI64IntegerAttr(halfDim + 1));
 
@@ -383,13 +381,13 @@ LogicalResult generateLinalgThreeFry32(OpBuilder &builder, Location loc,
   llvm::SmallVector<int64_t> collapseShape(resultTy.getShape());
   collapseShape[halfDim] =
       collapseShape[halfDim] + (collapseShape[halfDim] & 1);
-  Value reshape = builder.create<stablehlo::ReshapeOp>(
+  Value reshape = builder.create<mlir::stablehlo::ReshapeOp>(
       loc, resultTy.clone(collapseShape), concatenate);
 
   // Slice to only the required results.
   llvm::SmallVector<int64_t> offset(resultTy.getRank(), 0);
   llvm::SmallVector<int64_t> stride(resultTy.getRank(), 1);
-  Value slice = builder.create<stablehlo::SliceOp>(
+  Value slice = builder.create<mlir::stablehlo::SliceOp>(
       loc, resultTy, reshape, builder.getI64TensorAttr(offset),
       builder.getI64TensorAttr(resultTy.getShape()),
       builder.getI64TensorAttr(stride));
@@ -468,11 +466,11 @@ LogicalResult generateLinalgThreeFry(OpBuilder &builder, Location loc,
 }
 
 struct RngBitGeneratorConverter final
-    : OpConversionPattern<stablehlo::RngBitGeneratorOp> {
+    : OpConversionPattern<mlir::stablehlo::RngBitGeneratorOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      stablehlo::RngBitGeneratorOp op, OpAdaptor adaptor,
+      mlir::stablehlo::RngBitGeneratorOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Value state = adaptor.getInitialState();
@@ -482,7 +480,7 @@ struct RngBitGeneratorConverter final
       return rewriter.notifyMatchFailure(op, "type conversion failed");
     }
 
-    if (op.getRngAlgorithm() == stablehlo::RngAlgorithm::THREE_FRY) {
+    if (op.getRngAlgorithm() == mlir::stablehlo::RngAlgorithm::THREE_FRY) {
       Value random;
       if (failed(
               generateLinalgThreeFry(rewriter, loc, resultTy, state, random))) {
@@ -496,14 +494,15 @@ struct RngBitGeneratorConverter final
   }
 };
 
-struct RngUniformConversion final : OpConversionPattern<stablehlo::RngOp> {
+struct RngUniformConversion final
+    : OpConversionPattern<mlir::stablehlo::RngOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      stablehlo::RngOp op, OpAdaptor adaptor,
+      mlir::stablehlo::RngOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // We only handle uniform distributions.
-    if (op.getRngDistribution() != stablehlo::RngDistribution::UNIFORM) {
+    if (op.getRngDistribution() != mlir::stablehlo::RngDistribution::UNIFORM) {
       return failure();
     }
     // TODO(raikonenfnu): Handle other element types as well.
@@ -579,7 +578,6 @@ struct RngUniformConversion final : OpConversionPattern<stablehlo::RngOp> {
     return success();
   }
 };
-
 }  // namespace
 
 namespace detail {
