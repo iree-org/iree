@@ -252,30 +252,14 @@ static FailureOr<SmallVector<Type>> getFunctionArgTypesForUKernelMmt4D(
         memRefType.getMemorySpace()));
     // offset
     callArgumentTypes.push_back(indexType);
-    return success();
-  };
-  auto processMemrefTypeOperandStride0 =
-      [&](Value memRefValue) -> LogicalResult {
-    auto memRefType = memRefValue.getType().dyn_cast<MemRefType>();
-    if (!memRefType) {
-      return mmt4dUKernelOp->emitOpError(
-          llvm::formatv("unable to lower {0} to function call argument types",
-                        memRefValue.getType()));
-    }
     // stride[0]
     callArgumentTypes.push_back(indexType);
     return success();
   };
-  /// LHS, RHS, Out buffer+offset
+  /// LHS, RHS, Out
   if (failed(processMemrefTypeOperand(mmt4dUKernelOp.getLhs())) ||
       failed(processMemrefTypeOperand(mmt4dUKernelOp.getRhs())) ||
       failed(processMemrefTypeOperand(mmt4dUKernelOp.getOutput()))) {
-    return failure();
-  }
-  /// LHS, RHS, Out stride[0]
-  if (failed(processMemrefTypeOperandStride0(mmt4dUKernelOp.getLhs())) ||
-      failed(processMemrefTypeOperandStride0(mmt4dUKernelOp.getRhs())) ||
-      failed(processMemrefTypeOperandStride0(mmt4dUKernelOp.getOutput()))) {
     return failure();
   }
   // m, n, k
@@ -298,11 +282,7 @@ static FailureOr<SmallVector<Value>> getFunctionArgValuesForUKernelMmt4D(
     callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
     // offset.
     callOperands.push_back(extractStridedMetadataOp.getOffset());
-  };
-  auto processMemrefTypeOperandStride0 = [&](Value memRefValue) {
-    auto extractStridedMetadataOp =
-        rewriter.create<memref::ExtractStridedMetadataOp>(loc, memRefValue);
-    // stride[0].
+    // strides.
     callOperands.push_back(extractStridedMetadataOp.getStrides().front());
   };
   auto getDimAsI32 = [&](Value value, int dim) {
@@ -311,14 +291,12 @@ static FailureOr<SmallVector<Value>> getFunctionArgValuesForUKernelMmt4D(
                                                      dimValue);
     callOperands.push_back(asI32);
   };
-  // LHS, RHS, Out buffer+offset
+  // LHS
   processMemrefTypeOperand(mmt4dUKernelOp.getLhs());
+  // RHS
   processMemrefTypeOperand(mmt4dUKernelOp.getRhs());
+  // Out
   processMemrefTypeOperand(mmt4dUKernelOp.getOutput());
-  // LHS, RHS, Out stride[0]
-  processMemrefTypeOperandStride0(mmt4dUKernelOp.getLhs());
-  processMemrefTypeOperandStride0(mmt4dUKernelOp.getRhs());
-  processMemrefTypeOperandStride0(mmt4dUKernelOp.getOutput());
   // M
   callOperands.push_back(
       rewriter.create<memref::DimOp>(loc, mmt4dUKernelOp.getLhs(), 0));
