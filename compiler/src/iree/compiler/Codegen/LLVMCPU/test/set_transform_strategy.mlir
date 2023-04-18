@@ -36,22 +36,22 @@ hal.executable private @pack  {
 // CHECK:         hal.executable.export public @pack
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
 // CHECK-LABEL: func.func @pack
-// CHECK:         transform.sequence
-// CHECK:         %[[PACK:.+]] = transform.structured.match ops{["tensor.pack"]} in %arg0
+// CHECK:         transform.sequence failures(propagate)
+// CHECK-NEXT:    ^bb0(%[[VAR:.+]]: !pdl.operation)
+// CHECK:         %[[PACK:.+]] = transform.structured.match ops{["tensor.pack"]} in %[[VAR]]
 // CHECK:         %[[FORALL:.+]], %[[TILED_PACK:.+]] = transform.iree.tile_to_forall_and_workgroup_count_region
 // CHECK-SAME:      %[[PACK:.+]] num_threads [1]
 // CHECK:         %[[CAST:.+]] = cast %[[TILED_PACK]] : !pdl.operation to !transform.op<"tensor.pack">
 // CHECK:         %[[PAD:.+]], %[[RESHAPE:.+]], %[[TRANS:.+]] =
 // CHECK-SAME:      transform.structured.lower_pack %[[CAST]]
-// CHECK:         %[[TILED_TRANS:.+]], %{{.+}} = transform.structured.tile %[[TRANS]][1, 8, 8]
+// CHECK:         %[[TILED_TRANS:.+]], %{{.+}} = transform.structured.tile %[[TRANS]][1, 8, 8, 1]
 // CHECK:         %[[CAST:.+]] = cast %[[TILED_TRANS]] : !transform.op<"linalg.transpose"> to !pdl.operation
 // CHECK:         %[[GEN:.+]] = transform.structured.generalize %[[CAST]]
-// CHECK:         %[[FUNC:.+]] = transform.structured.match ops{["func.func"]} in %arg0
-// CHECK:         transform.iree.apply_patterns %[[FUNC]]
-// CHECK-SAME:      rank_reducing_linalg_via_reshapes
+// CHECK:         transform.iree.apply_patterns %[[VAR]]
+// CHECK-SAME:      rank_reducing_linalg
 // CHECK:         %{{.*}} = transform.structured.vectorize
 // CHECK:         %{{.*}} = transform.structured.hoist_redundant_tensor_subsets
-// CHECK:         %{{.*}} = transform.iree.bufferize %arg0
+// CHECK:         %{{.*}} = transform.iree.bufferize %[[VAR]]
 // CHECK:         transform.iree.erase_hal_descriptor_type_from_memref
 // CHECK:         transform.iree.forall_to_workgroup
 // CHECK:         %{{.*}} = transform.vector.apply_transfer_permutation_patterns

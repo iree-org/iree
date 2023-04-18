@@ -40,6 +40,7 @@ std::pair<Value, Value> buildCommonTrailingStrategy(
 struct CPUModel {
   static constexpr StringLiteral kDefaultCPU = "DefaultCPU";
   StringRef model = kDefaultCPU;
+  bool lowerToAVX2 = false;
 };
 
 /// Map an N-D parallel, 1-D reduction operation with optional leading and
@@ -58,7 +59,7 @@ LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
 
 LogicalResult matchAndSetPackStrategy(func::FuncOp entryPoint,
                                       tensor::PackOp op,
-                                      const PackConfig& config);
+                                      const CPUModel& cpuModel);
 
 }  // namespace cpu
 }  // namespace iree_compiler

@@ -14,7 +14,6 @@
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/CPU/Common.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/CPU/PackStrategy.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -1136,8 +1135,8 @@ static LogicalResult setTransformStrategyRootConfig(func::FuncOp entryPointFn,
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (!isX86_64(targetAttr)) return failure();
 
-  cpu::PackConfig packConfig{.lowerToAVX2 = hasAVX2Feature(targetAttr)};
-  if (failed(cpu::matchAndSetPackStrategy(entryPointFn, op, packConfig)))
+  cpu::CPUModel cpuModel{.lowerToAVX2 = hasAVX2Feature(targetAttr)};
+  if (failed(cpu::matchAndSetPackStrategy(entryPointFn, op, cpuModel)))
     return failure();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(),

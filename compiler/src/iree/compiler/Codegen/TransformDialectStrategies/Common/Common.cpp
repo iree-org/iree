@@ -444,6 +444,24 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
                          maybeBlockTrailingH, tileResult.forallH);
 }
 
+std::tuple<Value, Value, Value> mlir::iree_compiler::buildLowerPack(
+    ImplicitLocOpBuilder &b, Value packOp) {
+  MLIRContext *ctx = b.getContext();
+  auto lowerPack = b.create<transform::LowerPackOp>(
+      transform::OperationType::get(ctx, tensor::PadOp::getOperationName()),
+      transform::OperationType::get(ctx,
+                                    tensor::ExpandShapeOp::getOperationName()),
+      transform::OperationType::get(ctx,
+                                    linalg::TransposeOp::getOperationName()),
+      b.create<transform::CastOp>(transform::OperationType::get(
+                                      ctx, tensor::PackOp::getOperationName()),
+                                  packOp));
+  lowerPack.dump();
+  lowerPack.getTransposeOp().dump();
+  return std::make_tuple(lowerPack.getPadOp(), lowerPack.getExpandShapeOp(),
+                         lowerPack.getTransposeOp());
+}
+
 Value mlir::iree_compiler::buildMemoryOptimizations(ImplicitLocOpBuilder &b,
                                                     Value funcH) {
   ApplyPatternsOpPatterns configuration;

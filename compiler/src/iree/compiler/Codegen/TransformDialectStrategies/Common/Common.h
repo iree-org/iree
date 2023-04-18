@@ -227,6 +227,11 @@ buildReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value variantH,
     const AbstractReductionStrategy &strategy);
 
+/// Build transform IR that lower a pack op into pad + expand_shape + transpose
+/// ops.
+std::tuple<Value, Value, Value> buildLowerPack(ImplicitLocOpBuilder &b,
+                                               Value packOp);
+
 /// Build transform IR that applies memory optimizations.
 Value buildMemoryOptimizations(ImplicitLocOpBuilder &b, Value funcH);
 

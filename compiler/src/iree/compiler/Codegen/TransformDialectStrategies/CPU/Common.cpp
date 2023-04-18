@@ -178,8 +178,8 @@ LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
 
 LogicalResult matchAndSetPackStrategy(func::FuncOp entryPoint,
                                       tensor::PackOp op,
-                                      const PackConfig &config) {
-  // TODO(hanchung): Support pipeline for padding cases.
+                                      const CPUModel &cpuModel) {
+  // TODO(hanchung): Support the strategy for pack ops that have padding value.
   if (op.getPaddingValue()) return failure();
 
   // Only packing LHS is supported.
@@ -190,8 +190,9 @@ LogicalResult matchAndSetPackStrategy(func::FuncOp entryPoint,
   if (!outerDimsPerm.empty()) return failure();
 
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
-    LLVM_DEBUG(DBGS() << "use CPU pack strategy\n");
-    return buildPackStrategy(b, variant, config);
+    auto strategy =
+        PackStrategy::create(op.getContext(), op, cpuModel.lowerToAVX2);
+    return buildPackStrategy(b, variant, strategy);
   };
 
   createTransformRegion(entryPoint, strategyBuilder);
