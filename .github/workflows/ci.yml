@@ -299,7 +299,7 @@ jobs:
             --env CTEST_PARALLEL_LEVEL=2 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/nvidia@sha256:b00fe1b21a288b6edd701b30d2b23c85ea96b5f8707792b071fe9f3b7f15b4bb \
+            gcr.io/iree-oss/nvidia@sha256:e7a1daba40815d1e94c901ce7de4bead54e725302ba320eda6745857977528a7 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh

@@ -66,3 +66,6 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_install
   && cp /var/cuda-repo-ubuntu2204-11-8-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
   && apt-get update \
   && apt-get -y install cuda-toolkit-11-8
+
+# Adding CUDA binaries to Path
+ENV PATH=${PATH}:/usr/local/cuda/bin/

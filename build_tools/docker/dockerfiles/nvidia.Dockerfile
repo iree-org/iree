@@ -57,3 +57,6 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/11.6.0/local_install
   && apt-key add /var/cuda-repo-debian11-11-6-local/7fa2af80.pub \
   && apt-get update \
   && apt-get -y install cuda-toolkit-11-6
+
+# Adding CUDA binaries to Path
+ENV PATH=${PATH}:/usr/local/cuda/bin/
