@@ -2484,6 +2484,8 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
 
   detail::populateStableHloDotProdToLinalgConversionPatterns(
       context, typeConverter, patterns);
+  detail::populateStableHloRandomToLinalgConversionPatterns(
+      context, typeConverter, patterns);
   detail::populateStableHloReductionToLinalgConversionPatterns(
       context, typeConverter, patterns, enablePrimitiveOps);
   detail::populateScalarHloToArithConversionPatterns(
