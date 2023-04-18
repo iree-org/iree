@@ -31,6 +31,7 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "extract_slice.mlir"
+    "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
