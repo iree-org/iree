@@ -456,8 +456,6 @@ std::tuple<Value, Value, Value> mlir::iree_compiler::buildLowerPack(
       b.create<transform::CastOp>(transform::OperationType::get(
                                       ctx, tensor::PackOp::getOperationName()),
                                   packOp));
-  lowerPack.dump();
-  lowerPack.getTransposeOp().dump();
   return std::make_tuple(lowerPack.getPadOp(), lowerPack.getExpandShapeOp(),
                          lowerPack.getTransposeOp());
 }
