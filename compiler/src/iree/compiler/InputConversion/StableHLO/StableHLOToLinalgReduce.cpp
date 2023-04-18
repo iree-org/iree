@@ -25,13 +25,16 @@ namespace stablehlo = mlir::stablehlo;
 /// if `rank` is 4 and `reductionDims` is {1, 3}, then
 /// "(d0, d1, d2, d3) -> (d0, d2, d1, d3)" is used. The inverse permutation of
 /// the AffineMap is returned.
-AffineMap getTransposeMapForReduction(MLIRContext* context, int rank,
+AffineMap getTransposeMapForReduction(MLIRContext *context, int rank,
                                       ArrayRef<int64_t> reductionDims) {
   llvm::SmallSetVector<int, 4> s(reductionDims.begin(), reductionDims.end());
 
   SmallVector<unsigned, 4> permutation;
-  for (int i = 0; i < rank; ++i)
-    if (!s.contains(i)) permutation.push_back(i);
+  for (int i = 0; i < rank; ++i) {
+    if (!s.contains(i)) {
+      permutation.push_back(i);
+    }
+  }
 
   llvm::append_range(permutation, reductionDims);
   auto map = AffineMap::getPermutationMap(permutation, context);
@@ -39,7 +42,7 @@ AffineMap getTransposeMapForReduction(MLIRContext* context, int rank,
 }
 
 SmallVector<Value, 8> getReduceOpEmptyTensorDynSizes(
-    OpBuilder& b, Location loc, Value arg, ShapedType resultType,
+    OpBuilder &b, Location loc, Value arg, ShapedType resultType,
     ArrayRef<int64_t> reductionDims) {
   llvm::SmallSetVector<int, 4> s(reductionDims.begin(), reductionDims.end());
 
@@ -61,13 +64,13 @@ struct ReduceRegionReturnOpConversion final
 
   LogicalResult matchAndRewrite(
       stablehlo::ReturnOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+      ConversionPatternRewriter &rewriter) const override {
     if (!isInBodyOfLinalgOps(op)) {
       return failure();
     }
 
     SmallVector<Value, 4> operands(adaptor.getOperands());
-    for (Value& operand : operands) {
+    for (Value &operand : operands) {
       if (isa<ShapedType>(operand.getType())) {
         Location loc = operand.getLoc();
         operand = rewriter.create<tensor::ExtractOp>(loc, operand);
@@ -84,13 +87,13 @@ struct ReduceOpToGenericConverter final
 
   LogicalResult matchAndRewrite(
       stablehlo::ReduceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+      ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
     int numOperands = static_cast<int>(adaptor.getInputs().size());
 
     if (llvm::any_of(adaptor.getInputs(), [](Value v) {
-          return !v.getType().isa<RankedTensorType>();
+          return !isa<RankedTensorType>(v.getType());
         })) {
       return rewriter.notifyMatchFailure(op, "expects known-rank args");
     }
@@ -131,8 +134,9 @@ struct ReduceOpToGenericConverter final
     // `reduction_dims.size()` dimensions. We don't need an inverse
     // permutation here because they are the same.
     SmallVector<AffineExpr, 4> exprs;
-    for (int i = 0, e = srcRank - reductionDims.size(); i < e; ++i)
+    for (int i = 0, e = srcRank - reductionDims.size(); i < e; ++i) {
       exprs.push_back(rewriter.getAffineDimExpr(i));
+    }
     indexingMaps.append(numOperands,
                         AffineMap::get(srcRank, /*symbolCount=*/0, exprs,
                                        rewriter.getContext()));
@@ -148,7 +152,7 @@ struct ReduceOpToGenericConverter final
     // This is converted to a function with the same signature but with
     // element types. E.g., "(tensor<f32>, tensor<f32>) -> tensor<f32>" will
     // be converted to "(f32, f32, f32)".
-    Region& region = linalgOp.getRegion();
+    Region &region = linalgOp.getRegion();
     rewriter.inlineRegionBefore(op.getBody(), region, region.end());
     TypeConverter::SignatureConversion signatureConverter(numOperands * 2);
 
@@ -185,7 +189,7 @@ struct ReduceOpToReduceConverter final
 
   LogicalResult matchAndRewrite(
       stablehlo::ReduceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+      ConversionPatternRewriter &rewriter) const override {
     auto reductionDims =
         llvm::to_vector(op.getDimensions().getValues<int64_t>());
     // stablehlo.reduce doesn't specify the order of the reduction dimensions.
@@ -242,7 +246,7 @@ struct ReduceOpToReduceConverter final
         loc, adaptor.getInputs(), outputs, reductionDims,
         /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
 
-    Region& region = linalgOp.getRegion();
+    Region &region = linalgOp.getRegion();
     rewriter.inlineRegionBefore(op.getBody(), region, region.end());
 
     // Convert the signature of the body. The reduce op 'computation' region
@@ -256,13 +260,13 @@ struct ReduceOpToReduceConverter final
     TypeConverter::SignatureConversion signatureConverter(
         linalgOp.getNumDpsInputs() * 2);
     assert(linalgOp.getNumDpsInputs() == linalgOp.getNumDpsInits());
-    for (const auto& [idx, val] : llvm::enumerate(operandTypes)) {
+    for (const auto &[idx, val] : llvm::enumerate(operandTypes)) {
       signatureConverter.addInputs(
           /*origInputNo=*/idx + linalgOp.getNumDpsInputs(),
           // type for new operand number 'idx'.
           typeConverter->convertType(val.getElementType()));
     }
-    for (const auto& [idx, val] : llvm::enumerate(initTypes)) {
+    for (const auto &[idx, val] : llvm::enumerate(initTypes)) {
       signatureConverter.addInputs(
           /*origInputNo=*/idx,
           // type for new operand number 'idx' + linalgOp.getNumInputs()
@@ -289,8 +293,8 @@ struct ReduceWindowOpOnTensorsGenericConversion final
 
   LogicalResult matchAndRewrite(
       stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
-    MLIRContext* ctx = op->getContext();
+      ConversionPatternRewriter &rewriter) const override {
+    MLIRContext *ctx = op->getContext();
     Location loc = op.getLoc();
     llvm::SmallVector<Value> initValues = adaptor.getInitValues();
     llvm::SmallVector<Type> resultTypes;
@@ -350,9 +354,10 @@ struct ReduceWindowOpOnTensorsGenericConversion final
     }
 
     SmallVector<AffineMap, 4> inferredMaps(3, AffineMap::get(ctx));
-    if (rank > 0)
+    if (rank > 0) {
       inferredMaps =
           AffineMap::inferFromExprList({srcExprs, windowExprs, dstExprs});
+    }
 
     SmallVector<AffineMap, 4> indexingMaps;
 
@@ -385,8 +390,8 @@ struct ReduceWindowOpOnTensorsGenericConversion final
       }
       // Translate base dilation into interior padding.
       llvm::SmallVector<int64_t> staticInteriors(rank, 0);
-      for (const auto& dilation : llvm::enumerate(baseDilations)) {
-        staticInteriors[dilation.index()] = dilation.value() - 1;
+      for (auto [idx, dilation] : llvm::enumerate(baseDilations)) {
+        staticInteriors[idx] = dilation - 1;
       }
 
       auto padAttrType =
@@ -396,9 +401,7 @@ struct ReduceWindowOpOnTensorsGenericConversion final
       auto padInteriors =
           DenseIntElementsAttr::get(padAttrType, staticInteriors);
 
-      for (auto values : llvm::zip(inputs, initValues)) {
-        auto& input = std::get<0>(values);
-        auto& initValue = std::get<1>(values);
+      for (auto [input, initValue] : llvm::zip(inputs, initValues)) {
         input = rewriter.create<stablehlo::PadOp>(
             loc, input, initValue, padLows, padHighs, padInteriors);
       }
@@ -419,7 +422,7 @@ struct ReduceWindowOpOnTensorsGenericConversion final
     // Convert the signature of the body. This includes converting scalar
     // tensors to their scalar values and inserting an additional block arg for
     // the window arg.
-    Region& region = linalgOp.getRegion();
+    Region &region = linalgOp.getRegion();
     rewriter.cloneRegionBefore(op.getBody(), region, region.end());
 
     TypeConverter::SignatureConversion signatureConverter(
@@ -458,11 +461,11 @@ struct ReduceWindowOpConversion final
   /// Get the operation used for reduction applied to `result_index`th result.
   /// Its expected to be a binary operation that consumes `result_index`th and
   /// `result_index + getInputs().size`th arguments of the body.
-  static Operation* getReductionOp(stablehlo::ReduceWindowOp op,
+  static Operation *getReductionOp(stablehlo::ReduceWindowOp op,
                                    int resultIndex) {
     auto returnOp =
         cast<stablehlo::ReturnOp>(op.getBody().front().getTerminator());
-    Operation* computeOp = returnOp.getResults()[resultIndex].getDefiningOp();
+    Operation *computeOp = returnOp.getResults()[resultIndex].getDefiningOp();
     if (computeOp->getNumOperands() != 2) return nullptr;
     auto arg0 = computeOp->getOperand(0).dyn_cast<BlockArgument>();
     auto arg1 = computeOp->getOperand(1).dyn_cast<BlockArgument>();
@@ -494,7 +497,7 @@ struct ReduceWindowOpConversion final
                                     int resultIndex) {
     auto rank =
         reduceOp.getResultTypes()[resultIndex].cast<ShapedType>().getRank();
-    if (Operation* op = getReductionOp(reduceOp, resultIndex)) {
+    if (Operation *op = getReductionOp(reduceOp, resultIndex)) {
       if (isa<stablehlo::MinOp>(*op) && rank == 4) return PoolingType::k2DMin;
       if (isa<stablehlo::MinOp>(*op) && rank == 5) return PoolingType::k3DMin;
       if (isa<stablehlo::MaxOp>(*op) && rank == 4) return PoolingType::k2DMax;
@@ -507,7 +510,7 @@ struct ReduceWindowOpConversion final
 
   LogicalResult matchAndRewrite(
       stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+      ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     int rank = op.getResultTypes()[0].cast<ShapedType>().getRank();
     if (rank != 4 && rank != 5) {
@@ -584,7 +587,7 @@ struct ReduceWindowOpConversion final
           loc, fakeWindowShapes, resultType.getElementType());
 
       SmallVector<Value> resultDynamicDims;
-      for (const auto& en : llvm::enumerate(resultType.getShape())) {
+      for (const auto &en : llvm::enumerate(resultType.getShape())) {
         if (en.value() != ShapedType::kDynamic) continue;
         Value dimSize = rewriter.create<tensor::DimOp>(loc, input, en.index());
         if (en.index() == 0 || static_cast<int64_t>(en.index()) == rank - 1) {
@@ -618,7 +621,7 @@ struct ReduceWindowOpConversion final
       Value filledInitTensor =
           rewriter.create<linalg::FillOp>(loc, initValue, emptyTensor)
               .getResult(0);
-      auto createOp = [&](auto* typePtr) -> linalg::LinalgOp {
+      auto createOp = [&](auto *typePtr) -> linalg::LinalgOp {
         return cast<linalg::LinalgOp>(
             rewriter
                 .create<std::remove_pointer_t<decltype(typePtr)>>(
@@ -632,30 +635,33 @@ struct ReduceWindowOpConversion final
       PoolingType poolingType = getPoolingType(op, result.getResultNumber());
       switch (poolingType) {
         case PoolingType::k2DMin: {
-          poolingOp = createOp(static_cast<linalg::PoolingNhwcMinOp*>(nullptr));
+          poolingOp =
+              createOp(static_cast<linalg::PoolingNhwcMinOp *>(nullptr));
           break;
         }
         case PoolingType::k3DMin: {
           poolingOp =
-              createOp(static_cast<linalg::PoolingNdhwcMinOp*>(nullptr));
+              createOp(static_cast<linalg::PoolingNdhwcMinOp *>(nullptr));
           break;
         }
         case PoolingType::k2DMax: {
-          poolingOp = createOp(static_cast<linalg::PoolingNhwcMaxOp*>(nullptr));
+          poolingOp =
+              createOp(static_cast<linalg::PoolingNhwcMaxOp *>(nullptr));
           break;
         }
         case PoolingType::k3DMax: {
           poolingOp =
-              createOp(static_cast<linalg::PoolingNdhwcMaxOp*>(nullptr));
+              createOp(static_cast<linalg::PoolingNdhwcMaxOp *>(nullptr));
           break;
         }
         case PoolingType::k2DAdd: {
-          poolingOp = createOp(static_cast<linalg::PoolingNhwcSumOp*>(nullptr));
+          poolingOp =
+              createOp(static_cast<linalg::PoolingNhwcSumOp *>(nullptr));
           break;
         }
         case PoolingType::k3DAdd: {
           poolingOp =
-              createOp(static_cast<linalg::PoolingNdhwcSumOp*>(nullptr));
+              createOp(static_cast<linalg::PoolingNdhwcSumOp *>(nullptr));
           break;
         }
         case PoolingType::kInvalid:
@@ -672,8 +678,8 @@ struct ReduceWindowOpConversion final
 
 namespace detail {
 void populateStableHloReductionToLinalgConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns, bool enablePrimitiveOps) {
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns, bool enablePrimitiveOps) {
   if (enablePrimitiveOps) {
     patterns->add<ReduceOpToReduceConverter>(typeConverter, context);
   } else {
