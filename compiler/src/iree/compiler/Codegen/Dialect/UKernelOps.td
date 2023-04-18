@@ -66,44 +66,4 @@ def IREECodegen_UKernelGenericOp :
   }];
 }
 
-def IREECodegen_UKernelMmt4DOp :
-    IREECodegen_UKernelOp<"ukernel.mmt4d", []>  {
-  let summary = "Mmt4D Microkernel operator";
-
-  let description = [{
-    Operation to wrap a computation with root being a `linalg.mmt4d` 
-    forwarded to a microkernel.
-
-    This operation is meant to wrap a DAG whose is `linalg.mmt4d`-like
-    operation and forwarded to a micro kernel. Unlike `ukernel.generic`,
-    lowering into this operation does not fix the ABI of the micro kernel
-    function. When lowering to a function, the function call is expected
-    to match the ABI of the corresponding micro-kernel used.
-  }];
-
-  let arguments = (ins
-    RankedTensorOrMemRefType<[AnyType], [4]>:$lhs,
-    RankedTensorOrMemRefType<[AnyType], [4]>:$rhs,
-    RankedTensorOrMemRefType<[AnyType], [4]>:$output,
-    DefaultValuedAttr<BoolAttr, "false">:$accumulate);
-  let results = (outs Optional<AnyRankedTensor>:$result);
-  let assemblyFormat = [{
-    attr-dict `lhs` `(` $lhs `:` type($lhs) `)`
-    `rhs` `(` $rhs `:` type($rhs) `)`
-    `outs` `(` $output `:` type($output) `)`
-    `accumulate` `(` $accumulate `)` (`->` type($result)^)?
-  }];
-  let extraClassDeclaration = [{
-    Type getLhsElementType() {
-      return getLhs().getType().cast<ShapedType>().getElementType();
-    }
-    Type getRhsElementType() {
-      return getRhs().getType().cast<ShapedType>().getElementType();
-    }
-    Type getOutputElementType() {
-      return getOutput().getType().cast<ShapedType>().getElementType();
-    }
-  }];
-}
-
 #endif // IREE_CODEGEN_DIALECT_UKERNEL_OPS
