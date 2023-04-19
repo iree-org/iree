@@ -81,36 +81,38 @@ func.func @matmul_i8i8i32(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?xi8>,
 
 // -----
 
-func.func @mmt4d(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf32>,
+func.func @mmt4d_f32f32f32(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf32>,
     %arg2 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
   %0 = linalg.mmt4d ins(%arg0, %arg1 : tensor<?x?x?x?xf32>, tensor<?x?x?x?xf32>)
       outs(%arg2 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
   return %0 : tensor<?x?x?x?xf32>
 }
-//      CHECK: func @mmt4d(
+//      CHECK: func @mmt4d_f32f32f32(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.mmt4d
-// CHECK-SAME:       lhs(%[[ARG0]] :
-// CHECK-SAME:       rhs(%[[ARG1]] :
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
+//  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1 : i32
+//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[M0:.+]] = tensor.dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[N0:.+]] = tensor.dim %[[ARG1]], %[[C2]]
+//  CHECK-DAG:   %[[K0:.+]] = tensor.dim %[[ARG1]], %[[C3]]
+//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "vmvx.mmt4d.f32f32f32"
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
-// CHECK-SAME:       accumulate(true)
+// CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
 //      CHECK:   return %[[MICRO_KERNEL]]
 
 // -----
 
-func.func @mmt4d_fill(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
+func.func @mmt4d_fill(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf32>, %arg2 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
   %cst = arith.constant 0.0 : f32
-  %m = tensor.dim %arg0, %c0 : tensor<?x?x?x?xf32>
-  %n = tensor.dim %arg1, %c1 : tensor<?x?x?x?xf32>
-  %m0 = tensor.dim %arg0, %c2 : tensor<?x?x?x?xf32>
-  %n0 = tensor.dim %arg1, %c2 : tensor<?x?x?x?xf32>
-  %empty = tensor.empty(%m, %n, %m0, %n0) : tensor<?x?x?x?xf32>
-  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%arg2 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
   %0 = linalg.mmt4d ins(%arg0, %arg1 : tensor<?x?x?x?xf32>, tensor<?x?x?x?xf32>)
       outs(%fill : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
   return %0 : tensor<?x?x?x?xf32>
@@ -118,12 +120,18 @@ func.func @mmt4d_fill(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf32>) 
 //      CHECK: func @mmt4d_fill(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
-//      CHECK:   %[[DST:.+]] = tensor.empty
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.mmt4d
-// CHECK-SAME:       lhs(%[[ARG0]] :
-// CHECK-SAME:       rhs(%[[ARG1]] :
-// CHECK-SAME:       outs(%[[DST]] :
-// CHECK-SAME:       accumulate(false)
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 0 : i32
+//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[M0:.+]] = tensor.dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[N0:.+]] = tensor.dim %[[ARG1]], %[[C2]]
+//  CHECK-DAG:   %[[K0:.+]] = tensor.dim %[[ARG1]], %[[C3]]
+//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "vmvx.mmt4d.f32f32f32"
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
+// CHECK-SAME:       outs(%[[ARG2]] :
+// CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
 //      CHECK:   return %[[MICRO_KERNEL]]
 
 // -----
@@ -138,9 +146,19 @@ func.func @mmt4d_i8i8i32(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tensor<?x?x?x?xi8>,
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.mmt4d
-// CHECK-SAME:       lhs(%[[ARG0]] :
-// CHECK-SAME:       rhs(%[[ARG1]] :
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
+//  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1 : i32
+//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[M0:.+]] = tensor.dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[N0:.+]] = tensor.dim %[[ARG1]], %[[C2]]
+//  CHECK-DAG:   %[[K0:.+]] = tensor.dim %[[ARG1]], %[[C3]]
+//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "vmvx.mmt4d.i8i8i32"
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
-// CHECK-SAME:       accumulate(true)
+// CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
 //      CHECK:   return %[[MICRO_KERNEL]]

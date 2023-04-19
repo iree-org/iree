@@ -106,49 +106,62 @@ func.func @ukernel_generic(%arg0 : memref<?x?xf32>, %arg1 : memref<?x?xf32>,
 
 // -----
 
-func.func @ukernel_mmt4d(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32>,
-    %arg2 : memref<?x?x?x?xf32>) {
-  iree_codegen.ukernel.mmt4d lhs(%arg0 : memref<?x?x?x?xf32>) rhs(%arg1 : memref<?x?x?x?xf32>)
-      outs(%arg2 : memref<?x?x?x?xf32>) accumulate(false)
+func.func @ukernel_mmt4d_f32f32f32(%lhs : memref<?x?x?x?xf32>, %rhs : memref<?x?x?x?xf32>,
+    %acc : memref<?x?x?x?xf32>, %m : index, %n : index, %k : index, %m0 : i32, %n0 : i32, %k0 : i32, %flags : i32) {
+  iree_codegen.ukernel.generic "vmvx.mmt4d.f32f32f32" ins(%lhs, %rhs : memref<?x?x?x?xf32>, memref<?x?x?x?xf32>)
+      outs(%acc : memref<?x?x?x?xf32>) (%m, %n, %k, %m0, %n0, %k0, %flags : index, index, index, i32, i32, i32, i32) strided_outer_dims(1)
   return
 }
 // CHECK-LABEL: func.func private @vmvx.mmt4d.f32f32f32
 //  CHECK-SAME:     (memref<f32>, index, index, memref<f32>, index, index,
 //  CHECK-SAME:     memref<f32>, index, index, index, index, index, i32, i32, i32, i32)
-// CHECK-LABEL: func.func @ukernel_mmt4d(
+// CHECK-LABEL: func.func @ukernel_mmt4d_f32f32f32(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: memref<?x?x?x?xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: memref<?x?x?x?xf32>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: memref<?x?x?x?xf32>
+//  CHECK-SAME:     %[[M:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[N:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[K:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[M0:[a-zA-Z0-9]+]]: i32
+//  CHECK-SAME:     %[[N0:[a-zA-Z0-9]+]]: i32
+//  CHECK-SAME:     %[[K0:[a-zA-Z0-9]+]]: i32
+//  CHECK-SAME:     %[[FLAGS:[a-zA-Z0-9]+]]: i32
 //       CHECK:   %[[BASE0:.+]], %[[OFFSET0:.+]], %[[SIZE0:.+]]:4, %[[STRIDES0:.+]]:4 = memref.extract_strided_metadata %[[ARG0]]
 //       CHECK:   %[[BASE1:.+]], %[[OFFSET1:.+]], %[[SIZE1:.+]]:4, %[[STRIDES1:.+]]:4 = memref.extract_strided_metadata %[[ARG1]]
 //       CHECK:   %[[BASE2:.+]], %[[OFFSET2:.+]], %[[SIZE2:.+]]:4, %[[STRIDES2:.+]]:4 = memref.extract_strided_metadata %[[ARG2]]
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
-//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG1]], %[[C0]]
-//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:   %[[D2:.+]] = memref.dim %[[ARG0]], %[[C1]]
-//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
-//   CHECK-DAG:   %[[D3:.+]] = memref.dim %[[ARG0]], %[[C2]]
-//   CHECK-DAG:   %[[D3_I32:.+]] = arith.index_cast %[[D3]]
-//   CHECK-DAG:   %[[D4:.+]] = memref.dim %[[ARG1]], %[[C2]]
-//   CHECK-DAG:   %[[D4_I32:.+]] = arith.index_cast %[[D4]]
-//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
-//   CHECK-DAG:   %[[D5:.+]] = memref.dim %[[ARG0]], %[[C3]]
-//   CHECK-DAG:   %[[D5_I32:.+]] = arith.index_cast %[[D5]]
-//   CHECK-DAG:   %[[C0_I32:.+]] = arith.constant 0 : i32
 //       CHECK:   call @vmvx.mmt4d.f32f32f32(%[[BASE0]], %[[OFFSET0]], %[[STRIDES0]]#0
 //  CHECK-SAME:       %[[BASE1]], %[[OFFSET1]], %[[STRIDES1]]#0
 //  CHECK-SAME:       %[[BASE2]], %[[OFFSET2]], %[[STRIDES2]]#0
-//  CHECK-SAME:       %[[D0]], %[[D1]], %[[D2]],
-//  CHECK-SAME:       %[[D3_I32]], %[[D4_I32]], %[[D5_I32]], %[[C0_I32]])
+//  CHECK-SAME:       %[[M]], %[[N]], %[[K]],
+//  CHECK-SAME:       %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]])
 
 // -----
 
-func.func @ukernel_mmt4d_i8i8i32(%arg0 : memref<?x?x?x?xi8>, %arg1 : memref<?x?x?x?xi8>,
-    %arg2 : memref<?x?x?x?xi32>) {
-  iree_codegen.ukernel.mmt4d lhs(%arg0 : memref<?x?x?x?xi8>) rhs(%arg1 : memref<?x?x?x?xi8>)
-      outs(%arg2 : memref<?x?x?x?xi32>) accumulate(false)
+func.func @ukernel_mmt4d_i8i8i32(%lhs : memref<?x?x?x?xi8>, %rhs : memref<?x?x?x?xi8>,
+    %acc : memref<?x?x?x?xi32>, %m : index, %n : index, %k : index, %m0 : i32, %n0 : i32, %k0 : i32, %flags : i32) {
+  iree_codegen.ukernel.generic "vmvx.mmt4d.i8i8i32" ins(%lhs, %rhs : memref<?x?x?x?xi8>, memref<?x?x?x?xi8>)
+      outs(%acc : memref<?x?x?x?xi32>) (%m, %n, %k, %m0, %n0, %k0, %flags : index, index, index, i32, i32, i32, i32) strided_outer_dims(1)
   return
 }
-// CHECK-LABEL: func @ukernel_mmt4d_i8i8i32(
-//       CHECK:   call @vmvx.mmt4d.i8i8i32
+// CHECK-LABEL: func.func private @vmvx.mmt4d.i8i8i32
+//  CHECK-SAME:     (memref<i8>, index, index, memref<i8>, index, index,
+//  CHECK-SAME:     memref<i32>, index, index, index, index, index, i32, i32, i32, i32)
+// CHECK-LABEL: func.func @ukernel_mmt4d_i8i8i32(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: memref<?x?x?x?xi8>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: memref<?x?x?x?xi8>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: memref<?x?x?x?xi32>
+//  CHECK-SAME:     %[[M:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[N:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[K:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[M0:[a-zA-Z0-9]+]]: i32
+//  CHECK-SAME:     %[[N0:[a-zA-Z0-9]+]]: i32
+//  CHECK-SAME:     %[[K0:[a-zA-Z0-9]+]]: i32
+//  CHECK-SAME:     %[[FLAGS:[a-zA-Z0-9]+]]: i32
+//       CHECK:   %[[BASE0:.+]], %[[OFFSET0:.+]], %[[SIZE0:.+]]:4, %[[STRIDES0:.+]]:4 = memref.extract_strided_metadata %[[ARG0]]
+//       CHECK:   %[[BASE1:.+]], %[[OFFSET1:.+]], %[[SIZE1:.+]]:4, %[[STRIDES1:.+]]:4 = memref.extract_strided_metadata %[[ARG1]]
+//       CHECK:   %[[BASE2:.+]], %[[OFFSET2:.+]], %[[SIZE2:.+]]:4, %[[STRIDES2:.+]]:4 = memref.extract_strided_metadata %[[ARG2]]
+//       CHECK:   call @vmvx.mmt4d.i8i8i32(%[[BASE0]], %[[OFFSET0]], %[[STRIDES0]]#0
+//  CHECK-SAME:       %[[BASE1]], %[[OFFSET1]], %[[STRIDES1]]#0
+//  CHECK-SAME:       %[[BASE2]], %[[OFFSET2]], %[[STRIDES2]]#0
+//  CHECK-SAME:       %[[M]], %[[N]], %[[K]],
+//  CHECK-SAME:       %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]])
