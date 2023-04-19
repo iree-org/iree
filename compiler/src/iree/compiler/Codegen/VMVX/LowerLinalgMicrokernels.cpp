@@ -897,167 +897,6 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
   }
 };
 
-int getNumberOfUses(Value v) {
-  auto uses = v.getUses();
-  return std::distance(uses.begin(), uses.end());
-}
-
-template <typename OpType>
-OpType getUserOfType(Value v) {
-  auto uses = v.getUses();
-  for (const auto &u : uses) {
-    if (OpType user = llvm::dyn_cast<OpType>(u.getOwner())) {
-      return user;
-    }
-  }
-  return nullptr;
-}
-
-linalg::FillOp findFillOpSolelyZeroingOutputOf(linalg::LinalgOp op) {
-  Value out = op.getDpsInitOperand(0)->get();
-  if (getNumberOfUses(out) != 2) {
-    return nullptr;
-  }
-  linalg::FillOp fillOp = getUserOfType<linalg::FillOp>(out);
-  if (!fillOp) {
-    return nullptr;
-  }
-  if (!fillOp->isBeforeInBlock(op)) {
-    return nullptr;
-  }
-  Value fillValue = fillOp.value();
-  if (auto constIntOp = fillValue.getDefiningOp<arith::ConstantIntOp>()) {
-    if (constIntOp.value() == 0) {
-      return fillOp;
-    }
-  }
-  if (auto constFloatOp = fillValue.getDefiningOp<arith::ConstantFloatOp>()) {
-    if (constFloatOp.value().isZero()) {
-      return fillOp;
-    }
-  }
-  return nullptr;
-}
-
-/// Convert supported linalg contraction ops like matmul.
-struct LinalgContractionConversion
-    : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
-  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  struct OpInfo {
-    linalg::ContractionOpInterface contract;
-    linalg::LinalgOp op;
-
-    Value lhs;
-    Value rhs;
-    Value out;
-
-    StridedBufferAnalysis lhsAnal;
-    StridedBufferAnalysis rhsAnal;
-    StridedBufferAnalysis outAnal;
-
-    OpInfo(linalg::ContractionOpInterface contract)
-        : contract(contract),
-          op(llvm::cast<linalg::LinalgOp>(contract.getOperation())),
-          lhsAnal(contract.lhs()),
-          rhsAnal(contract.rhs()),
-          outAnal(op.getDpsInitOperands().front()->get()) {
-      lhs = contract.lhs();
-      rhs = contract.rhs();
-      out = op.getDpsInitOperands().front()->get();
-    }
-  };
-
-  static bool isSupportedElementTypes(const OpInfo &info) {
-    Type lhsElType = info.lhs.getType().cast<ShapedType>().getElementType();
-    Type rhsElType = info.rhs.getType().cast<ShapedType>().getElementType();
-    Type outElType = info.out.getType().cast<ShapedType>().getElementType();
-    if (lhsElType.isF32() && rhsElType.isF32() && outElType.isF32()) {
-      return true;
-    }
-    if (lhsElType.isSignlessInteger(8) && rhsElType.isSignlessInteger(8) &&
-        outElType.isSignlessInteger(32)) {
-      return true;
-    }
-    return false;
-  }
-
-  LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
-                                PatternRewriter &rewriter) const override {
-    OpInfo info(op);
-
-    if (!isSupportedElementTypes(info)) {
-      return rewriter.notifyMatchFailure(
-          op, "unsupported combination of lhs/rhs/out element types");
-    }
-
-    // Check that buffer descriptors could be computed.
-    if (!info.lhsAnal.isValid() || !info.rhsAnal.isValid() ||
-        !info.outAnal.isValid()) {
-      return rewriter.notifyMatchFailure(
-          op, "could not compute buffer descriptor for operands");
-    }
-
-    // Check for unit inner strides.
-    if (!info.lhsAnal.areInnerDimsContiguousRowMajor()) {
-      return rewriter.notifyMatchFailure(op, "lhs has non-unit inner stride");
-    }
-    if (!info.rhsAnal.areInnerDimsContiguousRowMajor()) {
-      return rewriter.notifyMatchFailure(op, "rhs has non-unit inner stride");
-    }
-    if (!info.outAnal.areInnerDimsContiguousRowMajor()) {
-      return rewriter.notifyMatchFailure(op, "out has non-unit inner stride");
-    }
-
-    // Switch on contraction type.
-    if (info.contract.isRowMajorMatmul()) {
-      if (succeeded(handleConformingMatmul2D(info, rewriter))) {
-        return success();
-      }
-    }
-
-    // Match failure.
-    return rewriter.notifyMatchFailure(op, "unsupported contraction variant");
-  }
-
-  LogicalResult handleConformingMatmul2D(OpInfo &info,
-                                         PatternRewriter &rewriter) const {
-    int flags = 0;
-    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
-      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
-    } else {
-      flags |= IREE_UK_FLAG_ACCUMULATE;  // accumulate into existing.
-    }
-
-    auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
-    auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
-    auto &outDesc = info.outAnal.getDesc(rewriter);
-
-    Value m = lhsDesc.sizes[0];
-    Value k = rhsDesc.sizes[0];
-    Value n = rhsDesc.sizes[1];
-
-    auto loc = info.op.getLoc();
-    auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
-    auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
-    auto outBuffer = outDesc.castToLinear(loc, rewriter);
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::MatmulOp>(
-        info.op,
-        // LHS
-        lhsBuffer, lhsDesc.offset, lhsDesc.strides[0],
-        // RHS
-        rhsBuffer, rhsDesc.offset, rhsDesc.strides[0],
-        // Out
-        outBuffer, outDesc.offset, outDesc.strides[0],
-        // m,n,k
-        m, n, k,
-        // flags
-        lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
-        outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
-    return success();
-  }
-};
-
 }  // namespace
 
 class VMVXLowerLinalgMicrokernelsPass
@@ -1068,32 +907,15 @@ class VMVXLowerLinalgMicrokernelsPass
   }
 
   void runOnOperation() override {
-    // Patterns that need to be applied first to match multiple linalg ops
-    // before they have been lowered.
-    {
-      RewritePatternSet patterns(&getContext());
-      // LinalgContractionConversion needs to match linalg::FillOp to determine
-      // whether to set the 'accumulate' flag or just erase the FillOp.
-      patterns.insert<LinalgContractionConversion>(&getContext());
+    RewritePatternSet patterns(&getContext());
+    patterns
+        .insert<LinalgBinaryGenericConversion, LinalgFillConversion,
+                LinalgTrivialGenericConversion, LinalgUnaryGenericConversion>(
+            &getContext());
 
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    // Other lowering patterns
-    {
-      RewritePatternSet patterns(&getContext());
-      patterns
-          .insert<LinalgBinaryGenericConversion, LinalgFillConversion,
-                  LinalgTrivialGenericConversion, LinalgUnaryGenericConversion>(
-              &getContext());
-
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
     }
 
     if (warnOnUnconverted) {

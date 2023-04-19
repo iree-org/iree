@@ -94,56 +94,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       genericMicroKernelOp.getOperation());
 }
 
-/// Matches an (linalg.fill -> )? linalg.matmul operation sequence and converts
-/// it into a iree_codegen.ukernel.generic operation, that is lowered
-/// into a call to the microkernel.
-static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
-    RewriterBase &rewriter, linalg::MatmulOp op) {
-  Value lhs = op.getDpsInputOperand(0)->get();
-  Value rhs = op.getDpsInputOperand(1)->get();
-  Value out = op.getDpsInitOperand(0)->get();
-  auto lhsType = lhs.getType().cast<ShapedType>();
-  auto rhsType = rhs.getType().cast<ShapedType>();
-  auto outType = out.getType().cast<ShapedType>();
-  std::string fnName = "";
-  Type lhsElemType = lhsType.getElementType();
-  Type rhsElemType = rhsType.getElementType();
-  Type outElemType = outType.getElementType();
-  if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
-      outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.matmul.i8i8i32";
-  } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
-             outElemType.isF32()) {
-    fnName = "vmvx.matmul.f32f32f32";
-  }
-  if (fnName.empty()) {
-    return rewriter.notifyMatchFailure(op,
-                                       "unable to match micro kernel to op");
-  }
-  bool accumulate = !isInitializedToZero(out);
-  int flags = 0;
-  if (accumulate) {
-    flags |= IREE_UK_FLAG_ACCUMULATE;
-  } else {  // Update the `out` value to encompass the dest of the op.
-    if (auto fillOp = out.getDefiningOp<linalg::FillOp>()) {
-      out = fillOp.getDpsInitOperand(0)->get();
-    }
-  }
-
-  Location loc = op.getLoc();
-  Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
-  Value n = rewriter.create<tensor::DimOp>(loc, rhs, 1);
-  Value k = rewriter.create<tensor::DimOp>(loc, lhs, 1);
-  Value flagsVal = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI32IntegerAttr(flags));
-  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fnName, ValueRange{lhs, rhs}, out,
-      ValueRange{m, n, k, flagsVal},
-      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
-  return cast<IREE::Codegen::UKernelOpInterface>(
-      genericMicroKernelOp.getOperation());
-}
-
 static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, tensor::PackOp op) {
   Value in = op.getSource();
@@ -333,8 +283,7 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
 void LLVMCPULowerToUKernelsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  patterns.insert<LowerToUKernelPattern<linalg::MatmulOp>,
-                  LowerToUKernelPattern<linalg::Mmt4DOp>,
+  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>,
                   LowerToUKernelPattern<tensor::PackOp>,
                   LowerToUKernelPattern<tensor::UnPackOp>>(context);
   if (failed(
