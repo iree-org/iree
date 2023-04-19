@@ -67,8 +67,12 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
             imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in models
     ]
+    # We use the same NVIDIA Ampere GPU for benchmarking code generated for
+    # both Pascal and Ampere architectures. What we care is not exactly these
+    # two architectures per se; they represent SIMT and tensorcore CodeGen
+    # paths that we would want both to work. Ampere is able to run both SIMT
+    # and tensorcore cases.
     ampere_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-        # We use the same cloud NVIDIA GPU for Vulkan and CUDA.
         architecture=common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
     run_module_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
