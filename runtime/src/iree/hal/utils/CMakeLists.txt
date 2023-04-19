@@ -103,6 +103,22 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    iree_hal_libmpi
+  HDRS
+    "libmpi.h"
+    "libmpi_dynamic_symbols.h"
+  SRCS
+    "libmpi.c"
+  DEPS
+    iree::base
+    iree::base::internal::dynamic_library
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     resource_set
   HDRS
     "resource_set.h"
