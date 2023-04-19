@@ -169,7 +169,8 @@ void iree_hal_cuda_dynamic_symbols_deinitialize(
   iree_dynamic_library_release(syms->cuda_library);
   iree_dynamic_library_release(syms->nccl_library);
   iree_dynamic_library_release(syms->mpi_library);
-  memset(syms->mpi_symbols, 0, sizeof(*syms->mpi_symbols));
+  if (syms->mpi_symbols)
+    memset(syms->mpi_symbols, 0, sizeof(*syms->mpi_symbols));
   memset(syms, 0, sizeof(*syms));
   IREE_TRACE_ZONE_END(z0);
 }

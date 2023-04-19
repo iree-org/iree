@@ -95,8 +95,9 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "iree_hal_libmpi",
     srcs = ["libmpi.c"],
-    hdrs = ["libmpi.h",
-            "libmpi_dynamic_symbols.h"
+    hdrs = [
+        "libmpi.h",
+        "libmpi_dynamic_symbols.h"
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -106,7 +107,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
     ],
 )
-
 
 iree_runtime_cc_library(
     name = "resource_set",

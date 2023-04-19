@@ -24,7 +24,7 @@ typedef struct iree_hal_cuda_dynamic_symbols_t {
   iree_dynamic_library_t* cuda_library;
   iree_dynamic_library_t* nccl_library;
   iree_dynamic_library_t* mpi_library;
-  iree_hal_mpi_dynamic_symbols_t *mpi_symbols;
+  iree_hal_mpi_dynamic_symbols_t* mpi_symbols;
 
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);

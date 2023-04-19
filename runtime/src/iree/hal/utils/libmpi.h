@@ -28,9 +28,7 @@ typedef struct iree_hal_mpi_dynamic_symbols_t {
 
 // Converts a mpi result to a Status object.
 iree_status_t iree_hal_mpi_result_to_status(
-    iree_hal_mpi_dynamic_symbols_t* syms,
-    int result,
-    const char* file,
+    iree_hal_mpi_dynamic_symbols_t* syms, int result, const char* file,
     uint32_t line);
 
 // IREE_RETURN_IF_ERROR but implicitly converts the mpi return value to
@@ -52,14 +50,12 @@ iree_status_t iree_hal_mpi_result_to_status(
   IREE_IGNORE_ERROR(iree_hal_mpi_result_to_status((syms), ((syms)->expr), \
                                                   __FILE__, __LINE__))
 
-
 iree_status_t iree_hal_mpi_initialize_library(
-   iree_allocator_t host_allocator,
-   iree_dynamic_library_t** out_library,
-   iree_hal_mpi_dynamic_symbols_t **out_syms);
+    iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
+    iree_hal_mpi_dynamic_symbols_t** out_syms);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif // IREE_HAL_UTILS_LIBMPI_H_
+#endif  // IREE_HAL_UTILS_LIBMPI_H_

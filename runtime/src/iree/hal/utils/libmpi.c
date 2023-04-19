@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/hal/utils/libmpi.h"
 
 #include "iree/base/tracing.h"
-#include "iree/hal/utils/libmpi.h"
 
 static const char* kMPILoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -19,21 +19,19 @@ static const char* kMPILoaderSearchNames[] = {
 // Load MPI entry points.
 static iree_status_t iree_hal_mpi_dynamic_symbols_resolve_all(
     iree_hal_mpi_dynamic_symbols_t* syms) {
-#define MPI_PFN_DECL(mpiSymbolName, ...)                          \
-  {                                                               \
-    static const char* kName = #mpiSymbolName;                    \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(      \
-        syms, kName, (void**)&syms->mpiSymbolName)); \
+#define MPI_PFN_DECL(mpiSymbolName, ...)                     \
+  {                                                          \
+    static const char* kName = #mpiSymbolName;               \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol( \
+        syms, kName, (void**)&syms->mpiSymbolName));         \
   }
 #include "iree/hal/utils/libmpi_dynamic_symbols.h"
 #undef MPI_PFN_DECL
   return iree_ok_status();
 }
 
-
 iree_status_t iree_hal_mpi_initialize_library(
-    iree_allocator_t host_allocator,
-    iree_dynamic_library_t** out_library,
+    iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
     iree_hal_mpi_dynamic_symbols_t** out_syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_library = NULL;
@@ -49,9 +47,10 @@ iree_status_t iree_hal_mpi_initialize_library(
                             "installed and on path");
   }
   if (iree_status_is_ok(status)) {
-    iree_hal_mpi_dynamic_symbols_t *syms = NULL;
-    status = iree_allocator_malloc(host_allocator, sizeof(*syms), (void**)&syms);
-    if(iree_status_is_ok(status)) {
+    iree_hal_mpi_dynamic_symbols_t* syms = NULL;
+    status =
+        iree_allocator_malloc(host_allocator, sizeof(*syms), (void**)&syms);
+    if (iree_status_is_ok(status)) {
       status = iree_hal_mpi_dynamic_symbols_resolve_all(syms);
       *out_syms = syms;
     }
@@ -64,11 +63,8 @@ iree_status_t iree_hal_mpi_initialize_library(
   return status;
 }
 
-
 iree_status_t iree_hal_mpi_result_to_status(
-    iree_hal_mpi_dynamic_symbols_t* syms,
-    int result,
-    const char* file,
+    iree_hal_mpi_dynamic_symbols_t* syms, int result, const char* file,
     uint32_t line) {
   iree_status_code_t code;
 
