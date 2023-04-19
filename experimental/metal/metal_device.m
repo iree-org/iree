@@ -444,9 +444,11 @@ static iree_status_t iree_hal_metal_device_profiling_begin(
 
       NSError* error = NULL;
       if (![device->capture_manager startCaptureWithDescriptor:capture_descriptor error:&error]) {
-#ifndef NDEBUG
-        NSLog(@"Failed to start capture: %@", error);
-#endif
+        iree_status_t status =
+            iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "failed to start profile capture");
+        const char* ns_c_error = [error.localizedDescription
+            cStringUsingEncoding:[NSString defaultCStringEncoding]];  // autoreleased
+        return iree_status_annotate_f(status, "with NSError: %s", ns_c_error);
       }
     }
   }
