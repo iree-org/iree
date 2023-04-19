@@ -112,8 +112,8 @@ iree_status_t Run(int* out_exit_code) {
   std::string function_name = std::string(FLAG_function);
   iree_vm_function_t function;
   if (function_name.empty()) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no --function= specified");
+    IREE_RETURN_IF_ERROR(iree_tooling_find_single_exported_function(
+        iree_tooling_module_list_back(&module_list), &function));
   } else {
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_name(
@@ -123,8 +123,6 @@ iree_status_t Run(int* out_exit_code) {
             &function),
         "looking up function '%s'", function_name.c_str());
   }
-
-  IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(device.get()));
 
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(iree_tooling_parse_to_variant_list(
@@ -142,6 +140,9 @@ iree_status_t Run(int* out_exit_code) {
                                            16, host_allocator, &outputs));
 
   printf("EXEC @%s\n", function_name.c_str());
+
+  IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(device.get()));
+
   IREE_RETURN_IF_ERROR(
       iree_vm_invoke(context.get(), function, IREE_VM_INVOCATION_FLAG_NONE,
                      /*policy=*/nullptr, inputs.get(), outputs.get(),

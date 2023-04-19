@@ -495,6 +495,44 @@ iree_status_t iree_tooling_resolve_modules(
   return status;
 }
 
+iree_status_t iree_tooling_find_single_exported_function(
+    iree_vm_module_t* module, iree_vm_function_t* out_function) {
+  memset(out_function, 0, sizeof(*out_function));
+  iree_vm_module_signature_t module_signature =
+      iree_vm_module_signature(module);
+  iree_host_size_t exported_functions = 0;
+  for (iree_host_size_t i = 0; i < module_signature.export_function_count;
+       ++i) {
+    iree_vm_function_t function = {0};
+    IREE_RETURN_IF_ERROR(
+        iree_vm_module_lookup_function_by_ordinal(
+            module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function),
+        "looking up function export %zu", i);
+    iree_string_view_t function_name = iree_vm_function_name(&function);
+    if (iree_string_view_starts_with(function_name,
+                                     iree_make_cstring_view("__")) ||
+        iree_string_view_find_char(function_name, '$', 0) !=
+            IREE_STRING_VIEW_NPOS) {
+      // Function was either internal or special; we don't want to run these
+      // as they have special ABI requirements or must only be called in
+      // specific situations (module initializers, etc).
+      continue;
+    }
+    if (exported_functions == 0) *out_function = function;
+    ++exported_functions;
+  }
+  if (exported_functions == 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "no exported functions found in module; at least one must be present");
+  } else if (exported_functions > 1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "more than one exported function present; "
+                            "--function= must be specified explicitly");
+  }
+  return iree_ok_status();
+}
+
 //===----------------------------------------------------------------------===//
 // Context management
 //===----------------------------------------------------------------------===//
