@@ -27,6 +27,12 @@ void populatePointwiseStableHloToLinalgConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns, bool enablePrimitiveOps);
 
+/// Populates the patterns that convert from convolution StableHLO ops to Linalg
+/// on tensors.
+void populateStableHloConvolutionToLinalgConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
+
 /// Populates the patterns that convert from dot product StableHLO ops to Linalg
 /// on tensors.
 void populateStableHloDotProdToLinalgConversionPatterns(
@@ -42,8 +48,8 @@ void populateStableHloRandomToLinalgConversionPatterns(
 /// Populates the patterns that convert from reduction StableHLO ops to Linalg
 /// on tensors.
 void populateStableHloReductionToLinalgConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns, bool enablePrimitiveOps);
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns, bool enablePrimitiveOps);
 
 /// Populates the patterns that convert scalar StableHLO ops to Arith ops.
 void populateScalarHloToArithConversionPatterns(
