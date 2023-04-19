@@ -932,6 +932,12 @@ jobs:
             "${DOCKER_IMAGE}" \
             "${TEST_SCRIPT}"
 
+  # Android cross-compilation and test is separated from cross_compile_and_test
+  # because some tests need to run on physical devices instead of emulators. And
+  # we need a fine-control on which tests only run on postsubmit as some devices
+  # are not scalable (while we want to test with Android emulator on ARM VMs on
+  # presubmit), which requires dynamic matrix generation (because "if" condition
+  # can't access matrix variable to skip certain matrix jobs for presubmit).
   build_and_test_android:
     needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
