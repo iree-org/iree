@@ -52,8 +52,6 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      DOCKER_IMAGE: gcr.io/iree-oss/android@sha256:3f641d25786b1e5e430ee4cacb8bfe57540fda5ecaa7ca2802c179c26e77ce09
-      BUILD_SCRIPT: build_tools/cmake/build_android.sh
       HOST_BUILD_DIR: ${{ inputs.build-dir }}
       HOST_BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
       HOST_BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
@@ -83,8 +81,8 @@ jobs:
             --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-            "${DOCKER_IMAGE}" \
-            "${BUILD_SCRIPT}"
+            gcr.io/iree-oss/android@sha256:3f641d25786b1e5e430ee4cacb8bfe57540fda5ecaa7ca2802c179c26e77ce09 \
+            build_tools/cmake/build_android.sh
           echo "target-build-dir=${TARGET_BUILD_DIR}" >> "${GITHUB_OUTPUT}"
       - name: "Creating archive of target build dir"
         id: archive
@@ -108,19 +106,21 @@ jobs:
 
   test:
     needs: cross_compile
+    # These physical devices are not scalable. Only run on postsubmit for now.
     # TODO: Uncomment before submit.
     # if: ! inputs.is-pr
     strategy:
       matrix:
         # TODO(#9855): Add Pixel-6-Pro and XT2201-2
         target:
-          - device_name: Pixel-4
-            label_exclude: vulkan
+          - device-name: Pixel-4
+            label-exclude: vulkan
+    name: test_on_${{ matrix.target.device-name }}
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ inputs.runner-group }}
       - environment=${{ inputs.runner-env }}
-      - machine-type=${{ matrix.target.device_name }}
+      - machine-type=${{ matrix.target.device-name }}
     env:
       TARGET_BUILD_DIR: ${{ needs.cross_compile.outputs.target-build-dir }}
       TARGET_BUILD_DIR_ARCHIVE: ${{ needs.cross_compile.outputs.target-build-dir-archive }}
@@ -135,7 +135,7 @@ jobs:
         run: tar -xf "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR}"
       - name: "Running tests"
         env:
-          LABEL_EXCLUDE: ${{ matrix.target.label_exclude }}
+          LABEL_EXCLUDE: ${{ matrix.target.label-exclude }}
         run: |
           ctest -j 4 \
             --test-dir "${TARGET_BUILD_DIR}" \
