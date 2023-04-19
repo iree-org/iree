@@ -124,11 +124,13 @@ static Value buildHoistOutputPaddingOp(ImplicitLocOpBuilder &b, Value variantH,
 
   // Perform a pass of canonicalization cleanups + folding fill + pad into pad
   // by applying `foldTensorSubsets` and `tilingCanonicalization`.
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b,
-      ApplyPatternsOpPatterns{.foldTensorSubsets = true,
-                              .tilingCanonicalization = true},
-      variantH);
+  {
+    ApplyPatternsOpPatterns config;
+    config.foldTensorSubsets = true;
+    config.tilingCanonicalization = true;
+    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config,
+                                                              variantH);
+  }
 
   // The canonicalization above should have rewritten hoistPad into a FillOp.
   // Unfortunately, the listener drops handles if the op types don't match. We
@@ -263,14 +265,23 @@ static Value buildConvertToTensorCoreOp(ImplicitLocOpBuilder &b, Value funcH,
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
   b.create<iree_compiler::IREE::transform_dialect::HoistStaticAllocOp>(funcH);
-  b.create<ApplyPatternsOp>(funcH,
-                            ApplyPatternsOpPatterns{.foldMemrefAliases = true});
-  b.create<ApplyPatternsOp>(
-      funcH, ApplyPatternsOpPatterns{.extractAddressComputations = true});
+  {
+    ApplyPatternsOpPatterns config;
+    config.foldMemrefAliases = true;
+    b.create<ApplyPatternsOp>(funcH, config);
+  }
+  {
+    ApplyPatternsOpPatterns config;
+    config.extractAddressComputations = true;
+    b.create<ApplyPatternsOp>(funcH, config);
+  }
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
-  b.create<ApplyPatternsOp>(
-      funcH, ApplyPatternsOpPatterns{.unrollVectorsGpuWmma = true});
+  {
+    ApplyPatternsOpPatterns config;
+    config.unrollVectorsGpuWmma = true;
+    b.create<ApplyPatternsOp>(funcH, config);
+  }
   // TODO: not a functional style transform and avoid returning funcH.
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
       pdl::OperationType::get(b.getContext()), funcH);
@@ -290,8 +301,9 @@ static void buildMultiBuffering(ImplicitLocOpBuilder &b, Value funcH,
                                 const MatmulStrategy &strategy) {
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
-  b.create<ApplyPatternsOp>(funcH,
-                            ApplyPatternsOpPatterns{.foldMemrefAliases = true});
+  ApplyPatternsOpPatterns config;
+  config.foldMemrefAliases = true;
+  b.create<ApplyPatternsOp>(funcH, config);
   // TODO: Avoid brittle matching here.
   // TODO: Better builder after integrate.
   Value allocH = b.create<transform::MatchOp>(
@@ -324,8 +336,9 @@ static Value buildConvertToAsyncCopies(ImplicitLocOpBuilder &b, Value funcH,
           TypeRange{}, funcH);
   // TODO: proper builder instead of a setting post-hoc.
   createAsyncGroupOp.setUseMmaSync(false);
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, ApplyPatternsOpPatterns{.foldMemrefAliases = true}, funcH);
+  ApplyPatternsOpPatterns config;
+  config.foldMemrefAliases = true;
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config, funcH);
   return funcH;
 }
 
@@ -464,6 +477,9 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // TODO: not a functional style op to avoid invalidating artificially.
   funcH = b.create<transform::MaterializeMasksOp>(
       pdl::OperationType::get(b.getContext()), funcH);
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(
-      b, ApplyPatternsOpPatterns{.foldMemrefAliases = true}, funcH);
+  {
+    ApplyPatternsOpPatterns config;
+    config.foldMemrefAliases = true;
+    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config, funcH);
+  }
 }
