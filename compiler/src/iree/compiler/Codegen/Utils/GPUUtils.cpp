@@ -613,10 +613,19 @@ static std::optional<int> getVectorContractOpOperandIdForVectorReadOp(
     Operation *op) {
   vector::ContractionOp contractOp;
 
+  // Check if the vector::TransferReadOp is consumed directly by
+  // vector::ContractionOp.
+  if (op->use_empty()) return std::nullopt;
   Operation *firstLevelUser = *((op->getUsers()).begin());
+  if (!firstLevelUser) return std::nullopt;
   if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser))
     return getVectorContractOpOperandId(contractOp, op->getResult(0));
+
+  // Check if the vector::TransferReadOp is consumed indirectly by
+  // vector::ContractionOp. Only check until the second level of use-def chain.
+  if (firstLevelUser->use_empty()) return std::nullopt;
   Operation *secondLevelUser = *((firstLevelUser->getUsers()).begin());
+  if (!secondLevelUser) return std::nullopt;
   if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser))
     return getVectorContractOpOperandId(contractOp,
                                         firstLevelUser->getResult(0));
@@ -668,9 +677,10 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     std::optional<int> operandId =
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
-      op->emitError() << "Cannot determine operandId this "
-                         "vector::TransferReadOp is used as in the "
-                         "vector::TransferContractOp";
+      LLVM_DEBUG({
+        llvm::dbgs() << "Failed to get operandId for vector::TransferReadOp:";
+        op->dump();
+      });
       return std::nullopt;
     }
 
