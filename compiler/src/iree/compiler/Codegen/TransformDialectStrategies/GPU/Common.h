@@ -97,6 +97,7 @@ struct GPUModel {
   static constexpr StringLiteral kDefaultGPU = "DefaultGPU";
   StringRef model = kDefaultGPU;
   bool hasWarpShuffle = false;
+  bool hasTF32TensorCore = false;
 };
 
 /// Try to find an exisiting transform dialect strategy for a given entry point.
