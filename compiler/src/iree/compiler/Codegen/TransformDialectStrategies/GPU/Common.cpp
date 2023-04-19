@@ -11,8 +11,10 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/MatmulTensorCoreStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/SmallReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/StagedReductionStrategy.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -24,11 +26,17 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/TypeUtilities.h"
 
 using namespace mlir;
 
 #define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+
+llvm::cl::opt<bool> clGPUEnableTransformDialectMatmulTensorCoreStrategy(
+    "iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy",
+    llvm::cl::desc("activate the matmul tensorcore strategy"),
+    llvm::cl::init(false));
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
@@ -51,6 +59,7 @@ using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
+using iree_compiler::gpu::buildMatmulTensorCoreStrategy;
 using iree_compiler::gpu::buildSmallReductionStrategy;
 using iree_compiler::gpu::buildStagedReductionStrategy;
 using iree_compiler::gpu::GPUModel;
@@ -445,11 +454,81 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
   return success();
 }
 
+static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
+                                               linalg::LinalgOp op,
+                                               const GPUModel &gpuModel) {
+  if (!clGPUEnableTransformDialectMatmulTensorCoreStrategy) return failure();
+
+  // 1. Match a reduction and surrounding ops.
+  StructuredOpMatcher *fill;
+  StructuredOpMatcher *matmul;
+  StructuredOpMatcher *trailing;
+  transform_ext::MatchedMatmulCaptures captures;
+  transform_ext::MatcherContext matcherContext;
+  makeMatmulMatcher(matcherContext, matmul, fill, trailing, captures);
+  if (!matchPattern(op, *matmul)) return failure();
+
+  // We are very peculiar about the dispatches we want to match for now:
+  //   - f32 only atm.
+  //   - Mandatory fill op.
+  //   - No trailing op.
+  //   - If the matmul is "aligned enough" then use the default IREE strategy.
+  //   - Otherwise, if it is aligned on 4xf32 on all dimensions, take it.
+  //   - Otherwise, use the default IREE strategy.
+  if (!fill->getCaptured() || trailing->getCaptured()) {
+    LLVM_DEBUG(DBGS() << "fill / trailing preconditions failed");
+    return failure();
+  }
+
+  // TODO: Capture in the matcher.
+  captures.lhsType =
+      getElementTypeOrSelf(op.getDpsInputOperand(0)->get().getType());
+  captures.rhsType =
+      getElementTypeOrSelf(op.getDpsInputOperand(1)->get().getType());
+  captures.outputType =
+      getElementTypeOrSelf(op.getDpsInitOperand(0)->get().getType());
+  if (!captures.lhsType.isF32() || !captures.rhsType.isF32() ||
+      !captures.outputType.isF32()) {
+    LLVM_DEBUG(DBGS() << "elemental type check failed\n");
+    return failure();
+  }
+
+  // TODO: Generalize to a good mix of sizes, alignments and element types.
+  const auto &matmulSize = captures.matmulOpSizes;
+  if (matmulSize.size() != 3) {
+    LLVM_DEBUG(DBGS() << "size capture failed\n");
+    return failure();
+  }
+
+  bool alignedAny64x64x16 = matmulSize[0] % 64 == 0 ||
+                            matmulSize[1] % 64 == 0 || matmulSize[2] % 16 == 0;
+  bool alignedAll4x4x4 = matmulSize[0] % 4 == 0 && matmulSize[1] % 4 == 0 &&
+                         matmulSize[2] % 4 == 0;
+  if (alignedAny64x64x16 || !alignedAll4x4x4) {
+    LLVM_DEBUG(DBGS() << "alignment check failed\n");
+    return failure();
+  }
+
+  // 2. Construct the configuration and the strategy builder.
+  // TODO: Generalize along the HW axis.
+  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+    iree_compiler::gpu::MatmulStrategy strategy(op->getContext(), captures);
+    return buildMatmulTensorCoreStrategy(b, variant, strategy);
+  };
+
+  // 3. Build strategy embedded into the IR.
+  mlir::iree_compiler::createTransformRegion(entryPoint, strategyBuilder);
+
+  return success();
+}
+
 LogicalResult mlir::iree_compiler::gpu::matchAndSetTransformStrategy(
     func::FuncOp entryPoint, Operation *op, const GPUModel &gpuModel) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) return failure();
   if (succeeded(matchAndSetReductionStrategy(entryPoint, linalgOp, gpuModel)))
+    return success();
+  if (succeeded(matchAndSetMatmulStrategy(entryPoint, linalgOp, gpuModel)))
     return success();
   // TODO: Add more transform dialect strategy for other kind of dispatch
   // regions.

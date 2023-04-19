@@ -16,10 +16,12 @@ iree_cc_library(
   HDRS
     "AbstractReductionStrategy.h"
     "Common.h"
+    "MatmulTensorCoreStrategy.h"
     "SmallReductionStrategy.h"
     "StagedReductionStrategy.h"
   SRCS
     "Common.cpp"
+    "MatmulTensorCoreStrategy.cpp"
     "SmallReductionStrategy.cpp"
     "StagedReductionStrategy.cpp"
   DEPS
@@ -42,17 +44,22 @@ iree_cc_library(
     MLIRLLVMDialect
     MLIRLinalgDialect
     MLIRLinalgTransformOps
+    MLIRMemRefDialect
+    MLIRMemRefTransformOps
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
+    MLIRSCFTransformOps
     MLIRSCFUtils
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransformOps
     MLIRTransformDialect
     MLIRVectorDialect
+    MLIRVectorTransformOps
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::PassHeaders
