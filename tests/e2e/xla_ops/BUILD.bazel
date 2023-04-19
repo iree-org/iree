@@ -83,6 +83,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "dot_bf16.mlir",  # Missing BF16 support on CUDA backend
             "fft.mlir",  # TODO(#9583)
         ],
     ),
@@ -166,7 +167,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "dot_bf16.mlir", # Missing BF16 support on CUDA backend
+            "dot_bf16.mlir",  # Missing BF16 support on CUDA backend
             "fft.mlir",  # TODO(#9583)
         ],
     ),
@@ -320,7 +321,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "dot_bf16.mlir", # Missing BF16 support on VMVX buffer ops
+            "dot_bf16.mlir",  # Missing BF16 support on VMVX buffer ops
             "exponential_fp16.mlir",
         ],
     ),
@@ -392,7 +393,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "dot_bf16.mlir", # Missing BF16 support on Vulkan backends
+            "dot_bf16.mlir",  # Missing BF16 support on Vulkan backends
             "exponential_fp16.mlir",
             "fft.mlir",  # TODO(#9583)
             "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
