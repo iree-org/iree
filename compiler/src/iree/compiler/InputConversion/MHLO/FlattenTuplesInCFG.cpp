@@ -237,13 +237,18 @@ bool convertFunction(func::FuncOp oldFunction, func::FuncOp newFunction) {
   OpBuilder builder(newFunction.getBody());
   IRMapping mapping;
 
-  bool hasTupleSig = (oldFunction.getNumInputs() != newFunction.getNumInputs()) || (
-      oldFunction.getNumResults() != newFunction.getNumResults());
+  // Check whether has tuple in signature.
+  bool hasTupleSig = (oldFunction.getArgumentTypes().size() !=
+                      newFunction.getArgumentTypes().size()) ||
+                     (oldFunction.getResultTypes().size() !=
+                      newFunction.getResultTypes().size());
 
+  // Cache unused XLA ABI marker names.
   auto xlaAbiParam = StringAttr::get(newFunction.getContext(),
                                      "xla_entry_computation_parameter_layouts"),
        xlaAbiLayout = StringAttr::get(newFunction.getContext(),
                                       "xla_entry_computation_result_layout");
+
   for (auto attr : oldFunction->getAttrs()) {
     if (attr.getName() == oldFunction.getFunctionTypeAttrName() ||
         // Currently skipping all arg, result and XLA specific ABI attributes.
@@ -252,7 +257,7 @@ bool convertFunction(func::FuncOp oldFunction, func::FuncOp newFunction) {
     // If it has tuples in sig, then skip arg and res attrs. None of the
     // existing ones along path that produces tuples are used further, so just
     // remove instead of flattening.
-    if (hasTypleSig && (attr.getName() == oldFunction.getArgAttrsAttrName() ||
+    if (hasTupleSig && (attr.getName() == oldFunction.getArgAttrsAttrName() ||
                         attr.getName() == oldFunction.getResAttrsAttrName()))
       continue;
     newFunction->setAttr(attr.getName(), attr.getValue());
