@@ -44,17 +44,22 @@ iree_cc_library(
     MLIRLLVMDialect
     MLIRLinalgDialect
     MLIRLinalgTransformOps
+    MLIRMemRefDialect
+    MLIRMemRefTransformOps
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRParser
     MLIRPass
     MLIRRewrite
     MLIRSCFDialect
+    MLIRSCFTransformOps
     MLIRSCFUtils
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransformOps
     MLIRTransformDialect
     MLIRVectorDialect
+    MLIRVectorTransformOps
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::PassHeaders
