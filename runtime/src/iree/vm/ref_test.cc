@@ -78,18 +78,22 @@ static int32_t ReadCounter(iree_vm_ref_t* ref) {
                                 iree_memory_order_seq_cst);
 }
 
-static iree_vm_ref_type_t kCTypeID = IREE_VM_REF_TYPE_NULL;
+}  // namespace
+
+IREE_VM_DECLARE_TYPE_ADAPTERS(ref_object_c, ref_object_c_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(ref_object_c, ref_object_c_t);
+
+namespace {
+
 static void RegisterTypeC(InstancePtr& instance) {
   static iree_vm_ref_type_descriptor_t descriptor = {0};
-  static iree_vm_ref_type_t registration = 0;
   descriptor.type_name = iree_make_cstring_view("CType");
   descriptor.offsetof_counter = offsetof(ref_object_c_t, ref_object.counter) /
                                 IREE_VM_REF_COUNTER_ALIGNMENT;
   descriptor.destroy =
       +[](void* ptr) { delete reinterpret_cast<ref_object_c_t*>(ptr); };
   IREE_CHECK_OK(iree_vm_instance_register_type(instance.get(), &descriptor,
-                                               &registration));
-  kCTypeID = registration;
+                                               &ref_object_c_registration));
 }
 
 // Tests type registration and lookup.
@@ -108,7 +112,8 @@ TEST(VMRefTest, WrappingCStruct) {
   auto instance = MakeInstance();
   RegisterTypeC(instance);
   iree_vm_ref_t ref = {0};
-  IREE_EXPECT_OK(iree_vm_ref_wrap_assign(new ref_object_c_t(), kCTypeID, &ref));
+  IREE_EXPECT_OK(iree_vm_ref_wrap_assign(new ref_object_c_t(),
+                                         ref_object_c_registration, &ref));
   EXPECT_EQ(1, ReadCounter(&ref));
   iree_vm_ref_release(&ref);
 }
@@ -155,7 +160,8 @@ TEST(VMRefTest, WrappingReleasesExisting) {
   auto instance = MakeInstance();
   RegisterTypeC(instance);
   iree_vm_ref_t ref = {0};
-  iree_vm_ref_wrap_assign(new ref_object_c_t(), kCTypeID, &ref);
+  iree_vm_ref_wrap_assign(new ref_object_c_t(), ref_object_c_registration,
+                          &ref);
   EXPECT_EQ(1, ReadCounter(&ref));
   iree_vm_ref_release(&ref);
 }
@@ -484,10 +490,37 @@ TEST(VMRefTest, EqualityDifferentTypes) {
   iree_vm_ref_release(&a_ref);
 }
 
+// Tests that in-place assignment of vm::ref when used with C create functions
+// properly tracks both the pointer and the iree_vm_ref_type_t.
+TEST(VMRefTest, InPlaceAssignment) {
+  auto instance = MakeInstance();
+  RegisterTypeC(instance);
+  auto create = [&](ref_object_c_t** out_object) {
+    *out_object = new ref_object_c_t();
+  };
+  iree::vm::ref<ref_object_c_t> ref;
+  EXPECT_FALSE(ref);
+  EXPECT_EQ(nullptr, ref.get());
+  EXPECT_EQ(IREE_VM_REF_TYPE_NULL, ref.type());
+  create(&ref);
+  EXPECT_TRUE(ref);
+  EXPECT_NE(nullptr, ref.get());
+  EXPECT_EQ(ref_object_c_type(), ref.type());
+  ref.reset();
+  EXPECT_FALSE(ref);
+  EXPECT_EQ(nullptr, ref.get());
+  EXPECT_EQ(IREE_VM_REF_TYPE_NULL, ref.type());
+}
+
 }  // namespace
 
-IREE_VM_DECLARE_TYPE_ADAPTERS(ref_object_c, ref_object_c_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(ref_object_c, ref_object_c_t);
+struct ref_object_d_t {
+  iree_vm_ref_object_t ref_object = {1};
+  int data = 1;
+};
+
+IREE_VM_DECLARE_TYPE_ADAPTERS(ref_object_d, ref_object_d_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(ref_object_d, ref_object_d_t);
 
 namespace {
 
@@ -495,15 +528,15 @@ namespace {
 // yet registered. This happens if whatever C++ object/scope owns the instance
 // has fields that are initialized prior to the instance/module loading.
 TEST(VMRefTest, UnregisteredType) {
-  iree::vm::ref<ref_object_c_t> null_ref;
+  iree::vm::ref<ref_object_d_t> null_ref;
   EXPECT_FALSE(null_ref);
   EXPECT_EQ(nullptr, null_ref.get());
   EXPECT_EQ(nullptr, null_ref.release());
-  EXPECT_EQ(0, null_ref.type());
+  EXPECT_EQ(IREE_VM_REF_TYPE_NULL, null_ref.type());
   null_ref.reset();  // don't die
-  auto retained_ref = iree::vm::retain_ref<ref_object_c_t>(nullptr);
+  auto retained_ref = iree::vm::retain_ref<ref_object_d_t>(nullptr);
   EXPECT_FALSE(retained_ref);
-  auto assigned_ref = iree::vm::assign_ref<ref_object_c_t>(nullptr);
+  auto assigned_ref = iree::vm::assign_ref<ref_object_d_t>(nullptr);
   EXPECT_FALSE(assigned_ref);
 }
 

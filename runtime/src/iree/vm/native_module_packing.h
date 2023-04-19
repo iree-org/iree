@@ -591,8 +591,9 @@ struct ResultPack<opaque_ref> {
 template <typename T>
 struct ResultPack<ref<T>> {
   static void Store(result_ptr_t& ptr, ref<T> value) {
-    iree_vm_ref_wrap_assign(value.release(), value.type(),
+    iree_vm_ref_wrap_assign(value.get(), value.type(),
                             reinterpret_cast<iree_vm_ref_t*>(ptr));
+    value.release();
     ptr += sizeof(iree_vm_ref_t);
   }
 };
