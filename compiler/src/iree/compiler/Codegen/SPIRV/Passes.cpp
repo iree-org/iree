@@ -541,9 +541,12 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
 void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
   addSPIRVTransformDialectPasses(pm);
 
+  // Try to remove any residual linalg ops by converting them to loops.
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  addLoopMaterializationPasses(nestedModulePM);
+
   // Run SPIRVVectorize pass additionally to convert vectors into forms needed
   // for SPIR-V.
-  auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 
