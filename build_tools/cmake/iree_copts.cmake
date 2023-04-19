@@ -178,6 +178,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
     # warnings turned off above.
+    "-Wc++20-extensions"  # Enable until we use C++20 across all compilers
     "-Wctad-maybe-unsupported"
     "-Wfloat-overflow-conversion"
     "-Wfloat-zero-conversion"

@@ -128,6 +128,7 @@ build:generic_clang --copt=-Wno-user-defined-warnings
 # Explicitly enable some additional warnings.
 # Some of these aren't on by default, or under -Wall, or are subsets of warnings
 # turned off above.
+build:generic_clang --copt=-Wc++20-extensions
 build:generic_clang --copt=-Wctad-maybe-unsupported
 build:generic_clang --copt=-Wfloat-overflow-conversion
 build:generic_clang --copt=-Wfloat-zero-conversion
