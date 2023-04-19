@@ -974,11 +974,10 @@ jobs:
             # Moto Edge X30 gets us covered on Adreno GPU.
             test_script: "IREE_LABEL_EXCLUDE=vulkan ./build_tools/cmake/test_android.sh"
             test_on_pr: false
+    # TODO: Uncomment before submit.
     if: |
       fromJson(needs.setup.outputs.should-run)
-    # TODO: Uncomment before submit.
-    #    && (matrix.target.test_on_pr || ! fromJson(needs.setup.outputs.is-pr))
-    # Show the concise name of matrix job.
+        && (matrix.target.test_on_pr || ! fromJson(needs.setup.outputs.is-pr))
     name: test_${{ matrix.target.platform }}_${{ matrix.target.arch }}_on_${{ matrix.target.device_name }}
     runs-on:
       - self-hosted # must come first
