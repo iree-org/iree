@@ -37,6 +37,7 @@ iree_status_t iree_hal_mpi_initialize_library(
     iree_hal_mpi_dynamic_symbols_t** out_syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_library = NULL;
+  *out_syms = NULL;
   iree_status_t status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(kMPILoaderSearchNames), kMPILoaderSearchNames,
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, out_library);
@@ -48,7 +49,12 @@ iree_status_t iree_hal_mpi_initialize_library(
                             "installed and on path");
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_mpi_dynamic_symbols_resolve_all(*out_syms);
+    iree_hal_mpi_dynamic_symbols_t *syms = NULL;
+    status = iree_allocator_malloc(host_allocator, sizeof(*syms), (void**)&syms);
+    if(iree_status_is_ok(status)) {
+      status = iree_hal_mpi_dynamic_symbols_resolve_all(syms);
+      *out_syms = syms;
+    }
   }
   if (!iree_status_is_ok(status)) {
     iree_dynamic_library_release(*out_library);
