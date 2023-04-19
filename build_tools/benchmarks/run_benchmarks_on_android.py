@@ -289,6 +289,9 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
   def __deduce_taskset_from_run_config(
       self, run_config: iree_definitions.E2EModelRunConfig) -> str:
     """Deduces the CPU mask according to device and execution config."""
+    # TODO(#13187): These logics are inherited from the legacy benchmark suites,
+    # which only work for a few specific phones. We should define the topology
+    # in their device specs.
     exec_config = run_config.module_execution_config
     single_thread = False
     if exec_config.driver != iree_definitions.RuntimeDriver.LOCAL_TASK:
