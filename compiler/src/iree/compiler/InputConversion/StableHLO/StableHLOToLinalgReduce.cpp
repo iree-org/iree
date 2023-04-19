@@ -11,15 +11,12 @@
 #include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 #include "iree/compiler/InputConversion/StableHLO/Rewriters.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
-namespace stablehlo = mlir::stablehlo;
-
 /// Returns a permutation AffineMap that puts all reduction dimensions to the
 /// last. The order of parallel loops and reduction loops are all sorted. E.g.,
 /// if `rank` is 4 and `reductionDims` is {1, 3}, then
@@ -59,11 +56,11 @@ SmallVector<Value, 8> getReduceOpEmptyTensorDynSizes(
 }
 
 struct ReduceRegionReturnOpConversion final
-    : OpConversionPattern<stablehlo::ReturnOp> {
+    : OpConversionPattern<mlir::stablehlo::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      stablehlo::ReturnOp op, OpAdaptor adaptor,
+      mlir::stablehlo::ReturnOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!isInBodyOfLinalgOps(op)) {
       return failure();
@@ -82,11 +79,11 @@ struct ReduceRegionReturnOpConversion final
 };
 
 struct ReduceOpToGenericConverter final
-    : OpConversionPattern<stablehlo::ReduceOp> {
+    : OpConversionPattern<mlir::stablehlo::ReduceOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      stablehlo::ReduceOp op, OpAdaptor adaptor,
+      mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
@@ -184,11 +181,11 @@ struct ReduceOpToGenericConverter final
 };
 
 struct ReduceOpToReduceConverter final
-    : OpConversionPattern<stablehlo::ReduceOp> {
+    : OpConversionPattern<mlir::stablehlo::ReduceOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      stablehlo::ReduceOp op, OpAdaptor adaptor,
+      mlir::stablehlo::ReduceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto reductionDims =
         llvm::to_vector(op.getDimensions().getValues<int64_t>());
@@ -288,11 +285,11 @@ struct ReduceOpToReduceConverter final
 };
 
 struct ReduceWindowOpOnTensorsGenericConversion final
-    : OpConversionPattern<stablehlo::ReduceWindowOp> {
+    : OpConversionPattern<mlir::stablehlo::ReduceWindowOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
+      mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     MLIRContext *ctx = op->getContext();
     Location loc = op.getLoc();
@@ -373,7 +370,7 @@ struct ReduceWindowOpOnTensorsGenericConversion final
       if (!resultTy.hasStaticShape()) return failure();
 
       auto broadcastSizes = rewriter.getI64TensorAttr(resultTy.getShape());
-      broadcastValues.push_back(rewriter.create<stablehlo::BroadcastOp>(
+      broadcastValues.push_back(rewriter.create<mlir::stablehlo::BroadcastOp>(
           loc, resultTy, initValue, broadcastSizes));
     }
 
@@ -402,7 +399,7 @@ struct ReduceWindowOpOnTensorsGenericConversion final
           DenseIntElementsAttr::get(padAttrType, staticInteriors);
 
       for (auto [input, initValue] : llvm::zip(inputs, initValues)) {
-        input = rewriter.create<stablehlo::PadOp>(
+        input = rewriter.create<mlir::stablehlo::PadOp>(
             loc, input, initValue, padLows, padHighs, padInteriors);
       }
     }
@@ -455,16 +452,16 @@ struct ReduceWindowOpOnTensorsGenericConversion final
 };
 
 struct ReduceWindowOpConversion final
-    : OpConversionPattern<stablehlo::ReduceWindowOp> {
+    : OpConversionPattern<mlir::stablehlo::ReduceWindowOp> {
   using OpConversionPattern::OpConversionPattern;
 
   /// Get the operation used for reduction applied to `result_index`th result.
   /// Its expected to be a binary operation that consumes `result_index`th and
   /// `result_index + getInputs().size`th arguments of the body.
-  static Operation *getReductionOp(stablehlo::ReduceWindowOp op,
+  static Operation *getReductionOp(mlir::stablehlo::ReduceWindowOp op,
                                    int resultIndex) {
     auto returnOp =
-        cast<stablehlo::ReturnOp>(op.getBody().front().getTerminator());
+        cast<mlir::stablehlo::ReturnOp>(op.getBody().front().getTerminator());
     Operation *computeOp = returnOp.getResults()[resultIndex].getDefiningOp();
     if (computeOp->getNumOperands() != 2) return nullptr;
     auto arg0 = computeOp->getOperand(0).dyn_cast<BlockArgument>();
@@ -493,23 +490,29 @@ struct ReduceWindowOpConversion final
     k3DAdd,
   };
 
-  static PoolingType getPoolingType(stablehlo::ReduceWindowOp reduceOp,
+  static PoolingType getPoolingType(mlir::stablehlo::ReduceWindowOp reduceOp,
                                     int resultIndex) {
     auto rank =
         reduceOp.getResultTypes()[resultIndex].cast<ShapedType>().getRank();
     if (Operation *op = getReductionOp(reduceOp, resultIndex)) {
-      if (isa<stablehlo::MinOp>(*op) && rank == 4) return PoolingType::k2DMin;
-      if (isa<stablehlo::MinOp>(*op) && rank == 5) return PoolingType::k3DMin;
-      if (isa<stablehlo::MaxOp>(*op) && rank == 4) return PoolingType::k2DMax;
-      if (isa<stablehlo::MaxOp>(*op) && rank == 5) return PoolingType::k3DMax;
-      if (isa<stablehlo::AddOp>(*op) && rank == 4) return PoolingType::k2DAdd;
-      if (isa<stablehlo::AddOp>(*op) && rank == 5) return PoolingType::k3DAdd;
+      if (isa<mlir::stablehlo::MinOp>(*op) && rank == 4)
+        return PoolingType::k2DMin;
+      if (isa<mlir::stablehlo::MinOp>(*op) && rank == 5)
+        return PoolingType::k3DMin;
+      if (isa<mlir::stablehlo::MaxOp>(*op) && rank == 4)
+        return PoolingType::k2DMax;
+      if (isa<mlir::stablehlo::MaxOp>(*op) && rank == 5)
+        return PoolingType::k3DMax;
+      if (isa<mlir::stablehlo::AddOp>(*op) && rank == 4)
+        return PoolingType::k2DAdd;
+      if (isa<mlir::stablehlo::AddOp>(*op) && rank == 5)
+        return PoolingType::k3DAdd;
     }
     return PoolingType::kInvalid;
   }
 
   LogicalResult matchAndRewrite(
-      stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
+      mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     int rank = op.getResultTypes()[0].cast<ShapedType>().getRank();
