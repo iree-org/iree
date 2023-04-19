@@ -47,6 +47,7 @@ iree_cc_library(
     "Passes.cpp"
     "StableHLOToArith.cpp"
     "StableHLOToLinalg.cpp"
+    "StableHLOToLinalgConvolution.cpp"
     "StableHLOToLinalgDotProd.cpp"
     "StableHLOToLinalgPointwise.cpp"
     "StableHLOToLinalgRandom.cpp"

@@ -2480,8 +2480,8 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
 
   // clang-format on
 
-  // TODO(#12678): Handle the convolution.
-
+  detail::populateStableHloConvolutionToLinalgConversionPatterns(
+      context, typeConverter, patterns);
   detail::populateStableHloDotProdToLinalgConversionPatterns(
       context, typeConverter, patterns);
   detail::populateStableHloRandomToLinalgConversionPatterns(
