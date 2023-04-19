@@ -23,14 +23,14 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # 3.5.2
         with:
           submodules: true
   small_manual_submodules:
     runs-on: windows-2022
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # 3.5.2
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
 
@@ -41,7 +41,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # 3.5.2
         with:
           submodules: true
   small_bash_manual_submodules:
@@ -51,7 +51,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # 3.5.2
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
   # ------------------------------------------------------------------------- #
@@ -63,14 +63,14 @@ jobs:
     runs-on: windows-2022-64core
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # 3.5.2
         with:
           submodules: true
   large_manual_submodules:
     runs-on: windows-2022-64core
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # 3.5.2
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
 
@@ -81,7 +81,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # 3.5.2
         with:
           submodules: true
   large_bash_manual_submodules:
@@ -91,6 +91,6 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ef4381812d7f6ada8d30124c82c14899e3866feb # 3.5.0 + fixes
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # 3.5.2
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
