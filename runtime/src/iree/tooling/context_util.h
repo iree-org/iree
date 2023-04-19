@@ -61,15 +61,16 @@ iree_status_t iree_tooling_resolve_modules(
     iree_hal_device_t** out_device,
     iree_hal_allocator_t** out_device_allocator);
 
-//===----------------------------------------------------------------------===//
-// Module loading
-//===----------------------------------------------------------------------===//
-
 // Loads modules in the order specified by the --module= flag.
 // Appends the modules to the |list|.
 iree_status_t iree_tooling_load_modules_from_flags(
     iree_vm_instance_t* instance, iree_allocator_t host_allocator,
     iree_tooling_module_list_t* list);
+
+// Returns the single exported user function from |module| in |out_function| or
+// an error if zero or more than one function are present.
+iree_status_t iree_tooling_find_single_exported_function(
+    iree_vm_module_t* module, iree_vm_function_t* out_function);
 
 //===----------------------------------------------------------------------===//
 // Context management

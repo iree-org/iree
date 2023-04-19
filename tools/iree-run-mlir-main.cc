@@ -4,29 +4,32 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// IREE source.mlir -> execution output test runner.
-// This is meant to be called from LIT for FileCheck tests, and tries to match
-// the interface of mlir-opt (featuring -split-input-file, etc) so it's easier
-// to work with there. If you want a more generalized runner for standalone
-// precompiled IREE modules use iree-run-module.
+// IREE source.mlir -> execution output runner.
+// This is meant to be called from LIT for FileCheck tests or as a developer
+// tool to emulate what an online compiler does. It tries to match the interface
+// of iree-compile and iree-opt (featuring -split-input-file, etc) so it's
+// easy to run tests or approximate an iree-compile | iree-run-module sequence.
+// If you want a more generalized runner for standalone precompiled IREE modules
+// use iree-run-module instead.
 //
-// By default all exported functions in the module will be run in order.
-// All input values, provided via -function-inputs, will be passed to the
-// functions (this means all input signatures must match). Results from the
-// executed functions will be printed to stdout for checking.
+// If there's a single exported function that will be executed and if there are
+// multiple functions --function= can be used to specify which is executed.
+// Function inputs can be provided with --input=. Results from the executed
+// function will be printed to stdout for checking or can be written to files
+// with --output=.
 //
 // Example input:
 // // RUN: iree-run-mlir %s | FileCheck %s
 // // CHECK-LABEL: @foo
-// // CHECK: 1xf32: 2
-// func.func @foo() -> tensor<f32> {
-//   %0 = arith.constant dense<2.0> : tensor<f32>
-//   return %0 : tensor<f32>
+// // CHECK: 2xf32=[2 3]
+// func.func @foo() -> tensor<2xf32> {
+//   %0 = arith.constant dense<[2.0, 3.0]> : tensor<2xf32>
+//   return %0 : tensor<2xf32>
 // }
 //
 // Command line arguments are handled by LLVM's parser by default but -- can be
 // used to separate the compiler flags from the runtime flags, such as:
-//   iree-run-mlir --iree-hal-target-backends=vulkan-spirv -- --logtostderr
+//   iree-run-mlir --iree-hal-target-backends=llvm-cpu -- --device=local-task
 
 #include <cstdio>
 #include <cstring>
@@ -138,6 +141,10 @@ static llvm::cl::list<std::string> run_args_flag{
     llvm::cl::desc("Argument passed to the execution flag parser"),
     llvm::cl::ConsumeAfter,
 };
+
+IREE_FLAG(string, function, "",
+          "Name of a function contained in the compiled module. If omitted\n"
+          "and there's a single exported function that will be run instead.");
 
 IREE_FLAG_LIST(
     string, input,
@@ -436,21 +443,22 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     return OkStatus();
   }
 
-  // Evaluate all exported functions.
-  auto run_function = [&](int ordinal) -> Status {
-    iree_vm_function_t function;
-    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+  // Choose which function to run - either the one specified in the flag or the
+  // only exported non-internal function.
+  iree_vm_function_t function = {0};
+  if (strlen(FLAG_function) == 0) {
+    IREE_RETURN_IF_ERROR(iree_tooling_find_single_exported_function(
+        main_module.get(), &function));
+  } else {
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
                              main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                             ordinal, &function),
-                         "looking up function export %d", ordinal);
+                             iree_make_cstring_view(FLAG_function), &function),
+                         "looking up function '%s'", FLAG_function);
+  }
+
+  // Evaluate all exported functions.
+  auto run_function = [&](iree_vm_function_t function) -> Status {
     iree_string_view_t function_name = iree_vm_function_name(&function);
-    if (iree_string_view_starts_with(function_name,
-                                     iree_make_cstring_view("__")) ||
-        iree_string_view_find_char(function_name, '$', 0) !=
-            IREE_STRING_VIEW_NPOS) {
-      // Skip internal or special functions.
-      return OkStatus();
-    }
 
     // Create the context we'll use for this (ensuring that we can't interfere
     // with other running evaluations, such as when in a multithreaded test
@@ -470,7 +478,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     IREE_RETURN_IF_ERROR(
         EvaluateFunction(context.get(), device.get(), device_allocator.get(),
                          function, function_name),
-        "evaluating export function %d", ordinal);
+        "evaluating export function %.*s", (int)function_name.size,
+        function_name.data);
 
     IREE_RETURN_IF_ERROR(iree_hal_end_profiling_from_flags(device.get()));
 
@@ -479,16 +488,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     device.reset();
     return OkStatus();
   };
-
-  Status evaluate_status = OkStatus();
-  auto module_signature = iree_vm_module_signature(main_module.get());
-  for (iree_host_size_t i = 0; i < module_signature.export_function_count;
-       ++i) {
-    evaluate_status = run_function(i);
-    if (!evaluate_status.ok()) {
-      break;
-    }
-  }
+  Status evaluate_status = run_function(function);
 
   main_module.reset();
   iree_tooling_module_list_reset(&module_list);
