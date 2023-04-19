@@ -24,7 +24,6 @@ iree_lit_test_suite(
     "flatten_tuples_in_cfg.mlir"
     "mhlo_to_linalg.mlir"
     "mhlo_to_mhlo_preprocessing.mlir"
-    "mhlo_to_mhlo_preprocessing_canonicalize_dot_general.mlir"
     "mhlo_to_mhlo_scatter.mlir"
     "missing_legalizations.mlir"
     "transformation_pipeline.mlir"
