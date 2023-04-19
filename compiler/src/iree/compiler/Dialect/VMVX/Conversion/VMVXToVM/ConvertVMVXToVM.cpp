@@ -174,32 +174,6 @@ class MatmulOpConversion : public VMVXImportOpConversion<IREE::VMVX::MatmulOp> {
   }
 };
 
-// Converts the vmvx.pack op to an appropriate typed import.
-class PackOpConversion : public VMVXImportOpConversion<IREE::VMVX::PackOp> {
- public:
-  using VMVXImportOpConversion::VMVXImportOpConversion;
-
-  std::string getImportFqName(IREE::VMVX::PackOp op) const override {
-    std::string name("vmvx.pack.");
-    name.append(getTypedTypeStr(op.getInType()));
-    name.append(getTypedTypeStr(op.getOutType()));
-    return name;
-  }
-};
-
-// Converts the vmvx.unpack op to an appropriate typed import.
-class UnpackOpConversion : public VMVXImportOpConversion<IREE::VMVX::UnpackOp> {
- public:
-  using VMVXImportOpConversion::VMVXImportOpConversion;
-
-  std::string getImportFqName(IREE::VMVX::UnpackOp op) const override {
-    std::string name("vmvx.unpack.");
-    name.append(getTypedTypeStr(op.getInType()));
-    name.append(getTypedTypeStr(op.getOutType()));
-    return name;
-  }
-};
-
 // Converts the vmvx.query_tile_sizes op to its import.
 class QueryTileSizesOpConversion
     : public VMVXImportOpConversion<IREE::VMVX::QueryTileSizesOp> {
@@ -235,9 +209,9 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns) {
   patterns.insert<BinaryOpConversion, CopyOpConversion, Fill2DOpConversion,
-                  MatmulOpConversion, UnaryOpConversion, PackOpConversion,
-                  UnpackOpConversion, QueryTileSizesOpConversion>(
-      context, importSymbols, typeConverter);
+                  MatmulOpConversion, UnaryOpConversion,
+                  QueryTileSizesOpConversion>(context, importSymbols,
+                                              typeConverter);
 }
 
 }  // namespace iree_compiler
