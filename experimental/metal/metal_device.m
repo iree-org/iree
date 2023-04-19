@@ -17,6 +17,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/buffer_transfer.h"
+#include "iree/hal/utils/resource_set.h"
 
 typedef struct iree_hal_metal_device_t {
   // Abstract resource used for injecting reference counting and vtable; must be at offset 0.
@@ -312,20 +313,14 @@ static iree_status_t iree_hal_metal_device_queue_execute(
   @autoreleasepool {
     // First create a new command buffer and encode wait commands for all wait semaphores.
     if (wait_semaphore_list.count > 0) {
-      // Copy the full semaphore list to heap--we will need to access them in command buffer
-      // completion callback.
-      iree_hal_semaphore_t** saved_semaphores;
-      iree_host_size_t size = sizeof(iree_hal_semaphore_t*) * wait_semaphore_list.count;
+      // Put the full semaphore list into a resource set, which retains them--we will need to access
+      // them until the command buffer completes.
+      iree_hal_resource_set_t* resource_set;
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_allocator_malloc(device->host_allocator, size, (void**)&saved_semaphores));
-      memcpy(saved_semaphores, wait_semaphore_list.semaphores, size);
-
-      // IREE will free resources once their refcounts become zero on host. However, there are work
-      // happening on the GPU async still needing access. So make sure we retain all semaphores
-      // until command buffer completion.
-      for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
-        iree_hal_semaphore_retain(saved_semaphores[i]);  // +1
-      }
+          z0, iree_hal_resource_set_allocate(&device->block_pool, &resource_set));
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_hal_resource_set_insert(resource_set, wait_semaphore_list.count,
+                                           wait_semaphore_list.semaphores));
 
       MTLCommandBufferDescriptor* descriptor = [MTLCommandBufferDescriptor new];  // +1
       descriptor.retainedReferences =
@@ -340,10 +335,8 @@ static iree_status_t iree_hal_metal_device_queue_execute(
         [wait_command_buffer encodeWaitForEvent:handle value:wait_semaphore_list.payload_values[i]];
       }
       [wait_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
-          iree_hal_semaphore_release(saved_semaphores[i]);  // -1
-        }
-        iree_allocator_free(device->host_allocator, saved_semaphores);
+        // Now we can release all retained wait semaphores.
+        iree_hal_resource_set_free(resource_set);
       }];
       [wait_command_buffer commit];
       [descriptor release];  // -1
@@ -362,19 +355,14 @@ static iree_status_t iree_hal_metal_device_queue_execute(
 
     // Finally create a new command buffer and encode signal commands for all signal semaphores.
     if (signal_semaphore_list.count > 0) {
-      // Copy the full semaphore list to heap--we will need to access them in command buffer
-      // completion callback.
-      iree_hal_semaphore_t** saved_semaphores;
-      iree_host_size_t size = sizeof(iree_hal_semaphore_t*) * signal_semaphore_list.count;
+      // Put the full semaphore list into a resource set, which retains them--we will need to access
+      // them until the command buffer completes.
+      iree_hal_resource_set_t* resource_set;
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_allocator_malloc(device->host_allocator, size, (void**)&saved_semaphores));
-
-      // IREE will free resources once their refcounts become zero on host. However, there are work
-      // happening on the GPU async still needing access. So make sure we retain all semaphores
-      // until command buffer completion.
-      for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-        iree_hal_semaphore_retain(saved_semaphores[i]);  // +1
-      }
+          z0, iree_hal_resource_set_allocate(&device->block_pool, &resource_set));
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_hal_resource_set_insert(resource_set, signal_semaphore_list.count,
+                                           signal_semaphore_list.semaphores));
 
       MTLCommandBufferDescriptor* descriptor = [MTLCommandBufferDescriptor new];  // +1
       descriptor.retainedReferences =
@@ -390,10 +378,8 @@ static iree_status_t iree_hal_metal_device_queue_execute(
                                            value:signal_semaphore_list.payload_values[i]];
       }
       [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-        for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
-          iree_hal_semaphore_release(saved_semaphores[i]);  // -1
-        }
-        iree_allocator_free(device->host_allocator, saved_semaphores);
+        // Now we can release all retained wait semaphores.
+        iree_hal_resource_set_free(resource_set);
       }];
       [signal_command_buffer commit];
       [descriptor release];  // -1
