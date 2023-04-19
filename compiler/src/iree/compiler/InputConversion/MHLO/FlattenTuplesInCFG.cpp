@@ -26,12 +26,12 @@ namespace MHLO {
 namespace {
 
 // Given a set of types, unpack to a list of a types, removing all tuples.
-void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> *newTypes) {
+void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> &newTypes) {
   for (Type type : types) {
     if (type.isa<TupleType>()) {
       untupleTypes(type.dyn_cast<TupleType>().getTypes(), newTypes);
     } else {
-      newTypes->push_back(type);
+      newTypes.push_back(type);
     }
   }
 }
@@ -139,7 +139,7 @@ bool convertCallOp(func::CallOp *oldOp, OpBuilder &builder,
   }
 
   SmallVector<Type, 4> resultTypes;
-  untupleTypes(oldOp->getOperation()->getResultTypes(), &resultTypes);
+  untupleTypes(oldOp->getOperation()->getResultTypes(), resultTypes);
   auto newOp = builder.create<func::CallOp>(oldOp->getLoc(), oldOp->getCallee(),
                                             resultTypes, newArgs);
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
@@ -237,10 +237,30 @@ bool convertFunction(func::FuncOp oldFunction, func::FuncOp newFunction) {
   OpBuilder builder(newFunction.getBody());
   IRMapping mapping;
 
+  // Check whether has tuple in signature.
+  bool hasTupleSig = (oldFunction.getArgumentTypes().size() !=
+                      newFunction.getArgumentTypes().size()) ||
+                     (oldFunction.getResultTypes().size() !=
+                      newFunction.getResultTypes().size());
+
+  // Cache unused XLA ABI marker names.
+  auto xlaAbiParam = StringAttr::get(newFunction.getContext(),
+                                     "xla_entry_computation_parameter_layouts"),
+       xlaAbiLayout = StringAttr::get(newFunction.getContext(),
+                                      "xla_entry_computation_result_layout");
+
   for (auto attr : oldFunction->getAttrs()) {
-    if (attr.getName() != oldFunction.getFunctionTypeAttrName()) {
-      newFunction->setAttr(attr.getName(), attr.getValue());
-    }
+    if (attr.getName() == oldFunction.getFunctionTypeAttrName() ||
+        // Currently skipping all arg, result and XLA specific ABI attributes.
+        attr.getName() == xlaAbiParam || attr.getName() == xlaAbiLayout)
+      continue;
+    // If it has tuples in sig, then skip arg and res attrs. None of the
+    // existing ones along path that produces tuples are used further, so just
+    // remove instead of flattening.
+    if (hasTupleSig && (attr.getName() == oldFunction.getArgAttrsAttrName() ||
+                        attr.getName() == oldFunction.getResAttrsAttrName()))
+      continue;
+    newFunction->setAttr(attr.getName(), attr.getValue());
   }
 
   newFunction.getBlocks().clear();
@@ -248,7 +268,7 @@ bool convertFunction(func::FuncOp oldFunction, func::FuncOp newFunction) {
     auto *newBlock = builder.createBlock(&newFunction.getBody());
     for (auto oldArg : oldBlock.getArguments()) {
       llvm::SmallVector<Type, 4> newTypes;
-      untupleTypes(oldArg.getType(), &newTypes);
+      untupleTypes(oldArg.getType(), newTypes);
 
       Value newTuple = processTuple(oldArg.getType(), oldFunction.getLoc(),
                                     newBlock, builder);
@@ -288,11 +308,12 @@ class FlattenTuplesInCFGPass
 
     for (auto oldFunction : module.getOps<func::FuncOp>()) {
       auto oldFunctionType = oldFunction.getFunctionType();
+
       llvm::SmallVector<Type, 10> newInputTypes;
-      untupleTypes(oldFunctionType.getInputs(), &newInputTypes);
+      untupleTypes(oldFunctionType.getInputs(), newInputTypes);
 
       llvm::SmallVector<Type, 10> newResultTypes;
-      untupleTypes(oldFunctionType.getResults(), &newResultTypes);
+      untupleTypes(oldFunctionType.getResults(), newResultTypes);
 
       auto newFunctionType =
           builder.getFunctionType(newInputTypes, newResultTypes);
