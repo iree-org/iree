@@ -423,6 +423,7 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
                                                   linalg::LinalgOp op,
                                                   const GPUModel &gpuModel) {
   if (!gpuModel.hasWarpShuffle) return failure();
+
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
@@ -458,6 +459,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
                                                linalg::LinalgOp op,
                                                const GPUModel &gpuModel) {
   if (!clGPUEnableTransformDialectMatmulTensorCoreStrategy) return failure();
+  if (!gpuModel.hasTF32TensorCore) return failure();
 
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *fill;
