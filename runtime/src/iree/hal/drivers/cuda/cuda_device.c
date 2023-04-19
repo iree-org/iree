@@ -316,9 +316,8 @@ IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_query_group_params(
         "MPI should be loaded to use NCCL collective operations.");
   }
   if (!syms->mpi_symbols) {
-    return iree_make_status(
-        IREE_STATUS_UNAVAILABLE,
-        "MPI symbols failed to load.");
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "MPI symbols failed to load.");
   }
   iree_hal_mpi_dynamic_symbols_t* mpi_syms = syms->mpi_symbols;
 

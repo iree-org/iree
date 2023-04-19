@@ -97,7 +97,7 @@ iree_runtime_cc_library(
     srcs = ["libmpi.c"],
     hdrs = [
         "libmpi.h",
-        "libmpi_dynamic_symbols.h"
+        "libmpi_dynamic_symbols.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
