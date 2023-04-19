@@ -44,6 +44,7 @@ iree_lit_test_suite(
     "pipeline_matmul_promotion.mlir"
     "pipeline_matmul_vectorization.mlir"
     "pipeline_reduction_subgroup.mlir"
+    "set_transform_strategy.mlir"
     "tile_and_distribute.mlir"
     "tile_and_distribute_scatter.mlir"
     "tile_and_distribute_sort.mlir"
@@ -64,6 +65,8 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    transform_dialect_dummy_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
