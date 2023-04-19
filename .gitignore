@@ -73,13 +73,7 @@ iree/builtins/**/bin/*.ll
 *.tar.*
 
 # VS Code DevContainer
-.devcontainer/*
-!.devcontainer/README.md
-!.devcontainer/configure.py
-!.devcontainer/devcontainer.json
-!.devcontainer/docker-compose.base.yml
-!.devcontainer/docs_data/
-!.devcontainer/docs_data/*.png
+.devcontainer/docker-compose.yml
 
 # Local cache files
 llvm-external-projects/iree-dialects/.cache
