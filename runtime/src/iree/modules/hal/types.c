@@ -120,11 +120,14 @@ iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
 
 static iree_status_t iree_hal_module_resolve_common_types(
     iree_vm_instance_t* instance) {
+  IREE_RETURN_IF_ERROR(iree_vm_resolve_builtin_types(instance));
+
   IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_buffer_t, "hal.buffer",
                              iree_hal_buffer_registration);
   IREE_VM_RESOLVE_HAL_C_TYPE(instance, iree_hal_buffer_view_t,
                              "hal.buffer_view",
                              iree_hal_buffer_view_registration);
+
   return iree_ok_status();
 }
 

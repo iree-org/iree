@@ -666,6 +666,7 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
   // TODO: unify the target informations into one structure.
   iree_compiler::gpu::GPUModel gpuModel;
   gpuModel.hasWarpShuffle = targetInfo.hasWarpShuffle;
+  gpuModel.hasTF32TensorCore = targetInfo.hasTF32TensorCore;
   if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
                                                               gpuModel)))
     return failure();

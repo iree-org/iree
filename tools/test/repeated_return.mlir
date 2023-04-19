@@ -1,5 +1,5 @@
-// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --function=many_tensor) | FileCheck %s
-// RUN: iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --device=local-task --function=many_tensor | FileCheck --check-prefix=BENCHMARK %s
+// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --module=- --function=many_tensor) | FileCheck %s
+// RUN: iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --device=local-task --module=- --function=many_tensor | FileCheck --check-prefix=BENCHMARK %s
 // RUN: iree-run-mlir --iree-hal-target-backends=vmvx %s | FileCheck %s
 
 // BENCHMARK-LABEL: BM_many_tensor

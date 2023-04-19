@@ -289,6 +289,17 @@ IREE_API_EXPORT bool iree_string_view_match_pattern(
   return iree_string_view_match_pattern_impl(value, pattern);
 }
 
+IREE_API_EXPORT void iree_string_view_to_cstring(
+    iree_string_view_t value, char* buffer, iree_host_size_t buffer_length) {
+  if (!buffer_length) return;
+  // Truncate and ensure there's space for the NUL terminator.
+  iree_host_size_t length = iree_min(value.size, buffer_length - 1);
+  // Copy string contents up to the truncated length.
+  memcpy(buffer, value.data, length);
+  // Add NUL terminator.
+  buffer[length] = 0;
+}
+
 IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(
     iree_string_view_t source_value, iree_string_view_t* target_value,
     char* buffer) {

@@ -89,6 +89,11 @@ IREE_API_EXPORT void iree_vm_instance_unregister_type(
 IREE_API_EXPORT iree_vm_ref_type_t iree_vm_instance_lookup_type(
     iree_vm_instance_t* instance, iree_string_view_t full_name);
 
+// Resolves all builtin VM types by looking them up on the instance.
+// This should only be called in dynamically-loaded libraries.
+IREE_API_EXPORT iree_status_t
+iree_vm_resolve_builtin_types(iree_vm_instance_t* instance);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

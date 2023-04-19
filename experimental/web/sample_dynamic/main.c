@@ -288,7 +288,7 @@ static iree_status_t print_outputs_from_call(
         "variant %" PRIhsz " not present", i);
 
     if (iree_vm_variant_is_value(variant)) {
-      switch (variant.type.value_type) {
+      switch (iree_vm_type_def_as_value(variant.type)) {
         case IREE_VM_VALUE_TYPE_I8: {
           IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
               outputs_builder, "i8=%" PRIi8, variant.i8));

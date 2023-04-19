@@ -1026,6 +1026,27 @@ void transform_ext::makeReductionMatcher(
   trailingCapture = &trailing;
 }
 
+void transform_ext::makeMatmulMatcher(
+    transform_ext::MatcherContext &matcherContext,
+    transform_ext::StructuredOpMatcher *&matmulCapture,
+    transform_ext::StructuredOpMatcher *&fillCapture,
+    transform_ext::StructuredOpMatcher *&trailingCapture,
+    transform_ext::MatchedMatmulCaptures &captures) {
+  auto &matmul = transform_ext::m_StructuredOp<linalg::MatmulOp>(matcherContext)
+                     // Capture op sizes.
+                     .dim(AllDims(), CaptureDims(captures.matmulOpSizes));
+  matmulCapture = &matmul;
+  // Mandatory FillOp must create the unique output of the reduction.
+  auto &fill = transform_ext::m_StructuredOp<linalg::FillOp>(matcherContext);
+  matmul = matmul.output(transform_ext::NumEqualsTo(1)).output(0, fill);
+  fillCapture = &fill;
+
+  auto &trailing = m_StructuredOp<linalg::GenericOp>(matcherContext);
+  matmul = matmul.result(0, HasAnyUse(), trailing, OptionalMatch())
+               .allTilableOpsCaptured<func::FuncOp>();
+  trailingCapture = &trailing;
+}
+
 void transform_ext::makeReductionMatcher(transform_ext::MatcherContext &context,
                                          StructuredOpMatcher *&reductionCapture,
                                          MatchedReductionCaptures &captures) {

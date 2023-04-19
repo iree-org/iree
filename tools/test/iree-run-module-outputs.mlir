@@ -1,7 +1,7 @@
 // Tests that execution providing no outputs is ok.
 
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-sync --function=no_output) | \
+// RUN:  iree-run-module --device=local-sync --module=- --function=no_output) | \
 // RUN: FileCheck --check-prefix=NO-OUTPUT %s
 // NO-OUTPUT-LABEL: EXEC @no_output
 func.func @no_output() {
@@ -13,7 +13,7 @@ func.func @no_output() {
 // Tests the default output printing to stdout.
 
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-sync --function=default) | \
+// RUN:  iree-run-module --device=local-sync --module=- --function=default) | \
 // RUN: FileCheck --check-prefix=OUTPUT-DEFAULT %s
 // OUTPUT-DEFAULT-LABEL: EXEC @default
 func.func @default() -> (i32, tensor<f32>, tensor<?x4xi32>) {
@@ -35,7 +35,7 @@ func.func @default() -> (i32, tensor<f32>, tensor<?x4xi32>) {
 // parsed by numpy.
 
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-sync --function=numpy \
+// RUN:  iree-run-module --device=local-sync --module=- --function=numpy \
 // RUN:                  --output= \
 // RUN:                  --output=@%t \
 // RUN:                  --output=+%t) && \

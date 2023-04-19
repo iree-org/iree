@@ -61,7 +61,7 @@ func.func @matmul_static(
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_default_spec.mlir | \
-// RUN: iree-run-module --function=matmul_static \
+// RUN: iree-run-module --module=- --function=matmul_static \
 // RUN:   --input="3x5xf32=1" \
 // RUN:   --input="5x3xf32=2" \
 // RUN:   --input="3x3xf32=42" | \

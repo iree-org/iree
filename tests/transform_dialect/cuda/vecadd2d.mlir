@@ -58,7 +58,7 @@ func.func @vecadd2d() -> (!type2) {
 /// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/vecadd2d_codegen_spec.mlir | \
-// RUN: iree-run-module --function=vecadd2d --device=cuda |\
+// RUN: iree-run-module --module=- --function=vecadd2d --device=cuda |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 //     CHECK:  hal.executable.export

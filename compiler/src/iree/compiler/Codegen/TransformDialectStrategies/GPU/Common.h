@@ -40,8 +40,12 @@ int64_t adjustNumberOfWarpsForBlockShuffle(int64_t numWarpsToUse,
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
+/// Takes an optional `warpDims` argument to specify the number of warp
+/// dimensions to consider along various dimensions and avoid second-guessing
+/// how the mapping to warps should occur.
 Value buildMapToBlockAndThreads(ImplicitLocOpBuilder& b, Value funcH,
-                                ArrayRef<int64_t> blockSize);
+                                ArrayRef<int64_t> blockSize,
+                                ArrayRef<int64_t> warpDims = {});
 
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
@@ -93,6 +97,7 @@ struct GPUModel {
   static constexpr StringLiteral kDefaultGPU = "DefaultGPU";
   StringRef model = kDefaultGPU;
   bool hasWarpShuffle = false;
+  bool hasTF32TensorCore = false;
 };
 
 /// Try to find an exisiting transform dialect strategy for a given entry point.

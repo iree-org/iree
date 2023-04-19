@@ -107,7 +107,7 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
   // as well as hoisting subset operations such as vector.transfer_read/write.
   funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, configuration, funcH);
-  funcH = iree_compiler::buildHoisting(b, funcH);
+  iree_compiler::buildHoisting(b, funcH);
 
   // Step N-2. Bufferize and drop HAL descriptor from memref ops.
   variantH = iree_compiler::buildBufferize(b, variantH);

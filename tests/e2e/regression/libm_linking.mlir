@@ -39,3 +39,11 @@ func.func @floor(%input : tensor<f32>) -> (tensor<f32>) {
   %result = math.floor %input : tensor<f32>
   return %result : tensor<f32>
 }
+
+// CHECK: vm.func private @exp2
+func.func @exp2(%input : tensor<f32>) -> (tensor<f32>) {
+  // May lower to llvm.intr.exp2 (exp2f)
+  %result = math.exp2 %input : tensor<f32>
+  return %result : tensor<f32>
+}
+

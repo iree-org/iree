@@ -193,6 +193,11 @@ IREE_API_EXPORT void iree_string_view_replace_char(iree_string_view_t value,
 IREE_API_EXPORT bool iree_string_view_match_pattern(iree_string_view_t value,
                                                     iree_string_view_t pattern);
 
+// Copies the string view |value| to |buffer| with |buffer_length| available
+// bytes and adds a NUL terminator. Truncates if capacity would be exceeded.
+IREE_API_EXPORT void iree_string_view_to_cstring(
+    iree_string_view_t value, char* buffer, iree_host_size_t buffer_length);
+
 // Copies the string bytes into the target buffer and returns the number of
 // characters copied. Does not include a NUL terminator.
 IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(

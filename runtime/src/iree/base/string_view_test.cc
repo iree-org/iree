@@ -390,6 +390,30 @@ TEST(StringViewTest, ReplaceChar) {
   EXPECT_EQ(replace_char("axbxc", 'x', 'y'), "aybyc");
 }
 
+TEST(StringViewTest, ToCStringEmpty) {
+  char buffer[3] = {0x7F, 0x7F, 0x7F};
+  iree_string_view_to_cstring(IREE_SV(""), buffer, sizeof(buffer));
+  EXPECT_EQ(buffer[0], 0);     // NUL
+  EXPECT_EQ(buffer[1], 0x7F);  // unchanged
+}
+
+TEST(StringViewTest, ToCStringNoBuffer) {
+  // Nothing to test but ASAN ensuring we don't null deref.
+  iree_string_view_to_cstring(IREE_SV("abc"), NULL, 0);
+}
+
+TEST(StringViewTest, ToCString) {
+  char buffer[6] = {0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F};
+  iree_string_view_to_cstring(IREE_SV("abc"), buffer, sizeof(buffer));
+  EXPECT_THAT(buffer, ElementsAre('a', 'b', 'c', 0, 0x7F, 0x7F));
+}
+
+TEST(StringViewTest, ToCStringTruncate) {
+  char buffer[3] = {0x7F, 0x7F, 0x7F};
+  iree_string_view_to_cstring(IREE_SV("abcdef"), buffer, sizeof(buffer));
+  EXPECT_THAT(buffer, ElementsAre('a', 'b', 0));
+}
+
 TEST(StringViewTest, AppendToBuffer) {
   char buffer[6] = {0, 1, 2, 3, 4, 5};
   iree_string_view_t source = iree_make_cstring_view("test");

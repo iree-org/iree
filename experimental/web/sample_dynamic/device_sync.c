@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/hal/drivers/local_sync/sync_device.h"
+#include "iree/hal/local/executable_plugin_manager.h"
 #include "iree/hal/local/loaders/system_library_loader.h"
 #include "iree/hal/local/loaders/vmvx_module_loader.h"
 
@@ -15,12 +16,17 @@ iree_status_t create_device_with_loaders(iree_allocator_t host_allocator,
 
   iree_status_t status = iree_ok_status();
 
+  iree_hal_executable_plugin_manager_t* plugin_manager = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_executable_plugin_manager_create(
+        /*capacity=*/0, host_allocator, &plugin_manager);
+  }
+
   iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
   iree_host_size_t loader_count = 0;
   if (iree_status_is_ok(status)) {
     status = iree_hal_system_library_loader_create(
-        iree_hal_executable_import_provider_null(), host_allocator,
-        &loaders[loader_count++]);
+        plugin_manager, host_allocator, &loaders[loader_count++]);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vmvx_module_loader_create_isolated(

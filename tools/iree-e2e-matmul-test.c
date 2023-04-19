@@ -1023,66 +1023,49 @@ static iree_status_t do_matmul_and_check_results(
   // linalg.matmul. We need to preserve the original test inputs to perform
   // reruns on variants in the failure case (see |replay_event_call_matmul|).
   iree_vm_list_t* device_inputs = NULL;
-  iree_status_t status = mask_and_copy_device_buffer_views_to_device(
+  IREE_CHECK_OK(mask_and_copy_device_buffer_views_to_device(
       replay->device, device_allocator, original_device_inputs, mask,
-      &device_inputs);
+      &device_inputs));
 
   // Perform a deep copy of the device-local inputs into host-local buffers.
   // Needed to pass to the reference matmul implementation and to logging
   // in the failure case.
   iree_vm_list_t* host_inputs = NULL;
-  if (iree_status_is_ok(status)) {
-    status = copy_device_buffer_views_to_host(replay->device, device_allocator,
-                                              device_inputs, &host_inputs);
-  }
+  IREE_CHECK_OK(copy_device_buffer_views_to_host(
+      replay->device, device_allocator, device_inputs, &host_inputs));
 
   // Invoke the function to produce the actual result.
   iree_vm_list_t* device_outputs = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                 /*initial_capacity=*/8, replay->host_allocator,
-                                 &device_outputs);
-  }
-
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_invoke(
-        replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
-        /*policy=*/NULL, device_inputs, device_outputs, replay->host_allocator);
-  }
-
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                    /*initial_capacity=*/8,
+                                    replay->host_allocator, &device_outputs));
+  IREE_CHECK_OK(iree_vm_invoke(
+      replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
+      /*policy=*/NULL, device_inputs, device_outputs, replay->host_allocator));
   iree_vm_list_release(device_inputs);
 
   // Get the device_actual_result from the device_outputs.
   iree_hal_buffer_view_t* device_actual_result;
-  if (iree_status_is_ok(status)) {
-    status = get_item_as_buffer_view(device_outputs, 0, &device_actual_result);
-  }
+  IREE_CHECK_OK(
+      get_item_as_buffer_view(device_outputs, 0, &device_actual_result));
 
   // Copy the results to a host local buffer to be able to map it.
   iree_hal_buffer_view_t* host_actual_result = NULL;
-  if (iree_status_is_ok(status)) {
-    status = copy_device_buffer_view_to_host(replay->device, device_allocator,
-                                             device_actual_result,
-                                             &host_actual_result);
-  }
+  IREE_CHECK_OK(copy_device_buffer_view_to_host(
+      replay->device, device_allocator, device_actual_result,
+      &host_actual_result));
 
   // Allocate host_expected_result with same shape as host_actual_result.
   iree_hal_buffer_view_t* host_expected_result = NULL;
-  if (iree_status_is_ok(status)) {
-    status = allocate_host_buffer_view_like(
-        device_allocator, host_actual_result, &host_expected_result);
-  }
+  IREE_CHECK_OK(allocate_host_buffer_view_like(
+      device_allocator, host_actual_result, &host_expected_result));
 
   // Use the reference matmul implementation to fill host_expected_result
-  if (iree_status_is_ok(status)) {
-    status = reference_matmul(host_inputs, host_expected_result);
-  }
+  IREE_CHECK_OK(reference_matmul(host_inputs, host_expected_result));
 
   // Check that host_actual_result and host_expected_result agree.
-  if (iree_status_is_ok(status)) {
-    status = check_matmul_results(file, host_inputs, host_actual_result,
-                                  host_expected_result);
-  }
+  iree_status_t status = check_matmul_results(
+      file, host_inputs, host_actual_result, host_expected_result);
 
   iree_vm_list_release(device_outputs);  // releases device_actual_result
   iree_vm_list_release(host_inputs);
