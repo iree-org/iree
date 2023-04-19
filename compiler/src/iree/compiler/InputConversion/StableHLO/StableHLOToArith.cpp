@@ -16,20 +16,18 @@
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
-namespace stablehlo = mlir::stablehlo;
-
 template <typename OpTy>
 struct ScalarHloToArithmeticPattern final : OpConversionPattern<OpTy> {
   ScalarHloToArithmeticPattern(
-      TypeConverter& typeConverter, MLIRContext* context,
-      llvm::function_ref<bool(Operation*)> filterFn = nullptr,
+      TypeConverter &typeConverter, MLIRContext *context,
+      llvm::function_ref<bool(Operation *)> filterFn = nullptr,
       PatternBenefit benefit = 1)
       : OpConversionPattern<OpTy>(typeConverter, context, benefit),
         filterFn(filterFn) {}
 
   LogicalResult matchAndRewrite(
       OpTy op, typename OpTy::Adaptor adaptor,
-      ConversionPatternRewriter& rewriter) const override {
+      ConversionPatternRewriter &rewriter) const override {
     if (filterFn && !filterFn(op)) return failure();
 
     auto isScalar = [](Value v) {
@@ -42,7 +40,7 @@ struct ScalarHloToArithmeticPattern final : OpConversionPattern<OpTy> {
     Location loc = op.getLoc();
 
     auto resultTy = dyn_cast_or_null<ShapedType>(
-        this->typeConverter->convertType(op->getResultTypes().front()));
+        this->getTypeConverter()->convertType(op->getResultTypes().front()));
     if (!resultTy) return failure();
 
     SmallVector<Value> operands;
@@ -50,7 +48,7 @@ struct ScalarHloToArithmeticPattern final : OpConversionPattern<OpTy> {
       operands.push_back(
           rewriter.create<tensor::ExtractOp>(loc, operand, ValueRange()));
     }
-    Value scalarResult = stablehlo::StableHloOpToStdScalarOp::mapOp(
+    Value scalarResult = mlir::stablehlo::StableHloOpToStdScalarOp::mapOp(
         op, resultTy.getElementType(), operands, &rewriter);
     if (!scalarResult) return failure();
     rewriter.replaceOpWithNewOp<tensor::FromElementsOp>(op, resultTy,
@@ -59,64 +57,65 @@ struct ScalarHloToArithmeticPattern final : OpConversionPattern<OpTy> {
   }
 
  private:
-  llvm::function_ref<bool(Operation*)> filterFn;
+  llvm::function_ref<bool(Operation *)> filterFn;
 };
 
 }  // namespace
 
 namespace detail {
 void populateScalarHloToArithConversionPatterns(
-    MLIRContext* context, TypeConverter& typeConverter,
-    RewritePatternSet* patterns,
-    llvm::function_ref<bool(Operation*)> filterFn) {
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns,
+    llvm::function_ref<bool(Operation *)> filterFn) {
   // TODO(#12678): Handle the XLA rng op.
-  patterns->add<ScalarHloToArithmeticPattern<stablehlo::AbsOp>,
-                ScalarHloToArithmeticPattern<stablehlo::AddOp>,
-                ScalarHloToArithmeticPattern<stablehlo::AndOp>,
-                ScalarHloToArithmeticPattern<stablehlo::Atan2Op>,
-                ScalarHloToArithmeticPattern<stablehlo::BitcastConvertOp>,
-                ScalarHloToArithmeticPattern<stablehlo::CbrtOp>,
-                ScalarHloToArithmeticPattern<stablehlo::CeilOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ClampOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ClzOp>,
-                ScalarHloToArithmeticPattern<stablehlo::CompareOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ComplexOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ConvertOp>,
-                ScalarHloToArithmeticPattern<stablehlo::CosineOp>,
-                ScalarHloToArithmeticPattern<stablehlo::DivOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ExpOp>,
-                ScalarHloToArithmeticPattern<stablehlo::Expm1Op>,
-                ScalarHloToArithmeticPattern<stablehlo::FloorOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ImagOp>,
-                ScalarHloToArithmeticPattern<stablehlo::IsFiniteOp>,
-                ScalarHloToArithmeticPattern<stablehlo::Log1pOp>,
-                ScalarHloToArithmeticPattern<stablehlo::LogOp>,
-                ScalarHloToArithmeticPattern<stablehlo::LogisticOp>,
-                ScalarHloToArithmeticPattern<stablehlo::MaxOp>,
-                ScalarHloToArithmeticPattern<stablehlo::MinOp>,
-                ScalarHloToArithmeticPattern<stablehlo::MulOp>,
-                ScalarHloToArithmeticPattern<stablehlo::NegOp>,
-                ScalarHloToArithmeticPattern<stablehlo::NotOp>,
-                ScalarHloToArithmeticPattern<stablehlo::OrOp>,
-                ScalarHloToArithmeticPattern<stablehlo::PopulationCountOp>,
-                ScalarHloToArithmeticPattern<stablehlo::PowOp>,
-                ScalarHloToArithmeticPattern<stablehlo::RealOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ReducePrecisionOp>,
-                ScalarHloToArithmeticPattern<stablehlo::RemOp>,
-                ScalarHloToArithmeticPattern<stablehlo::RoundNearestEvenOp>,
-                ScalarHloToArithmeticPattern<stablehlo::RoundOp>,
-                ScalarHloToArithmeticPattern<stablehlo::RsqrtOp>,
-                ScalarHloToArithmeticPattern<stablehlo::SelectOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ShiftLeftOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ShiftRightArithmeticOp>,
-                ScalarHloToArithmeticPattern<stablehlo::ShiftRightLogicalOp>,
-                ScalarHloToArithmeticPattern<stablehlo::SignOp>,
-                ScalarHloToArithmeticPattern<stablehlo::SineOp>,
-                ScalarHloToArithmeticPattern<stablehlo::SqrtOp>,
-                ScalarHloToArithmeticPattern<stablehlo::SubtractOp>,
-                ScalarHloToArithmeticPattern<stablehlo::TanhOp>,
-                ScalarHloToArithmeticPattern<stablehlo::XorOp> >(
-      typeConverter, context, filterFn);
+  patterns->add<
+      ScalarHloToArithmeticPattern<mlir::stablehlo::AbsOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::AddOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::AndOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::Atan2Op>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::BitcastConvertOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::CbrtOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::CeilOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ClampOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ClzOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::CompareOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ComplexOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ConvertOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::CosineOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::DivOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ExpOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::Expm1Op>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::FloorOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ImagOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::IsFiniteOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::Log1pOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::LogOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::LogisticOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::MaxOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::MinOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::MulOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::NegOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::NotOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::OrOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::PopulationCountOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::PowOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::RealOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ReducePrecisionOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::RemOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::RoundNearestEvenOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::RoundOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::RsqrtOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::SelectOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ShiftLeftOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ShiftRightArithmeticOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::ShiftRightLogicalOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::SignOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::SineOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::SqrtOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::SubtractOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::TanhOp>,
+      ScalarHloToArithmeticPattern<mlir::stablehlo::XorOp> >(typeConverter,
+                                                             context, filterFn);
 }
 }  // namespace detail
 
