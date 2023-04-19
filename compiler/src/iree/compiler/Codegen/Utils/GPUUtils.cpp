@@ -16,6 +16,8 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define DBGSNL() (llvm::dbgs() << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
 
@@ -678,8 +680,8 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
       LLVM_DEBUG({
-        llvm::dbgs() << "Failed to get operandId for vector::TransferReadOp:";
-        op->dump();
+        DBGS() << "Failed to get operandId for vector::TransferReadOp: " << *op
+               << "\n";
       });
       return std::nullopt;
     }
