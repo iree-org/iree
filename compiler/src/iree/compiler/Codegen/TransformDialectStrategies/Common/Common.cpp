@@ -294,9 +294,8 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b,
 }
 
 /// Hoist redundant subet ops.
-Value mlir::iree_compiler::buildHoisting(ImplicitLocOpBuilder &b, Value funcH) {
-  auto pdlOperationType = pdl::OperationType::get(b.getContext());
-  return b.create<HoistRedundantTensorSubsetsOp>(pdlOperationType, funcH);
+void mlir::iree_compiler::buildHoisting(ImplicitLocOpBuilder &b, Value funcH) {
+  b.create<HoistRedundantTensorSubsetsOp>(funcH);
 }
 
 /// Bufferize and drop HAL descriptor from memref ops.

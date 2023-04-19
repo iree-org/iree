@@ -178,7 +178,7 @@ buildTileFuseDistToForallAndWorgroupCountWithNumThreads(
 Value buildVectorize(ImplicitLocOpBuilder &b, Value funcH);
 
 /// Build transform IR to hoist redundant subset operations.
-Value buildHoisting(ImplicitLocOpBuilder &b, Value funcH);
+void buildHoisting(ImplicitLocOpBuilder &b, Value funcH);
 
 /// Build transform IR to bufferize and drop HAL descriptor from memref ops.
 /// Takes a handle variantOp and returns a handle to the same variant op.
