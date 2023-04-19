@@ -861,12 +861,6 @@ jobs:
     strategy:
       matrix:
         target:
-          - platform: android
-            arch: armv8.2-a
-            abi: arm64-v8a
-            docker_image: "gcr.io/iree-oss/android@sha256:3f641d25786b1e5e430ee4cacb8bfe57540fda5ecaa7ca2802c179c26e77ce09"
-            build_script: "./build_tools/cmake/build_android.sh"
-            # No test_script
           - platform: linux
             arch: riscv_64
             abi: lp64d
@@ -937,6 +931,25 @@ jobs:
             --env "BUILD_PRESET=test" \
             "${DOCKER_IMAGE}" \
             "${TEST_SCRIPT}"
+
+  # Android cross-compilation and test is separated from cross_compile_and_test
+  # because some tests need to run on physical devices instead of emulators. And
+  # we need a fine-control on which tests only run on postsubmit as some devices
+  # are not scalable (while we want to test with Android emulator on ARM VMs on
+  # presubmit), which requires dynamic matrix generation (because "if" condition
+  # can't access matrix variable to skip certain matrix jobs for presubmit).
+  build_and_test_android:
+    needs: [setup, build_all]
+    if: fromJson(needs.setup.outputs.should-run)
+    uses: ./.github/workflows/build_and_test_android.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      write-caches: ${{ needs.setup.outputs.write-caches }}
+      is-pr: ${{ fromJson(needs.setup.outputs.is-pr) }}
+      build-dir: ${{ needs.build_all.outputs.build-dir }}
+      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
 
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
@@ -1051,6 +1064,7 @@ jobs:
 
       # Crosscompilation
       - cross_compile_and_test
+      - build_and_test_android
 
       # Artifacts for e2e testing and benchmarking
       - build_benchmark_tools
