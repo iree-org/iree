@@ -21,6 +21,7 @@
 
 #ifdef IREE_HAVE_MHLO_INPUT
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/StableHLO/Passes.h"
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
 #include "iree/compiler/InputConversion/TMTensor/Passes.h"
@@ -54,6 +55,9 @@ void buildIREEVMTransformPassPipeline(
       break;
     case InputDialectOptions::Type::xla:
       MHLO::buildXLAInputConversionPassPipeline(passManager);
+      break;
+    case InputDialectOptions::Type::stablehlo_experimental:
+      stablehlo::buildStableHLOInputConversionPassPipeline(passManager);
       break;
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT

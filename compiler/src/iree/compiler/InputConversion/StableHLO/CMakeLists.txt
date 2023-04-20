@@ -88,7 +88,19 @@ iree_cc_library(
     ::PassHeaders
     ::StableHLOToLinalg
     LLVMSupport
+    MLIRLinalgTransforms
+    MLIRMLProgramDialect
     MLIRPass
+    MLIRReconcileUnrealizedCasts
+    MLIRSCFToControlFlow
+    MLIRSCFTransforms
+    MLIRShapeOpsTransforms
+    MLIRShapeToStandard
+    MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::InputConversion::Common
   PUBLIC
 )
 

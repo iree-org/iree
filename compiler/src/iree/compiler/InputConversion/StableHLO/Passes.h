@@ -20,7 +20,7 @@ std::unique_ptr<TypeConverter> createStableHloToLinalgTypeConverter();
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-// TODO: Add a full conversion pipeline and passes.
+void buildStableHLOInputConversionPassPipeline(OpPassManager &passManager);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
