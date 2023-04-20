@@ -148,7 +148,8 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
       // If no alignment specified align at least to the size of an element.
       Type elType = allocOp.getType().getElementType();
       if (auto shapeType = elType.dyn_cast<ShapedType>())
-        alignement = shapeType.getSizeInBits() / 8;
+        alignement =
+            shapeType.getNumElements() * shapeType.getElementTypeBitWidth();
       else
         alignement = elType.getIntOrFloatBitWidth() / 8;
     }
