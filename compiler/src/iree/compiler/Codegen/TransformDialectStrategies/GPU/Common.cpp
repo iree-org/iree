@@ -504,9 +504,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 
   bool alignedAny64x64x16 = matmulSize[0] % 64 == 0 ||
                             matmulSize[1] % 64 == 0 || matmulSize[2] % 16 == 0;
-  bool alignedAll4x4x4 = matmulSize[0] % 4 == 0 && matmulSize[1] % 4 == 0 &&
-                         matmulSize[2] % 4 == 0;
-  if (alignedAny64x64x16 || !alignedAll4x4x4) {
+  if (alignedAny64x64x16) {
     LLVM_DEBUG(DBGS() << "alignment check failed\n");
     return failure();
   }
