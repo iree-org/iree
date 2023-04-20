@@ -1466,8 +1466,7 @@ for general details.</p>
 <summary>Tip - Faster recompilation with ccache</summary>
 <p>We recommend using <a href="https://ccache.dev/"><code>ccache</code></a> with CMake, especially
 when rebuilding the compiler. To use it, configure CMake with:</p>
-<div class="highlight"><pre><span></span><code>-DCMAKE_C_COMPILER_LAUNCHER<span class="o">=</span>ccache
--DCMAKE_CXX_COMPILER_LAUNCHER<span class="o">=</span>ccache
+<div class="highlight"><pre><span></span><code>-DCMAKE_C_COMPILER_LAUNCHER<span class="o">=</span>ccache<span class="w"> </span>-DCMAKE_CXX_COMPILER_LAUNCHER<span class="o">=</span>ccache
 </code></pre></div>
 <p>See also our <a href="https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/ccache.md">developer documentation for ccache</a>.</p>
 </details>
