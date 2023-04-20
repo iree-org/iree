@@ -1,0 +1,42 @@
+{
+  "version": "3.9",
+  "services": {
+    "iree-dev": {
+      "image": null,
+      "build": {
+        "context": "../",
+        "network": "host",
+        "dockerfile": null
+      },
+      "network_mode": "host",
+      "ipc": "host",
+      "cap_add": [
+        "SYS_PTRACE",
+        "SYS_ADMIN"
+      ],
+      "security_opt": [
+        "seccomp:unconfined"
+      ],
+      "deploy": {
+        "resources": {
+          "reservations": {
+            "devices": [
+              {
+                "driver": "nvidia",
+                "count": 1,
+                "capabilities": [
+                  "gpu"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "volumes": [
+        "..:/workspaces/iree:cached",
+        "~/.gitconfig:/etc/gitconfig:cached"
+      ],
+      "command": "/bin/sh -c \"while sleep 1000; do :; done\""
+    }
+  }
+}
