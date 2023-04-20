@@ -102,6 +102,7 @@ iree_cc_library(
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms
+    MLIRArmSMETransforms
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CommonPasses

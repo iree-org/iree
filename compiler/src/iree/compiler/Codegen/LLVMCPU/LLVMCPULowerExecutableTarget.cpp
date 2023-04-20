@@ -191,6 +191,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           isX86(target) || isRISCV(target) ||
           (isAArch64(target) && hasAnySVEFeature(target));
       bool enableMicrokernels = hasMicrokernels(target);
+      bool enableAArch64SSVE = isAArch64(target) && hasAnySVEFeature(target) &&
+                               hasSMEFeature(target);
       if (!testLoweringConfiguration) {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
@@ -200,7 +202,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUBufferOpsTileAndVectorize:
             addCPUBufferOpsTileAndVectorizePipeline(executableLoweringPipeline,
-                                                    enableVectorMasking);
+                                                    enableVectorMasking,
+                                                    enableAArch64SSVE);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
@@ -219,12 +222,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline,
                 static_cast<int>(TilingLevel::NumTileLevels),
-                /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2);
+                /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2,
+                enableAArch64SSVE);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
             addConvTileAndDecomposeExpertPassPipeline(
-                executableLoweringPipeline, enableVectorMasking);
+                executableLoweringPipeline, enableVectorMasking,
+                enableAArch64SSVE);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert:
             addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
