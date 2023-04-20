@@ -9,7 +9,7 @@
 // RUN: -td-matmul-strategy-num-threads-x=32 \
 // RUN: -td-matmul-strategy-num-threads-y=4 \
 // RUN: -td-matmul-strategy-num-threads-z=1 \
-// RUN: -td-matmul-strategy-num-warps-x=8 \
+// RUN: -td-matmul-strategy-num-warps-x=1 \
 // RUN: -td-matmul-strategy-num-warps-y=4 \
 // RUN: -td-matmul-strategy-num-warps-z=1 \
 // RUN: -td-matmul-strategy-use-async-copies=true \
@@ -134,13 +134,13 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.structured.insert_slice_to_copy %{{.*}} : (!pdl.operation) -> !pdl.operation
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [64, 2] tile_sizes [](mapping = [#gpu.linear<x>, #gpu.linear<y>])
 // WITH_OPTIONS:   transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!pdl.operation) -> ()
-// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
+// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [8, 16] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
 // WITH_OPTIONS: transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!pdl.operation) -> ()
-// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
-// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [2, 4]
-// WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [2, 4]
+// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [8, 16] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
+// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 4] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 4] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [4, 4]
+// WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [1, 4]
 // WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [32, 4]
 // WITH_OPTIONS: transform.vector.lower_masked_transfers %{{.*}} : (!pdl.operation) -> !pdl.operation
 // WITH_OPTIONS: transform.structured.vectorize %{{.*}}
@@ -150,7 +150,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.iree.forall_to_workgroup %{{.*}} : (!pdl.operation) -> ()
 // The workgroup dimensions are controled by td-matmul-strategy-num-threads-XX.
 // The warp dimensions are controled by td-matmul-strategy-num-warps-XX.
-// WITH_OPTIONS: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [32, 4, 1] warp_dims = [8, 4, 1] : (!pdl.operation) -> ()
+// WITH_OPTIONS: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [32, 4, 1] warp_dims = [1, 4, 1] : (!pdl.operation) -> ()
 // WITH_OPTIONS: transform.iree.hoist_static_alloc %{{.*}} : (!pdl.operation) -> ()
 // WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {fold_memref_aliases} : (!pdl.operation) -> ()
 // WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {extract_address_computations} : (!pdl.operation) -> ()
@@ -173,6 +173,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.vector.lower_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
 // WITH_OPTIONS: transform.vector.materialize_masks %{{.*}} : (!pdl.operation) -> !pdl.operation
 // WITH_OPTIONS: transform.iree.apply_patterns %{{.*}} {canonicalization, cse, fold_memref_aliases, licm, tiling_canonicalization} : (!pdl.operation) -> ()
+
 // -----
 
 hal.executable @matmul {

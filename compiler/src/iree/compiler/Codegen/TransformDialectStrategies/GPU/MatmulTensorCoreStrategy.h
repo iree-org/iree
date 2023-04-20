@@ -108,6 +108,11 @@ struct MatmulStrategy : StrategyBase {
     for (auto v : numThreads) res *= v;
     return res;
   }
+  int64_t totalNumWarps() const {
+    int64_t res = 1;
+    for (auto v : numWarps) res *= v;
+    return res;
+  }
 
   int64_t lhsCopyVectorSize() const {
     if (k() % 4 == 0) return 4;

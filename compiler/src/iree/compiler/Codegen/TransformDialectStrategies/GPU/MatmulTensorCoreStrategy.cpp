@@ -524,6 +524,10 @@ static Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH) {
 
 void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
     ImplicitLocOpBuilder &b, Value variantH, const MatmulStrategy &strategy) {
+  assert(strategy.totalNumThreads() ==
+             strategy.totalNumWarps() * kCudaWarpSize &&
+         "Number of threads specified by warps must match total number of "
+         "threads");
   // Step 1. Apply block-level part of the strategy, keeps everything fused.
   auto [fillH, matmulH, maybeTiledTrailingHBlock, forall] =
       buildMatmulStrategyBlockDistribution(b, variantH, strategy);
