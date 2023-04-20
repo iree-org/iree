@@ -523,17 +523,17 @@ iree_status_t iree_vm_bytecode_function_verify(
   pc += 4;
 #define VM_VerifyConstI64(name)            \
   IREE_VM_VERIFY_PC_RANGE(pc + 8, max_pc); \
-  uint32_t name = OP_I64(0);               \
+  uint64_t name = OP_I64(0);               \
   (void)(name);                            \
   pc += 8;
 #define VM_VerifyConstF32(name)            \
   IREE_VM_VERIFY_PC_RANGE(pc + 4, max_pc); \
-  uint32_t name = OP_F32(0);               \
+  float name = OP_F32(0);                  \
   (void)(name);                            \
   pc += 4;
 #define VM_VerifyConstF64(name)            \
   IREE_VM_VERIFY_PC_RANGE(pc + 8, max_pc); \
-  uint32_t name = OP_F64(0);               \
+  double name = OP_F64(0);                 \
   (void)(name);                            \
   pc += 8;
 
