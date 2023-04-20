@@ -68,20 +68,24 @@ struct StrategyBase {
 struct MatmulStrategy : StrategyBase {
   MatmulStrategy(MLIRContext *context,
                  const transform_ext::MatchedMatmulCaptures &captures)
-      : StrategyBase(context), captures(captures) {}
+      : StrategyBase(context), captures(captures) {
+    initDefaultValues();
+  }
 
   /// Constructor quantities.
   transform_ext::MatchedMatmulCaptures captures;
 
   /// Tile sizes for the workgroup / determines grid size for all known
-  /// reduction strategies.
-  SmallVector<int64_t> blockTileSizes = {128, 128, 1};
-  int64_t reductionTileSize = 16;
-  SmallVector<int64_t> numThreads = {64, 2, 1};
-  SmallVector<int64_t> numWarps = {2, 2, 1};
-  bool useAsyncCopies = true;
-  bool useMmaSync = false;
-  int64_t pipelineDepth = 3;
+  /// reduction strategies. The initial values are set by initDefaultValues();
+  SmallVector<int64_t> blockTileSizes;
+  int64_t reductionTileSize;
+  SmallVector<int64_t> numThreads;
+  SmallVector<int64_t> numWarps;
+  bool useAsyncCopies;
+  bool useMmaSync;
+  int64_t pipelineDepth;
+
+  void initDefaultValues();
 
   int64_t m() const {
     assert(captures.matmulOpSizes.size() == 3 && "need 3 sizes");
