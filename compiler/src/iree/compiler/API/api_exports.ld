@@ -7,6 +7,7 @@ VER_0 {
     ireeCompilerErrorGetMessage;
     ireeCompilerGetAPIVersion;
     ireeCompilerGetProcessCLArgs;
+    ireeCompilerGetRevision;
     ireeCompilerGlobalInitialize;
     ireeCompilerGlobalShutdown;
     ireeCompilerInvocationCreate;

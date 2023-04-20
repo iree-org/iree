@@ -6,6 +6,7 @@ EXPORTS
   ireeCompilerErrorGetMessage
   ireeCompilerGetAPIVersion
   ireeCompilerGetProcessCLArgs
+  ireeCompilerGetRevision
   ireeCompilerGlobalInitialize
   ireeCompilerGlobalShutdown
   ireeCompilerInvocationCreate

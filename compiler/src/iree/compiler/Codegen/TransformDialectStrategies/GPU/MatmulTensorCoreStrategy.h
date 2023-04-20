@@ -16,69 +16,72 @@ namespace gpu {
 
 struct GPUModel;
 
-struct MatmulStrategy {
-  MatmulStrategy(MLIRContext *context,
-                 const transform_ext::MatchedMatmulCaptures &captures)
-      : context(context), captures(captures) {}
+/// Base quantities generally useful for all GPU strategies.
+// TODO: refactor into a common place.
+struct StrategyBase {
+  StrategyBase(MLIRContext *ctx) : ctx(ctx) {}
 
   /// Constructor quantities.
-  MLIRContext *context;
+  MLIRContext *ctx;
+
+  Attribute blockX() const {
+    return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimX);
+  }
+  Attribute blockY() const {
+    return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimY);
+  }
+  Attribute blockZ() const {
+    return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimZ);
+  }
+  Attribute threadX() const {
+    return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimX);
+  }
+  Attribute threadY() const {
+    return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimY);
+  }
+  Attribute threadZ() const {
+    return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimZ);
+  }
+  Attribute warpX() const {
+    return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimX);
+  }
+  Attribute warpY() const {
+    return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimY);
+  }
+  Attribute warpZ() const {
+    return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimZ);
+  }
+  Attribute linearIdX() const {
+    return mlir::gpu::GPULinearIdMappingAttr::get(ctx,
+                                                  mlir::gpu::LinearId::DimX);
+  }
+  Attribute linearIdY() const {
+    return mlir::gpu::GPULinearIdMappingAttr::get(ctx,
+                                                  mlir::gpu::LinearId::DimY);
+  }
+  Attribute linearIdZ() const {
+    return mlir::gpu::GPULinearIdMappingAttr::get(ctx,
+                                                  mlir::gpu::LinearId::DimZ);
+  }
+};
+
+struct MatmulStrategy : StrategyBase {
+  MatmulStrategy(MLIRContext *context,
+                 const transform_ext::MatchedMatmulCaptures &captures)
+      : StrategyBase(context), captures(captures) {}
+
+  /// Constructor quantities.
   transform_ext::MatchedMatmulCaptures captures;
 
   /// Tile sizes for the workgroup / determines grid size for all known
   /// reduction strategies.
   SmallVector<int64_t> blockTileSizes = {128, 128, 1};
   int64_t reductionTileSize = 16;
-  SmallVector<int64_t> numThreads = {32, 4, 1};
+  SmallVector<int64_t> numThreads = {64, 2, 1};
   SmallVector<int64_t> numWarps = {2, 2, 1};
+  bool useAsyncCopies = true;
   bool useMmaSync = false;
   int64_t pipelineDepth = 3;
-
-  Attribute blockX(MLIRContext *ctx) const {
-    return mlir::gpu::GPUBlockMappingAttr::get(context,
-                                               mlir::gpu::Blocks::DimX);
-  }
-  Attribute blockY(MLIRContext *ctx) const {
-    return mlir::gpu::GPUBlockMappingAttr::get(context,
-                                               mlir::gpu::Blocks::DimY);
-  }
-  Attribute blockZ(MLIRContext *ctx) const {
-    return mlir::gpu::GPUBlockMappingAttr::get(context,
-                                               mlir::gpu::Blocks::DimZ);
-  }
-  Attribute threadX(MLIRContext *ctx) const {
-    return mlir::gpu::GPUThreadMappingAttr::get(context,
-                                                mlir::gpu::Threads::DimX);
-  }
-  Attribute threadY(MLIRContext *ctx) const {
-    return mlir::gpu::GPUThreadMappingAttr::get(context,
-                                                mlir::gpu::Threads::DimY);
-  }
-  Attribute threadZ(MLIRContext *ctx) const {
-    return mlir::gpu::GPUThreadMappingAttr::get(context,
-                                                mlir::gpu::Threads::DimZ);
-  }
-  Attribute warpX(MLIRContext *ctx) const {
-    return mlir::gpu::GPUWarpMappingAttr::get(context, mlir::gpu::Warps::DimX);
-  }
-  Attribute warpY(MLIRContext *ctx) const {
-    return mlir::gpu::GPUWarpMappingAttr::get(context, mlir::gpu::Warps::DimY);
-  }
-  Attribute warpZ(MLIRContext *ctx) const {
-    return mlir::gpu::GPUWarpMappingAttr::get(context, mlir::gpu::Warps::DimZ);
-  }
-  Attribute linearIdX(MLIRContext *ctx) const {
-    return mlir::gpu::GPULinearIdMappingAttr::get(context,
-                                                  mlir::gpu::LinearId::DimX);
-  }
-  Attribute linearIdY(MLIRContext *ctx) const {
-    return mlir::gpu::GPULinearIdMappingAttr::get(context,
-                                                  mlir::gpu::LinearId::DimY);
-  }
-  Attribute linearIdZ(MLIRContext *ctx) const {
-    return mlir::gpu::GPULinearIdMappingAttr::get(context,
-                                                  mlir::gpu::LinearId::DimZ);
-  }
 
   int64_t m() const {
     assert(captures.matmulOpSizes.size() == 3 && "need 3 sizes");
@@ -112,51 +115,75 @@ struct MatmulStrategy {
 
   struct MappingInfo {
     SmallVector<int64_t> numThreads;
+    // Explicitly computing the tileSizes is only needed until masked
+    // vectorization properly computes the bounds automatically.
+    SmallVector<int64_t> tileSizes;
     SmallVector<Attribute> threadMapping;
   };
-  MappingInfo getBlockMapping(MLIRContext *ctx) const {
-    ArrayRef<int64_t> blocks{blockTileSizes};
-    return MappingInfo{SmallVector<int64_t>{blocks.take_front(2)},
-                       {blockY(ctx), blockX(ctx)}};
+  MappingInfo getBlockMapping() const {
+    return MappingInfo{/*numThreads=*/{},
+                       /*tileSizes=*/{blockTileSizes[0], blockTileSizes[1]},
+                       /*threadMapping=*/{blockY(), blockX()}};
   }
   // LHS copy is of size mxk.
-  MappingInfo lhsCopyMapping(MLIRContext *ctx) const {
+  MappingInfo lhsCopyMapping() const {
     assert(reductionTileSize % lhsCopyVectorSize() == 0 &&
            "vector size must divide reductionTileSize");
     int64_t numThreadsK = reductionTileSize / lhsCopyVectorSize();
     assert(totalNumThreads() % numThreadsK == 0 &&
            "num threads must be divisible by num threads along k");
     int64_t numThreadsM = totalNumThreads() / numThreadsK;
-    return MappingInfo{{numThreadsM, numThreadsK},
-                       {threadX(ctx), threadY(ctx)}};
+    assert(blockTileSizes[0] % numThreadsM == 0 &&
+           "blockTileSizes[0] must be divisible by numThreadsM");
+    assert(reductionTileSize % numThreadsK == 0 &&
+           "reductionTileSize must be divisible by numThreadsK");
+    return MappingInfo{
+        /*numThreads=*/{numThreadsM, numThreadsK},
+        /*tileSizes=*/
+        {blockTileSizes[0] / numThreadsM, reductionTileSize / numThreadsK},
+        /*threadMapping=*/{linearIdX(), linearIdY()}};
   }
   // RHS copy is of size kxn.
-  MappingInfo rhsCopyMapping(MLIRContext *ctx) const {
+  MappingInfo rhsCopyMapping() const {
     assert(blockTileSizes[1] % rhsCopyVectorSize() == 0 &&
            "vector size must divide blockTileSizes[1]");
     int64_t numThreadsN = blockTileSizes[1] / rhsCopyVectorSize();
     assert(totalNumThreads() % numThreadsN == 0 &&
            "num threads must be divisible by num threads along n");
     int64_t numThreadsK = totalNumThreads() / numThreadsN;
-    return MappingInfo{{numThreadsK, numThreadsN},
-                       {threadY(ctx), threadX(ctx)}};
+    assert(reductionTileSize % numThreadsK == 0 &&
+           "blockTileSizes[0] must be divisible by numThreadsK");
+    assert(blockTileSizes[1] % numThreadsN == 0 &&
+           "reductionTileSize must be divisible by numThreadsN");
+    return MappingInfo{
+        /*numThreads=*/{numThreadsK, numThreadsN},
+        /*tileSizes=*/
+        {reductionTileSize / numThreadsK, blockTileSizes[1] / numThreadsN},
+        /*threadMapping=*/{linearIdY(), linearIdX()}};
   }
   // RES copy is of size mxn.
-  MappingInfo resCopyMapping(MLIRContext *ctx) const {
+  MappingInfo resCopyMapping() const {
     assert(blockTileSizes[1] % resCopyVectorSize() == 0 &&
            "vector size must divide n");
     int64_t numThreadsN = blockTileSizes[1] / resCopyVectorSize();
     assert(totalNumThreads() % numThreadsN == 0 &&
            "num threads must be divisible by num threads along n");
     int64_t numThreadsM = totalNumThreads() / numThreadsN;
-    return MappingInfo{{numThreadsM, numThreadsN},
-                       {threadY(ctx), threadX(ctx)}};
+    assert(blockTileSizes[0] % numThreadsM == 0 &&
+           "blockTileSizes[0] must be divisible by numThreadsM");
+    assert(blockTileSizes[1] % numThreadsN == 0 &&
+           "blockTileSizes[1] must be divisible by numThreadsN");
+    return MappingInfo{
+        /*numThreads=*/{numThreadsM, numThreadsN},
+        /*tileSizes=*/
+        {blockTileSizes[0] / numThreadsM, blockTileSizes[1] / numThreadsN},
+        /*threadMapping=*/{linearIdY(), linearIdX()}};
   }
   // COMPUTE is of size mxn.
-  MappingInfo computeMapping(MLIRContext *ctx) const {
-    ArrayRef<int64_t> warps{numWarps};
-    return MappingInfo{SmallVector<int64_t>{warps.take_front(2)},
-                       {warpY(ctx), warpX(ctx)}};
+  MappingInfo computeMapping() const {
+    return MappingInfo{/*numThreads=*/{numWarps[0], numWarps[1]},
+                       /*tileSizes=*/{},
+                       /*threadMapping=*/{warpY(), warpX()}};
   }
 };
 

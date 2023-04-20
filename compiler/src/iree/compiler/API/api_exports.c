@@ -14,6 +14,7 @@ extern void ireeCompilerErrorDestroy();
 extern void ireeCompilerErrorGetMessage();
 extern void ireeCompilerGetAPIVersion();
 extern void ireeCompilerGetProcessCLArgs();
+extern void ireeCompilerGetRevision();
 extern void ireeCompilerGlobalInitialize();
 extern void ireeCompilerGlobalShutdown();
 extern void ireeCompilerInvocationCreate();
@@ -604,6 +605,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerErrorGetMessage;
   x += (uintptr_t)&ireeCompilerGetAPIVersion;
   x += (uintptr_t)&ireeCompilerGetProcessCLArgs;
+  x += (uintptr_t)&ireeCompilerGetRevision;
   x += (uintptr_t)&ireeCompilerGlobalInitialize;
   x += (uintptr_t)&ireeCompilerGlobalShutdown;
   x += (uintptr_t)&ireeCompilerInvocationCreate;

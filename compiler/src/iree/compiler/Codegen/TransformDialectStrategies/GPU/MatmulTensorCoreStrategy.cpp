@@ -160,23 +160,22 @@ static std::tuple<Value, Value, Value> buildDistributeCopies(
   Value copyBackOpH = b.create<transform::InsertSliceToCopyOp>(
       insertSliceH.getType(), insertSliceH);
 
-  MLIRContext *ctx = b.getContext();
   Value lhsH = b.create<transform::GetProducerOfOperand>(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(0));
   Value rhsH = b.create<transform::GetProducerOfOperand>(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(1));
 
-  MatmulStrategy::MappingInfo lhsCopyMapping = strategy.lhsCopyMapping(ctx);
+  MatmulStrategy::MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
   Value lhsCopyOpH = buildDistributeOnePadOrCopy(
       b, variantH, lhsH, /*numThreads=*/lhsCopyMapping.numThreads,
       /*threadDimMapping=*/lhsCopyMapping.threadMapping, /*foldIfBranch=*/true);
 
-  MatmulStrategy::MappingInfo rhsCopyMapping = strategy.rhsCopyMapping(ctx);
+  MatmulStrategy::MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
   Value rhsCopyOpH = buildDistributeOnePadOrCopy(
       b, variantH, rhsH, /*numThreads=*/rhsCopyMapping.numThreads,
       /*threadDimMapping=*/rhsCopyMapping.threadMapping, /*foldIfBranch=*/true);
 
-  MatmulStrategy::MappingInfo resCopyMapping = strategy.resCopyMapping(ctx);
+  MatmulStrategy::MappingInfo resCopyMapping = strategy.resCopyMapping();
   copyBackOpH = buildDistributeOnePadOrCopy(
       b, variantH, copyBackOpH,
       /*numThreads=*/resCopyMapping.numThreads,
@@ -203,13 +202,15 @@ static void buildMatmulVectorization(ImplicitLocOpBuilder &b, Value variantH,
         b, configuration, variantH);
   }
   // Apply vector masking.
-  // TODO: extract information from strategy.
+  MatmulStrategy::MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
   b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
-                                         ArrayRef<int64_t>({4, 4}));
+                                         lhsCopyMapping.tileSizes);
+  MatmulStrategy::MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
   b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), false,
-                                         ArrayRef<int64_t>({4, 4}));
+                                         rhsCopyMapping.tileSizes);
+  MatmulStrategy::MappingInfo resCopyMapping = strategy.resCopyMapping();
   b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
-                                         ArrayRef<int64_t>({32, 4}));
+                                         resCopyMapping.tileSizes);
 
   // TODO: don't rematch, apply on the variant op directly.
   Value funcH =
@@ -357,8 +358,7 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
   // Step 2. Create the block/mapping tiling level and fusee.
   // auto [fusionTargetH, fusionGroupH] =
   //     buildSelectFirstNonEmpty(b, maybeTrailingH, matmulH);
-  MLIRContext *ctx = b.getContext();
-  MatmulStrategy::MappingInfo blockMapping = strategy.getBlockMapping(ctx);
+  MatmulStrategy::MappingInfo blockMapping = strategy.getBlockMapping();
   TileToForallAndFuseAndDistributeResult tileResult =
       buildTileFuseDistToForallAndWorkgroupCountWithTileSizes(
           /*builder=*/b,
@@ -366,7 +366,7 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
           /*rootH=*/matmulH,
           /*opsToFuseH=*/fillH,
           /*tileSizes=*/
-          getAsOpFoldResult(b.getI64ArrayAttr(blockMapping.numThreads)),
+          getAsOpFoldResult(b.getI64ArrayAttr(blockMapping.tileSizes)),
           /*threadDimMapping=*/
           b.getArrayAttr(blockMapping.threadMapping));
 
@@ -418,8 +418,7 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   // Step 5. Distribute to warps: SIMD programming model.
   // TODO: get the number of warps from strategy.
-  MLIRContext *ctx = b.getContext();
-  MatmulStrategy::MappingInfo computeMapping = strategy.computeMapping(ctx);
+  MatmulStrategy::MappingInfo computeMapping = strategy.computeMapping();
   buildTileFuseDistToForallWithNumThreads(
       b, variantH, paddedMatmulOpH, ValueRange(),
       getAsOpFoldResult(b.getI64ArrayAttr(computeMapping.numThreads)),
@@ -448,15 +447,17 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // TODO: avoid consuming handles and returning here.
   funcH = buildConvertToTensorCoreOp(b, funcH, strategy);
 
-  // Step 10. Multi-buffering.
-  buildMultiBuffering(b, funcH, strategy);
+  if (strategy.useAsyncCopies) {
+    // Step 10. Multi-buffering.
+    buildMultiBuffering(b, funcH, strategy);
 
-  // Step 11. Convert to async copies.
-  // TODO: avoid consuming handles and returning here.
-  funcH = buildConvertToAsyncCopies(b, funcH, strategy);
+    // Step 11. Convert to async copies.
+    // TODO: avoid consuming handles and returning here.
+    funcH = buildConvertToAsyncCopies(b, funcH, strategy);
 
-  // Step 12. Pipeline shared memory copies.
-  buildPipelineSharedMemoryCopies(b, funcH, strategy);
+    // Step 12. Pipeline shared memory copies.
+    buildPipelineSharedMemoryCopies(b, funcH, strategy);
+  }
 
   // Step 13. Late lowerings and cleanups.
   // TODO: not a functional style op to avoid invalidating artificially.

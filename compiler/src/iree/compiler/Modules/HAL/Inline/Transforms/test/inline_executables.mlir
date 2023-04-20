@@ -174,7 +174,7 @@ func.func private @dispatch0(%resource0: !stream.resource<constant>, %resource1:
                                %resource2 as %resource2_inner: !stream.resource<external>{%resource_size}) {
     // CHECK: stream.cmd.dispatch
     // CHECK: hal_inline.target = @__dispatch_ex_dispatch_0
-    stream.cmd.dispatch @ex::@dispatch_0[%workload_x, %workload_y](%constant0, %constant1 : i32, i32) {
+    stream.cmd.dispatch @ex::@vmvx_ir::@dispatch_0[%workload_x, %workload_y](%constant0, %constant1 : i32, i32) {
       ro %resource0_inner[%binding0_offset for %binding0_length] : !stream.resource<constant>{%resource_size},
       ro %resource1_inner[%binding1_offset for %binding1_length] : !stream.resource<transient>{%resource_size},
       wo %resource2_inner[%binding2_offset for %binding2_length] : !stream.resource<external>{%resource_size}
