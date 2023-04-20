@@ -5,6 +5,7 @@ _ireeCompilerErrorDestroy
 _ireeCompilerErrorGetMessage
 _ireeCompilerGetAPIVersion
 _ireeCompilerGetProcessCLArgs
+_ireeCompilerGetRevision
 _ireeCompilerGlobalInitialize
 _ireeCompilerGlobalShutdown
 _ireeCompilerInvocationCreate
