@@ -414,42 +414,6 @@ vm.import private @fill.2d.x32(
 )
 
 //==============================================================================
-// matmul ops
-//==============================================================================
-
-vm.import private @matmul.f32f32f32(
-  %lhs_buffer : !vm.buffer,
-  %lhs_offset : i64,
-  %lhs_row_stride : i64,
-  %rhs_buffer : !vm.buffer,
-  %rhs_offset : i64,
-  %rhs_row_stride : i64,
-  %out_buffer : !vm.buffer,
-  %out_offset : i64,
-  %out_row_stride : i64,
-  %m : i64,
-  %n : i64,
-  %k : i64,
-  %flags : i32
-)
-
-vm.import private @matmul.i8i8i32(
-  %lhs_buffer : !vm.buffer,
-  %lhs_offset : i64,
-  %lhs_row_stride : i64,
-  %rhs_buffer : !vm.buffer,
-  %rhs_offset : i64,
-  %rhs_row_stride : i64,
-  %out_buffer : !vm.buffer,
-  %out_offset : i64,
-  %out_row_stride : i64,
-  %m : i64,
-  %n : i64,
-  %k : i64,
-  %flags : i32
-)
-
-//==============================================================================
 // mmt4d ops
 //==============================================================================
 
