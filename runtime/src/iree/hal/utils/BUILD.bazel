@@ -108,6 +108,17 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "libmpi_test",
+    srcs = ["libmpi_test.cc"],
+    deps = [
+        ":iree_hal_libmpi",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_library(
     name = "resource_set",
     srcs = ["resource_set.c"],
