@@ -23,7 +23,7 @@ ml_program.global private mutable @variable(dense<0> : tensor<2xui32>) : tensor<
 func.func @global_types() -> tensor<2xui32> {
   // CHECK-NEXT: %[[VALUE:.+]] = ml_program.global_load @variable : tensor<2xi32>
   %0 = ml_program.global_load @variable : tensor<2xui32>
-  // CHECK-NEXT: %[[CAST:.*]] = util.reinterpret %[[VALUE]] : tensor<2xi32> to tensor<2xui32>
+  // CHECK-NEXT: %[[CAST:.*]] = tensor.bitcast %[[VALUE]] : tensor<2xi32> to tensor<2xui32>
   // CHECK: return %[[CAST]] : tensor<2xui32>
   return %0 : tensor<2xui32>
 }
@@ -43,8 +43,8 @@ func.func @optimization_barrier(%arg0: tensor<3x4xf32>, %arg1: tensor<4xi32>) ->
 
 // CHECK: @unsigned_integer_input_output(%[[ARG0:.*]]: tensor<2x2xui32>, %[[ARG1:.*]]: tensor<2x2xui32>) -> tensor<2x2xui32>
 func.func @unsigned_integer_input_output(%arg0: tensor<2x2xui32>, %arg1: tensor<2x2xui32>) -> tensor<2x2xui32> {
-  // CHECK: %[[CAST0:.*]] = util.reinterpret %[[ARG0]] : tensor<2x2xui32> to tensor<2x2xi32>
-  // CHECK: %[[CAST1:.*]] = util.reinterpret %[[ARG1]] : tensor<2x2xui32> to tensor<2x2xi32>
+  // CHECK: %[[CAST0:.*]] = tensor.bitcast %[[ARG0]] : tensor<2x2xui32> to tensor<2x2xi32>
+  // CHECK: %[[CAST1:.*]] = tensor.bitcast %[[ARG1]] : tensor<2x2xui32> to tensor<2x2xi32>
   // CHECK: %[[INIT:.*]] = tensor.empty() : tensor<2x2xi32> 
   // CHECK: %[[LINALG:.*]] = linalg.generic
   //  CHECK-SAME:       ins(%[[CAST0]], %[[CAST1]] : tensor<2x2xi32>, tensor<2x2xi32>
@@ -53,7 +53,7 @@ func.func @unsigned_integer_input_output(%arg0: tensor<2x2xui32>, %arg1: tensor<
   // CHECK: %[[ADD:.*]] = arith.addi %[[IN0]], %[[IN1]] : i32
   // CHECK: linalg.yield %[[ADD:.*]] : i32 
   %0 = "mhlo.add"(%arg0, %arg1) : (tensor<2x2xui32>, tensor<2x2xui32>) -> tensor<2x2xui32>
-  // CHECK: %[[CAST_RESULT:.*]] = util.reinterpret %[[LINALG]] : tensor<2x2xi32> to tensor<2x2xui32>
+  // CHECK: %[[CAST_RESULT:.*]] = tensor.bitcast %[[LINALG]] : tensor<2x2xi32> to tensor<2x2xui32>
   // CHECK: return %[[CAST_RESULT]]
   return %0 : tensor<2x2xui32>
 }
