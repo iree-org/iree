@@ -230,7 +230,10 @@ struct OptimizationBarrierOpConversion
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> outputs;
     for (unsigned i = 0, e = adaptor.getOperands().size(); i < e; ++i) {
-      outputs.push_back(rewriter.create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), adaptor.getOperands()[i]).getResult(0));
+      outputs.push_back(rewriter
+                            .create<IREE::Util::OptimizationBarrierOp>(
+                                op.getLoc(), adaptor.getOperands()[i])
+                            .getResult(0));
     }
     rewriter.replaceOp(op, outputs);
     return success();
