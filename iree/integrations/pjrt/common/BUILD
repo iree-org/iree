@@ -44,6 +44,7 @@ iree_pjrt_cc_library(
     hdrs = [
         "api_impl.h",
         "dylib_entry_point.cc.inc",
+        "iree_helpers.h",
         "platform.h",
     ],
     deps = [

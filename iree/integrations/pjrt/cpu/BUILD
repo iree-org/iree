@@ -16,6 +16,7 @@ iree_pjrt_cc_library(
     ],
     deps = [
         "//iree/integrations/pjrt/common:impl",
+        "@iree_core//runtime/src/iree/hal/drivers/local_sync:sync_driver",
         "@iree_core//runtime/src/iree/hal/drivers/local_task:task_driver",
         "@iree_core//runtime/src/iree/hal/local",
         "@iree_core//runtime/src/iree/hal/local:executable_loader",

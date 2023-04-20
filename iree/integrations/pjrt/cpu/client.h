@@ -23,9 +23,8 @@ class CPUClientInstance final : public ClientInstance {
  private:
   iree_status_t InitializeDeps();
 
-  // Options.
-  iree_hal_task_device_params_t device_params_;
-  iree_task_executor_options_t task_executor_options_;
+  // Instance scoped options.
+  bool single_threaded_debug_ = false;
   iree_task_topology_t task_topology_options_;
 
   // Deps.

@@ -11,6 +11,7 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/integrations/pjrt/common/iree_helpers.h"
 #include "iree/integrations/pjrt/common/tensor_utils.h"
 
 using iree::vm::retain_ref;
@@ -461,7 +462,7 @@ iree_status_t BufferInstance::GetHostSizeInBytes(iree_host_size_t* host_size) {
 
 iree_status_t BufferInstance::AsyncDeallocate() {
   IREE_TRACE_SCOPE();
-  return iree_hal_device_queue_dealloca(
+  return IreeApi::hal_device_queue_dealloca(
       device().device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(done_fence()),
       /*signal_semaphore_list=*/iree_hal_semaphore_list_empty(),
@@ -535,7 +536,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
     copy_data->event->ExternalSignalReady(iree_ok_status());
     delete copy_data;
   };
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_import_buffer(
+  IREE_RETURN_IF_ERROR(IreeApi::hal_allocator_import_buffer(
       device_.device_allocator(), dst_buffer_params, &dst_external_buffer,
       /*release_callback=*/{release_callback, copy_to_host_data}, &dst_buffer));
 
@@ -556,7 +557,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
       /*transfer_count=*/1, &transfer_command, &transfer_cb));
   dst_buffer.reset();
 
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
+  IREE_RETURN_IF_ERROR(IreeApi::hal_device_queue_execute(
       device_.device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(ready_fence_.get()),
       /*signal_semaphore_list=*/iree_hal_semaphore_list_empty(),
@@ -567,12 +568,12 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
 
 iree_status_t BufferInstance::AdvanceReadyFence(iree_hal_semaphore_t* semaphore,
                                                 uint64_t timepoint) {
-  return iree_hal_fence_insert(ready_fence_.get(), semaphore, timepoint);
+  return IreeApi::hal_fence_insert(ready_fence_.get(), semaphore, timepoint);
 }
 
 iree_status_t BufferInstance::AdvanceDoneFence(iree_hal_semaphore_t* semaphore,
                                                uint64_t timepoint) {
-  return iree_hal_fence_insert(done_fence_.get(), semaphore, timepoint);
+  return IreeApi::hal_fence_insert(done_fence_.get(), semaphore, timepoint);
 }
 
 //===----------------------------------------------------------------------===//
@@ -634,8 +635,8 @@ void DeviceInstance::BindApi(PJRT_Api* api) {
 }
 
 iree_status_t DeviceInstance::CreateFence(iree_hal_fence_t** out_fence) {
-  return iree_hal_fence_create(/*capacity=*/2, client_.host_allocator(),
-                               out_fence);
+  return IreeApi::hal_fence_create(/*capacity=*/2, client_.host_allocator(),
+                                   out_fence);
 }
 
 iree_status_t DeviceInstance::OpenDevice() {
@@ -767,7 +768,7 @@ iree_status_t DeviceInstance::HostBufferToDevice(
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   params.usage =
       IREE_HAL_BUFFER_USAGE_DEFAULT | IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET;
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_alloca(
+  IREE_RETURN_IF_ERROR(IreeApi::hal_device_queue_alloca(
       device(), IREE_HAL_QUEUE_AFFINITY_ANY,
       /*wait_semaphore_list=*/
       {1, &transfer_timeline_, &wait_transfer_start},
@@ -803,14 +804,14 @@ iree_status_t DeviceInstance::HostBufferToDevice(
   }
 
   if (has_zero_length) {
-    IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
+    IREE_RETURN_IF_ERROR(IreeApi::hal_device_queue_barrier(
         device(), IREE_HAL_QUEUE_AFFINITY_ANY,
         /*wait_semaphore_list=*/
         {1, &transfer_timeline_, &signal_alloca_complete},
         /*signal_semaphore_list=*/
         {1, &transfer_timeline_, &signal_copy_complete}));
   } else {
-    IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
+    IREE_RETURN_IF_ERROR(IreeApi::hal_device_queue_execute(
         device(), IREE_HAL_QUEUE_AFFINITY_ANY,
         /*wait_semaphore_list=*/
         {1, &transfer_timeline_, &signal_alloca_complete},
@@ -853,7 +854,7 @@ iree_status_t DeviceInstance::AcquireHostStagingBuffer(
   memset(&params, 0, sizeof(params));
   params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
   params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+  IREE_RETURN_IF_ERROR(IreeApi::hal_allocator_allocate_buffer(
       device_allocator(), params, initial_contents.data_length,
       initial_contents, out_buffer));
   // We did a synchronous snapshot (memcpy).
@@ -1494,13 +1495,13 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
     // semaphores.
     IREE_RETURN_IF_ERROR(
         inv.res_exe->device_instance->CreateFence(&inv.wait_fence));
-    IREE_RETURN_IF_ERROR(iree_hal_fence_insert(
+    IREE_RETURN_IF_ERROR(IreeApi::hal_fence_insert(
         inv.wait_fence.get(), inv.res_exe->device_instance->main_timeline(),
         wait_timepoint));
 
     // Signal fence. This signals the next tick on the main execution
     // timeline.
-    IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
+    IREE_RETURN_IF_ERROR(IreeApi::hal_fence_create_at(
         inv.res_exe->device_instance->main_timeline(), signal_timepoint,
         client_.host_allocator(), &inv.signal_fence));
 
@@ -1520,8 +1521,8 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
           iree_vm_list_push_ref_move(inv.inputs.get(), &bv_ref));
 
       // Extend the execute wait to include the input's ready signal.
-      IREE_RETURN_IF_ERROR(
-          iree_hal_fence_extend(inv.wait_fence.get(), buffer->ready_fence()));
+      IREE_RETURN_IF_ERROR(IreeApi::hal_fence_extend(inv.wait_fence.get(),
+                                                     buffer->ready_fence()));
 
       // And extend the buffer's done fence to close over this execution.
       buffer->AdvanceDoneFence(inv.res_exe->device_instance->main_timeline(),
@@ -1541,17 +1542,29 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
   iree_status_t status = iree_ok_status();
   for (size_t dev_index = 0; dev_index < args->num_devices; ++dev_index) {
     auto& inv = invs[dev_index];
-    auto new_status = iree_vm_invoke(
-        inv.res_exe->vm_context.get(), inv.res_exe->main_function,
-        IREE_VM_INVOCATION_FLAG_NONE,
-        /*policy=*/nullptr, inv.inputs.get(), inv.outputs.get(), allocator);
+    if (IreeApi::LOGGING_ENABLED) {
+      IreeApi::LogInvoke(
+          "vm_invoke[async]",
+          "context=%p, f=%d, wait_fence=%p {%s}, signal_fence=%p {%s}",
+          inv.res_exe->vm_context.get(),
+          (int)inv.res_exe->main_function.ordinal, inv.wait_fence.get(),
+          IreeApi::FenceToString(inv.wait_fence.get()).c_str(),
+          inv.signal_fence.get(),
+          IreeApi::FenceToString(inv.signal_fence.get()).c_str());
+    }
+    auto new_status = IreeApi::HandleStatus(
+        "vm_invoke[async]",
+        iree_vm_invoke(inv.res_exe->vm_context.get(),
+                       inv.res_exe->main_function, IREE_VM_INVOCATION_FLAG_NONE,
+                       /*policy=*/nullptr, inv.inputs.get(), inv.outputs.get(),
+                       allocator));
     // Any invocation that fails needs a barrier so that signal fence is
     // incremented otherwise future waits will fail. We do this instead of
     // incrementing as only a subset of devices may fail.
     if (!iree_status_is_ok(new_status)) {
       status = new_status;
       // We can ignore the error as we are already erroring out earlier.
-      IREE_IGNORE_ERROR(iree_hal_device_queue_barrier(
+      IREE_IGNORE_ERROR(IreeApi::hal_device_queue_barrier(
           inv.res_exe->device_instance->device(), IREE_HAL_QUEUE_AFFINITY_ANY,
           iree_hal_fence_semaphore_list(inv.wait_fence.get()),
           iree_hal_fence_semaphore_list(inv.signal_fence.get())));
