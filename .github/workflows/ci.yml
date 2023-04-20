@@ -84,12 +84,12 @@ jobs:
       BUILD_DIR: build-windows
       IREE_VULKAN_DISABLE: 1
     steps:
-      - id: 'gcp-auth'
-        name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v1'
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        uses: "google-github-actions/auth@v1"
         with:
-          token_format: 'access_token'
-          credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
+          token_format: "access_token"
+          credentials_json: "${{ secrets.GOOGLE_CREDENTIALS }}"
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Updating git submodules"
