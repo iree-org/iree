@@ -70,6 +70,7 @@ class BenchmarkConfig:
   driver_filter: Optional[str] = None
   model_name_filter: Optional[str] = None
   mode_filter: Optional[str] = None
+  use_compatible_filter: bool = True
 
   keep_going: bool = False
   benchmark_min_time: float = 0
@@ -121,16 +122,17 @@ class BenchmarkConfig:
       else:
         root_benchmark_dir = build_dir / BENCHMARK_SUITE_REL_PATH
 
-    return BenchmarkConfig(root_benchmark_dir=root_benchmark_dir,
-                           benchmark_results_dir=per_commit_tmp_dir /
-                           BENCHMARK_RESULTS_REL_PATH,
-                           git_commit_hash=git_commit_hash,
-                           normal_benchmark_tool_dir=real_path_or_none(
-                               args.normal_benchmark_tool_dir),
-                           trace_capture_config=trace_capture_config,
-                           driver_filter=args.driver_filter_regex,
-                           model_name_filter=args.model_name_regex,
-                           mode_filter=args.mode_regex,
-                           keep_going=args.keep_going,
-                           benchmark_min_time=args.benchmark_min_time,
-                           continue_from_previous=args.continue_from_previous)
+    return BenchmarkConfig(
+        root_benchmark_dir=root_benchmark_dir,
+        benchmark_results_dir=per_commit_tmp_dir / BENCHMARK_RESULTS_REL_PATH,
+        git_commit_hash=git_commit_hash,
+        normal_benchmark_tool_dir=real_path_or_none(
+            args.normal_benchmark_tool_dir),
+        trace_capture_config=trace_capture_config,
+        driver_filter=args.driver_filter_regex,
+        model_name_filter=args.model_name_regex,
+        mode_filter=args.mode_regex,
+        use_compatible_filter=not args.disable_compatible_filter,
+        keep_going=args.keep_going,
+        benchmark_min_time=args.benchmark_min_time,
+        continue_from_previous=args.continue_from_previous)
