@@ -18,12 +18,12 @@ static const char* kMPILoaderSearchNames[] = {
 
 // Load MPI entry points.
 static iree_status_t iree_hal_mpi_dynamic_symbols_resolve_all(
-    iree_hal_mpi_dynamic_symbols_t* syms) {
+    iree_dynamic_library_t* library, iree_hal_mpi_dynamic_symbols_t* syms) {
 #define MPI_PFN_DECL(mpiSymbolName, ...)                     \
   {                                                          \
     static const char* kName = #mpiSymbolName;               \
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol( \
-        syms, kName, (void**)&syms->mpiSymbolName));         \
+        library, kName, (void**)&syms->mpiSymbolName));      \
   }
 #include "iree/hal/utils/libmpi_dynamic_symbols.h"
 #undef MPI_PFN_DECL
@@ -51,7 +51,7 @@ iree_status_t iree_hal_mpi_initialize_library(
     status =
         iree_allocator_malloc(host_allocator, sizeof(*syms), (void**)&syms);
     if (iree_status_is_ok(status)) {
-      status = iree_hal_mpi_dynamic_symbols_resolve_all(syms);
+      status = iree_hal_mpi_dynamic_symbols_resolve_all(*out_library, syms);
       *out_syms = syms;
     }
   }
