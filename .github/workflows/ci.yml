@@ -41,6 +41,7 @@ on:
   push:
     branches:
       - main
+      - gcmn-windows-git-checkout
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
@@ -74,7 +75,7 @@ jobs:
 
   build_test_all_windows:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
+    # if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on: windows-2022-64core
     defaults:
       run:
