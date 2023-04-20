@@ -820,41 +820,6 @@ OpFoldResult BufferLoadOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-//===----------------------------------------------------------------------===//
-// util.reinterpret
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-// Replaces reinterpet(reinterpret(x, A), B) with reinterpret(x, B)
-struct ReinterpretReinterpretOptimization : public OpRewritePattern<ReinterpretOp> {
-  using OpRewritePattern<ReinterpretOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(ReinterpretOp op,
-                                PatternRewriter &rewriter) const override {
-    Value input = op.getInput();
-    Operation *definingOp = input.getDefiningOp();
-    if (!definingOp)
-      return failure();
-
-    if (ReinterpretOp reinterpretOp = dyn_cast<ReinterpretOp>(definingOp)) {
-      rewriter.replaceOpWithNewOp<ReinterpretOp>(
-          op, op.getType(), reinterpretOp.getInput());
-      return success();
-    }
-
-    return failure();
-  }
-};
-
-}  // namespace
-
-void ReinterpretOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                MLIRContext *context) {
-  results.insert<ReinterpretReinterpretOptimization>(context);
-}
-
-
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler

@@ -1372,13 +1372,6 @@ void BufferStoreOp::setSubrangeOperand(unsigned operandIndex,
   getLengthMutable().assign(operand.length);
 }
 
-bool ReinterpretOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
-  if (inputs.size() != 1 || outputs.size() != 1)
-    return false;
-  // TODO(trevor-m): Improve this.
-  return true;
-}
-
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler

@@ -27,30 +27,12 @@ namespace iree_compiler {
 // Utilities
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-struct RemoveReinterpretOptimization : public OpRewritePattern<IREE::Util::ReinterpretOp> {
-  using OpRewritePattern<IREE::Util::ReinterpretOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(IREE::Util::ReinterpretOp op,
-                                PatternRewriter &rewriter) const override {
-    Value input = op.getInput();
-    rewriter.replaceOp(op, input);
-    return success();
-  }
-};
-
-}
-
-
 void populateUtilConversionPatterns(MLIRContext *context,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
   patterns
       .insert<GenericConvertTypesPattern<IREE::Util::OptimizationBarrierOp>>(
           typeConverter, context);
-  patterns
-      .insert<RemoveReinterpretOptimization>(context);
 
   typeConverter.addConversion([&](IREE::Util::PtrType type,
                                   SmallVectorImpl<Type> &results) {

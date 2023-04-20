@@ -1219,26 +1219,4 @@ def Util_StatusCheckOkOp : Util_Op<"status.check_ok"> {
   ];
 }
 
-//===----------------------------------------------------------------------===//
-// ReinterpretOp
-//===----------------------------------------------------------------------===//
-
-def ReinterpretOp : Util_Op<"reinterpret", [
-  DeclareOpInterfaceMethods<CastOpInterface>,
-  Pure
-]> {
-  let summary = "An reinterpret conversion from one type to another";
-  let description = [{
-    A cast.
-  }];
-
-  let arguments = (ins AnyType:$input);
-  let results = (outs AnyType:$output);
-  let assemblyFormat = [{
-    $input `:` type($input) `to` type($output) attr-dict
-  }];
-
-  let hasCanonicalizer = 1;
-}
-
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_OPS

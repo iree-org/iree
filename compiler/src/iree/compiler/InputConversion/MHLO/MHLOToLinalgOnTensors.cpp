@@ -357,14 +357,14 @@ std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
       .getResult();
 }
 
-std::optional<Value> materializeReinterpret(OpBuilder& builder, Type resultType,
+std::optional<Value> materializeBitcast(OpBuilder& builder, Type resultType,
                                ValueRange inputs,
                                Location loc) {
   if (inputs.size() != 1)
     return std::nullopt;
   // if (getElementTypeOrSelf(inputs.front().getType()).isUnsignedInteger() ||
   //     getElementTypeOrSelf(resultType).isUnsignedInteger())
-  return builder.create<IREE::Util::ReinterpretOp>(loc, resultType, inputs)
+  return builder.create<tensor::BitcastOp>(loc, resultType, inputs)
     .getResult();
 }
 
@@ -377,7 +377,7 @@ std::optional<Value> materializeCastFromIllegal(OpBuilder& builder, Type type,
       !toType.isSignlessInteger())
     return std::nullopt;
   // Use reinterpet to do signless->signful conversions.
-  return builder.create<IREE::Util::ReinterpretOp>(loc, type, inputs[0])
+  return builder.create<tensor::BitcastOp>(loc, type, inputs[0])
       ->getResult(0);
 }
 
@@ -389,7 +389,7 @@ std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
       (!toType.isSignedInteger() && !toType.isUnsignedInteger()))
     return std::nullopt;
   // Use reinterpet to do signless->signful conversions.
-  return builder.create<IREE::Util::ReinterpretOp>(loc, type, inputs[0])
+  return builder.create<tensor::BitcastOp>(loc, type, inputs[0])
       ->getResult(0);
 }
 
@@ -410,9 +410,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
     auto typeConverter = mhlo::createHloToLinalgTypeConverter();
     //auto typeConverter = std::make_unique<LinalgTypeConverter>();
     typeConverter->addArgumentMaterialization(scalarToTensor);
-    typeConverter->addArgumentMaterialization(materializeReinterpret);
-    typeConverter->addTargetMaterialization(materializeReinterpret);
-    typeConverter->addSourceMaterialization(materializeReinterpret);
+    typeConverter->addArgumentMaterialization(materializeBitcast);
+    typeConverter->addTargetMaterialization(materializeBitcast);
+    typeConverter->addSourceMaterialization(materializeBitcast);
     // NOTE: not using corresponding setupMHLOToFlowPatterns because the entire
     // MHLO dialects are marked illegal by this pass.
     // TODO: Collapse/rework all of these patterns once the consolidation
@@ -505,7 +505,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();
     target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect>();
-    target.addLegalOp<IREE::Util::ReinterpretOp>();
+    target.addLegalOp<tensor::BitcastOp>();
     target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
     if (failed(applyPartialConversion(getOperation(), target,
