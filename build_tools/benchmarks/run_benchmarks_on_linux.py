@@ -20,10 +20,16 @@ import shutil
 import subprocess
 import tarfile
 
-from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
+from common.benchmark_driver import IreeBenchmarkDriver
+from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
+                                    BenchmarkSuite)
 from common.benchmark_config import BenchmarkConfig
-from common.benchmark_definition import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash, get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
+from common.benchmark_definition import (execute_cmd,
+                                         execute_cmd_and_get_output,
+                                         get_git_commit_hash,
+                                         get_iree_benchmark_module_arguments,
+                                         wait_for_iree_benchmark_module_start,
+                                         BenchmarkInfo)
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_framework.definitions import iree_definitions
 from e2e_test_framework import serialization
@@ -32,19 +38,21 @@ from e2e_model_tests import run_module_utils
 import common.common_arguments
 
 
-class LinuxBenchmarkDriver(BenchmarkDriver):
+class LinuxBenchmarkDriver(IreeBenchmarkDriver):
   """Linux benchmark driver."""
 
   def __init__(self, gpu_id: str, *args, **kwargs):
     self.gpu_id = gpu_id
     super().__init__(*args, **kwargs)
 
-  def run_benchmark_case(self, benchmark_case: BenchmarkCase,
+  def run_benchmark_case(self, benchmark_info: BenchmarkInfo,
+                         benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
 
     if benchmark_results_filename:
-      self.__run_benchmark(benchmark_case=benchmark_case,
+      self.__run_benchmark(benchmark_info=benchmark_info,
+                           benchmark_case=benchmark_case,
                            results_filename=benchmark_results_filename)
 
     if capture_filename:
@@ -92,7 +100,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
 
     return cmds
 
-  def __run_benchmark(self, benchmark_case: BenchmarkCase,
+  def __run_benchmark(self, benchmark_info: BenchmarkInfo,
+                      benchmark_case: BenchmarkCase,
                       results_filename: pathlib.Path):
     if self.config.normal_benchmark_tool_dir is None:
       raise ValueError("normal_benchmark_tool_dir can't be None.")
@@ -109,10 +118,12 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
               driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
-    result_json = execute_cmd_and_get_output(
+    benchmark_stdout = execute_cmd_and_get_output(
         cmd, cwd=benchmark_case.benchmark_case_dir, verbose=self.verbose)
+    benchmark_run = self._parse_and_serialize_benchmark_run(
+        benchmark_info, results_filename, benchmark_stdout)
     if self.verbose:
-      print(result_json)
+      print(benchmark_run)
 
   def __run_capture(self, benchmark_case: BenchmarkCase,
                     capture_filename: pathlib.Path):
@@ -120,7 +131,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     if capture_config is None:
       raise ValueError("capture_config can't be None.")
 
-    tool_path = capture_config.traced_benchmark_tool_dir / benchmark_case.benchmark_tool_name
+    tool_path = (capture_config.traced_benchmark_tool_dir /
+                 benchmark_case.benchmark_tool_name)
     cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
                                  tool_path=tool_path)
     process = subprocess.Popen(cmd,

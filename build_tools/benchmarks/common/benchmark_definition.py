@@ -390,22 +390,53 @@ class BenchmarkInfo:
 
 
 @dataclass
+class BenchmarkLatency:
+  """Stores latency statistics for a benchmark run."""
+  mean: float
+  median: float
+  stddev: float
+  unit: str
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "mean": self.mean,
+        "median": self.median,
+        "stddev": self.stddev,
+        "unit": self.unit,
+    }
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return BenchmarkLatency(
+        json_object["mean"],
+        json_object["median"],
+        json_object["stddev"],
+        json_object["unit"],
+    )
+
+
+@dataclass
 class BenchmarkRun(object):
   """An object describing a single run of the benchmark binary.
 
   - benchmark_info: a BenchmarkInfo object describing the benchmark setup.
-  - context: the benchmark context returned by the benchmarking framework.
-  - results: the benchmark results returned by the benchmarking framework.
+  - context: additional context returned by the benchmarking framework.
+  - real_time: the real time latency statistics returned by the benchmarking
+      framework.
+  - cpu_time: the cp time latency statistics returned by the benchmarking
+      framework.
   """
   benchmark_info: BenchmarkInfo
   context: Dict[str, Any]
-  results: Sequence[Dict[str, Any]]
+  real_time: BenchmarkLatency
+  cpu_time: BenchmarkLatency
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
         "benchmark_info": self.benchmark_info.to_json_object(),
         "context": self.context,
-        "results": self.results,
+        "real_time": self.real_time.to_json_object(),
+        "cpu_time": self.cpu_time.to_json_object(),
     }
 
   def to_json_str(self) -> str:
@@ -415,7 +446,10 @@ class BenchmarkRun(object):
   def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkRun(
         BenchmarkInfo.from_json_object(json_object["benchmark_info"]),
-        json_object["context"], json_object["results"])
+        json_object["context"],
+        BenchmarkLatency.from_json_object(json_object["real_time"]),
+        BenchmarkLatency.from_json_object(json_object["cpu_time"]),
+    )
 
 
 class BenchmarkResults(object):
@@ -437,27 +471,6 @@ class BenchmarkResults(object):
     if self.commit != other.commit:
       raise ValueError("Inconsistent pull request commit")
     self.benchmarks.extend(other.benchmarks)
-
-  def get_aggregate_time(self, benchmark_index: int, kind: str) -> int:
-    """Returns the Google Benchmark aggreate time for the given kind.
-
-      Args:
-      - benchmark_index: the benchmark's index.
-      - kind: what kind of aggregate time to get; choices:
-        'mean', 'median', 'stddev'.
-      Returns:
-        Time in nanoseconds.
-      """
-    time = None
-    for bench_case in self.benchmarks[benchmark_index].results:
-      if bench_case["name"].endswith(f"real_time_{kind}"):
-        if bench_case["time_unit"] != "ns":
-          raise ValueError(f"Expected ns as time unit")
-        time = int(round(bench_case["real_time"]))
-        break
-    if time is None:
-      raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
-    return time
 
   def to_json_str(self) -> str:
     json_object = {"commit": self.commit, "benchmarks": []}
