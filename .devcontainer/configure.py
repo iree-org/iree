@@ -167,22 +167,19 @@ if __name__ == "__main__":
   # ------------------------------------------------------------------------- #
 
   # STEP 6 [OPTIONAL]: Does the user want to use NVIDIA GPUs ?
-  use_nvidia_gpu = False
   nvidia_gpu_available, err_msg = is_nvidia_gpu_available()
 
   if nvidia_gpu_available:
-    use_nvidia_gpu = get_input(
-        "[OPTIONAL] Do you wish to use NVIDIA GPU [y/N]?",
-        default_answer="n",
-        accepted_answers=["y", "n"]) == "y"
-
-    if use_nvidia_gpu:
+    if get_input("[OPTIONAL] Do you wish to use NVIDIA GPU [y/N]?",
+                 default_answer="n",
+                 accepted_answers=["y", "n"]) == "y":
       docker_image_key = "nvidia"
-    else:
-      del docker_config["services"]["iree-dev"]["deploy"]
 
   else:
     print(f"[INFO] NVIDIA GPUs are not available for use: {err_msg}")
+
+  if docker_image_key != "nvidia":
+    del docker_config["services"]["iree-dev"]["deploy"]
 
   # ------------------------------------------------------------------------- #
   #            Setting the right docker image / container to build            #
