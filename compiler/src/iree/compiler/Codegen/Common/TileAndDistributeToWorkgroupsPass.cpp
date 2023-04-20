@@ -325,8 +325,23 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       return signalPassFailure();
     }
 
+    IRRewriter rewriter(context);
     // If there are no compute ops, nothing more to do.
-    if (computeOps.empty()) continue;
+    if (computeOps.empty()) {
+      if (failed(lowerWorkgroupCount(rewriter, funcOp,
+                                     /*workgroupCountVals =*/ValueRange{},
+                                     /*tileSizes =*/ArrayRef<int64_t>{},
+                                     /*staticLoopRanges =*/ArrayRef<int64_t>{},
+                                     /*interchange =*/ArrayRef<int64_t>{},
+                                     /*partitionedLoops =*/ArrayRef<unsigned>{},
+                                     maxWorkgroupParallelDims))) {
+        funcOp.emitOpError(
+            "failed to lower workgroup count region when no compute ops in the "
+            "dispatch");
+        return signalPassFailure();
+      }
+      continue;
+    }
 
     // Configure the linalg options.
     // Tile size selection function.
@@ -354,7 +369,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 
-    IRRewriter rewriter(context);
     FailureOr<IREETileAndFuseResult> tileAndFuseResult =
         tileAndFuseDispatchUsingSCFForOp(
             rewriter, cast<TilingInterface>(computeOps.back()),

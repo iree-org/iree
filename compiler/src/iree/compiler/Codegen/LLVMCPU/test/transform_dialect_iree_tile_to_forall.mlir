@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --cse --split-input-file | FileCheck %s
 
 // Check that we can specify `num_threads` when lowering
 // `workgroup_count_from_body_slice` using
