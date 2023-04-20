@@ -30,6 +30,7 @@ static iree_status_t iree_hal_mpi_dynamic_symbols_resolve_all(
   return iree_ok_status();
 }
 
+// Load the dynamic library and the symbols
 iree_status_t iree_hal_mpi_initialize_library(
     iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
     iree_hal_mpi_dynamic_symbols_t** out_syms) {
@@ -63,6 +64,7 @@ iree_status_t iree_hal_mpi_initialize_library(
   return status;
 }
 
+// convert an MPI_Status result to an iree_status_t
 iree_status_t iree_hal_mpi_result_to_status(
     iree_hal_mpi_dynamic_symbols_t* syms, int result, const char* file,
     uint32_t line) {

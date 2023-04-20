@@ -13,6 +13,10 @@
 extern "C" {
 #endif  // __cplusplus
 
+// A collection of known MPI symbols (functions and handles)
+//
+// To support additional functions, define the function or handles
+// in libmpi_dynamic_symbols.h
 typedef struct iree_hal_mpi_dynamic_symbols_t {
 #define MPI_PFN_DECL(mpiSymbolName, ...) int (*mpiSymbolName)(__VA_ARGS__);
 #include "iree/hal/utils/libmpi_dynamic_symbols.h"
@@ -50,6 +54,18 @@ iree_status_t iree_hal_mpi_result_to_status(
   IREE_IGNORE_ERROR(iree_hal_mpi_result_to_status((syms), ((syms)->expr), \
                                                   __FILE__, __LINE__))
 
+// Dynamically loads libmpi and sets up the symbol table.
+//
+// Args:
+//  - host_allocator: the allocator to use to create the library and symbol
+//    objects.
+//  - out_library: out parameter -- on success, it holds a pointer to the
+//    dynamic library object.
+//  - out_syms: out parameter -- on success, it populates the list of symbols
+//    available from the MPI library
+//
+// Returns: IREE_STATUS_SUCCESS if it found the library, and fills in the
+// pointers to our_library and out_symbols
 iree_status_t iree_hal_mpi_initialize_library(
     iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
     iree_hal_mpi_dynamic_symbols_t** out_syms);
