@@ -190,16 +190,17 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   LogicalResult matchAndRewrite(
       OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultType = this->getTypeConverter()
-                          ->convertType(op.getResult().getType())
-                          .template cast<TypeTy>();
-    auto operandType = this->getTypeConverter()
-                           ->convertType(op.getOperand().getType())
-                           .template cast<TypeTy>();
+    auto resultType =
+        this->getTypeConverter()->convertType(op.getResult().getType());
+    auto operandType =
+        this->getTypeConverter()->convertType(op.getOperand().getType());
+
+    auto resultEType = cast<TypeTy>(getElementTypeOrSelf(resultType));
+    auto operandEType = cast<TypeTy>(getElementTypeOrSelf(operandType));
     // If post-conversion, the types would be equal, then the op becomes a
     // no-op. Note that the op does not itself allow such a configuration, so we
     // have to catch this before creating the new op.
-    if (resultType == operandType) {
+    if (resultEType == operandEType) {
       rewriter.replaceOp(op, adaptor.getOperands()[0]);
       return success();
     }
@@ -208,8 +209,8 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
     // TODO: In some cases, we can repair the situation here, but for integer
     // truncation, we don't know whether we should invert with signed or
     // unsigned extension.
-    if (!OperandToResultWidthLegalityRelation()(operandType.getWidth(),
-                                                resultType.getWidth())) {
+    if (!OperandToResultWidthLegalityRelation()(operandEType.getWidth(),
+                                                resultEType.getWidth())) {
       return rewriter.notifyMatchFailure(op, "invalid width combination");
     }
     rewriter.replaceOpWithNewOp<OpTy>(op, resultType, op.getOperand());
