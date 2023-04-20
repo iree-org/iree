@@ -35,6 +35,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createPromoteArithBF16ToF32Pass();
 
 // Test passes.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createTestConversionPass();
