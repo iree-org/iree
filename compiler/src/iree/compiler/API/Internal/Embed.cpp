@@ -80,6 +80,9 @@
 #include "llvm/Support/Windows/WindowsSupport.h"
 #endif
 
+#define IREE_COMPILER_API_MAJOR 1
+#define IREE_COMPILER_API_MINOR 1
+
 namespace mlir::iree_compiler::embed {
 namespace {
 
@@ -105,6 +108,9 @@ struct GlobalInit {
   // Populated and retained if we have to copy and handle our own permuted
   // argv (i.e. Windows). Otherwise, not used.
   llvm::SmallVector<const char *> retainedArgv;
+
+  // Stash the revision for the life of the instance.
+  std::string revision = getIreeRevision();
 
   // Our session options can optionally be bound to the global command-line
   // environment. If that is not the case, then these will be nullptr, and
@@ -821,7 +827,13 @@ const char *ireeCompilerErrorGetMessage(iree_compiler_error_t *error) {
   return unwrap(error)->message.c_str();
 }
 
-int ireeCompilerGetAPIVersion() { return 0; }
+int ireeCompilerGetAPIVersion() {
+  static_assert(IREE_COMPILER_API_MINOR >= 0 && IREE_COMPILER_API_MINOR < 65536,
+                "illegal api minor version");
+  static_assert(IREE_COMPILER_API_MAJOR >= 0 && IREE_COMPILER_API_MAJOR < 65536,
+                "illegal api minor version");
+  return IREE_COMPILER_API_MAJOR << 16 | IREE_COMPILER_API_MINOR;
+}
 
 void ireeCompilerGetProcessCLArgs(int *argc, const char ***argv) {
 #ifdef _WIN32
@@ -881,6 +893,14 @@ void ireeCompilerGlobalInitialize() {
     abort();
   }
   globalInit = new GlobalInit();
+}
+
+const char *ireeCompilerGetRevision() {
+  if (!globalInit) {
+    fprintf(stderr, "FATAL ERROR: Not initialized\n");
+    abort();
+  }
+  return globalInit->revision.c_str();
 }
 
 void ireeCompilerGlobalShutdown() {

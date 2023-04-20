@@ -56,6 +56,13 @@ IREE_EMBED_EXPORTED const char *ireeCompilerErrorGetMessage(
 //===----------------------------------------------------------------------===//
 
 // Gets the version of the API that this compiler exports.
+// The version is encoded with the lower 16 bits containing the minor version
+// and upper bits containing the major version.
+// The compiler API is versioned. Within a major version, symbols may be
+// added, but existing symbols must not be removed or changed to alter
+// previously exposed functionality. A major version bump implies an API
+// break and no forward or backward compatibility is assumed across major
+// versions.
 IREE_EMBED_EXPORTED int ireeCompilerGetAPIVersion();
 
 // The compiler must be globally initialized before further use.
@@ -68,6 +75,13 @@ IREE_EMBED_EXPORTED int ireeCompilerGetAPIVersion();
 // to initialize will fail/abort. If this is not desirable, some higher level
 // code must hold initialization open with its own call.
 IREE_EMBED_EXPORTED void ireeCompilerGlobalInitialize();
+
+// Gets the build revision of the IREE compiler. In official releases, this
+// will be a string with the build tag. In development builds, it may be an
+// empty string. The returned is valid for as long as the compiler is
+// initialized.
+// Available since: 1.1
+IREE_EMBED_EXPORTED const char *ireeCompilerGetRevision();
 
 // Processes an argc/argv from main() using platform specific dark magic,
 // possibly updating them in-place to cleaned up values. On most systems,
