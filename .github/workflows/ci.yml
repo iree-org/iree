@@ -113,6 +113,7 @@ jobs:
         env:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
           IREE_CCACHE_GCP_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
+          CCACHE_NAMESPACE: github-windows-2022-64core
         run: |
           ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
