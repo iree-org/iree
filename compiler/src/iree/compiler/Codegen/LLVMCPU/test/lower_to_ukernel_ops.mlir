@@ -162,3 +162,126 @@ func.func @mmt4d_i8i8i32(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tensor<?x?x?x?xi8>,
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
 //      CHECK:   return %[[MICRO_KERNEL]]
+
+// -----
+
+//      CHECK: func @pack_i8i8(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xi8>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x7x8xi8>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: i8
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 0 : i32
+//  CHECK-DAG:   %[[IN_SIZE0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[IN_SIZE1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_SIZE0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_SIZE1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_SIZE2:.+]] = arith.constant 7 : index
+//  CHECK-DAG:   %[[OUT_SIZE3:.+]] = arith.constant 8 : index
+//       CHECK: ukernel.generic "vmvx.pack.i8i8"
+//  CHECK-SAME:   ins(%[[ARG0]] :
+//  CHECK-SAME:   outs(%[[ARG1]] :
+//  CHECK-SAME:   (%[[IN_SIZE0]], %[[IN_SIZE1]], %[[OUT_SIZE0]], %[[OUT_SIZE1]], %[[OUT_SIZE2]], %[[OUT_SIZE3]], %[[ARG2]], %[[FLAGS]] :
+func.func @pack_i8i8(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?x7x8xi8>, %arg2 : i8) -> tensor<?x?x7x8xi8> {
+  %result = tensor.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+      : tensor<?x?xi8> -> tensor<?x?x7x8xi8>
+  func.return %result : tensor<?x?x7x8xi8>
+}
+
+// -----
+
+//      CHECK: func @pack_i32i32_transpose_inner(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xi32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x7x8xi32>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: i32
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 65536 : i32
+//  CHECK-DAG:   %[[IN_SIZE0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[IN_SIZE1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_SIZE0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_SIZE1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_SIZE2:.+]] = arith.constant 7 : index
+//  CHECK-DAG:   %[[OUT_SIZE3:.+]] = arith.constant 8 : index
+//       CHECK: ukernel.generic "vmvx.pack.i32i32"
+//  CHECK-SAME:   ins(%[[ARG0]] :
+//  CHECK-SAME:   outs(%[[ARG1]] :
+//  CHECK-SAME:   (%[[IN_SIZE0]], %[[IN_SIZE1]], %[[OUT_SIZE0]], %[[OUT_SIZE1]], %[[OUT_SIZE2]], %[[OUT_SIZE3]], %[[ARG2]], %[[FLAGS]] :
+func.func @pack_i32i32_transpose_inner(%arg0 : tensor<?x?xi32>, %arg1 : tensor<?x?x7x8xi32>, %arg2 : i32) -> tensor<?x?x7x8xi32> {
+  %result = tensor.pack %arg0 padding_value(%arg2 : i32) inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
+      : tensor<?x?xi32> -> tensor<?x?x7x8xi32>
+  func.return %result : tensor<?x?x7x8xi32>
+}
+
+// -----
+
+//      CHECK: func @pack_f32f32_transpose_inner_and_outer(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x7x8xf32>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: f32
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 196608 : i32
+//  CHECK-DAG:   %[[IN_SIZE0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[IN_SIZE1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_SIZE0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_SIZE1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_SIZE2:.+]] = arith.constant 7 : index
+//  CHECK-DAG:   %[[OUT_SIZE3:.+]] = arith.constant 8 : index
+//       CHECK: ukernel.generic "vmvx.pack.f32f32"
+//  CHECK-SAME:   ins(%[[ARG0]] :
+//  CHECK-SAME:   outs(%[[ARG1]] :
+//  CHECK-SAME:   (%[[IN_SIZE0]], %[[IN_SIZE1]], %[[OUT_SIZE0]], %[[OUT_SIZE1]], %[[OUT_SIZE2]], %[[OUT_SIZE3]], %[[ARG2]], %[[FLAGS]] :
+func.func @pack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?x7x8xf32>, %arg2 : f32) -> tensor<?x?x7x8xf32> {
+  %result = tensor.pack %arg0 padding_value(%arg2 : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
+      : tensor<?x?xf32> -> tensor<?x?x7x8xf32>
+  func.return %result : tensor<?x?x7x8xf32>
+}
+
+// -----
+
+//      CHECK: func @unpack_i32i32_transpose_inner(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x7x8xi32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xi32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 65536 : i32
+//  CHECK-DAG:   %[[IN_SIZE0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[IN_SIZE1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_SIZE0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_SIZE1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[IN_SIZE2:.+]] = arith.constant 7 : index
+//  CHECK-DAG:   %[[IN_SIZE3:.+]] = arith.constant 8 : index
+//       CHECK: ukernel.generic "vmvx.unpack.i32i32"
+//  CHECK-SAME:   ins(%[[ARG0]] :
+//  CHECK-SAME:   outs(%[[ARG1]] :
+//  CHECK-SAME:   (%[[IN_SIZE0]], %[[IN_SIZE1]], %[[IN_SIZE2]], %[[IN_SIZE3]], %[[OUT_SIZE0]], %[[OUT_SIZE1]], %[[FLAGS]] :
+func.func @unpack_i32i32_transpose_inner(%arg0 : tensor<?x?x7x8xi32>, %arg1 : tensor<?x?xi32>) -> tensor<?x?xi32> {
+  %result = tensor.unpack %arg0 inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
+      : tensor<?x?x7x8xi32> -> tensor<?x?xi32>
+  func.return %result : tensor<?x?xi32>
+}
+
+// -----
+
+//      CHECK: func @unpack_f32f32_transpose_inner_and_outer(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x7x8xf32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 196608 : i32
+//  CHECK-DAG:   %[[IN_SIZE0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[IN_SIZE1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[OUT_SIZE0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[OUT_SIZE1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[IN_SIZE2:.+]] = arith.constant 7 : index
+//  CHECK-DAG:   %[[IN_SIZE3:.+]] = arith.constant 8 : index
+//       CHECK: ukernel.generic "vmvx.unpack.f32f32"
+//  CHECK-SAME:   ins(%[[ARG0]] :
+//  CHECK-SAME:   outs(%[[ARG1]] :
+//  CHECK-SAME:   (%[[IN_SIZE0]], %[[IN_SIZE1]], %[[IN_SIZE2]], %[[IN_SIZE3]], %[[OUT_SIZE0]], %[[OUT_SIZE1]], %[[FLAGS]] :
+func.func @unpack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?x7x8xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %result = tensor.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [7, 8] into %arg1
+      : tensor<?x?x7x8xf32> -> tensor<?x?xf32>
+  func.return %result : tensor<?x?xf32>
+}

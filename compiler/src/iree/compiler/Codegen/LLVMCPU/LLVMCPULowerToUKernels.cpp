@@ -42,10 +42,6 @@ static bool isInitializedToZero(Value outsOperand) {
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, linalg::Mmt4DOp op) {
-  if (!op.hasTensorSemantics()) {
-    return rewriter.notifyMatchFailure(
-        op, "operations needs to have tensor semantics");
-  }
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
   Value out = op.getDpsInitOperand(0)->get();
@@ -103,10 +99,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, linalg::MatmulOp op) {
-  if (!op.hasTensorSemantics()) {
-    return rewriter.notifyMatchFailure(
-        op, "operations needs to have tensor semantics");
-  }
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
   Value out = op.getDpsInitOperand(0)->get();
@@ -152,49 +144,199 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       genericMicroKernelOp.getOperation());
 }
 
+static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
+    RewriterBase &rewriter, tensor::PackOp op) {
+  Value in = op.getSource();
+  Value out = op.getDest();
+  auto inType = in.getType().cast<ShapedType>();
+  auto outType = out.getType().cast<ShapedType>();
+  Type inElemType = inType.getElementType();
+  Type outElemType = outType.getElementType();
+  std::string fnName;
+  if (inElemType.isSignlessInteger(8) && outElemType.isSignlessInteger(8)) {
+    fnName = "vmvx.pack.i8i8";
+  } else if (inElemType.isSignlessInteger(32) &&
+             outElemType.isSignlessInteger(32)) {
+    fnName = "vmvx.pack.i32i32";
+  } else if (inElemType.isF32() && outElemType.isF32()) {
+    fnName = "vmvx.pack.f32f32";
+  } else {
+    return rewriter.notifyMatchFailure(
+        op, "unsupported combination of element types");
+  }
+
+  if (inType.getRank() != 2) {
+    return rewriter.notifyMatchFailure(op, "expected input to be 2D");
+  }
+
+  if (outType.getRank() != 4) {
+    return rewriter.notifyMatchFailure(op, "expected output to be 4D");
+  }
+
+  int64_t innerDimsPos[2] = {0, 1};
+  ArrayRef<int64_t> innerDimsPosArr = op.getInnerDimsPos();
+  if (!innerDimsPosArr.empty()) {
+    innerDimsPos[0] = innerDimsPosArr[0];
+    innerDimsPos[1] = innerDimsPosArr[1];
+  }
+
+  int64_t outerDimsPerm[2] = {0, 1};
+  ArrayRef<int64_t> outerDimsPosArr = op.getOuterDimsPerm();
+  if (!outerDimsPosArr.empty()) {
+    outerDimsPerm[0] = outerDimsPosArr[0];
+    outerDimsPerm[1] = outerDimsPosArr[1];
+  }
+
+  int flags = 0;
+
+  if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
+    // nothing to do
+  } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
+    flags |= IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
+  } else {
+    return rewriter.notifyMatchFailure(op, "unsupported inner_dims_pos");
+  }
+
+  if (outerDimsPerm[0] == 0 && outerDimsPerm[1] == 1) {
+    // nothing to do
+  } else if (outerDimsPerm[0] == 1 && outerDimsPerm[1] == 0) {
+    flags |= IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
+  } else {
+    return rewriter.notifyMatchFailure(op, "unsupported outer_dims_perm");
+  }
+
+  Location loc = op.getLoc();
+  Value paddingVal = op.getPaddingValue();
+  if (!paddingVal) {
+    paddingVal = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(inElemType), inElemType);
+  }
+
+  Value in_size0 = rewriter.create<tensor::DimOp>(loc, in, 0);
+  Value in_size1 = rewriter.create<tensor::DimOp>(loc, in, 1);
+  Value out_size0 = rewriter.create<tensor::DimOp>(loc, out, 0);
+  Value out_size1 = rewriter.create<tensor::DimOp>(loc, out, 1);
+  Value out_size2 = rewriter.create<tensor::DimOp>(loc, out, 2);
+  Value out_size3 = rewriter.create<tensor::DimOp>(loc, out, 3);
+  Value flagsVal = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI32IntegerAttr(flags));
+  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
+      loc, outType, fnName, in, out,
+      ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
+                 paddingVal, flagsVal},
+      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
+  return cast<IREE::Codegen::UKernelOpInterface>(
+      genericMicroKernelOp.getOperation());
+}
+
+static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
+    RewriterBase &rewriter, tensor::UnPackOp op) {
+  Value in = op.getSource();
+  Value out = op.getDest();
+  auto inType = in.getType().cast<ShapedType>();
+  auto outType = out.getType().cast<ShapedType>();
+  Type inElemType = inType.getElementType();
+  Type outElemType = outType.getElementType();
+  std::string fnName;
+  if (inElemType.isSignlessInteger(32) && outElemType.isSignlessInteger(32)) {
+    fnName = "vmvx.unpack.i32i32";
+  } else if (inElemType.isF32() && outElemType.isF32()) {
+    fnName = "vmvx.unpack.f32f32";
+  } else {
+    return rewriter.notifyMatchFailure(
+        op, "unsupported combination of element types");
+  }
+
+  if (inType.getRank() != 4) {
+    return rewriter.notifyMatchFailure(op, "expected input to be 4D");
+  }
+
+  if (outType.getRank() != 2) {
+    return rewriter.notifyMatchFailure(op, "expected output to be 2D");
+  }
+
+  int64_t innerDimsPos[2] = {0, 1};
+  ArrayRef<int64_t> innerDimsPosArr = op.getInnerDimsPos();
+  if (!innerDimsPosArr.empty()) {
+    innerDimsPos[0] = innerDimsPosArr[0];
+    innerDimsPos[1] = innerDimsPosArr[1];
+  }
+
+  int64_t outerDimsPerm[2] = {0, 1};
+  ArrayRef<int64_t> outerDimsPosArr = op.getOuterDimsPerm();
+  if (!outerDimsPosArr.empty()) {
+    outerDimsPerm[0] = outerDimsPosArr[0];
+    outerDimsPerm[1] = outerDimsPosArr[1];
+  }
+
+  int flags = 0;
+
+  if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
+    // nothing to do
+  } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
+    flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER;
+  } else {
+    return rewriter.notifyMatchFailure(op, "unsupported inner_dims_pos");
+  }
+
+  if (outerDimsPerm[0] == 0 && outerDimsPerm[1] == 1) {
+    // nothing to do
+  } else if (outerDimsPerm[0] == 1 && outerDimsPerm[1] == 0) {
+    flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
+  } else {
+    return rewriter.notifyMatchFailure(op, "unsupported outer_dims_perm");
+  }
+
+  Location loc = op.getLoc();
+  Value in_size0 = rewriter.create<tensor::DimOp>(loc, in, 0);
+  Value in_size1 = rewriter.create<tensor::DimOp>(loc, in, 1);
+  Value in_size2 = rewriter.create<tensor::DimOp>(loc, in, 2);
+  Value in_size3 = rewriter.create<tensor::DimOp>(loc, in, 3);
+  Value out_size0 = rewriter.create<tensor::DimOp>(loc, out, 0);
+  Value out_size1 = rewriter.create<tensor::DimOp>(loc, out, 1);
+  Value flagsVal = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI32IntegerAttr(flags));
+  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
+      loc, outType, fnName, in, out,
+      ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
+                 flagsVal},
+      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
+  return cast<IREE::Codegen::UKernelOpInterface>(
+      genericMicroKernelOp.getOperation());
+}
+
 namespace {
 
-/// Pattern to lower (linalg.fill -> )? linalg.matmul operation sequence and
-/// converts it into a iree_codegen.ukernel.generic operation
-struct UKernelMatmulPattern : OpRewritePattern<linalg::MatmulOp> {
-  using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
+template <typename OpType>
+struct LowerToUKernelPattern : OpRewritePattern<OpType> {
+  using OpRewritePattern<OpType>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
-    FailureOr<IREE::Codegen::UKernelOpInterface> microKernelOp =
-        matchDAGForUKernel(rewriter, matmulOp);
-    if (failed(microKernelOp)) {
+    if (!op.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(
-          matmulOp, "failed to find microkernel op to replace with");
+          op, "operation needs to have tensor semantics");
     }
-    rewriter.replaceOp(matmulOp, microKernelOp.value()->getResults());
+    FailureOr<IREE::Codegen::UKernelOpInterface> ukernelOp =
+        matchDAGForUKernel(rewriter, op);
+    if (failed(ukernelOp)) {
+      return rewriter.notifyMatchFailure(
+          op, "failed to find microkernel op to replace with");
+    }
+    rewriter.replaceOp(op, ukernelOp.value()->getResults());
     return success();
   }
 };
 
-/// Pattern to lower (linalg.fill -> )? linalg.mmt4d operation sequence and
-/// converts it into a iree_codegen.ukernel.mmt4d operation
-struct UKernelMmt4DPattern : OpRewritePattern<linalg::Mmt4DOp> {
-  using OpRewritePattern<linalg::Mmt4DOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::Mmt4DOp mmt4dOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<IREE::Codegen::UKernelOpInterface> microKernelOp =
-        matchDAGForUKernel(rewriter, mmt4dOp);
-    if (failed(microKernelOp)) {
-      return rewriter.notifyMatchFailure(
-          mmt4dOp, "failed to find microkernel op to replace with");
-    }
-    rewriter.replaceOp(mmt4dOp, microKernelOp.value()->getResults());
-    return success();
-  }
-};
 }  // namespace
 
 void LLVMCPULowerToUKernelsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  patterns.insert<UKernelMatmulPattern, UKernelMmt4DPattern>(context);
+  patterns.insert<LowerToUKernelPattern<linalg::MatmulOp>,
+                  LowerToUKernelPattern<linalg::Mmt4DOp>,
+                  LowerToUKernelPattern<tensor::PackOp>,
+                  LowerToUKernelPattern<tensor::UnPackOp>>(context);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
