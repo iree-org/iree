@@ -8,6 +8,7 @@
 #define IREE_PJRT_PLUGIN_PJRT_CPU_CLIENT_H_
 
 #include "iree/hal/drivers/local_task/task_driver.h"
+#include "iree/hal/local/loaders/registration/init.h"
 #include "iree/integrations/pjrt/common/api_impl.h"
 
 namespace iree::pjrt::cpu {
@@ -28,6 +29,7 @@ class CPUClientInstance final : public ClientInstance {
   iree_task_topology_t task_topology_options_;
 
   // Deps.
+  iree_hal_executable_plugin_manager_t* plugin_manager_ = nullptr;
   iree_hal_executable_loader_t* loaders_[8] = {nullptr};
   iree_host_size_t loader_count_ = 0;
   iree_task_executor_t* executor_ = nullptr;

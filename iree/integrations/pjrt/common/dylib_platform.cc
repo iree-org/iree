@@ -83,7 +83,7 @@ iree_status_t DylibPlatform::SubclassInitialize() {
   };
   // TODO: Use a config key like "SAVE_ALL" to control all artifact saving.
   artifact_dumper_ = std::make_unique<FilesArtifactDumper>(
-      logger(), artifact_path_callback, /*retain_all=*/false);
+      logger(), artifact_path_callback, /*retain_all=*/true);
 
   return iree_ok_status();
 }

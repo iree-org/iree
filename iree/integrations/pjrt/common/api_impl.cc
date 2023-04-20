@@ -1012,7 +1012,8 @@ PJRT_Error* ClientInstance::Initialize() {
 }
 
 iree_status_t ClientInstance::InitializeVM() {
-  IREE_RETURN_IF_ERROR(iree_vm_instance_create(host_allocator_, &vm_instance_));
+  IREE_RETURN_IF_ERROR(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                               host_allocator_, &vm_instance_));
   IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(vm_instance_.get()));
   return iree_ok_status();
 }
@@ -1503,11 +1504,12 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
         inv.res_exe->device_instance->main_timeline(), signal_timepoint,
         client_.host_allocator(), &inv.signal_fence));
 
-    IREE_RETURN_IF_ERROR(iree_vm_list_create(
-        /*element_type=*/nullptr, args->num_args, allocator, &inv.inputs));
-    IREE_RETURN_IF_ERROR(iree_vm_list_create(
-        /*element_type=*/nullptr, inv.res_exe->result_count, allocator,
-        &inv.outputs));
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             args->num_args, allocator,
+                                             &inv.inputs));
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             inv.res_exe->result_count,
+                                             allocator, &inv.outputs));
 
     // Populate inputs.
     for (size_t i = 0; i < args->num_args; ++i) {
@@ -1543,17 +1545,16 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
         inv.res_exe->vm_context.get(), inv.res_exe->main_function,
         IREE_VM_INVOCATION_FLAG_NONE,
         /*policy=*/nullptr, inv.inputs.get(), inv.outputs.get(), allocator);
-    // Any invocation that fails needs a barrier so that signal fence is incremented
-    // otherwise future waits will fail. We do this instead of incrementing as only
-    // a subset of devices may fail.
+    // Any invocation that fails needs a barrier so that signal fence is
+    // incremented otherwise future waits will fail. We do this instead of
+    // incrementing as only a subset of devices may fail.
     if (!iree_status_is_ok(new_status)) {
       status = new_status;
       // We can ignore the error as we are already erroring out earlier.
       IREE_IGNORE_ERROR(iree_hal_device_queue_barrier(
-        inv.res_exe->device_instance->device(),
-        IREE_HAL_QUEUE_AFFINITY_ANY,
-        iree_hal_fence_semaphore_list(inv.wait_fence.get()),
-        iree_hal_fence_semaphore_list(inv.signal_fence.get())));
+          inv.res_exe->device_instance->device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+          iree_hal_fence_semaphore_list(inv.wait_fence.get()),
+          iree_hal_fence_semaphore_list(inv.signal_fence.get())));
     }
   }
 
@@ -1565,7 +1566,7 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
     for (size_t i = 0; i < inv.res_exe->result_count; ++i) {
       iree::vm::ref<iree_hal_buffer_view_t> ret_buffer_view =
           retain_ref((iree_hal_buffer_view_t*)iree_vm_list_get_ref_deref(
-              inv.outputs.get(), i, &iree_hal_buffer_view_descriptor));
+              inv.outputs.get(), i, iree_hal_buffer_view_type()));
       // This should not be possible so just hard-assert.
       IREE_ASSERT_ARGUMENT(ret_buffer_view);
       auto result_buffer = std::make_unique<BufferInstance>(

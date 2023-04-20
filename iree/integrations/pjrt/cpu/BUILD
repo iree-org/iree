@@ -20,6 +20,7 @@ iree_pjrt_cc_library(
         "@iree_core//runtime/src/iree/hal/local",
         "@iree_core//runtime/src/iree/hal/local:executable_loader",
         "@iree_core//runtime/src/iree/hal/local/loaders/registration",
+        "@iree_core//runtime/src/iree/hal/local/plugins/registration",
         "@iree_core//runtime/src/iree/task:api",
     ],
 )

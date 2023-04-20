@@ -7,9 +7,9 @@
 ### Update with: openxla-workspace pin
 
 PINNED_VERSIONS = {
-  "iree": "5c005b7de092ca48aee76356b77f09141cdc5599",
-  "xla": "179d4899a1fbe5d8a8dc462edd90c504a9421686",
-  "jax": "fb46d3d084c2de13ceb0344c4adc241df910cb4d"
+  "iree": "85482169432caefcb8f99e75a3901d307f3d51e7",
+  "xla": "ddbbf307ce56f1194d5b30c17c8e8431303032b2",
+  "jax": "87c328864b4225eabf72a739dfb4dc414de95031"
 }
 
 ORIGINS = {
@@ -42,6 +42,14 @@ def main():
   parser.add_argument("--exclude-dep",
                       nargs="*",
                       help="Excludes dependencies by regex")
+  parser.add_argument("--depth",
+                      type=int,
+                      default=0,
+                      help="Fetch revisions with --depth")
+  parser.add_argument("--submodules-depth",
+                      type=int,
+                      default=0,
+                      help="Update submodules with --depth")
   args = parser.parse_args()
 
   workspace_dir = Path(__file__).resolve().parent.parent
@@ -64,7 +72,11 @@ def main():
       run(["init"], repo_dir)
       run(["remote", "add", "origin", ORIGINS[repo_name]], repo_dir)
     # Checkout detached head.
-    run(["fetch", "--depth=1", "origin", revision], repo_dir)
+    fetch_args = ["fetch"]
+    if args.depth > 0:
+      fetch_args.append(["--depth=1"])
+    fetch_args += ["origin", revision]
+    run(fetch_args, repo_dir)
     run(["-c", "advice.detachedHead=false", "checkout", revision], repo_dir)
     if SUBMODULES.get(repo_name):
       print(f"  Initializing submodules for {repo_name}")
@@ -85,10 +97,12 @@ def main():
           continue
         submodules.append(submodule_path)
 
-      run([
-          "submodule", "update", "--init", "--depth", "1",
-          "--recommend-shallow", "--"
-      ] + submodules, repo_dir)
+      update_args = ["submodule", "update", "--init"]
+      if args.submodules_depth > 0:
+        update_args += ["--depth", "1"]
+      update_args += ["--"]
+      update_args += submodules
+      run(update_args, repo_dir)
 
 
 def run(args,

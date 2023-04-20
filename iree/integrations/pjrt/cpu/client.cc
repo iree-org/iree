@@ -7,7 +7,7 @@
 #include "iree/integrations/pjrt/cpu/client.h"
 
 #include "iree/hal/drivers/local_task/task_driver.h"
-#include "iree/hal/local/loaders/registration/init.h"
+#include "iree/hal/local/plugins/registration/init.h"
 #include "iree/task/api.h"
 
 namespace iree::pjrt::cpu {
@@ -30,6 +30,7 @@ CPUClientInstance::~CPUClientInstance() {
   for (iree_host_size_t i = 0; i < loader_count_; ++i) {
     iree_hal_executable_loader_release(loaders_[i]);
   }
+  iree_hal_executable_plugin_manager_release(plugin_manager_);
   iree_task_topology_deinitialize(&task_topology_options_);
 }
 
@@ -42,10 +43,14 @@ iree_status_t CPUClientInstance::InitializeDeps() {
   IREE_RETURN_IF_ERROR(iree_task_topology_initialize_from_flags(
       /*node_id=*/0, &task_topology_options_));
 
+  // plugin_manager_
+  IREE_RETURN_IF_ERROR(iree_hal_executable_plugin_manager_create(
+      /*capacity=*/0, host_allocator_, &plugin_manager_));
+
   // loaders_
   IREE_RETURN_IF_ERROR(iree_hal_create_all_available_executable_loaders(
-      iree_hal_executable_import_provider_default(), IREE_ARRAYSIZE(loaders_),
-      &loader_count_, loaders_, host_allocator_));
+      plugin_manager_, IREE_ARRAYSIZE(loaders_), &loader_count_, loaders_,
+      host_allocator_));
 
   // device_allocator_
   IREE_RETURN_IF_ERROR(iree_hal_allocator_create_heap(
