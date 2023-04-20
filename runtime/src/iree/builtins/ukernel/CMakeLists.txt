@@ -55,9 +55,8 @@ iree_cc_library(
     "api.h"
   SRCS
     "common.h"
+    "elementwise.c"
     "elementwise.h"
-    "elementwise_generic.c"
-    "elementwise_impl.c.inc"
     "mmt4d.c"
     "mmt4d.h"
     "mmt4d_tile.c"
