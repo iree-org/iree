@@ -111,7 +111,7 @@ jobs:
       # Finally: build and run tests.
       - name: "Building IREE"
         env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ inputs.write-caches }}
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
           IREE_CCACHE_GCP_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
         run: |
           ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
