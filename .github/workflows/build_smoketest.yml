@@ -38,7 +38,7 @@ jobs:
           # TODO: https://github.com/openxla/openxla-pjrt-plugin/issues/30
           sudo apt install -y lld
           # Since only building the runtime, exclude compiler deps (expensive).
-          python ./sync_deps.py --exclude-submodule "iree:third_party/(llvm|mlir-hlo)"
+          python ./sync_deps.py --depth 1 --submodules-depth 1 --exclude-submodule "iree:third_party/(llvm|mlir-hlo)"
           pip install -r requirements.txt
 
       - name: Setup Bazelisk
@@ -49,7 +49,7 @@ jobs:
           CUDA_SDK_DIR="$(../iree/third_party/nvidia_sdk_download/fetch_cuda_toolkit.py /tmp/cuda_sdk)"
           python ./configure.py --cc=clang --cxx=clang++ --cuda-sdk-dir=$CUDA_SDK_DIR
 
-      - name: "Build CPU plugin"
+      - name: "Build Plugins"
         run: |
           bazel build :plugins
 

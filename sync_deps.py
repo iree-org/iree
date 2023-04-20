@@ -74,8 +74,8 @@ def main():
     # Checkout detached head.
     fetch_args = ["fetch"]
     if args.depth > 0:
-      fetch_args.append(["--depth=1"])
-    fetch_args += ["origin", revision]
+      fetch_args.extend(["--depth=1"])
+    fetch_args.extend(["origin", revision])
     run(fetch_args, repo_dir)
     run(["-c", "advice.detachedHead=false", "checkout", revision], repo_dir)
     if SUBMODULES.get(repo_name):
@@ -99,9 +99,9 @@ def main():
 
       update_args = ["submodule", "update", "--init"]
       if args.submodules_depth > 0:
-        update_args += ["--depth", "1"]
-      update_args += ["--"]
-      update_args += submodules
+        update_args.extend(["--depth", "1"])
+      update_args.extend(["--"])
+      update_args.extend(submodules)
       run(update_args, repo_dir)
 
 

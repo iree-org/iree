@@ -33,7 +33,7 @@ jobs:
       - name: Sync and install versions
         run: |
           # Since only building the runtime, exclude compiler deps (expensive).
-          python ./sync_deps.py --exclude-submodule "iree:third_party/(llvm|mlir-hlo)"
+          python ./sync_deps.py --depth 1 --submodules-depth 1 --exclude-submodule "iree:third_party/(llvm|mlir-hlo)"
 
       - name: Build Packages (Linux)
         run: |
