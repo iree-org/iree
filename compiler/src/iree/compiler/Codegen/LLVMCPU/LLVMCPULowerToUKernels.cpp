@@ -42,10 +42,6 @@ static bool isInitializedToZero(Value outsOperand) {
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, linalg::Mmt4DOp op) {
-  if (!op.hasTensorSemantics()) {
-    return rewriter.notifyMatchFailure(
-        op, "operations needs to have tensor semantics");
-  }
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
   Value out = op.getDpsInitOperand(0)->get();
@@ -103,10 +99,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, linalg::MatmulOp op) {
-  if (!op.hasTensorSemantics()) {
-    return rewriter.notifyMatchFailure(
-        op, "operations needs to have tensor semantics");
-  }
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
   Value out = op.getDpsInitOperand(0)->get();
@@ -154,10 +146,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
 
 static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, tensor::PackOp op) {
-  if (!op.hasTensorSemantics()) {
-    return rewriter.notifyMatchFailure(
-        op, "operations needs to have tensor semantics");
-  }
   Value in = op.getSource();
   Value out = op.getDest();
   auto inType = in.getType().cast<ShapedType>();
@@ -221,8 +209,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value paddingVal = op.getPaddingValue();
   if (!paddingVal) {
     paddingVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(inType.getElementType()),
-        inType.getElementType());
+        loc, rewriter.getZeroAttr(inElemType), inElemType);
   }
 
   Value in_size0 = rewriter.create<tensor::DimOp>(loc, in, 0);
@@ -244,10 +231,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
 
 static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     RewriterBase &rewriter, tensor::UnPackOp op) {
-  if (!op.hasTensorSemantics()) {
-    return rewriter.notifyMatchFailure(
-        op, "operations needs to have tensor semantics");
-  }
   Value in = op.getSource();
   Value out = op.getDest();
   auto inType = in.getType().cast<ShapedType>();
@@ -291,7 +274,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
     // nothing to do
   } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
-    flags |= IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
+    flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER;
   } else {
     return rewriter.notifyMatchFailure(op, "unsupported inner_dims_pos");
   }
@@ -299,7 +282,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   if (outerDimsPerm[0] == 0 && outerDimsPerm[1] == 1) {
     // nothing to do
   } else if (outerDimsPerm[0] == 1 && outerDimsPerm[1] == 0) {
-    flags |= IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
+    flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
   } else {
     return rewriter.notifyMatchFailure(op, "unsupported outer_dims_perm");
   }
@@ -324,71 +307,23 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
 
 namespace {
 
-/// Pattern to lower (linalg.fill -> )? linalg.matmul operation sequence and
-/// converts it into a iree_codegen.ukernel.generic operation
-struct UKernelMatmulPattern : OpRewritePattern<linalg::MatmulOp> {
-  using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
+template <typename OpType>
+struct LowerToUKernelPattern : OpRewritePattern<OpType> {
+  using OpRewritePattern<OpType>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+  LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
-    FailureOr<IREE::Codegen::UKernelOpInterface> microKernelOp =
-        matchDAGForUKernel(rewriter, matmulOp);
-    if (failed(microKernelOp)) {
+    if (!op.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(
-          matmulOp, "failed to find microkernel op to replace with");
+          op, "operation needs to have tensor semantics");
     }
-    rewriter.replaceOp(matmulOp, microKernelOp.value()->getResults());
-    return success();
-  }
-};
-
-/// Pattern to lower (linalg.fill -> )? linalg.mmt4d to ukernel.generic
-struct UKernelMmt4DPattern : OpRewritePattern<linalg::Mmt4DOp> {
-  using OpRewritePattern<linalg::Mmt4DOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::Mmt4DOp mmt4dOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<IREE::Codegen::UKernelOpInterface> microKernelOp =
-        matchDAGForUKernel(rewriter, mmt4dOp);
-    if (failed(microKernelOp)) {
+    FailureOr<IREE::Codegen::UKernelOpInterface> ukernelOp =
+        matchDAGForUKernel(rewriter, op);
+    if (failed(ukernelOp)) {
       return rewriter.notifyMatchFailure(
-          mmt4dOp, "failed to find microkernel op to replace with");
+          op, "failed to find microkernel op to replace with");
     }
-    rewriter.replaceOp(mmt4dOp, microKernelOp.value()->getResults());
-    return success();
-  }
-};
-
-/// Pattern to lower tensor.pack to ukernel.generic
-struct UKernelPackPattern : OpRewritePattern<tensor::PackOp> {
-  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::PackOp packOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<IREE::Codegen::UKernelOpInterface> microKernelOp =
-        matchDAGForUKernel(rewriter, packOp);
-    if (failed(microKernelOp)) {
-      return rewriter.notifyMatchFailure(
-          packOp, "failed to find microkernel op to replace with");
-    }
-    rewriter.replaceOp(packOp, microKernelOp.value()->getResults());
-    return success();
-  }
-};
-
-/// Pattern to lower tensor.unpack to ukernel.generic
-struct UKernelUnpackPattern : OpRewritePattern<tensor::UnPackOp> {
-  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::UnPackOp unpackOp,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<IREE::Codegen::UKernelOpInterface> microKernelOp =
-        matchDAGForUKernel(rewriter, unpackOp);
-    if (failed(microKernelOp)) {
-      return rewriter.notifyMatchFailure(
-          unpackOp, "failed to find microkernel op to replace with");
-    }
-    rewriter.replaceOp(unpackOp, microKernelOp.value()->getResults());
+    rewriter.replaceOp(op, ukernelOp.value()->getResults());
     return success();
   }
 };
@@ -398,8 +333,10 @@ struct UKernelUnpackPattern : OpRewritePattern<tensor::UnPackOp> {
 void LLVMCPULowerToUKernelsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  patterns.insert<UKernelMatmulPattern, UKernelMmt4DPattern, UKernelPackPattern,
-                  UKernelUnpackPattern>(context);
+  patterns.insert<LowerToUKernelPattern<linalg::MatmulOp>,
+                  LowerToUKernelPattern<linalg::Mmt4DOp>,
+                  LowerToUKernelPattern<tensor::PackOp>,
+                  LowerToUKernelPattern<tensor::UnPackOp>>(context);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
