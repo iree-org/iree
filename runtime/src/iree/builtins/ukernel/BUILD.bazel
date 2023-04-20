@@ -23,20 +23,23 @@ iree_runtime_cc_library(
     deps = [":static_assert"],
 )
 
-ukernel_headers = [
+internal_headers = [
     "common.h",
     "elementwise.h",
     "mmt4d.h",
+    "mmt4d_internal.h",
     "pack.h",
+    "pack_internal.h",
     "query_tile_sizes.h",
+    "query_tile_sizes_internal.h",
     "unpack.h",
+    "unpack_internal.h",
 ]
 
-# :types is the type declarations used by both the entry points and the
-# internal implementation functions.
 iree_runtime_cc_library(
-    name = "headers",
-    hdrs = ukernel_headers,
+    name = "internal_headers",
+    hdrs = internal_headers,
+    visibility = [":__subpackages__"],
     deps = [
         ":exported_bits",
         ":static_assert",
@@ -49,22 +52,18 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "ukernel",
     srcs = [
+        "elementwise.c",
         "mmt4d.c",
+        "mmt4d_tile.c",
         "pack.c",
+        "pack_tile.c",
         "query_tile_sizes.c",
         "unpack.c",
-        "elementwise.c",
-        "mmt4d_tile.c",
-        "pack_tile.c",
-        "mmt4d_tile.h",
-        "pack_tile.h",
         "unpack_tile.c",
-        "unpack_tile.h",
-    ] + ukernel_headers,
+    ] + internal_headers,
     hdrs = ["api.h"],
     deps = [
         ":exported_bits",
-        ":headers",
         ":static_assert",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/builtins/ukernel/arch:config",

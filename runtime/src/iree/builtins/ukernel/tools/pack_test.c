@@ -6,6 +6,7 @@
 
 #include "iree/base/api.h"
 #include "iree/builtins/ukernel/api.h"
+#include "iree/builtins/ukernel/pack_internal.h"
 #include "iree/builtins/ukernel/tools/test.h"
 #include "iree/builtins/ukernel/tools/util.h"
 

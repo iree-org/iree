@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_ARCH_X86_64_PACK_X86_64_H_
 #define IREE_BUILTINS_UKERNEL_ARCH_X86_64_PACK_X86_64_H_
 
-#include "iree/builtins/ukernel/pack.h"
+#include "iree/builtins/ukernel/pack_internal.h"
 
 // Returns the x86_64 tile function to use for the pack op with given params, or
 // NULL if no suitable x86_64 tile function exists for these params, in which

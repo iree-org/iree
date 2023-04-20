@@ -32,14 +32,18 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    headers
+    internal_headers
   HDRS
     "common.h"
     "elementwise.h"
     "mmt4d.h"
+    "mmt4d_internal.h"
     "pack.h"
+    "pack_internal.h"
     "query_tile_sizes.h"
+    "query_tile_sizes_internal.h"
     "unpack.h"
+    "unpack_internal.h"
   DEPS
     ::exported_bits
     ::static_assert
@@ -59,21 +63,21 @@ iree_cc_library(
     "elementwise.h"
     "mmt4d.c"
     "mmt4d.h"
+    "mmt4d_internal.h"
     "mmt4d_tile.c"
-    "mmt4d_tile.h"
     "pack.c"
     "pack.h"
+    "pack_internal.h"
     "pack_tile.c"
-    "pack_tile.h"
     "query_tile_sizes.c"
     "query_tile_sizes.h"
+    "query_tile_sizes_internal.h"
     "unpack.c"
     "unpack.h"
+    "unpack_internal.h"
     "unpack_tile.c"
-    "unpack_tile.h"
   DEPS
     ::exported_bits
-    ::headers
     ::static_assert
     iree::base::core_headers
     iree::builtins::ukernel::arch::config

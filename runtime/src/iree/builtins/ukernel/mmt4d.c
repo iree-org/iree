@@ -6,7 +6,7 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
-#include "iree/builtins/ukernel/mmt4d_tile.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 #define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
 

@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_ARCH_X86_64_MMT4D_X86_64_H_
 #define IREE_BUILTINS_UKERNEL_ARCH_X86_64_MMT4D_X86_64_H_
 
-#include "iree/builtins/ukernel/mmt4d.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 // Returns the x86_64 tile function to use for the mmt4d with given params, or
 // NULL if no suitable x86_64 tile function exists for these params, in which

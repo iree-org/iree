@@ -12,6 +12,7 @@
 #include "iree/builtins/ukernel/tools/benchmark.h"
 #include "iree/builtins/ukernel/tools/memcpy_benchmark.h"
 #include "iree/builtins/ukernel/tools/util.h"
+#include "iree/builtins/ukernel/unpack_internal.h"
 
 IREE_FLAG(int64_t, batch_min_traversal_size, 10000000,
           "Minimum number of bytes to be traversed in each batch.");
