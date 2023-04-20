@@ -257,22 +257,24 @@ T5_LARGE_48x512_FP32_TF = common_definitions.Model(
     entry_function="forward",
     input_types=["48x512xi32", "48x512xi32"])
 
-T5_LARGE_64x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_64x512_FP32_TF,
-    name="T5LargeTFBatch64",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-64"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681193933/T5_LARGE/batch_64/tf-model.tar.gz",
-    entry_function="forward",
-    input_types=["64x512xi32", "64x512xi32"])
+# Disabled due to https://github.com/openxla/iree/issues/13189.
+#T5_LARGE_64x512_FP32_TF = common_definitions.Model(
+#    id=unique_ids.MODEL_T5_LARGE_64x512_FP32_TF,
+#    name="T5LargeTFBatch64",
+#    tags=["fp32", "seqlen512", "tensorflow", "batch-64"],
+#    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
+#    source_url=
+#    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681193933/T5_LARGE/batch_64/tf-model.tar.gz",
+#    entry_function="forward",
+#    input_types=["64x512xi32", "64x512xi32"])
 
-T5_LARGE_512x512_FP32_TF = common_definitions.Model(
-    id=unique_ids.MODEL_T5_LARGE_512x512_FP32_TF,
-    name="T5LargeTFBatch512",
-    tags=["fp32", "seqlen512", "tensorflow", "batch-512"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681193933/T5_LARGE/batch_512/tf-model.tar.gz",
-    entry_function="forward",
-    input_types=["512x512xi32", "512x512xi32"])
+# Disabled due to https://github.com/openxla/iree/issues/13189.
+#T5_LARGE_512x512_FP32_TF = common_definitions.Model(
+#    id=unique_ids.MODEL_T5_LARGE_512x512_FP32_TF,
+#    name="T5LargeTFBatch512",
+#    tags=["fp32", "seqlen512", "tensorflow", "batch-512"],
+#    source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
+#    source_url=
+#    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681193933/T5_LARGE/batch_512/tf-model.tar.gz",
+#    entry_function="forward",
+#    input_types=["512x512xi32", "512x512xi32"])
