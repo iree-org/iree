@@ -90,10 +90,21 @@ jobs:
           token_format: "access_token"
           credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
           create_credentials_file: false
+      # actions/cache is for some reason unusably slow on the large managed
+      # Windows GitHub runners so we roll our own. See
+      # https://github.com/actions/checkout/issues/1186
+      # TODO(gcmn): Factor this out into something reusable across jobs. Can't
+      # be a script because we haven't done the checkout yet :-)
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Updating git submodules"
-        run: git submodule update --init --jobs 8 --depth 1
+        env:
+          REMOTE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          mkdir -p ${GITHUB_WORKSPACE}
+          cd ${GITHUB_WORKSPACE}
+          git init
+          git fetch --depth 1 "${REMOTE_URL}" "${GITHUB_SHA}"
+          git checkout "${GITHUB_SHA}"
+          git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
         uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
         with:
