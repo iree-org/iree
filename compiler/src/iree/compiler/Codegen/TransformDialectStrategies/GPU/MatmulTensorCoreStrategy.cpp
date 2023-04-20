@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -333,11 +334,17 @@ static Value buildConvertToAsyncCopies(ImplicitLocOpBuilder &b, Value funcH,
 static void buildPipelineSharedMemoryCopies(ImplicitLocOpBuilder &b,
                                             Value funcH,
                                             const MatmulStrategy &strategy) {
-  Value subgroupMmaOpH = b.create<transform::MatchOp>(
-      funcH, mlir::gpu::SubgroupMmaComputeOp::getOperationName());
+  Value computeOpH;
+  if (strategy.useMmaSync) {
+    computeOpH = b.create<transform::MatchOp>(
+        funcH, mlir::nvgpu::MmaSyncOp::getOperationName());
+  } else {
+    computeOpH = b.create<transform::MatchOp>(
+        funcH, mlir::gpu::SubgroupMmaComputeOp::getOperationName());
+  }
   // TODO: Better builder.
   Value forOpH = b.create<transform::GetParentForOp>(
-      pdl::OperationType::get(b.getContext()), subgroupMmaOpH);
+      pdl::OperationType::get(b.getContext()), computeOpH);
   // TODO: Better builder instead of setting post-hoc.
   auto pipelineOp = b.create<
       iree_compiler::IREE::transform_dialect::PipelineSharedMemoryCopiesOp>(
