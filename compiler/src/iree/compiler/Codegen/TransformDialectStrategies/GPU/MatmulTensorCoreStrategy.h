@@ -10,6 +10,10 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
+namespace llvm {
+class raw_ostream;
+}
+
 namespace mlir {
 namespace iree_compiler {
 namespace gpu {
@@ -189,6 +193,9 @@ struct MatmulStrategy : StrategyBase {
                        /*tileSizes=*/{},
                        /*threadMapping=*/{warpY(), warpX()}};
   }
+
+  void print(llvm::raw_ostream &os) const;
+  LLVM_DUMP_METHOD void dump() const;
 };
 
 void buildMatmulTensorCoreStrategy(ImplicitLocOpBuilder &b, Value variantH,
