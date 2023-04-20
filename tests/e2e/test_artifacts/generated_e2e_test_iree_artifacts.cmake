@@ -687,6 +687,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "EfficientNetV2STF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -703,6 +704,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "MiniLML12H384Uncased(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -719,6 +721,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertForMaskedLMTF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -735,6 +738,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -751,6 +755,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "ClipTextSeqLen64PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -767,6 +772,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Unet2dPT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -783,6 +789,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "EfficientNetB7PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -905,6 +912,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50TFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -921,6 +929,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50TFBatch8(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -937,6 +946,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50TFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -953,6 +963,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50TFBatch128(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -969,6 +980,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50TFBatch256(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -985,6 +997,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50TFBatch2048(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1001,6 +1014,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1017,6 +1031,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch16(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1033,6 +1048,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch24(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1049,6 +1065,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch32(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1065,6 +1082,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch48(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1081,6 +1099,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1097,6 +1116,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch512(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1113,6 +1133,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch1024(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1129,6 +1150,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargeTFBatch1280(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1145,6 +1167,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "T5LargeTFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1161,6 +1184,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "T5LargeTFBatch16(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1177,6 +1201,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "T5LargeTFBatch24(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1193,6 +1218,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "T5LargeTFBatch32(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1209,6 +1235,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "T5LargeTFBatch48(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1225,6 +1252,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "T5LargeTFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1241,6 +1269,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "T5LargeTFBatch512(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1257,6 +1286,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1273,6 +1303,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch16(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1289,6 +1320,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch24(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1305,6 +1337,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch32(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1321,6 +1354,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch48(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1337,6 +1371,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1353,6 +1388,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch512(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1369,6 +1405,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch1024(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1385,6 +1422,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "BertLargePTBatch1280(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1401,6 +1439,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50PTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1417,6 +1456,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50PTBatch8(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1433,6 +1473,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50PTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1449,6 +1490,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50PTBatch128(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1465,6 +1507,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50PTBatch256(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1481,6 +1524,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
   FRIENDLY_NAME
     "Resnet50PTBatch2048(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -3550,6 +3594,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3570,6 +3615,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3590,6 +3636,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3610,6 +3657,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3630,6 +3678,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3650,6 +3699,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3670,6 +3720,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3820,6 +3871,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3840,6 +3892,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3860,6 +3913,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3880,6 +3934,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3900,6 +3955,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3920,6 +3976,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3940,6 +3997,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3960,6 +4018,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3980,6 +4039,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4000,6 +4060,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4020,6 +4081,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4040,6 +4102,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4060,6 +4123,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4080,6 +4144,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4100,6 +4165,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4120,6 +4186,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4140,6 +4207,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4160,6 +4228,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4180,6 +4249,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4200,6 +4270,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4220,6 +4291,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4240,6 +4312,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4260,6 +4333,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4280,6 +4354,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4300,6 +4375,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4320,6 +4396,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4340,6 +4417,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4360,6 +4438,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4380,6 +4459,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4400,6 +4480,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4420,6 +4501,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4440,6 +4522,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4460,6 +4543,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4480,6 +4564,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4500,6 +4585,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4520,6 +4606,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4540,6 +4627,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-use-mma-sync"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"

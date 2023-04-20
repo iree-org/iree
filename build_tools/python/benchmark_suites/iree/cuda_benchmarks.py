@@ -24,7 +24,10 @@ class Linux_CUDA_Benchmarks(object):
   SM_80_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CUDA_SM80_DEFAULTS,
       tags=["default-flags"],
-      compile_targets=[SM_80_GPU_TARGET])
+      compile_targets=[SM_80_GPU_TARGET],
+      extra_flags=[
+          "--iree-codegen-llvmgpu-use-mma-sync",
+      ])
   SM_80_UBENCH_MATMUL_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CUDA_SM80_MATMUL_UBENCH,
       tags=["ukernel", "matmul"],
