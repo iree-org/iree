@@ -32,7 +32,7 @@ jobs:
 
       - name: "Install openxla-dev-tools"
         run: |
-          pip install git+https://github.com/stellaraccident/openxla-dev-tools.git
+          pip install git+https://github.com/openxla/openxla-devtools.git
 
       - name: "Check out workspace"
         run: |
