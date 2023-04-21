@@ -66,8 +66,20 @@ class BenchmarkDriver(object):
       self.config.trace_capture_config.capture_tmp_dir.mkdir(parents=True,
                                                              exist_ok=True)
 
-    cpu_target_arch = self.device_info.get_iree_cpu_arch_name()
-    gpu_target_arch = self.device_info.get_iree_gpu_arch_name()
+    use_legacy_name = self.benchmark_suite.legacy_suite
+
+    cpu_target_arch = self.device_info.get_iree_cpu_arch_name(use_legacy_name)
+    if cpu_target_arch is None:
+      print("WARNING: Detected unsupported CPU architecture in "
+            f'"{self.device_info}", CPU benchmarking is disabled.')
+      cpu_target_arch = "unknown"
+
+    gpu_target_arch = self.device_info.get_iree_gpu_arch_name(use_legacy_name)
+    if gpu_target_arch is None:
+      print("WARNING: Detected unsupported GPU architecture in "
+            f'"{self.device_info}", GPU benchmarking is disabled.')
+      gpu_target_arch = "unknown"
+
     drivers, loaders = self.__get_available_drivers_and_loaders()
 
     for category, _ in self.benchmark_suite.list_categories():
