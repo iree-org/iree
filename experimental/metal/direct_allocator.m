@@ -26,6 +26,7 @@ typedef struct iree_hal_metal_allocator_t {
   iree_hal_device_t* base_device;
   id<MTLDevice> device;
 
+  bool is_unified_memory;
   iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode;
 
   iree_allocator_t host_allocator;
@@ -57,6 +58,7 @@ iree_status_t iree_hal_metal_allocator_create(
     allocator->base_device = base_device;
     iree_hal_device_retain(base_device);
     allocator->device = [device retain];  // +1
+    allocator->is_unified_memory = [device hasUnifiedMemory];
     allocator->resource_tracking_mode = resource_tracking_mode;
     allocator->host_allocator = host_allocator;
 
@@ -112,8 +114,26 @@ static iree_hal_buffer_compatibility_t iree_hal_metal_allocator_query_buffer_com
 
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+      compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
+    }
     if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
+    }
+  }
+
+  if (iree_all_bits_set(params->type,
+                        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    // On iOS, we don't have device local + host visible memory. But given the unified memory
+    // architecture, it's fine to just request host local + device visible memory.
+    // On macOS, for unified memory architecture, it's similar to iOS. Otherwise, we can have
+    // device local + host visible memory backed by Managed storage mode.
+    iree_hal_metal_allocator_t* allocator = iree_hal_metal_allocator_cast(base_allocator);
+    if (allocator->is_unified_memory) {
+      params->type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
+      params->type |= IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+      // We have suggested other configurations than the original request. Mark accordingly.
+      compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE;
     }
   }
 
@@ -155,13 +175,17 @@ static MTLResourceOptions iree_hal_metal_select_resource_options(
   if (iree_all_bits_set(type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     if (iree_all_bits_set(type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       // Device local + host visible.
+      // iree_hal_metal_allocator_query_buffer_compatibility guarantees that we only fall into this
+      // case for macOS devices with non-uniform memory.
 #if defined(IREE_PLATFORM_MACOS)
-      options = is_unified_memory ? MTLResourceStorageModeShared : MTLResourceStorageModeManaged;
+      IREE_ASSERT(!is_unified_memory);
+      options = MTLResourceStorageModeManaged;
 #else
       options = MTLResourceStorageModeShared;
 #endif  // IREE_PLATFORM_MACOS
     } else {
       // Device local + host invisible.
+      // For unified memory, update it to Shared storage mode if we have initial data.
       options = (is_unified_memory && has_init_data) ? MTLResourceStorageModeShared
                                                      : MTLResourceStorageModePrivate;
     }
@@ -202,19 +226,33 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
 
   // Coerce options into those required by the current device.
   iree_hal_buffer_params_t compat_params = *params;
-  if (!iree_all_bits_set(iree_hal_metal_allocator_query_buffer_compatibility(
-                             base_allocator, &compat_params, &allocation_size),
-                         IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)) {
+  iree_hal_buffer_compatibility_t compatibility =
+      iree_hal_metal_allocator_query_buffer_compatibility(base_allocator, &compat_params,
+                                                          &allocation_size);
+  if (!iree_all_bits_set(compatibility, IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)) {
+#if IREE_STATUS_MODE
+    iree_bitfield_string_temp_t temp0, temp1, temp2;
+    iree_string_view_t memory_type_str = iree_hal_memory_type_format(params->type, &temp0);
+    iree_string_view_t usage_str = iree_hal_buffer_usage_format(params->usage, &temp1);
+    iree_string_view_t compatibility_str =
+        iree_hal_buffer_compatibility_format(compatibility, &temp2);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocator cannot allocate a buffer with the given parameters; "
+                            "memory_type=%.*s, usage=%.*s, compatibility=%.*s",
+                            (int)memory_type_str.size, memory_type_str.data, (int)usage_str.size,
+                            usage_str.data, (int)compatibility_str.size, compatibility_str.data);
+#else
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocator cannot allocate a buffer with the given parameters");
+#endif  // IREE_STATUS_MODE
   }
 
   iree_status_t status = iree_ok_status();
-  bool is_unified_memory = [allocator->device hasUnifiedMemory];
   bool has_init_data = !iree_const_byte_span_is_empty(initial_data);
 
-  MTLResourceOptions options = iree_hal_metal_select_resource_options(
-      compat_params.type, is_unified_memory, has_init_data, allocator->resource_tracking_mode);
+  MTLResourceOptions options =
+      iree_hal_metal_select_resource_options(compat_params.type, allocator->is_unified_memory,
+                                             has_init_data, allocator->resource_tracking_mode);
   id<MTLBuffer> metal_buffer = nil;
   // If we chose shared storage mode, we can handle initial data with newByfferWithBytes directly.
   // Otherwise we just create the buffer here, and explicitly transfer range later.
@@ -240,13 +278,20 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
         /*byte_length=*/allocation_size, iree_hal_buffer_release_callback_null(), &buffer);  // +1
   }
 
-  if (iree_status_is_ok(status) && has_init_data &&
-      !iree_all_bits_set(options, MTLResourceStorageModeShared)) {
-    status = iree_hal_device_transfer_range(
-        allocator->base_device,
-        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data, initial_data.data_length),
-        0, iree_hal_make_device_transfer_buffer(buffer), 0, initial_data.data_length,
-        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+  if (iree_status_is_ok(status) && has_init_data) {
+    if (iree_all_bits_set(options, MTLResourceStorageModePrivate)) {
+      // This should only happen for macOS devices with non-uniform memory; for uniform memory
+      // devices, the allocator compatibility would update it to use Shared storage mode.
+      status = iree_make_status(IREE_STATUS_UNIMPLEMENTED, "private storage with initial data");
+    } else {
+#if defined(IREE_PLATFORM_MACOS)
+      // Explicitly handle synchronization for Managed storage mode.
+      if (iree_all_bits_set(options, MTLResourceStorageModeManaged)) {
+        memcpy(metal_buffer.contents, initial_data.data, initial_data.data_length);
+        [metal_buffer didModifyRange:NSMakeRange(0, initial_data.data_length)];
+      }
+#endif  // IREE_PLATFORM_MACOS
+    }
   }
 
   if (iree_status_is_ok(status)) {
