@@ -254,16 +254,12 @@ func.func @${operation_name}_${compilation_info_name}(
     return SubstituteTemplate(self.linalg_row_row_matmul_template, values)
 
 
-# Emit `mhlo.matmul` operation.
-# TODO: Add support for testing lowering matmul op from other dialect.
 class EmitMhloMatmulOperation:
+  """Emitters for the `mhlo.matmul` operation."""
 
+  # TODO: Add support for other dailects.
   def __init__(self):
     self.mlir_dialect = MlirDialect.Mhlo
-
-    self.linalg_row_row_matmul_template = """
-// mhlo.matmul operation row-row layout
-"""
 
 
 ###############################################################################
@@ -360,8 +356,9 @@ class MatmulOperationLauncher:
     self.batch_size = args.batch_size
 
     # Additional paths.
-    self.matmul_path = os.path.join(self.generated_path, 'matmul')
-    self.operation_path = os.path.join(self.matmul_path, operation.name())
+    self.operation_path = os.path.join(
+        self.generated_path, OperationKindNames[operation.operation_kind],
+        operation.name())
     self.source_mlir_file = os.path.join(self.operation_path,
                                          operation.name() + '.mlir')
 
@@ -395,7 +392,9 @@ class MatmulOperationLauncher:
 
     # General compilation options
     cmd += [f"--iree-hal-target-backends={self.args.device}"]
-    cmd += [f"--iree-hal-cuda-llvm-target-arch={self.args.cuda_arch}"]
+
+    if self.args.device == "cuda":
+      cmd += [f"--iree-hal-cuda-llvm-target-arch={self.args.cuda_arch}"]
     if self.args.split_k_slices != "":
       cmd += [f"--iree-flow-split-matmul-reduction={self.args.split_k_slices}"]
     if self.args.use_mma_sync:
@@ -521,7 +520,7 @@ class MatmulOperationLauncher:
 
 
 ##############################################################################
-class MatmulGenerator:
+class CudaMatmulGenerator:
   """Matmul dispatch generator class.
   Generates a list of pre-definied matmul operations with resonable tuning cofigurations. 
   The generator function are seperated based on the target backend and the data type.
@@ -539,9 +538,8 @@ class MatmulGenerator:
         LLVMGPUMatmulTensorCoreMmaSync,  # Tensor Core (MMA.SYNC)
     ]
     """
-    self.problem_shapes = [  #[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
-        [2560, 2560, 2560], [3456, 1024, 2048]
-    ]
+    self.problem_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
+                           [2560, 2560, 2560], [3456, 1024, 2048]]
     """
 
     self.problem_shapes = [[128, 128, 768]]
@@ -551,7 +549,7 @@ class MatmulGenerator:
 
     # CUDA specific constants.
     self.cuda_warp_size = 32
-    self.cuda_smem_capacity_in_bytes_sm80 = 192 << 10
+    self.cuda_smem_capacity_in_bytes_sm80 = 163 << 10
 
   def _is_tile_aligned_shape(self, dispatch):
     """Checks if the given dispatch is valid for CUDA."""
@@ -601,11 +599,11 @@ class MatmulGenerator:
     """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
 
     tile_descriptions = [
-        TileDescription([256, 128, 32], 3, [64, 4, 1]),
-        TileDescription([128, 256, 32], 3, [128, 2, 1]),
-        TileDescription([128, 128, 64], 4, [64, 2, 1]),
-        TileDescription([128, 128, 32], 5, [64, 2, 1]),
-        TileDescription([128, 64, 32], 5, [64, 2, 1]),
+        #TileDescription([256, 128, 32], 3, [64, 4, 1]),
+        #TileDescription([128, 256, 32], 3, [128, 2, 1]),
+        #TileDescription([128, 128, 64], 4, [64, 2, 1]),
+        #TileDescription([128, 128, 32], 5, [64, 2, 1]),
+        #TileDescription([128, 64, 32], 5, [64, 2, 1]),
         TileDescription([64, 64, 64], 5, [64, 2, 1]),
         TileDescription([64, 64, 32], 10, [64, 2, 1]),
     ]
@@ -638,7 +636,6 @@ class MatmulGenerator:
       self.dispatches_collection_list.append(DispatchCollection(\
         operation, supported_configuration_list))
 
-  ################################################################################
   def _cuda_matmul_tensor_cores_f32(self):
     """Appends a list of matmul dispatches for GPU TensorCore F32 data type."""
 
@@ -666,7 +663,7 @@ class MatmulGenerator:
         TensorDescription(DataType.f32, LayoutType.RowMajor), \
         TensorDescription(DataType.f32, LayoutType.RowMajor))
 
-      # Filter out configurations that are not supported by LLVM GPU CUDA backend.
+      # Filter out configurations that are not supported by CUDA backend.
       supported_configuration_list = self._cuda_supported_configuration_list(
           operation, configuration_list)
 
@@ -680,9 +677,8 @@ class MatmulGenerator:
 
   def generate(self):
     """Generates a list of matmul operations."""
-    if self.args.device == 'cuda':
-      self._cuda_matmul_tensor_cores_f16()
-      self._cuda_matmul_tensor_cores_f32()
+    self._cuda_matmul_tensor_cores_f16()
+    #self._cuda_matmul_tensor_cores_f32()
     return self.dispatches_collection_list
 
 

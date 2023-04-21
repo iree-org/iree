@@ -48,11 +48,15 @@ GpuArchTypeNames = {
 ###################################################################################################
 class OperationKind(enum.Enum):
   Matmul = auto()
+  BatchMatmul = auto()
+  SplitkMatmul = auto()
   Conv2d = auto()
 
 
 OperationKindNames = {
     OperationKind.Matmul: 'matmul',
+    OperationKind.BatchMatmul: 'batch_matmul',
+    OperationKind.SplitkMatmul: 'splitk_matmul',
     OperationKind.Conv2d: 'conv2d'
 }
 

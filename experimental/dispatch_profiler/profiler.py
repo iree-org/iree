@@ -2,6 +2,7 @@ import argparse
 
 from library import *
 from matmul import *
+from batch_matmul import *
 from manifest import *
 from performance_report import *
 from options import parse_profiler_arguments
@@ -11,6 +12,7 @@ from options import parse_profiler_arguments
 # Map of operation kinds to their dispatch launchers.
 operation_launcher_map = {
     OperationKind.Matmul: MatmulOperationLauncher,
+    OperationKind.BatchMatmul: BatchMatmulOperationLauncher,
 }
 ###############################################################################
 

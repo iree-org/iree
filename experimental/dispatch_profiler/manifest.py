@@ -4,6 +4,7 @@ import shutil
 
 from library import *
 from matmul import *
+from batch_matmul import *
 
 
 ###############################################################################
@@ -21,6 +22,7 @@ class EmitSourceMLIR:
 
     mlir_configuration_emitter = {
         OperationKind.Matmul: EmitMatmulCompilationInfo,
+        OperationKind.BatchMatmul: EmitBatchMatmulCompilationInfo,
         #OperationKind.Conv2d : EmitConv2dCompilationInfo, TODO: Add conv2d
     }
     self.configuration_emitter = mlir_configuration_emitter[
@@ -28,6 +30,7 @@ class EmitSourceMLIR:
 
     mlir_dispatch_emitter = {
         OperationKind.Matmul: EmitLinalgMatmulDispatch,
+        OperationKind.BatchMatmul: EmitLinalgBatchMatmulDispatch,
         #OperationKind.Conv2d : EmitLinalgConv2dDispatch, TODO: Add conv2d
     }
     self.dispatch_emitter = mlir_dispatch_emitter[self.operation_kind]()
@@ -79,6 +82,7 @@ class Manifest:
     else:
       operations_kind_list = [
           OperationKind.Matmul,
+          OperationKind.BatchMatmul,
           #OperationKind.Conv2d
       ]
       self.operation_kind_enabled = [x for x in operations_kind_list\
@@ -159,8 +163,8 @@ class Manifest:
 
   def load(self):
     """Loads the manifest with pre-defined dispatches for supported operations."""
-    matmul_dispatch_collection_list = MatmulGenerator(self.args).generate()
-    self.append(matmul_dispatch_collection_list)
+    self.append(CudaMatmulGenerator(self.args).generate())
+    self.append(CudaBatchMatmulGenerator(self.args).generate())
 
   def emit(self, mlir_dialect=MlirDialect.Linalg):
     """Emits the operations in the Manifest to the build directory as MLIR source files.
@@ -177,6 +181,7 @@ class Manifest:
 
     # For each operation_kind create a directory and emit the operations with
     # all the configurations in the configuration_list into their seperate directories.
+    print(self.operations)
     for operation_kind, dispatch_collection_list in self.operations.items():
 
       operation_kind_path = os.path.join(generated_path,
