@@ -521,7 +521,7 @@ jobs:
           output_dir: "${{ github.workspace }}/bindist"
           # Note when upgrading: Build just one Python version synced to our
           # minimum.
-          override_python_versions: cp38-cp38m
+          override_python_versions: cp38-cp38
         run: |
           ./build_tools/python_deploy/build_linux_packages.sh
 
