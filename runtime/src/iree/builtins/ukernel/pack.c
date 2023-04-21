@@ -205,8 +205,9 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   if (params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER) {
     iree_uk_ssize_swap(&tile_size0, &tile_size1);
   }
-  const char* in_buf = params->in_buffer;
-  char* out_buf = params->out_buffer;
+  const char* in_buf =
+      (const char*)params->in_buffer + (params->in_offset * elem_size);
+  char* out_buf = (char*)params->out_buffer + (params->out_offset * elem_size);
   // Prepare for padding.
   iree_uk_pack_tmpbuf_helper_t padding_helper;
   if (params->in_size0 < outer_size0 * tile_size0 ||

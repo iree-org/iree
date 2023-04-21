@@ -22,8 +22,11 @@ typedef enum iree_uk_unpack_type_t {
 
 typedef struct iree_uk_unpack_params_t {
   iree_uk_unpack_type_t type;
-  iree_uk_uint32_t flags;
+  const void* in_buffer;
+  iree_uk_ssize_t in_offset;
   iree_uk_ssize_t in_stride0;
+  void* out_buffer;
+  iree_uk_ssize_t out_offset;
   iree_uk_ssize_t out_stride0;
   iree_uk_ssize_t in_size0;
   iree_uk_ssize_t in_size1;
@@ -31,8 +34,7 @@ typedef struct iree_uk_unpack_params_t {
   iree_uk_ssize_t in_size3;
   iree_uk_ssize_t out_size0;
   iree_uk_ssize_t out_size1;
-  const void* in_buffer;
-  void* out_buffer;
+  iree_uk_uint32_t flags;
   const iree_uk_uint64_t* cpu_data;
 } iree_uk_unpack_params_t;
 

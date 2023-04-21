@@ -41,18 +41,18 @@ static iree_status_t iree_uk_benchmark_mmt4d(
   params.M = FLAG_m_size;
   params.N = FLAG_n_size;
   params.K = FLAG_k_size;
-  params.lhs_stride = params.K * params.M0 * params.K0;
-  params.rhs_stride = params.K * params.N0 * params.K0;
-  params.out_stride = params.N * params.M0 * params.N0;
+  params.lhs_stride0 = params.K * params.M0 * params.K0;
+  params.rhs_stride0 = params.K * params.N0 * params.K0;
+  params.out_stride0 = params.N * params.M0 * params.N0;
   iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(params.type);
   iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(params.type);
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params.type);
   iree_uk_ssize_t lhs_buffer_size =
-      iree_uk_2d_buffer_length(lhs_type, params.M, params.lhs_stride);
+      iree_uk_2d_buffer_length(lhs_type, params.M, params.lhs_stride0);
   iree_uk_ssize_t rhs_buffer_size =
-      iree_uk_2d_buffer_length(rhs_type, params.N, params.rhs_stride);
+      iree_uk_2d_buffer_length(rhs_type, params.N, params.rhs_stride0);
   iree_uk_ssize_t out_buffer_size =
-      iree_uk_2d_buffer_length(out_type, params.M, params.out_stride);
+      iree_uk_2d_buffer_length(out_type, params.M, params.out_stride0);
   void* lhs_buffer = malloc(lhs_buffer_size);
   void* rhs_buffer = malloc(rhs_buffer_size);
   void* out_buffer = malloc(out_buffer_size);

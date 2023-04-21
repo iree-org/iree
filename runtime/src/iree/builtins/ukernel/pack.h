@@ -22,8 +22,11 @@ typedef enum iree_uk_pack_type_t {
 
 typedef struct iree_uk_pack_params_t {
   iree_uk_pack_type_t type;
-  iree_uk_uint32_t flags;
+  const void* in_buffer;
+  iree_uk_ssize_t in_offset;
   iree_uk_ssize_t in_stride0;
+  void* out_buffer;
+  iree_uk_ssize_t out_offset;
   iree_uk_ssize_t out_stride0;
   iree_uk_ssize_t in_size0;
   iree_uk_ssize_t in_size1;
@@ -31,8 +34,6 @@ typedef struct iree_uk_pack_params_t {
   iree_uk_ssize_t out_size1;
   iree_uk_ssize_t out_size2;
   iree_uk_ssize_t out_size3;
-  const void* in_buffer;
-  void* out_buffer;
   // The least significant bits of `padding_value`, up to element size, are used
   // for padding. As this is based solely on bit-significance and not on byte
   // addresses, this is independent of endianness.
@@ -44,6 +45,7 @@ typedef struct iree_uk_pack_params_t {
   // patterns are supported for padding. This covers most cases as floating
   // point types encode zero as zero bits.
   iree_uk_uint64_t padding_value;
+  iree_uk_uint32_t flags;
   const iree_uk_uint64_t* cpu_data;
 } iree_uk_pack_params_t;
 
