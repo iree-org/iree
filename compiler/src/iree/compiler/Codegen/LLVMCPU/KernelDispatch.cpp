@@ -1176,7 +1176,7 @@ static LogicalResult setUnPackOpRootConfig(
     distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
   }
 
-  SmallVector<int64_t> tileSizes(op.getDestRank(), 1);
+  SmallVector<int64_t> tileSizes(op.getStaticInnerTiles());
   TileSizesListType tileSizesList = {distTileSizes};
   tileSizesList.push_back(tileSizes);
   tileSizesList.push_back(/*reduction tile sizes=*/{});
@@ -2053,11 +2053,11 @@ static LogicalResult setTranslationInfoAndRootConfig(
     }
   }
 
-  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
+  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
     return failure();
   }
 
-  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
+  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
     return failure();
   }
 
