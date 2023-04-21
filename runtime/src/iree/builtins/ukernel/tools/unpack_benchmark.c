@@ -147,10 +147,8 @@ int main(int argc, char** argv) {
                                     FLAG_batch_min_traversal_size);
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8,
-                                    NULL);
-  iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 8, 8,
-                                    NULL);
+  iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8, "");
+  iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 8, 8, "");
 #elif defined(IREE_UK_ARCH_X86_64)
   iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8,
                                     "avx2_fma");
@@ -163,10 +161,8 @@ int main(int argc, char** argv) {
 #else   // defined(IREE_UK_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
-  iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8,
-                                    NULL);
-  iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 8, 8,
-                                    NULL);
+  iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8, "");
+  iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 8, 8, "");
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
   iree_uk_benchmark_run_and_cleanup();

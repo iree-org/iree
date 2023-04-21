@@ -41,6 +41,19 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    util_test
+  SRCS
+    "util_test.c"
+  DEPS
+    ::test
+    ::util
+    iree::base
+    iree::base::internal::cpu
+    iree::schemas::cpu_data
+)
+
 iree_cc_library(
   NAME
     benchmark
