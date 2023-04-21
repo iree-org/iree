@@ -390,26 +390,6 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
-    "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-1024"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680491395/BERT_LARGE/batch_1024/tf-model.tar.gz"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-1024_BertLargeTFBatch1024"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
-    "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-1280"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1680491395/BERT_LARGE/batch_1280/tf-model.tar.gz"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-1280_BertLargeTFBatch1280"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
     "model-587e595d-2adf-4e41-9617-43178a133725-batch-1"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1681193933/T5_LARGE/batch_1/tf-model.tar.gz"
