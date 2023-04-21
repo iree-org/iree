@@ -70,7 +70,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         gpu_target_arch_filter="gpu-mali",
         driver_filter="vulkan",
         mode_filter=".*full-inference.*",
-        model_name_filter="deepnet.*/case2")
+        model_name_filter="deepnet.*")
     all_benchmarks = suite.filter_benchmarks_for_category(
         category="TFLite",
         available_drivers=None,
