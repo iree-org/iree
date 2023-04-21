@@ -46,16 +46,8 @@ config.excludes = [
     "imagenet_test_data.py",
 ]
 
-PYTHON_EXEC = sys.executable
-
-# Some environments use a version of Python built against an embedded
-# interpreter and lack a sys.executable. In this case, we allow an explicit
-# override from the environment.
-if PYTHON_EXEC is None:
-  PYTHON_EXEC = os.getenv("PYTHON")
-
 config.substitutions.extend([
-    ("%PYTHON", PYTHON_EXEC),
+    ("%PYTHON", os.getenv("PYTHON", sys.executable)),
 ])
 
 # Add our local projects to the PYTHONPATH
