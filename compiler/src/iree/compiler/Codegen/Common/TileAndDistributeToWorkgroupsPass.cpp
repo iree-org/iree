@@ -183,8 +183,8 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
         AffineExpr s0, s1;
         bindSymbols(rewriter.getContext(), s0, s1);
         SmallVector<OpFoldResult> mapOperands = {workload, tileSize};
-        return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.ceilDiv(s1),
-                                             mapOperands);
+        return affine::makeComposedFoldedAffineApply(
+            rewriter, loc, s0.ceilDiv(s1), mapOperands);
       }));
   // If there is interchange, first apply interchange on the number of tiles.
   if (!givenInterchange.empty()) {
