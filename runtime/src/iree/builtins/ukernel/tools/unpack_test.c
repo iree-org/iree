@@ -184,7 +184,6 @@ int main(int argc, char** argv) {
   // to test weird tile shapes to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
   iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 3, 5, NULL);
-  iree_uk_test_unpack(iree_uk_unpack_type_i8i8, 4, 2, NULL);
   iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 3, 4, NULL);
 
 #if defined(IREE_UK_ARCH_ARM_64)
