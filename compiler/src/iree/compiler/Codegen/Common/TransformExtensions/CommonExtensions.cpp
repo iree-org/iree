@@ -495,7 +495,7 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
       // upstream moveLoopInvariantCode if necessary.
       funcOp->walk([](Operation *op) {
         (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
-            .Case<AffineForOp, scf::ForOp>(
+            .Case<affine::AffineForOp, scf::ForOp>(
                 [](auto loop) { return promoteIfSingleIteration(loop); })
             .Default([](Operation *) { return success(); });
       });
@@ -1019,7 +1019,7 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
       AffineExpr s0, s1;
       bindSymbols(rewriter.getContext(), s0, s1);
       auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
-      workgroupCount[workgroupsDim] = makeComposedFoldedAffineApply(
+      workgroupCount[workgroupsDim] = affine::makeComposedFoldedAffineApply(
           rewriter, loc, m,
           ArrayRef<OpFoldResult>{workload[nextTiledDim],
                                  unpackedTileSizesOrNumThreads[nextTiledDim]});
@@ -1524,7 +1524,7 @@ static LogicalResult adjustWorkgroupCountComputeRegionForImg2Col(
     // until the next dim affected by the collapse_shape op.
     auto m = AffineMap::get(0, indices.size(), product);
     Value collapsedIndex =
-        makeComposedAffineApply(rewriter, loc, m, originalSizes);
+        affine::makeComposedAffineApply(rewriter, loc, m, originalSizes);
     newWorkload.push_back(collapsedIndex);
     newWorkload.append(skipped);
     pushRange(newWorkload, workloadDims[indices.back()] + 1,

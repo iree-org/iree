@@ -195,9 +195,9 @@ namespace {
 struct FormDispatchWorkgroupsPass
     : public FormDispatchWorkgroupsBase<FormDispatchWorkgroupsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
   FormDispatchWorkgroupsPass(bool generateWorkloadRegion) {
     this->generateWorkloadRegion = generateWorkloadRegion;

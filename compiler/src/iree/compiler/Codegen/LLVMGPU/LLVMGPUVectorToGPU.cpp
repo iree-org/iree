@@ -43,7 +43,7 @@ struct LLVMGPUVectorToGPUPass
   LLVMGPUVectorToGPUPass(GPUTensorCoreType tensorCoreType)
       : tensorCoreType(tensorCoreType) {}
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect, AffineDialect,
+    registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect, affine::AffineDialect,
                     memref::MemRefDialect>();
   }
 

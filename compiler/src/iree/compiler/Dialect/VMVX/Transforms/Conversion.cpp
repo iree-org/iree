@@ -69,7 +69,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     conversionTarget
         .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
                          mlir::arith::ArithDialect>();
-    conversionTarget.addLegalDialect<mlir::AffineDialect>();
+    conversionTarget.addLegalDialect<mlir::affine::AffineDialect>();
     conversionTarget.addLegalDialect<memref::MemRefDialect>();
     conversionTarget.addIllegalOp<mlir::UnrealizedConversionCastOp>();
 

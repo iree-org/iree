@@ -99,7 +99,7 @@ def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   }];
   let constructor = "mlir::iree_compiler::createDecomposeAffineOpsPass()";
   let dependentDialects = [
-      "AffineDialect"
+      "affine::AffineDialect"
   ];
 }
 
@@ -134,7 +134,7 @@ def ExtractAddressComputationGPU: Pass<"extract-address-computation-gpu"> {
   }];
   let constructor = "mlir::iree_compiler::createExtractAddressComputationGPUPass()";
   let dependentDialects = [
-      "memref::MemRefDialect", "nvgpu::NVGPUDialect", "AffineDialect"
+      "memref::MemRefDialect", "nvgpu::NVGPUDialect", "affine::AffineDialect"
   ];
 }
 
@@ -173,7 +173,7 @@ def BufferizeCopyOnlyDispatches :
     Option<"embedSubspanOffsetIntoMemRefType",
            "embed-subspan-offset-into-memref-type", "bool", /*default=*/"true",
            "Embeds the offset information on subspan ops into the type."
-           "Is a work-around for #12933">,    
+           "Is a work-around for #12933">,
   ];
 }
 
@@ -274,7 +274,7 @@ def TileAndDistributeToWorkgroups :
       "Maximum number of dims to distribute workgroups across.">,
     Option<"distributionMethod", "distribution-method", "int32_t",
       /*default=*/ "0",
-      "Pick the distribution method">      
+      "Pick the distribution method">
   ];
 }
 

@@ -44,7 +44,7 @@ struct BufferizeCopyOnlyDispatchesPass
     this->embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, bufferization::BufferizationDialect,
+    registry.insert<affine::AffineDialect, bufferization::BufferizationDialect,
                     IREE::Flow::FlowDialect, linalg::LinalgDialect,
                     memref::MemRefDialect, tensor::TensorDialect>();
   }

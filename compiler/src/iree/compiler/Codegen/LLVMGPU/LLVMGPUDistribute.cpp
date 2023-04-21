@@ -31,7 +31,7 @@ namespace {
 struct LLVMGPUDistributePass
     : public LLVMGPUDistributeBase<LLVMGPUDistributePass> {
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect>();
+    registry.insert<affine::AffineDialect, gpu::GPUDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();

@@ -193,8 +193,8 @@ struct LowerDispatchWorkgroupCountForDagRootOp
           AffineExpr s0, s1;
           bindSymbols(rewriter.getContext(), s0, s1);
           SmallVector<OpFoldResult> mapOperands = {workload, tileSize};
-          return makeComposedFoldedAffineApply(rewriter, loc, s0.ceilDiv(s1),
-                                               mapOperands);
+          return affine::makeComposedFoldedAffineApply(
+              rewriter, loc, s0.ceilDiv(s1), mapOperands);
         }));
     // If there is interchange, first apply interchange on the number of tiles.
     if (!givenInterchange.empty()) {
@@ -219,7 +219,7 @@ struct LowerDispatchWorkgroupCountForDagRootOp
         // combined into one.
         AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
         AffineExpr s1 = rewriter.getAffineSymbolExpr(1);
-        numWorkgroups.back() = makeComposedAffineApply(
+        numWorkgroups.back() = affine::makeComposedAffineApply(
             rewriter, loc, s0 * s1, {numWorkgroups.back(), numTileAlongDim});
         continue;
       }
@@ -320,10 +320,10 @@ struct TileAndDistributeToWorkgroupsPass
     this->distributionMethod = (int32_t)distributionMethod;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, IREE::HAL::HALDialect,
-                linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
+                    IREE::HAL::HALDialect, linalg::LinalgDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
 
   void runOnOperation() override;

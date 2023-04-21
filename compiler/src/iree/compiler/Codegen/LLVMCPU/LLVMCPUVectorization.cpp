@@ -207,7 +207,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
 
   // Gathers all innermost loops through a post order pruned walk.
   funcOp.walk([](Operation *op) {
-    if (auto forOp = dyn_cast<AffineForOp>(op))
+    if (auto forOp = dyn_cast<affine::AffineForOp>(op))
       (void)promoteIfSingleIteration(forOp);
     else if (auto forOp = dyn_cast<scf::ForOp>(op))
       (void)promoteIfSingleIteration(forOp);

@@ -66,7 +66,7 @@ class TransformDialectInterpreterPass
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
                     mlir::iree_compiler::IREE::Flow::FlowDialect,
                     arith::ArithDialect,
-                    AffineDialect,
+                   affine::AffineDialect,
                     bufferization::BufferizationDialect,
                     func::FuncDialect,
                     gpu::GPUDialect,

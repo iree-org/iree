@@ -59,7 +59,7 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
         builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]);
     if (i == 0) {
       mlir::AffineExpr d0 = builder.getAffineDimExpr(0);
-      subgroupId = mlir::makeComposedAffineApply(
+      subgroupId = mlir::affine::makeComposedAffineApply(
           builder, loc, d0.floorDiv(builder.getAffineConstantExpr(warpSize)),
           {subgroupId});
     }

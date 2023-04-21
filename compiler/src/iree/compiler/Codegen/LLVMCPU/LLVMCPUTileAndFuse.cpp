@@ -53,8 +53,8 @@ struct LLVMCPUTileAndFusePass : LLVMCPUTileAndFuseBase<LLVMCPUTileAndFusePass> {
     this->tilingLevel.setValue(tilingLevel);
   }
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, AffineDialect, linalg::LinalgDialect,
-                    scf::SCFDialect>();
+    registry.insert<arith::ArithDialect, affine::AffineDialect,
+                    linalg::LinalgDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override;

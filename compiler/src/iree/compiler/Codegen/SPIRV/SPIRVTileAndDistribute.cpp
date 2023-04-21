@@ -119,9 +119,9 @@ class SPIRVTileAndDistributePass
   SPIRVTileAndDistributePass(const SPIRVTileAndDistributePass &pass) = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
-                    memref::MemRefDialect, scf::SCFDialect,
-                    vector::VectorDialect>();
+    registry.insert<affine::AffineDialect, gpu::GPUDialect,
+                    linalg::LinalgDialect, memref::MemRefDialect,
+                    scf::SCFDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;
