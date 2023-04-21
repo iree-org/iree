@@ -264,15 +264,17 @@ template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
 LogicalResult lowerWorkgroupCountFromBodySliceOp(
     RewriterBase &rewriter,
     IREE::Flow::DispatchWorkgroupCountFromBodySliceOp workgroupCountOp,
-    func::FuncOp entryPointFn, ValueRange workgroupCount,
+    func::FuncOp entryPointFn, ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims) {
   // Compute the backward slice of the workgroup count operations.
   llvm::SetVector<Operation *> slice;
   auto filter = [](Operation *op) {
     return !isa<IREE::Flow::DispatchWorkloadOrdinalOp>(op);
   };
-  for (auto val : workgroupCount) {
-    mlir::getBackwardSlice(val, &slice, filter, /*inclusive=*/true);
+  for (auto ofr : workgroupCount) {
+    if (auto val = ofr.dyn_cast<Value>()) {
+      mlir::getBackwardSlice(val, &slice, filter, /*inclusive=*/true);
+    }
   }
   // Since there are more than one slices, sort the operations again.
   auto slicedOps = llvm::to_vector(slice);
@@ -318,8 +320,12 @@ LogicalResult lowerWorkgroupCountFromBodySliceOp(
   SmallVector<OpFoldResult> results;
   // Since the workgroup count at HAL level is in x, y, z form, process the
   // workload in reverse.
-  for (auto val : llvm::reverse(workgroupCount)) {
-    results.push_back(getAsOpFoldResult(map.lookup(val)));
+  for (auto ofr : llvm::reverse(workgroupCount)) {
+    if (auto val = ofr.dyn_cast<Value>()) {
+      results.push_back(getAsOpFoldResult(map.lookup(val)));
+    } else {
+      results.push_back(ofr);
+    }
   }
 
   // The `maxWorkgroupParallelDims` represents the maximum dimension number
@@ -357,10 +363,9 @@ LogicalResult lowerWorkgroupCountFromBodySliceOp(
   return success();
 }
 
-LogicalResult lowerWorkgroupCountFromBodySliceOp(RewriterBase &rewriter,
-                                                 func::FuncOp entryPointFn,
-                                                 ValueRange workgroupCount,
-                                                 int maxWorkgroupParallelDims) {
+LogicalResult lowerWorkgroupCountFromBodySliceOp(
+    RewriterBase &rewriter, func::FuncOp entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
   if (failed(exportOp)) {

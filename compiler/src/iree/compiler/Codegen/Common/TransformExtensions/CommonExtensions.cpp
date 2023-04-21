@@ -789,23 +789,24 @@ void transform_dialect::IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
 }
 
 DiagnosedSilenceableFailure transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::apply(
-        transform::TransformResults &transformResults,
+    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::applyToOne(
+        Operation *target, transform::ApplyToEachResultList &results,
         transform::TransformState &state) {
-  ArrayRef<Operation *> targetOps = state.getPayloadOps(getForAllOp());
-  if (targetOps.empty()) {
-    return DiagnosedSilenceableFailure::success();
+  auto forAllOp = dyn_cast<scf::ForallOp>(target);
+  if (!forAllOp) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "expected scf.forall operation handle");
   }
-  auto forAllOp = dyn_cast<scf::ForallOp>(targetOps.front());
-  auto funcOp = forAllOp->getParentOfType<func::FuncOp>();
   if (!forAllOp.isNormalized()) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "Expect the for op to be normalized");
   }
-  IRRewriter rewriter(getContext());
-  Location loc = forAllOp.getLoc();
-  SmallVector<Value> workgroupCount = getValueOrCreateConstantIndexOp(
-      rewriter, loc, forAllOp.getMixedUpperBound());
+  IRRewriter rewriter(target->getContext());
+  auto workgroupCount =
+      getMixedValues(forAllOp.getStaticUpperBound(),
+                     forAllOp.getDynamicUpperBound(), rewriter);
+
+  auto funcOp = forAllOp->getParentOfType<func::FuncOp>();
   if (failed(lowerWorkgroupCountFromBodySliceOp(rewriter, funcOp,
                                                 workgroupCount))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),

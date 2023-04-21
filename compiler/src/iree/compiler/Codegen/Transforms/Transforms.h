@@ -132,7 +132,7 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
 LogicalResult lowerWorkgroupCountFromBodySliceOp(
     RewriterBase &rewriter,
     IREE::Flow::DispatchWorkgroupCountFromBodySliceOp workgroupCountOp,
-    func::FuncOp entryPointFn, ValueRange workgroupCount,
+    func::FuncOp entryPointFn, ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
 /// Wrapper around `lowerWorkgroupCountFromBodySliceOp` method that
@@ -141,7 +141,7 @@ LogicalResult lowerWorkgroupCountFromBodySliceOp(
 /// and finds the `flow.dispatch.workgroup_count_from_body_slice` op to lower.
 LogicalResult lowerWorkgroupCountFromBodySliceOp(
     RewriterBase &rewriter, func::FuncOp entryPointFn,
-    ValueRange workgroupCount,
+    ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
 }  // namespace iree_compiler

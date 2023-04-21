@@ -225,7 +225,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
 /// that are handled by default.
 static LogicalResult lowerWorkgroupCount(
     RewriterBase &rewriter, func::FuncOp entryPointFn,
-    ValueRange workgroupCountVals, ArrayRef<int64_t> tileSizes,
+    ArrayRef<OpFoldResult> workgroupCount, ArrayRef<int64_t> tileSizes,
     ArrayRef<int64_t> staticLoopRanges, ArrayRef<int64_t> interchange,
     ArrayRef<unsigned> partitionedLoops, int maxWorkgroupParallelDims) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
@@ -261,7 +261,7 @@ static LogicalResult lowerWorkgroupCount(
       .Case<IREE::Flow::DispatchWorkgroupCountFromBodySliceOp>(
           [&](auto countOp) {
             return lowerWorkgroupCountFromBodySliceOp(
-                rewriter, countOp, entryPointFn, workgroupCountVals,
+                rewriter, countOp, entryPointFn, workgroupCount,
                 maxWorkgroupParallelDims);
           })
       .Case<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>([&](auto countOp) {
@@ -328,13 +328,14 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     IRRewriter rewriter(context);
     // If there are no compute ops, nothing more to do.
     if (computeOps.empty()) {
-      if (failed(lowerWorkgroupCount(rewriter, funcOp,
-                                     /*workgroupCountVals =*/ValueRange{},
-                                     /*tileSizes =*/ArrayRef<int64_t>{},
-                                     /*staticLoopRanges =*/ArrayRef<int64_t>{},
-                                     /*interchange =*/ArrayRef<int64_t>{},
-                                     /*partitionedLoops =*/ArrayRef<unsigned>{},
-                                     maxWorkgroupParallelDims))) {
+      if (failed(lowerWorkgroupCount(
+              rewriter, funcOp,
+              /*workgroupCountVals =*/ArrayRef<OpFoldResult>{},
+              /*tileSizes =*/ArrayRef<int64_t>{},
+              /*staticLoopRanges =*/ArrayRef<int64_t>{},
+              /*interchange =*/ArrayRef<int64_t>{},
+              /*partitionedLoops =*/ArrayRef<unsigned>{},
+              maxWorkgroupParallelDims))) {
         funcOp.emitOpError(
             "failed to lower workgroup count region when no compute ops in the "
             "dispatch");
@@ -379,10 +380,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     }
 
     // Materialize the computation for workgroup counts.
+    auto workgroupCountOfr =
+        getAsOpFoldResult(tileAndFuseResult->workgroupCount);
     if (failed(lowerWorkgroupCount(
-            rewriter, funcOp, tileAndFuseResult->workgroupCount, tileSizes,
-            staticLoopRanges, interchange, partitionableLoops,
-            maxWorkgroupParallelDims))) {
+            rewriter, funcOp, workgroupCountOfr, tileSizes, staticLoopRanges,
+            interchange, partitionableLoops, maxWorkgroupParallelDims))) {
       funcOp.emitOpError("workgroup count lowering failed");
       return signalPassFailure();
     }

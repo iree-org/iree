@@ -465,6 +465,7 @@ def ShareForallOperandsOp : Op<
 def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
     Op<Transform_Dialect, "iree.populate_workgroup_count_region_using_num_threads_slice",
       [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       TransformEachOpTrait,
        TransformOpInterface]> {
   let description = [{
     TODO
@@ -477,8 +478,9 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-      ::mlir::transform::TransformResults &results,
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::Operation *target,
+      ::mlir::transform::ApplyToEachResultList &results,
       ::mlir::transform::TransformState &state);
   }];
 }
