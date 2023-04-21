@@ -74,14 +74,16 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  // TODO(dcaballe): We should split this pass into smaller/simpler ones and
-  // replace the code below with a full canonicalize pass.
+  // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
+  // lower them and can't be optimized away anymore.
   {
     RewritePatternSet patterns(ctx);
-    for (auto *dialect : ctx->getLoadedDialects())
+    SmallVector<Dialect *> dialects;
+    dialects.push_back(ctx->getLoadedDialect<vector::VectorDialect>());
+    dialects.push_back(ctx->getLoadedDialect<memref::MemRefDialect>());
+    dialects.push_back(ctx->getLoadedDialect<linalg::LinalgDialect>());
+    for (auto &dialect : dialects)
       dialect->getCanonicalizationPatterns(patterns);
-    for (RegisteredOperationName op : ctx->getRegisteredOperations())
-      op.getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
@@ -100,17 +102,6 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
-
-  // TODO(dcaballe): We should split this pass into smaller/simpler ones and
-  // replace the code below with a full canonicalize pass.
-  {
-    RewritePatternSet patterns(ctx);
-    for (auto *dialect : ctx->getLoadedDialects())
-      dialect->getCanonicalizationPatterns(patterns);
-    for (RegisteredOperationName op : ctx->getRegisteredOperations())
-      op.getCanonicalizationPatterns(patterns, ctx);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
-  }
 
   // Lowering for vector.transpose ops.
   {
