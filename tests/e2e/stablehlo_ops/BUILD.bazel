@@ -109,7 +109,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "concatenate.mlir",  # TODO(#12678): Investigate this failure.
-            "dot_bf16.mlir",   # Missing BF16 support on Vulkan backends
+            "dot_bf16.mlir",  # Missing BF16 support on Vulkan backends
         ],
     ),
     compiler_flags = ["--iree-input-type=stablehlo_experimental"],
