@@ -76,6 +76,11 @@ iree_status_t DylibPlatform::SubclassInitialize() {
 
   // And initialize the compiler.
   compiler_ = std::make_unique<InprocessCompiler>();
+  {
+    std::string message("Compiler Version: ");
+    message.append(compiler_->GetRevision());
+    logger().debug(message);
+  }
 
   // Initialize the artifact dumper.
   auto artifact_path_callback = [this]() -> std::optional<std::string> {

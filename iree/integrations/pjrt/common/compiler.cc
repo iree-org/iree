@@ -195,4 +195,17 @@ std::unique_ptr<CompilerJob> InprocessCompiler::StartJob() {
       });
 }
 
+std::string InprocessCompiler::GetRevision() {
+  std::string result;
+  const char* revision = ireeCompilerGetRevision();
+  result.append(revision[0] ? revision : "<unknown>");
+  result.append(" (API version ");
+  int packed_api_version = ireeCompilerGetAPIVersion();
+  result.append(std::to_string(packed_api_version >> 16));
+  result.append(".");
+  result.append(std::to_string(packed_api_version & 0xffff));
+  result.append(")");
+  return result;
+}
+
 }  // namespace iree::pjrt

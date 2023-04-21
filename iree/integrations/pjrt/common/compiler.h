@@ -62,11 +62,16 @@ class AbstractCompiler {
 
   // Starts a new compiler job.
   virtual std::unique_ptr<CompilerJob> StartJob() = 0;
+
+  // Gets descriptive revision information which identifies the version of
+  // the compiler and/or APIs of the compiler.
+  virtual std::string GetRevision() = 0;
 };
 
 class InprocessCompiler : public AbstractCompiler {
  public:
   std::unique_ptr<CompilerJob> StartJob() override;
+  std::string GetRevision() override;
 };
 
 }  // namespace iree::pjrt
