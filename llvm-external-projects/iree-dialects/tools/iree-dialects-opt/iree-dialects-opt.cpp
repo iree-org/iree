@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithDialect,
-      mlir::AffineDialect,
+      mlir::affine::AffineDialect,
       mlir::cf::ControlFlowDialect,
       mlir::func::FuncDialect,
       mlir::linalg::LinalgDialect,
