@@ -127,8 +127,8 @@ struct VectorizePadWithConditions final
       auto srcDimSize =
           rewriter.createOrFold<tensor::DimOp>(loc, padOp.getSource(), i);
       auto lb = getAsIndexValue(lowPads[i], rewriter, loc);
-      auto ub = rewriter.create<AffineApplyOp>(loc, addMap,
-                                               ValueRange{lb, srcDimSize});
+      auto ub = rewriter.create<affine::AffineApplyOp>(
+          loc, addMap, ValueRange{lb, srcDimSize});
       paddedDimLBs[i] = lb;
       paddedDimUBs[i] = ub;
     }
@@ -189,7 +189,7 @@ struct VectorizePadWithConditions final
 
       // Need to subtract the low padding to get the index into the source.
       for (int dim : paddedDimIndices) {
-        readIndices[dim] = rewriter.create<AffineApplyOp>(
+        readIndices[dim] = rewriter.create<affine::AffineApplyOp>(
             loc, subMap, ValueRange{valueIndices[dim], paddedDimLBs[dim]});
       }
 
@@ -225,8 +225,9 @@ struct VectorizePadWithConditions final
 struct TensorToVectorVectorizePadPass
     : public TensorToVectorVectorizePadBase<TensorToVectorVectorizePadPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, arith::ArithDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, vector::VectorDialect>();
+    registry.insert<affine::AffineDialect, arith::ArithDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override {

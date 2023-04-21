@@ -1223,10 +1223,10 @@ LogicalResult ReverseOp::getResultTilePosition(
     Value offset =
         getValueOrCreateConstantIndexOp(builder, loc, resultOffsets[dim]);
     Value tileSize = getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]);
-    resultOffsets[dim] =
-        builder
-            .create<AffineApplyOp>(loc, map, ValueRange{size, offset, tileSize})
-            .getResult();
+    resultOffsets[dim] = builder
+                             .create<affine::AffineApplyOp>(
+                                 loc, map, ValueRange{size, offset, tileSize})
+                             .getResult();
   }
   resultSizes.assign(sizes.begin(), sizes.end());
   return success();
@@ -1781,7 +1781,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   bindSymbols(builder.getContext(), s0, s1);
   AffineExpr ceilDivExpr = s0.ceilDiv(s1);
   for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    resultDims[tiledDim.value()] = makeComposedFoldedAffineApply(
+    resultDims[tiledDim.value()] = affine::makeComposedFoldedAffineApply(
         builder, loc, ceilDivExpr,
         {resultDims[tiledDim.value()], innerTileSizes[tiledDim.index()]});
   }
@@ -1881,7 +1881,7 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
       AffineExpr i, j, tile;
       bindDims(builder.getContext(), i, j);
       bindSymbols(builder.getContext(), tile);
-      OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
+      OpFoldResult sourceIndex = affine::makeComposedFoldedAffineApply(
           builder, loc, i * tile + j,
           ArrayRef<OpFoldResult>{
               interchangedIvs[dim],
@@ -2039,9 +2039,10 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   inputIvsPointLoops.reserve(dimAndTileMapping.size());
   for (auto dim : llvm::seq<int64_t>(0, getOutputRank())) {
     if (dimAndTileMapping.count(dim)) {
-      DivModValue divMod = getDivMod(builder, loc, ivs[dim],
-                                     getValueOrCreateConstantIndexOp(
-                                         builder, loc, dimAndTileMapping[dim]));
+      affine::DivModValue divMod =
+          affine::getDivMod(builder, loc, ivs[dim],
+                            getValueOrCreateConstantIndexOp(
+                                builder, loc, dimAndTileMapping[dim]));
       inputIvsPointLoops.push_back(divMod.remainder);
       inputIvs.push_back(divMod.quotient);
     } else {

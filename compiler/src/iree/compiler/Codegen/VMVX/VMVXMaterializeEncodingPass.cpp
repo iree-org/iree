@@ -54,10 +54,10 @@ static MaterializeEncodingValueFn getMaterializeEncodingValueFn(
 struct VMVXMaterializeEncodingPass
     : public VMVXMaterializeEncodingBase<VMVXMaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<arith::ArithDialect, AffineDialect, tensor::TensorDialect,
-                IREE::Flow::FlowDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                IREE::VMVX::VMVXDialect>();
+    registry.insert<arith::ArithDialect, affine::AffineDialect,
+                    tensor::TensorDialect, IREE::Flow::FlowDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect,
+                    IREE::VMVX::VMVXDialect>();
   }
   void runOnOperation() override;
 };

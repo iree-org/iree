@@ -154,7 +154,7 @@ class VectorReduceToGPUPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
-                    AffineDialect>();
+                    affine::AffineDialect>();
   }
 
   void runOnOperation() override {

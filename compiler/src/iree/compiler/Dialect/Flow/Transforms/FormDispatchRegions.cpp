@@ -851,9 +851,9 @@ struct FormDispatchRegionsPass
   using FormDispatchRegionsBase<
       FormDispatchRegionsPass>::FormDispatchRegionsBase;
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
   /// These constructors are auto-generated in `Passes.h.inc` from the
   /// tablegen file if `GEN_PASS_DEF_FORMDISPATCHREGIONS` is defined

@@ -161,7 +161,7 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
         // Similar to linalg tiling, the tile size is the min(tileSizes, ub -
         // iv) to account for cases where tile size does not divide (ub - lb)
         // exactly.
-        Value inBoundsTileSize = b.create<AffineMinOp>(
+        Value inBoundsTileSize = b.create<affine::AffineMinOp>(
             loc, affineMaps,
             ValueRange{iv,
                        getValueOrCreateConstantIndexOp(builder, loc,
@@ -306,10 +306,10 @@ struct TilingInterfaceTilingPass
     : public TilingInterfaceTilingBase<TilingInterfaceTilingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
-        AffineDialect, IREE::Input::IREEInputDialect, linalg::LinalgDialect,
-        IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-        func::FuncDialect, mlir::arith::ArithDialect, math::MathDialect,
-        tensor::TensorDialect, scf::SCFDialect>();
+        affine::AffineDialect, IREE::Input::IREEInputDialect,
+        linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+        memref::MemRefDialect, func::FuncDialect, mlir::arith::ArithDialect,
+        math::MathDialect, tensor::TensorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override;
 };

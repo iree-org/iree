@@ -86,7 +86,7 @@ static FailureOr<Value> padIfNeeded(
   AffineExpr highPadExpr =
       shapeExpr.ceilDiv(paddingExpr) * paddingExpr - shapeExpr;
   for (auto shape : llvm::enumerate(shape.value())) {
-    highPad[shape.index()] = makeComposedFoldedAffineApply(
+    highPad[shape.index()] = affine::makeComposedFoldedAffineApply(
         builder, loc, highPadExpr, {paddingOfr, shape.value()});
   }
 

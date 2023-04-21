@@ -450,7 +450,7 @@ FailureOr<SmallVector<Value>> MemRefConversionPattern<OpTy>::adjustIndices(
   unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
   Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
   auto newIndices = llvm::to_vector(indices);
-  newIndices.back() = rewriter.create<AffineApplyOp>(
+  newIndices.back() = rewriter.create<affine::AffineApplyOp>(
       loc, divMap, ValueRange{indices.back(), valueRatio});
   return newIndices;
 }
@@ -618,7 +618,7 @@ struct ScalarizeVectorTransferRead final
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      indices[dimPos] = rewriter.create<AffineApplyOp>(
+      indices[dimPos] = rewriter.create<affine::AffineApplyOp>(
           loc, addMap, ValueRange{oldIndex, iVal});
       Value scalar =
           rewriter.create<memref::LoadOp>(loc, readOp.getSource(), indices);
@@ -660,7 +660,7 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      indices[dimPos] = rewriter.create<AffineApplyOp>(
+      indices[dimPos] = rewriter.create<affine::AffineApplyOp>(
           loc, addMap, ValueRange{oldIndex, iVal});
       Value scalar =
           rewriter.create<memref::LoadOp>(loc, loadOp.getBase(), indices);
@@ -704,7 +704,7 @@ struct ScalarizeVectorTransferWrite final
     Value oldIndex = indices[dimPos];
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      indices[dimPos] = rewriter.create<AffineApplyOp>(
+      indices[dimPos] = rewriter.create<affine::AffineApplyOp>(
           loc, addMap, ValueRange{oldIndex, iVal});
       Value scalar =
           rewriter.create<vector::ExtractOp>(loc, writeOp.getVector(), i);
@@ -719,7 +719,7 @@ struct ScalarizeVectorTransferWrite final
 class SPIRVVectorizeLoadStorePass final
     : public SPIRVVectorizeLoadStoreBase<SPIRVVectorizeLoadStorePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, memref::MemRefDialect>();
+    registry.insert<affine::AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override;

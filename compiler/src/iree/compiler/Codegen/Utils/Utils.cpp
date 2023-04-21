@@ -162,7 +162,8 @@ static bool isaAffineExprOfType(AffineExpr expr) {
 
 /// Returns a Value that represents the value for symbol or dim expr for the map
 /// in the `applyOp`.
-static Value getValueForDimOrSymbol(AffineApplyOp applyOp, AffineExpr expr) {
+static Value getValueForDimOrSymbol(affine::AffineApplyOp applyOp,
+                                    AffineExpr expr) {
   unsigned numDims = applyOp.getAffineMap().getNumDims();
   if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
     return applyOp.getOperand(dimExpr.getPosition());
@@ -173,7 +174,7 @@ static Value getValueForDimOrSymbol(AffineApplyOp applyOp, AffineExpr expr) {
   return nullptr;
 }
 static SmallVector<Value> getValuesForDimsOrSymbols(
-    AffineApplyOp applyOp, ArrayRef<AffineExpr> exprs) {
+    affine::AffineApplyOp applyOp, ArrayRef<AffineExpr> exprs) {
   SmallVector<Value> vals;
   for (auto expr : exprs) {
     vals.push_back(getValueForDimOrSymbol(applyOp, expr));
@@ -228,7 +229,7 @@ namespace {
 class LowerBoundExprVisitor
     : public AffineExprVisitor<LowerBoundExprVisitor, LogicalResult> {
  public:
-  LowerBoundExprVisitor(AffineApplyOp applyOp,
+  LowerBoundExprVisitor(affine::AffineApplyOp applyOp,
                         LoopTilingAndDistributionInfo &loopInfo)
       : applyOp(applyOp), loopInfo(loopInfo) {}
 
@@ -304,7 +305,7 @@ class LowerBoundExprVisitor
   }
 
  private:
-  AffineApplyOp applyOp;
+  affine::AffineApplyOp applyOp;
   LoopTilingAndDistributionInfo &loopInfo;
 };
 
@@ -315,7 +316,7 @@ class LowerBoundExprVisitor
 class StepExprVisitor
     : public AffineExprVisitor<StepExprVisitor, LogicalResult> {
  public:
-  StepExprVisitor(AffineApplyOp applyOp,
+  StepExprVisitor(affine::AffineApplyOp applyOp,
                   LoopTilingAndDistributionInfo &loopInfo)
       : applyOp(applyOp), loopInfo(loopInfo) {}
 
@@ -419,7 +420,7 @@ class StepExprVisitor
     return failure();
   }
 
-  AffineApplyOp applyOp;
+  affine::AffineApplyOp applyOp;
   LoopTilingAndDistributionInfo &loopInfo;
 };
 }  // namespace
@@ -451,8 +452,8 @@ std::optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   loopInfo.loop = forOp;
   loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.getUpperBound());
 
-  auto lbApplyOp = forOp.getLowerBound().getDefiningOp<AffineApplyOp>();
-  auto stepApplyOp = forOp.getStep().getDefiningOp<AffineApplyOp>();
+  auto lbApplyOp = forOp.getLowerBound().getDefiningOp<affine::AffineApplyOp>();
+  auto stepApplyOp = forOp.getStep().getDefiningOp<affine::AffineApplyOp>();
 
   if (!lbApplyOp || !stepApplyOp) {
     // Try to see if this is a specical case where we have:
@@ -587,16 +588,16 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
         AffineExpr d0, d1;
         int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
         bindSymbols(builder.getContext(), d0, d1);
-        Value numTiles = makeComposedAffineApply(
+        Value numTiles = affine::makeComposedAffineApply(
             builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
         Value dimValue;
         if (dim == numParallelDims - 1)
           dimValue = splitDim;
         else {
-          dimValue = makeComposedAffineApply(builder, loc, (d0 % d1),
-                                             {splitDim, numTiles});
-          splitDim = makeComposedAffineApply(builder, loc, (d0).floorDiv(d1),
-                                             {splitDim, numTiles});
+          dimValue = affine::makeComposedAffineApply(builder, loc, (d0 % d1),
+                                                     {splitDim, numTiles});
+          splitDim = affine::makeComposedAffineApply(
+              builder, loc, (d0).floorDiv(d1), {splitDim, numTiles});
         }
         procInfo[numParallelDims - dim - 1] = {dimValue, numTiles,
                                                distributionMethod};
@@ -634,8 +635,8 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
           });
   AffineExpr s0, s1;
   bindSymbols(rewriter.getContext(), s0, s1);
-  return makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
-                                       {byteOffset, elementWidth});
+  return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
+                                               {byteOffset, elementWidth});
 }
 
 //===---------------------------------------------------------------------===//

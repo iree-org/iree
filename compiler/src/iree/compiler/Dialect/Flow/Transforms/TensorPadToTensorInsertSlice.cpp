@@ -96,7 +96,7 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
       };
       expr = addValueOrAttr(expr, lowPad[dim]);
       expr = addValueOrAttr(expr, highPad[dim]);
-      Value v = applyMapToValues(
+      Value v = affine::applyMapToValues(
           rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
       if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
         outputShape.push_back(cst.getValue());

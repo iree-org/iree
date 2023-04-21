@@ -31,7 +31,7 @@ static bool isDivisible(Value v, int64_t dividend);
 /// scf.for %iv = %lb to %ub step %step
 ///   %affine.min affine_map<(d0, d1) -> (N, d0 - d1)>(%ub, %iv)
 /// ```
-static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
+static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
   if (!minOp.getSymbolOperands().empty() ||
       minOp.getAffineMap().getNumResults() != 2) {
     return {};
@@ -114,8 +114,8 @@ static bool isDivisible(Value v, int64_t dividend) {
   AffineExpr mod = getAffineDimExpr(0, ctx) % dividend;
   AffineMap modMap = AffineMap::get(1, 0, {mod}, ctx);
   SmallVector<Value> ops(1, v);
-  fullyComposeAffineMapAndOperands(&modMap, &ops);
-  canonicalizeMapAndOperands(&modMap, &ops);
+  affine::fullyComposeAffineMapAndOperands(&modMap, &ops);
+  affine::canonicalizeMapAndOperands(&modMap, &ops);
   modMap = simplifyAffineMap(modMap);
   auto cst = modMap.getResult(0).dyn_cast<AffineConstantExpr>();
   if (cst) return (cst.getValue() == 0);
@@ -124,7 +124,7 @@ static bool isDivisible(Value v, int64_t dividend) {
   // by `dividend`.
   if (modMap.getResult(0) != mod) return false;
   assert(ops.size() == 1);
-  auto minOp = ops[0].getDefiningOp<AffineMinOp>();
+  auto minOp = ops[0].getDefiningOp<affine::AffineMinOp>();
   return (minOp && affineMinOpDivisible(minOp, dividend));
 }
 
@@ -136,7 +136,7 @@ static bool isDivisible(Value v, int64_t dividend) {
 /// With N a compile time constant. This operations can be replace by
 /// `%cN = arith.constant N : index` if we can prove that %lb, %step and %ub are
 /// divisible by N.
-static std::optional<int64_t> foldAffineMin(AffineMinOp minOp) {
+static std::optional<int64_t> foldAffineMin(affine::AffineMinOp minOp) {
   AffineMap map = minOp.getAffineMap();
   int64_t constantResult = 0;
   for (AffineExpr result : map.getResults()) {
@@ -153,11 +153,12 @@ static std::optional<int64_t> foldAffineMin(AffineMinOp minOp) {
 
 namespace {
 struct AffineMinDistributedSCFCanonicalizationPattern
-    : public mlir::OpRewritePattern<mlir::AffineMinOp> {
-  using OpRewritePattern<mlir::AffineMinOp>::OpRewritePattern;
+    : public mlir::OpRewritePattern<mlir::affine::AffineMinOp> {
+  using OpRewritePattern<mlir::affine::AffineMinOp>::OpRewritePattern;
 
   mlir::LogicalResult matchAndRewrite(
-      mlir::AffineMinOp minOp, mlir::PatternRewriter &rewriter) const override {
+      mlir::affine::AffineMinOp minOp,
+      mlir::PatternRewriter &rewriter) const override {
     std::optional<int64_t> cst = foldAffineMin(minOp);
     if (!cst) return failure();
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(minOp,
@@ -192,7 +193,7 @@ struct AffineMinDistributedSCFCanonicalizationPass
     // Explicitly walk and apply the pattern locally to avoid more general
     // folding on the rest of the IR.
     SmallVector<Operation *> minOps;
-    funcOp.walk([&minOps](AffineMinOp minOp) {
+    funcOp.walk([&minOps](affine::AffineMinOp minOp) {
       minOps.push_back(minOp.getOperation());
     });
     (void)applyOpPatternsAndFold(minOps, frozenPatterns);

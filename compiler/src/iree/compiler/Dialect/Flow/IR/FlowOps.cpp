@@ -1596,7 +1596,7 @@ struct FoldTensorLoadWithExtractSlice
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.extract_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.load1 (i.e. the consumer).
-    if (failed(mergeOffsetsSizesAndStrides(
+    if (failed(affine::mergeOffsetsSizesAndStrides(
             rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
             extractSliceOp, dispatchTensorLoadOp.getDroppedDims(), offsets,
             sizes, strides))) {
@@ -1640,7 +1640,7 @@ struct FoldInsertSliceWithTensorStoreOp
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.insert_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.store` (i.e. the consumer).
-    if (failed(mergeOffsetsSizesAndStrides(
+    if (failed(affine::mergeOffsetsSizesAndStrides(
             rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
             insertSliceOp, dispatchTensorStoreOp.getDroppedDims(), offsets,
             sizes, strides))) {

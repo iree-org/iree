@@ -22,7 +22,7 @@ struct DecomposeAffineOpsPass
 
 void DecomposeAffineOpsPass::runOnOperation() {
   IRRewriter rewriter(&getContext());
-  this->getOperation()->walk([&](AffineApplyOp op) {
+  this->getOperation()->walk([&](affine::AffineApplyOp op) {
     rewriter.setInsertionPoint(op);
     reorderOperandsByHoistability(rewriter, op);
     (void)decompose(rewriter, op);
