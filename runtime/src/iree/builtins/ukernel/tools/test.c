@@ -101,7 +101,7 @@ void iree_uk_test(const char* name,
   // We might skip the actual test payload requiring CPU features if these are
   // not supported.
   bool skipped = false;
-  if (cpu_features) {
+  if (strlen(cpu_features)) {
     iree_uk_initialize_cpu_once();
     iree_uk_make_cpu_data_for_features(cpu_features, test.cpu_data);
     if (iree_uk_cpu_supports(test.cpu_data)) {

@@ -148,8 +148,6 @@ int iree_uk_type_triple_str(char* buf, int buf_length,
 
 void iree_uk_make_cpu_data_for_features(const char* cpu_features,
                                         iree_uk_uint64_t* out_cpu_data_fields) {
-  // The caller should have checked for NULL prior to calling this function.
-  IREE_UK_ASSERT(cpu_features != NULL);
   const size_t data_fields_byte_size =
       IREE_CPU_DATA_FIELD_COUNT * sizeof(out_cpu_data_fields[0]);
   memset(out_cpu_data_fields, 0, data_fields_byte_size);

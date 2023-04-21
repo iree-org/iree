@@ -102,8 +102,8 @@ int main(int argc, char** argv) {
   iree_uk_benchmark_initialize(&argc, argv);
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);
-  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, "");
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, "");
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 4,
                                    "dotprod");
   iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8, "i8mm");
@@ -121,8 +121,8 @@ int main(int argc, char** argv) {
 #else  // defined(IREE_UK_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
-  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);
-  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, "");
+  iree_uk_benchmark_register_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, "");
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
   iree_uk_benchmark_run_and_cleanup();

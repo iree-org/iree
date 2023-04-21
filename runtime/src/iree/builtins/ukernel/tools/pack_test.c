@@ -188,21 +188,21 @@ int main(int argc, char** argv) {
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird tile shapes to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 3, 5, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 4, 2, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i32i32, 3, 4, NULL);
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 3, 5, "");
+  iree_uk_test_pack(iree_uk_pack_type_i8i8, 4, 2, "");
+  iree_uk_test_pack(iree_uk_pack_type_i32i32, 3, 4, "");
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 8, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 1, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i32i32, 8, 8, NULL);
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, "");
+  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 8, "");
+  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 1, "");
+  iree_uk_test_pack(iree_uk_pack_type_i32i32, 8, 8, "");
   // Tile size selected with CPU feature dotprod.
   // Not passing a cpu_features_list because the packing code itself
   // does not depend on any features.
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 4, NULL);
+  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 4, "");
   // Tile size selected for CPU feature i8mm. Same comment as for dotprod.
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 8, NULL);
+  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 8, "");
 #elif defined(IREE_UK_ARCH_X86_64)
   iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, "avx2_fma");
   iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 2, "avx2_fma");

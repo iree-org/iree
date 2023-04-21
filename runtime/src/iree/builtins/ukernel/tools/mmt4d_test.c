@@ -202,19 +202,19 @@ int main(int argc, char** argv) {
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird M0, N0, K0 to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 3, 5, 7, NULL);
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 9, 6, 3, NULL);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 3, 5, 7, "");
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 9, 6, 3, "");
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, NULL);
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, NULL);
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, "");
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 1, "");
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 4, "dotprod");
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 8, "i8mm");
 #elif defined(IREE_UK_ARCH_X86_64)
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 4, 1, NULL);  // SSE
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 4, 1, "");  // SSE
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_f32f32f32, 16, 16, 1, "avx512_base");
-  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 4, 2, NULL);  // SSE2
+  iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 4, 2, "");  // SSE2
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 8, 8, 2, "avx2_fma");
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 16, 16, 2, "avx512_base");
   iree_uk_test_mmt4d(iree_uk_mmt4d_type_i8i8i32, 16, 16, 2, "avx512_vnni");
