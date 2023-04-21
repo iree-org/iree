@@ -556,6 +556,13 @@ def LLVMCPUVectorLowering :
     Option<"lowerVectorTransposeToAVX2", "lower-vector-transpose-to-avx2", "bool",
       /*default=*/"false",
       "Add specific transpose to avx2 lowering patterns.">,
+    Option<"lowerVectorTransposeTo", "lower-vector-transpose-to",
+       "std::string", /*default=*/[{"shuffle_1d"}],
+      [{Lower vector.transpose to finer-grained vector ops, options are:\n"
+          "\teltwise [default]\n"
+          "\tflat_transpose (requires LLVM matrix intrinsics support)\n"
+          "\tshuffle_1d (lower 2-D transposes to shape_cast + shuffle)\n"
+          "\tshuffle_16x16 (lower 2-D transposes to shape_cast + shuffle on 16x16)\n}]>,
   ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUVectorLoweringPass()";

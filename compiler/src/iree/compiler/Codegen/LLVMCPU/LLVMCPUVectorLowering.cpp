@@ -25,6 +25,7 @@ class LLVMCPUVectorLoweringPass
   LLVMCPUVectorLoweringPass(const LLVMCPUVectorLoweringPassOptions &options) {
     this->splitVectorTransfersTo = options.splitVectorTransfersTo;
     this->lowerVectorTransposeToAVX2 = options.lowerVectorTransposeToAVX2;
+    this->lowerVectorTransposeTo = options.lowerVectorTransposeTo;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -39,7 +40,14 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   auto funcOp = getOperation();
 
   // Per-function lowering pipeline.
-  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle;
+  vector::VectorTransposeLowering vectorTransposeLowering =
+      llvm::StringSwitch<vector::VectorTransposeLowering>(
+          lowerVectorTransposeTo.getValue())
+          .Case("eltwise", vector::VectorTransposeLowering::EltWise)
+          .Case("flat_transpose", vector::VectorTransposeLowering::Flat)
+          .Case("shuffle_1d", vector::VectorTransposeLowering::Shuffle1D)
+          .Case("shuffle_16x16", vector::VectorTransposeLowering::Shuffle16x16)
+          .Default(vector::VectorTransposeLowering::Shuffle1D);
   auto vectorMultiReductionLowering =
       vector::VectorMultiReductionLowering::InnerReduction;
   auto vectorContractLowering = vector::VectorContractLowering::OuterProduct;

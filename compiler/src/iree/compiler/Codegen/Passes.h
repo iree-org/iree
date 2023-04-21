@@ -352,6 +352,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
 struct LLVMCPUVectorLoweringPassOptions {
   std::string splitVectorTransfersTo = "";
   bool lowerVectorTransposeToAVX2 = false;
+  std::string lowerVectorTransposeTo = "shuffle_1d";
 };
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(

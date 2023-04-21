@@ -486,6 +486,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.lowerVectorTransposeTo = "shuffle_16x16";
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
   }
@@ -587,19 +588,30 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 void addCPUDataTilingPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ParallelTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass());
 
-  LLVMCPUVectorizationPassOptions options;
-  options.vectorizePadding = true;
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUVectorizationPass(options));
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  {
+    LLVMCPUVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   addBufferizePasses(nestedModulePM);
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSplitFullPartialTransferPass("linalg-copy"));
+
+  {
+    LLVMCPUVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    options.lowerVectorTransposeTo = "shuffle_16x16";
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorLoweringPass(options));
+  }
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
