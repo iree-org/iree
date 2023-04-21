@@ -813,9 +813,9 @@ DiagnosedSilenceableFailure transform_dialect::
                                                   rewriter.getIndexAttr(1));
   if (auto blockMapping = forAllOp.getMapping()) {
     for (auto [index, mapAttr] : llvm::enumerate(blockMapping.value())) {
-      workgroupCountOrdered[workgroupCountOrdered.size() - 1 -
-                            mapAttr.dyn_cast<DeviceMappingAttrInterface>()
-                                .getMappingId()] = workgroupCount[index];
+      int id = mapAttr.cast<DeviceMappingAttrInterface>().getMappingId();
+      workgroupCountOrdered[workgroupCountOrdered.size() - 1 - id] =
+          workgroupCount[index];
     }
   } else {
     workgroupCountOrdered = workgroupCount;

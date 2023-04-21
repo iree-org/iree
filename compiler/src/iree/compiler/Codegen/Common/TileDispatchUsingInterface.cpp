@@ -153,7 +153,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     if (method != linalg::DistributionMethod::None) {
       Value numWorkgroups = getValueOrCreateConstantIndexOp(
           builder, loc,
-          makeComposedFoldedAffineApply(
+          affine::makeComposedFoldedAffineApply(
               builder, loc, numIterationsMap,
               {getAsOpFoldResult(loopRange.offset),
                getAsOpFoldResult(loopRange.size),

@@ -342,10 +342,11 @@ LogicalResult lowerWorkgroupCountFromBodySliceOp(
     AffineMap foldMap = AffineMap::get(0, 2, s0 * s1);
     for (auto [index, foldedResult] : llvm::enumerate(
              resultsRef.take_back(results.size() - maxWorkgroupParallelDims))) {
-      resultsRef[maxWorkgroupParallelDims - 1] = makeComposedFoldedAffineApply(
-          rewriter, loc, foldMap,
-          {resultsRef[maxWorkgroupParallelDims - 1],
-           resultsRef[maxWorkgroupParallelDims + index]});
+      resultsRef[maxWorkgroupParallelDims - 1] =
+          affine::makeComposedFoldedAffineApply(
+              rewriter, loc, foldMap,
+              {resultsRef[maxWorkgroupParallelDims - 1],
+               resultsRef[maxWorkgroupParallelDims + index]});
     }
     results.resize(maxWorkgroupParallelDims);
   }

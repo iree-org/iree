@@ -206,10 +206,10 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
   result.forallH = tileToForeachOp.getForallOp();
   result.tiledOpH = tileToForeachOp.getTiledOp();
 
-  // Handle the workgroup count region.
-  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
-      result.forallH);
-
+  /*   // Handle the workgroup count region.
+    b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+        result.forallH);
+   */
   // Perform a pass of canonicalization + enabling after tiling.
   ApplyPatternsOpPatterns configuration;
   isolatedParentOpH =
@@ -395,6 +395,11 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
           /*threadDimMapping=*/
           b.getArrayAttr(
               allBlocksRef.take_front(strategy.captures.reductionRank - 1)));
+
+  // Handle the workgroup count region.
+  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+      tileResult.forallH);
+
   fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.forallH);
   maybeLeadingH =
       b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH);
