@@ -490,9 +490,8 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   //   - f32 only atm.
   //   - Mandatory fill op.
   //   - No trailing op.
-  //   - If the matmul is "aligned enough" then use the default IREE strategy.
-  //   - Otherwise, if it is aligned on 4xf32 on all dimensions, take it.
-  //   - Otherwise, use the default IREE strategy.
+  //   - If the matmul is "too aligned" then use the default IREE strategy.
+  //   - Otherwise, we take it.
   if (!fill->getCaptured() || trailing->getCaptured()) {
     LDBG("--Matmul strategy fill / trailing preconditions failed\n");
     return failure();
@@ -518,9 +517,18 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
-  bool alignedAny64x64x16 = matmulSize[0] % 64 == 0 ||
-                            matmulSize[1] % 64 == 0 || matmulSize[2] % 16 == 0;
-  if (alignedAny64x64x16) {
+  // Currently the unaligned transform strategy does not properly handle
+  // optionality when padding operations get folded away. So we only use it when
+  // all operands require a padding that does not fold. This is the case when
+  // either:
+  //   - m and k are not aligned to the tile sizes (conservatively, take 64, 16)
+  //   - n and k are not aligned to the tile sizes (conservatively, take 64, 16)
+  // Other cases currently result in folding and fall back to the default
+  // unaligned IREE strategy.
+  bool unsupportedAlignedCases =
+      (matmulSize[0] % 64 == 0 && matmulSize[2] % 16 == 0) ||
+      (matmulSize[1] % 64 == 0 && matmulSize[2] % 16 == 0);
+  if (unsupportedAlignedCases) {
     LDBG("--Matmul strategy alignment check failed\n");
     return failure();
   }
