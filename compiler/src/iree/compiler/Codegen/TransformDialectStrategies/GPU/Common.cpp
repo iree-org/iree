@@ -32,6 +32,7 @@ using namespace mlir;
 
 #define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << '[' << DEBUG_TYPE << "] " << X)
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectMatmulTensorCoreStrategy(
     "iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy",
@@ -422,14 +423,20 @@ static ReductionConfig getReductionConfig(
 static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
                                                   linalg::LinalgOp op,
                                                   const GPUModel &gpuModel) {
-  if (!gpuModel.hasWarpShuffle) return failure();
+  if (!gpuModel.hasWarpShuffle) {
+    LDBG("--Reduction strategy no warp shuffle\n");
+    return failure();
+  }
 
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
   transform_ext::MatcherContext matcherContext;
   makeReductionMatcher(matcherContext, reduction, captures);
-  if (!matchPattern(op, *reduction)) return failure();
+  if (!matchPattern(op, *reduction)) {
+    LDBG("--Reduction strategy failed to match\n");
+    return failure();
+  }
 
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
@@ -458,8 +465,14 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
 static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
                                                linalg::LinalgOp op,
                                                const GPUModel &gpuModel) {
-  if (!clGPUEnableTransformDialectMatmulTensorCoreStrategy) return failure();
-  if (!gpuModel.hasTF32TensorCore) return failure();
+  if (!clGPUEnableTransformDialectMatmulTensorCoreStrategy) {
+    LDBG("--Matmul strategy flag turned off\n");
+    return failure();
+  }
+  if (!gpuModel.hasTF32TensorCore) {
+    LDBG("--Matmul strategy no TF32 tensor core\n");
+    return failure();
+  }
 
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *fill;
@@ -468,7 +481,10 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   transform_ext::MatchedMatmulCaptures captures;
   transform_ext::MatcherContext matcherContext;
   makeMatmulMatcher(matcherContext, matmul, fill, trailing, captures);
-  if (!matchPattern(op, *matmul)) return failure();
+  if (!matchPattern(op, *matmul)) {
+    LDBG("--Matmul strategy fail to match\n");
+    return failure();
+  }
 
   // We are very peculiar about the dispatches we want to match for now:
   //   - f32 only atm.
@@ -478,7 +494,7 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   //   - Otherwise, if it is aligned on 4xf32 on all dimensions, take it.
   //   - Otherwise, use the default IREE strategy.
   if (!fill->getCaptured() || trailing->getCaptured()) {
-    LLVM_DEBUG(DBGS() << "fill / trailing preconditions failed");
+    LDBG("--Matmul strategy fill / trailing preconditions failed\n");
     return failure();
   }
 
@@ -491,21 +507,21 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
       getElementTypeOrSelf(op.getDpsInitOperand(0)->get().getType());
   if (!captures.lhsType.isF32() || !captures.rhsType.isF32() ||
       !captures.outputType.isF32()) {
-    LLVM_DEBUG(DBGS() << "elemental type check failed\n");
+    LDBG("--Matmul strategy elemental type check failed\n");
     return failure();
   }
 
   // TODO: Generalize to a good mix of sizes, alignments and element types.
   const auto &matmulSize = captures.matmulOpSizes;
   if (matmulSize.size() != 3) {
-    LLVM_DEBUG(DBGS() << "size capture failed\n");
+    LDBG("--Matmul strategy size capture failed\n");
     return failure();
   }
 
   bool alignedAny64x64x16 = matmulSize[0] % 64 == 0 ||
                             matmulSize[1] % 64 == 0 || matmulSize[2] % 16 == 0;
   if (alignedAny64x64x16) {
-    LLVM_DEBUG(DBGS() << "alignment check failed\n");
+    LDBG("--Matmul strategy alignment check failed\n");
     return failure();
   }
 
@@ -524,13 +540,22 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 
 LogicalResult mlir::iree_compiler::gpu::matchAndSetTransformStrategy(
     func::FuncOp entryPoint, Operation *op, const GPUModel &gpuModel) {
+  LDBG("Look up a TD strategy for entryPoint:\n" << entryPoint << "\n");
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) return failure();
-  if (succeeded(matchAndSetReductionStrategy(entryPoint, linalgOp, gpuModel)))
+  if (!linalgOp) {
+    LDBG("Not a Linalg op: " << *op << " -> Fail\n");
+    return failure();
+  }
+  if (succeeded(matchAndSetReductionStrategy(entryPoint, linalgOp, gpuModel))) {
+    LDBG("Activate reduction strategy\n");
     return success();
-  if (succeeded(matchAndSetMatmulStrategy(entryPoint, linalgOp, gpuModel)))
+  }
+  if (succeeded(matchAndSetMatmulStrategy(entryPoint, linalgOp, gpuModel))) {
+    LDBG("Activate matmul\n");
     return success();
+  }
   // TODO: Add more transform dialect strategy for other kind of dispatch
   // regions.
+  LDBG("No suitable strategy found\n");
   return failure();
 }
