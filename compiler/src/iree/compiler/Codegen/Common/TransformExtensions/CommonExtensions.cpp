@@ -806,9 +806,24 @@ DiagnosedSilenceableFailure transform_dialect::
       getMixedValues(forAllOp.getStaticUpperBound(),
                      forAllOp.getDynamicUpperBound(), rewriter);
 
+  // Account for mapping attribute if present. The attribute used for mapping
+  // provides a mapping ID that is ordered in `x` = 0, `y`=1, and `z` = 2. Use
+  // this to shuffle the workgroup count around.
+  SmallVector<OpFoldResult> workgroupCountOrdered(workgroupCount.size(),
+                                                  rewriter.getIndexAttr(1));
+  if (auto blockMapping = forAllOp.getMapping()) {
+    for (auto [index, mapAttr] : llvm::enumerate(blockMapping.value())) {
+      workgroupCountOrdered[workgroupCountOrdered.size() - 1 -
+                            mapAttr.dyn_cast<DeviceMappingAttrInterface>()
+                                .getMappingId()] = workgroupCount[index];
+    }
+  } else {
+    workgroupCountOrdered = workgroupCount;
+  }
+
   auto funcOp = forAllOp->getParentOfType<func::FuncOp>();
   if (failed(lowerWorkgroupCountFromBodySliceOp(rewriter, funcOp,
-                                                workgroupCount))) {
+                                                workgroupCountOrdered))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "failed to lower workgroup count region");
   }
