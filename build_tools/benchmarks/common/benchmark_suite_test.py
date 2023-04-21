@@ -13,6 +13,7 @@ from typing import Sequence
 from common.benchmark_definition import IREE_DRIVERS_INFOS
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_artifacts import iree_artifacts
 
 
 class BenchmarkSuiteTest(unittest.TestCase):
@@ -216,7 +217,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             BenchmarkCase(model_name=model_tflite.name,
                           model_tags=model_tflite.tags,
                           bench_mode=exec_config_a.tags,
-                          target_arch="cpu-riscv_32-generic",
+                          target_arch="riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
                           benchmark_case_dir=None,
@@ -224,7 +225,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             BenchmarkCase(model_name=model_tflite.name,
                           model_tags=model_tflite.tags,
                           bench_mode=exec_config_b.tags,
-                          target_arch="cpu-riscv_64-generic",
+                          target_arch="riscv_64-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
                           benchmark_tool_name="iree-benchmark-module",
                           benchmark_case_dir=None,
@@ -233,14 +234,14 @@ class BenchmarkSuiteTest(unittest.TestCase):
     self.assertEqual(
         suite.filter_benchmarks_for_category(
             category="exported_tf_v2",
-            cpu_target_arch_filter="cpu-riscv_32-generic",
+            cpu_target_arch_filter="riscv_32-generic",
             model_name_filter="model_tf.*fp32",
             mode_filter="defaults"),
         [
             BenchmarkCase(model_name=model_tf.name,
                           model_tags=model_tf.tags,
                           bench_mode=exec_config_a.tags,
-                          target_arch="cpu-riscv_32-generic",
+                          target_arch="riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
                           benchmark_case_dir=None,

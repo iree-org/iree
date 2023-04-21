@@ -221,9 +221,7 @@ class BenchmarkSuite(object):
             f"Can't map execution config to driver info: {module_exec_config}.")
       driver_info = IREE_DRIVERS_INFOS[driver_info_key]
 
-      arch_info = target_device_spec.architecture
-      target_arch = f"{arch_info.type.value}-{arch_info.architecture}-{arch_info.microarchitecture}"
-
+      target_arch = str(target_device_spec.architecture)
       model = module_gen_config.imported_model.model
 
       benchmark_case = BenchmarkCase(model_name=model.name,
