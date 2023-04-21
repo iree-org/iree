@@ -654,6 +654,8 @@ static iree_status_t iree_vmvx_pack_f(iree_uk_pack_type_t type,
                            /*stride1=*/1,
                            /*size0=*/args->out_size0,
                            /*size1=*/args->out_size1 * out_tile_size);
+  uint32_t padding_value_bits_as_uint32;
+  memcpy(&padding_value_bits_as_uint32, &args->padding_value, sizeof(uint32_t));
   iree_uk_pack_params_t ukernel_params = {
       .type = type,
       .in_buffer = in,
@@ -666,7 +668,7 @@ static iree_status_t iree_vmvx_pack_f(iree_uk_pack_type_t type,
       .out_size1 = args->out_size1,
       .out_size2 = args->out_size2,
       .out_size3 = args->out_size3,
-      .padding_value = &args->padding_value,
+      .padding_value = padding_value_bits_as_uint32,
       .flags = args->flags,
       .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };
@@ -707,7 +709,7 @@ static iree_status_t iree_vmvx_pack_i(iree_uk_pack_type_t type,
       .out_size1 = args->out_size1,
       .out_size2 = args->out_size2,
       .out_size3 = args->out_size3,
-      .padding_value = &args->padding_value,
+      .padding_value = args->padding_value,
       .flags = args->flags,
       .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
   };

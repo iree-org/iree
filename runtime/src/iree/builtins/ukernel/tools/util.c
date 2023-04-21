@@ -53,13 +53,19 @@ bool iree_uk_2d_buffers_equal(const void* buf1, const void* buf2,
 #define IREE_PRNG_MULTIPLIER 48271
 #define IREE_PRNG_MODULUS 2147483647
 
-uint32_t iree_uk_random_engine_get(iree_uk_random_engine_t* e) {
+iree_uk_uint32_t iree_uk_random_engine_get_uint32(iree_uk_random_engine_t* e) {
   e->state = (e->state * IREE_PRNG_MULTIPLIER) % IREE_PRNG_MODULUS;
   return e->state;
 }
 
+iree_uk_uint64_t iree_uk_random_engine_get_uint64(iree_uk_random_engine_t* e) {
+  iree_uk_uint64_t result = iree_uk_random_engine_get_uint32(e);
+  result = (result << 32) + iree_uk_random_engine_get_uint32(e);
+  return result;
+}
+
 int iree_uk_random_engine_get_0_65535(iree_uk_random_engine_t* e) {
-  iree_uk_uint32_t v = iree_uk_random_engine_get(e);
+  iree_uk_uint32_t v = iree_uk_random_engine_get_uint32(e);
   // Return the middle two out of the 4 bytes of state. It avoids
   // some mild issues with the least-significant and most-significant bytes.
   return (v >> 8) & 0xffff;

@@ -28,26 +28,32 @@ static iree_uk_ssize_t iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
                                                : (x / y);
 }
 
-// Returns true if the `num_bytes` bytes at `buf` are all equal.
-static bool iree_uk_is_single_byte_pattern(const char* buf,
-                                           iree_uk_ssize_t num_bytes) {
-  for (iree_uk_ssize_t i = 1; i < num_bytes; ++i) {
-    if (buf[i] != buf[0]) return false;
+// Returns true if the bytes in `bytes01234567` are all equal.
+static bool iree_uk_is_single_byte_pattern(iree_uk_uint64_t bytes01234567) {
+  // Most common case of zero pattern.
+  if (!bytes01234567) {
+    return true;
   }
-  return true;
+  iree_uk_uint32_t bytes0123 = bytes01234567;
+  iree_uk_uint32_t bytes4567 = bytes01234567 >> 32;
+  iree_uk_uint16_t bytes01 = bytes0123;
+  iree_uk_uint16_t bytes23 = bytes0123 >> 16;
+  iree_uk_uint8_t byte0 = bytes01;
+  iree_uk_uint8_t byte1 = bytes01 >> 8;
+  return (bytes0123 == bytes4567) && (bytes01 == bytes23) && (byte0 == byte1);
 }
 
 // Initializes a `iree_uk_pack_tmpbuf_helper_t`. Asserts if the temporary buffer
 // is smaller than one tile.
 static void iree_uk_pack_tmpbuf_helper_t_init(
     iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1,
-    iree_uk_ssize_t elem_size, const void* padding_value,
+    iree_uk_ssize_t elem_size, iree_uk_uint64_t padding_value,
     iree_uk_pack_tmpbuf_helper_t* helper) {
   helper->max_tiles_in_tmp_buf = iree_uk_div_nonneg_by_pos_and_likely_po2_i32(
       iree_uk_pack_tmp_buf_size, tile_size0 * tile_size1 * elem_size);
   IREE_UK_ASSERT(helper->max_tiles_in_tmp_buf > 0);
   helper->is_padding_single_byte =
-      iree_uk_is_single_byte_pattern(padding_value, elem_size);
+      (elem_size == 1) || iree_uk_is_single_byte_pattern(padding_value);
 }
 
 static void iree_uk_pack_validate(const iree_uk_pack_params_t* params) {
@@ -106,30 +112,44 @@ static bool iree_uk_pack_early(const iree_uk_pack_params_t* params) {
 // Fills `buf` with `num_elems` times the `pattern` of size `elem_size`.
 // If this pattern's `elem_size` bytes are all equal, then it is legal to pass
 // `is_single_byte_pattern=true`, which allows the impl to use memset.
-static void iree_uk_fill(char* buf, iree_uk_ssize_t num_elems,
-                         iree_uk_ssize_t elem_size, bool is_single_byte_pattern,
-                         const char* pattern) {
-  if (is_single_byte_pattern) {
-    iree_uk_memset(buf, pattern[0], num_elems * elem_size);
-  } else {
+static void iree_uk_fill(char* IREE_UK_RESTRICT buf, iree_uk_ssize_t num_elems,
+                         iree_uk_ssize_t elem_size,
+                         iree_uk_uint64_t padding_value,
+                         bool is_padding_single_byte) {
+  if (is_padding_single_byte) {
+    iree_uk_memset(buf, padding_value & 0xFF, num_elems * elem_size);
+  } else if (elem_size == 2) {
+    iree_uk_uint16_t padding_value_uint16 = padding_value;
+    iree_uk_uint16_t* IREE_UK_RESTRICT buf_uint16 = (iree_uk_uint16_t*)buf;
     for (iree_uk_ssize_t i = 0; i < num_elems; ++i) {
-      iree_uk_memcpy(buf + i * elem_size, pattern, elem_size);
+      buf_uint16[i] = padding_value_uint16;
+    }
+  } else if (elem_size == 4) {
+    iree_uk_uint32_t padding_value_uint32 = padding_value;
+    iree_uk_uint32_t* IREE_UK_RESTRICT buf_uint32 = (iree_uk_uint32_t*)buf;
+    for (iree_uk_ssize_t i = 0; i < num_elems; ++i) {
+      buf_uint32[i] = padding_value_uint32;
+    }
+  } else {  // elem_size >= 8
+    // While arbitrary large elem_size is allowed, padding_value remains a
+    // uint64, so elem_size >= 16 only support a repeating 8-byte pattern.
+    iree_uk_uint64_t* IREE_UK_RESTRICT buf_uint64 = (iree_uk_uint64_t*)buf;
+    for (iree_uk_ssize_t i = 0; i < num_elems * elem_size / 8; ++i) {
+      buf_uint64[i] = padding_value;
     }
   }
 }
 
 // Copy from a source 2D buffer to a destination 2D buffer, padding to the
 // destination size.
-static void iree_uk_copy_and_pad(iree_uk_ssize_t src_size0,
-                                 iree_uk_ssize_t src_size1,
-                                 iree_uk_ssize_t src_stride0,
-                                 const char* src_buf, iree_uk_ssize_t dst_size0,
-                                 iree_uk_ssize_t dst_size1,
-                                 iree_uk_ssize_t dst_stride0, char* dst_buf,
-                                 iree_uk_ssize_t elem_size, const char* padding,
-                                 bool padding_is_single_byte) {
+static void iree_uk_copy_and_pad(
+    iree_uk_ssize_t src_size0, iree_uk_ssize_t src_size1,
+    iree_uk_ssize_t src_stride0, const char* src_buf, iree_uk_ssize_t dst_size0,
+    iree_uk_ssize_t dst_size1, iree_uk_ssize_t dst_stride0, char* dst_buf,
+    iree_uk_ssize_t elem_size, iree_uk_uint64_t padding_value,
+    bool is_padding_single_byte) {
   iree_uk_fill(dst_buf, dst_size1 + (dst_size0 - 1) * dst_stride0, elem_size,
-               padding_is_single_byte, padding);
+               padding_value, is_padding_single_byte);
   for (iree_uk_ssize_t in_i0 = 0; in_i0 < src_size0; in_i0++) {
     iree_uk_memcpy(dst_buf, src_buf, src_size1 * elem_size);
     dst_buf += dst_stride0 * elem_size;
@@ -145,7 +165,7 @@ static void iree_uk_pad_and_pack_row_using_tile_func(
     iree_uk_ssize_t tile_size0, iree_uk_ssize_t tile_size1,
     iree_uk_ssize_t elem_size, iree_uk_ssize_t in_size1,
     iree_uk_ssize_t in_stride0, iree_uk_ssize_t out_stride1,
-    const void* padding_value, iree_uk_pack_tmpbuf_helper_t* helper,
+    iree_uk_uint64_t padding_value, iree_uk_pack_tmpbuf_helper_t* helper,
     const char* in_buf, char* out_buf) {
   iree_uk_ssize_t dim1_tile = dim1_tile_start;
   while (dim1_tile < dim1_tile_end) {

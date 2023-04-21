@@ -72,7 +72,6 @@ static iree_status_t iree_uk_benchmark_pack(
       iree_uk_2d_buffer_length(out_type, params.out_size0, params.out_stride0);
   void* in_buffer = malloc(in_buffer_size);
   void* out_buffer = malloc(out_buffer_size);
-  void* padding_value_buffer = malloc(out_type_size);
   iree_uk_random_engine_t* engine = iree_uk_benchmark_random_engine(user_data);
   // It's just about plausible that on some platform, for some number type,
   // performance might be different on zero buffers vs random buffers. But it
@@ -81,10 +80,9 @@ static iree_status_t iree_uk_benchmark_pack(
   iree_uk_write_random_buffer(in_buffer, in_buffer_size, in_type, engine);
   iree_uk_write_random_buffer(out_buffer, out_buffer_size, out_type, engine);
   // Test single-byte padding pattern, most common use case as 0.0f is 0 bytes.
-  memset(padding_value_buffer, 0, out_type_size);
   params.in_buffer = in_buffer;
   params.out_buffer = out_buffer;
-  params.padding_value = padding_value_buffer;
+  params.padding_value = 0;
   int64_t total_iterations = 0;
   int64_t batch_count =
       (FLAG_batch_min_traversal_size + FLAG_working_set_size - 1) /
@@ -103,7 +101,6 @@ static iree_status_t iree_uk_benchmark_pack(
                                      total_iterations * out_buffer_size);
   free(in_buffer);
   free(out_buffer);
-  free(padding_value_buffer);
   return iree_ok_status();
 }
 
