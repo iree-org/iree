@@ -468,7 +468,15 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
        TransformEachOpTrait,
        TransformOpInterface]> {
   let description = [{
-    TODO
+    Populate the workgroup_count region on the `hal.executable.export` op.
+
+    The default dispatch region formation expects that the workgroup count
+    be computed from within the dispatch by using a program slice. The utility
+    method `lowerWorkgroupCountFromBodySliceOp` handles populating the
+    workgroup count region given the values in the dispatch that represent the
+    number of workgroups. This transform op calls the underlying function using
+    the `num_threads` value from the `scf.for_all` op that distributes the work
+    to different workgroups.
   }];
 
   let arguments = (ins PDL_Operation:$for_all_op);

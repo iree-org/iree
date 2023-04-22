@@ -22,6 +22,23 @@ namespace iree_compiler {
 
 namespace {
 
+/// Replace the following sequence
+///
+/// ```mlir
+/// %1 = <cast> %0 : .. to index
+/// %2 = flow.dispatch.workload_ordinal %1, 0
+/// %3 = <some_op>(...%1)...
+/// ```
+///
+/// with
+///
+/// ```mlir
+/// %1 = <cast> %0 : .. to index
+/// %2 = flow.dispatch.workload_ordinal %1, 0
+/// %3 = <some_op>(...%2)...
+/// ```
+///
+/// to make all the uses flow through `flow.dispatch_workload_ordinal` ops.
 template <typename CastOpTy>
 struct BubbleUpAcrossCastOp
     : public OpRewritePattern<IREE::Flow::DispatchWorkloadOrdinalOp> {

@@ -15,7 +15,7 @@
 // RUN: -td-matmul-strategy-use-async-copies=true \
 // RUN: -td-matmul-strategy-use-mma-sync=true \
 // RUN: -td-matmul-strategy-pipeline-depth=5 \
-// RUN: | FileCheck --check-prefix WITH_OPTIONS %s
+// RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
 hal.executable @matmul {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
@@ -93,8 +93,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.sequence  failures(propagate) {
 // WITH_OPTIONS: transform.iree.match_callback failures(propagate) "matmul"
 // Tile sizes are set by td-matmul-strategy-blk-size-XX.
-// WITH_OPTIONS: transform.iree.tile_to_forall_and_workgroup_count_region %{{.*}} num_threads [] tile_sizes [256, 64](mapping = [#gpu.block<y>, #gpu.block<x>])
+// WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}} num_threads [] tile_sizes [256, 64](mapping = [#gpu.block<y>, #gpu.block<x>])
 // WITH_OPTIONS: transform.structured.fuse_into_containing_op
+// WITH_OPTIONS: transform.iree.populate_workgroup_count_region_using_num_threads_slice
 // The tiling is affected by td-matmul-strategy-reduc-size: 8.
 // WITH_OPTIONS: transform.structured.tile %{{.*}}[0, 0, 8]
 // WITH_OPTIONS: transform.structured.pad %{{.*}} {pack_paddings = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}

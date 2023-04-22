@@ -206,10 +206,6 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b,
   result.forallH = tileToForeachOp.getForallOp();
   result.tiledOpH = tileToForeachOp.getTiledOp();
 
-  /*   // Handle the workgroup count region.
-    b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
-        result.forallH);
-   */
   // Perform a pass of canonicalization + enabling after tiling.
   ApplyPatternsOpPatterns configuration;
   isolatedParentOpH =

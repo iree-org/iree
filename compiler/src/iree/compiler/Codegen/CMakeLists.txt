@@ -48,6 +48,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtPasses
+    MLIRPass
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
