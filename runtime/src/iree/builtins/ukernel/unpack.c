@@ -38,12 +38,12 @@ static void iree_uk_unpack_tmpbuf_helper_init(
 
 static void iree_uk_unpack_validate(const iree_uk_unpack_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
-  const iree_uk_uint32_t allflags =
-      IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER | IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
+  const iree_uk_uint32_t allflags = IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER |
+                                    IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER |
+                                    IREE_UK_FLAG_UNPACK_TYPE_MASK;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
-  IREE_UK_ASSERT(params->type == iree_uk_unpack_type_f32f32 ||
-                 params->type == iree_uk_unpack_type_i8i8 ||
-                 params->type == iree_uk_unpack_type_i32i32);
+  iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params->flags);
+  IREE_UK_ASSERT(unpack_type != iree_uk_unpack_type_none);
   IREE_UK_ASSERT(params->in_stride0 >= 0);
   IREE_UK_ASSERT(params->out_stride0 >= 0);
   IREE_UK_ASSERT(params->out_size0 >= 0);
@@ -76,7 +76,7 @@ static void iree_uk_unpack_validate(const iree_uk_unpack_params_t* params) {
   // in the validation function so that the subsequent ukernel code can be
   // treated as infallible.
   iree_uk_unpack_tmpbuf_helper_t helper;
-  iree_uk_type_t elem_type = iree_uk_unpack_in_type(params->type);
+  iree_uk_type_t elem_type = iree_uk_unpack_in_type(unpack_type);
   iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
   iree_uk_unpack_tmpbuf_helper_init(tile_size0, tile_size1, elem_size, &helper);
 #endif  // IREE_UK_ENABLE_ASSERTS
@@ -131,7 +131,8 @@ static void iree_uk_unpack_using_tile_func(
     const iree_uk_unpack_params_t* params,
     iree_uk_unpack_tile_func_t tile_func) {
   // For now, the input and output element types are always the same.
-  iree_uk_type_t elem_type = iree_uk_unpack_in_type(params->type);
+  iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params->flags);
+  iree_uk_type_t elem_type = iree_uk_unpack_in_type(unpack_type);
   iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
   iree_uk_ssize_t outer_size0 = params->in_size0;
   iree_uk_ssize_t outer_size1 = params->in_size1;

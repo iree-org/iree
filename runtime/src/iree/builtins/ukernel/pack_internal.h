@@ -9,6 +9,26 @@
 
 #include "iree/builtins/ukernel/pack.h"
 
+typedef enum iree_uk_pack_type_t {
+  iree_uk_pack_type_none = 0,
+  iree_uk_pack_type_f32f32 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
+  iree_uk_pack_type_i8i8 = IREE_UK_TIE_2_TYPES_LITERAL(INT_8, INT_8),
+  iree_uk_pack_type_i32i32 = IREE_UK_TIE_2_TYPES_LITERAL(INT_32, INT_32),
+} iree_uk_pack_type_t;
+
+static inline iree_uk_pack_type_t iree_uk_pack_type(iree_uk_uint32_t flags) {
+  switch (flags & IREE_UK_FLAG_PACK_TYPE_MASK) {
+    case IREE_UK_FLAG_PACK_TYPE_F32F32:
+      return iree_uk_pack_type_f32f32;
+    case IREE_UK_FLAG_PACK_TYPE_I8I8:
+      return iree_uk_pack_type_i8i8;
+    case IREE_UK_FLAG_PACK_TYPE_I32I32:
+      return iree_uk_pack_type_i32i32;
+    default:
+      return iree_uk_pack_type_none;
+  }
+}
+
 static inline iree_uk_type_t iree_uk_pack_in_type(iree_uk_pack_type_t type) {
   return iree_uk_untie_type(0, type);
 }

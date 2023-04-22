@@ -64,7 +64,7 @@ static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arm_64_i8i8i32(
 
 iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arm_64(
     const iree_uk_mmt4d_params_t* params) {
-  switch (params->type) {
+  switch (iree_uk_mmt4d_type(params->flags)) {
     case iree_uk_mmt4d_type_f32f32f32:
       return iree_uk_mmt4d_select_tile_func_arm_64_f32f32f32(params);
     case iree_uk_mmt4d_type_i8i8i32:

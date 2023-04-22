@@ -12,7 +12,8 @@
 
 static void iree_pack_reference(const iree_uk_pack_params_t* params) {
   // For now, the input and output element types are always the same.
-  iree_uk_type_t elem_type = iree_uk_pack_in_type(params->type);
+  iree_uk_pack_type_t pack_type = iree_uk_pack_type(params->flags);
+  iree_uk_type_t elem_type = iree_uk_pack_in_type(pack_type);
   iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
   iree_uk_ssize_t outer_size0 = params->out_size0;
   iree_uk_ssize_t outer_size1 = params->out_size1;
@@ -77,7 +78,8 @@ static void iree_uk_test_pack_for_shape_params(
   iree_uk_random_engine_t* engine = iree_uk_test_random_engine(test);
   params.in_stride0 = params.in_size1 + iree_uk_random_engine_get_0_1(engine);
   params.out_stride0 = params.out_size1 * params.out_size2 * params.out_size3;
-  iree_uk_type_t in_type = iree_uk_pack_in_type(params.type);
+  iree_uk_pack_type_t pack_type = iree_uk_pack_type(params.flags);
+  iree_uk_type_t in_type = iree_uk_pack_in_type(pack_type);
   iree_uk_ssize_t in_buffer_size =
       iree_uk_2d_buffer_length(in_type, params.in_size0, params.in_stride0);
   void* in_buffer = malloc(in_buffer_size);
@@ -89,7 +91,7 @@ static void iree_uk_test_pack_for_shape_params(
 
   iree_uk_pack_params_t reference_params;
   memcpy(&reference_params, &params, sizeof reference_params);
-  iree_uk_type_t out_type = iree_uk_pack_out_type(params.type);
+  iree_uk_type_t out_type = iree_uk_pack_out_type(pack_type);
   iree_uk_ssize_t out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params.out_size0, params.out_stride0);
   void* reference_out_buffer = malloc(out_buffer_size);
@@ -153,7 +155,6 @@ static void iree_uk_test_pack_for_tile_params(iree_uk_test_t* test,
           }
           params.out_size0 = outer_shape.size0;
           params.out_size1 = outer_shape.size1;
-          params.flags = 0;
           if (transpose_outer) {
             params.flags |= IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
             iree_uk_ssize_swap(&params.out_size0, &params.out_size1);
@@ -185,11 +186,12 @@ static void iree_uk_test_pack_for_tile_params(iree_uk_test_t* test,
   }
 }
 
-static void iree_uk_test_pack(iree_uk_pack_type_t type, int tile_size0,
+static void iree_uk_test_pack(iree_uk_uint32_t flags, int tile_size0,
                               int tile_size1, const char* cpu_features) {
   iree_uk_pack_params_t params = {
-      .type = type, .out_size2 = tile_size0, .out_size3 = tile_size1};
+      .flags = flags, .out_size2 = tile_size0, .out_size3 = tile_size1};
   char types_str[32];
+  iree_uk_pack_type_t type = iree_uk_pack_type(flags);
   iree_uk_type_pair_str(types_str, sizeof types_str, type);
   char test_label_str[256];
   snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%d",
@@ -202,30 +204,30 @@ int main(int argc, char** argv) {
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird tile shapes to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 3, 5, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 4, 2, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i32i32, 3, 4, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 3, 5, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 4, 2, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 3, 4, NULL);
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 8, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 1, NULL);
-  iree_uk_test_pack(iree_uk_pack_type_i32i32, 8, 8, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 1, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 8, 8, NULL);
   // Tile size selected with CPU feature dotprod.
   // Not passing a cpu_features_list because the packing code itself
   // does not depend on any features.
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 4, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 4, NULL);
   // Tile size selected for CPU feature i8mm. Same comment as for dotprod.
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 8, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 8, NULL);
 #elif defined(IREE_UK_ARCH_X86_64)
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 1, "avx2_fma");
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 8, 2, "avx2_fma");
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 8, 8, "avx2_fma");
-  iree_uk_test_pack(iree_uk_pack_type_i32i32, 8, 8, "avx2_fma");
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 16, 1, "avx512_base");
-  iree_uk_test_pack(iree_uk_pack_type_i8i8, 16, 2, "avx512_base");
-  iree_uk_test_pack(iree_uk_pack_type_f32f32, 16, 16, "avx512_base");
-  iree_uk_test_pack(iree_uk_pack_type_i32i32, 16, 16, "avx512_base");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "avx2_fma");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 2, "avx2_fma");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8, "avx2_fma");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 8, 8, "avx2_fma");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 1, "avx512_base");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 16, 2, "avx512_base");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 16, "avx512_base");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 16, 16, "avx512_base");
   // avx512_vnni uses the same tile size and same pack code as avx512_base.
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 }

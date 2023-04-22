@@ -17,7 +17,7 @@ void iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma(
   const float* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const float* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
   __m256 acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7;
-  if (flags & IREE_UK_FLAG_ACCUMULATE) {
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     acc0 = _mm256_loadu_ps(out_ptr + 0 * 8);
     acc1 = _mm256_loadu_ps(out_ptr + 1 * 8);
     acc2 = _mm256_loadu_ps(out_ptr + 2 * 8);
@@ -75,7 +75,7 @@ void iree_uk_mmt4d_tile_i8i8i32_8x8x2_x86_64_avx2_fma(
   __m256i acc_3_0123_7_4567;
   __m256i acc_3_4567_7_0123;
 
-  if (flags & IREE_UK_FLAG_ACCUMULATE) {
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     acc_0_0123_4_4567 = iree_uk_avx_loadu_2x128(
         (__m128i*)(out_ptr + 0 * 8 + 0), (__m128i*)(out_ptr + 4 * 8 + 4));
     acc_0_4567_4_0123 = iree_uk_avx_loadu_2x128(
