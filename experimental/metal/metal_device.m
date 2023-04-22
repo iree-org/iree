@@ -82,6 +82,11 @@ const iree_hal_metal_device_params_t* iree_hal_metal_device_params(
   return &device->params;
 }
 
+id<MTLCommandQueue> iree_hal_metal_device_command_queue(const iree_hal_device_t* base_device) {
+  const iree_hal_metal_device_t* device = iree_hal_metal_device_const_cast(base_device);
+  return device->queue;
+}
+
 static iree_status_t iree_hal_metal_device_create_internal(
     iree_string_view_t identifier, const iree_hal_metal_device_params_t* params,
     id<MTLDevice> metal_device, iree_allocator_t host_allocator, iree_hal_device_t** out_device) {

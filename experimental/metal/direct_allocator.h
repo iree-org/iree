@@ -27,6 +27,10 @@ iree_status_t iree_hal_metal_allocator_create(
     iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
+// Returns the underyling HAL device associated with the given |allocator|.
+const iree_hal_device_t* iree_hal_metal_allocator_device(
+    const iree_hal_allocator_t* allocator);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

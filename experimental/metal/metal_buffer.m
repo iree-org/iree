@@ -8,6 +8,8 @@
 
 #import <Metal/Metal.h>
 
+#include "experimental/metal/direct_allocator.h"
+#include "experimental/metal/metal_device.h"
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -81,14 +83,35 @@ id<MTLBuffer> iree_hal_metal_buffer_handle(const iree_hal_buffer_t* base_buffer)
 static iree_status_t iree_hal_metal_buffer_invalidate_range(iree_hal_buffer_t* base_buffer,
                                                             iree_device_size_t local_byte_offset,
                                                             iree_device_size_t local_byte_length) {
+  IREE_TRACE_ZONE_BEGIN(z0);
 #if defined(IREE_PLATFORM_MACOS)
   // Special treatment for the MTLStorageManaged storage mode on macOS.
+  // In order to synchronize the GPU modifications back to CPU, we need to record a command buffer
+  // and commit to the queue.
   iree_hal_metal_buffer_t* buffer = iree_hal_metal_buffer_cast(base_buffer);
   if (buffer->buffer.storageMode == MTLStorageModeManaged) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "unimplemented buffer invalidation for managed storage mode");
+    const iree_hal_device_t* device =
+        iree_hal_metal_allocator_device(buffer->base.device_allocator);
+    id<MTLCommandQueue> queue = iree_hal_metal_device_command_queue(device);
+    id<MTLCommandBuffer> command_buffer = [queue commandBuffer];
+
+    id<MTLBlitCommandEncoder> blitCommandEncoder = [command_buffer blitCommandEncoder];
+    [blitCommandEncoder synchronizeResource:buffer->buffer];
+    [blitCommandEncoder endEncoding];
+
+    __block dispatch_semaphore_t work_done = dispatch_semaphore_create(0);
+    [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+      dispatch_semaphore_signal(work_done);
+    }];
+
+    [command_buffer commit];
+
+    intptr_t timed_out = dispatch_semaphore_wait(work_done, DISPATCH_TIME_FOREVER);
+    (void)timed_out;
+    dispatch_release(work_done);
   }
 #endif  // IREE_PLATFORM_MACOS
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 

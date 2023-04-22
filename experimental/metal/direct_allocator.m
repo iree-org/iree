@@ -41,6 +41,12 @@ static iree_hal_metal_allocator_t* iree_hal_metal_allocator_cast(iree_hal_alloca
   return (iree_hal_metal_allocator_t*)base_value;
 }
 
+static const iree_hal_metal_allocator_t* iree_hal_metal_allocator_const_cast(
+    const iree_hal_allocator_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_metal_allocator_vtable);
+  return (const iree_hal_metal_allocator_t*)base_value;
+}
+
 iree_status_t iree_hal_metal_allocator_create(
     iree_hal_device_t* base_device, id<MTLDevice> device,
     iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode,
@@ -85,6 +91,12 @@ static iree_allocator_t iree_hal_metal_allocator_host_allocator(
     const iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_metal_allocator_t* allocator = (iree_hal_metal_allocator_t*)base_allocator;
   return allocator->host_allocator;
+}
+
+const iree_hal_device_t* iree_hal_metal_allocator_device(
+    const iree_hal_allocator_t* base_allocator) {
+  const iree_hal_metal_allocator_t* allocator = (const iree_hal_metal_allocator_t*)base_allocator;
+  return allocator->base_device;
 }
 
 static iree_status_t iree_hal_metal_allocator_trim(
