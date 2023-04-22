@@ -243,6 +243,10 @@ void BuildDefaultIREEVMTransformPassPipeline(mlir::OpPassManager& passManager) {
       }};
 
   buildIREEVMTransformPassPipeline(
+      // TODO: Using the default global registry will make plugin based
+      // target backends opaque. If we are keeping this tool, do something
+      // better.
+      mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal(),
       mlir::iree_compiler::BindingOptions::FromFlags::get(),
       mlir::iree_compiler::InputDialectOptions::FromFlags::get(),
       mlir::iree_compiler::PreprocessingOptions::FromFlags::get(),

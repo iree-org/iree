@@ -28,11 +28,15 @@ class SerializeTargetExecutablesPass
     : public PassWrapper<SerializeTargetExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
  public:
-  SerializeTargetExecutablesPass() = default;
-  SerializeTargetExecutablesPass(const SerializeTargetExecutablesPass &pass) {}
-  SerializeTargetExecutablesPass(StringRef target, int debugLevel,
+  SerializeTargetExecutablesPass()
+      : targetRegistry(TargetBackendRegistry::getGlobal()) {}
+  SerializeTargetExecutablesPass(const SerializeTargetExecutablesPass &pass)
+      : targetRegistry(pass.targetRegistry) {}
+  SerializeTargetExecutablesPass(const TargetBackendRegistry &targetRegistry,
+                                 StringRef target, int debugLevel,
                                  std::string dumpIntermediatesPath,
-                                 std::string dumpBinariesPath) {
+                                 std::string dumpBinariesPath)
+      : targetRegistry(targetRegistry) {
     this->target = target.str();
     this->debugLevel = debugLevel;
     this->dumpIntermediatesPath = dumpIntermediatesPath;
@@ -49,7 +53,7 @@ class SerializeTargetExecutablesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackend = getTargetBackend(target);
+    auto targetBackend = targetRegistry.getTargetBackend(target);
     if (targetBackend) {
       targetBackend->getDependentDialects(registry);
     }
@@ -59,7 +63,7 @@ class SerializeTargetExecutablesPass
     auto executableOp = getOperation();
     auto moduleOp = executableOp->getParentOfType<mlir::ModuleOp>();
 
-    auto targetBackend = getTargetBackend(target);
+    auto targetBackend = targetRegistry.getTargetBackend(target);
     if (!targetBackend) {
       executableOp.emitError()
           << "unregistered target backend '" << target << "'";
@@ -119,14 +123,18 @@ class SerializeTargetExecutablesPass
       *this, "dump-binaries-path",
       llvm::cl::desc("Path to write translated and serialized executable "
                      "binaries into for debugging.")};
+
+  const TargetBackendRegistry &targetRegistry;
 };
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeTargetExecutablesPass(StringRef target, int debugLevel,
-                                     std::string dumpIntermediatesPath,
-                                     std::string dumpBinariesPath) {
+createSerializeTargetExecutablesPass(
+    const TargetBackendRegistry &targetRegistry, StringRef target,
+    int debugLevel, std::string dumpIntermediatesPath,
+    std::string dumpBinariesPath) {
   return std::make_unique<SerializeTargetExecutablesPass>(
-      target, debugLevel, dumpIntermediatesPath, dumpBinariesPath);
+      targetRegistry, target, debugLevel, dumpIntermediatesPath,
+      dumpBinariesPath);
 }
 
 static PassRegistration<SerializeTargetExecutablesPass> linkTargetPass([] {
@@ -137,10 +145,13 @@ class SerializeExecutablesPass
     : public PassWrapper<SerializeExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
  public:
-  SerializeExecutablesPass() = default;
-  SerializeExecutablesPass(int debugLevel, std::string dumpIntermediatesPath,
+  SerializeExecutablesPass()
+      : targetRegistry(TargetBackendRegistry::getGlobal()) {}
+  SerializeExecutablesPass(const TargetBackendRegistry &targetRegistry,
+                           int debugLevel, std::string dumpIntermediatesPath,
                            std::string dumpBinariesPath)
-      : debugLevel(debugLevel),
+      : targetRegistry(targetRegistry),
+        debugLevel(debugLevel),
         dumpIntermediatesPath(dumpIntermediatesPath),
         dumpBinariesPath(dumpBinariesPath) {}
 
@@ -157,7 +168,8 @@ class SerializeExecutablesPass
     OpPassManager passManager(executableOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
       passManager.addPass(createSerializeTargetExecutablesPass(
-          targetName, debugLevel, dumpIntermediatesPath, dumpBinariesPath));
+          targetRegistry, targetName, debugLevel, dumpIntermediatesPath,
+          dumpBinariesPath));
     }
     if (failed(runPipeline(passManager, executableOp))) {
       executableOp.emitError() << "failed to serialize executables";
@@ -166,17 +178,19 @@ class SerializeExecutablesPass
   }
 
  private:
+  const TargetBackendRegistry &targetRegistry;
   int debugLevel;
   std::string dumpIntermediatesPath;
   std::string dumpBinariesPath;
 };
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass(int debugLevel,
+createSerializeExecutablesPass(const TargetBackendRegistry &targetRegistry,
+                               int debugLevel,
                                std::string dumpIntermediatesPath,
                                std::string dumpBinariesPath) {
   return std::make_unique<SerializeExecutablesPass>(
-      debugLevel, dumpIntermediatesPath, dumpBinariesPath);
+      targetRegistry, debugLevel, dumpIntermediatesPath, dumpBinariesPath);
 }
 
 static PassRegistration<SerializeExecutablesPass> linkPass([] {

@@ -29,16 +29,20 @@ namespace HAL {
 class AssignTargetDevicesPass
     : public PassWrapper<AssignTargetDevicesPass, OperationPass<ModuleOp>> {
  public:
-  AssignTargetDevicesPass() = default;
-  AssignTargetDevicesPass(const AssignTargetDevicesPass &pass) {}
-  AssignTargetDevicesPass(ArrayRef<std::string> targets) {
+  AssignTargetDevicesPass()
+      : targetRegistry(TargetBackendRegistry::getGlobal()) {}
+  AssignTargetDevicesPass(const AssignTargetDevicesPass &pass)
+      : targetRegistry(pass.targetRegistry) {}
+  AssignTargetDevicesPass(const TargetBackendRegistry &targetRegistry,
+                          ArrayRef<std::string> targets)
+      : targetRegistry(targetRegistry) {
     this->targets = targets;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    for (auto &targetBackend :
-         getTargetBackends(getRegisteredTargetBackends())) {
+    for (auto &targetBackend : targetRegistry.getTargetBackends(
+             targetRegistry.getRegisteredTargetBackends())) {
       targetBackend->getDependentDialects(registry);
     }
   }
@@ -74,12 +78,14 @@ class AssignTargetDevicesPass
 
     SmallVector<Attribute> targetAttrs;
     for (const auto &targetName : targets) {
-      auto targetBackend = getTargetBackend(targetName);
+      auto targetBackend = targetRegistry.getTargetBackend(targetName);
       if (!targetBackend) {
         std::string backends;
         llvm::raw_string_ostream os(backends);
         llvm::interleaveComma(
-            getTargetBackends(getRegisteredTargetBackends()), os,
+            targetRegistry.getTargetBackends(
+                targetRegistry.getRegisteredTargetBackends()),
+            os,
             [&os](const std::shared_ptr<
                   mlir::iree_compiler::IREE::HAL::TargetBackend>
                       b) { os << b->name(); });
@@ -104,11 +110,14 @@ class AssignTargetDevicesPass
   ListOption<std::string> targets{*this, "targets",
                                   llvm::cl::desc("List of devices to target."),
                                   llvm::cl::ZeroOrMore};
+
+  const TargetBackendRegistry &targetRegistry;
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createAssignTargetDevicesPass(
+    const TargetBackendRegistry &targetRegistry,
     ArrayRef<std::string> targets) {
-  return std::make_unique<AssignTargetDevicesPass>(targets);
+  return std::make_unique<AssignTargetDevicesPass>(targetRegistry, targets);
 }
 
 static PassRegistration<AssignTargetDevicesPass> pass([] {

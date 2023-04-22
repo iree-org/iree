@@ -117,8 +117,10 @@ void ireeCompilerBuildIREEVMPassPipeline(IreeCompilerOptions options,
       // buildConstEvalPassPipelineCallback =
       [](OpPassManager &pm) { pm.addPass(ConstEval::createJitGlobalsPass()); }};
   buildIREEVMTransformPassPipeline(
-      optionsCpp->bindingOptions, optionsCpp->inputDialectOptions,
-      optionsCpp->preprocessingOptions,
+      // TODO: Initialize the plugin manager and pass get the real target
+      // registry.
+      IREE::HAL::TargetBackendRegistry::getGlobal(), optionsCpp->bindingOptions,
+      optionsCpp->inputDialectOptions, optionsCpp->preprocessingOptions,
       optionsCpp->highLevelOptimizationOptions, optionsCpp->schedulingOptions,
       optionsCpp->halTargetOptions, optionsCpp->vmTargetOptions, hooks,
       *passManagerCpp);

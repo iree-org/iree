@@ -33,7 +33,9 @@ using CreateTargetBackendFn = std::function<std::shared_ptr<TargetBackend>()>;
 //   vulkan-v1.1-high
 class TargetBackendRegistration {
  public:
-  TargetBackendRegistration(StringRef name, CreateTargetBackendFn fn);
+  // TODO: Remove the registerStaticGlobal mode once callers are migrated.
+  TargetBackendRegistration(StringRef name, CreateTargetBackendFn fn,
+                            bool registerStaticGlobal = true);
 
   std::shared_ptr<TargetBackend> acquire();
 
@@ -43,15 +45,50 @@ class TargetBackendRegistration {
   std::shared_ptr<TargetBackend> cachedValue;
 };
 
-// Returns a list of registered target backends.
-std::vector<std::string> getRegisteredTargetBackends();
+// A registry of target
+class TargetBackendList {
+ public:
+  void add(llvm::StringRef name, CreateTargetBackendFn fn) {
+    entries.push_back(std::make_pair(name, fn));
+  }
 
-// Returns the target backend with the given name.
-std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName);
+ private:
+  llvm::SmallVector<std::pair<llvm::StringRef, CreateTargetBackendFn>> entries;
+  friend class TargetBackendRegistry;
+};
 
-// Returns one backend per entry in |targetNames|.
-SmallVector<std::shared_ptr<TargetBackend>> getTargetBackends(
-    ArrayRef<std::string> targetNames);
+// A concrete target backend registry.
+class TargetBackendRegistry {
+ public:
+  // Merge from a list of of targets. The registry will own the registration
+  // entries.
+  void mergeFrom(const TargetBackendList &targets);
+  // Initialize from an existing registry. This registry will not own the
+  // backing registration entries. The source registry must remain live for the
+  // life of this.
+  void mergeFrom(const TargetBackendRegistry &registry);
+
+  // Returns the read-only global registry. This is used by passes which depend
+  // on it from their default constructor.
+  static const TargetBackendRegistry &getGlobal();
+
+  // Returns a list of registered target backends.
+  std::vector<std::string> getRegisteredTargetBackends() const;
+
+  // Returns the target backend with the given name.
+  std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName) const;
+
+  // Returns one backend per entry in |targetNames|.
+  SmallVector<std::shared_ptr<TargetBackend>> getTargetBackends(
+      ArrayRef<std::string> targetNames) const;
+
+ private:
+  llvm::StringMap<TargetBackendRegistration *> registrations;
+  llvm::SmallVector<std::unique_ptr<TargetBackendRegistration>>
+      ownedRegistrations;
+
+  friend class TargetBackendRegistration;
+};
 
 // Returns a sorted uniqued set of target backends used in the executable.
 SmallVector<std::string> gatherExecutableTargetNames(

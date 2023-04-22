@@ -79,6 +79,7 @@ inline static void enumerateIREEVMPipelinePhases(
 // If a |runTo| phase is specified the pipeline will stop and output the full
 // IR after the phase completes.
 void buildIREEVMTransformPassPipeline(
+    const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,

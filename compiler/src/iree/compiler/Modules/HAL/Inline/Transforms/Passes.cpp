@@ -49,12 +49,14 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 //===----------------------------------------------------------------------===//
 
 void buildHALInlineStaticTransformPassPipeline(
-    OpPassManager &passManager, const TargetOptions &targetOptions) {
+    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    const TargetOptions &targetOptions) {
   //----------------------------------------------------------------------------
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
 
-  IREE::HAL::buildHALConfigurationPassPipeline(passManager, targetOptions);
+  IREE::HAL::buildHALConfigurationPassPipeline(passManager, targetRegistry,
+                                               targetOptions);
 
   //----------------------------------------------------------------------------
   // Executable translation
@@ -62,7 +64,7 @@ void buildHALInlineStaticTransformPassPipeline(
 
   // Translate each executable down to common MLIR dialects.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createTranslateExecutablesPass());
+      IREE::HAL::createTranslateExecutablesPass(targetRegistry));
 
   // Inline the translated executable functions.
   // We preserve the executables for their metadata used during conversion.
@@ -104,7 +106,8 @@ void registerHALInlinePasses() {
       "Runs the inline HAL dialect transformation pipeline",
       [](OpPassManager &passManager) {
         buildHALInlineStaticTransformPassPipeline(
-            passManager, TargetOptions::FromFlags::get());
+            passManager, TargetBackendRegistry::getGlobal(),
+            TargetOptions::FromFlags::get());
       });
 }
 

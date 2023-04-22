@@ -146,10 +146,13 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     options->highLevelOptimizationOptions.constEval = false;
 
     buildIREEVMTransformPassPipeline(
-        options->bindingOptions, options->inputOptions,
-        options->preprocessingOptions, options->highLevelOptimizationOptions,
-        options->schedulingOptions, options->executableOptions,
-        options->targetOptions, options->hooks, compilePipeline);
+        // TODO: If ever not using VMVX, plumb the real target registry
+        // through.
+        IREE::HAL::TargetBackendRegistry::getGlobal(), options->bindingOptions,
+        options->inputOptions, options->preprocessingOptions,
+        options->highLevelOptimizationOptions, options->schedulingOptions,
+        options->executableOptions, options->targetOptions, options->hooks,
+        compilePipeline);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {

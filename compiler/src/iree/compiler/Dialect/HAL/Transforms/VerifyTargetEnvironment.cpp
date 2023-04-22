@@ -27,7 +27,8 @@ namespace HAL {
 class VerifyTargetEnvironmentPass
     : public PassWrapper<VerifyTargetEnvironmentPass, OperationPass<ModuleOp>> {
  public:
-  VerifyTargetEnvironmentPass() = default;
+  VerifyTargetEnvironmentPass(const TargetBackendRegistry &targetRegistry)
+      : targetRegistry(targetRegistry) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
@@ -64,7 +65,8 @@ class VerifyTargetEnvironmentPass
       auto diagnostic = moduleOp.emitError();
       diagnostic
           << "no HAL target devices specified on the module (available = [ ";
-      for (const auto &targetName : getRegisteredTargetBackends()) {
+      for (const auto &targetName :
+           targetRegistry.getRegisteredTargetBackends()) {
         diagnostic << "'" << targetName << "' ";
       }
       diagnostic << "])";
@@ -82,13 +84,14 @@ class VerifyTargetEnvironmentPass
       }
 
       auto targetBackend =
-          IREE::HAL::getTargetBackend(targetAttr.getDeviceID().getValue());
+          targetRegistry.getTargetBackend(targetAttr.getDeviceID().getValue());
       if (!targetBackend) {
         auto diagnostic = moduleOp.emitError();
         diagnostic
             << "unregistered target backend " << targetAttr.getDeviceID()
             << "; ensure it is linked in to the compiler (available = [ ";
-        for (const auto &targetName : getRegisteredTargetBackends()) {
+        for (const auto &targetName :
+             targetRegistry.getRegisteredTargetBackends()) {
           diagnostic << "'" << targetName << "' ";
         }
         diagnostic << "])";
@@ -97,14 +100,18 @@ class VerifyTargetEnvironmentPass
       }
     }
   }
+
+  const TargetBackendRegistry &targetRegistry;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createVerifyTargetEnvironmentPass() {
-  return std::make_unique<VerifyTargetEnvironmentPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createVerifyTargetEnvironmentPass(
+    const TargetBackendRegistry &targetRegistry) {
+  return std::make_unique<VerifyTargetEnvironmentPass>(targetRegistry);
 }
 
 static PassRegistration<VerifyTargetEnvironmentPass> pass([] {
-  return std::make_unique<VerifyTargetEnvironmentPass>();
+  return std::make_unique<VerifyTargetEnvironmentPass>(
+      TargetBackendRegistry::getGlobal());
 });
 
 }  // namespace HAL
