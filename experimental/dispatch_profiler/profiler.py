@@ -5,16 +5,9 @@ from matmul import *
 from batch_matmul import *
 from manifest import *
 from performance_report import *
+from launchers import *
 from options import parse_profiler_arguments
 from options import parse_profiler_arguments
-
-###############################################################################
-# Map of operation kinds to their dispatch launchers.
-operation_launcher_map = {
-    OperationKind.Matmul: MatmulOperationLauncher,
-    OperationKind.BatchMatmul: BatchMatmulOperationLauncher,
-}
-###############################################################################
 
 ###############################################################################
 # Profiler main : The main entry point for the profiler tool.
@@ -63,15 +56,15 @@ if __name__ == "__main__":
 
       # Select and create an instance of operation_launcher for the operation with operation_kind.
       # print(operation_collection.operation.name())
-      operation_launcher = operation_launcher_map[operation_kind](
-          args, operation_collection.operation)
+      operation_launcher = IreeToolsLauncher(args,
+                                             operation_collection.operation)
 
       for configuration in operation_collection.configuration_list:
 
         # Compile the operation dispatches for verification and profiling.
         if args.compile_only:
-          operation_launcher.compile(CompilationMode.Verify)
-          operation_launcher.compile(CompilationMode.Profile)
+          operation_launcher.iree_compile(CompilationMode.Verify)
+          operation_launcher.iree_compile(CompilationMode.Profile)
 
         else:
           # Initialize verification and profiling results.

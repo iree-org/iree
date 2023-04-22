@@ -120,9 +120,11 @@ class MatmulCompilationInfo:
   def __init__(self,
                tile_description,
                translation_info,
+               operation_kind=OperationKind.Matmul,
                config_type=CompilationConfigType.Custom):
     self.tile_description = tile_description  # TileDescription
     self.translation_info = translation_info  # TranslationInfo
+    self.operation_kind = operation_kind  # OperationKind
     self.config_type = config_type  # CompilationConfigType
 
   def csv_headers(self):
@@ -160,10 +162,18 @@ class EmitMatmulCompilationInfo:
   """Emitters for the matmul compilation info."""
 
   def __init__(self):
-    self.compilation_info_template = """
+    self.matmul_compilation_info_template = """
 // matmul compilation info (tile configuration, translation info, workgroup size)
 #${compilation_info_name} = #iree_codegen.compilation_info<
   lowering_config = <tile_sizes = [[${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
+  translation_info = <${translation_info} pipeline_depth = ${stages}>,
+  workgroup_size = [${block_dim_x} : index, ${block_dim_y} : index, ${block_dim_z} : index]
+>
+"""
+    self.batch_matmul_compilation_info_template = """
+// batch matmul compilation info (tile configuration, translation info, workgroup size)
+#${compilation_info_name} = #iree_codegen.compilation_info<
+  lowering_config = <tile_sizes = [[1, ${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
   translation_info = <${translation_info} pipeline_depth = ${stages}>,
   workgroup_size = [${block_dim_x} : index, ${block_dim_y} : index, ${block_dim_z} : index]
 >
@@ -195,7 +205,13 @@ class EmitMatmulCompilationInfo:
             str(compilation_info.tile_description.block_dim[2]),
     }
 
-    return SubstituteTemplate(self.compilation_info_template, values)
+    compilation_info_template = self.matmul_compilation_info_template
+
+    if compilation_info.operation_kind == OperationKind.BatchMatmul or \
+       compilation_info.operation_kind == OperationKind.SplitkMatmul:
+      compilation_info_template = self.batch_matmul_compilation_info_template
+
+    return SubstituteTemplate(compilation_info_template, values)
 
 
 ###############################################################################
@@ -263,18 +279,14 @@ class EmitMhloMatmulOperation:
 
 
 ###############################################################################
-class ReferenceMatmulOperation:
-  """Reference implementation for the matmul operation in numpy.
-      ReferenceMatmulOperation class has the following responsibilities:
-       1) Generates matmul operation inputs as np.array for a desired 
-          distribution.
-       2) Runs the matmul reference operation in np.matmul.
-       3) Generates the matmul operation expected output as np.array.
-       4) Additional, generate input and output filename strings.
-  """
+class ReferenceMatmulOp(ReferenceOpInterface):
+  """Reference implementation for the matmul operation in numpy."""
 
-  def __init__(self, matmul_operation, dist_lhs, dist_rhs):
+  def __init__(self, matmul_operation, op_reference_cache_path, dist_lhs,
+               dist_rhs):
     self.matmul_operation = matmul_operation
+    self.op_reference_cache_path = op_reference_cache_path
+
     # Problem shape.
     self.M = matmul_operation.problem_shape[0]
     self.N = matmul_operation.problem_shape[1]
@@ -306,15 +318,30 @@ class ReferenceMatmulOperation:
       dist=DistributionName[self.dist_rhs])
 
     # Filename for the reference result tensor.
-    self.reference_filename_result = "m{problem_m}xn{problem_n}_"\
+    self.filename_reference_result = "m{problem_m}xn{problem_n}_"\
       "{tensor_description}_reference_result.npy".format(
       problem_m=self.M,
       problem_n=self.N,
       tensor_description=self.matmul_operation.result.name())
 
-  # Generates input data, runs reference numpy.matmul, and save npy files to the output directory.
-  def run_and_save(self, output_dir="."):
+    # Filepath for input and output files.
+    self.filepath_lhs = os.path.join(self.op_reference_cache_path,
+                                     self.filename_lhs)
+    self.filepath_rhs = os.path.join(self.op_reference_cache_path,
+                                     self.filename_rhs)
+    self.filepath_reference_result = os.path.join(
+        self.op_reference_cache_path, self.filename_reference_result)
 
+  def get_input_filepaths(self):
+    """Returns the list of input file paths."""
+    return [self.filepath_lhs, self.filepath_rhs]
+
+  def get_output_filepaths(self):
+    """Returns the list of output file paths."""
+    return [self.filepath_reference_result]
+
+  def __call__(self):
+    """Generates input data, runs reference numpy.matmul, and save npy files to the output directory."""
     # Generate the input data as np.array for the matmul operation.
     lhs_np_array = get_np_array(self.matmul_operation.lhs, (self.M, self.K),
                                 self.dist_lhs)
@@ -325,198 +352,75 @@ class ReferenceMatmulOperation:
     result = np.matmul(lhs_np_array, rhs_np_array)
 
     # Save the input data as np.array for the matmul operation.
-    np.save(os.path.join(output_dir, self.filename_lhs),\
-             np.array(lhs_np_array, dtype = self.dtype_lhs))
-    np.save(os.path.join(output_dir, self.filename_rhs),\
-             np.array(rhs_np_array, dtype = self.dtype_rhs))
+    np.save(self.filepath_lhs, np.array(lhs_np_array, dtype=self.dtype_lhs))
+    np.save(self.filepath_rhs, np.array(rhs_np_array, dtype=self.dtype_rhs))
 
     # Save the expected result as an np.array.
-    np.save(os.path.join(output_dir, self.reference_filename_result),\
-             np.array(result, dtype = self.dtype_result))
+    np.save(self.filepath_reference_result,
+            np.array(result, dtype=self.dtype_result))
+
+  def is_cached(self):
+    """Checks if the reference run is cached."""
+    if not os.path.exists(self.filepath_lhs) or \
+       not os.path.exists(self.filepath_rhs) or \
+       not os.path.exists(self.filepath_reference_result):
+      return False
+    return True
 
 
-###############################################################################
-class MatmulOperationLauncher:
-  """Launches the compilation and execution of the matmul operation.
-  MatmulOperationLauncher class has the following responsibilities:
-    1) Launches compilation of the matmul for a verification or profiling runs.
-    2) Launches the verification by running the IREE compiled matmul operation
-       and the python nmpy.matmul.
-    3) Launches the profiling by running the IREE compiled matmul operation.
-  """
+class CudaMatmulDispatchChecker:
+  """Given a matmul dispatch, checks if the dispatch is supported by the target GPU."""
 
-  def __init__(self, args, operation):
-    self.operation = operation
-
-    # Variables from top-level argparse.
-    self.generated_path = os.path.join(args.build_dir, 'generated',
-                                       args.mlir_dialect)
+  def __init__(self, args):
     self.args = args
-    self.benchmark_dispatch_repeat_count = args.batch_size
-    self.batch_size = args.batch_size
 
-    # Additional paths.
-    self.operation_path = os.path.join(
-        self.generated_path, OperationKindNames[operation.operation_kind],
-        operation.name())
-    self.source_mlir_file = os.path.join(self.operation_path,
-                                         operation.name() + '.mlir')
+    # CUDA shared memory capacity per SM in Kbytes.
+    self.sharedMemPerSm = {
+        "sm_80": 163,
+        "sm_86": 99,
+    }
 
-    # path to iree-compile tool. (for compiling the input mlir file to vmfb)
-    self.iree_compile_path = os.path.join(args.build_dir, 'tools',
-                                          'iree-compile')
+    self.cuda_arch = self.args.cuda_arch
+    self.cuda_warp_size = 32
+    self.cuda_smem_capacity_per_sm_in_bytes = self.sharedMemPerSm[
+        self.cuda_arch] << 10
 
-    # path to iree-benchmark-module tool. (for performance benchmarking and profiling)
-    self.iree_benchmark_module_path = os.path.join(args.build_dir, 'tools',
-                                                   'iree-benchmark-module')
+  def _is_tile_aligned_shape(self, dispatch):
+    """Checks if the given dispatch is valid for CUDA."""
+    problem_shape = dispatch.operation.problem_shape
+    threadblock_shape = dispatch.configuration.tile_description.threadblock_shape
+    if len(problem_shape) != len(threadblock_shape):
+      raise ValueError("Problem shape and threadblock shape must have the "\
+                       "same rank.")
+    is_aligned = all(
+        a % b == 0 for a, b in zip(problem_shape, threadblock_shape))
+    return is_aligned
 
-    # path to iree-run-module tool. (for verification)
-    self.iree_run_module_path = os.path.join(args.build_dir, 'tools',
-                                             'iree-run-module')
+  def _cuda_smem_required_in_bytes(self, dispatch):
+    """Returns size bytes of shared memory required for a given cuda dispatch."""
+    threadblock_shape = dispatch.configuration.tile_description.threadblock_shape
+    num_stages = dispatch.configuration.tile_description.stages
+    tile_shape_lhs = threadblock_shape[0] * threadblock_shape[2]
+    tile_shape_rhs = threadblock_shape[2] * threadblock_shape[1]
+    return ((tile_shape_lhs * DataTypeSizeInBits[dispatch.operation.lhs.datatype] + \
+             tile_shape_rhs * DataTypeSizeInBits[dispatch.operation.rhs.datatype]) * num_stages) // 8
 
-    # output vmfb files for the operation.
-    self.vmfb_verify_file = os.path.join(self.operation_path,
-                                         self.operation.name() + '_verify.vmfb')
-    self.vmfb_benchmark_file = os.path.join(
-        self.operation_path,
-        self.operation.name() + '_benchmark.vmfb')
+  def _is_cuda_smem_avialable(self, dispatch):
+    """Checks if the given dispatch is valid for CUDA."""
+    return self._cuda_smem_required_in_bytes(
+        dispatch) <= self.cuda_smem_capacity_per_sm_in_bytes
 
-  def compile(self, compilation_mode):
-    """Compiles the matmul operation to a vmfb file for profiling."""
-
-    benchmark_dispatch_repeat_count = self.benchmark_dispatch_repeat_count if compilation_mode == CompilationMode.Profile else 1
-    vmfb_file = self.vmfb_benchmark_file if compilation_mode == CompilationMode.Profile else self.vmfb_verify_file
-
-    # Base iree-compile commandline
-    cmd = [self.iree_compile_path, self.source_mlir_file, "-o", f"{vmfb_file}"]
-
-    # General compilation options
-    cmd += [f"--iree-hal-target-backends={self.args.device}"]
-
-    if self.args.device == "cuda":
-      cmd += [f"--iree-hal-cuda-llvm-target-arch={self.args.cuda_arch}"]
-    if self.args.split_k_slices != "":
-      cmd += [f"--iree-flow-split-matmul-reduction={self.args.split_k_slices}"]
-    if self.args.use_mma_sync:
-      cmd += [f"--iree-codegen-llvmgpu-use-mma-sync"]
-    if self.args.use_wmma:
-      cmd += [f"--iree-codegen-llvmgpu-use-wmma"]
-
-    # Compilation options for profiling
-    cmd += [
-        f"--iree-hal-benchmark-dispatch-repeat-count={benchmark_dispatch_repeat_count}"
-    ]
-
-    # Appends print ir options at the end of the command line.
-    if self.args.mlir_print_ir_after_all:
-      cmd += [f"--mlir-print-ir-after-all"]
-
-    if not os.path.exists(vmfb_file) or self.args.force_compile:
-      print(f">> Compilation command for "
-            f"{CompilationModeNames[compilation_mode]} : {' '.join(cmd)}")
-      #subprocess.check_output(cmd)
-      compile_log_filename = f"{self.operation_path}/iree_compile_logs.mlir"
-      with open(compile_log_filename, "w") as fp:
-        subprocess.run(cmd, stderr=fp)
-
-    elif self.args.verbose:
-      print("Skipping compilation of matmul operation: " + vmfb_file +
-            " since it already exists.")
-
-  def verify(self, configuration):
-    """Verifies the matmul operation with a given configuration."""
-    # First compile the operation to a vmfb file.
-    self.compile(CompilationMode.Verify)
-
-    # Verify using random data distribution.
-    # TODO 1) make input distribution configurable through command line.
-    # TODO 2) make the reference run to check if reference npy files are present,
-    #         then do not re-run the reference.
-    reference_op = ReferenceMatmulOperation(self.operation,\
-                                         Distribution.Random,\
-                                         Distribution.Random)
-
-    lhs_npy_file = os.path.join(self.operation_path, reference_op.filename_lhs)
-    rhs_npy_file = os.path.join(self.operation_path, reference_op.filename_rhs)
-    expected_result_npy_file = os.path.join(
-        self.operation_path, reference_op.reference_filename_result)
-
-    # If the reference numpy do not exists, run the reference implementation
-    # and generate npy files.
-    if not os.path.exists(lhs_npy_file) or \
-       not os.path.exists(rhs_npy_file) or \
-       not os.path.exists(expected_result_npy_file):
-      reference_op.run_and_save(self.operation_path)
-
-    # Commandline `iree-run-module` for verification.
-    cmd = [
-        self.iree_run_module_path, f'--module={self.vmfb_verify_file}',
-        f'--device={self.args.device}'
-    ]
-
-    # Operation-specific verification command-line.
-    # TODO: abstract the operation-specific verification command-line out of verification.
-    cmd.append(f'--function={self.operation.name()}_{configuration.name()}')
-    cmd.append(f'--input=@{lhs_npy_file}')
-    cmd.append(f'--input=@{rhs_npy_file}')
-    cmd.append(f'--expected_output=@{expected_result_npy_file}')
-
-    # Print the command if verbose.
-    if self.args.verbose:
-      print(">> Verification command: " + ' '.join(cmd))
-
-    # Launch verification.
-    cmd_output = subprocess.check_output(cmd, text=True)
-
-    # Parse the verification output.
-    m = re.search(r"\[(?P<verification_result>[a-zA-Z]+)\]", cmd_output)
-    if m is None:
-      raise Exception(
-          "Failed to parse verification output by iree-run-module: " +
-          cmd_output)
-    verification_result = m.group('verification_result')
-
-    if self.args.verbose or verification_result != "SUCCESS":
-      print(cmd_output)
-
-    return verification_result
-
-  def profile(self, configuration):
-    """Profiles the matmul operation with a given configuration."""
-    # First compile the operation to a vmfb file.
-    self.compile(CompilationMode.Profile)
-
-    # Commandline `iree-benchmark-module` for profiling.
-    cmd = [
-        self.iree_benchmark_module_path, f'--module={self.vmfb_benchmark_file}',
-        f'--device={self.args.device}'
-    ]
-
-    # Profiling specific flags.
-    cmd += [f'--benchmark_repetitions={self.args.benchmark_repetitions}']
-    cmd += [f'--batch_size={self.batch_size}']
-
-    # Operation-specific profiling command-line.
-    cmd += [f'--function={self.operation.name()}_{configuration.name()}']
-    cmd += [f'--input={self.operation.lhs_npy_shape()}']
-    cmd += [f'--input={self.operation.rhs_npy_shape()}']
-
-    # Print the command if verbose.
-    if self.args.verbose:
-      print(">> Profiling command: " + ' '.join(cmd))
-
-    # Launch profiling.
-    cmd_output = subprocess.check_output(cmd,
-                                         text=True,
-                                         stderr=subprocess.STDOUT)
-
-    # Parse the profiling output.
-    m = re.search(r"real_time_median\s+(?P<runtime>\d+.\d+)\s+ms", cmd_output)
-    if m is None:
-      raise Exception("Failed to parse runtime from benchmark result: " +
-                      cmd_output)
-    runtime_in_ms = float(m.group('runtime'))
-    return runtime_in_ms
+  def is_valid(self, dispatch):
+    """Checks if the given dispatch is valid for CUDA."""
+    if not self._is_tile_aligned_shape(dispatch):
+      print(f"Warning: {dispatch.name()} is not aligned is being skipped.")
+      return False
+    if not self._is_cuda_smem_avialable(dispatch):
+      print(f"Warning: {dispatch.name()} requires {self._cuda_smem_required_in_bytes(dispatch)} "\
+            f"bytes of shared memory, which is larger than the {self.cuda_arch} capacity "\
+            f"{self.cuda_smem_capacity_per_sm_in_bytes} bytes.")
+      return False
+    return True
 
 
 ##############################################################################
@@ -547,52 +451,16 @@ class CudaMatmulGenerator:
     # List of pre-definied matmul dispatch collections.
     self.dispatches_collection_list = []
 
-    # CUDA specific constants.
-    self.cuda_warp_size = 32
-    self.cuda_smem_capacity_in_bytes_sm80 = 163 << 10
-
-  def _is_tile_aligned_shape(self, dispatch):
-    """Checks if the given dispatch is valid for CUDA."""
-    problem_shape = dispatch.operation.problem_shape
-    threadblock_shape = dispatch.configuration.tile_description.threadblock_shape
-    if len(problem_shape) != len(threadblock_shape):
-      raise ValueError("Problem shape and threadblock shape must have the "\
-                       "same rank.")
-    is_aligned = all(
-        a % b == 0 for a, b in zip(problem_shape, threadblock_shape))
-    return is_aligned
-
-  def _cuda_smem_required_in_bytes(self, dispatch):
-    """Returns size bytes of shared memory required for a given cuda dispatch."""
-    threadblock_shape = dispatch.configuration.tile_description.threadblock_shape
-    num_stages = dispatch.configuration.tile_description.stages
-    tile_shape_lhs = threadblock_shape[0] * threadblock_shape[2]
-    tile_shape_rhs = threadblock_shape[2] * threadblock_shape[1]
-    return ((tile_shape_lhs * DataTypeSizeInBits[dispatch.operation.lhs.datatype] + \
-             tile_shape_rhs * DataTypeSizeInBits[dispatch.operation.rhs.datatype]) * num_stages) // 8
-
-  def _is_cuda_smem_avialable(self, dispatch):
-    """Checks if the given dispatch is valid for CUDA."""
-    return self._cuda_smem_required_in_bytes(
-        dispatch) <= self.cuda_smem_capacity_in_bytes_sm80
-
   def _cuda_supported_configuration_list(self, operation, configuration_list):
     """Returns a list of supported configurations for CUDA."""
     supported_configuration_list = []
+    dispatch_checker = CudaMatmulDispatchChecker(self.args)
     for configuration in configuration_list:
-      dispatch = Dispatch(operation, configuration)
-      if not self._is_tile_aligned_shape(dispatch):
-        print(f"Warning: {dispatch.name()} is not aligned is being skipped.")
+      if not dispatch_checker.is_valid(Dispatch(operation, configuration)):
         continue
-      if not self._is_cuda_smem_avialable(dispatch):
-        print(f"Warning: {dispatch.name()} requires {self._cuda_smem_required_in_bytes(dispatch)} "\
-              f"bytes of shared memory, which is larger than the SM80 capacity "\
-              f"{self.cuda_smem_capacity_in_bytes_sm80} bytes.")
-        continue
-
-      # If all checks pass, add the configuration to the supported list.
       supported_configuration_list.append(configuration)
 
+    # Return the supported configuration list.
     return supported_configuration_list
 
   def _cuda_matmul_tensor_cores_f16(self):
@@ -628,7 +496,7 @@ class CudaMatmulGenerator:
       supported_configuration_list = self._cuda_supported_configuration_list(
           operation, configuration_list)
 
-      # Add default configuration if requested.
+      # Add default configuration if enabled.
       if self.args.default_config:
         supported_configuration_list.append(
             MatmulCompilationInfo([], [], CompilationConfigType.Default))
@@ -678,7 +546,7 @@ class CudaMatmulGenerator:
   def generate(self):
     """Generates a list of matmul operations."""
     self._cuda_matmul_tensor_cores_f16()
-    #self._cuda_matmul_tensor_cores_f32()
+    self._cuda_matmul_tensor_cores_f32()
     return self.dispatches_collection_list
 
 

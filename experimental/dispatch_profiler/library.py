@@ -2,6 +2,7 @@ import enum
 from enum import auto
 import re
 import numpy as np
+from abc import ABC, abstractmethod
 from collections import namedtuple
 
 ###################################################################################################
@@ -307,3 +308,30 @@ def SubstituteTemplate(template, values):
     newtext = re.sub(regex, value, text)
     text = newtext
   return text
+
+
+###################################################################################################
+class ReferenceOpInterface(ABC):
+  """Interface for reference implementations."""
+
+  @abstractmethod
+  def get_input_filepaths(self):
+    """Returns the list of inputs."""
+    pass
+
+  @abstractmethod
+  def get_output_filepaths(self):
+    """Returns the list of outputs."""
+    pass
+
+  @abstractmethod
+  def __call__(self):
+    """Runs the reference implementation."""
+    pass
+
+  @abstractmethod
+  def is_cached(self):
+    """Returns whether the reference run is cached."""
+    pass
+
+  ###################################################################################################

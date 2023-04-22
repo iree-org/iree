@@ -22,7 +22,7 @@ class EmitSourceMLIR:
 
     mlir_configuration_emitter = {
         OperationKind.Matmul: EmitMatmulCompilationInfo,
-        OperationKind.BatchMatmul: EmitBatchMatmulCompilationInfo,
+        OperationKind.BatchMatmul: EmitMatmulCompilationInfo,
         #OperationKind.Conv2d : EmitConv2dCompilationInfo, TODO: Add conv2d
     }
     self.configuration_emitter = mlir_configuration_emitter[
