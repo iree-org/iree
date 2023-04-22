@@ -809,21 +809,27 @@ DiagnosedSilenceableFailure transform_dialect::
   // Account for mapping attribute if present. The attribute used for mapping
   // provides a mapping ID that is ordered in `x` = 0, `y`=1, and `z` = 2. Use
   // this to shuffle the workgroup count around.
-  SmallVector<OpFoldResult> workgroupCountOrdered(workgroupCount.size(),
-                                                  rewriter.getIndexAttr(1));
   if (auto blockMapping = forAllOp.getMapping()) {
-    for (auto [index, mapAttr] : llvm::enumerate(blockMapping.value())) {
-      int id = mapAttr.cast<DeviceMappingAttrInterface>().getMappingId();
-      workgroupCountOrdered[workgroupCountOrdered.size() - 1 - id] =
-          workgroupCount[index];
+    // Get the mapping IDs.
+    auto mappingIds = llvm::to_vector(
+        llvm::map_range(blockMapping.value(), [](Attribute mappingAttr) -> int {
+          return mappingAttr.cast<DeviceMappingAttrInterface>().getMappingId();
+        }));
+    int maxId = 0;
+    for (auto id : mappingIds) {
+      maxId = std::max(maxId, id);
     }
-  } else {
-    workgroupCountOrdered = workgroupCount;
+    SmallVector<OpFoldResult> workgroupCountOrdered(maxId + 1,
+                                                    rewriter.getIndexAttr(1));
+    for (auto [index, mapId] : llvm::enumerate(mappingIds)) {
+      workgroupCountOrdered[maxId - mapId] = workgroupCount[index];
+    }
+    workgroupCount = workgroupCountOrdered;
   }
 
   auto funcOp = forAllOp->getParentOfType<func::FuncOp>();
   if (failed(lowerWorkgroupCountFromBodySliceOp(rewriter, funcOp,
-                                                workgroupCountOrdered))) {
+                                                workgroupCount))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "failed to lower workgroup count region");
   }
