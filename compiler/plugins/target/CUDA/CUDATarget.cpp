@@ -639,25 +639,10 @@ class CUDATargetBackend final : public TargetBackend {
   const CUDAOptions &options;
 };
 
-// void registerCUDATargetBackends(const CUDAOptions &options) {
-//   static TargetBackendRegistration registration("cuda", [&]() {
-//     LLVMInitializeNVPTXTarget();
-//     LLVMInitializeNVPTXTargetMC();
-//     LLVMInitializeNVPTXTargetInfo();
-//     LLVMInitializeNVPTXAsmPrinter();
-//     return std::make_shared<CUDATargetBackend>(options);
-//   });
-// }
-
 namespace {
 struct CUDASession
     : public PluginSession<CUDASession, CUDAOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  // LogicalResult onActivate() override {
-  //   registerCUDATargetBackends(getOptions());
-  //   return success();
-  // }
-
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.device.target<"cuda", ...
     // #hal.executable.target<"cuda", ...
