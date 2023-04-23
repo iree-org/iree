@@ -596,7 +596,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
 // Exported pack function definitions
 //===----------------------------------------------------------------------===//
 
-IREE_VMVX_ABI_FIXED_STRUCT(pack_f, rIIIrIIIIIIIIfi, {
+IREE_VMVX_ABI_FIXED_STRUCT(pack, rIIIrIIIIIIIIIi, {
   iree_vm_ref_t in_ref;
   int64_t in_offset;
   int64_t in_stride0;
@@ -609,72 +609,13 @@ IREE_VMVX_ABI_FIXED_STRUCT(pack_f, rIIIrIIIIIIIIfi, {
   int64_t out_size1;
   int64_t out_size2;
   int64_t out_size3;
-  float padding_value;
+  uint64_t padding_value;
   uint32_t flags;
 });
-IREE_VMVX_ABI_DEFINE_SHIM(pack_f, v);
+IREE_VMVX_ABI_DEFINE_SHIM(pack, v);
 
-IREE_VMVX_ABI_FIXED_STRUCT(pack_i, rIIIrIIIIIIIIii, {
-  iree_vm_ref_t in_ref;
-  int64_t in_offset;
-  int64_t in_stride0;
-  iree_vm_ref_t out_ref;
-  int64_t out_offset;
-  int64_t out_stride0;
-  int64_t in_size0;
-  int64_t in_size1;
-  int64_t out_size0;
-  int64_t out_size1;
-  int64_t out_size2;
-  int64_t out_size3;
-  int32_t padding_value;
-  uint32_t flags;
-});
-IREE_VMVX_ABI_DEFINE_SHIM(pack_i, v);
-
-static iree_status_t iree_vmvx_pack_f(int in_elem_size, int out_elem_size,
-                                      const iree_vm_abi_pack_f_t* args) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_host_size_t out_tile_size = args->out_size2 * args->out_size3;
-  MAP_BUFFER_2D_UNTYPED_RO(in,
-                           /*dtype_size=*/in_elem_size,
-                           /*buffer_ref=*/args->in_ref,
-                           /*offset=*/args->in_offset,
-                           /*stride0=*/args->in_stride0,
-                           /*stride1=*/1,
-                           /*size0=*/args->in_size0,
-                           /*size1=*/args->in_size1);
-  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/out_elem_size,
-                           /*buffer_ref=*/args->out_ref,
-                           /*offset=*/args->out_offset,
-                           /*stride0=*/args->out_stride0,
-                           /*stride1=*/1,
-                           /*size0=*/args->out_size0,
-                           /*size1=*/args->out_size1 * out_tile_size);
-  uint32_t padding_value_bits_as_uint32;
-  memcpy(&padding_value_bits_as_uint32, &args->padding_value, sizeof(uint32_t));
-  iree_uk_pack_params_t ukernel_params = {
-      .in_buffer = in,
-      .out_buffer = out,
-      .in_stride0 = args->in_stride0,
-      .out_stride0 = args->out_stride0,
-      .in_size0 = args->in_size0,
-      .in_size1 = args->in_size1,
-      .out_size0 = args->out_size0,
-      .out_size1 = args->out_size1,
-      .out_size2 = args->out_size2,
-      .out_size3 = args->out_size3,
-      .padding_value = padding_value_bits_as_uint32,
-      .flags = args->flags,
-      .cpu_data = (const iree_uk_uint64_t*)iree_cpu_data_fields(),
-  };
-  iree_uk_pack(&ukernel_params);
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_vmvx_pack_i(int in_elem_size, int out_elem_size,
-                                      const iree_vm_abi_pack_i_t* args) {
+static iree_status_t iree_vmvx_pack(int in_elem_size, int out_elem_size,
+                                    const iree_vm_abi_pack_t* args) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_host_size_t out_tile_size = args->out_size2 * args->out_size3;
   MAP_BUFFER_2D_UNTYPED_RO(in,
@@ -712,16 +653,16 @@ static iree_status_t iree_vmvx_pack_i(int in_elem_size, int out_elem_size,
   return iree_ok_status();
 }
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_f32f32, pack_f, v) {
-  return iree_vmvx_pack_f(4, 4, args);
+IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_f32f32, pack, v) {
+  return iree_vmvx_pack(4, 4, args);
 }
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i8i8, pack_i, v) {
-  return iree_vmvx_pack_i(1, 1, args);
+IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i8i8, pack, v) {
+  return iree_vmvx_pack(1, 1, args);
 }
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i32i32, pack_i, v) {
-  return iree_vmvx_pack_i(4, 4, args);
+IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i32i32, pack, v) {
+  return iree_vmvx_pack(4, 4, args);
 }
 
 //===----------------------------------------------------------------------===//
