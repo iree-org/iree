@@ -115,16 +115,6 @@ function(iree_cc_library)
     list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
   endif()
 
-  # Find and add threads as dependency.
-  if(NOT ANDROID AND IREE_ENABLE_THREADING)
-    set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
-    set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-    find_package(Threads)
-    list(APPEND _RULE_DEPS Threads::Threads)
-  else()
-    # Android provides its own pthreads support with no linking required.
-  endif()
-
   if(NOT _RULE_IS_INTERFACE)
     add_library(${_OBJECTS_NAME} OBJECT)
     if(_RULE_SHARED OR BUILD_SHARED_LIBS)
@@ -203,6 +193,7 @@ function(iree_cc_library)
     target_link_libraries(${_NAME}
       PUBLIC
         ${_RULE_DEPS}
+        ${IREE_THREADS_DEPS}
     )
 
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
