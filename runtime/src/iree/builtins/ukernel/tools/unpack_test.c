@@ -8,6 +8,7 @@
 #include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/tools/test.h"
 #include "iree/builtins/ukernel/tools/util.h"
+#include "iree/builtins/ukernel/unpack_internal.h"
 
 static void iree_unpack_reference(const iree_uk_unpack_params_t* params) {
   // For now, the input and output element types are always the same.

@@ -4,9 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/pack.h"
-
-#include "iree/builtins/ukernel/pack_tile.h"
+#include "iree/builtins/ukernel/pack_internal.h"
 
 enum { iree_uk_pack_tmp_buf_size = 4096 };
 

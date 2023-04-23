@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_TOOLS_UTIL_H_
 #define IREE_BUILTINS_UKERNEL_TOOLS_UTIL_H_
 
-#include "iree/builtins/ukernel/common.h"
+#include "iree/builtins/ukernel/api.h"
 
 // Helper to determine the length of test buffers to allocate.
 iree_uk_ssize_t iree_uk_2d_buffer_length(iree_uk_type_t type,

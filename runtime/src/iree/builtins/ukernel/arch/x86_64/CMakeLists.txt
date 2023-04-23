@@ -74,7 +74,7 @@ iree_cc_library(
   HDRS
     "common_x86_64.h"
   DEPS
-    iree::builtins::ukernel::headers
+    iree::builtins::ukernel::internal_headers
     iree::schemas::cpu_data
 )
 
@@ -89,7 +89,7 @@ if(IREE_UK_BUILD_X86_64_AVX2_FMA)
     COPTS
       "${IREE_UK_COPTS_X86_64_AVX2_FMA}"
     DEPS
-      iree::builtins::ukernel::headers
+      iree::builtins::ukernel::internal_headers
   )
   list(APPEND IREE_UK_X86_64_DEPS "iree::builtins::ukernel::arch::x86_64::x86_64_avx2_fma")
 endif()
@@ -105,7 +105,7 @@ if(IREE_UK_BUILD_X86_64_AVX512_BASE)
     COPTS
       "${IREE_UK_COPTS_X86_64_AVX512_BASE}"
     DEPS
-      iree::builtins::ukernel::headers
+      iree::builtins::ukernel::internal_headers
   )
   list(APPEND IREE_UK_X86_64_DEPS "iree::builtins::ukernel::arch::x86_64::x86_64_avx512_base")
 endif()
@@ -119,7 +119,7 @@ if(IREE_UK_BUILD_X86_64_AVX512_VNNI)
     COPTS
       "${IREE_UK_COPTS_X86_64_AVX512_VNNI}"
     DEPS
-      iree::builtins::ukernel::headers
+      iree::builtins::ukernel::internal_headers
   )
   list(APPEND IREE_UK_X86_64_DEPS "iree::builtins::ukernel::arch::x86_64::x86_64_avx512_vnni")
 endif()
@@ -141,7 +141,7 @@ iree_cc_library(
   DEPS
     ::common_x86_64
     iree::base::core_headers
-    iree::builtins::ukernel::headers
+    iree::builtins::ukernel::internal_headers
     ${IREE_UK_X86_64_DEPS}
   PUBLIC
 )

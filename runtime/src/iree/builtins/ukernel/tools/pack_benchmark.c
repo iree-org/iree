@@ -9,6 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/builtins/ukernel/api.h"
+#include "iree/builtins/ukernel/pack_internal.h"
 #include "iree/builtins/ukernel/tools/benchmark.h"
 #include "iree/builtins/ukernel/tools/memcpy_benchmark.h"
 #include "iree/builtins/ukernel/tools/util.h"
