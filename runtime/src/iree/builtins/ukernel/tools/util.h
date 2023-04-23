@@ -27,6 +27,8 @@ static inline iree_uk_random_engine_t iree_uk_random_engine_init(void) {
   return (iree_uk_random_engine_t){.state = 1};
 }
 
+iree_uk_uint32_t iree_uk_random_engine_get_uint32(iree_uk_random_engine_t* e);
+iree_uk_uint64_t iree_uk_random_engine_get_uint64(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_0_65535(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_0_1(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_minus16_plus15(iree_uk_random_engine_t* e);

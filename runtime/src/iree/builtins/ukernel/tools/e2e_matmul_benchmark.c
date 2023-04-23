@@ -190,9 +190,6 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_stride = N1 * M0 * N0,
   };
 
-  char padding_value_buf[4] = {0};
-  IREE_UK_ASSERT(sizeof padding_value_buf >= iree_uk_type_size(out_type));
-
   iree_uk_pack_params_t pack_lhs_params = {
       .type = iree_uk_tie_2_types(lhs_type, lhs_type),
       .cpu_data = cpu_data,
@@ -205,7 +202,7 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size3 = K0,
       .in_stride0 = params->K,
       .out_stride0 = mmt4d_params.lhs_stride,
-      .padding_value = padding_value_buf,
+      .padding_value = 0,
   };
 
   iree_uk_pack_params_t pack_rhs_params = {
@@ -221,7 +218,7 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size3 = K0,
       .in_stride0 = params->N,
       .out_stride0 = mmt4d_params.rhs_stride,
-      .padding_value = padding_value_buf,
+      .padding_value = 0,
   };
 
   iree_uk_pack_params_t pack_out_params = {
@@ -236,7 +233,7 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size3 = N0,
       .in_stride0 = params->N,
       .out_stride0 = mmt4d_params.out_stride,
-      .padding_value = padding_value_buf,
+      .padding_value = 0,
   };
 
   iree_uk_unpack_params_t unpack_out_params = {

@@ -43,7 +43,17 @@ static void iree_pack_reference(const iree_uk_pack_params_t* params) {
           iree_uk_ssize_t i1 = outer_i1 * tile_size1 + tile_i1;
           char* out_ptr = ((char*)params->out_buffer) + out_offset * elem_size;
           if (i0 >= params->in_size0 || i1 >= params->in_size1) {
-            memcpy(out_ptr, params->padding_value, elem_size);
+            if (elem_size == 1) {
+              *(iree_uk_uint8_t*)out_ptr = params->padding_value;
+            } else if (elem_size == 2) {
+              *(iree_uk_uint16_t*)out_ptr = params->padding_value;
+            } else if (elem_size == 4) {
+              *(iree_uk_uint32_t*)out_ptr = params->padding_value;
+            } else {
+              for (iree_uk_ssize_t k = 0; k < elem_size; k += 8) {
+                *(iree_uk_uint64_t*)(out_ptr + k) = params->padding_value;
+              }
+            }
           } else {
             iree_uk_ssize_t in_offset = i1 + i0 * params->in_stride0;
             const char* in_ptr =
@@ -158,14 +168,8 @@ static void iree_uk_test_pack_for_tile_params(iree_uk_test_t* test,
             params.in_size1 = params.in_size1 - pad_size1;
             if (params.in_size1 < 0) params.in_size1 = 0;
           }
-          iree_uk_type_t out_type = iree_uk_pack_out_type(params.type);
-          int out_elem_size = iree_uk_type_size(out_type);
-          void* padding_value_buffer = malloc(out_elem_size);
-          iree_uk_write_random_buffer(padding_value_buffer, out_elem_size,
-                                      out_type, engine);
-          params.padding_value = padding_value_buffer;
+          params.padding_value = iree_uk_random_engine_get_uint64(engine);
           iree_uk_test_pack_for_shape_params(test, &params);
-          free(padding_value_buffer);
         }
       }
     }
