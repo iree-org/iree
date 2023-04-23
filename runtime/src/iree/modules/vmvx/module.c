@@ -793,10 +793,6 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_f32f32, unpack, v) {
   return iree_vmvx_unpack(iree_uk_unpack_type_f32f32, 4, 4, args);
 }
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i8i8, unpack, v) {
-  return iree_vmvx_unpack(iree_uk_unpack_type_i8i8, 1, 1, args);
-}
-
 IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i32i32, unpack, v) {
   return iree_vmvx_unpack(iree_uk_unpack_type_i32i32, 4, 4, args);
 }
