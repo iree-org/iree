@@ -423,7 +423,7 @@ class BenchmarkRun(object):
   - context: additional context returned by the benchmarking framework.
   - real_time: the real time latency statistics returned by the benchmarking
       framework.
-  - cpu_time: the cp time latency statistics returned by the benchmarking
+  - cpu_time: the cpu time latency statistics returned by the benchmarking
       framework.
   """
   benchmark_info: BenchmarkInfo
