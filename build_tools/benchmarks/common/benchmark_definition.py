@@ -17,7 +17,7 @@ import subprocess
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # A map from CPU ABI to IREE's benchmark target architecture.
 CPU_ABI_TO_TARGET_ARCH_MAP = {
@@ -413,9 +413,9 @@ class BenchmarkInfo:
 @dataclass
 class BenchmarkLatency:
   """Stores latency statistics for a benchmark run."""
-  mean: float
-  median: float
-  stddev: float
+  mean: int
+  median: int
+  stddev: int
   unit: str
 
   def to_json_object(self) -> Dict[str, Any]:
@@ -437,25 +437,22 @@ class BenchmarkLatency:
 
 
 @dataclass
-class BenchmarkRun(object):
-  """An object describing a single run of the benchmark binary.
+class BenchmarkMetrics(object):
+  """An object describing the results from a single benchmark.
 
-  - benchmark_info: a BenchmarkInfo object describing the benchmark setup.
-  - context: additional context and raw results returned by the benchmarking
-      framework.
+  - context: additional JSON-compatible context and raw results returned by the
+      benchmarking framework.
   - real_time: the real time latency statistics returned by the benchmarking
       framework.
   - cpu_time: the cpu time latency statistics returned by the benchmarking
       framework.
   """
-  benchmark_info: BenchmarkInfo
   context: Dict[str, Any]
   real_time: BenchmarkLatency
   cpu_time: BenchmarkLatency
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
-        "benchmark_info": self.benchmark_info.to_json_object(),
         "context": self.context,
         "real_time": self.real_time.to_json_object(),
         "cpu_time": self.cpu_time.to_json_object(),
@@ -466,11 +463,37 @@ class BenchmarkRun(object):
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return BenchmarkRun(
-        BenchmarkInfo.from_json_object(json_object["benchmark_info"]),
+    return BenchmarkMetrics(
         json_object["context"],
         BenchmarkLatency.from_json_object(json_object["real_time"]),
         BenchmarkLatency.from_json_object(json_object["cpu_time"]),
+    )
+
+
+@dataclass
+class BenchmarkRun(object):
+  """An object describing a single run of the benchmark binary.
+
+  - info: a BenchmarkInfo object describing the benchmark setup.
+  - metrics: a BenchmarkMetrics object containing the results of the benchmark.
+  """
+  info: BenchmarkInfo
+  metrics: BenchmarkMetrics
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "info": self.info.to_json_object(),
+        "metrics": self.metrics.to_json_object(),
+    }
+
+  def to_json_str(self) -> str:
+    return json.dumps(self.to_json_object())
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return BenchmarkRun(
+        BenchmarkInfo.from_json_object(json_object["info"]),
+        BenchmarkMetrics.from_json_object(json_object["metrics"]),
     )
 
 
@@ -483,8 +506,8 @@ class BenchmarkResults(object):
     """
 
   def __init__(self):
-    self.commit = "<unknown>"
-    self.benchmarks = []
+    self.commit: str = "<unknown>"
+    self.benchmarks: List[BenchmarkRun] = []
 
   def set_commit(self, commit: str):
     self.commit = commit

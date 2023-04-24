@@ -11,8 +11,9 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
-                                         BenchmarkLatency, BenchmarkRun,
-                                         DeviceInfo, get_google_benchmark_times)
+                                         BenchmarkLatency, BenchmarkMetrics,
+                                         BenchmarkRun, DeviceInfo,
+                                         get_google_benchmark_times)
 
 
 class BenchmarkDriver(object):
@@ -29,19 +30,17 @@ class BenchmarkDriver(object):
     self.benchmark_suite = benchmark_suite
     self.benchmark_grace_time = benchmark_grace_time
     self.verbose = verbose
-    self.finished_benchmarks: List[pathlib.Path] = []
+    self.finished_benchmarks: List[Tuple[BenchmarkInfo, pathlib.Path]] = []
     self.finished_captures: List[pathlib.Path] = []
     self.benchmark_errors = []
     self._seen_benchmark_names: Set[str] = set()
 
-  def run_benchmark_case(self, benchmark_info: BenchmarkInfo,
-                         benchmark_case: BenchmarkCase,
+  def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
     """Runs the benchmark case and serializes the results.
 
     Args:
-      benchmark_info: the benchmark info.
       benchmark_case: the benchmark_case.
       benchmark_results_filename: the path to store the serialized BenchmarkRun.
         Benchmarking is required if set.
@@ -99,7 +98,7 @@ class BenchmarkDriver(object):
         # files exist.
         if self.config.continue_from_previous:
           if results_path is not None and results_path.exists():
-            self.finished_benchmarks.append(results_path)
+            self.finished_benchmarks.append((benchmark_info, results_path))
             results_path = None
 
           if capture_path is not None and capture_path.exists():
@@ -113,8 +112,7 @@ class BenchmarkDriver(object):
         print(f"--> Benchmark started: {benchmark_name} <--")
 
         try:
-          self.run_benchmark_case(benchmark_info, benchmark_case, results_path,
-                                  capture_path)
+          self.run_benchmark_case(benchmark_case, results_path, capture_path)
         except Exception as e:
           # Delete unfinished results if they exist.
           # TODO(#11087): Use missing_ok=True once we move to Python 3.8.
@@ -136,7 +134,7 @@ class BenchmarkDriver(object):
         print("Benchmark completed")
 
         if results_path:
-          self.finished_benchmarks.append(results_path)
+          self.finished_benchmarks.append((benchmark_info, results_path))
         if capture_path:
           self.finished_captures.append(capture_path)
 
@@ -146,19 +144,20 @@ class BenchmarkDriver(object):
     results = BenchmarkResults()
     results.set_commit(self.config.git_commit_hash)
 
-    for path in self.finished_benchmarks:
-      benchmark_run_json_object = json.loads(path.read_text())
-      benchmark_run = BenchmarkRun.from_json_object(benchmark_run_json_object)
+    finished_benchmarks = sorted(self.finished_benchmarks,
+                                 key=lambda pair: str(pair[0]))
+    for info, path in finished_benchmarks:
+      benchmark_metrics_json_object = json.loads(path.read_text())
+      benchmark_run = BenchmarkRun(info=info,
+                                   metrics=BenchmarkMetrics.from_json_object(
+                                       benchmark_metrics_json_object))
       results.benchmarks.append(benchmark_run)
-
-    results.benchmarks = list(
-        sorted(results.benchmarks, key=lambda run: str(run.benchmark_info)))
 
     return results
 
   def get_benchmark_result_filenames(self) -> Sequence[pathlib.Path]:
     """Returns the json file paths of finished benchmarks."""
-    return self.finished_benchmarks
+    return [path for info, path in self.finished_benchmarks]
 
   def get_capture_filenames(self) -> Sequence[pathlib.Path]:
     """Returns the tracy file paths of finished captures."""
@@ -250,9 +249,9 @@ class BenchmarkDriver(object):
 
 class IreeBenchmarkDriver(BenchmarkDriver):
 
-  def _parse_and_serialize_benchmark_run(self, benchmark_info: BenchmarkInfo,
-                                         results_filename: pathlib.Path,
-                                         benchmark_stdout: str) -> BenchmarkRun:
+  def _parse_and_serialize_benchmark_metrics(
+      self, results_filename: pathlib.Path,
+      benchmark_stdout: str) -> BenchmarkMetrics:
     iree_benchmark_json = json.loads(benchmark_stdout)
     real_times = dict(unit="ns")
     cpu_times = dict(unit="ns")
@@ -260,12 +259,11 @@ class IreeBenchmarkDriver(BenchmarkDriver):
       real_times[metric], cpu_times[metric] = get_google_benchmark_times(
           iree_benchmark_json, metric)
 
-    benchmark_run = BenchmarkRun(
-        benchmark_info,
+    benchmark_metrics = BenchmarkMetrics(
         context=iree_benchmark_json,
         real_time=BenchmarkLatency.from_json_object(real_times),
         cpu_time=BenchmarkLatency.from_json_object(cpu_times),
     )
     with open(results_filename, "w") as f:
-      f.write(json.dumps(benchmark_run.to_json_object()))
-    return benchmark_run
+      f.write(json.dumps(benchmark_metrics.to_json_object()))
+    return benchmark_metrics

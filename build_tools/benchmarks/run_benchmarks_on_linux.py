@@ -28,8 +28,7 @@ from common.benchmark_definition import (execute_cmd,
                                          execute_cmd_and_get_output,
                                          get_git_commit_hash,
                                          get_iree_benchmark_module_arguments,
-                                         wait_for_iree_benchmark_module_start,
-                                         BenchmarkInfo)
+                                         wait_for_iree_benchmark_module_start)
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_framework.definitions import iree_definitions
 from e2e_test_framework import serialization
@@ -45,14 +44,12 @@ class LinuxBenchmarkDriver(IreeBenchmarkDriver):
     self.gpu_id = gpu_id
     super().__init__(*args, **kwargs)
 
-  def run_benchmark_case(self, benchmark_info: BenchmarkInfo,
-                         benchmark_case: BenchmarkCase,
+  def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
 
     if benchmark_results_filename:
-      self.__run_benchmark(benchmark_info=benchmark_info,
-                           benchmark_case=benchmark_case,
+      self.__run_benchmark(benchmark_case=benchmark_case,
                            results_filename=benchmark_results_filename)
 
     if capture_filename:
@@ -100,8 +97,7 @@ class LinuxBenchmarkDriver(IreeBenchmarkDriver):
 
     return cmds
 
-  def __run_benchmark(self, benchmark_info: BenchmarkInfo,
-                      benchmark_case: BenchmarkCase,
+  def __run_benchmark(self, benchmark_case: BenchmarkCase,
                       results_filename: pathlib.Path):
     if self.config.normal_benchmark_tool_dir is None:
       raise ValueError("normal_benchmark_tool_dir can't be None.")
@@ -120,10 +116,10 @@ class LinuxBenchmarkDriver(IreeBenchmarkDriver):
 
     benchmark_stdout = execute_cmd_and_get_output(
         cmd, cwd=benchmark_case.benchmark_case_dir, verbose=self.verbose)
-    benchmark_run = self._parse_and_serialize_benchmark_run(
-        benchmark_info, results_filename, benchmark_stdout)
+    benchmark_metrics = self._parse_and_serialize_benchmark_metrics(
+        results_filename, benchmark_stdout)
     if self.verbose:
-      print(benchmark_run)
+      print(benchmark_metrics)
 
   def __run_capture(self, benchmark_case: BenchmarkCase,
                     capture_filename: pathlib.Path):
@@ -201,7 +197,7 @@ def main(args):
 
   trace_capture_config = benchmark_config.trace_capture_config
   if trace_capture_config:
-    # Put all captures in a tarball and remove the origial files.
+    # Put all captures in a tarball and remove the original files.
     with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
       for capture_filename in benchmark_driver.get_capture_filenames():
         tar.add(capture_filename)

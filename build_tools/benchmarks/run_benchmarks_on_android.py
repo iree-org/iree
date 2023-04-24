@@ -47,8 +47,7 @@ from common.benchmark_definition import (DriverInfo, execute_cmd,
                                          execute_cmd_and_get_output,
                                          get_git_commit_hash,
                                          get_iree_benchmark_module_arguments,
-                                         wait_for_iree_benchmark_module_start,
-                                         BenchmarkInfo)
+                                         wait_for_iree_benchmark_module_start)
 from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
                                     BenchmarkSuite)
 from common.android_device_utils import (get_android_device_model,
@@ -183,8 +182,7 @@ class AndroidBenchmarkDriver(IreeBenchmarkDriver):
     super().__init__(*args, **kwargs)
     self.already_pushed_files = {}
 
-  def run_benchmark_case(self, benchmark_info: BenchmarkInfo,
-                         benchmark_case: BenchmarkCase,
+  def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
     benchmark_case_dir = benchmark_case.benchmark_case_dir
@@ -202,8 +200,7 @@ class AndroidBenchmarkDriver(IreeBenchmarkDriver):
     taskset = self.__deduce_taskset(benchmark_case.bench_mode)
 
     if benchmark_results_filename is not None:
-      self.__run_benchmark(benchmark_info=benchmark_info,
-                           android_case_dir=android_case_dir,
+      self.__run_benchmark(android_case_dir=android_case_dir,
                            tool_name=benchmark_case.benchmark_tool_name,
                            driver_info=benchmark_case.driver_info,
                            results_filename=benchmark_results_filename,
@@ -215,10 +212,9 @@ class AndroidBenchmarkDriver(IreeBenchmarkDriver):
                          capture_filename=capture_filename,
                          taskset=taskset)
 
-  def __run_benchmark(self, benchmark_info: BenchmarkInfo,
-                      android_case_dir: pathlib.PurePosixPath, tool_name: str,
-                      driver_info: DriverInfo, results_filename: pathlib.Path,
-                      taskset: str):
+  def __run_benchmark(self, android_case_dir: pathlib.PurePosixPath,
+                      tool_name: str, driver_info: DriverInfo,
+                      results_filename: pathlib.Path, taskset: str):
     if self.config.normal_benchmark_tool_dir is None:
       raise ValueError("normal_benchmark_tool_dir can't be None.")
 
@@ -238,10 +234,10 @@ class AndroidBenchmarkDriver(IreeBenchmarkDriver):
     benchmark_stdout = adb_execute_and_get_output(cmd,
                                                   android_case_dir,
                                                   verbose=self.verbose)
-    benchmark_run = self._parse_and_serialize_benchmark_run(
-        benchmark_info, results_filename, benchmark_stdout)
+    benchmark_metrics = self._parse_and_serialize_benchmark_metrics(
+        results_filename, benchmark_stdout)
     if self.verbose:
-      print(benchmark_run)
+      print(benchmark_metrics)
 
   def __run_capture(self, android_case_dir: pathlib.PurePosixPath,
                     tool_name: str, capture_filename: pathlib.Path,
@@ -390,7 +386,7 @@ def main(args):
     print(benchmark_results.benchmarks)
 
   if trace_capture_config:
-    # Put all captures in a tarball and remove the origial files.
+    # Put all captures in a tarball and remove the original files.
     with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
       for capture_filename in benchmark_driver.get_capture_filenames():
         tar.add(capture_filename)

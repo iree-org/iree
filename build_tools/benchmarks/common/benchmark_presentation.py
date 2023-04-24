@@ -272,14 +272,14 @@ def aggregate_all_benchmarks(
     for benchmark_index in range(len(file_results.benchmarks)):
       benchmark_run = file_results.benchmarks[benchmark_index]
 
-      series_name = str(benchmark_run.benchmark_info)
+      series_name = str(benchmark_run.info)
       # Make sure each benchmark has a unique name.
       if series_name in benchmark_names:
         raise ValueError(f"Duplicated benchmark name: {series_name}")
       benchmark_names.add(series_name)
 
       # TODO(#11076): Remove legacy path.
-      series_id = benchmark_run.benchmark_info.run_config_id
+      series_id = benchmark_run.info.run_config_id
       if series_id is None:
         series_id = series_name
 
@@ -288,10 +288,10 @@ def aggregate_all_benchmarks(
 
       aggregate_results[series_id] = AggregateBenchmarkLatency(
           name=series_name,
-          benchmark_info=benchmark_run.benchmark_info,
-          mean_time=benchmark_run.real_time.mean,
-          median_time=benchmark_run.real_time.median,
-          stddev_time=benchmark_run.real_time.stddev)
+          benchmark_info=benchmark_run.info,
+          mean_time=benchmark_run.metrics.real_time.mean,
+          median_time=benchmark_run.metrics.real_time.median,
+          stddev_time=benchmark_run.metrics.real_time.stddev)
 
   return aggregate_results
 
