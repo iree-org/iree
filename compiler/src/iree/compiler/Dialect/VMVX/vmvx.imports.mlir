@@ -472,7 +472,7 @@ vm.import private @pack.f32f32(
   %out_size1 : i64,
   %out_size2 : i64,
   %out_size3 : i64,
-  %padding_value : f32,
+  %padding_value : i64,
   %flags : i32
 )
 
@@ -489,7 +489,7 @@ vm.import private @pack.i8i8(
   %out_size1 : i64,
   %out_size2 : i64,
   %out_size3 : i64,
-  %padding_value : i32,
+  %padding_value : i64,
   %flags : i32
 )
 
@@ -506,7 +506,7 @@ vm.import private @pack.i32i32(
   %in_size3 : i64,
   %out_size0 : i64,
   %out_size1 : i64,
-  %padding_value : i32,
+  %padding_value : i64,
   %flags : i32
 )
 

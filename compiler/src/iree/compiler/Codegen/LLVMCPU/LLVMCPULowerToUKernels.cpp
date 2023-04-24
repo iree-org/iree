@@ -159,12 +159,38 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   }
 
   Location loc = op.getLoc();
-  Value paddingVal = op.getPaddingValue();
-  if (!paddingVal) {
-    paddingVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(inElemType), inElemType);
-  }
+  Type i64 = rewriter.getI64Type();
 
+  // The ukernel requires a padding value of type i64. When the element type is
+  // a narrower N-bit type, only the least significant N bits of the i64 padding
+  // value are used.
+  Value paddingVal = op.getPaddingValue();
+  // If the pack op didn't have a padding_value attribute, default to 0.
+  if (!paddingVal) {
+    paddingVal =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(i64), i64);
+  }
+  int paddingValBitWidth = paddingVal.getType().getIntOrFloatBitWidth();
+  // Non-integer element types get bitcast to integer of same bit width.
+  if (!paddingVal.getType().isSignlessInteger()) {
+    Type sameWidthIntType = rewriter.getIntegerType(paddingValBitWidth);
+    if (!sameWidthIntType) {
+      return rewriter.notifyMatchFailure(op, "no integer type with this width");
+    }
+    paddingVal =
+        rewriter.create<arith::BitcastOp>(loc, sameWidthIntType, paddingVal);
+  }
+  // Element types > 64bits could be supported, when the padding value is a
+  // repeating 64-bit pattern. For now, we leave this as not-yet-implemented.
+  if (paddingValBitWidth > 64) {
+    return rewriter.notifyMatchFailure(op,
+                                       "unsupported padding_value bit width");
+  }
+  // Integers narrower than 64 bit get extended to 64 bits, it doesn't matter
+  // how, as the high bits are unused.
+  if (paddingValBitWidth < 64) {
+    paddingVal = rewriter.create<arith::ExtUIOp>(loc, i64, paddingVal);
+  }
   Value in_size0 = rewriter.create<tensor::DimOp>(loc, in, 0);
   Value in_size1 = rewriter.create<tensor::DimOp>(loc, in, 1);
   Value out_size0 = rewriter.create<tensor::DimOp>(loc, out, 0);
