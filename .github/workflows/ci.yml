@@ -1093,8 +1093,10 @@ jobs:
           BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
           BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+          EXECUTION_BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ needs.execution_benchmarks.outputs.benchmark-config-gcs-artifact }}
           EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
-          COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
+          COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.benchmark-config-gcs-artifact }}
+          COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
         # Github markdown doesn't support non-http hyperlink
         # (https://github.com/github/markup/issues/933). So the GCS links are
         # shown as plaintext. If the job of an artifact is skipped or failed, we
@@ -1106,8 +1108,10 @@ jobs:
           - Compiler/host tools archive: \`${BUILD_DIR_GCS_ARTIFACT:-Not exists}\`
           - E2E test artifacts directory: \`${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR:-Not exists}\`
           - Benchmark tool binaries directory: \`${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR:-Not exists}\`
+          - Execution benchmark config: \`${EXECUTION_BENCHMARK_CONFIG_GCS_ARTIFACT:-Not exists}\`
           - Execution benchmark results/traces directory: \`${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR:-Not exists}\`
-          - Compilation statistics result: \`${COMPILE_STATS_RESULTS_GCS_ARTIFACT:-Not exists}\`
+          - Compilation benchmark config: \`${COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT:-Not exists}\`
+          - Compilation benchmark results: \`${COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT:-Not exists}\`
 
           You can list and download \`gs://\` URLs with [gcloud cli](
           https://cloud.google.com/sdk/gcloud/reference/storage).
