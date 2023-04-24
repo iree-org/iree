@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+if [ -z "$PYTHON_BIN_PATH" ]; then
+  PYTHON_BIN_PATH=$(which python3 || which python || true)
+fi
+CONFIGURE_DIR=$(dirname "$0")
+
+function ask_question() {
+  if [[ -z "$1" ]]; then
+    echo "\`ask_question\` received no argument"
+    exit 1
+  fi
+
+  while :
+  do
+    read -r -p "${1} " response
+
+    case "$response" in
+      [yY])
+          echo "1"
+          break
+          ;;
+      [nN])
+          echo "0"
+          break
+          ;;
+      *)
+          echo "Incorrect input received: \`${response}\`. Expected: 'Y' or 'N'"
+          ;;
+    esac
+  done
+}
+
+# ====================== VSCode Development Container ======================= #
+
+response=$(ask_question 'Do you wish to configure VS Code Dev Container [y/N]?')
+if [[ ${response} -eq "1" ]]; then
+  "$PYTHON_BIN_PATH" "${CONFIGURE_DIR}/.devcontainer/configure.py" "$@"
+fi
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
+
+echo "Configuration finished"
