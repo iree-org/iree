@@ -12,7 +12,7 @@ from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
                                          BenchmarkLatency, BenchmarkRun,
-                                         DeviceInfo)
+                                         DeviceInfo, get_google_benchmark_times)
 
 
 class BenchmarkDriver(object):
@@ -257,7 +257,7 @@ class IreeBenchmarkDriver(BenchmarkDriver):
     real_times = dict(unit="ns")
     cpu_times = dict(unit="ns")
     for metric in ["mean", "median", "stddev"]:
-      real_times[metric], cpu_times[metric] = self._get_aggregate_time(
+      real_times[metric], cpu_times[metric] = get_google_benchmark_times(
           iree_benchmark_json, metric)
 
     benchmark_run = BenchmarkRun(
@@ -269,23 +269,3 @@ class IreeBenchmarkDriver(BenchmarkDriver):
     with open(results_filename, "w") as f:
       f.write(json.dumps(benchmark_run.to_json_object()))
     return benchmark_run
-
-  def _get_aggregate_time(self, benchmark_json: Dict[str, Any],
-                          metric: str) -> Tuple[int, int]:
-    """Returns the Google Benchmark aggregate times for the given metric.
-
-      Args:
-      - benchmark_index: the benchmark's index.
-      - metric: what kind of aggregate time to get; choices:
-        'mean', 'median', 'stddev'.
-      Returns:
-        Real time and CPU time in nanoseconds.
-      """
-    for bench_case in benchmark_json["benchmarks"]:
-      if bench_case["name"].endswith(f"real_time_{metric}"):
-        if bench_case["time_unit"] != "ns":
-          raise ValueError(f"Expected ns as time unit")
-        real_time = int(round(bench_case["real_time"]))
-        cpu_time = int(round(bench_case["cpu_time"]))
-        return real_time, cpu_time
-    raise ValueError(f"Cannot found real_time_{metric} in benchmark results")
