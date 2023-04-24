@@ -77,6 +77,35 @@ static int simple_mul_workgroup(void* context, void* params_ptr,
   return 0;
 }
 
+static int simple_mul_workgroup_ukernel(void* context, void* params_ptr,
+                                        void* reserved) {
+  typedef struct {
+    const float* restrict binding0;
+    size_t binding0_offset;
+    const float* restrict binding1;
+    size_t binding1_offset;
+    float* restrict binding2;
+    size_t binding2_offset;
+    size_t size;
+    size_t tid;
+  } params_t;
+  const params_t* params = (const params_t*)params_ptr;
+  // The operation `iree_codegen.ukernel.generic` always operates
+  // on a slice of the inputs to produce a slice of the output,
+  // so the loop here just needs to iterate from `0` to `size`,
+  // where `size` is the size of the slice to be executed by this call.
+  for (size_t i = 0; i < params->size; ++i) {
+    // The operation `iree_codegen.ukernel.generic` takes a slice of
+    // the inputs and outputs as operands. So the `pointer` and `offset`
+    // passed into this function represent the starting location of
+    // where to read the data from for this invocation of the function.
+    params->binding2[params->binding2_offset + i] =
+        params->binding0[params->binding0_offset + i] *
+        params->binding1[params->binding2_offset + i];
+  }
+  return 0;
+}
+
 // Called once for each plugin load and paired with a future call to unload.
 // We don't do anything special here as this plugin is meant to represent a
 // pure/stateless kernel library. Even in standalone mode we could allocate
@@ -116,6 +145,10 @@ static iree_hal_executable_plugin_status_t standalone_plugin_resolve(
     if (iree_hal_executable_plugin_strcmp(symbol_name,
                                           "simple_mul_workgroup") == 0) {
       params->out_fn_ptrs[i] = simple_mul_workgroup;
+      params->out_fn_contexts[i] = NULL;  // no context used, could be self
+    } else if (iree_hal_executable_plugin_strcmp(
+                   symbol_name, "simple_mul_workgroup_ukernel") == 0) {
+      params->out_fn_ptrs[i] = simple_mul_workgroup_ukernel;
       params->out_fn_contexts[i] = NULL;  // no context used, could be self
     } else {
       if (is_optional) {

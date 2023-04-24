@@ -1,7 +1,7 @@
 // RUN: iree-compile --iree-hal-target-backends=llvm-cpu %s | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
-// RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/system_ukernel$IREE_DYLIB_EXT \
+// RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/system_plugin$IREE_DYLIB_EXT \
 // RUN:     --function=ukernel_example \
 // RUN:     --input=8xf32=2 \
 // RUN:     --input=8xf32=4 | \
@@ -45,10 +45,10 @@ func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tens
     %3 = tensor.extract_slice %dest[%offset] [%size] [1] : tensor<?xf32> to tensor<?xf32>
 
     // Invoke the ukernel.
-    %4 = iree_codegen.ukernel.generic "simple_mul_workgroup"
+    %4 = iree_codegen.ukernel.generic "simple_mul_workgroup_ukernel"
       ins(%1, %2 : tensor<?xf32>, tensor<?xf32>)
       outs(%3 : tensor<?xf32>)
-      (%size, %id : index, index) -> tensor<?xf32>
+      (%size, %id : index, index) strided_outer_dims(0) -> tensor<?xf32>
 
     // Insert the result back into the result at the right position.
     %5 = tensor.insert_slice %4 into %dest[%offset] [%size] [1] : tensor<?xf32> into tensor<?xf32>

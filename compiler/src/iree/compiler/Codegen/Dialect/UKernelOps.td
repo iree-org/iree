@@ -61,8 +61,8 @@ def IREECodegen_UKernelGenericOp :
     attr-dict $u_kernel_fn_name
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     (`outs` `(` $outputs^  `:` type($outputs) `)`)?
-    (`(` $other_operands^ `:` type($other_operands) `)`)? (`->` type($results)^)?
-    (`strided_outer_dims` `(` $strided_outer_dims^ `)`)?
+    (`(` $other_operands^ `:` type($other_operands) `)`)?
+    (`strided_outer_dims` `(` $strided_outer_dims^ `)`)? (`->` type($results)^)?
   }];
 }
 
