@@ -1087,3 +1087,31 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           description: "The following jobs failed: ${{ steps.failed_jobs.outputs.failed-jobs }}"
+      - name: Show useful artifact links
+        if: always()
+        env:
+          BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+          E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
+          EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
+          COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
+        # Github markdown doesn't support non-http hyperlink
+        # (https://github.com/github/markup/issues/933). So the GCS links are
+        # shown as plaintext. If the job of an artifact is skipped or failed, we
+        # show "Not exists" in the link.
+        run: |
+          cat <<EOF >> "${GITHUB_STEP_SUMMARY}"
+          ### :link: Artifact Links
+
+          - Compiler/host tools archive: \`${BUILD_DIR_GCS_ARTIFACT:-Not exists}\`
+          - E2E test artifacts directory: \`${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR:-Not exists}\`
+          - Benchmark tool binaries directory: \`${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR:-Not exists}\`
+          - Execution benchmark results/traces directory: \`${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR:-Not exists}\`
+          - Compilation statistics result: \`${COMPILE_STATS_RESULTS_GCS_ARTIFACT:-Not exists}\`
+
+          You can list and download \`gs://\` URLs with [gcloud cli](
+          https://cloud.google.com/sdk/gcloud/reference/storage).
+
+          To run benchmarks locally with the CI-built E2E test artifacts, see [IREE Benchmark Suites](
+          https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/developers/developing_iree/benchmark_suites.md).
+          EOF
