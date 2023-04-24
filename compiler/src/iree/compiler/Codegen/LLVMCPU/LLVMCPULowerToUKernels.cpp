@@ -170,24 +170,26 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     paddingVal =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(i64), i64);
   }
+  int paddingValBitWidth = paddingVal.getType().getIntOrFloatBitWidth();
+  // Non-integer element types get bitcast to integer of same bit width.
+  if (!paddingVal.getType().isSignlessInteger()) {
+    Type sameWidthIntType = rewriter.getIntegerType(paddingValBitWidth);
+    if (!sameWidthIntType) {
+      return rewriter.notifyMatchFailure(op, "no integer type with this width");
+    }
+    paddingVal =
+        rewriter.create<arith::BitcastOp>(loc, sameWidthIntType, paddingVal);
+  }
   // Element types > 64bits could be supported, when the padding value is a
   // repeating 64-bit pattern. For now, we leave this as not-yet-implemented.
-  int paddingValBitWidth = paddingVal.getType().getIntOrFloatBitWidth();
   if (paddingValBitWidth > 64) {
     return rewriter.notifyMatchFailure(op,
                                        "unsupported padding_value bit width");
   }
-  // Non-integer element types get bitcast to integer of same bit width.
-  if (!paddingVal.getType().isSignlessInteger()) {
-    Type sameWidthIntType = rewriter.getIntegerType(paddingValBitWidth);
-    paddingVal =
-        rewriter.create<arith::BitcastOp>(loc, sameWidthIntType, paddingVal);
-  }
   // Integers narrower than 64 bit get extended to 64 bits, it doesn't matter
   // how, as the high bits are unused.
   if (paddingValBitWidth < 64) {
-    paddingVal =
-        rewriter.create<arith::ExtUIOp>(loc, rewriter.getI64Type(), paddingVal);
+    paddingVal = rewriter.create<arith::ExtUIOp>(loc, i64, paddingVal);
   }
   Value in_size0 = rewriter.create<tensor::DimOp>(loc, in, 0);
   Value in_size1 = rewriter.create<tensor::DimOp>(loc, in, 1);
