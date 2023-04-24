@@ -2037,11 +2037,11 @@ static LogicalResult setTranslationInfoAndRootConfig(
     }
   }
 
-  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
+  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
     return failure();
   }
 
-  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
+  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
     return failure();
   }
 
