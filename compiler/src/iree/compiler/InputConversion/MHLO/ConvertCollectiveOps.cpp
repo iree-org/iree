@@ -145,10 +145,6 @@ static LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
       return rewriter.notifyMatchFailure(
           op, "must not set use_global_device_ids when channel_id <= 0");
     }
-  } else {
-    if (!op.getUseGlobalDeviceIds()) {
-      return rewriter.notifyMatchFailure(op, "must set use_global_device_ids");
-    }
   }
 
   return success();
@@ -212,6 +208,128 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
   return std::make_pair(color, key);
 }
 
+static StringAttr convertToRankGroupsByFlattening(DenseIntElementsAttr groups) {
+  if (!groups) return StringAttr();
+
+  auto groupsType = groups.getType().cast<RankedTensorType>();
+  assert(groupsType.getRank() == 2);
+  int rows = groupsType.getShape()[0];
+  int cols = groupsType.getShape()[1];
+  auto values = groups.getValues<int64_t>();
+
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  bool firstGroup = true;
+  for (int i = 0; i < rows; ++i) {
+    if (!firstGroup) {
+      os << ',';
+    }
+    os << '(';
+    bool firstItem = true;
+    for (int j = 0; j < cols; ++j) {
+      const int index = i * cols + j;
+      int64_t value = values[index];
+      // -1 represents a null value in a group, where the group does not
+      // fully occupy the space in the row, e.g., [[0,1,2,3], [4,5,-1,-1]].
+      if (value != -1) {
+        // When there was a value before, put a comma.
+        if (!firstItem) {
+          os << ',';
+        }
+        os << value;
+        firstItem = false;
+      }
+    }
+    os << ')';
+    firstGroup = false;
+  }
+  return StringAttr::get(groups.getContext(), str);
+}
+
+static StringAttr convertToRankGroupsByCrossReplica(
+    DenseIntElementsAttr replicaGroups, int32_t numPartitions) {
+  if (numPartitions < 1) numPartitions = 1;
+
+  auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
+  assert(groupsType.getRank() == 2);
+  int rows = groupsType.getShape()[0];
+  int cols = groupsType.getShape()[1];
+  auto values = replicaGroups.getValues<int64_t>();
+
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  bool firstGroup = true;
+  for (int i = 0; i < rows; ++i) {
+    for (int p = 0; p < numPartitions; ++p) {
+      if (!firstGroup) {
+        os << ',';
+      }
+      os << '(';
+      bool firstItem = true;
+      for (int j = 0; j < cols; ++j) {
+        const int index = i * cols + j;
+        const int64_t replicaId = values[index];
+        if (replicaId != -1) {
+          // -1 represents a null value in a group, where the group does not
+          // fully occupy the space in the row, e.g., [[0,1,2,3], [4,5,-1,-1]].
+          const int64_t value = replicaId * numPartitions + p;
+          // When there was a value before, put a comma.
+          if (!firstItem) {
+            os << ',';
+          }
+          os << value;
+          firstItem = false;
+        }
+      }
+      os << ')';
+      firstGroup = false;
+    }
+  }
+  return StringAttr::get(replicaGroups.getContext(), str);
+}
+
+static StringAttr convertToRankGroupsByCrossReplicaAndPartition(
+    DenseIntElementsAttr replicaGroups, int32_t numPartitions) {
+  if (numPartitions < 1) numPartitions = 1;
+
+  auto groupsType = replicaGroups.getType().cast<RankedTensorType>();
+  assert(groupsType.getRank() == 2);
+  int rows = groupsType.getShape()[0];
+  int cols = groupsType.getShape()[1];
+  auto values = replicaGroups.getValues<int64_t>();
+
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  bool firstGroup = true;
+  for (int i = 0; i < rows; ++i) {
+    if (!firstGroup) {
+      os << ',';
+    }
+    os << '(';
+    bool firstItem = true;
+    for (int p = 0; p < numPartitions; ++p) {
+      for (int j = 0; j < cols; ++j) {
+        const int index = i * cols + j;
+        const int64_t replicaId = values[index];
+        if (replicaId != -1) {
+          // -1 represents a null value in a group, where the group does not
+          // fully occupy the space in the row, e.g., [[0,1,2,3], [4,5,-1,-1]].
+          const int64_t value = replicaId * numPartitions + p;
+          // When there was a value before, put a comma.
+          if (!firstItem) {
+            os << ',';
+          }
+          os << value;
+          firstItem = false;
+        }
+      }
+    }
+    os << ')';
+    firstGroup = false;
+  }
+  return StringAttr::get(replicaGroups.getContext(), str);
+}
+
 /// Creates a channel matching the given |channelHandleAttr| scoped to the
 /// requested group.
 static Value createChannelWithGroupInfo(
@@ -219,34 +337,41 @@ static Value createChannelWithGroupInfo(
     int32_t numReplicas, int32_t numPartitions,
     DenseIntElementsAttr replicaGroups, bool useGlobalDeviceIds,
     OpBuilder &builder) {
+  // Set numPartitions to 1 if not set by the user.
+  if (numPartitions == -1) numPartitions = 1;
+
   // Base channel that may be split by the group info.
   Value baseChannel =
       builder.create<IREE::Flow::ChannelDefaultOp>(loc, /*group=*/StringAttr{});
 
-  // TODO(okkwon): Convert replica_groups into flattened IDs.
-  //
-  // Once mhlo exposes `num_replicas` and `num_partitions`,
-  // use the channel ID to determine the collective operation mode, such as
-  // cross_replica, cross_partition, cross_replic_and_partition, and
-  // flattend_ids. Currently, we only supports the flanttend_ids mode.
-  //
-  // int64_t channelId = 0;
-  // if (channelHandleAttr) {
-  //   channelId = channelHandleAttr.getHandle();
-  // }
-
   // No need to split if there is a single group.
   ShapedType replicaGroupType = replicaGroups.getType();
   assert(replicaGroupType.getRank() == 2);
-  if (replicaGroupType.getDimSize(0) == 1) {
+  if (numPartitions == 1 && replicaGroupType.getDimSize(0) == 1) {
     return baseChannel;
+  }
+
+  // Convert replica_groups into flattened IDs.
+  DenseIntElementsAttr rankGroups;
+  int64_t channelId = channelHandleAttr ? channelHandleAttr.getHandle() : 0;
+  if (channelId <= 0) {
+    assert(!useGlobalDeviceIds);
+    rankGroups =
+        convertToRankGroupsByCrossReplica(replicaGroups, numPartitions);
+  } else {
+    if (useGlobalDeviceIds) {
+      rankGroups = convertToRankGroupsByFlattening(replicaGroups);
+    } else {
+      rankGroups = convertToRankGroupsByCrossReplicaAndPartition(replicaGroups,
+                                                                 numPartitions);
+    }
   }
 
   // Construct lookups for color and key split parameters.
   // Note that `replica_groups` can be interpreted in multiple ways based on the
   // other attributes.
   auto [color, key] =
-      makeSplitColorAndKey(loc, baseChannel, replicaGroups, builder);
+      makeSplitColorAndKey(loc, baseChannel, rankGroups, builder);
 
   // Split the channel. Note that this is an expensive operation.
   return builder.create<IREE::Flow::ChannelSplitOp>(loc, baseChannel, color,
