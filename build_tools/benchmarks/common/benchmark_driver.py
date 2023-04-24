@@ -42,8 +42,8 @@ class BenchmarkDriver(object):
 
     Args:
       benchmark_case: the benchmark_case.
-      benchmark_results_filename: the path to store the serialized BenchmarkRun.
-        Benchmarking is required if set.
+      benchmark_results_filename: the path to store the serialized
+        BenchmarkMetrics. Benchmarking is required if set.
       capture_filename: the path to store captured trace. Trace capturing is
         required if set.
 

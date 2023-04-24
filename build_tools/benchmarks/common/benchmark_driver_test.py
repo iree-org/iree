@@ -15,8 +15,8 @@ from common import benchmark_config
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (IREE_DRIVERS_INFOS, DeviceInfo,
-                                         PlatformType, BenchmarkInfo,
-                                         BenchmarkLatency, BenchmarkMetrics)
+                                         PlatformType, BenchmarkLatency,
+                                         BenchmarkMetrics)
 
 
 class FakeBenchmarkDriver(BenchmarkDriver):
@@ -29,8 +29,7 @@ class FakeBenchmarkDriver(BenchmarkDriver):
     self.raise_exception_on_case = raise_exception_on_case
     self.run_benchmark_cases = []
 
-  def run_benchmark_case(self, benchmark_info: BenchmarkInfo,
-                         benchmark_case: BenchmarkCase,
+  def run_benchmark_case(self, benchmark_case: BenchmarkCase,
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
     if (self.raise_exception_on_case is not None and
