@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     WGSL
   SRCS
+    "WGSLExpandExtendedMultiplication.cpp"
     "WGSLReplacePushConstants.cpp"
   DEPS
     MLIRArithDialect

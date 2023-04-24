@@ -15,6 +15,7 @@ package(
 iree_compiler_cc_library(
     name = "WGSL",
     srcs = [
+        "WGSLExpandExtendedMultiplication.cpp",
         "WGSLReplacePushConstants.cpp",
     ],
     deps = [

@@ -218,6 +218,7 @@ VULKAN_SRCS = enforce_glob(
         "max_pool.mlir",
         "maximum.mlir",
         "minimum.mlir",
+        "mul_shift.mlir",
         "mul.mlir",
         "negate.mlir",
         "pad.mlir",
@@ -236,7 +237,6 @@ VULKAN_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "logical_right_shift_16.mlir",  # TODO(#11828)
-        "mul_shift.mlir",  # TODO(#11571)
     ],
 )
 
