@@ -110,6 +110,19 @@ static LogicalResult verifyLoweringConfiguration(
   return failure(walkResult.wasInterrupted());
 }
 
+static bool hasPackMatmulLhsOp(ModuleOp moduleOp) {
+  bool hasPackMatmulLhsOp = false;
+  moduleOp.walk([&](tensor::PackOp op) {
+    if (op.getSourceRank() == 2 && op.getInnerDimsPos().size() == 2 &&
+        op.getInnerDimsPos()[0] == 0 && op.getInnerDimsPos()[1] == 1) {
+      hasPackMatmulLhsOp = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return hasPackMatmulLhsOp;
+}
+
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
@@ -185,6 +198,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
       auto target = variantOp.getTarget();
       bool lowerToAVX2 = hasAVX2Feature(target);
+      bool lowerTransposeToShuffle16x16 =
+          hasAVX512fFeature(target) && hasPackMatmulLhsOp(moduleOp);
       bool enableVectorMasking =
           isX86(target) || isRISCV(target) ||
           (isAArch64(target) && hasAnySVEFeature(target));
@@ -205,7 +220,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline,
                 static_cast<int>(TilingLevel::NumTileLevels),
-                /*enablePeeling=*/false, enableVectorMasking, lowerToAVX2);
+                /*enablePeeling=*/false, enableVectorMasking, lowerToAVX2,
+                lowerTransposeToShuffle16x16);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingPadExpert:
@@ -217,7 +233,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addMultiTilingExpertPassPipeline(
                 executableLoweringPipeline,
                 static_cast<int>(TilingLevel::NumTileLevels),
-                /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2);
+                /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2,
+                lowerTransposeToShuffle16x16);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
@@ -229,7 +246,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                                              enableMicrokernels);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling:
-            addCPUDataTilingPipeline(executableLoweringPipeline);
+            addCPUDataTilingPipeline(executableLoweringPipeline,
+                                     lowerTransposeToShuffle16x16);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
             addVMVXDefaultPassPipeline(executableLoweringPipeline,

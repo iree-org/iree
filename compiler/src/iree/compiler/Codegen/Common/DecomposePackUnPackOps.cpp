@@ -14,6 +14,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
@@ -56,6 +57,58 @@ struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
       return rewriter.notifyMatchFailure(
           op, "cannot lower to empty + transpose + reshape + extract_slice");
     }
+    return success();
+  }
+};
+
+/// Folding trailing unit dims away from transpose op if they are not
+/// transposed. The decomposition stage is close to vectorization, this avoids
+/// trailing unit dims at vector types. It does not trigger issues at vector
+/// level because all the elements in a inner tiles are batch-handled. The
+/// strides of outer dims are still the same.
+struct FoldTrailingUnitTranspose
+    : public OpRewritePattern<linalg::TransposeOp> {
+  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::TransposeOp op,
+                                PatternRewriter &rewriter) const override {
+    auto inputTy = op.getInput().getType().cast<ShapedType>();
+    if (!inputTy.hasStaticShape()) return failure();
+    int numDropDims = 0;
+    ArrayRef<int64_t> perm = op.getPermutation();
+    for (int idx = inputTy.getRank() - 1; idx >= 0; idx--) {
+      if (idx != perm[idx] || inputTy.getDimSize(idx) != 1) break;
+      numDropDims++;
+    }
+    if (numDropDims == 0) return failure();
+
+    Location loc = op.getLoc();
+    SmallVector<OpFoldResult> srcMixedSizes =
+        tensor::createDimValues(rewriter, loc, op.getInput());
+    SmallVector<OpFoldResult> mixedStride(inputTy.getRank(),
+                                          rewriter.getIndexAttr(1));
+    SmallVector<OpFoldResult> mixedOffsets(inputTy.getRank(),
+                                           rewriter.getIndexAttr(0));
+    auto src = rewriter.create<tensor::ExtractSliceOp>(
+        loc,
+        RankedTensorType::get(inputTy.getShape().drop_back(numDropDims),
+                              inputTy.getElementType()),
+        op.getInput(), mixedOffsets, srcMixedSizes, mixedStride);
+
+    SmallVector<OpFoldResult> destMixedSizes =
+        tensor::createDimValues(rewriter, loc, op.getInit());
+    auto initTy = op.getInit().getType().cast<ShapedType>();
+    destMixedSizes.resize(initTy.getRank() - numDropDims);
+    auto dest = rewriter.create<tensor::EmptyOp>(loc, destMixedSizes,
+                                                 initTy.getElementType());
+    auto transp = rewriter.create<linalg::TransposeOp>(
+        loc, src, dest, perm.drop_back(numDropDims));
+    destMixedSizes.resize(initTy.getRank(), rewriter.getIndexAttr(1));
+    auto insertSliceOp = rewriter.create<tensor::InsertSliceOp>(
+        loc, transp.getResult()[0], op.getInit(), mixedOffsets, destMixedSizes,
+        mixedStride);
+    rewriter.replaceOp(op, insertSliceOp.getResult());
+
     return success();
   }
 };
@@ -194,6 +247,28 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       return signalPassFailure();
     }
   }
+
+  LLVM_DEBUG({
+    llvm::dbgs()
+        << "--- After generalizing tensor.pack and tensor.unpack ops ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
+  // Fold trailing unit dims away for linalg.transpose ops.
+  {
+    RewritePatternSet patterns(ctx);
+    patterns.add<FoldTrailingUnitTranspose>(ctx);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "--- After unit dims away ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

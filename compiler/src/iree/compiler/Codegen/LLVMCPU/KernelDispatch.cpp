@@ -1143,6 +1143,11 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
   return workgroupTileSizes;
 }
 
+static bool isPackMatmulLHS(tensor::PackOp op) {
+  return op.getSourceRank() == 2 && op.getInnerDimsPos().size() == 2 &&
+         op.getInnerDimsPos()[0] == 0 && op.getInnerDimsPos()[1] == 1;
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
@@ -1161,6 +1166,12 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   }
 
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
+  if (hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
+    tileSizes.back() = vectorSize;
+  }
+
   TileSizesListType tileSizesList = {distTileSizes};
   tileSizesList.push_back(tileSizes);
 

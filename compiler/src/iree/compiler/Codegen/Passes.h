@@ -349,6 +349,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorizationPass(
 struct LLVMCPUVectorLoweringPassOptions {
   std::string splitVectorTransfersTo = "";
   bool lowerVectorTransposeToAVX2 = false;
+  std::string lowerVectorTransposeTo = "shuffle_1d";
 };
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
@@ -416,7 +417,8 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes to lower ops through data tiling transformations.
-void addCPUDataTilingPipeline(OpPassManager &passManager);
+void addCPUDataTilingPipeline(OpPassManager &passManager,
+                              bool lowerTransposeToShuffle16x16);
 
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.
@@ -446,7 +448,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
                                       int64_t numLevels, bool enablePeeling,
                                       bool enableVectorMasking,
-                                      bool lowerToAVX2);
+                                      bool lowerToAVX2,
+                                      bool lowerTransposeToShuffle16x16);
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
                                           bool enableVectorMasking);
 

@@ -236,11 +236,12 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK:          %[[RES1:.+]] = scf.for %[[J:.+]] = %[[C0]] to %[[D1]] step %[[C1]]
 // CHECK:            %[[IN_I:.+]] = affine.apply #[[MAP]](%[[I]])
 // CHECK:            %[[IN_TILE:.+]] = tensor.extract_slice %[[IN]][%[[IN_I]], %[[J]]] [16, 1] [1, 1]
-// CHECK:            %[[EMPTY:.+]] = tensor.empty() : tensor<16x1xf32>
+// CHECK:            %[[IN_TILE_2:.+]] = tensor.extract_slice %[[IN_TILE]][0, 0] [16, 1] [1, 1] : tensor<16x1xf32> to tensor<16xf32>
+// CHECK:            %[[EMPTY:.+]] = tensor.empty() : tensor<16xf32>
 // CHECK:            %[[TRANSP:.+]] = linalg.transpose
-// CHECK-SAME:         ins(%[[IN_TILE]] : tensor<16x1xf32>)
-// CHECK-SAME:         outs(%[[EMPTY]] : tensor<16x1xf32>)
-// CHECK-SAME:         permutation = [0, 1]
+// CHECK-SAME:         ins(%[[IN_TILE_2]] : tensor<16xf32>)
+// CHECK-SAME:         outs(%[[EMPTY]] : tensor<16xf32>)
+// CHECK-SAME:         permutation = [0]
 
 // -----
 

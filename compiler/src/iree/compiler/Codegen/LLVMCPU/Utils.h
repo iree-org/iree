@@ -29,6 +29,9 @@ bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature);
 /// Returns true if the 'targetAttr' contains '+avx2' in its cpu features.
 bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+/// Returns true if the 'targetAttr' contains '+avx512f' in its cpu features.
+bool hasAVX512fFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 /// Returns true if the 'targetAttr' contains '+v' in its cpu features.
 bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
