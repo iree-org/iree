@@ -68,6 +68,9 @@ iree_lit_test_suite(
             "vectorize_reduction.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "transform_dialect_dummy_spec.mlir",
+        ],
     ),
     cfg = "//compiler:lit.cfg.py",
     data = [
