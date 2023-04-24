@@ -35,12 +35,14 @@ static void iree_unpack_reference(const iree_uk_unpack_params_t* params) {
       for (iree_uk_ssize_t tile_i0 = 0; tile_i0 < tile_size0; ++tile_i0) {
         for (iree_uk_ssize_t tile_i1 = 0; tile_i1 < tile_size1; ++tile_i1) {
           iree_uk_ssize_t in_offset =
-              outer_i0 * in_stride_outer0 + tile_i0 * in_stride_tile0 +
-              outer_i1 * in_stride_outer1 + tile_i1 * in_stride_tile1;
+              params->in_offset + outer_i0 * in_stride_outer0 +
+              tile_i0 * in_stride_tile0 + outer_i1 * in_stride_outer1 +
+              tile_i1 * in_stride_tile1;
           iree_uk_ssize_t i0 = outer_i0 * tile_size0 + tile_i0;
           iree_uk_ssize_t i1 = outer_i1 * tile_size1 + tile_i1;
           if (!(i0 >= params->out_size0 || i1 >= params->out_size1)) {
-            iree_uk_ssize_t out_offset = i1 + i0 * params->out_stride0;
+            iree_uk_ssize_t out_offset =
+                params->out_offset + i1 + i0 * params->out_stride0;
             const char* in_ptr =
                 ((char*)params->in_buffer) + in_offset * elem_size;
             char* out_ptr =
@@ -68,34 +70,42 @@ static void iree_uk_test_unpack_for_shape_params(
       iree_uk_2d_buffer_length(in_type, params.in_size0, params.in_stride0);
   void* in_buffer = malloc(in_buffer_size);
   iree_uk_write_random_buffer(in_buffer, in_buffer_size, in_type, engine);
-  params.in_buffer = in_buffer;
+  params.in_offset = iree_uk_random_engine_get_0_65535(engine);
+  params.out_offset = iree_uk_random_engine_get_0_65535(engine);
+  params.in_buffer =
+      (const char*)in_buffer - (params.in_offset * iree_uk_type_size(in_type));
 
   iree_uk_unpack_params_t reference_params;
   memcpy(&reference_params, &params, sizeof reference_params);
   iree_uk_type_t out_type = iree_uk_unpack_out_type(params.type);
   iree_uk_ssize_t out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params.out_size0, params.out_stride0);
-  reference_params.out_buffer = malloc(out_buffer_size);
-  iree_uk_write_random_buffer(reference_params.out_buffer, out_buffer_size,
-                              out_type, engine);
+  void* reference_out_buffer = malloc(out_buffer_size);
+  iree_uk_write_random_buffer(reference_out_buffer, out_buffer_size, out_type,
+                              engine);
+  reference_params.out_buffer =
+      (char*)reference_out_buffer -
+      (params.out_offset * iree_uk_type_size(out_type));
 
   iree_uk_unpack_params_t actual_params;
   memcpy(&actual_params, &params, sizeof actual_params);
-  actual_params.out_buffer = malloc(out_buffer_size);
-  iree_uk_write_random_buffer(actual_params.out_buffer, out_buffer_size,
-                              out_type, engine);
+  void* actual_out_buffer = malloc(out_buffer_size);
+  iree_uk_write_random_buffer(actual_out_buffer, out_buffer_size, out_type,
+                              engine);
+  actual_params.out_buffer = (char*)actual_out_buffer -
+                             (params.out_offset * iree_uk_type_size(out_type));
 
   iree_unpack_reference(&reference_params);
   iree_uk_unpack(&actual_params);
 
-  if (!iree_uk_2d_buffers_equal(
-          actual_params.out_buffer, reference_params.out_buffer, out_type,
-          params.out_size0, params.out_size1, params.out_stride0)) {
+  if (!iree_uk_2d_buffers_equal(actual_out_buffer, reference_out_buffer,
+                                out_type, params.out_size0, params.out_size1,
+                                params.out_stride0)) {
     IREE_UK_TEST_FAIL(test);
   }
 
-  free(reference_params.out_buffer);
-  free(actual_params.out_buffer);
+  free(reference_out_buffer);
+  free(actual_out_buffer);
   free(in_buffer);
 }
 

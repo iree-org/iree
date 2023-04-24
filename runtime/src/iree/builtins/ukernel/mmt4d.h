@@ -23,19 +23,22 @@ typedef enum iree_uk_mmt4d_type_t {
 
 typedef struct iree_uk_mmt4d_params_t {
   iree_uk_mmt4d_type_t type;
-  iree_uk_uint32_t flags;
-  iree_uk_ssize_t lhs_stride;
-  iree_uk_ssize_t rhs_stride;
-  iree_uk_ssize_t out_stride;
+  const void* lhs_buffer;
+  iree_uk_ssize_t lhs_offset;
+  iree_uk_ssize_t lhs_stride0;
+  const void* rhs_buffer;
+  iree_uk_ssize_t rhs_offset;
+  iree_uk_ssize_t rhs_stride0;
+  void* out_buffer;
+  iree_uk_ssize_t out_offset;
+  iree_uk_ssize_t out_stride0;
   iree_uk_ssize_t M;
   iree_uk_ssize_t N;
   iree_uk_ssize_t K;
   iree_uk_int32_t M0;
   iree_uk_int32_t N0;
   iree_uk_int32_t K0;
-  const void* lhs_buffer;
-  const void* rhs_buffer;
-  void* out_buffer;
+  iree_uk_uint32_t flags;
   const iree_uk_uint64_t* cpu_data;
 } iree_uk_mmt4d_params_t;
 

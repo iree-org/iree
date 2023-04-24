@@ -185,9 +185,9 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .M0 = M0,
       .K0 = K0,
       .N0 = N0,
-      .lhs_stride = K1 * M0 * K0,
-      .rhs_stride = K1 * N0 * K0,
-      .out_stride = N1 * M0 * N0,
+      .lhs_stride0 = K1 * M0 * K0,
+      .rhs_stride0 = K1 * N0 * K0,
+      .out_stride0 = N1 * M0 * N0,
   };
 
   iree_uk_pack_params_t pack_lhs_params = {
@@ -201,7 +201,7 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = M0,
       .out_size3 = K0,
       .in_stride0 = params->K,
-      .out_stride0 = mmt4d_params.lhs_stride,
+      .out_stride0 = mmt4d_params.lhs_stride0,
       .padding_value = 0,
   };
 
@@ -217,7 +217,7 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = N0,
       .out_size3 = K0,
       .in_stride0 = params->N,
-      .out_stride0 = mmt4d_params.rhs_stride,
+      .out_stride0 = mmt4d_params.rhs_stride0,
       .padding_value = 0,
   };
 
@@ -232,7 +232,7 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = M0,
       .out_size3 = N0,
       .in_stride0 = params->N,
-      .out_stride0 = mmt4d_params.out_stride,
+      .out_stride0 = mmt4d_params.out_stride0,
       .padding_value = 0,
   };
 
@@ -247,7 +247,7 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .in_size2 = M0,
       .in_size3 = N0,
       .out_stride0 = params->N,
-      .in_stride0 = mmt4d_params.out_stride,
+      .in_stride0 = mmt4d_params.out_stride0,
   };
 
   iree_uk_ssize_t rowmajor_lhs_buffer_size =
@@ -257,11 +257,11 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
   iree_uk_ssize_t rowmajor_out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params->M, params->N);
   iree_uk_ssize_t packed_lhs_buffer_size =
-      iree_uk_2d_buffer_length(lhs_type, M1, mmt4d_params.lhs_stride);
+      iree_uk_2d_buffer_length(lhs_type, M1, mmt4d_params.lhs_stride0);
   iree_uk_ssize_t packed_rhs_buffer_size =
-      iree_uk_2d_buffer_length(rhs_type, N1, mmt4d_params.rhs_stride);
+      iree_uk_2d_buffer_length(rhs_type, N1, mmt4d_params.rhs_stride0);
   iree_uk_ssize_t packed_out_buffer_size =
-      iree_uk_2d_buffer_length(out_type, M1, mmt4d_params.out_stride);
+      iree_uk_2d_buffer_length(out_type, M1, mmt4d_params.out_stride0);
   void* rowmajor_lhs_buffer = malloc(rowmajor_lhs_buffer_size);
   void* rowmajor_rhs_buffer = malloc(rowmajor_rhs_buffer_size);
   void* rowmajor_init_out_buffer = malloc(rowmajor_out_buffer_size);

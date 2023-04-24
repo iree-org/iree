@@ -146,8 +146,9 @@ static void iree_uk_unpack_using_tile_func(
   if (params->flags & IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER) {
     iree_uk_ssize_swap(&tile_size0, &tile_size1);
   }
-  const char* in_buf = params->in_buffer;
-  char* out_buf = params->out_buffer;
+  const char* in_buf =
+      (const char*)params->in_buffer + (params->in_offset * elem_size);
+  char* out_buf = (char*)params->out_buffer + (params->out_offset * elem_size);
   // Prepare for handling incomplete tiles with a temporary buffer.
   iree_uk_unpack_tmpbuf_helper_t tmpbuf_helper;
   if (params->out_size0 < outer_size0 * tile_size0 ||

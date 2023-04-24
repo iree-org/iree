@@ -47,14 +47,16 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
       iree_uk_type_size(iree_uk_mmt4d_out_type(params->type));
   for (iree_uk_ssize_t i = 0; i < params->M; ++i) {
     for (iree_uk_ssize_t j = 0; j < params->N; ++j) {
-      void* out_tile_ptr =
-          ((char*)params->out_buffer) +
-          (i * params->out_stride + j * params->M0 * params->N0) *
-              out_elem_size;
-      const void* lhs_panel_ptr = ((const char*)params->lhs_buffer) +
-                                  i * params->lhs_stride * lhs_elem_size;
-      const void* rhs_panel_ptr = ((const char*)params->rhs_buffer) +
-                                  j * params->rhs_stride * rhs_elem_size;
+      void* out_tile_ptr = ((char*)params->out_buffer) +
+                           (params->out_offset + i * params->out_stride0 +
+                            j * params->M0 * params->N0) *
+                               out_elem_size;
+      const void* lhs_panel_ptr =
+          ((const char*)params->lhs_buffer) +
+          (params->lhs_offset + i * params->lhs_stride0) * lhs_elem_size;
+      const void* rhs_panel_ptr =
+          ((const char*)params->rhs_buffer) +
+          (params->rhs_offset + j * params->rhs_stride0) * rhs_elem_size;
       for (iree_uk_ssize_t i0 = 0; i0 < params->M0; ++i0) {
         for (iree_uk_ssize_t j0 = 0; j0 < params->N0; ++j0) {
           void* out_ptr =
@@ -91,39 +93,48 @@ static void iree_uk_test_mmt4d_for_shape_params(
   // Populate strides first - we need them below to compute buffer lengths.
   // Randomly make strides either tight or not to exercise all cases.
   iree_uk_random_engine_t* engine = iree_uk_test_random_engine(test);
-  params.lhs_stride =
+  params.lhs_stride0 =
       params.K * params.M0 * params.K0 + iree_uk_random_engine_get_0_1(engine);
-  params.rhs_stride =
+  params.rhs_stride0 =
       params.K * params.N0 * params.K0 + iree_uk_random_engine_get_0_1(engine);
-  params.out_stride =
+  params.out_stride0 =
       params.N * params.M0 * params.N0 + iree_uk_random_engine_get_0_1(engine);
   iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(params.type);
   iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(params.type);
+  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params.type);
   iree_uk_ssize_t lhs_buffer_size =
-      iree_uk_2d_buffer_length(lhs_type, params.M, params.lhs_stride);
+      iree_uk_2d_buffer_length(lhs_type, params.M, params.lhs_stride0);
   iree_uk_ssize_t rhs_buffer_size =
-      iree_uk_2d_buffer_length(rhs_type, params.N, params.rhs_stride);
+      iree_uk_2d_buffer_length(rhs_type, params.N, params.rhs_stride0);
   void* lhs_buffer = malloc(lhs_buffer_size);
   void* rhs_buffer = malloc(rhs_buffer_size);
   iree_uk_write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type, engine);
   iree_uk_write_random_buffer(rhs_buffer, rhs_buffer_size, rhs_type, engine);
-  params.lhs_buffer = lhs_buffer;
-  params.rhs_buffer = rhs_buffer;
+  params.lhs_offset = iree_uk_random_engine_get_0_65535(engine);
+  params.rhs_offset = iree_uk_random_engine_get_0_65535(engine);
+  params.out_offset = iree_uk_random_engine_get_0_65535(engine);
+  params.lhs_buffer = (const char*)lhs_buffer -
+                      (params.lhs_offset * iree_uk_type_size(lhs_type));
+  params.rhs_buffer = (const char*)rhs_buffer -
+                      (params.rhs_offset * iree_uk_type_size(rhs_type));
 
   iree_uk_mmt4d_params_t reference_params;
   memcpy(&reference_params, &params, sizeof params);
-  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params.type);
   iree_uk_ssize_t out_buffer_size =
-      iree_uk_2d_buffer_length(out_type, params.M, params.out_stride);
-  reference_params.out_buffer = malloc(out_buffer_size);
-  iree_uk_write_random_buffer(reference_params.out_buffer, out_buffer_size,
-                              out_type, engine);
+      iree_uk_2d_buffer_length(out_type, params.M, params.out_stride0);
+  void* reference_out_buffer = malloc(out_buffer_size);
+  iree_uk_write_random_buffer(reference_out_buffer, out_buffer_size, out_type,
+                              engine);
+  reference_params.out_buffer =
+      (char*)reference_out_buffer -
+      (params.out_offset * iree_uk_type_size(out_type));
 
   iree_uk_mmt4d_params_t actual_params;
   memcpy(&actual_params, &params, sizeof params);
-  actual_params.out_buffer = malloc(out_buffer_size);
-  memcpy(actual_params.out_buffer, reference_params.out_buffer,
-         out_buffer_size);
+  void* actual_out_buffer = malloc(out_buffer_size);
+  memcpy(actual_out_buffer, reference_out_buffer, out_buffer_size);
+  actual_params.out_buffer = (char*)actual_out_buffer -
+                             (params.out_offset * iree_uk_type_size(out_type));
 
   iree_mmt4d_reference(&reference_params);
   iree_uk_mmt4d(&actual_params);
@@ -135,13 +146,12 @@ static void iree_uk_test_mmt4d_for_shape_params(
   // become problematic when we do float16. See the comment at the top of this
   // file explaining how we refrain from letting this grow into a 1000-line-long
   // fully-featured test.
-  if (memcmp(actual_params.out_buffer, reference_params.out_buffer,
-             out_buffer_size)) {
+  if (memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size)) {
     IREE_UK_TEST_FAIL(test);
   }
 
-  free(reference_params.out_buffer);
-  free(actual_params.out_buffer);
+  free(reference_out_buffer);
+  free(actual_out_buffer);
   free(lhs_buffer);
   free(rhs_buffer);
 }

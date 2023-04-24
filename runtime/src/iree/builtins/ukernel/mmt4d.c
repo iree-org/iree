@@ -52,15 +52,18 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
   const iree_uk_int16_t lhs_elem_size_log2 = iree_uk_type_size_log2(lhs_type);
   const iree_uk_int16_t rhs_elem_size_log2 = iree_uk_type_size_log2(rhs_type);
   const iree_uk_int16_t out_elem_size_log2 = iree_uk_type_size_log2(out_type);
-  char* out_tile_row = params->out_buffer;
-  const char* lhs_panel = params->lhs_buffer;
+  char* out_tile_row =
+      (char*)params->out_buffer + (params->out_offset << out_elem_size_log2);
+  const char* lhs_panel = (const char*)params->lhs_buffer +
+                          (params->lhs_offset << lhs_elem_size_log2);
   iree_uk_int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
-  iree_uk_ssize_t lhs_panel_stride = params->lhs_stride << lhs_elem_size_log2;
-  iree_uk_ssize_t rhs_panel_stride = params->rhs_stride << rhs_elem_size_log2;
-  iree_uk_ssize_t out_stride = params->out_stride << out_elem_size_log2;
+  iree_uk_ssize_t lhs_panel_stride = params->lhs_stride0 << lhs_elem_size_log2;
+  iree_uk_ssize_t rhs_panel_stride = params->rhs_stride0 << rhs_elem_size_log2;
+  iree_uk_ssize_t out_stride = params->out_stride0 << out_elem_size_log2;
   for (iree_uk_int32_t i = 0; i < M; ++i) {
     char* out_tile = out_tile_row;
-    const char* rhs_panel = params->rhs_buffer;
+    const char* rhs_panel = (const char*)params->rhs_buffer +
+                            (params->rhs_offset << rhs_elem_size_log2);
     for (iree_uk_int32_t j = 0; j < N; ++j) {
       tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
       out_tile += out_tile_size;
@@ -74,11 +77,12 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
 // Helper for early-return path when K==0 and we just need to clear the output.
 static void iree_uk_mmt4d_zero_out(const iree_uk_mmt4d_params_t* params) {
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params->type);
-  int out_type_size_log2 = iree_uk_type_size_log2(out_type);
+  int out_elem_size_log2 = iree_uk_type_size_log2(out_type);
   iree_uk_ssize_t contiguous_size = params->N * params->M0 * params->N0
-                                    << out_type_size_log2;
-  iree_uk_ssize_t stride = params->out_stride << out_type_size_log2;
-  char* out_ptr = params->out_buffer;
+                                    << out_elem_size_log2;
+  iree_uk_ssize_t stride = params->out_stride0 << out_elem_size_log2;
+  char* out_ptr =
+      (char*)params->out_buffer + (params->out_offset << out_elem_size_log2);
   for (iree_uk_ssize_t i = 0; i < params->M; ++i) {
     iree_uk_memset(out_ptr, 0, contiguous_size);
     out_ptr += stride;
