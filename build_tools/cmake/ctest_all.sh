@@ -81,11 +81,14 @@ declare -a excluded_tests=()
 if [[ "$OSTYPE" =~ ^msys ]]; then
   # These tests are failing on Windows.
   excluded_tests+=(
-    # TODO(#11077): Fix assert on task->pending_dependency_count atomic
+    # TODO(#11077): INVALID_ARGUMENT: argument/result signature mismatch
     "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_mmt4d_f32_small_ukernel_vmvx_local-task"
+    # TODO: Regressed when `pack` ukernel gained a uint64_t parameter in #13264.
+    "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_pack.mlir"
+    "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_pack_dynamic_inner_tiles.mlir"
     # TODO: Fix equality mismatch
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
