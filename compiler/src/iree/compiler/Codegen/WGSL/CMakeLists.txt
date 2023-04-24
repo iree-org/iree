@@ -20,6 +20,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRIR
     MLIRPass
+    MLIRSPIRVTransforms
     MLIRTensorDialect
     MLIRVectorDialect
     iree::compiler::Codegen::PassHeaders
