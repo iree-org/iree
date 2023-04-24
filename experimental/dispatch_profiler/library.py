@@ -56,8 +56,8 @@ class OperationKind(enum.Enum):
 
 OperationKindNames = {
     OperationKind.Matmul: 'matmul',
+    OperationKind.SplitkMatmul: 'matmul_splitk',
     OperationKind.BatchMatmul: 'batch_matmul',
-    OperationKind.SplitkMatmul: 'splitk_matmul',
     OperationKind.Conv2d: 'conv2d'
 }
 

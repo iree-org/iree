@@ -58,7 +58,6 @@ if __name__ == "__main__":
       # print(operation_collection.operation.name())
       operation_launcher = IreeToolsLauncher(args,
                                              operation_collection.operation)
-
       for configuration in operation_collection.configuration_list:
 
         # Compile the operation dispatches for verification and profiling.

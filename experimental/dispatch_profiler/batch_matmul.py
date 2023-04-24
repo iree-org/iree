@@ -1,58 +1,33 @@
-from matmul import *
+from library import *
+from dispatch import *
+from matmul import MatmulOperation, MatmulCompilationInfo,\
+  CudaMatmulDispatchChecker, CudaMatmulGenerator
+import os.path
 
 
 class BatchMatmulOperation(MatmulOperation):
+  """Data structure to describe a batch matrix multiplication operation."""
 
   def __init__(self, bmm_shape, lhs, rhs, result):
-    super().__init__(bmm_shape[1:], lhs, rhs, result)
-    self.batch_size = bmm_shape[0]
+    assert len(bmm_shape) == 4, "Batch matmul shape must be 4D"
+    super().__init__(bmm_shape[1:], lhs, rhs, result, bmm_shape[0])
     self.operation_kind = OperationKind.BatchMatmul
 
   def name(self):
     return f'{OperationKindNames[self.operation_kind]}_'\
-           f'{self.batch_size}x{self.M}x{self.N}x{self.K}_'\
+           f'{self.batch_count}x{self.M}x{self.N}x{self.K}_'\
            f'{DataTypeName[self.lhs.datatype]}{ShortLayoutTypeName[self.lhs.layout]}_'\
            f'{DataTypeName[self.rhs.datatype]}{ShortLayoutTypeName[self.rhs.layout]}_'\
            f'{DataTypeName[self.result.datatype]}{ShortLayoutTypeName[self.result.layout]}'
 
-  def csv_headers(self):
-    return ["Batch size", "M", "N", "K", "lhs", "rhs", "result"]
-
-  def create_dict_entry(self):
-    return [self.batch_size] + super().create_dict_entry()
-
   def lhs_npy_shape(self):
-    return f'{self.batch_size}x{super().lhs_npy_shape()}'
+    return f'{self.batch_count}x{super().lhs_npy_shape()}'
 
   def rhs_npy_shape(self):
-    return f'{self.batch_size}x{super().rhs_npy_shape()}'
+    return f'{self.batch_count}x{super().rhs_npy_shape()}'
 
   def result_npy_shape(self):
-    return f'{self.batch_size}x{super().result_npy_shape()}'
-
-  def bytes(self):
-    return self.batch_size * super().bytes()
-
-  def flops(self):
-    return self.batch_size * super().flops()
-
-
-class EmitBatchMatmulCompilationInfo(EmitMatmulCompilationInfo):
-  """Emitters for the matmul compilation info."""
-
-  def __init__(self):
-    self.compilation_info_template = """
-// batch matmul compilation info (tile configuration, translation info, workgroup size)
-#${compilation_info_name} = #iree_codegen.compilation_info<
-  lowering_config = <tile_sizes = [[1, ${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
-  translation_info = <${translation_info} pipeline_depth = ${stages}>,
-  workgroup_size = [${block_dim_x} : index, ${block_dim_y} : index, ${block_dim_z} : index]
->
-"""
-
-  def emit(self, compilation_info):
-    """Emits the matmul compilation info as a string."""
-    return super().emit(compilation_info)
+    return f'{self.batch_count}x{super().result_npy_shape()}'
 
 
 class EmitLinalgBatchMatmulDispatch:
@@ -64,16 +39,16 @@ class EmitLinalgBatchMatmulDispatch:
     self.linalg_row_row_matmul_template = """
 // Dispatch linalg.batch_matmul row-row layout 
 func.func @${operation_name}_${compilation_info_name}(
-  %lhs: tensor<${batch_size}x${problem_m}x${problem_k}x${datatype_lhs}>,
-  %rhs: tensor<${batch_size}x${problem_k}x${problem_n}x${datatype_rhs}>) -> tensor<${batch_size}x${problem_m}x${problem_n}x${datatype_result}>
+  %lhs: tensor<${batch_count}x${problem_m}x${problem_k}x${datatype_lhs}>,
+  %rhs: tensor<${batch_count}x${problem_k}x${problem_n}x${datatype_rhs}>) -> tensor<${batch_count}x${problem_m}x${problem_n}x${datatype_result}>
 {
   %c0 = arith.constant 0.0 : ${datatype_result}
-  %init = tensor.empty() : tensor<${batch_size}x${problem_m}x${problem_n}x${datatype_result}>
-  %inital_result = linalg.fill ins(%c0 : ${datatype_result}) outs(%init : tensor<${batch_size}x${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${batch_size}x${problem_m}x${problem_n}x${datatype_result}>
+  %init = tensor.empty() : tensor<${batch_count}x${problem_m}x${problem_n}x${datatype_result}>
+  %inital_result = linalg.fill ins(%c0 : ${datatype_result}) outs(%init : tensor<${batch_count}x${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${batch_count}x${problem_m}x${problem_n}x${datatype_result}>
   %result = linalg.batch_matmul ${compilation_info_attribute} 
-                     ins(%lhs, %rhs: tensor<${batch_size}x${problem_m}x${problem_k}x${datatype_lhs}>, tensor<${batch_size}x${problem_k}x${problem_n}x${datatype_rhs}>)
-                     outs(%inital_result: tensor<${batch_size}x${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${batch_size}x${problem_m}x${problem_n}x${datatype_result}>
-  return %result : tensor<${batch_size}x${problem_m}x${problem_n}x${datatype_result}>
+                     ins(%lhs, %rhs: tensor<${batch_count}x${problem_m}x${problem_k}x${datatype_lhs}>, tensor<${batch_count}x${problem_k}x${problem_n}x${datatype_rhs}>)
+                     outs(%inital_result: tensor<${batch_count}x${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${batch_count}x${problem_m}x${problem_n}x${datatype_result}>
+  return %result : tensor<${batch_count}x${problem_m}x${problem_n}x${datatype_result}>
 }
 """
 
@@ -89,7 +64,7 @@ func.func @${operation_name}_${compilation_info_name}(
     values = {
         'operation_name': dispatch.operation.name(),
         'compilation_info_attribute': compilation_info_attribute,
-        'batch_size': str(dispatch.operation.batch_size),
+        'batch_count': str(dispatch.operation.batch_count),
         'problem_m': str(dispatch.operation.M),
         'problem_n': str(dispatch.operation.N),
         'problem_k': str(dispatch.operation.K),
@@ -114,7 +89,7 @@ class ReferenceBatchMatmulOp(ReferenceOpInterface):
       os.makedirs(op_reference_cache_path)
 
     # Problem shape.
-    self.batch_size = bmm_operation.batch_size
+    self.batch_count = bmm_operation.batch_count
     self.M = bmm_operation.M
     self.N = bmm_operation.N
     self.K = bmm_operation.K
@@ -129,27 +104,27 @@ class ReferenceBatchMatmulOp(ReferenceOpInterface):
     self.dist_rhs = dist_rhs
 
     # Filename for the left hand side input tensor.
-    self.filename_lhs = "batch_size{batch_size}xm{problem_m}xk{problem_k}_"\
+    self.filename_lhs = "batch_count{batch_count}xm{problem_m}xk{problem_k}_"\
       "{tensor_description}_{dist}_lhs.npy".format(
-      batch_size=self.batch_size,
+      batch_count=self.batch_count,
       problem_m=self.M,
       problem_k=self.K,
       tensor_description=self.bmm_operation.lhs.name(),
       dist=DistributionName[self.dist_lhs])
 
     # Filename for the right hand side input tensor.
-    self.filename_rhs = "batch_size{batch_size}xk{problem_k}xn{problem_n}_"\
+    self.filename_rhs = "batch_count{batch_count}xk{problem_k}xn{problem_n}_"\
       "{tensor_description}_{dist}_rhs.npy".format(
-      batch_size=self.batch_size,
+      batch_count=self.batch_count,
       problem_k=self.K,
       problem_n=self.N,
       tensor_description=self.bmm_operation.rhs.name(),
       dist=DistributionName[self.dist_rhs])
 
     # Filename for the reference result tensor.
-    self.filename_reference_result = "batch_size{batch_size}xm{problem_m}xn{problem_n}_"\
+    self.filename_reference_result = "batch_count{batch_count}xm{problem_m}xn{problem_n}_"\
       "{tensor_description}_reference_result.npy".format(
-      batch_size=self.batch_size,
+      batch_count=self.batch_count,
       problem_m=self.M,
       problem_n=self.N,
       tensor_description=self.bmm_operation.result.name())
@@ -174,10 +149,10 @@ class ReferenceBatchMatmulOp(ReferenceOpInterface):
     """Generates input data, runs reference numpy.matmul, and save npy files to the output directory."""
     # Generate the input data as np.array for the matmul operation.
     lhs_np_array = get_np_array(self.bmm_operation.lhs,
-                                (self.batch_size, self.M, self.K),
+                                (self.batch_count, self.M, self.K),
                                 self.dist_lhs)
     rhs_np_array = get_np_array(self.bmm_operation.rhs,
-                                (self.batch_size, self.K, self.N),
+                                (self.batch_count, self.K, self.N),
                                 self.dist_rhs)
 
     # Run the reference np.matmul and generate result np.array.
@@ -201,59 +176,30 @@ class ReferenceBatchMatmulOp(ReferenceOpInterface):
 
 
 ##############################################################################
-class CudaBatchMatmulGenerator:
-  """Batch matmul dispatch generator class.
-  Generates a list of pre-definied batch matmul operations with resonable tuning 
-  cofigurations. The generator function are seperated based on the target backend 
-  and the data type."""
+class CudaBatchMatmulGenerator(CudaMatmulGenerator):
+  """Batch matmul dispatch generator class. """
 
   def __init__(self, args):
-
-    self.args = args
-
-    self.translation_infos = [
-        #TranslationInfo.LLVMGPUMatmulTensorCore, # Tensor Core (WMMA)
-        TranslationInfo.
-        LLVMGPUMatmulTensorCoreMmaSync,  # Tensor Core (MMA.SYNC)
-    ]
-
-    # List of pre-definied batch matmul shapes.
-    self.bmm_shapes = [[16, 128, 128, 256]]
-
-    # List of pre-definied matmul dispatch collections.
+    """Initializes the batch matmul dispatch generator."""
+    super().__init__(args)
+    self.batch_matmul_shapes = [[16, 128, 128, 256]]
     self.dispatches_collection_list = []
-
-  def _cuda_supported_configuration_list(self, operation, configuration_list):
-    """Returns a list of supported configurations for CUDA."""
-    supported_configuration_list = []
-    dispatch_checker = CudaMatmulDispatchChecker(self.args)
-    for configuration in configuration_list:
-      if not dispatch_checker.is_valid(Dispatch(operation, configuration)):
-        continue
-      supported_configuration_list.append(configuration)
-
-    # Return the supported configuration list.
-    return supported_configuration_list
 
   def _cuda_matmul_tensor_cores_f16(self):
     """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
 
-    tile_descriptions = [
-        TileDescription([64, 64, 64], 5, [64, 2, 1]),
-        TileDescription([64, 64, 32], 10, [64, 2, 1]),
-    ]
-
     # Create configuration list from the tile descriptions and translation infos.
     configuration_list = []
 
-    for tile_description in tile_descriptions:
+    for tile_description in self.tile_descriptions_tensor_cores_f16:
       for translation_info in self.translation_infos:
         configuration_list.append(
             MatmulCompilationInfo(tile_description, translation_info,
-                                  OperationKind.BatchMatmul))
+                                  OperationKind.BatchMatmul,
+                                  CompilationConfigType.Custom))
 
     # Create dispatches collection for each problem shape with the configuration list.
-    for bmm_shape in self.bmm_shapes:
+    for bmm_shape in self.batch_matmul_shapes:
       operation = BatchMatmulOperation(
         bmm_shape,\
         TensorDescription(DataType.f16, LayoutType.RowMajor), \
@@ -268,7 +214,8 @@ class CudaBatchMatmulGenerator:
       # Add default configuration if enabled.
       if self.args.default_config:
         supported_configuration_list.append(
-            MatmulCompilationInfo([], [], CompilationConfigType.Default))
+            MatmulCompilationInfo([], [], 1, OperationKind.BatchMatmul,
+                                  CompilationConfigType.Default))
       self.dispatches_collection_list.append(DispatchCollection(\
         operation, configuration_list))
 

@@ -1,5 +1,6 @@
 from library import *
-from batch_matmul import *
+from matmul import ReferenceMatmulOp
+from batch_matmul import ReferenceBatchMatmulOp
 import os.path
 import subprocess
 
@@ -43,15 +44,20 @@ class IreeToolsLauncher:
                                              'iree-run-module')
 
     # output vmfb files for the operation.
-    self.vmfb_verify_file = os.path.join(self.operation_path,
-                                         self.operation.name() + '_verify.vmfb')
-    self.vmfb_benchmark_file = os.path.join(
-        self.operation_path,
-        self.operation.name() + '_benchmark.vmfb')
+    split_k_suffix = "_".join([
+        "split_k_slice", str(operation.split_k_slices)
+    ]) if operation.operation_kind == OperationKind.SplitkMatmul else ""
+    verify_vmfb = split_k_suffix + "_verify.vmfb"
+    benchmark_vmfb = split_k_suffix + "_benchmark.vmfb"
+    self.vmfb_verify_filepath = os.path.join(
+        self.operation_path, "_".join([self.operation.name(), verify_vmfb]))
+    self.vmfb_benchmark_filepath = os.path.join(
+        self.operation_path, "_".join([self.operation.name(), benchmark_vmfb]))
 
     # reference implementation for the operation_kind.
     self.reference_impl_map = {
         OperationKind.Matmul: ReferenceMatmulOp,
+        OperationKind.SplitkMatmul: ReferenceMatmulOp,
         OperationKind.BatchMatmul: ReferenceBatchMatmulOp,
     }
 
@@ -59,7 +65,7 @@ class IreeToolsLauncher:
     """Compiles the input mlir file to vmfb file."""
 
     benchmark_dispatch_repeat_count = self.benchmark_dispatch_repeat_count if compilation_mode == CompilationMode.Profile else 1
-    vmfb_file = self.vmfb_benchmark_file if compilation_mode == CompilationMode.Profile else self.vmfb_verify_file
+    vmfb_file = self.vmfb_benchmark_filepath if compilation_mode == CompilationMode.Profile else self.vmfb_verify_filepath
 
     # Base iree-compile commandline
     cmd = [self.iree_compile_path, self.source_mlir_file, "-o", f"{vmfb_file}"]
@@ -69,8 +75,10 @@ class IreeToolsLauncher:
 
     if self.args.device == "cuda":
       cmd += [f"--iree-hal-cuda-llvm-target-arch={self.args.cuda_arch}"]
-    if self.args.split_k_slices != "":
-      cmd += [f"--iree-flow-split-matmul-reduction={self.args.split_k_slices}"]
+    if self.operation.operation_kind == OperationKind.SplitkMatmul:
+      cmd += [
+          f"--iree-flow-split-matmul-reduction={self.operation.split_k_slices}"
+      ]
     if self.args.use_mma_sync:
       cmd += [f"--iree-codegen-llvmgpu-use-mma-sync"]
     if self.args.use_wmma:
@@ -111,7 +119,7 @@ class IreeToolsLauncher:
 
     # Commandline `iree-run-module` for verification.
     cmd = [
-        self.iree_run_module_path, f'--module={self.vmfb_verify_file}',
+        self.iree_run_module_path, f'--module={self.vmfb_verify_filepath}',
         f'--device={self.args.device}'
     ]
 
@@ -149,7 +157,8 @@ class IreeToolsLauncher:
 
     # Commandline `iree-benchmark-module` for profiling.
     cmd = [
-        self.iree_benchmark_module_path, f'--module={self.vmfb_benchmark_file}',
+        self.iree_benchmark_module_path,
+        f'--module={self.vmfb_benchmark_filepath}',
         f'--device={self.args.device}'
     ]
 

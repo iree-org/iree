@@ -22,6 +22,7 @@ class EmitSourceMLIR:
 
     mlir_configuration_emitter = {
         OperationKind.Matmul: EmitMatmulCompilationInfo,
+        OperationKind.SplitkMatmul: EmitMatmulCompilationInfo,
         OperationKind.BatchMatmul: EmitMatmulCompilationInfo,
         #OperationKind.Conv2d : EmitConv2dCompilationInfo, TODO: Add conv2d
     }
@@ -30,6 +31,7 @@ class EmitSourceMLIR:
 
     mlir_dispatch_emitter = {
         OperationKind.Matmul: EmitLinalgMatmulDispatch,
+        OperationKind.SplitkMatmul: EmitLinalgMatmulDispatch,
         OperationKind.BatchMatmul: EmitLinalgBatchMatmulDispatch,
         #OperationKind.Conv2d : EmitLinalgConv2dDispatch, TODO: Add conv2d
     }
@@ -82,6 +84,7 @@ class Manifest:
     else:
       operations_kind_list = [
           OperationKind.Matmul,
+          OperationKind.SplitkMatmul,
           OperationKind.BatchMatmul,
           #OperationKind.Conv2d
       ]
@@ -164,6 +167,7 @@ class Manifest:
   def load(self):
     """Loads the manifest with pre-defined dispatches for supported operations."""
     self.append(CudaMatmulGenerator(self.args).generate())
+    self.append(CudaSplitKMatmulGenerator(self.args).generate())
     self.append(CudaBatchMatmulGenerator(self.args).generate())
 
   def emit(self, mlir_dialect=MlirDialect.Linalg):
