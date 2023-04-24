@@ -11,12 +11,12 @@
 
 static inline iree_uk_uint32_t iree_uk_query_tile_sizes_operand_role(
     iree_uk_uint32_t flags) {
-  return flags & IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_MASK_INTERNAL;
+  return flags & IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_MASK;
 }
 
 static inline iree_uk_uint32_t iree_uk_query_tile_sizes_operation(
     iree_uk_uint32_t flags) {
-  return flags & IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MASK_INTERNAL;
+  return flags & IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MASK;
 }
 
 // Holds matmul tile params as returned from architecture-specific backend code.

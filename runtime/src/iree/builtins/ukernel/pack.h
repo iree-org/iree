@@ -13,15 +13,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-// TODO(benoitjacob): move to internal, user specifies type in flags.
-typedef enum iree_uk_pack_type_t {
-  iree_uk_pack_type_f32f32 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
-  iree_uk_pack_type_i8i8 = IREE_UK_TIE_2_TYPES_LITERAL(INT_8, INT_8),
-  iree_uk_pack_type_i32i32 = IREE_UK_TIE_2_TYPES_LITERAL(INT_32, INT_32),
-} iree_uk_pack_type_t;
-
 typedef struct iree_uk_pack_params_t {
-  iree_uk_pack_type_t type;
   const void* in_buffer;
   iree_uk_ssize_t in_offset;
   iree_uk_ssize_t in_stride0;

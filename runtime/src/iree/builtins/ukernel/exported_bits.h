@@ -24,59 +24,83 @@
 // but asm code also cares about the bit-position values (i.e. the log2's).
 // Consistency between the two is guarded by static_assert's but only when
 // the language is C/C++ (not assembly).
+//
+// Ukernel flags are typically of type uint32. For now, we treat all flags as
+// specific to one op, sometimes duplicating identical flags for multiple ops.
+// In the future we might let multiple ops share common flags, but it is too
+// early to tell which yet.
 
-// ukernel flags are typically of type uint32.
-// Some flags will be common to many ukernels, while others will be specific
-// to one or a few ukernels. To make our 32 bits last as long as possible,
-// we need to make some educated guess as to how to split them between common
-// and ukernel-specific bits. Let's split them in half:
-// * The low 16 bits (bits 0..15) are for common bits, expected to be shared
-//   among many ukernels.
-// * The high 16 bits (bits 16..31) are for ukernel-specific bits.
-
-// Static assertions ensuring consistency of flag values.
+// Static assertions ensuring consistency of flag values, for those flags for
+// which we define _BIT_POS (typically, flags that are used in asm code, where
+// having _BIT_POS allows using bit-test instructions.)
 #define IREE_UK_ENSURE_CONSISTENT_FLAG(F) \
   IREE_UK_STATIC_ASSERT((F) == (1u << (F##_BIT_POS)))
 
-// Common bits (bits 0..15).
-#define IREE_UK_FLAG_ACCUMULATE 0x1u
-#define IREE_UK_FLAG_ACCUMULATE_BIT_POS 0
-IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_ACCUMULATE);
+//===----------------------------------------------------------------------===//
+// mmt4d
+//===----------------------------------------------------------------------===//
 
-// `pack` ukernel-specific bits (bits 16..31).
-#define IREE_UK_FLAG_PACK_TRANSPOSE_INNER 0x10000u
-#define IREE_UK_FLAG_PACK_TRANSPOSE_INNER_BIT_POS 16
-IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_PACK_TRANSPOSE_INNER);
-#define IREE_UK_FLAG_PACK_TRANSPOSE_OUTER 0x20000u
-#define IREE_UK_FLAG_PACK_TRANSPOSE_OUTER_BIT_POS 17
-IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_PACK_TRANSPOSE_OUTER);
+// type enum
+#define IREE_UK_FLAG_MMT4D_TYPE_MASK 0xFF
+#define IREE_UK_FLAG_MMT4D_TYPE_NONE 0x00
+#define IREE_UK_FLAG_MMT4D_TYPE_F32F32F32 0x01
+#define IREE_UK_FLAG_MMT4D_TYPE_I8I8I32 0x02
+#define IREE_UK_FLAG_MMT4D_TYPE_END 0x03
 
-// `unpack` ukernel-specific bits (bits 16..31).
-#define IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER 0x10000u
-#define IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER_BIT_POS 16
-IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER);
-#define IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER 0x20000u
-#define IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER_BIT_POS 17
-IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER);
+// bit flags
+#define IREE_UK_FLAG_MMT4D_ACCUMULATE 0x100
+#define IREE_UK_FLAG_MMT4D_ACCUMULATE_BIT_POS 8
+IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_MMT4D_ACCUMULATE);
 
-// `query_tile_sizes` ukernel-specific bits (bits 16..31).
-// OPERAND_ROLE (bits 16..19) describes the role that a tensor plays in an
-// operation, e.g. "left-hand-size operand" (e.g. in a matmul)
-// Note: the _INTERNAL suffix conveys that the _MASK value should only be used
-// by microkernels decoding flags, not by the compiler setting flags. Masks may
-// have to change even if flag values don't.
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_MASK_INTERNAL 0xf0000u
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS 0x00000u
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS 0x10000u
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT 0x20000u
-// OPERATION (bits 20..31, though may be shrunk as needed as this is currently
-// only using bit 20 and will only grow as needed) describes the operation
-// owning the tensor (that we are doing a query_tile_sizes for) as an operand.
-// Note: the _INTERNAL suffix conveys that the _MASK value should only be used
-// by microkernels decoding flags, not by the compiler setting flags. Masks may
-// have to change even if flag values don't.
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MASK_INTERNAL 0xfff00000u
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32 0x000000u
-#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32 0x100000u
+//===----------------------------------------------------------------------===//
+// pack
+//===----------------------------------------------------------------------===//
+
+// type enum
+#define IREE_UK_FLAG_PACK_TYPE_MASK 0xFF
+#define IREE_UK_FLAG_PACK_TYPE_NONE 0x00
+#define IREE_UK_FLAG_PACK_TYPE_F32F32 0x01
+#define IREE_UK_FLAG_PACK_TYPE_I8I8 0x02
+#define IREE_UK_FLAG_PACK_TYPE_I32I32 0x03
+#define IREE_UK_FLAG_PACK_TYPE_END 0x04
+
+// bit flags
+#define IREE_UK_FLAG_PACK_TRANSPOSE_INNER 0x100
+#define IREE_UK_FLAG_PACK_TRANSPOSE_OUTER 0x200
+
+//===----------------------------------------------------------------------===//
+// unpack
+//===----------------------------------------------------------------------===//
+
+// type enum
+#define IREE_UK_FLAG_UNPACK_TYPE_MASK 0xFF
+#define IREE_UK_FLAG_UNPACK_TYPE_NONE 0x00
+#define IREE_UK_FLAG_UNPACK_TYPE_F32F32 0x01
+#define IREE_UK_FLAG_UNPACK_TYPE_I32I32 0x02
+#define IREE_UK_FLAG_UNPACK_TYPE_END 0x03
+
+// bit flags
+#define IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER 0x100
+#define IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER 0x200
+
+//===----------------------------------------------------------------------===//
+// query_tile_sizes
+//===----------------------------------------------------------------------===//
+
+// OPERAND_ROLE describes the role that a tensor plays in an
+// operation, e.g. "left-hand-size operand" (e.g. in a matmul).
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_MASK 0xFF
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_NONE 0x00
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS 0x01
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS 0x02
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT 0x03
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_END 0x04
+
+// OPERATION describes the operation the the operand (that we are doing a
+// query_tile_sizes for) belongs to.
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MASK 0xFF00
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE 0x0000
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32 0x0100
+#define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32 0x0200
 
 #endif  // IREE_BUILTINS_UKERNEL_EXPORTED_BITS_H_

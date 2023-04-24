@@ -31,7 +31,8 @@ static void iree_uk_unpack_tile_8x8_x32_arm_64_direct(
 
 iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_arm_64(
     const iree_uk_unpack_params_t* params) {
-  int esize = iree_uk_type_size(iree_uk_unpack_out_type(params->type));
+  iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params->flags);
+  int esize = iree_uk_type_size(iree_uk_unpack_out_type(unpack_type));
   bool transpose = params->flags & IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER;
   // Unpack is currently only used in practice with esize==4 and non-transpose.
   if (esize != 4 || transpose) return 0;

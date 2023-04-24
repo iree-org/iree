@@ -52,12 +52,15 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Type rhsElemType = rhsType.getElementType();
   Type outElemType = outType.getElementType();
   std::string fnName;
+  uint32_t flags = 0;
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
     fnName = "vmvx.mmt4d.i8i8i32";
+    flags = IREE_UK_FLAG_MMT4D_TYPE_I8I8I32;
   } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
              outElemType.isF32()) {
     fnName = "vmvx.mmt4d.f32f32f32";
+    flags = IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
   }
   if (fnName.empty()) {
     return rewriter.notifyMatchFailure(
@@ -65,16 +68,15 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   }
 
   // Check if the accumulator is zero-filled.
-  int flags = 0;
   if (isInitializedToZero(out)) {
-    // Not setting flags |= IREE_UK_FLAG_ACCUMULATE, so the mmt4d op won't read
-    // the existing accumulator, so its defining op can be discarded.
+    // Not setting flags |= IREE_UK_FLAG_MMT4D_ACCUMULATE, so the mmt4d op won't
+    // read the existing accumulator, so its defining op can be discarded.
     if (auto fillOp = out.getDefiningOp<linalg::FillOp>()) {
       out = fillOp.getDpsInitOperand(0)->get();
     }
   } else {
     // Tell the mmt4d op to read the existing accumulator.
-    flags |= IREE_UK_FLAG_ACCUMULATE;
+    flags |= IREE_UK_FLAG_MMT4D_ACCUMULATE;
   }
   Location loc = op.getLoc();
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
@@ -83,7 +85,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value m0 = rewriter.create<tensor::DimOp>(loc, lhs, 2);
   Value n0 = rewriter.create<tensor::DimOp>(loc, rhs, 2);
   Value k0 = rewriter.create<tensor::DimOp>(loc, rhs, 3);
-
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
@@ -103,13 +104,17 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
   std::string fnName;
+  uint32_t flags = 0;
   if (inElemType.isSignlessInteger(8) && outElemType.isSignlessInteger(8)) {
     fnName = "vmvx.pack.i8i8";
+    flags = IREE_UK_FLAG_PACK_TYPE_I8I8;
   } else if (inElemType.isSignlessInteger(32) &&
              outElemType.isSignlessInteger(32)) {
     fnName = "vmvx.pack.i32i32";
+    flags = IREE_UK_FLAG_PACK_TYPE_I32I32;
   } else if (inElemType.isF32() && outElemType.isF32()) {
     fnName = "vmvx.pack.f32f32";
+    flags = IREE_UK_FLAG_PACK_TYPE_F32F32;
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
@@ -136,8 +141,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     outerDimsPerm[0] = outerDimsPosArr[0];
     outerDimsPerm[1] = outerDimsPosArr[1];
   }
-
-  int flags = 0;
 
   if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
     // nothing to do
@@ -188,10 +191,13 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
   std::string fnName;
+  uint32_t flags = 0;
   if (inElemType.isSignlessInteger(32) && outElemType.isSignlessInteger(32)) {
     fnName = "vmvx.unpack.i32i32";
+    flags = IREE_UK_FLAG_UNPACK_TYPE_I32I32;
   } else if (inElemType.isF32() && outElemType.isF32()) {
     fnName = "vmvx.unpack.f32f32";
+    flags = IREE_UK_FLAG_UNPACK_TYPE_F32F32;
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
@@ -218,8 +224,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     outerDimsPerm[0] = outerDimsPosArr[0];
     outerDimsPerm[1] = outerDimsPosArr[1];
   }
-
-  int flags = 0;
 
   if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
     // nothing to do

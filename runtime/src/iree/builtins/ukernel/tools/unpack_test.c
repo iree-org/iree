@@ -11,8 +11,9 @@
 #include "iree/builtins/ukernel/unpack_internal.h"
 
 static void iree_unpack_reference(const iree_uk_unpack_params_t* params) {
+  iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params->flags);
   // For now, the input and output element types are always the same.
-  iree_uk_type_t elem_type = iree_uk_unpack_in_type(params->type);
+  iree_uk_type_t elem_type = iree_uk_unpack_in_type(unpack_type);
   iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
   iree_uk_ssize_t outer_size0 = params->in_size0;
   iree_uk_ssize_t outer_size1 = params->in_size1;
@@ -65,7 +66,8 @@ static void iree_uk_test_unpack_for_shape_params(
   params.out_stride0 = params.out_size1 + iree_uk_random_engine_get_0_1(engine);
   params.in_stride0 = params.in_size1 * params.in_size2 * params.in_size3 +
                       iree_uk_random_engine_get_0_1(engine);
-  iree_uk_type_t in_type = iree_uk_unpack_in_type(params.type);
+  iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params.flags);
+  iree_uk_type_t in_type = iree_uk_unpack_in_type(unpack_type);
   iree_uk_ssize_t in_buffer_size =
       iree_uk_2d_buffer_length(in_type, params.in_size0, params.in_stride0);
   void* in_buffer = malloc(in_buffer_size);
@@ -77,7 +79,7 @@ static void iree_uk_test_unpack_for_shape_params(
 
   iree_uk_unpack_params_t reference_params;
   memcpy(&reference_params, &params, sizeof reference_params);
-  iree_uk_type_t out_type = iree_uk_unpack_out_type(params.type);
+  iree_uk_type_t out_type = iree_uk_unpack_out_type(unpack_type);
   iree_uk_ssize_t out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params.out_size0, params.out_stride0);
   void* reference_out_buffer = malloc(out_buffer_size);
@@ -147,7 +149,6 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
           }
           iree_uk_ssize_t tile_size0 = params.in_size2;
           iree_uk_ssize_t tile_size1 = params.in_size3;
-          params.flags = 0;
           if (transpose_outer) {
             params.flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
             iree_uk_ssize_swap(&in_size0, &in_size1);
@@ -176,12 +177,13 @@ static void iree_uk_test_unpack_for_tile_params(iree_uk_test_t* test,
   }
 }
 
-static void iree_uk_test_unpack(iree_uk_unpack_type_t type, int tile_size0,
+static void iree_uk_test_unpack(iree_uk_uint32_t flags, int tile_size0,
                                 int tile_size1, const char* cpu_features) {
   iree_uk_unpack_params_t params = {
-      .type = type, .in_size2 = tile_size0, .in_size3 = tile_size1};
+      .flags = flags, .in_size2 = tile_size0, .in_size3 = tile_size1};
   char types_str[32];
-  iree_uk_type_pair_str(types_str, sizeof types_str, type);
+  iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(flags);
+  iree_uk_type_pair_str(types_str, sizeof types_str, unpack_type);
   char test_label_str[256];
   snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%d",
            types_str, tile_size0, tile_size1);
@@ -193,16 +195,16 @@ int main(int argc, char** argv) {
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird tile shapes to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
-  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 3, 5, NULL);
-  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 3, 4, NULL);
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 3, 5, NULL);
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 3, 4, NULL);
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 8, 8, NULL);
-  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 8, 8, NULL);
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8, NULL);
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 8, 8, NULL);
 #elif defined(IREE_UK_ARCH_X86_64)
-  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 8, 8, "avx2_fma");
-  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 8, 8, "avx2_fma");
-  iree_uk_test_unpack(iree_uk_unpack_type_f32f32, 16, 16, "avx512_base");
-  iree_uk_test_unpack(iree_uk_unpack_type_i32i32, 16, 16, "avx512_base");
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8, "avx2_fma");
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 8, 8, "avx2_fma");
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 16, 16, "avx512_base");
+  iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 16, 16, "avx512_base");
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 }

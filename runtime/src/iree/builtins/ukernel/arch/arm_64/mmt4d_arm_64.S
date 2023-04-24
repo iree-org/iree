@@ -12,7 +12,7 @@
 BEGIN_FUNCTION iree_uk_mmt4d_tile_f32f32f32_8x8x1_arm_64
 
         // Do we accumulate into or clear the accumulator tile?
-        tbnz w4, IREE_UK_FLAG_ACCUMULATE_BIT_POS, 1f
+        tbnz w4, IREE_UK_FLAG_MMT4D_ACCUMULATE_BIT_POS, 1f
 
     0:
         // No-accumulate case. Clear the 8x8 accumulator tile.
@@ -99,7 +99,7 @@ END_FUNCTION iree_uk_mmt4d_tile_f32f32f32_8x8x1_arm_64
 BEGIN_FUNCTION iree_uk_mmt4d_tile_i8i8i32_8x8x1_arm_64
 
         // Do we accumulate into or clear the accumulator tile?
-        tbnz w4, IREE_UK_FLAG_ACCUMULATE_BIT_POS, 1f
+        tbnz w4, IREE_UK_FLAG_MMT4D_ACCUMULATE_BIT_POS, 1f
 
     0:
         // No-accumulate case. Clear the 8x8 accumulator tile.
