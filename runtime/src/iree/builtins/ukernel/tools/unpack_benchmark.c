@@ -92,7 +92,7 @@ static iree_status_t iree_uk_benchmark_unpack(
   // Report bytes per second, so that can be easily compared to known memory
   // system performance metrics (e.g. RAM bandwidth, to tell whether this is
   // memory-bound).
-  iree_benchmark_set_items_processed(benchmark_state,
+  iree_benchmark_set_bytes_processed(benchmark_state,
                                      total_iterations * out_buffer_size);
   free(in_buffer);
   free(out_buffer);
