@@ -441,7 +441,8 @@ class BenchmarkRun(object):
   """An object describing a single run of the benchmark binary.
 
   - benchmark_info: a BenchmarkInfo object describing the benchmark setup.
-  - context: additional context returned by the benchmarking framework.
+  - context: additional context and raw results returned by the benchmarking
+      framework.
   - real_time: the real time latency statistics returned by the benchmarking
       framework.
   - cpu_time: the cpu time latency statistics returned by the benchmarking

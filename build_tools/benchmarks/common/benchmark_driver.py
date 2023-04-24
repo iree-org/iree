@@ -262,7 +262,7 @@ class IreeBenchmarkDriver(BenchmarkDriver):
 
     benchmark_run = BenchmarkRun(
         benchmark_info,
-        context=iree_benchmark_json["context"],
+        context=iree_benchmark_json,
         real_time=BenchmarkLatency.from_json_object(real_times),
         cpu_time=BenchmarkLatency.from_json_object(cpu_times),
     )
