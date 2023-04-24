@@ -216,6 +216,7 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
 /// requested group.
 static Value createChannelWithGroupInfo(
     Location loc, mhlo::ChannelHandleAttr channelHandleAttr,
+    int32_t numReplicas, int32_t numPartitions,
     DenseIntElementsAttr replicaGroups, bool useGlobalDeviceIds,
     OpBuilder &builder) {
   // Base channel that may be split by the group info.
@@ -268,6 +269,30 @@ static Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
       permutationAttr);
 }
 
+static int32_t getNumReplicas(ModuleOp moduleOp) {
+  if (!moduleOp) {
+    return -1;
+  }
+  if (auto numReplicasAttr =
+          moduleOp->getAttrOfType<IntegerAttr>("mhlo.num_replicas")) {
+    return numReplicasAttr.getInt();
+  } else {
+    return -1;
+  }
+}
+
+static int32_t getNumPartitions(ModuleOp moduleOp) {
+  if (!moduleOp) {
+    return -1;
+  }
+  if (auto numPartitionsAttr =
+          moduleOp->getAttrOfType<IntegerAttr>("mhlo.num_partitions")) {
+    return numPartitionsAttr.getInt();
+  } else {
+    return -1;
+  }
+}
+
 }  // namespace
 
 /// Converts mhlo.replica_id to flow.channel.default + flow.channel.rank.
@@ -307,10 +332,14 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
 
     auto loc = op.getLoc();
 
-    // Get the channel used for communication.
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numReplicas = getNumReplicas(moduleOp);
+    int32_t numPartitions = getNumPartitions(moduleOp);
+
+    // Create a channel.
     Value channel = createChannelWithGroupInfo(
-        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
-        op.getUseGlobalDeviceIds(), rewriter);
+        loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
+        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
     auto resultType = op.getResult().getType().cast<RankedTensorType>();
@@ -392,10 +421,14 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
 
     auto loc = op.getLoc();
 
-    // Get the channel used for communication.
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numReplicas = getNumReplicas(moduleOp);
+    int32_t numPartitions = getNumPartitions(moduleOp);
+
+    // Create a channel.
     Value channel = createChannelWithGroupInfo(
-        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
-        op.getUseGlobalDeviceIds(), rewriter);
+        loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
+        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Convert mhlo reduction op into flow reduction op.
     auto reductionOpAttr =
@@ -591,10 +624,14 @@ struct ReduceScatterOpConversion
 
     auto loc = op.getLoc();
 
-    // Get the channel used for communication.
+    auto moduleOp = op->getParentOfType<ModuleOp>();
+    int32_t numReplicas = getNumReplicas(moduleOp);
+    int32_t numPartitions = getNumPartitions(moduleOp);
+
+    // Create a channel.
     Value channel = createChannelWithGroupInfo(
-        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
-        op.getUseGlobalDeviceIds(), rewriter);
+        loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
+        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
     auto resultType = op.getResult().getType().cast<RankedTensorType>();
