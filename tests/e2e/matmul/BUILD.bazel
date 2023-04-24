@@ -327,7 +327,10 @@ py_binary(
 ]]
 
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_{0}_gpu_large_{1}".format(lhs_rhs_type, vulkan_target_and_pipeline[0]),
+    name = "e2e_matmul_direct_{0}_gpu_large_{1}".format(
+        lhs_rhs_type,
+        vulkan_target_and_pipeline[0],
+    ),
     compiler_flags = [
         "--iree-vulkan-target-triple=%s" % vulkan_target_and_pipeline[0],
     ],
