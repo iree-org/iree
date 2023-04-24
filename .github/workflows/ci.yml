@@ -1105,13 +1105,22 @@ jobs:
           cat <<EOF >> "${GITHUB_STEP_SUMMARY}"
           ### :link: Artifact Links
 
-          - Compiler/host tools archive: \`${BUILD_DIR_GCS_ARTIFACT:-Not exists}\`
-          - E2E test artifacts directory: \`${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR:-Not exists}\`
-          - Benchmark tool binaries directory: \`${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR:-Not exists}\`
-          - Execution benchmark config: \`${EXECUTION_BENCHMARK_CONFIG_GCS_ARTIFACT:-Not exists}\`
-          - Execution benchmark results/traces directory: \`${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR:-Not exists}\`
-          - Compilation benchmark config: \`${COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT:-Not exists}\`
-          - Compilation benchmark results: \`${COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT:-Not exists}\`
+          \`\`\`sh
+          # Compiler/host tools archive:
+          export BUILD_DIR_GCS_ARTIFACT="${BUILD_DIR_GCS_ARTIFACT:-Not exists}"
+          # E2E test artifacts directory:
+          export E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR:-Not exists}"
+          # Benchmark tool binaries directory:
+          export BENCHMARK_TOOLS_GCS_ARTIFACT_DIR="${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR:-Not exists}"
+          # Execution benchmark config:
+          export EXECUTION_BENCHMARK_CONFIG_GCS_ARTIFACT="${EXECUTION_BENCHMARK_CONFIG_GCS_ARTIFACT:-Not exists}"
+          # Execution benchmark results/traces directory
+          export EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR="${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR:-Not exists}"
+          # Compilation benchmark config:
+          export COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT="${COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT:-Not exists}"
+          # Compilation benchmark results:
+          export COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT="${COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT:-Not exists}"
+          \`\`\`
 
           You can list and download \`gs://\` URLs with [gcloud cli](
           https://cloud.google.com/sdk/gcloud/reference/storage).
