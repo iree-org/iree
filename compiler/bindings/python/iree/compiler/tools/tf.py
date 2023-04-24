@@ -9,6 +9,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+import os
 import logging
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
@@ -116,58 +117,34 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
   """
   from iree.tools.tf.scripts.iree_import_tf import __main__
 
-  def import_using_tf_api(output_path, options):
-    # TODO: import_extra_args for things like --output-format=mlir-ir?
-    __main__.import_saved_model(output_path=output_path,
+  with TempFileSaver.implicit() as tfs, tempfile.TemporaryDirectory() as tmpdir:
+    options = ImportOptions(**kwargs)
+
+    if options.import_only and options.output_file:
+      # Importing to a file and stopping, write to that file directly.
+      tf_iree_input = options.output_file
+    elif options.save_temp_iree_input:
+      # Saving the file, use tfs.
+      tf_iree_input = tfs.alloc_optional("tf-iree-input.mlir",
+                                         export_as=options.save_temp_iree_input)
+    else:
+      # Not saving the file, so generate a loose temp file without tfs.
+      tf_iree_input = os.path.join(tmpdir, 'tf-iree-input.mlir')
+
+    __main__.import_saved_model(output_path=tf_iree_input,
                                 saved_model_dir=saved_model_dir,
                                 exported_names=",".join(options.exported_names),
                                 import_type=options.import_type.value,
                                 tags=",".join(options.saved_model_tags))
 
-  with TempFileSaver.implicit() as tfs:
-    options = ImportOptions(**kwargs)
-
-    # This is a two step process:
-    #   1. Import from saved model -> MLIR
-    #   2. Compile from imported MLIR using IREE
-    #
-    # * When `import_only` is set, only run step 1 and output the imported IR
-    # * When `save_temp_iree_input` is set, save the imported IR to a file
-    # (We could handle the case when _both_ are set by duplicating the file)
-
-    print("===============")
-    print("options")
-    print(options)
-    print("===============")
-
-    # Note: tfs.alloc_optional does not create a file if export_as is false
-    # Since we always want the output of the import pipeline (either to
-    # dump it out with import_only _or_ to pass it to iree-compile), we always
-    # need a (temporary) output file path.
-    # HOWEVER, NamedTemporaryFile is tightly scoped on Windows - you can't
-    # reuse the file _name_ from the file _object_ that it creates.
-    # So.... we need some portable way to get a temp file _name_:
-    # https://stackoverflow.com/questions/23212435/permission-denied-to-write-to-my-temporary-file
-    # https://stackoverflow.com/questions/2549384/how-do-i-create-a-named-temporary-file-on-windows-in-python
-
-    print("options.output_file:", options.output_file)
     if options.import_only:
-      print("import_only set")
-      output_file = tfs.alloc_optional("tf-output.mlir",
-                                        export_as=options.output_file)
-      import_using_tf_api(output_file, options)
       if options.output_file:
         return None
-      with open(output_file, "r"):
-        return output_file.read()
-
-    print("import_only _not_ set")
-    save_iree_input = tfs.alloc_optional("tf-iree-input.mlir",
-                                        export_as=options.save_temp_iree_input)
-    import_using_tf_api(save_iree_input, options)
+      with open(tf_iree_input, "r") as f:
+        return f.read()
 
     # Run IREE compilation pipeline
-    compile_cl = build_compile_command_line(save_iree_input, tfs, options)
+    compile_cl = build_compile_command_line(tf_iree_input, tfs, options)
     result = invoke_pipeline([compile_cl])
     if options.output_file:
       return None
