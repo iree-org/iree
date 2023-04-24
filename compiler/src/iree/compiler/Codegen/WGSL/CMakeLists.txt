@@ -14,13 +14,11 @@ iree_cc_library(
   NAME
     WGSL
   SRCS
-    "WGSLExpandExtendedMultiplication.cpp"
     "WGSLReplacePushConstants.cpp"
   DEPS
     MLIRArithDialect
     MLIRIR
     MLIRPass
-    MLIRSPIRVTransforms
     MLIRTensorDialect
     MLIRVectorDialect
     iree::compiler::Codegen::PassHeaders

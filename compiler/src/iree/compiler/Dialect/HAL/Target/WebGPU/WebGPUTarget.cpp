@@ -21,7 +21,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/Dialect/SPIRV/Transforms/SPIRVWebGPUTransforms.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 #include "spirv-tools/libspirv.hpp"
 
@@ -113,8 +113,8 @@ class WebGPUTargetBackend : public TargetBackend {
     // WGSL does not support extended multiplication:
     // https://github.com/gpuweb/gpuweb/issues/1565. Make sure to lower it to
     // regular multiplication before we convert SPIR-V to WGSL.
-    passManager.nest<ModuleOp>().addPass(
-        createWGSLExpandExtendedMultiplicationPass());
+    passManager.nest<ModuleOp>().nest<spirv::ModuleOp>().addPass(
+        spirv::createSPIRVWebGPUPreparePass());
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,

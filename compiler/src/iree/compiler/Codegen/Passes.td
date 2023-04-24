@@ -909,14 +909,6 @@ def WGSLReplacePushConstants :
   let constructor = "mlir::iree_compiler::createWGSLReplacePushConstantsPass()";
 }
 
-def WGSLExpandExtendedMultiplication :
-    Pass<"iree-wgsl-expand-extended-multiplication", "mlir::ModuleOp"> {
-  let summary =
-      "Expands unsupported extended multiplication ops to regular multiplication";
-  let constructor =
-      "mlir::iree_compiler::createWGSLExpandExtendedMultiplicationPass()";
-}
-
 //------------------------------------------------------------------------------
 // Test Passes
 //------------------------------------------------------------------------------
