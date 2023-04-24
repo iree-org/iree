@@ -1,0 +1,39 @@
+name: Benchmark XLA
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
+  benchmark_cuda:
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - gpu
+      - os-family=Linux
+    env:
+      TF_VERSION: 2.12.0
+      TF_RESULTS_DIR: results-dir
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          submodules: true
+      - name: "Benchmarking XLA:GPU on CUDA"
+        run: |
+          mkdir "${TF_RESULTS_DIR}" &&
+          ./build_tools/github_actions/docker_run.sh \
+            --gpus all \
+            gcr.io/iree-oss/nvidia-bleeding-edge@sha256:f96ad79f12aac1e20e8de8c021546538be6e054e5cf5f5751384a7cab0a34eeb \
+          ./build_tools/benchmarks/xla/benchmark_xla.sh "${TF_VERSION}" "$(pwd)/${TF_RESULTS_DIR}"
+      - name: "Uploading artifacts"
+        run: |
+          gcloud storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"

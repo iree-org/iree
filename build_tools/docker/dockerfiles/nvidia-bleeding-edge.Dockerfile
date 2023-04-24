@@ -10,7 +10,7 @@
 # To use the host GPUs, `docker run` must be called with the `--gpus all` flag.
 
 # We use .deb files that we host because we have to pin the version and packages
-# routinely dissapear from the Ubuntu apt repositories. The versions need to be
+# routinely disappear from the Ubuntu apt repositories. The versions need to be
 # compatible with the host driver (usually <= host driver version).
 ARG NVIDIA_GL_DEB="libnvidia-gl-515-server_515.86.01-0ubuntu0.22.04.1_amd64.deb"
 ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-515-server_515.86.01-0ubuntu0.22.04.1_amd64.deb"
@@ -57,6 +57,8 @@ RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
   "/tmp/${NVIDIA_COMPUTE_DEB}" \
   "/tmp/${NVIDIA_EGL_WAYLAND_DEB}"
 
+######## CUDA ########
+
 # install cuda sdk
 # 11.8 is the latest version of 11.x, which is IREE currently compiled with.
 # See https://docs.nvidia.com/cuda/cuda-runtime-api/version-mixing-rules.html
@@ -69,3 +71,19 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_install
 
 # Adding CUDA binaries to Path
 ENV PATH=${PATH}:/usr/local/cuda/bin/
+
+######## CuDNN ########
+WORKDIR /cudnn
+
+ARG NVIDIA_CUDNN_DEB=cudnn-local-repo-ubuntu2204-8.8.1.3_1.0-1_amd64.deb
+RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_CUDNN_DEB}" \
+  && dpkg --install ${NVIDIA_CUDNN_DEB} \
+  && cp /var/cudnn-local-repo-ubuntu2204-*/cudnn-*-keyring.gpg /usr/share/keyrings/ \
+  && apt-get update \
+  && apt-get -y install libcudnn8 \
+  && apt-get -y install libcudnn8-dev \
+  && rm -rf /cudnn
+
+######## Python ########
+
+RUN apt-get -y install python-is-python3
