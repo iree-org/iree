@@ -602,6 +602,97 @@ struct ScatterImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
   }
 };
 
+// Breaksdown reduce with complex operands to 2 reduce operations: 1 for
+// imaginary and one for real.
+class BreakupComplexInReduce : public OpRewritePattern<mhlo::ReduceOp> {
+  using OpRewritePattern<mhlo::ReduceOp>::OpRewritePattern;
+
+  template <typename T>
+  mhlo::ReduceOp createReducer(mhlo::ReduceOp op, Type newType, Type retType,
+                               Region &fixedRegion,
+                               PatternRewriter &rewriter) const {
+    const Location loc = op->getLoc();
+    auto inp = op.getInputs()[0];
+    auto init = op.getInitValues();
+    auto dims = op.getDimensionsAttr();
+    Value newInp = rewriter.create<T>(loc, inp);
+    Value newInit = rewriter.create<T>(loc, init);
+
+    mhlo::ReduceOp reduce =
+        rewriter.create<mhlo::ReduceOp>(loc, retType, newInp, newInit, dims);
+
+    Region &newBody = reduce.getBody();
+    IRMapping mapping;
+    fixedRegion.cloneInto(&newBody, mapping);
+    return reduce;
+  }
+
+  LogicalResult matchAndRewrite(mhlo::ReduceOp op,
+                                PatternRewriter &rewriter) const final {
+    auto inp = op.getInputs()[0];
+    Type inpType = inp.getType();
+    if (isa<TensorType>(inp.getType())) {
+      inpType = dyn_cast<TensorType>(inpType).getElementType();
+    }
+    if (!isa<ComplexType>(inpType)) {
+      return rewriter.notifyMatchFailure(
+          op, "Input parameter must be a complex value.");
+    }
+    Region &region = op.getBody();
+
+    Type newType = dyn_cast<ComplexType>(inpType).getElementType();
+    if (isa<TensorType>(inp.getType())) {
+      auto shape = dyn_cast<TensorType>(inp.getType()).getShape();
+      newType = dyn_cast<TensorType>(inp.getType()).cloneWith(shape, newType);
+    }
+
+    auto replaceComplexTypes = [&](auto &arg) -> Type {
+      auto argType = arg.getType();
+      if (isa<TensorType>(argType)) {
+        auto type = dyn_cast<TensorType>(argType).getElementType();
+        if (isa<ComplexType>(type)) {
+          type = dyn_cast<ComplexType>(type).getElementType();
+          auto shape = dyn_cast<TensorType>(argType).getShape();
+          return dyn_cast<TensorType>(argType).cloneWith(shape, {type});
+          llvm::errs() << "OK new arg: ";
+          arg.dump();
+        }
+      }
+      return argType;
+    };
+
+    // Fixup arguments in reducer body to convert complex to scalar.
+    auto args = region.getArguments();
+    for (auto &arg : args) {
+      auto newType = replaceComplexTypes(arg);
+      arg.setType(newType);
+    }
+
+    // Walk through-body and fix up return types from complex to scalar.
+    region.walk([&](Operation *retOp) {
+      if (isa<mhlo::ReturnOp>(*retOp)) {
+        mhlo::ReturnOp ret = dyn_cast<mhlo::ReturnOp>(*retOp);
+        auto result = ret.getResultsMutable()[0];
+        Type resultType = replaceComplexTypes(result);
+        result.setType(resultType);
+      }
+    });
+
+    auto result = op.getResult(0);
+    Type newResultType = replaceComplexTypes(result);
+
+    mhlo::ReduceOp realReduce = createReducer<mhlo::RealOp>(
+        op, newType, newResultType, region, rewriter);
+    mhlo::ReduceOp imagReduce = createReducer<mhlo::ImagOp>(
+        op, newType, newResultType, region, rewriter);
+
+    rewriter.replaceOpWithNewOp<mhlo::ComplexOp>(op, op.getResultTypes(),
+                                                 realReduce.getResult(0),
+                                                 imagReduce.getResult(0));
+    return success();
+  }
+};
+
 struct ScatterCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
   using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
@@ -1449,6 +1540,9 @@ struct MHLOToMHLOPreprocessingPass
     patterns.insert<ScatterInt64Indices, ScatterImplicitIndex,
                     ScatterImplicitBatch, ScatterMaterializeInsertedDim,
                     ScatterCollapseBatch, ScatterBatchFirst>(context);
+
+    // Split up complex in reduce to real and imag.
+    patterns.insert<BreakupComplexInReduce>(context);
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);

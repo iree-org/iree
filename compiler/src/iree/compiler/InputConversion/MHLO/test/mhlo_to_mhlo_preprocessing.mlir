@@ -345,6 +345,29 @@ func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf
 
 // -----
 
+// CHECK-LABEL: @reducer_func
+func.func @reducer_func(%arg0: tensor<2x2x3xcomplex<f32>>, %arg1: tensor<2x2x3xcomplex<f32>>) -> (tensor<2x3xcomplex<f32>>) {
+    %0 = mhlo.constant dense<(3.000000e+00,1.000000e+00)> : tensor<complex<f32>>
+
+    // CHECK-DAG: [[OUTR:%.+]] = mhlo.real %arg1
+    // CHECK-DAG: [[OUTRC:%.+]] = mhlo.real %0
+    // CHECK-DAG: [[OUTRI:%.+]] = mhlo.imag %0
+    // CHECK-DAG: [[OUTI:%.+]] = mhlo.imag %arg1
+
+    // CHECK-DAG: [[OUTREDR:%.+]] = mhlo.reduce([[OUTR]] init: [[OUTRC]])
+    // CHECK-DAG: [[OUTREDI:%.+]] = mhlo.reduce([[OUTI]] init: [[OUTRI]])
+    %1 = mhlo.reduce(%arg1 init: %0) across dimensions = [0] : (tensor<2x2x3xcomplex<f32>>, tensor<complex<f32>>) -> tensor<2x3xcomplex<f32>>
+   reducer(%arg2: tensor<complex<f32>>, %arg3: tensor<complex<f32>>)  {
+    %2 = mhlo.add %arg2, %arg3 : tensor<complex<f32>>
+    mhlo.return %2 : tensor<complex<f32>>
+  }
+  // CHECK-DAG: [[CMPLX:%.+]] = mhlo.complex [[OUTREDR]], [[OUTREDI]]
+  // CHECK-DAG: return [[CMPLX]]
+  return %1 : tensor<2x3xcomplex<f32>>
+  }
+
+// -----
+
 // CHECK-LABEL: @dynamic_dot_general
 // This verifies non-crashing, the lowering to linalg happens elsewhere.
 func.func @dynamic_dot_general(%arg1: tensor<?x1024x16x64xf32>, %arg2: tensor<?x1024x16x64xf32>) -> tensor<?x16x1024x1024xf32> {
