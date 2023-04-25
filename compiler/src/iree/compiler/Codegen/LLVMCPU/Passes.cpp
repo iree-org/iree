@@ -693,18 +693,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<ModuleOp>(
-      createVerifyLinalgTransformLegalityPass());
-  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createTypePropagationPass());
+  addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createLLVMCPUMaterializeEncodingPass());
-  passManager.addNestedPass<ModuleOp>(createBufferizeCopyOnlyDispatchesPass());
-  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createDecomposeSoftmaxPass());
-  // Temporary solution to avoid large allocations due to softmax lowering.
-  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createRematerializeParallelOpsPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(

@@ -30,6 +30,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -37,6 +38,7 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -142,173 +144,138 @@ getMaterializationInfo(tensor::PackOp packOp) {
 // workgroups.
 //===---------------------------------------------------------------------===//
 
-namespace {
-
 /// The `flow.dispatch.workgroup_count_from_dag_root` op is lowered to
 /// a sequence of `affine.apply affine_map<()[s0, s1] -> ceildDiv(s0,
 /// s1)>(workload, tileSize)`. for each of the dimensions. When tile size is
 /// zero, number of workgroups is set to 1.
-struct LowerDispatchWorkgroupCountForDagRootOp
-    : OpRewritePattern<IREE::Flow::DispatchWorkgroupCountFromDagRootOp> {
-  LowerDispatchWorkgroupCountForDagRootOp(MLIRContext *context,
-                                          ArrayRef<int64_t> tileSizes,
-                                          ArrayRef<int64_t> staticLoopRanges,
-                                          ArrayRef<int64_t> interchange,
-                                          ArrayRef<unsigned> partitionedLoops,
-                                          int32_t maxWorkgroupParallelDims,
-                                          PatternBenefit benefit = 1)
-      : OpRewritePattern(context, benefit),
-        givenTileSizes(tileSizes),
-        givenStaticLoopRanges(staticLoopRanges),
-        givenInterchange(interchange),
-        partitionedLoops(partitionedLoops),
-        maxWorkgroupParallelDims(maxWorkgroupParallelDims) {}
+static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
+    RewriterBase &rewriter,
+    IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
+    ArrayRef<int64_t> givenTileSizes, ArrayRef<int64_t> givenStaticLoopRanges,
+    ArrayRef<int64_t> givenInterchange, ArrayRef<unsigned> partitionedLoops,
+    int maxWorkgroupParallelDims) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+  auto workloadValues = workgroupCountOp.getOperands();
+  SmallVector<OpFoldResult> tileSizes = llvm::to_vector(llvm::map_range(
+      givenTileSizes,
+      [&](int64_t v) -> OpFoldResult { return rewriter.getIndexAttr(v); }));
 
-  LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
-      PatternRewriter &rewriter) const override {
-    auto workloadValues = workgroupCountOp.getOperands();
-    SmallVector<OpFoldResult> tileSizes = llvm::to_vector(llvm::map_range(
-        givenTileSizes,
-        [&](int64_t v) -> OpFoldResult { return rewriter.getIndexAttr(v); }));
+  Attribute zero = rewriter.getIndexAttr(0);
+  tileSizes.resize(workloadValues.size(), zero);
+  SmallVector<int64_t> staticLoopRanges =
+      llvm::to_vector(givenStaticLoopRanges);
+  staticLoopRanges.resize(workloadValues.size(), ShapedType::kDynamic);
+  Location loc = workgroupCountOp.getLoc();
+  auto numTiles = llvm::to_vector(llvm::map_range(
+      llvm::zip_equal(workloadValues, staticLoopRanges, tileSizes),
+      [&](std::tuple<Value, int64_t, OpFoldResult> p) -> OpFoldResult {
+        auto tileSize = std::get<2>(p);
+        if (isConstantIntValue(tileSize, 0)) {
+          return rewriter.getIndexAttr(1);
+        }
 
-    Attribute zero = rewriter.getIndexAttr(0);
-    tileSizes.resize(workloadValues.size(), zero);
-    SmallVector<int64_t> staticLoopRanges = givenStaticLoopRanges;
-    staticLoopRanges.resize(workloadValues.size(), ShapedType::kDynamic);
-    Location loc = workgroupCountOp.getLoc();
-    auto numTiles = llvm::to_vector(llvm::map_range(
-        llvm::zip_equal(workloadValues, staticLoopRanges, tileSizes),
-        [&](std::tuple<Value, int64_t, OpFoldResult> p) -> OpFoldResult {
-          auto tileSize = std::get<2>(p);
-          if (isConstantIntValue(tileSize, 0)) {
-            return rewriter.getIndexAttr(1);
-          }
-
-          int64_t staticLoopRange = std::get<1>(p);
-          OpFoldResult workload =
-              (staticLoopRange == ShapedType::kDynamic
-                   ? OpFoldResult(std::get<0>(p))
-                   : OpFoldResult(rewriter.getIndexAttr(staticLoopRange)));
-          AffineExpr s0, s1;
-          bindSymbols(rewriter.getContext(), s0, s1);
-          SmallVector<OpFoldResult> mapOperands = {workload, tileSize};
-          return affine::makeComposedFoldedAffineApply(
-              rewriter, loc, s0.ceilDiv(s1), mapOperands);
-        }));
-    // If there is interchange, first apply interchange on the number of tiles.
-    if (!givenInterchange.empty()) {
-      SmallVector<OpFoldResult> interchangedNumTiles = numTiles;
-      for (auto [index, loop] : llvm::enumerate(givenInterchange)) {
-        interchangedNumTiles[loop] = numTiles[index];
-      }
-      numTiles = interchangedNumTiles;
+        int64_t staticLoopRange = std::get<1>(p);
+        OpFoldResult workload =
+            (staticLoopRange == ShapedType::kDynamic
+                 ? OpFoldResult(std::get<0>(p))
+                 : OpFoldResult(rewriter.getIndexAttr(staticLoopRange)));
+        AffineExpr s0, s1;
+        bindSymbols(rewriter.getContext(), s0, s1);
+        SmallVector<OpFoldResult> mapOperands = {workload, tileSize};
+        return affine::makeComposedFoldedAffineApply(
+            rewriter, loc, s0.ceilDiv(s1), mapOperands);
+      }));
+  // If there is interchange, first apply interchange on the number of tiles.
+  if (!givenInterchange.empty()) {
+    SmallVector<OpFoldResult> interchangedNumTiles = numTiles;
+    for (auto [index, loop] : llvm::enumerate(givenInterchange)) {
+      interchangedNumTiles[loop] = numTiles[index];
     }
+    numTiles = interchangedNumTiles;
+  }
 
-    // Prune the numtiles for just the partitioned loops. Iterate in reverse
-    // since the number of workgroups is specified from fastest varying to
-    // slowest varying.
-    SmallVector<Value> numWorkgroups;
-    for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
-      if (partitionedLoop >= tileSizes.size()) continue;
-      if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
-      Value numTileAlongDim = getValueOrCreateConstantIndexOp(
-          rewriter, loc, numTiles[partitionedLoop]);
-      if (numWorkgroups.size() == maxWorkgroupParallelDims) {
-        // IREE runtime only has 3 ID dimensions. After all the num of tiles are
-        // combined into one.
-        AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
-        AffineExpr s1 = rewriter.getAffineSymbolExpr(1);
-        numWorkgroups.back() = affine::makeComposedAffineApply(
-            rewriter, loc, s0 * s1, {numWorkgroups.back(), numTileAlongDim});
-        continue;
-      }
-      numWorkgroups.push_back(numTileAlongDim);
+  // Prune the numtiles for just the partitioned loops. Iterate in reverse
+  // since the number of workgroups is specified from fastest varying to
+  // slowest varying.
+  SmallVector<Value> numWorkgroups;
+  for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
+    if (partitionedLoop >= tileSizes.size()) continue;
+    if (isConstantIntValue(tileSizes[partitionedLoop], 0)) continue;
+    Value numTileAlongDim = getValueOrCreateConstantIndexOp(
+        rewriter, loc, numTiles[partitionedLoop]);
+    if (numWorkgroups.size() == maxWorkgroupParallelDims) {
+      // IREE runtime only has 3 ID dimensions. After all the num of tiles are
+      // combined into one.
+      AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
+      AffineExpr s1 = rewriter.getAffineSymbolExpr(1);
+      numWorkgroups.back() = affine::makeComposedAffineApply(
+          rewriter, loc, s0 * s1, {numWorkgroups.back(), numTileAlongDim});
+      continue;
     }
-    Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    numWorkgroups.resize(workgroupCountOp.getNumResults(), one);
-    rewriter.replaceOp(workgroupCountOp, numWorkgroups);
+    numWorkgroups.push_back(numTileAlongDim);
+  }
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  numWorkgroups.resize(workgroupCountOp.getNumResults(), one);
+  rewriter.replaceOp(workgroupCountOp, numWorkgroups);
+  return success();
+}
+
+/// Lowers the computation within the workgroup count region for the ops
+/// that are handled by default.
+static LogicalResult lowerWorkgroupCount(
+    RewriterBase &rewriter, func::FuncOp entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, ArrayRef<int64_t> tileSizes,
+    ArrayRef<int64_t> staticLoopRanges, ArrayRef<int64_t> interchange,
+    ArrayRef<unsigned> partitionedLoops, int maxWorkgroupParallelDims) {
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
+      getEntryPoint(entryPointFn);
+  if (failed(exportOp)) {
+    return entryPointFn.emitOpError(
+        "expected function to be entry point function");
+  }
+  Block *body = exportOp->getWorkgroupCountBody();
+  if (!body) {
+    return exportOp->emitOpError("unexpected empty workgroup count region");
+  }
+  SmallVector<Operation *> countOps;
+  for (Operation &op : *body) {
+    if (isa<IREE::Flow::DispatchWorkgroupCountFromSliceOp,
+            IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(&op)) {
+      countOps.push_back(&op);
+    }
+  }
+  if (countOps.empty()) {
+    // If there are no default handled `flow.dispatch.workgroup_count`
+    // operation, do nothing. do nothing.
     return success();
   }
-
- private:
-  /// Tile sizes specified for tile+distribute.
-  SmallVector<int64_t> givenTileSizes;
-
-  /// Static loop ranges of the distributed loops.
-  // TODO: Remove this usage. This is just a WAR to help remove the unit-trip
-  // distribution loops.
-  SmallVector<int64_t> givenStaticLoopRanges;
-
-  /// Interchange specified for tile+distribute.
-  SmallVector<int64_t> givenInterchange;
-
-  /// Loops that are partitioned.
-  SmallVector<unsigned> partitionedLoops;
-
-  /// Maximum number of dims to distribute workgroups across.
-  int32_t maxWorkgroupParallelDims;
-};
-
-/// Pattern to lower a `flow.dispatch.workgroup_count_from_set_encoding` op.
-/// At the Flow level this op uses the logical shape of the tensor
-/// as the workload. This gets materialized into an physical tensor
-/// Lower this operation accounting for the change of shape from
-/// the logical shape to the physical shape. It lowers to
-/// a `flow.dispatch.workgroup_count_from_root_dag` where the root
-/// is the `pack` op that materialized the encoding.
-struct LowerDispatchWorkgroupCountFromSetEncodingOp
-    : public OpRewritePattern<
-          IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp> {
-  LowerDispatchWorkgroupCountFromSetEncodingOp(
-      MLIRContext *context,
-      IREE::LinalgExt::MaterializeEncodingInfo encodingInfo,
-      RankedTensorType inputType, PatternBenefit benefit = 1)
-      : OpRewritePattern(context, benefit),
-        materializeEncodingInfo(std::move(encodingInfo)),
-        inputType(inputType) {
-    for (int64_t &s : materializeEncodingInfo.innerTileSizes) {
-      if (s == ShapedType::kDynamic) {
-        // Dynamic tile sizes. The actual values can only be queried in device
-        // code, not here, so we use an approximation here. They are currently
-        // powers of two <= 16, so this value works for now. This is also
-        // consistent with the default padding in SetEncoding.
-        s = 16;
-      }
-    }
+  if (!llvm::hasSingleElement(countOps)) {
+    return exportOp->emitOpError(
+        "unexpected multiple flow.dispatch.workgroup_count_from_dag_root "
+        "operations "
+        "in body");
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp workgroupCountOp,
-      PatternRewriter &rewriter) const override {
-    ValueRange workload = workgroupCountOp.getOperands();
-    // The workload represents the unpacked shape. Get the workload of the
-    // packed shape.
-    Location loc = workgroupCountOp.getLoc();
-    auto innerTileSizes = getInnerTileSizesOfr(rewriter, loc, inputType,
-                                               materializeEncodingInfo, {});
-    if (failed(innerTileSizes)) return failure();
-    SmallVector<OpFoldResult> resultShape = tensor::PackOp::getResultShape(
-        rewriter, loc, getAsOpFoldResult(workload), *innerTileSizes,
-        materializeEncodingInfo.innerDimsPos,
-        materializeEncodingInfo.outerDimsPerm);
-    resultShape.resize(materializeEncodingInfo.srcRank);
-
-    rewriter
-        .replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
-            workgroupCountOp,
-            getValueOrCreateConstantIndexOp(rewriter, loc, resultShape));
-    return success();
-  }
-
- private:
-  IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo;
-  RankedTensorType inputType;
-};
+  return TypeSwitch<Operation *, LogicalResult>(countOps[0])
+      .Case<IREE::Flow::DispatchWorkgroupCountFromSliceOp>([&](auto countOp) {
+        return lowerWorkgroupCountFromSliceOp(rewriter, countOp, entryPointFn,
+                                              workgroupCount,
+                                              maxWorkgroupParallelDims);
+      })
+      .Case<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>([&](auto countOp) {
+        return lowerDispatchWorkgroupCountForDagRootOp(
+            rewriter, countOp, tileSizes, staticLoopRanges, interchange,
+            partitionedLoops, maxWorkgroupParallelDims);
+      })
+      .Default([&](Operation *) { return success(); });
+}
 
 //===---------------------------------------------------------------------===//
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
+
+namespace {
 
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
@@ -357,50 +324,24 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    // Lower the workgroup count ops.
-    {
-      RewritePatternSet patterns(context);
-      patterns.insert<LowerDispatchWorkgroupCountForDagRootOp>(
-          context, tileSizes, staticLoopRanges, interchange, partitionableLoops,
-          maxWorkgroupParallelDims);
-      auto res = funcOp.walk([&](tensor::PackOp packOp) -> WalkResult {
-        FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
-            getMaterializationInfo(packOp);
-        if (failed(encodingInfo)) return WalkResult::interrupt();
-        auto tensorType = packOp.getSourceType();
-        // The LowerDispatchWorkgroupCountFromSetEncodingOp pattern is going to
-        // call materializeEncodingValueFn, passing it a tensor type, expecting
-        // that tensor type to have a TensorEncodingAttr. The problem is that
-        // MaterializeEncoding has already run, rewriting the SetEncoding op
-        // and its result tensor, which used to hold the TensorEncodingAttr,
-        // into a pack op, whose new result tensor does not anymore have a
-        // TensorEncodingAttr. As a work-around for that, we made
-        // MaterializeEncoding preserve the TensorEncodingAttr as an attr on the
-        // pack op itself, so the present code can read it and reconstruct a
-        // tensorTypeWithEncoding, so
-        // LowerDispatchWorkgroupCountFromSetEncodingOp can call
-        // materializeEncodingValueFn.
-        Attribute encodingAttr =
-            packOp->getAttr(StringAttr::get(context, "encoding"));
-        auto tensorTypeWithEncoding = RankedTensorType::Builder(
-            tensorType.getShape(), tensorType.getElementType(), encodingAttr);
-        patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
-            context, encodingInfo.value(), tensorTypeWithEncoding);
-        return WalkResult::advance();
-      });
-      if (res.wasInterrupted()) {
-        exportOp.emitOpError(
-            "failed to get encoding information from pack ops");
-        return signalPassFailure();
-      }
-      if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
-        exportOp.emitOpError("failed to lower number of workgroups");
-        return signalPassFailure();
-      }
-    }
-
+    IRRewriter rewriter(context);
     // If there are no compute ops, nothing more to do.
-    if (computeOps.empty()) continue;
+    if (computeOps.empty()) {
+      if (failed(lowerWorkgroupCount(
+              rewriter, funcOp,
+              /*workgroupCountVals =*/ArrayRef<OpFoldResult>{},
+              /*tileSizes =*/ArrayRef<int64_t>{},
+              /*staticLoopRanges =*/ArrayRef<int64_t>{},
+              /*interchange =*/ArrayRef<int64_t>{},
+              /*partitionedLoops =*/ArrayRef<unsigned>{},
+              maxWorkgroupParallelDims))) {
+        funcOp.emitOpError(
+            "failed to lower workgroup count region when no compute ops in the "
+            "dispatch");
+        return signalPassFailure();
+      }
+      continue;
+    }
 
     // Configure the linalg options.
     // Tile size selection function.
@@ -428,12 +369,33 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
             .setLoopType(linalg::LinalgTilingLoopType::Loops)
             .setTileSizeComputationFunction(tileSizeFn);
 
-    IRRewriter rewriter(context);
-    if (failed(tileAndFuseDispatchUsingSCFForOp(
+    FailureOr<IREETileAndFuseResult> tileAndFuseResult =
+        tileAndFuseDispatchUsingSCFForOp(
             rewriter, cast<TilingInterface>(computeOps.back()),
-            linalgTilingOptions))) {
+            linalgTilingOptions);
+    if (failed(tileAndFuseResult)) {
       funcOp.emitOpError("Tile+Distribute failed");
       return signalPassFailure();
+    }
+
+    // Materialize the computation for workgroup counts.
+    auto workgroupCountOfr =
+        getAsOpFoldResult(tileAndFuseResult->workgroupCount);
+    if (failed(lowerWorkgroupCount(
+            rewriter, funcOp, workgroupCountOfr, tileSizes, staticLoopRanges,
+            interchange, partitionableLoops, maxWorkgroupParallelDims))) {
+      funcOp.emitOpError("workgroup count lowering failed");
+      return signalPassFailure();
+    }
+
+    // Resolve the `tensor.dim` operations in workgroup count region.
+    {
+      RewritePatternSet patterns(exportOp->getContext());
+      memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
+        exportOp.emitOpError("`tensor.dim` resolution in exportOp failed");
+        return signalPassFailure();
+      }
     }
 
     {

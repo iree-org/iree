@@ -1475,29 +1475,67 @@ def FLOW_DispatchWorkgroupCountFromDagRootOp :
     for ops within the dispatch.
   }];
   let description = [{
-    By default the IREEs backend relies on tile + distribution of the root
-    of the DAG (Directed AcyclicGraph) of ops within the dispatch to split
-    the work amongst workgroups. The workload captured is the size of the
-    iteration space of the root of the DAG. This op represents the computation
-    that given the workload returns the number of workgroups to use. The
-    backends are responsible for lowering this op into actual computation
-    (typically based on the tile sizes used to tile and distribute the root of
-    the DAG).
+    When using tile + distribution of the root of the DAG (Directed Acyclic
+    Graph) of ops within the dispatch to split the work amongst workgroups. The
+    workload captured is the size of the iteration space of the root of the DAG.
+    This op represents the computation that given the workload returns the
+    number of workgroups to use. The backends are responsible for lowering this
+    op into actual computation (typically based on the tile sizes used to tile
+    and distribute the root of the DAG).
   }];
 }
 
-def FLOW_DispatchWorkgroupCountFromSetEncodingOp :
-    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_set_encoding_op"> {
+def FLOW_DispatchWorkgroupCountFromSliceOp :
+    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_slice"> {
   let summary = [{
-    Workgroup count for dispatches that have a root as set_encoding op.
+    Place holder to signify default workgroup count calculation.
   }];
   let description = [{
-    For dispatches where the set_encoding operation is the root (producers
-    might be fused into these ops), the actual iteration space is materialized
-    only in the backend. This op is a placeholder to represent the workgroup
-    count calculation that accounts for the materialization.
-    The operands to the op represent the shape of the source of the pack
-    operation.
+    The default computation of the number of workgroups (or workgroup count)
+    assumes that the dispatch + captured values is enough to compute the
+    workgroup count. It does so by using a program slice of the values
+    within the dispatch that represent the number of workgroups when available
+    within the dispatch.
+    Currently the arguments of index types captured by the 
+    `flow.dispatch.workgroups` is treated as the workload for the operation.
+    It is a requirement that the slice of the program that computes the
+    number of workgroups will need to have its leaves be these captured values.
+
+    TODO: This could be generalized in future to allow the slices to encompass
+    arbitrary computation. The computation of the workgroup count can then be
+    done on the device itself, if this is data dependent. In such cases the 
+    workload could be more than just values of index types.
+  }];
+}
+
+def FLOW_DispatchWorkloadOrdinalOp :
+    FLOW_PureOp<"dispatch.workload.ordinal"> {
+  let arguments = (ins
+    Index:$operand,
+    IndexAttr:$ordinal
+  );
+  let results = (outs Index:$result);
+
+  let summary = [{
+    Annotates the values captured as workload within the body of
+    `flow.dispatch.workgroups` op.
+  }];
+  let description = [{
+    The arguments that represent the captured/returned values of the
+    `flow.dispatch.workgroups, i.e. the signature of the body of the op is not
+    preserved during IREEs compilation. Since the workloads are derived from
+    the operands captured by the operation, this op denotes the values captured
+    as workloads. This can be used in the backends to map back to the workload
+    values while materializing the workgroup count computation.
+
+    TODO: Find a better way to represent this information, either by somehow
+    propagating the signature of the created dispatch workgroup op through
+    the compilation stack until the codegen backends, or as a separate
+    list/attribute that can be plumbed through without using explicit ops.
+  }];
+
+  let assemblyFormat = [{
+    attr-dict $operand $ordinal `:` type($operand)
   }];
 }
 

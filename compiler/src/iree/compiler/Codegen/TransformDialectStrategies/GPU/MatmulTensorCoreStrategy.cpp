@@ -42,6 +42,8 @@ using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
     IREEEraseHALDescriptorTypeFromMemRefOp;
+using iree_compiler::IREE::transform_dialect::
+    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
@@ -53,8 +55,8 @@ using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
 
 using iree_compiler::buildSelectFirstNonEmpty;
-using iree_compiler::buildTileFuseDistToForallAndWorkgroupCountWithTileSizes;
 using iree_compiler::buildTileFuseDistToForallWithNumThreads;
+using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
@@ -490,7 +492,7 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
   //     buildSelectFirstNonEmpty(b, maybeTrailingH, matmulH);
   MatmulStrategy::MappingInfo blockMapping = strategy.getBlockMapping();
   TileToForallAndFuseAndDistributeResult tileResult =
-      buildTileFuseDistToForallAndWorkgroupCountWithTileSizes(
+      buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
           /*isolatedParentOpH=*/variantH,
           /*rootH=*/matmulH,
@@ -499,6 +501,10 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
           getAsOpFoldResult(b.getI64ArrayAttr(blockMapping.tileSizes)),
           /*threadDimMapping=*/
           b.getArrayAttr(blockMapping.threadMapping));
+
+  // Handle the workgroup count region.
+  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+      tileResult.forallH);
 
   // TODO: handle trailing op.
   return std::make_tuple(tileResult.resultingFusedOpsHandles.front(),

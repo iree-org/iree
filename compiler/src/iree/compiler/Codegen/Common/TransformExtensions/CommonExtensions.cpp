@@ -627,44 +627,6 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
 // ForallToWorkgroupOp
 //===---------------------------------------------------------------------===//
 
-/// Populate the workgroup_count region of `dispatchOp`.
-/// For now, this only supports constant index ops and empty workload
-/// operands. Assumes the HAL::ExecutableExportOp is built with an empty
-/// region.
-static LogicalResult populateWorkgroupCountComputingRegion(
-    RewriterBase &rewriter, scf::ForallOp forallOp,
-    HAL::ExecutableExportOp exportOp) {
-  Location loc = forallOp.getLoc();
-  OpBuilder::InsertionGuard g(rewriter);
-  Region &r = exportOp.getWorkgroupCount();
-  assert(r.empty() && "expected block-less workgroup_count region");
-  Block *block = rewriter.createBlock(&r);
-  // The HAL::DeviceType argument is always the first argument.
-  block->addArgument(HAL::DeviceType::get(rewriter.getContext()), loc);
-  rewriter.setInsertionPointToStart(block);
-
-  SmallVector<Value> results;
-  // For now, this assumes that we only pull in constants.
-  // TODO: Iteratively pull required operations.
-  for (Value v : forallOp.getUpperBound(rewriter)) {
-    auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
-    if (!op) return failure();
-    results.push_back(
-        cast<arith::ConstantIndexOp>(rewriter.clone(*op)).getResult());
-  }
-  // Pad to `3` to match assumptions hardcoded in IREE.
-  for (unsigned i = results.size(); i < 3; ++i) {
-    results.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
-  }
-  rewriter.create<HAL::ReturnOp>(loc, results);
-
-  return success();
-}
-
-//===---------------------------------------------------------------------===//
-// Patterns for ForallToWorkgroup rewrite.
-//===---------------------------------------------------------------------===//
-
 LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
                                        scf::ForallOp forallOp,
                                        IREE::HAL::ExecutableExportOp exportOp) {
@@ -715,42 +677,7 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   SmallVector<Value> gridDimValues =
       getValuesSortedByKey(blockMapping, numBlocks, comparator);
 
-  // Step 3. Outline the compute workload region and set up the workload
-  // operands, if this has not been done already.
-  // Using `transform.iree.tile_to_forall_and_workgroup_count_region` is
-  // the preferred way to set up tiling and workgroup_count region **at the
-  // same time**.
-  //
-  // The block of code below will be retired once there is enough confidence
-  // we can do everything without it. This includes in particular providing
-  // custom fusion heuristics at the flow level: at this time, the only way to
-  // fully control fusion of more advanced cases is to use the transform
-  // dialect at the flow level and explicitly match the ops we want to fuse.
-  // Once fusion is customizable enough in perpetuity, we can retire this.
-  if (exportOp.getWorkgroupCount().empty()) {
-    if (llvm::any_of(forallOp.getUpperBound(rewriter), [](Value v) {
-          return !v.getDefiningOp<arith::ConstantIndexOp>();
-        })) {
-      return forallOp->emitError(
-          "unsupported dynamic workgroup_count atm --- need to slice out "
-          "workgroup_count computation into "
-          "ExecutableExport::workgroup_count."
-          "\nThis region may require arbitrary computations and cannot "
-          "magically match what the `stream.cmd.dispatch` has already "
-          "imposed "
-          "on us at a distance."
-          "\nFor now we must specify the number of values properly when "
-          "applying the topLevel tile_to_forall_op");
-    }
-    if (failed(populateWorkgroupCountComputingRegion(rewriter, forallOp,
-                                                     exportOp))) {
-      return forallOp->emitOpError(
-                 "failed to populate workload region for dispatchOp: ")
-             << exportOp;
-    }
-  }
-
-  // Step 4. Create the workgroup id and count ops.
+  // Step 3. Create the workgroup id and count ops.
   IRMapping bvm;
   SmallVector<Value> workgroupIdOps, workgroupCountOps;
   for (Attribute attr : blockMapping) {
@@ -764,9 +691,9 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   bvm.map(forallOp.getInductionVars(), workgroupIdOps);
   bvm.map(forallOp.getUpperBound(rewriter), workgroupCountOps);
 
-  // Step 5. Predicate omitted given unique topLevel scf::ForallOp.
+  // Step 4. Predicate omitted given unique topLevel scf::ForallOp.
 
-  // Step 6. Move the body of forallOp.
+  // Step 5. Move the body of forallOp.
   // Erase the terminator first, it will not be used since we are on buffers.
   rewriter.eraseOp(forallOp.getTerminator());
   Block *targetBlock;
@@ -777,7 +704,7 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   targetBlock->getOperations().splice(insertionPoint,
                                       sourceBlock.getOperations());
 
-  // Step 7. RAUW thread indices to thread ops.
+  // Step 6. RAUW thread indices to thread ops.
   for (Value blockIdx : forallOp.getInductionVars()) {
     for (Operation *user : llvm::make_early_inc_range(blockIdx.getUsers())) {
       rewriter.updateRootInPlace(user, [&]() {
@@ -786,9 +713,9 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
     }
   }
 
-  // Step 5. Barriers omitted given unique topLevel scf::ForallOp.
+  // Step 6. Barriers omitted given unique topLevel scf::ForallOp.
 
-  // Step 6. Erase old op.
+  // Step 7. Erase old op.
   rewriter.eraseOp(forallOp);
 
   return success();
@@ -852,268 +779,60 @@ void transform_dialect::ForallToWorkgroupOp::getEffects(
 }
 
 //===---------------------------------------------------------------------===//
-// TileToForallAndWorkgroupCountRegionOp
+// IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
-    OpBuilder &builder, OperationState &result, Value target,
-    ArrayRef<int64_t> staticTileSizes, transform::TileSizesSpec,
-    ArrayAttr mappingAttr) {
-  return build(builder, result, target,
-               /*mixedTileSizes=*/
-               getAsOpFoldResult(builder.getI64ArrayAttr(staticTileSizes)),
-               /*_=*/transform::TileSizesSpec(), /*mapping=*/mappingAttr);
-}
-
-void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
-    OpBuilder &builder, OperationState &result, Value target,
-    ArrayRef<OpFoldResult> mixedTileSizes, transform::TileSizesSpec,
-    ArrayAttr mappingAttr) {
-  assert(result.name.isRegistered() && "not registered!!");
-  SmallVector<int64_t> staticTileSizes;
-  SmallVector<Value> dynamicTileSizes;
-  dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes);
-  // Call the default builder which sets up the proper operands segment sizes
-  // attributes for multiple variadic operands. In the absence of this,
-  // horrible bugs ensue.
-  MLIRContext *ctx = builder.getContext();
-  auto operationType = pdl::OperationType::get(ctx);
-
-  build(builder, result,
-        /*resultTypes=*/TypeRange{operationType, operationType},
-        /*target=*/target,
-        /*numThreads=*/ValueRange{},
-        /*tileSizes=*/dynamicTileSizes,
-        /*staticNumThreads=*/ArrayRef<int64_t>(),
-        /*staticTileSizes=*/staticTileSizes,
-        /*mapping=*/mappingAttr);
-}
-
-void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
-    OpBuilder &builder, OperationState &result, Value target,
-    ArrayRef<int64_t> staticNumThreads, transform::NumThreadsSpec,
-    ArrayAttr mappingAttr) {
-  return build(builder, result,
-               /*target=*/target,
-               /*mixedNumThreads=*/
-               getAsOpFoldResult(builder.getI64ArrayAttr(staticNumThreads)),
-               /*_=*/transform::NumThreadsSpec(),
-               /*mapping=*/mappingAttr);
-}
-
-void transform_dialect::TileToForallAndWorkgroupCountRegionOp::build(
-    OpBuilder &builder, OperationState &result, Value target,
-    ArrayRef<OpFoldResult> mixedNumThreads, transform::NumThreadsSpec,
-    ArrayAttr mappingAttr) {
-  assert(result.name.isRegistered() && "not registered!!");
-  SmallVector<int64_t> staticNumThreads;
-  SmallVector<Value> dynamicNumThreads;
-  dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
-                             staticNumThreads);
-  // Call the default builder which sets up the proper operands segment sizes
-  // attributes for multiple variadic operands. In the absence of this,
-  // horrible bugs ensue.
-  MLIRContext *ctx = builder.getContext();
-  auto operationType = pdl::OperationType::get(ctx);
-  build(builder, result,
-        /*resultTypes=*/TypeRange{operationType, operationType},
-        /*target=*/target,
-        /*numThreads=*/dynamicNumThreads,
-        /*tileSizes=*/ValueRange{},
-        /*staticNumThreads=*/staticNumThreads,
-        /*staticTileSizes=*/ArrayRef<int64_t>(),
-        /*mapping=*/mappingAttr);
-}
-
-/// Lower the ops within the workgroup count region of `exportOp` that
-/// represents the workgroup count calculation, to the actual
-/// computation that returns the number of workgroups. For now
-/// this lowers the `flow.dispatch.workgroup_count_from_dag_root` op
-/// to `ceilDiv(workload, tileSizes)`.
-/// Note: transform::TransformState &state is passed to allow  unpacking
-/// pdl::OperationType handles on the fly.
-static LogicalResult lowerWorkgroupCountComputingRegion(
-    transform::TransformState &state, RewriterBase &rewriter, Location loc,
-    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> numThreads,
-    ArrayRef<OpFoldResult> tileSizes, std::optional<ArrayAttr> mapping) {
-  Region &r = exportOp.getWorkgroupCount();
-  if (!r.hasOneBlock()) {
-    return rewriter.notifyMatchFailure(exportOp,
-                                       "expected export op to have a workgroup "
-                                       "count region with a single block");
-  }
-  auto workgroupCountOps =
-      r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
-  if (!llvm::hasSingleElement(workgroupCountOps)) {
-    return rewriter.notifyMatchFailure(
-        exportOp,
-        "expected region to have a single "
-        "flow.dispatch.workgroup_count_from_dag_root op");
-  }
-  auto workgroupCountOp = *workgroupCountOps.begin();
-  auto workload = workgroupCountOp.getOperands();
-
-  bool useNumThreads = !numThreads.empty();
-  ArrayRef<OpFoldResult> tileSizesOrNumThreads =
-      useNumThreads ? numThreads : tileSizes;
-  StringRef kindStr = useNumThreads ? "num thread" : "tile size";
-
-  SmallVector<OpFoldResult> unpackedTileSizesOrNumThreads;
-  int64_t numTiledDims = 0;
-  for (auto ofr : tileSizesOrNumThreads) {
-    if (ofr.is<Value>() &&
-        ofr.get<Value>().getType().isa<pdl::OperationType>()) {
-      for (Operation *sizeProducer : state.getPayloadOps(ofr.get<Value>())) {
-        if (sizeProducer->getNumResults() != 1) {
-          auto diag = mlir::emitDefiniteFailure(sizeProducer)
-                      << "the operation producing " << kindStr
-                      << " must have one result";
-          diag.attachNote(loc) << "when applying this transform";
-          return diag;
-        }
-        unpackedTileSizesOrNumThreads.push_back(sizeProducer->getResult(0));
-      }
-    } else {
-      unpackedTileSizesOrNumThreads.push_back(ofr);
-    }
-    if (!isConstantIntValue(unpackedTileSizesOrNumThreads.back(), 0))
-      ++numTiledDims;
-  }
-
-  if (unpackedTileSizesOrNumThreads.size() > workload.size()) {
-    return rewriter.notifyMatchFailure(
-        exportOp,
-        "number of " + kindStr + "s overflow the dimension from the workload");
-  }
-
-  // Generate permutation of tiled dims based on the specified mapping.
-  SmallVector<int64_t> mappingPermutation;
-  if (mapping.has_value()) {
-    if (numTiledDims != mapping->size()) {
-      return rewriter.notifyMatchFailure(exportOp,
-                                         "number of mapping elements must "
-                                         "match number of non-zero " +
-                                             kindStr + "s");
-    }
-    for (DeviceMappingAttrInterface map : mapping.value())
-      mappingPermutation.push_back(map.getMappingId());
-  } else {
-    // No mapping specified: No permutation.
-    for (int64_t i = 0; i < numTiledDims; ++i) mappingPermutation.push_back(i);
-  }
-
-  // Compute number of workgroups.
-  SmallVector<OpFoldResult> workgroupCount(3, rewriter.getIndexAttr(1));
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(workgroupCountOp);
-  loc = workgroupCountOp.getLoc();
-  int64_t nextTiledDim = 0;
-  for (int64_t workgroupsDim : mappingPermutation) {
-    // Skip dims with tile size 0. These are not tiled.
-    while (isConstantIntValue(unpackedTileSizesOrNumThreads[nextTiledDim], 0))
-      ++nextTiledDim;
-    if (useNumThreads) {
-      workgroupCount[workgroupsDim] =
-          unpackedTileSizesOrNumThreads[nextTiledDim];
-    } else {
-      AffineExpr s0, s1;
-      bindSymbols(rewriter.getContext(), s0, s1);
-      auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
-      workgroupCount[workgroupsDim] = affine::makeComposedFoldedAffineApply(
-          rewriter, loc, m,
-          ArrayRef<OpFoldResult>{workload[nextTiledDim],
-                                 unpackedTileSizesOrNumThreads[nextTiledDim]});
-    }
-    ++nextTiledDim;
-  }
-
-  rewriter.replaceOp(workgroupCountOp, getValueOrCreateConstantIndexOp(
-                                           rewriter, loc, workgroupCount));
-  return success();
-}
-
-SmallVector<OpFoldResult>
-transform_dialect::TileToForallAndWorkgroupCountRegionOp::getMixedNumThreads() {
-  Builder b(getContext());
-  return getMixedValues(getStaticNumThreads(), getNumThreads(), b);
-}
-
-SmallVector<OpFoldResult>
-transform_dialect::TileToForallAndWorkgroupCountRegionOp::getMixedTileSizes() {
-  Builder b(getContext());
-  return getMixedValues(getStaticTileSizes(), getTileSizes(), b);
-}
-
-LogicalResult
-transform_dialect::TileToForallAndWorkgroupCountRegionOp::verify() {
-  if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
-    return emitOpError("either num_threads or tile_sizes must be specified");
-  return success();
-}
-
-void transform_dialect::TileToForallAndWorkgroupCountRegionOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::onlyReadsHandle(getTileSizes(), effects);
-  transform::onlyReadsHandle(getNumThreads(), effects);
-  transform::producesHandle(getResults(), effects);
+void transform_dialect::IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
+    getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getForAllOp(), effects);
   transform::modifiesPayload(effects);
 }
 
-DiagnosedSilenceableFailure
-transform_dialect::TileToForallAndWorkgroupCountRegionOp::apply(
-    transform::TransformResults &transformResults,
-    transform::TransformState &state) {
-  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-  if (targetOps.empty()) {
-    transformResults.set(getForallOp().cast<OpResult>(), {});
-    transformResults.set(getTiledOp().cast<OpResult>(), {});
-    return DiagnosedSilenceableFailure::success();
-  }
-  if (targetOps.size() != 1) {
-    return mlir::emitDefiniteFailure(
-               state.getTopLevel(),
-               "expected single target op in payload, got: ")
-           << targetOps.size();
-  }
-  auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (failed(exportOp)) {
+DiagnosedSilenceableFailure transform_dialect::
+    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::applyToOne(
+        Operation *target, transform::ApplyToEachResultList &results,
+        transform::TransformState &state) {
+  auto forAllOp = dyn_cast<scf::ForallOp>(target);
+  if (!forAllOp) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "couldn't find export op for func");
+                                     "expected scf.forall operation handle");
+  }
+  if (!forAllOp.isNormalized()) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Expect the for op to be normalized");
+  }
+  IRRewriter rewriter(target->getContext());
+  auto workgroupCount =
+      getMixedValues(forAllOp.getStaticUpperBound(),
+                     forAllOp.getDynamicUpperBound(), rewriter);
+
+  // Account for mapping attribute if present. The attribute used for mapping
+  // provides a mapping ID that is ordered in `x` = 0, `y`=1, and `z` = 2. Use
+  // this to shuffle the workgroup count around.
+  if (auto blockMapping = forAllOp.getMapping()) {
+    // Get the mapping IDs.
+    auto mappingIds = llvm::to_vector(
+        llvm::map_range(blockMapping.value(), [](Attribute mappingAttr) -> int {
+          return mappingAttr.cast<DeviceMappingAttrInterface>().getMappingId();
+        }));
+    int maxId = 0;
+    for (auto id : mappingIds) {
+      maxId = std::max(maxId, id);
+    }
+    SmallVector<OpFoldResult> workgroupCountOrdered(maxId + 1,
+                                                    rewriter.getIndexAttr(1));
+    for (auto [index, mapId] : llvm::enumerate(mappingIds)) {
+      workgroupCountOrdered[maxId - mapId] = workgroupCount[index];
+    }
+    workgroupCount = workgroupCountOrdered;
   }
 
-  /// Lower the workgroup count region in keeping with the way dispatch
-  /// regions are created by default in IREEs compilation flow.
-  IRRewriter rewriter(getContext());
-  if (failed(lowerWorkgroupCountComputingRegion(
-          state, rewriter, getLoc(), exportOp.value(), getMixedNumThreads(),
-          getMixedTileSizes(), getMapping()))) {
-    return mlir::emitDefiniteFailure(exportOp.value(),
+  auto funcOp = forAllOp->getParentOfType<func::FuncOp>();
+  if (failed(
+          lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCount))) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "failed to lower workgroup count region");
   }
-
-  ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
-
-  // Result payload ops.
-  SmallVector<Operation *> tileOps;
-  SmallVector<Operation *> tiledOps;
-
-  DiagnosedSilenceableFailure diag = transform::tileToForallOpImpl(
-      rewriter, state, cast<transform::TransformOpInterface>(getOperation()),
-      targets, getMixedNumThreads(), getMixedTileSizes(), getMapping(), tileOps,
-      tiledOps);
-
-  if (!diag.succeeded()) {
-    transformResults.set(getForallOp().cast<OpResult>(),
-                         SmallVector<mlir::Operation *>{});
-    transformResults.set(getTiledOp().cast<OpResult>(),
-                         SmallVector<mlir::Operation *>{});
-    return diag;
-  }
-
-  transformResults.set(getForallOp().cast<OpResult>(), tileOps);
-  transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -1439,178 +1158,6 @@ void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
-}
-
-//===---------------------------------------------------------------------===//
-// ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp
-//===---------------------------------------------------------------------===//
-
-// Rewrite the workgroup count compute region based on the specified collapsed
-// dimensions on the output tensor. Only the dims that are expected to be tiled
-// and distributed are adjusted, thus considering only the output is sufficient.
-// TODO: This should be deprecated once workgroup count computation is
-// refactored based on slices.
-static LogicalResult adjustWorkgroupCountComputeRegionForImg2Col(
-    transform::TransformState &state, RewriterBase &rewriter, Location loc,
-    HAL::ExecutableExportOp exportOp, AffineMap outputMap,
-    tensor::CollapseShapeOp collapseOp) {
-  Region &r = exportOp.getWorkgroupCount();
-  if (!r.hasOneBlock()) {
-    return rewriter.notifyMatchFailure(exportOp,
-                                       "expected export op to have a workgroup "
-                                       "count region with a single block");
-  }
-  auto workgroupCountOps =
-      r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
-  if (!llvm::hasSingleElement(workgroupCountOps)) {
-    return rewriter.notifyMatchFailure(
-        exportOp,
-        "expected region to have a single "
-        "flow.dispatch.workgroup_count_from_dag_root op");
-  }
-  auto workgroupCountOp = *workgroupCountOps.begin();
-  auto workload = workgroupCountOp.getOperands();
-
-  // Extend the vector with workload values in range [l, r).
-  auto pushRange = [&](SmallVector<Value> &vec, int l, int r) {
-    for (; l < r; l++) vec.push_back(workload[l]);
-  };
-
-  SmallVector<unsigned> workloadDims;
-  for (AffineExpr result : outputMap.getResults()) {
-    workloadDims.push_back(result.cast<AffineDimExpr>().getPosition());
-  }
-  workloadDims.push_back(workload.size());
-  SmallVector<ReassociationIndices> dimCollapseMapping =
-      collapseOp.getReassociationIndices();
-
-  // Adjust the workgroup count computation. This happens by taking the product
-  // of workloads corresponding to groups of collapsed dims. For example,
-  //    workload = [w1, w2, w3, w4, w5, w6, w7, w8]
-  //    dimCollapseMapping = [[0], [1, 2], [3]]
-  //    workloadDims = [1, 3, 4, 5, (8)]
-  // will collapse to
-  //    newWorkload = [w1, w2, w3, w4 * w5, w6, w7, w8]
-  SmallVector<Value> newWorkload;
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(workgroupCountOp);
-  loc = workgroupCountOp.getLoc();
-  for (auto indices : dimCollapseMapping) {
-    // If there is a single index we can just push the corresponding workload
-    // arg.
-    if (indices.size() == 1) {
-      int64_t index = indices[0];
-      pushRange(newWorkload, workloadDims[index], workloadDims[index + 1]);
-      continue;
-    }
-
-    assert(indices.size());
-    SmallVector<AffineExpr> syms(indices.size());
-    bindSymbolsList(rewriter.getContext(), MutableArrayRef<AffineExpr>{syms});
-    SmallVector<Value> originalSizes;
-    AffineExpr product = syms[0];
-    SmallVector<Value> skipped;
-    for (auto [enIndex, dimIndex] : llvm::enumerate(indices)) {
-      originalSizes.push_back(workload[workloadDims[dimIndex]]);
-      if (enIndex > 0) {
-        // Push any skipped workload values.
-        pushRange(skipped, workloadDims[dimIndex - 1] + 1,
-                  workloadDims[dimIndex]);
-        product = product * syms[enIndex];
-      }
-    }
-
-    // Make+push the collapsed workload value, followed by all values
-    // until the next dim affected by the collapse_shape op.
-    auto m = AffineMap::get(0, indices.size(), product);
-    Value collapsedIndex =
-        affine::makeComposedAffineApply(rewriter, loc, m, originalSizes);
-    newWorkload.push_back(collapsedIndex);
-    newWorkload.append(skipped);
-    pushRange(newWorkload, workloadDims[indices.back()] + 1,
-              workloadDims[indices.back() + 1]);
-  }
-
-  rewriter.replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
-      workgroupCountOp, newWorkload);
-  return success();
-}
-
-DiagnosedSilenceableFailure
-transform_dialect::ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp::applyToOne(
-    linalg::LinalgOp target, transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  auto funcOp = target->getParentOfType<func::FuncOp>();
-
-  // Get the output map for the target operation before rewriting.
-  AffineMap outputMap = target.getIndexingMapsArray().back();
-
-  IRRewriter rewriter(target->getContext());
-  rewriter.setInsertionPoint(target);
-  // TODO: Extend this to other convolution cases by handling cases beyond
-  // collapse -> matmul -> expand from the patterns for 2D convolutions handled
-  // here.
-  auto maybeTransformed =
-      TypeSwitch<Operation *, FailureOr<std::pair<Operation *, Operation *>>>(
-          target)
-          .Case([&](linalg::Conv2DNhwcHwcfOp op) {
-            return rewriteInIm2Col(rewriter, op);
-          })
-          .Case([&](linalg::Conv2DNchwFchwOp op) {
-            return rewriteInIm2Col(rewriter, op);
-          })
-          .Default([&](Operation *op) {
-            return rewriter.notifyMatchFailure(op, "not supported");
-          });
-  if (failed(maybeTransformed)) return emitDefaultSilenceableFailure(target);
-
-  Operation *im2col = maybeTransformed->first;
-  Operation *convReplacement = maybeTransformed->second;
-
-  // Push handles for the im2col operation and the operation that replaces the
-  // original convolution.
-  results.push_back(im2col);
-  // Handle to the operation that replaces the original convolution.
-  results.push_back(convReplacement);
-
-  // If there is no export region, no adjustment needed.
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (failed(exportOp)) return DiagnosedSilenceableFailure::success();
-
-  // The result of the im2col pattern is expected to be an expand on the matmul
-  // output.
-  auto expandShapeOp = dyn_cast<tensor::ExpandShapeOp>(convReplacement);
-  if (!expandShapeOp)
-    return mlir::emitDefiniteFailure(target,
-                                     "im2col matmul output not expanded");
-
-  auto matmulOp = expandShapeOp.getSrc().getDefiningOp<linalg::LinalgOp>();
-  if (!matmulOp || !isaContractionOpInterface(matmulOp))
-    return mlir::emitDefiniteFailure(target, "im2col matmul not found");
-
-  // If there is no collapse then the workgroup count compute region doesn't
-  // need to be updated.
-  auto outputCollapse = matmulOp.getDpsInitOperand(0)
-                            ->get()
-                            .getDefiningOp<tensor::CollapseShapeOp>();
-  if (!outputCollapse) return DiagnosedSilenceableFailure::success();
-
-  /// Lower the workgroup count region in keeping with the way dispatch
-  /// regions are created by default in IREEs compilation flow.
-  if (failed(adjustWorkgroupCountComputeRegionForImg2Col(
-          state, rewriter, getLoc(), exportOp.value(), outputMap,
-          outputCollapse))) {
-    return mlir::emitDefiniteFailure(convReplacement,
-                                     "failed to adjust workgroup count region");
-  }
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
-  result.addOperands(target);
-  MLIRContext *ctx = builder.getContext();
-  result.addTypes({pdl::OperationType::get(ctx), pdl::OperationType::get(ctx)});
 }
 
 #define GET_OP_CLASSES

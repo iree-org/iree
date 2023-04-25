@@ -13,8 +13,9 @@ transform.sequence failures(propagate) {
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %not_root = merge_handles %fill, %red : !pdl.operation
   %forall, %tiled_generic =
-    transform.iree.tile_to_forall_and_workgroup_count_region %root tile_sizes [1, 4]
+    transform.structured.tile_to_forall_op %root tile_sizes [1, 4]
     ( mapping = [#gpu.block<x>, #gpu.block<y>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!pdl.operation) -> ()
   transform.structured.fuse_into_containing_op %not_root into %forall
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.

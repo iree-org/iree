@@ -721,34 +721,6 @@ static unsigned decideFusableLinalgOps(
 // Dispatch region formation
 //===----------------------------------------------------------------------===//
 
-static void buildSetEncodingWorkloadRegion(OpBuilder &builder, Location loc,
-                                           ArrayRef<BlockArgument> args) {
-  auto numWorkgroupsOp =
-      builder.create<Flow::DispatchWorkgroupCountFromSetEncodingOp>(loc, args);
-  builder.create<Flow::ReturnOp>(loc, numWorkgroupsOp.getResults());
-}
-
-static void buildDefaultWorkloadRegion(OpBuilder &builder, Location loc,
-                                       ArrayRef<BlockArgument> args) {
-  auto numWorkgroupsOp =
-      builder.create<Flow::DispatchWorkgroupCountFromDagRootOp>(loc, args);
-  builder.create<Flow::ReturnOp>(loc, numWorkgroupsOp.getResults());
-}
-
-FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
-                                                    Operation *rootOp) {
-  Flow::WorkloadBuilder result;
-  // The workload region of the WorkgroupsOp is populated by the
-  // `regionBuilder` during ConvertRegionToWorkgroups .
-  if (isa<LinalgExt::SetEncodingOp>(rootOp)) {
-    result.regionBuilder = buildSetEncodingWorkloadRegion;
-  } else {
-    result.regionBuilder = buildDefaultWorkloadRegion;
-  }
-
-  return result;
-}
-
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
 static LogicalResult createFusionGroups(
     TensorDimTrackingRewriter &rewriter, FunctionOpInterface funcOp,
@@ -783,18 +755,7 @@ static LogicalResult createFusionGroups(
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Flow::DispatchRegionOp> regionOps;
-  DenseMap<Flow::DispatchRegionOp, std::optional<Flow::WorkloadBuilder>>
-      workloadBuilders;
   for (const auto &it : llvm::enumerate(roots)) {
-    // Compute workload.
-    std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
-    if (options.generateWorkloadRegion) {
-      auto maybeBuilder = iree_compiler::IREE::Flow::getWorkloadBuilder(
-          rewriter, /*rootOp=*/it.value());
-      if (failed(maybeBuilder)) return failure();
-      workloadBuilder = *maybeBuilder;
-    }
-
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
@@ -805,8 +766,7 @@ static LogicalResult createFusionGroups(
 
     // Create fusion group.
     Flow::DispatchRegionOp regionOp;
-    auto maybeRegionOp =
-        Flow::wrapOpInDispatchRegion(rewriter, it.value(), workloadBuilder);
+    auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, it.value());
     if (failed(maybeRegionOp)) return failure();
     regionOp = *maybeRegionOp;
 
@@ -831,6 +791,13 @@ static LogicalResult createFusionGroups(
           movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
       if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
+    }
+    // Simplify tensor::DimOps.
+    {
+      SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        return failure();
+      }
     }
     regionOps.push_back(regionOp);
   }

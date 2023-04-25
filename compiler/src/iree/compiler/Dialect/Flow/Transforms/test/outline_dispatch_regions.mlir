@@ -292,19 +292,23 @@ func.func @main() -> tensor<4x8xf32> {
 func.func @main(%arg0: tensor<?x?xf32>, %arg1: index, %arg2: index, %arg3: tensor<?x?xf32>, %arg4: index, %arg5: index) -> (tensor<?x?xf32>, index, index) {
   %0 = flow.tensor.tie_shape %arg0 : tensor<?x?xf32>{%arg1, %arg2}
   %1 = flow.tensor.tie_shape %arg3 : tensor<?x?xf32>{%arg4, %arg5}
-  %2 = flow.dispatch.workgroups[%arg4, %arg5](%0, %1, %arg1, %arg2, %arg4, %arg5) : (tensor<?x?xf32>{%arg1, %arg2}, tensor<?x?xf32>{%arg4, %arg5}, index, index, index, index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>{%arg4, %arg5} =
+  %2 = flow.dispatch.workgroups[%arg1, %arg2, %arg4, %arg5](%0, %1, %arg1, %arg2, %arg4, %arg5) : (tensor<?x?xf32>{%arg1, %arg2}, tensor<?x?xf32>{%arg4, %arg5}, index, index, index, index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>{%arg4, %arg5} =
       (%arg6: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg7: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg8: index, %arg9: index, %arg10: index, %arg11: index, %arg12: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>) {
-    %4 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg8, %arg9}
-    %5 = flow.dispatch.tie_shape %arg7 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg10, %arg11}
-    %6 = flow.dispatch.tie_shape %arg12 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%arg10, %arg11}
-    %7 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%arg8, %arg9], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg8, %arg9} -> tensor<?x?xf32>
-    %8 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%arg10, %arg11], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg10, %arg11} -> tensor<?x?xf32>
+    %arg8_0 = flow.dispatch.workload.ordinal %arg8 0 : index
+    %arg9_0 = flow.dispatch.workload.ordinal %arg9 1 : index
+    %arg10_0 = flow.dispatch.workload.ordinal %arg10 2 : index
+    %arg11_0 = flow.dispatch.workload.ordinal %arg11 3 : index
+    %4 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg8_0, %arg9_0}
+    %5 = flow.dispatch.tie_shape %arg7 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg10_0, %arg11_0}
+    %6 = flow.dispatch.tie_shape %arg12 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%arg10_0, %arg11_0}
+    %7 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%arg8_0, %arg9_0], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg8_0, %arg9_0} -> tensor<?x?xf32>
+    %8 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%arg10_0, %arg11_0], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg10_0, %arg11_0} -> tensor<?x?xf32>
     %mapped = linalg.map { math.absf } ins(%7 : tensor<?x?xf32>) outs(%8 : tensor<?x?xf32>)
     %9 = iree_linalg_ext.set_encoding %mapped : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>
-    flow.dispatch.tensor.store %9, %6, offsets = [0, 0], sizes = [%arg10, %arg11], strides = [1, 1] : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%arg10, %arg11}
+    flow.dispatch.tensor.store %9, %6, offsets = [0, 0], sizes = [%arg10_0, %arg11_0], strides = [1, 1] : tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%arg10, %arg11}
     flow.return
-  } count(%arg6: index, %arg7: index) -> (index, index, index) {
-    %x, %y, %z = flow.dispatch.workgroup_count_from_set_encoding_op %arg6, %arg7
+  } count(%arg6: index, %arg7: index, %arg8: index, %arg9: index) -> (index, index, index) {
+    %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg6, %arg7, %arg8, %arg9
     flow.return %x, %y, %z : index, index, index
   }
   %3 = flow.dispatch.workgroups[%arg4, %arg5](%2, %arg4, %arg5) : (tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>{%arg4, %arg5}, index, index) -> tensor<?x?xf32>{%arg4, %arg5} =
