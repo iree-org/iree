@@ -12,10 +12,12 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -116,6 +118,72 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
     return builder.create<affine::AffineApplyOp>(
         rootOp->getLoc(), workload, ValueRange{offset, size, stride});
   }));
+}
+
+/// For very specific cases where the shape is data dependent, we cannot
+/// use the normal way of workgroup count calculation through use of
+/// program slices within the body of the op. This is because
+/// the program slice will also include other tensors.. The general solution
+/// here requires making the workgroup count calculation also run on the device.
+/// This isnt plumbed through yet. For these, just use
+/// the workgroup count calculation based on the root of the DAG.
+static bool checkShapeIsDataDependant(Operation *op) {
+  if (auto linalgOp = dyn_cast<linalg::GenericOp>(op)) {
+    /// Currently checked case is
+    /// - linalg.generic op
+    /// - all parallel iterators
+    /// - output shape depends on tensor.extract;
+    if (!llvm::all_of(linalgOp.getIteratorTypesArray(),
+                      linalg::isParallelIterator)) {
+      return false;
+    }
+    auto filterFn = [](Operation *op) {
+      // Only look for slices with a few ops to not blow up the slice
+      // computation.
+      if (!isa<arith::IndexCastOp, tensor::EmptyOp, tensor::ExtractOp>(op)) {
+        return false;
+      }
+      // The slice computation method has an assert that the parent op
+      // needs to have a single region with a single block. This seems
+      // unnecessary for IREEs use case. For now avoid this assert by bailing if
+      // any operands are block arguments.
+      if (llvm::any_of(op->getOperands(),
+                       [](Value v) { return v.isa<BlockArgument>(); })) {
+        auto parentOp = op->getParentOp();
+        if (parentOp->getNumRegions() != 1 ||
+            parentOp->getRegion(0).getBlocks().size() != 1) {
+          return false;
+        }
+      }
+      return true;
+    };
+    llvm::SetVector<Operation *> slice;
+    for (OpOperand *initOperand : linalgOp.getDpsInitOperands()) {
+      mlir::getBackwardSlice(initOperand->get(), &slice, filterFn,
+                             /*inclusive =*/true);
+    }
+    return llvm::any_of(
+        slice, [](Operation *op) { return isa<tensor::ExtractOp>(op); });
+  }
+  return false;
+}
+
+/// Populate the workgroup count calculation to be based on root of the DAG op.
+/// These is the legacy path for workgroup count calculation that
+/// arent handled by the current default.
+static void createWorkgroupCountFromDagRootRegion(
+    RewriterBase &rewriter, Location loc, Flow::DispatchRegionOp &regionOp,
+    TypeRange workloadTypes, ArrayRef<Location> workloadLocs) {
+  Region &countRegion = regionOp.getWorkgroupCount();
+  if (!countRegion.empty()) return;
+  Block *body = rewriter.createBlock(&countRegion, countRegion.begin(),
+                                     workloadTypes, workloadLocs);
+  auto args = body->getArguments();
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointToStart(body);
+  auto countOp =
+      rewriter.create<Flow::DispatchWorkgroupCountFromDagRootOp>(loc, args);
+  rewriter.create<Flow::ReturnOp>(loc, countOp->getResults());
 }
 
 /// Return `true` if the given type is a ShapedType and has at least one
@@ -237,13 +305,13 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
 }
 
 Flow::DispatchRegionOp Flow::makeEmptyDispatchRegion(OpBuilder &builder,
-                                                     Location loc) {
+                                                     Location loc,
+                                                     ValueRange workload) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
   auto regionOp = builder.create<Flow::DispatchRegionOp>(
-      loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(),
-      /*workload=*/ValueRange());
+      loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(), workload);
   Block &body = regionOp.getBody().emplaceBlock();
   builder.setInsertionPointToStart(&body);
   builder.create<Flow::ReturnOp>(loc, ValueRange());
@@ -348,12 +416,29 @@ FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
     RewriterBase &rewriter, Operation *op) {
   OpBuilder::InsertionGuard g(rewriter);
 
+  SmallVector<Value> workload;
+  bool useWorkloadCountFromDagRootMode = checkShapeIsDataDependant(op);
+  if (useWorkloadCountFromDagRootMode) {
+    rewriter.setInsertionPoint(op);
+    workload = getWorkloadForRootOp(rewriter, op);
+  }
+
   rewriter.setInsertionPointAfter(op);
   Flow::DispatchRegionOp regionOp =
-      Flow::makeEmptyDispatchRegion(rewriter, op->getLoc());
+      Flow::makeEmptyDispatchRegion(rewriter, op->getLoc(), workload);
 
   // Move the op into the dispatch region.
   auto newRegionOp = movePrecedingOpIntoDispatchRegion(rewriter, op, regionOp);
+
+  if (succeeded(newRegionOp) && useWorkloadCountFromDagRootMode) {
+    auto newWorkload = newRegionOp->getWorkload();
+    auto workloadTypes = llvm::to_vector(
+        llvm::map_range(newWorkload, [](Value v) { return v.getType(); }));
+    auto workloadLocs = llvm::to_vector(
+        llvm::map_range(newWorkload, [](Value v) { return v.getLoc(); }));
+    createWorkgroupCountFromDagRootRegion(rewriter, op->getLoc(), *newRegionOp,
+                                          workloadTypes, workloadLocs);
+  }
 
   return newRegionOp;
 }

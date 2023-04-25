@@ -37,8 +37,8 @@ FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
     const SmallVector<Value> &dynamicDims);
 
 /// Create an empty DispatchRegionOp.
-Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder,
-                                               Location loc);
+Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder, Location loc,
+                                               ValueRange workload);
 
 /// Clone a `target` op that is preceding the given dispatch region op into the
 /// dispatch region.

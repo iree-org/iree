@@ -792,6 +792,13 @@ static LogicalResult createFusionGroups(
       if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
     }
+    // Simplify tensor::DimOps.
+    {
+      SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
+      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        return failure();
+      }
+    }
     regionOps.push_back(regionOp);
   }
 

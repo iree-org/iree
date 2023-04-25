@@ -336,3 +336,41 @@ func.func @unpack_encoding_elementwise_fusion(
 //  CHECK-SAME:         ins(%[[UNPACK]], %[[ARG1]]
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @data_dependent_shape(%arg0 : tensor<f32>, %arg1 : tensor<2xi32>)
+    -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0_i32 = tensor.extract %arg1[%c0] : tensor<2xi32>
+  %d0 = arith.index_cast %d0_i32 : i32 to index
+  %d1_i32 = tensor.extract %arg1[%c1] : tensor<2xi32>
+  %d1 = arith.index_cast %d1_i32 : i32 to index
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  %generic = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> ()>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<f32>) outs(%empty : tensor<?x?xf32>) {
+    ^bb0(%b0: f32, %b1 : f32):
+      linalg.yield %b0 : f32
+    } -> tensor<?x?xf32>
+  return %generic : tensor<?x?xf32>
+}
+//      CHECK: func @data_dependent_shape(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<f32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<2xi32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//      CHECK:   %[[D0_I32:.+]] = tensor.extract %[[ARG1]][%[[C0]]]
+//      CHECK:   %[[D0:.+]] = arith.index_cast %[[D0_I32]]
+//      CHECK:   %[[D1_I32:.+]] = tensor.extract %[[ARG1]][%[[C1]]]
+//      CHECK:   %[[D1:.+]] = arith.index_cast %[[D1_I32]]
+//      CHECK:   %[[WL0:.+]] = affine.apply
+// CHECK-SAME:       %[[D0]]
+//      CHECK:   %[[WL1:.+]] = affine.apply
+// CHECK-SAME:       %[[D1]]
+//      CHECK:   flow.dispatch.region[%[[WL0]], %[[WL1]]]
+//      CHECK:     count(%[[B0:.+]]: index, %[[B1:.+]]: index)
+//      CHECK:       %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_dag_root %[[B0]], %[[B1]]
+//      CHECK:       flow.return %[[X]], %[[Y]], %[[Z]]
