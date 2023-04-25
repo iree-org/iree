@@ -77,7 +77,7 @@ pushd ${BUILD_DIR}
 # Note: The sample creates a device directly, so no drivers are required.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_HOST_BINARY_ROOT=${INSTALL_ROOT} \
+  -DIREE_HOST_BIN_DIR="${INSTALL_ROOT}/bin" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_ENABLE_THREADING=OFF \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
@@ -95,5 +95,5 @@ popd
 echo "=== Copying static files (.html, .js) to the build directory ==="
 
 cp ${SOURCE_DIR?}/index.html ${BINARY_DIR}
-cp ${ROOT_DIR?}/docs/website/overrides/ghost.svg ${BINARY_DIR}
+cp "${ROOT_DIR}/docs/website/overrides/.icons/iree/ghost.svg" "${BINARY_DIR}"
 cp ${SOURCE_DIR?}/iree_api_webgpu.js ${BINARY_DIR}

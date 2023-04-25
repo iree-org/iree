@@ -92,10 +92,10 @@ static void iree_hal_webgpu_simple_allocator_query_statistics(
 }
 
 static iree_hal_buffer_compatibility_t
-iree_hal_webgpu_simple_allocator_query_compatibility(
+iree_hal_webgpu_simple_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
-    const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size) {
+    iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_device_size_t* IREE_RESTRICT allocation_size) {
   // TODO(benvanik): check to ensure the allocator can serve the memory type.
 
   // All buffers can be allocated on the heap.
@@ -117,6 +117,11 @@ iree_hal_webgpu_simple_allocator_query_compatibility(
   if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
     return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
   }
+
+  // Guard against the corner case where the requested buffer size is 0. The
+  // application is unlikely to do anything when requesting a 0-byte buffer; but
+  // it can happen in real world use cases. So we should at least not crash.
+  if (*allocation_size == 0) *allocation_size = 4;
 
   return compatibility;
 }
@@ -252,7 +257,8 @@ const iree_hal_allocator_vtable_t iree_hal_webgpu_simple_allocator_vtable = {
     .host_allocator = iree_hal_webgpu_simple_allocator_host_allocator,
     .trim = iree_hal_webgpu_simple_allocator_trim,
     .query_statistics = iree_hal_webgpu_simple_allocator_query_statistics,
-    .query_compatibility = iree_hal_webgpu_simple_allocator_query_compatibility,
+    .query_buffer_compatibility =
+        iree_hal_webgpu_simple_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_webgpu_simple_allocator_allocate_buffer,
     .deallocate_buffer = iree_hal_webgpu_simple_allocator_deallocate_buffer,
     .import_buffer = iree_hal_webgpu_allocator_import_buffer,

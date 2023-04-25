@@ -380,6 +380,8 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
 
 # Our Emscripten library code uses dynCall, which needs these link flags.
 # TODO(scotttodd): Find a way to refactor this, this is nasty to always set :(
+#                  In particular, this is incompatible with any sample that
+#                  also sets its own `-sEXPORTED_RUNTIME_METHODS=` list
 if(EMSCRIPTEN)
   iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ALL
