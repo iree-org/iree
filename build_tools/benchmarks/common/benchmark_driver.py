@@ -7,13 +7,12 @@
 import json
 import pathlib
 import time
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import List, Optional, Sequence, Set, Tuple
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
-                                         BenchmarkLatency, BenchmarkMetrics,
-                                         BenchmarkRun, DeviceInfo,
-                                         get_google_benchmark_latencies)
+                                         BenchmarkMetrics, BenchmarkRun,
+                                         DeviceInfo)
 
 
 class BenchmarkDriver(object):
@@ -245,20 +244,3 @@ class BenchmarkDriver(object):
       print(f"Available loaders: {available_loaders_str}")
 
     return available_drivers, available_loaders
-
-
-class IreeBenchmarkDriver(BenchmarkDriver):
-
-  def _parse_and_serialize_benchmark_metrics(
-      self, results_filename: pathlib.Path,
-      benchmark_stdout: str) -> BenchmarkMetrics:
-    iree_benchmark_json = json.loads(benchmark_stdout)
-    real_time, cpu_time = get_google_benchmark_latencies(iree_benchmark_json)
-    benchmark_metrics = BenchmarkMetrics(
-        real_time=real_time,
-        cpu_time=cpu_time,
-        raw_data=iree_benchmark_json,
-    )
-    with open(results_filename, "w") as f:
-      f.write(json.dumps(benchmark_metrics.to_json_object()))
-    return benchmark_metrics

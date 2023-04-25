@@ -42,12 +42,11 @@ import shutil
 
 from typing import Any, Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
-from common.benchmark_driver import IreeBenchmarkDriver
-from common.benchmark_definition import (DriverInfo, execute_cmd,
-                                         execute_cmd_and_get_output,
-                                         get_git_commit_hash,
-                                         get_iree_benchmark_module_arguments,
-                                         wait_for_iree_benchmark_module_start)
+from common.benchmark_driver import BenchmarkDriver
+from common.benchmark_definition import (
+    DriverInfo, execute_cmd, execute_cmd_and_get_output, get_git_commit_hash,
+    get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start,
+    parse_and_serialize_iree_benchmark_metrics)
 from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
                                     BenchmarkSuite)
 from common.android_device_utils import (get_android_device_model,
@@ -175,7 +174,7 @@ def get_vmfb_full_path_for_benchmark_case(
   raise ValueError(f"{flagfile} does not contain a --module flag")
 
 
-class AndroidBenchmarkDriver(IreeBenchmarkDriver):
+class AndroidBenchmarkDriver(BenchmarkDriver):
   """Android benchmark driver."""
 
   def __init__(self, *args, **kwargs):
@@ -234,7 +233,7 @@ class AndroidBenchmarkDriver(IreeBenchmarkDriver):
     benchmark_stdout = adb_execute_and_get_output(cmd,
                                                   android_case_dir,
                                                   verbose=self.verbose)
-    benchmark_metrics = self._parse_and_serialize_benchmark_metrics(
+    benchmark_metrics = parse_and_serialize_iree_benchmark_metrics(
         results_filename, benchmark_stdout)
     if self.verbose:
       print(benchmark_metrics)

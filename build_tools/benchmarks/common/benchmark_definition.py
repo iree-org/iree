@@ -464,6 +464,20 @@ class BenchmarkMetrics(object):
     )
 
 
+def parse_and_serialize_iree_benchmark_metrics(
+    results_filename: pathlib.Path, benchmark_stdout: str) -> BenchmarkMetrics:
+  iree_benchmark_json = json.loads(benchmark_stdout)
+  real_time, cpu_time = get_google_benchmark_latencies(iree_benchmark_json)
+  benchmark_metrics = BenchmarkMetrics(
+      real_time=real_time,
+      cpu_time=cpu_time,
+      raw_data=iree_benchmark_json,
+  )
+  with open(results_filename, "w") as f:
+    f.write(json.dumps(benchmark_metrics.to_json_object()))
+  return benchmark_metrics
+
+
 @dataclasses.dataclass
 class BenchmarkRun(object):
   """An object describing a single run of the benchmark binary.
