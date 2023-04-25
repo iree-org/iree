@@ -25,7 +25,7 @@ DOCKER_IMAGE_SHORTNAME_DICT = {
 
 configure_base = SourceFileLoader("configure_base",
                                   str(CURRENT_DIR.parent /
-                                      "configure")).load_module()
+                                      "configure.py")).load_module()
 
 
 def is_nvidia_gpu_available():
