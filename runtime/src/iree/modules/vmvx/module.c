@@ -523,10 +523,7 @@ IREE_VMVX_ABI_FIXED_STRUCT(mmt4d, rIIrIIrIIIIIiiii, {
 });
 IREE_VMVX_ABI_DEFINE_SHIM(mmt4d, v);
 
-static iree_status_t iree_vmvx_mmt4d(int lhs_elem_size, int rhs_elem_size,
-                                     int out_elem_size,
-                                     const iree_vm_abi_mmt4d_t* args) {
-  IREE_TRACE_ZONE_BEGIN(z0);
+IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d, mmt4d, v) {
   iree_host_size_t M = (iree_host_size_t)args->m;
   iree_host_size_t N = (iree_host_size_t)args->n;
   iree_host_size_t K = (iree_host_size_t)args->k;
@@ -536,20 +533,35 @@ static iree_status_t iree_vmvx_mmt4d(int lhs_elem_size, int rhs_elem_size,
   iree_host_size_t lhs_tile_size = M0 * K0;
   iree_host_size_t rhs_tile_size = N0 * K0;
   iree_host_size_t out_tile_size = M0 * N0;
+  int in_elem_size = 0;
+  int out_elem_size = 0;
+  switch (args->flags & IREE_UK_FLAG_MMT4D_TYPE_MASK) {
+    case IREE_UK_FLAG_MMT4D_TYPE_F32F32F32:
+      in_elem_size = 4;
+      out_elem_size = 4;
+      break;
+    case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
+      in_elem_size = 1;
+      out_elem_size = 4;
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "unhandled flags");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
   // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
   // Thanks to the requirement that all dimensions but the outer-most one are
   // contiguous row-major, the outer-most stride is the only nontrivial stride,
   // we can correctly coalesce the inner 3 dimensions without changing the
   // mapped span.
   MAP_BUFFER_2D_UNTYPED_RO(lhs,
-                           /*dtype_size=*/lhs_elem_size,
+                           /*dtype_size=*/in_elem_size,
                            /*buffer_ref=*/args->lhs_ref,
                            /*offset=*/args->lhs_offset,
                            /*stride0=*/args->lhs_row_stride,
                            /*stride1=*/1,
                            /*size0=*/M,
                            /*size1=*/K * lhs_tile_size);
-  MAP_BUFFER_2D_UNTYPED_RO(rhs, /*dtype_size=*/rhs_elem_size,
+  MAP_BUFFER_2D_UNTYPED_RO(rhs, /*dtype_size=*/in_elem_size,
                            /*buffer_ref=*/args->rhs_ref,
                            /*offset=*/args->rhs_offset,
                            /*stride0=*/args->rhs_row_stride,
@@ -584,14 +596,6 @@ static iree_status_t iree_vmvx_mmt4d(int lhs_elem_size, int rhs_elem_size,
   return iree_ok_status();
 }
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
-  return iree_vmvx_mmt4d(4, 4, 4, args);
-}
-
-IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
-  return iree_vmvx_mmt4d(1, 1, 4, args);
-}
-
 //===----------------------------------------------------------------------===//
 // Exported pack function definitions
 //===----------------------------------------------------------------------===//
@@ -614,19 +618,30 @@ IREE_VMVX_ABI_FIXED_STRUCT(pack, rIIIrIIIIIIIIIi, {
 });
 IREE_VMVX_ABI_DEFINE_SHIM(pack, v);
 
-static iree_status_t iree_vmvx_pack(int in_elem_size, int out_elem_size,
-                                    const iree_vm_abi_pack_t* args) {
-  IREE_TRACE_ZONE_BEGIN(z0);
+IREE_VMVX_ABI_EXPORT(iree_vmvx_pack, pack, v) {
   iree_host_size_t out_tile_size = args->out_size2 * args->out_size3;
+  int elem_size = 0;
+  switch (args->flags & IREE_UK_FLAG_PACK_TYPE_MASK) {
+    case IREE_UK_FLAG_PACK_TYPE_F32F32:
+    case IREE_UK_FLAG_PACK_TYPE_I32I32:
+      elem_size = 4;
+      break;
+    case IREE_UK_FLAG_PACK_TYPE_I8I8:
+      elem_size = 1;
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "unhandled flags");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
   MAP_BUFFER_2D_UNTYPED_RO(in,
-                           /*dtype_size=*/in_elem_size,
+                           /*dtype_size=*/elem_size,
                            /*buffer_ref=*/args->in_ref,
                            /*offset=*/args->in_offset,
                            /*stride0=*/args->in_stride0,
                            /*stride1=*/1,
                            /*size0=*/args->in_size0,
                            /*size1=*/args->in_size1);
-  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/out_elem_size,
+  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/elem_size,
                            /*buffer_ref=*/args->out_ref,
                            /*offset=*/args->out_offset,
                            /*stride0=*/args->out_stride0,
@@ -653,18 +668,6 @@ static iree_status_t iree_vmvx_pack(int in_elem_size, int out_elem_size,
   return iree_ok_status();
 }
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_f32f32, pack, v) {
-  return iree_vmvx_pack(4, 4, args);
-}
-
-IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i8i8, pack, v) {
-  return iree_vmvx_pack(1, 1, args);
-}
-
-IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i32i32, pack, v) {
-  return iree_vmvx_pack(4, 4, args);
-}
-
 //===----------------------------------------------------------------------===//
 // Exported unpack function definitions
 //===----------------------------------------------------------------------===//
@@ -686,19 +689,27 @@ IREE_VMVX_ABI_FIXED_STRUCT(unpack, rIIIrIIIIIIIIi, {
 });
 IREE_VMVX_ABI_DEFINE_SHIM(unpack, v);
 
-static iree_status_t iree_vmvx_unpack(int in_elem_size, int out_elem_size,
-                                      const iree_vm_abi_unpack_t* args) {
-  IREE_TRACE_ZONE_BEGIN(z0);
+IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack, unpack, v) {
   iree_host_size_t out_tile_size = args->in_size2 * args->in_size3;
+  int elem_size = 0;
+  switch (args->flags & IREE_UK_FLAG_UNPACK_TYPE_MASK) {
+    case IREE_UK_FLAG_UNPACK_TYPE_F32F32:
+    case IREE_UK_FLAG_UNPACK_TYPE_I32I32:
+      elem_size = 4;
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "unhandled flags");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
   MAP_BUFFER_2D_UNTYPED_RO(in,
-                           /*dtype_size=*/in_elem_size,
+                           /*dtype_size=*/elem_size,
                            /*buffer_ref=*/args->in_ref,
                            /*offset=*/args->in_offset,
                            /*stride0=*/args->in_stride0,
                            /*stride1=*/1,
                            /*size0=*/args->in_size0,
                            /*size1=*/args->in_size1 * out_tile_size);
-  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/out_elem_size,
+  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/elem_size,
                            /*buffer_ref=*/args->out_ref,
                            /*offset=*/args->out_offset,
                            /*stride0=*/args->out_stride0,
@@ -722,14 +733,6 @@ static iree_status_t iree_vmvx_unpack(int in_elem_size, int out_elem_size,
   iree_uk_unpack(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
-}
-
-IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_f32f32, unpack, v) {
-  return iree_vmvx_unpack(4, 4, args);
-}
-
-IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i32i32, unpack, v) {
-  return iree_vmvx_unpack(4, 4, args);
 }
 
 //===----------------------------------------------------------------------===//

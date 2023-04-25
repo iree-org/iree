@@ -51,18 +51,14 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Type lhsElemType = lhsType.getElementType();
   Type rhsElemType = rhsType.getElementType();
   Type outElemType = outType.getElementType();
-  std::string fnName;
   uint32_t flags = 0;
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.mmt4d.i8i8i32";
     flags = IREE_UK_FLAG_MMT4D_TYPE_I8I8I32;
   } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
              outElemType.isF32()) {
-    fnName = "vmvx.mmt4d.f32f32f32";
     flags = IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
-  }
-  if (fnName.empty()) {
+  } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
   }
@@ -88,7 +84,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fnName, ValueRange{lhs, rhs}, out,
+      loc, outType, "vmvx.mmt4d", ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
@@ -103,17 +99,13 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   auto outType = out.getType().cast<ShapedType>();
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
-  std::string fnName;
   uint32_t flags = 0;
   if (inElemType.isSignlessInteger(8) && outElemType.isSignlessInteger(8)) {
-    fnName = "vmvx.pack.i8i8";
     flags = IREE_UK_FLAG_PACK_TYPE_I8I8;
   } else if (inElemType.isSignlessInteger(32) &&
              outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.pack.i32i32";
     flags = IREE_UK_FLAG_PACK_TYPE_I32I32;
   } else if (inElemType.isF32() && outElemType.isF32()) {
-    fnName = "vmvx.pack.f32f32";
     flags = IREE_UK_FLAG_PACK_TYPE_F32F32;
   } else {
     return rewriter.notifyMatchFailure(
@@ -200,7 +192,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fnName, in, out,
+      loc, outType, "vmvx.pack", in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
@@ -216,13 +208,10 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   auto outType = out.getType().cast<ShapedType>();
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
-  std::string fnName;
   uint32_t flags = 0;
   if (inElemType.isSignlessInteger(32) && outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.unpack.i32i32";
     flags = IREE_UK_FLAG_UNPACK_TYPE_I32I32;
   } else if (inElemType.isF32() && outElemType.isF32()) {
-    fnName = "vmvx.unpack.f32f32";
     flags = IREE_UK_FLAG_UNPACK_TYPE_F32F32;
   } else {
     return rewriter.notifyMatchFailure(
@@ -277,7 +266,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fnName, in, out,
+      loc, outType, "vmvx.unpack", in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));

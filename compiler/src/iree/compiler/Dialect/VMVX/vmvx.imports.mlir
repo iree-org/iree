@@ -417,26 +417,7 @@ vm.import private @fill.2d.x32(
 // mmt4d ops
 //==============================================================================
 
-vm.import private @mmt4d.f32f32f32(
-  %lhs_buffer : !vm.buffer,
-  %lhs_offset : i64,
-  %lhs_row_stride : i64,
-  %rhs_buffer : !vm.buffer,
-  %rhs_offset : i64,
-  %rhs_row_stride : i64,
-  %out_buffer : !vm.buffer,
-  %out_offset : i64,
-  %out_row_stride : i64,
-  %m : i64,
-  %n : i64,
-  %k : i64,
-  %m0 : i32,
-  %n0 : i32,
-  %k0 : i32,
-  %flags : i32
-)
-
-vm.import private @mmt4d.i8i8i32(
+vm.import private @mmt4d(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_row_stride : i64,
@@ -459,7 +440,7 @@ vm.import private @mmt4d.i8i8i32(
 // pack ops
 //==============================================================================
 
-vm.import private @pack.f32f32(
+vm.import private @pack(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_stride0 : i64,
@@ -472,40 +453,6 @@ vm.import private @pack.f32f32(
   %out_size1 : i64,
   %out_size2 : i64,
   %out_size3 : i64,
-  %padding_value : i64,
-  %flags : i32
-)
-
-vm.import private @pack.i8i8(
-  %in_buffer : !vm.buffer,
-  %in_offset : i64,
-  %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
-  %out_offset : i64,
-  %out_stride0 : i64,
-  %in_size0 : i64,
-  %in_size1 : i64,
-  %out_size0 : i64,
-  %out_size1 : i64,
-  %out_size2 : i64,
-  %out_size3 : i64,
-  %padding_value : i64,
-  %flags : i32
-)
-
-vm.import private @pack.i32i32(
-  %in_buffer : !vm.buffer,
-  %in_offset : i64,
-  %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
-  %out_offset : i64,
-  %out_stride0 : i64,
-  %in_size0 : i64,
-  %in_size1 : i64,
-  %in_size2 : i64,
-  %in_size3 : i64,
-  %out_size0 : i64,
-  %out_size1 : i64,
   %padding_value : i64,
   %flags : i32
 )
@@ -514,23 +461,7 @@ vm.import private @pack.i32i32(
 // unpack ops
 //==============================================================================
 
-vm.import private @unpack.f32f32(
-  %in_buffer : !vm.buffer,
-  %in_offset : i64,
-  %in_stride0 : i64,
-  %out_buffer : !vm.buffer,
-  %out_offset : i64,
-  %out_stride0 : i64,
-  %in_size0 : i64,
-  %in_size1 : i64,
-  %in_size2 : i64,
-  %in_size3 : i64,
-  %out_size0 : i64,
-  %out_size1 : i64,
-  %flags : i32
-)
-
-vm.import private @unpack.i32i32(
+vm.import private @unpack(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_stride0 : i64,
