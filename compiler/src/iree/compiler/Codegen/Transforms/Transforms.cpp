@@ -258,12 +258,12 @@ template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
     RewriterBase &rewriter, func::FuncOp funcOp);
 
 //===---------------------------------------------------------------------===//
-// Lowering `flow.dispatch.workgroup_count_from_body_slice` operation.
+// Lowering `flow.dispatch.workgroup_count_from_slice` operation.
 //===---------------------------------------------------------------------===//
 
-LogicalResult lowerWorkgroupCountFromBodySliceOp(
+LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter,
-    IREE::Flow::DispatchWorkgroupCountFromBodySliceOp workgroupCountOp,
+    IREE::Flow::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
     func::FuncOp entryPointFn, ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims) {
   // Compute the backward slice of the workgroup count operations.
@@ -364,7 +364,7 @@ LogicalResult lowerWorkgroupCountFromBodySliceOp(
   return success();
 }
 
-LogicalResult lowerWorkgroupCountFromBodySliceOp(
+LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, func::FuncOp entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
@@ -377,8 +377,7 @@ LogicalResult lowerWorkgroupCountFromBodySliceOp(
   if (!body) {
     return exportOp->emitOpError("unexpected empty workgroup count region");
   }
-  auto countOps =
-      body->getOps<IREE::Flow::DispatchWorkgroupCountFromBodySliceOp>();
+  auto countOps = body->getOps<IREE::Flow::DispatchWorkgroupCountFromSliceOp>();
   if (countOps.empty()) {
     // If there are no `flow.dispatch.workgroup_count_default` operations
     // do nothing.
@@ -389,9 +388,9 @@ LogicalResult lowerWorkgroupCountFromBodySliceOp(
         "unexpected multiple flow.dispatch.workgroup_count_default operations "
         "in body");
   }
-  return lowerWorkgroupCountFromBodySliceOp(rewriter, *countOps.begin(),
-                                            entryPointFn, workgroupCount,
-                                            maxWorkgroupParallelDims);
+  return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
+                                        entryPointFn, workgroupCount,
+                                        maxWorkgroupParallelDims);
 }
 
 //===---------------------------------------------------------------------===//

@@ -1,7 +1,7 @@
 // RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --cse --split-input-file | FileCheck %s
 
 // Check that we can specify `num_threads` when lowering
-// `workgroup_count_from_body_slice` using
+// `workgroup_count_from_slice` using
 // `transform.iree.populate_workgroup_count_region_using_num_threads_slice`
 
 
@@ -21,7 +21,7 @@ hal.executable private @matmul_static_dispatch_0 {
     // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
     // CHECK: hal.return %[[C32]], %[[C1]], %[[C1]] : index, index, index
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
 
@@ -79,7 +79,7 @@ hal.executable private @matmul_static_dispatch_0 {
     // CHECK-DAG: %[[C8:.*]] = arith.constant 8 : index
     // CHECK: hal.return %[[C3]], %[[C5]], %[[C8]] : index, index, index
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }   
   
@@ -133,7 +133,7 @@ hal.executable private @matmul_static_dispatch_0 {
     // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
     // CHECK: hal.return %[[C171]], %[[C1]], %[[C2]] : index, index, index
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }   
   

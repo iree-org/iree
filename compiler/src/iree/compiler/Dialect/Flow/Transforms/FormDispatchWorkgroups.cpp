@@ -181,7 +181,7 @@ LogicalResult convertExtractSliceOps(
 ///   op `flow.dispatch.workgroups_count_from_body_slice`. This op is
 ///   resolved in the backends into the actual workgroup count computation.
 /// - To correlate back to the captured workload,
-/// `flow.dispatch.workload_ordinal`
+/// `flow.dispatch.workload.ordinal`
 ///   to map the captured operand to the position in the workload list.
 static void createDefaultWorkgroupCountRegion(
     RewriterBase &rewriter, Flow::DispatchWorkgroupsOp workgroupsOp) {
@@ -211,7 +211,7 @@ static void createDefaultWorkgroupCountRegion(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(block);
   auto defaultCountOp =
-      rewriter.create<Flow::DispatchWorkgroupCountFromBodySliceOp>(
+      rewriter.create<Flow::DispatchWorkgroupCountFromSliceOp>(
           loc, block->getArguments());
   rewriter.create<Flow::ReturnOp>(loc, defaultCountOp.getResults());
 

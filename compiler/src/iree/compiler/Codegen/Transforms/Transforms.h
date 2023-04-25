@@ -129,17 +129,17 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
 /// computation to compute the number of workgroups. In absence of this
 /// operation, this method does nothing assuming that the workgroup count
 /// computation has already been resolved.
-LogicalResult lowerWorkgroupCountFromBodySliceOp(
+LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter,
-    IREE::Flow::DispatchWorkgroupCountFromBodySliceOp workgroupCountOp,
+    IREE::Flow::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
     func::FuncOp entryPointFn, ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
-/// Wrapper around `lowerWorkgroupCountFromBodySliceOp` method that
-/// takes the `flow.dispatch.workgroup_count_from_body_slice` op
+/// Wrapper around `lowerWorkgroupCountFromSliceOp` method that
+/// takes the `flow.dispatch.workgroup_count_from_slice` op
 /// as an argument. Looks up the `hal.executable.export` operation
-/// and finds the `flow.dispatch.workgroup_count_from_body_slice` op to lower.
-LogicalResult lowerWorkgroupCountFromBodySliceOp(
+/// and finds the `flow.dispatch.workgroup_count_from_slice` op to lower.
+LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, func::FuncOp entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);

@@ -26,7 +26,7 @@ namespace {
 ///
 /// ```mlir
 /// %1 = <cast> %0 : .. to index
-/// %2 = flow.dispatch.workload_ordinal %1, 0
+/// %2 = flow.dispatch.workload.ordinal %1, 0
 /// %3 = <some_op>(...%1)...
 /// ```
 ///
@@ -34,11 +34,11 @@ namespace {
 ///
 /// ```mlir
 /// %1 = <cast> %0 : .. to index
-/// %2 = flow.dispatch.workload_ordinal %1, 0
+/// %2 = flow.dispatch.workload.ordinal %1, 0
 /// %3 = <some_op>(...%2)...
 /// ```
 ///
-/// to make all the uses flow through `flow.dispatch_workload_ordinal` ops.
+/// to make all the uses flow through `flow.dispatch.workload.ordinal` ops.
 template <typename CastOpTy>
 struct BubbleUpAcrossCastOp
     : public OpRewritePattern<IREE::Flow::DispatchWorkloadOrdinalOp> {

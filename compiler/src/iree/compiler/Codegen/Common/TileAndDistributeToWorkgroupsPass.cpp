@@ -240,7 +240,7 @@ static LogicalResult lowerWorkgroupCount(
   }
   SmallVector<Operation *> countOps;
   for (Operation &op : *body) {
-    if (isa<IREE::Flow::DispatchWorkgroupCountFromBodySliceOp,
+    if (isa<IREE::Flow::DispatchWorkgroupCountFromSliceOp,
             IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(&op)) {
       countOps.push_back(&op);
     }
@@ -258,12 +258,11 @@ static LogicalResult lowerWorkgroupCount(
   }
 
   return TypeSwitch<Operation *, LogicalResult>(countOps[0])
-      .Case<IREE::Flow::DispatchWorkgroupCountFromBodySliceOp>(
-          [&](auto countOp) {
-            return lowerWorkgroupCountFromBodySliceOp(
-                rewriter, countOp, entryPointFn, workgroupCount,
-                maxWorkgroupParallelDims);
-          })
+      .Case<IREE::Flow::DispatchWorkgroupCountFromSliceOp>([&](auto countOp) {
+        return lowerWorkgroupCountFromSliceOp(rewriter, countOp, entryPointFn,
+                                              workgroupCount,
+                                              maxWorkgroupParallelDims);
+      })
       .Case<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>([&](auto countOp) {
         return lowerDispatchWorkgroupCountForDagRootOp(
             rewriter, countOp, tileSizes, staticLoopRanges, interchange,

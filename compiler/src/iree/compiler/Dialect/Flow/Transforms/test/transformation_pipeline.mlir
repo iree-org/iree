@@ -17,7 +17,7 @@ func.func @elementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 // CHECK-LABEL: flow.executable private @elementwiseOps_dispatch_0 {
 //  CHECK-NEXT:   flow.executable.export public @elementwiseOps_dispatch_0{{.*}} workgroups() -> (index, index, index) {
-//       CHECK:     %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+//       CHECK:     %x, %y, %z = flow.dispatch.workgroup_count_from_slice
 //       CHECK:     flow.return %x, %y, %z
 //       CHECK:   module {
 //  CHECK-NEXT:     func.func @elementwiseOps_dispatch_0{{.*}}(%arg0: !flow.dispatch.tensor<readonly:tensor<4xf32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<4xf32>>) {

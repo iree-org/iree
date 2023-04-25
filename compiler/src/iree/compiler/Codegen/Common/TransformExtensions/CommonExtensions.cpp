@@ -828,8 +828,8 @@ DiagnosedSilenceableFailure transform_dialect::
   }
 
   auto funcOp = forAllOp->getParentOfType<func::FuncOp>();
-  if (failed(lowerWorkgroupCountFromBodySliceOp(rewriter, funcOp,
-                                                workgroupCount))) {
+  if (failed(
+          lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCount))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "failed to lower workgroup count region");
   }

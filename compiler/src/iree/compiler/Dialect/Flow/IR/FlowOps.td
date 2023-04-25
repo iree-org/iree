@@ -1485,8 +1485,8 @@ def FLOW_DispatchWorkgroupCountFromDagRootOp :
   }];
 }
 
-def FLOW_DispatchWorkgroupCountFromBodySliceOp :
-    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_body_slice"> {
+def FLOW_DispatchWorkgroupCountFromSliceOp :
+    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_slice"> {
   let summary = [{
     Place holder to signify default workgroup count calculation.
   }];
@@ -1509,7 +1509,7 @@ def FLOW_DispatchWorkgroupCountFromBodySliceOp :
 }
 
 def FLOW_DispatchWorkloadOrdinalOp :
-    FLOW_PureOp<"dispatch.workload_ordinal"> {
+    FLOW_PureOp<"dispatch.workload.ordinal"> {
   let arguments = (ins
     Index:$operand,
     IndexAttr:$ordinal

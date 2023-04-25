@@ -472,7 +472,7 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
 
     The default dispatch region formation expects that the workgroup count
     be computed from within the dispatch by using a program slice. The utility
-    method `lowerWorkgroupCountFromBodySliceOp` handles populating the
+    method `lowerWorkgroupCountFromSliceOp` handles populating the
     workgroup count region given the values in the dispatch that represent the
     number of workgroups. This transform op calls the underlying function using
     the `num_threads` value from the `scf.for_all` op that distributes the work

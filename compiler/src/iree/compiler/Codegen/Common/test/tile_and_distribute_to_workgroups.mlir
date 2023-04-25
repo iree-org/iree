@@ -20,7 +20,7 @@ hal.executable private @matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @matmul_tensors layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -28,9 +28,9 @@ hal.executable private @matmul_tensors {
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2}
         %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -119,15 +119,15 @@ hal.executable private @add {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @add layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       func.func @add() {
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
         %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
         %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -193,7 +193,7 @@ hal.executable private @add4D {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @add4D layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -202,10 +202,10 @@ hal.executable private @add4D {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload_ordinal %cl_3 3  : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3 3  : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%0, %1, %2, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32)
@@ -273,7 +273,7 @@ hal.executable private @add_distribute4D {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @add_distribute4D layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -282,10 +282,10 @@ hal.executable private @add_distribute4D {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload_ordinal %cl_3 3 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%0, %1, %2, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32)
@@ -394,7 +394,7 @@ hal.executable private @add_distribute4D_zero_tile_size {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @add_distribute4D_zero_tile_size layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -403,10 +403,10 @@ hal.executable private @add_distribute4D_zero_tile_size {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload_ordinal %cl_3 3 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%0, %1, %2, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32)
@@ -468,7 +468,7 @@ hal.executable private @batch_matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @batch_matmul_tensors layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -478,10 +478,10 @@ hal.executable private @batch_matmul_tensors {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload_ordinal %cl_3 3 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%0, %1, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32)
@@ -539,7 +539,7 @@ hal.executable private @preset_config_matmul_tensors {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @preset_config layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -603,7 +603,7 @@ hal.executable public @copy_op {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @copy_op layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3: index, %arg4 : index, %arg5: index, %arg6 : index, %arg7: index, %arg8 : index, %arg9: index, %arg10: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8, %arg9, %arg10
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8, %arg9, %arg10
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -618,16 +618,16 @@ hal.executable public @copy_op {
         %cl_7 = hal.interface.constant.load[7] : index
         %cl_8 = hal.interface.constant.load[8] : index
         %cl_9 = hal.interface.constant.load[9] : index
-        %source_size_y = flow.dispatch.workload_ordinal %cl_0 0: index
-        %source_size_x = flow.dispatch.workload_ordinal %cl_1 1: index
-        %dest_size_y = flow.dispatch.workload_ordinal %cl_2 2: index
-        %dest_size_x = flow.dispatch.workload_ordinal %cl_3 3: index
-        %source_offset_y = flow.dispatch.workload_ordinal %cl_4 4: index
-        %source_offset_x = flow.dispatch.workload_ordinal %cl_5 5: index
-        %dest_offset_y = flow.dispatch.workload_ordinal %cl_6 6: index
-        %dest_offset_x = flow.dispatch.workload_ordinal %cl_7 7: index
-        %slice_size_y = flow.dispatch.workload_ordinal %cl_8 8: index
-        %slice_size_x = flow.dispatch.workload_ordinal %cl_9 9: index
+        %source_size_y = flow.dispatch.workload.ordinal %cl_0 0: index
+        %source_size_x = flow.dispatch.workload.ordinal %cl_1 1: index
+        %dest_size_y = flow.dispatch.workload.ordinal %cl_2 2: index
+        %dest_size_x = flow.dispatch.workload.ordinal %cl_3 3: index
+        %source_offset_y = flow.dispatch.workload.ordinal %cl_4 4: index
+        %source_offset_x = flow.dispatch.workload.ordinal %cl_5 5: index
+        %dest_offset_y = flow.dispatch.workload.ordinal %cl_6 6: index
+        %dest_offset_x = flow.dispatch.workload.ordinal %cl_7 7: index
+        %slice_size_y = flow.dispatch.workload.ordinal %cl_8 8: index
+        %slice_size_x = flow.dispatch.workload.ordinal %cl_9 9: index
         %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%source_size_y, %source_size_x}
         %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%dest_size_y, %dest_size_x}
         %source_subview = memref.subview %source[%source_offset_y, %source_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, strided<[?, ?], offset : ?>>
@@ -704,7 +704,7 @@ hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @static_1d_fft_stage2 layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -759,7 +759,7 @@ hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @static_3d_fft_stage3 layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -816,7 +816,7 @@ hal.executable private @outs_fusion {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @outs_fusion_fn layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -825,9 +825,9 @@ hal.executable private @outs_fusion {
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2}
         %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -914,15 +914,15 @@ hal.executable private @conv {
         %cl_6 = hal.interface.constant.load[6] : index
         %cl_7 = hal.interface.constant.load[7] : index
         %cl_8 = hal.interface.constant.load[8] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload_ordinal %cl_3 3 : index
-        %4 = flow.dispatch.workload_ordinal %cl_4 4 : index
-        %5 = flow.dispatch.workload_ordinal %cl_5 5 : index
-        %6 = flow.dispatch.workload_ordinal %cl_6 6 : index
-        %7 = flow.dispatch.workload_ordinal %cl_7 7 : index
-        %8 = flow.dispatch.workload_ordinal %cl_8 8 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
+        %4 = flow.dispatch.workload.ordinal %cl_4 4 : index
+        %5 = flow.dispatch.workload.ordinal %cl_5 5 : index
+        %6 = flow.dispatch.workload.ordinal %cl_6 6 : index
+        %7 = flow.dispatch.workload.ordinal %cl_7 7 : index
+        %8 = flow.dispatch.workload.ordinal %cl_8 8 : index
         %9 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%0, %1, %2, %3}
         %10 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -1065,7 +1065,7 @@ hal.executable private @generic_static {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @generic_static layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1136,7 +1136,7 @@ hal.executable private @matmul_static {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
     hal.executable.export public @matmul_static layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1193,7 +1193,7 @@ hal.executable private @restrict_num_workgroups {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
     hal.executable.export public @restrict_num_workgroups layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1253,7 +1253,7 @@ hal.executable private @reduction {
   hal.executable.variant public @reduction, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @reduction ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1323,7 +1323,7 @@ hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @gemm_unit_N ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1331,8 +1331,8 @@ hal.executable private @gemm_unit_N {
         %c0 = arith.constant 0 : index
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
         %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
         %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0)
@@ -1395,7 +1395,7 @@ hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1455,7 +1455,7 @@ hal.executable private @generic_unit_dims {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @generic_unit_dims layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1464,10 +1464,10 @@ hal.executable private @generic_unit_dims {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload_ordinal %cl_3 3 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<1x?x1x1x?x?x1x?xf32>>{%0, %1, %2, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -1531,13 +1531,13 @@ hal.executable private @reduce_to_scalar {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @reduce_to_scalar layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       func.func @reduce_to_scalar() {
         %cl_0 = hal.interface.constant.load[0] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
         %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%0}
         %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -1591,7 +1591,7 @@ hal.executable private @scalar {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @scalar layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1716,7 +1716,7 @@ hal.executable private @matmul_interchange {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @matmul_interchange layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1724,9 +1724,9 @@ hal.executable private @matmul_interchange {
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
-        %0 = flow.dispatch.workload_ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload_ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload_ordinal %cl_2 2 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2}
         %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -1791,11 +1791,11 @@ hal.executable private @no_compute {
         %2 = arith.index_cast %cl_2 : i32 to index
         %3 = arith.index_cast %cl_3 : i32 to index
         %4 = arith.index_cast %cl_4 : i32 to index
-        %5 = flow.dispatch.workload_ordinal %0 0 : index
-        %6 = flow.dispatch.workload_ordinal %1 1 : index
-        %7 = flow.dispatch.workload_ordinal %2 2 : index
-        %8 = flow.dispatch.workload_ordinal %3 3 : index
-        %9 = flow.dispatch.workload_ordinal %4 4 : index
+        %5 = flow.dispatch.workload.ordinal %0 0 : index
+        %6 = flow.dispatch.workload.ordinal %1 1 : index
+        %7 = flow.dispatch.workload.ordinal %2 2 : index
+        %8 = flow.dispatch.workload.ordinal %3 3 : index
+        %9 = flow.dispatch.workload.ordinal %4 4 : index
         %10 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?x?x?xf32>{%5, %6, %7}
         memref.assume_alignment %10, 64 : memref<?x?x?xf32>
         %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1x?x?xf32>{%8, %9}
@@ -1819,7 +1819,7 @@ hal.executable private @tile_multiuse_producer {
           <0, storage_buffer, ReadOnly>, <1, storage_buffer>, <2, storage_buffer>, <3, storage_buffer>]>]>)
       attributes {translation_info = #iree_codegen.translation_info<CPUDoubleTilingExpert>} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1915,7 +1915,7 @@ hal.executable private @no_tile {
         push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>, <3, storage_buffer>]>]>)
         attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1955,7 +1955,7 @@ hal.executable private @pack_lowering {
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
         attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1995,7 +1995,7 @@ hal.executable private @pack_lowering {
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
         attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2035,7 +2035,7 @@ hal.executable private @clone_index_computations {
             <0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
         attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3 : index, %arg4 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2050,10 +2050,10 @@ hal.executable private @clone_index_computations {
         %1 = arith.index_castui %cl_1 : i32 to index
         %2 = arith.index_castui %cl_2 : i32 to index
         %3 = arith.index_castui %cl_3 : i32 to index
-        %4 = flow.dispatch.workload_ordinal %0 0 : index
-        %5 = flow.dispatch.workload_ordinal %1 1 : index
-        %6 = flow.dispatch.workload_ordinal %2 2 : index
-        %7 = flow.dispatch.workload_ordinal %3 3 : index
+        %4 = flow.dispatch.workload.ordinal %0 0 : index
+        %5 = flow.dispatch.workload.ordinal %1 1 : index
+        %6 = flow.dispatch.workload.ordinal %2 2 : index
+        %7 = flow.dispatch.workload.ordinal %3 3 : index
         %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %5}
         %9 = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%6]
@@ -2098,7 +2098,7 @@ hal.executable private @dynamic_unpack {
             <0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
         attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2113,10 +2113,10 @@ hal.executable private @dynamic_unpack {
         %1 = arith.index_castui %cl_1 : i32 to index
         %2 = arith.index_castui %cl_2 : i32 to index
         %3 = arith.index_castui %cl_3 : i32 to index
-        %4 = flow.dispatch.workload_ordinal %0 0 : index
-        %5 = flow.dispatch.workload_ordinal %1 1 : index
-        %6 = flow.dispatch.workload_ordinal %2 2 : index
-        %7 = flow.dispatch.workload_ordinal %3 3 : index
+        %4 = flow.dispatch.workload.ordinal %0 0 : index
+        %5 = flow.dispatch.workload.ordinal %1 1 : index
+        %6 = flow.dispatch.workload.ordinal %2 2 : index
+        %7 = flow.dispatch.workload.ordinal %3 3 : index
         %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5}
         %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
@@ -2144,7 +2144,7 @@ hal.executable private @dynamic_unpack_dynamic_tile {
             <0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
         attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2161,10 +2161,10 @@ hal.executable private @dynamic_unpack_dynamic_tile {
         %1 = arith.index_castui %cl_1 : i32 to index
         %2 = arith.index_castui %cl_2 : i32 to index
         %3 = arith.index_castui %cl_3 : i32 to index
-        %4 = flow.dispatch.workload_ordinal %0 0 : index
-        %5 = flow.dispatch.workload_ordinal %1 1 : index
-        %6 = flow.dispatch.workload_ordinal %2 2 : index
-        %7 = flow.dispatch.workload_ordinal %3 3 : index
+        %4 = flow.dispatch.workload.ordinal %0 0 : index
+        %5 = flow.dispatch.workload.ordinal %1 1 : index
+        %6 = flow.dispatch.workload.ordinal %2 2 : index
+        %7 = flow.dispatch.workload.ordinal %3 3 : index
         %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%4, %5, %c32, %c16}
         %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, %c32, %c16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%4, %5, %c32, %c16} -> tensor<?x?x?x?xi32>
@@ -2192,7 +2192,7 @@ hal.executable private @unpack_elem {
             <0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
         attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2227,7 +2227,7 @@ hal.executable private @dynamic_unpack_fusion {
   hal.executable.variant public @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb", {ukernels = true}> {
     hal.executable.export public @dynamic_unpack_fusion ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<VMVXDefault>} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2288,7 +2288,7 @@ hal.executable private @elem_pack {
   hal.executable.variant public @embedded_elf_arm_64, target = <"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-unknown-unknown-eabi-elf"}> {
     hal.executable.export public @elem_pack ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer>, <4, storage_buffer>, <5, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2354,7 +2354,7 @@ hal.executable private @scatter {
     layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
     attributes {translation_info = #iree_codegen.translation_info<LLVMGPUDistribute>, workgroup_size = [1 : index, 1 : index, 1 : index]} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2391,7 +2391,7 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
     hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
       hal.executable.export public @collapse_workgroups_dispatch_dispatch_0_generic_1024x128x16x64 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
       ^bb0(%arg0: !hal.device):
-        %x, %y, %z = flow.dispatch.workgroup_count_from_body_slice
+        %x, %y, %z = flow.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -2421,3 +2421,70 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
 //   CHECKW-DAG:               %[[C1:.*]] = arith.constant 1 : index
 //       CHECKW:               hal.return %[[C2097152]], %[[C1]], %[[C1]] : index, index, index
 //       CHECKW:             }
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  native_vector_size = 16 : index,
+  target_triple = "aarch64-unknown-unknown-eabi-elf"
+}>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+hal.executable private @matmul_tensors {
+  hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
+    hal.executable.export public @matmul_tensor_count_from_dag_root layout(#pipeline_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @matmul_tensor_count_from_dag_root() {
+        %0 = hal.interface.constant.load[0] : index
+        %1 = hal.interface.constant.load[1] : index
+        %2 = hal.interface.constant.load[2] : index
+        %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2}
+        %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %1}
+        %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
+        %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
+        %7 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%0, %2], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2} -> tensor<?x?xf32>
+        %8 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%2, %1], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %1} -> tensor<?x?xf32>
+        %9 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1} -> tensor<?x?xf32>
+        %10 = linalg.matmul {lowering_config = #config}
+            ins(%7, %8 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%9 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        flow.dispatch.tensor.store %10, %6, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1]
+            : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.export public @matmul_tensor_count_from_dag_root
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+// CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:    %[[WORKLOAD_M:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_N:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:    %[[WORKLOAD_K:[a-zA-Z0-9_]+]]: index)
+//  CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_M]]]
+//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_N]]]
+//      CHECK:    hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
