@@ -524,7 +524,6 @@ IREE_VMVX_ABI_FIXED_STRUCT(mmt4d, rIIrIIrIIIIIiiii, {
 IREE_VMVX_ABI_DEFINE_SHIM(mmt4d, v);
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d, mmt4d, v) {
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_host_size_t M = (iree_host_size_t)args->m;
   iree_host_size_t N = (iree_host_size_t)args->n;
   iree_host_size_t K = (iree_host_size_t)args->k;
@@ -548,6 +547,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d, mmt4d, v) {
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "unhandled flags");
   }
+  IREE_TRACE_ZONE_BEGIN(z0);
   // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
   // Thanks to the requirement that all dimensions but the outer-most one are
   // contiguous row-major, the outer-most stride is the only nontrivial stride,
@@ -619,7 +619,6 @@ IREE_VMVX_ABI_FIXED_STRUCT(pack, rIIIrIIIIIIIIIi, {
 IREE_VMVX_ABI_DEFINE_SHIM(pack, v);
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_pack, pack, v) {
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_host_size_t out_tile_size = args->out_size2 * args->out_size3;
   int elem_size = 0;
   switch (args->flags & IREE_UK_FLAG_PACK_TYPE_MASK) {
@@ -633,6 +632,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_pack, pack, v) {
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "unhandled flags");
   }
+  IREE_TRACE_ZONE_BEGIN(z0);
   MAP_BUFFER_2D_UNTYPED_RO(in,
                            /*dtype_size=*/elem_size,
                            /*buffer_ref=*/args->in_ref,
@@ -690,7 +690,6 @@ IREE_VMVX_ABI_FIXED_STRUCT(unpack, rIIIrIIIIIIIIi, {
 IREE_VMVX_ABI_DEFINE_SHIM(unpack, v);
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack, unpack, v) {
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_host_size_t out_tile_size = args->in_size2 * args->in_size3;
   int elem_size = 0;
   switch (args->flags & IREE_UK_FLAG_UNPACK_TYPE_MASK) {
@@ -701,6 +700,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack, unpack, v) {
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "unhandled flags");
   }
+  IREE_TRACE_ZONE_BEGIN(z0);
   MAP_BUFFER_2D_UNTYPED_RO(in,
                            /*dtype_size=*/elem_size,
                            /*buffer_ref=*/args->in_ref,
