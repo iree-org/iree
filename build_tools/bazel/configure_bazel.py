@@ -9,7 +9,6 @@ import platform
 import os
 import sys
 
-
 CURRENT_DIR = pathlib.Path(__file__).resolve().parent
 
 
@@ -61,6 +60,7 @@ def write_platform(bazelrc):
     print(f"build:release --config=msvc_release", file=bazelrc)
   else:
     detect_unix_platform_config(bazelrc)
+
 
 if __name__ == "__main__":
   if len(sys.argv) > 1:
