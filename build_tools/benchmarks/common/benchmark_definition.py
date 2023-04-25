@@ -15,7 +15,7 @@ import pathlib
 import re
 import subprocess
 
-from dataclasses import dataclass
+import dataclasses
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -43,7 +43,7 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
 CANONICAL_MICROARCHITECTURE_NAMES = {"CascadeLake", "Zen2"}
 
 
-@dataclass
+@dataclasses.dataclass
 class DriverInfo:
   """An object describing a IREE HAL driver.
 
@@ -99,6 +99,7 @@ def execute_cmd(args: Sequence[Any],
   try:
     return subprocess.run(args, check=True, text=True, **kwargs)
   except subprocess.CalledProcessError as exc:
+    print(" \\\n".join(str(a) for a in args))
     print((f"\n\nThe following command failed:\n\n{args}"
            f"\n\nReturn code: {exc.returncode}\n\n"))
     if exc.stdout:
@@ -176,7 +177,7 @@ class PlatformType(Enum):
   LINUX = "Linux"
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class DeviceInfo:
   """An object describing a device.
 
@@ -284,7 +285,7 @@ class DeviceInfo:
     return rev
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class BenchmarkInfo:
   """An object describing the current benchmark.
 
@@ -389,7 +390,7 @@ class BenchmarkInfo:
                          run_config_id=json_object.get("run_config_id"))
 
 
-@dataclass
+@dataclasses.dataclass
 class BenchmarkLatency:
   """Stores latency statistics for a benchmark run."""
   mean: int
@@ -398,21 +399,11 @@ class BenchmarkLatency:
   unit: str
 
   def to_json_object(self) -> Dict[str, Any]:
-    return {
-        "mean": self.mean,
-        "median": self.median,
-        "stddev": self.stddev,
-        "unit": self.unit,
-    }
+    return dataclasses.asdict(self)
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return BenchmarkLatency(
-        json_object["mean"],
-        json_object["median"],
-        json_object["stddev"],
-        json_object["unit"],
-    )
+    return BenchmarkLatency(**json_object)
 
 
 def get_google_benchmark_latencies(
@@ -443,7 +434,7 @@ def get_google_benchmark_latencies(
   return real_time, cpu_time
 
 
-@dataclass
+@dataclasses.dataclass
 class BenchmarkMetrics(object):
   """An object describing the results from a single benchmark.
 
@@ -465,9 +456,6 @@ class BenchmarkMetrics(object):
         "raw_data": self.raw_data,
     }
 
-  def to_json_str(self) -> str:
-    return json.dumps(self.to_json_object())
-
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkMetrics(
@@ -477,7 +465,7 @@ class BenchmarkMetrics(object):
     )
 
 
-@dataclass
+@dataclasses.dataclass
 class BenchmarkRun(object):
   """An object describing a single run of the benchmark binary.
 
@@ -492,9 +480,6 @@ class BenchmarkRun(object):
         "info": self.info.to_json_object(),
         "metrics": self.metrics.to_json_object(),
     }
-
-  def to_json_str(self) -> str:
-    return json.dumps(self.to_json_object())
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
@@ -540,7 +525,7 @@ class BenchmarkResults(object):
     return results
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationInfo(object):
   name: str
   model_name: str
@@ -590,7 +575,7 @@ class CompilationInfo(object):
                            gen_config_id=json_object.get("gen_config_id"))
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class ModuleComponentSizes(object):
   file_bytes: int
   vm_component_bytes: int
@@ -602,7 +587,7 @@ class ModuleComponentSizes(object):
     return ModuleComponentSizes(**json_object)
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationStatistics(object):
   compilation_info: CompilationInfo
   # Module file and component sizes.
@@ -620,7 +605,7 @@ class CompilationStatistics(object):
         compilation_time_ms=json_object["compilation_time_ms"])
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationResults(object):
   commit: str
   compilation_statistics: Sequence[CompilationStatistics]
