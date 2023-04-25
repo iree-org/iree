@@ -152,12 +152,12 @@ If you don't have artifacts locally, see
 find the GCS directory of the CI artifacts. Then fetch the needed files:
 
 ```sh
-export GCS_URL="gs://iree-github-actions-<presubmit|postsubmit>-artifacts/<run_id>/<run_attempt>"
+# Get ${E2E_TEST_ARTIFACTS_DIR_URL} from "Fetching Benchmark Artifacts from CI".
 export E2E_TEST_ARTIFACTS_DIR="e2e_test_artifacts"
 
 # Download all artifacts
 mkdir "${E2E_TEST_ARTIFACTS_DIR?}"
-gcloud storage cp -r "${GCS_URL?}/e2e-test-artifacts" "${E2E_TEST_ARTIFACTS_DIR?}"
+gcloud storage cp -r "${E2E_TEST_ARTIFACTS_DIR_URL?}" "${E2E_TEST_ARTIFACTS_DIR?}"
 ```
 
 Run the helper tool to dump benchmark commands from benchmark configs:
@@ -188,22 +188,18 @@ build_tools/benchmarks/benchmark_helper.py dump-cmds \
 #### 1. Find the corresponding CI workflow run
 
 On the commit of the benchmark run, you can find the list of the workflow jobs
-by clicking the green check mark. Click the `Details` of job
-`build_e2e_test_artifacts`:
+by clicking the green check mark. Click any job starts with `CI /`:
 
-![image](https://user-images.githubusercontent.com/2104162/223781032-c22e2922-2bd7-422d-abc2-d6ef0d31b0f8.png)
+![image](https://user-images.githubusercontent.com/2104162/234647960-3df9d0f0-a34a-47ad-bda8-095ae44de865.png)
 
-#### 2. Get the URLs of the GCS artifacts
+#### 2. Get URLs of GCS artifacts
 
-On the CI run page, click `Summary` on the top-left to open the summary page.
-Scroll down and the links to artifacts are listed in a section titled "Artifact
-Links". Pasting the content in your shell will define all needed variables for
-the following steps.
+On the CI page, click `Summary` on the top-left to open the summary page. Scroll
+down and the links to artifacts are listed in a section titled "Artifact Links".
+Paste the content in your shell to define all needed variables for the following
+steps:
 
-```
-Copying file://build-e2e-test-artifacts/e2e_test_artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb to gs://iree-github-actions-postsubmit-artifacts/4360950546/1/e2e-test-artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb
-...
-```
+![image](https://user-images.githubusercontent.com/2104162/234655723-0c5b1044-cbe9-411a-88af-3ed0478c9ce5.png)
 
 #### 3. Fetch the benchmark artifacts
 
@@ -215,7 +211,7 @@ see
 [Find Compile and Run Commands to Reproduce Benchmarks](#find-compile-and-run-commands-to-reproduce-benchmarks).
 
 Assume you get the GCS URL variables from
-[2. Get the GCS directory of the built artifacts](#2-get-the-gcs-directory-of-the-built-artifacts).
+[Get URLs of GCS artifacts](#2-get-urls-of-gcs-artifacts).
 
 Download artifacts:
 
