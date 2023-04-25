@@ -650,7 +650,7 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
     return forallOp->emitError("mapping must be present");
   SmallVector<Attribute> blockMapping =
       llvm::to_vector(forallOp.getMapping()->getValue());
-  if (llvm::any_of(blockMapping, [](DeviceMappingAttrInterface map) {
+  if (llvm::any_of(blockMapping, [](Attribute map) {
         return !map.isa<gpu::GPUBlockMappingAttr>();
       })) {
     return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");

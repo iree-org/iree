@@ -760,10 +760,11 @@ class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
 
     Type wideType = rewriter.getIntegerType(64);
     // Shift amount necessary to extract the high bits from widened result.
-    Attribute shiftValAttr = rewriter.getI64IntegerAttr(32);
+    TypedAttr shiftValAttr = rewriter.getI64IntegerAttr(32);
     if (auto vecTy = resultType.dyn_cast<VectorType>()) {
       wideType = VectorType::get(vecTy.getShape(), wideType);
-      shiftValAttr = SplatElementsAttr::get(wideType, shiftValAttr);
+      shiftValAttr =
+          SplatElementsAttr::get(cast<ShapedType>(wideType), shiftValAttr);
     }
     Value shiftVal = rewriter.create<arith::ConstantOp>(loc, shiftValAttr);
 
