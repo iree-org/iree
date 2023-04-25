@@ -79,7 +79,7 @@ FlowDialect::FlowDialect(MLIRContext *context)
 Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
   if (arith::ConstantOp::isBuildableWith(value, type))
-    return builder.create<arith::ConstantOp>(loc, type, value);
+    return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(value));
   return nullptr;
 }
 

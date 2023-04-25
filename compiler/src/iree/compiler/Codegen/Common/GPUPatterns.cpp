@@ -187,9 +187,10 @@ static LogicalResult contractOpFilter(Operation *op) {
   // Limit promotion to matmul and batch matmul, there may be generic
   // ops with more batch dimensions we didn't distribute and therefore
   // cannot find a higher bound.
-  return success(linalg::isaContractionOpInterface(op) &&
-                 linalgOp.getNumParallelLoops() >= 2 &&
-                 linalgOp.getNumParallelLoops() <= 3);
+  return success(
+      linalg::isaContractionOpInterface(cast<linalg::LinalgOp>(op)) &&
+      linalgOp.getNumParallelLoops() >= 2 &&
+      linalgOp.getNumParallelLoops() <= 3);
 }
 
 }  // namespace

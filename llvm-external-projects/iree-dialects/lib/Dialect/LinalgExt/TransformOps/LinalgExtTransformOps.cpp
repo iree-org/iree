@@ -53,7 +53,8 @@ LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
     // Apply the pattern.
     SimplePatternRewriter rewriter(target);
     FailureOr<LinalgExt::FusionResult> result =
-        pattern.returningMatchAndRewrite(target, rewriter);
+        pattern.returningMatchAndRewrite(cast<TilingInterface>(target),
+                                         rewriter);
     if (failed(result))
       return emitDefaultDefiniteFailure(target);
 

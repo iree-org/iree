@@ -259,7 +259,7 @@ static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
                                     OpBuilder &builder) {
   if (arith::ConstantOp::isBuildableWith(attr, type)) {
     // Common case fast-path.
-    return builder.create<arith::ConstantOp>(loc, type, attr);
+    return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(attr));
   } else if (mlir::func::ConstantOp::isBuildableWith(attr, type)) {
     return builder.create<mlir::func::ConstantOp>(
         loc, type, attr.cast<FlatSymbolRefAttr>());

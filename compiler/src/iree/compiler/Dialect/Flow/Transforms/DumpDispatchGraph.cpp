@@ -209,9 +209,9 @@ class DumpDispatchGraphPass
     // Elide "big" elements attributes.
     auto elements = attr.dyn_cast<ElementsAttr>();
     if (elements && elements.getNumElements() > largeAttrLimit) {
-      os << std::string(elements.getType().getRank(), '[') << "..."
-         << std::string(elements.getType().getRank(), ']') << " : "
-         << elements.getType();
+      auto type = cast<ShapedType>(elements.getType());
+      os << std::string(type.getRank(), '[') << "..."
+         << std::string(type.getRank(), ']') << " : " << type;
       return;
     }
 

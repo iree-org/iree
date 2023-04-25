@@ -385,7 +385,7 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
 
 // List of identity elements by operation.
 // https://en.wikipedia.org/wiki/Identity_element
-static Attribute getCombiningKindIdentity(OpBuilder &builder,
+static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
                                           vector::CombiningKind combiningKind,
                                           Type type) {
   switch (combiningKind) {
@@ -419,7 +419,7 @@ static Attribute getCombiningKindIdentity(OpBuilder &builder,
       return builder.getFloatAttr(type, negInfApFloat);
     }
   }
-  return Attribute();
+  return TypedAttr();
 }
 
 /// Compute the value on a single thread to get per lane reduction value.
@@ -463,11 +463,11 @@ static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
   } else {
     // In cases where vecSize < unrollCount, we would pad the vector
     // with identity elements until it's total bit size is 32.
-    Attribute identityAttr =
+    TypedAttr identityAttr =
         getCombiningKindIdentity(builder, kind, elementType);
     identityAttr = DenseElementsAttr::get(unrolledLaneValType, identityAttr);
-    Value identity = builder.create<arith::ConstantOp>(loc, identityAttr,
-                                                       unrolledLaneValType);
+    Value identity = builder.create<arith::ConstantOp>(loc, unrolledLaneValType,
+                                                       identityAttr);
     perLaneReduction = builder.create<vector::InsertStridedSliceOp>(
         loc, input, identity, /*offsets=*/ArrayRef<int64_t>{0},
         /*strides=*/ArrayRef<int64_t>{1});
@@ -484,13 +484,13 @@ static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
   if (vectorType) {
     elementType = vectorType.getElementType();
   }
-  Attribute identityAttr = getCombiningKindIdentity(builder, kind, elementType);
+  TypedAttr identityAttr = getCombiningKindIdentity(builder, kind, elementType);
   if (vectorType) {
     identityAttr = DenseElementsAttr::get(vectorType, identityAttr);
   }
   assert(identityAttr && "Unknown identity value for the reduction");
   Value identity =
-      builder.create<arith::ConstantOp>(loc, identityAttr, identityType);
+      builder.create<arith::ConstantOp>(loc, identityType, identityAttr);
   return identity;
 }
 
