@@ -3,6 +3,7 @@
 // RUN:     --device=local-sync \
 // RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/system_plugin$IREE_DYLIB_EXT \
 // RUN:     --function=ukernel_example \
+// RUN:     --module=- \
 // RUN:     --input=8xf32=2 \
 // RUN:     --input=8xf32=4 | \
 // RUN: FileCheck %s --check-prefix=CHECK-SYSTEM
