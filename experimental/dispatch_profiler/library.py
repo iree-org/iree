@@ -321,7 +321,7 @@ class ReferenceOpInterface(ABC):
 
   @abstractmethod
   def get_output_filepaths(self):
-    """Returns the list of outputs."""
+    """Returns the list of outputs/."""
     pass
 
   @abstractmethod

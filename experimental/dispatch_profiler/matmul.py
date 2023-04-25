@@ -14,8 +14,9 @@ class MatmulOperation:
   """Data structure to describe a matrix multiplication operation. 
      This includes the shape, datatype, and layout of the operands. This data 
      structure is *independent* of the compilation* and tiling configuration. 
-     It strictly contains the parameter that changes the functionality of matmul 
-     operation.
+     It "mostly" contains the parameter that changes the functionality of matmul 
+     operation. The only exception is the split_k_slices parameter, which is
+     changes the performance of the matmul operation and not the functionality.
   """
 
   def __init__(self,
@@ -71,18 +72,11 @@ class MatmulOperation:
            f'{DataTypeName[self.rhs.datatype]}{ShortLayoutTypeName[self.rhs.layout]}_'\
            f'{DataTypeName[self.result.datatype]}{ShortLayoutTypeName[self.result.layout]}'
 
-  def csv_headers(self):
-    """Returns the csv headers for the matmul operation."""
-    return [
-        "op_kind", "Operation", "batch_count", "M", "N", "K", \
-        "lhs", "rhs", "result", "bytes", "flops"
-    ]
-
-  def create_dict_entry(self):
-    """Returns the dictionary entry for the matmul operation."""
+  def get_argument_dict(self):
+    """Returns the dictionary of matmul arguments (shape, datatypes, split_k_slices)."""
+    split_k_mode = "N/A" if self.operation_kind == OperationKind.Matmul else "parallel"
+    split_k_slices = "N/A" if self.operation_kind == OperationKind.Matmul else self.split_k_slices
     return {
-        "op_kind": OperationKindNames[self.operation_kind],
-        "Operation": self.name(),
         "batch_count": self.batch_count,
         "M": self.M,
         "N": self.N,
@@ -90,9 +84,20 @@ class MatmulOperation:
         "lhs": self.lhs.name(),
         "rhs": self.rhs.name(),
         "result": self.result.name(),
+        "split_k_mode": split_k_mode,
+        "split_k_slices": split_k_slices
+    }
+
+  def get_dict_entry(self):
+    """Returns the dictionary of matmul operation summary."""
+    dict_entry = {
+        "op_kind": OperationKindNames[self.operation_kind],
+        "Operation": self.name(),
         "bytes": self.bytes(),
         "flops": self.flops(),
     }
+    dict_entry.update(self.get_argument_dict())
+    return dict_entry
 
   def lhs_npy_shape(self):
     """Returns the shape of the lhs numpy array as a string in the format "MxKxDataType"."""
@@ -140,19 +145,18 @@ class MatmulCompilationInfo:
     self.operation_kind = operation_kind  # OperationKind
     self.config_type = config_type  # CompilationConfigType
 
-  def csv_headers(self):
-    """Returns the csv headers for the matmul compilation info."""
-    return ["Core class", "Math instruction"]
-
-  def create_dict_entry(self):
+  def get_dict_entry(self):
     """Returns the dictionary entry for the matmul compilation info."""
+    translation_info_name = TranslationInfoName[self.translation_info]
     dict_entry = {
-        "Core class": self.translation_info.split('_')[0],
-        "Instruction class": self.translation_info.split('_')[1],
+        "Tile config": self.tile_description.name(),
+        "Core class": translation_info_name.split('_')[0],
+        "Instruction class": translation_info_name.split('_')[1],
     }
 
     if self.config_type == CompilationConfigType.Default:
       return dict_entry.update({
+          "Tile config": "Default",
           "Core class": "Default",
           "Instruction class": "Default"
       })
@@ -570,51 +574,3 @@ class CudaMatmulGenerator:
     self._cuda_matmul_tensor_cores_f16()
     #self._cuda_matmul_tensor_cores_f32()
     return self.dispatches_collection_list
-
-
-class CudaSplitKMatmulGenerator(CudaMatmulGenerator):
-  """SplitK Matmul dispatch generator class."""
-
-  def __init__(self, args):
-    """Initializes the splitK matmul generator."""
-    super().__init__(args)
-    self.matmul_shapes = [[128, 128, 12288]]
-    self.split_k_slice_list = [16]
-    self.dispatches_collection_list = []
-
-  def _cuda_matmul_tensor_cores_f16(self):
-    """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
-
-    # Create configuration list from the tile descriptions and translation infos.
-    configuration_list = []
-
-    for tile_description in self.tile_descriptions_tensor_cores_f16:
-      for translation_info in self.translation_infos:
-        configuration_list.append(
-            MatmulCompilationInfo(tile_description, translation_info,
-                                  OperationKind.SplitkMatmul,
-                                  CompilationConfigType.Custom))
-
-    # Create dispatches collection for each problem shape with the configuration list.
-    for matmul_shape in self.matmul_shapes:
-      for split_k_slice in self.split_k_slice_list:
-        operation = MatmulOperation(
-          matmul_shape,\
-          TensorDescription(DataType.f16, LayoutType.RowMajor), \
-          TensorDescription(DataType.f16, LayoutType.RowMajor), \
-          TensorDescription(DataType.f16, LayoutType.RowMajor), \
-          1, # batch_count 
-          split_k_slice,
-          OperationKind.SplitkMatmul)
-
-        # Filter out configurations that are not supported by LLVM GPU CUDA backend.
-        supported_configuration_list = self._cuda_supported_configuration_list(
-            operation, configuration_list)
-
-        # Add default configuration if enabled.
-        if self.args.default_config:
-          supported_configuration_list.append(
-              MatmulCompilationInfo([], [], CompilationConfigType.Default))
-
-        self.dispatches_collection_list.append(DispatchCollection(\
-          operation, supported_configuration_list))

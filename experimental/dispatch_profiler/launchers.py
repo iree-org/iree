@@ -24,7 +24,7 @@ class IreeToolsLauncher:
     self.source_mlir_file = os.path.join(self.operation_path,
                                          operation.name() + '.mlir')
 
-    # path to cached numpy refernece input/output files.
+    # path to cached numpy refernece input and expected output files.
     self.op_reference_cache_path = os.path.join(args.build_dir, 'generated',\
                                              'reference_cache', operation.name())
 
@@ -43,12 +43,13 @@ class IreeToolsLauncher:
     self.iree_run_module_path = os.path.join(args.build_dir, 'tools',
                                              'iree-run-module')
 
-    # output vmfb files for the operation.
+    # output vmfb files for verification and profiling.
     split_k_suffix = "_".join([
         "split_k_slice", str(operation.split_k_slices)
     ]) if operation.operation_kind == OperationKind.SplitkMatmul else ""
     verify_vmfb = split_k_suffix + "_verify.vmfb"
-    benchmark_vmfb = split_k_suffix + "_benchmark.vmfb"
+    benchmark_vmfb = split_k_suffix + "_profile.vmfb"
+
     self.vmfb_verify_filepath = os.path.join(
         self.operation_path, "_".join([self.operation.name(), verify_vmfb]))
     self.vmfb_benchmark_filepath = os.path.join(
@@ -106,7 +107,7 @@ class IreeToolsLauncher:
             " since it already exists.")
 
   def verify(self, configuration):
-    """Verifies the  operation with a given configuration."""
+    """Verifies the operation with a given configuration."""
     # First compile the operation to a vmfb file.
     self.iree_compile(CompilationMode.Verify)
 
@@ -151,7 +152,7 @@ class IreeToolsLauncher:
     return verification_result
 
   def profile(self, configuration):
-    """Profiles the matmul operation with a given configuration."""
+    """Profiles the operation with a given configuration."""
     # First compile the operation to a vmfb file.
     self.iree_compile(CompilationMode.Profile)
 

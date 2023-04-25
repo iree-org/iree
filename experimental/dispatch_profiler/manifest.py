@@ -5,6 +5,7 @@ import shutil
 from library import *
 from matmul import *
 from batch_matmul import *
+from split_k_matmul import *
 
 
 ###############################################################################

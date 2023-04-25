@@ -1,7 +1,6 @@
 from library import *
 from dispatch import *
-from matmul import MatmulOperation, MatmulCompilationInfo,\
-  CudaMatmulDispatchChecker, CudaMatmulGenerator
+from matmul import MatmulOperation, MatmulCompilationInfo, CudaMatmulGenerator
 import os.path
 
 
