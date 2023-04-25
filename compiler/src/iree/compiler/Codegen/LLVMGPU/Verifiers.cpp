@@ -117,7 +117,7 @@ LogicalResult verifyGPUMatmulPipeline(
 
   if (auto batchMatmulOp = dyn_cast<linalg::BatchMatmulOp>(op)) {
     // Inspect the batch tile dimensions separately for batch. The batch tile
-    // dim should be strictly greater than 1 for parallelizable loops and 0
+    // dim should be strictly greater than 1 for parallelizable loops and 1
     // for non-parallelizable.
     if (cast<PartitionableLoopsInterface>(op).getPartitionableLoops(
             kNumMaxParallelDims)[0] == 0) {
@@ -128,10 +128,10 @@ LogicalResult verifyGPUMatmulPipeline(
                << "compilation pipeline " << pipelineName;
       }
     } else {
-      if (tileShape[0] != 0) {
+      if (tileShape[0] != 1) {
         return op->emitError("Received batch tile dimension of ")
                << tileShape[0]
-               << " instead of 0 for non-partitionable loops with compilation"
+               << " instead of 1 for non-partitionable loops with compilation"
                << " pipeline " << pipelineName;
       }
     }
