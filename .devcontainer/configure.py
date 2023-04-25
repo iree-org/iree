@@ -10,7 +10,6 @@
 import json
 import os
 import pathlib
-import shlex
 import subprocess
 import sys
 
@@ -24,11 +23,9 @@ DOCKER_IMAGE_SHORTNAME_DICT = {
     "nvidia": "nvidia-bleeding-edge",
 }
 
-
-def run_shell(cmd):
-  cmd = shlex.split(cmd)
-  return subprocess.run(cmd, check=True, text=True,
-                        stdout=subprocess.PIPE).stdout
+configure_base = SourceFileLoader("configure_base",
+                                  str(CURRENT_DIR.parent /
+                                      "configure")).load_module()
 
 
 def is_nvidia_gpu_available():
@@ -37,7 +34,8 @@ def is_nvidia_gpu_available():
   is installed."""
 
   command_str = f"'{which('docker')}' info --format '{{{{json .}}}}'"
-  data = json.loads(run_shell(command_str))
+  data = json.loads(
+      configure_base.run_shell(command_str, stdout=subprocess.PIPE))
 
   if "nvidia" not in data["Runtimes"].keys():
     return (
@@ -51,42 +49,17 @@ def is_nvidia_gpu_available():
 
   command_str = f"{nvidia_smi_executable} --query-gpu=gpu_name --format=csv"
 
-  if run_shell(command_str).splitlines()[1:]:  # Skip header
+  if configure_base.run_shell(
+      command_str, stdout=subprocess.PIPE).splitlines()[1:]:  # Skip header
     return True, None
   else:
     return False, "No NVIDIA GPU was found on this system."
 
 
-def _get_input(question, default_answer):
-  try:
-    answer = input(f"\n- {question} ")
-  except EOFError:
-    answer = default_answer
-
-  return (answer or default_answer).strip().lower()
-
-
-def get_input(question, default_answer='', accepted_answers=None):
-  if accepted_answers is None:
-    raise RuntimeError("Argument `accepted_answers` is None.")
-
-  accepted_answers = [x.strip().lower() for x in accepted_answers]
-
-  while True:
-    answer = _get_input(question, default_answer)
-    if answer not in accepted_answers:
-      print(f"\tERROR: Unsupported answer received: {answer}."
-            f"Expected: {accepted_answers}")
-      continue
-    break
-
-  return answer
-
-
 def get_input_path(question):
 
   while True:
-    answer = _get_input(question, default_answer="")
+    answer = configure_base._get_input(question, default_answer="")
     if answer != "" and not os.path.isdir(answer):
       print(f"\tERROR: Received path does not exist: `{answer}`")
       continue
@@ -108,7 +81,8 @@ if __name__ == "__main__":
         "https://docs.docker.com/desktop/")
 
   try:
-    run_shell(f"'{docker_executable}' compose version")
+    configure_base.run_shell(f"'{docker_executable}' compose version",
+                             stdout=subprocess.PIPE)
   except subprocess.CalledProcessError as e:
     raise RuntimeError(
         "Docker Compose must be installed in order to use IREE VS Code "
@@ -124,18 +98,18 @@ if __name__ == "__main__":
   # STEP 1: Verify the user doesn't have a pre-existing `docker-compose.yml`.
   #         If yes, confirm they want to overwrite it.
   if os.path.isfile(CURRENT_DIR / "docker-compose.yml"):
-    if get_input(
+    if configure_base.get_input(
         "A `docker-compose.yml` already exists. Are you certain you want to overwrite it [y/N]?",
         default_answer="n",
         accepted_answers=["y", "n"]) == "n":
-      sys.exit(1)
+      sys.exit(0)
 
   # STEP 2: Read the template configuration file
   with open(CURRENT_DIR / "docker-compose.base.yml") as f:
     docker_config = json.load(f)
 
   # STEP 3: Prebuilt vs Locally Built Containers
-  use_official_img = get_input(
+  use_official_img = configure_base.get_input(
       "Do you wish to use the official prebuild development containers [Y/n]?",
       default_answer="y",
       accepted_answers=["y", "n"]) == "y"
@@ -170,9 +144,10 @@ if __name__ == "__main__":
   nvidia_gpu_available, err_msg = is_nvidia_gpu_available()
 
   if nvidia_gpu_available:
-    if get_input("[OPTIONAL] Do you wish to use NVIDIA GPU [y/N]?",
-                 default_answer="n",
-                 accepted_answers=["y", "n"]) == "y":
+    if configure_base.get_input(
+        "[OPTIONAL] Do you wish to use NVIDIA GPU [y/N]?",
+        default_answer="n",
+        accepted_answers=["y", "n"]) == "y":
       docker_image_key = "nvidia"
 
   else:

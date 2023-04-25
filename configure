@@ -1,46 +1,71 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
 
-set -e
-set -o pipefail
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""Top level configure script conditionally calling more specific configuration
+scripts"""
 
-if [ -z "$PYTHON_BIN_PATH" ]; then
-  PYTHON_BIN_PATH=$(which python3 || which python || true)
-fi
-CONFIGURE_DIR=$(dirname "$0")
+import pathlib
+import shlex
+import subprocess
 
-function ask_question() {
-  if [[ -z "$1" ]]; then
-    echo "\`ask_question\` received no argument"
-    exit 1
-  fi
+from shutil import which
 
-  while :
-  do
-    read -r -p "${1} " response
 
-    case "$response" in
-      [yY])
-          echo "1"
-          break
-          ;;
-      [nN])
-          echo "0"
-          break
-          ;;
-      *)
-          echo "Incorrect input received: \`${response}\`. Expected: 'Y' or 'N'"
-          ;;
-    esac
-  done
-}
+def run_shell(cmd_str, stdout=None):
+  cmd = shlex.split(cmd_str)
+  cmd_rslt = subprocess.run(cmd, check=True, text=True, stdout=stdout)
 
-# ====================== VSCode Development Container ======================= #
+  if cmd_rslt.returncode != 0:
+    raise RuntimeError(f"[ERROR] Command `{cmd_str}` returned with code: "
+                       f"{cmd_rslt.returncode}")
 
-response=$(ask_question 'Do you wish to configure VS Code Dev Container [y/N]?')
-if [[ ${response} -eq "1" ]]; then
-  "$PYTHON_BIN_PATH" "${CONFIGURE_DIR}/.devcontainer/configure.py" "$@"
-fi
+  if stdout is not None:
+    return cmd_rslt.stdout
 
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
 
-echo "Configuration finished"
+def _get_input(question, default_answer):
+  try:
+    answer = input(f"\n- {question} ")
+  except EOFError:
+    answer = default_answer
+
+  return (answer or default_answer).strip().lower()
+
+
+def get_input(question, default_answer='', accepted_answers=None):
+  if accepted_answers is None:
+    raise RuntimeError("Argument `accepted_answers` is None.")
+
+  accepted_answers = [x.strip().lower() for x in accepted_answers]
+
+  while True:
+    answer = _get_input(question, default_answer)
+    if answer not in accepted_answers:
+      print(f"\tERROR: Unsupported answer received: {answer}."
+            f"Expected: {accepted_answers}")
+      continue
+    break
+
+  return answer
+
+
+if __name__ == "__main__":
+
+  IREE_DIR = pathlib.Path(__file__).resolve().parent
+
+  # ====================== VSCode Development Container ===================== #
+  if get_input(
+      "Do you wish to use and configure VS Code Development Container [y/N]?",
+      default_answer="n",
+      accepted_answers=["y", "n"]) == "y":
+
+    run_shell(f"{which('python3')} {IREE_DIR / '.devcontainer/configure.py'}")
+    # run_shell(f"{which('python3')} --version")
+
+  # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
+
+  print("Configuration finished")
