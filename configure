@@ -53,19 +53,36 @@ def get_input(question, default_answer='', accepted_answers=None):
   return answer
 
 
+def print_header(header_name):
+  print("\n" + "-" * 80)
+  print(f"[*] {header_name} ...")
+  print("-" * 80)
+
+
 if __name__ == "__main__":
 
   IREE_DIR = pathlib.Path(__file__).resolve().parent
 
   # ====================== VSCode Development Container ===================== #
+  print_header("VS Code Development Container")
+
   if get_input(
       "Do you wish to use and configure VS Code Development Container [y/N]?",
       default_answer="n",
       accepted_answers=["y", "n"]) == "y":
 
     run_shell(f"{which('python3')} {IREE_DIR / '.devcontainer/configure.py'}")
-    # run_shell(f"{which('python3')} --version")
+
+  # ================================= Bazel ================================= #
+  print_header("Bazel")
+
+  if get_input(
+      "Do you wish to use and configure Bazel [y/N]?",
+      default_answer="n",
+      accepted_answers=["y", "n"]) == "y":
+
+    run_shell(f"{which('python3')} {IREE_DIR / 'build_tools/bazel/configure_bazel.py'}")
 
   # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
 
-  print("Configuration finished")
+  print_header("Configuration finished")

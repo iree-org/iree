@@ -4,10 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import pathlib
 import platform
 import os
-import subprocess
 import sys
+
+
+CURRENT_DIR = pathlib.Path(__file__).resolve().parent
 
 
 def detect_unix_platform_config(bazelrc):
@@ -59,11 +62,13 @@ def write_platform(bazelrc):
   else:
     detect_unix_platform_config(bazelrc)
 
-if len(sys.argv) > 1:
-  local_bazelrc = sys.argv[1]
-else:
-  local_bazelrc = os.path.join(os.path.dirname(__file__), "configured.bazelrc")
-with open(local_bazelrc, "wt") as bazelrc:
-  write_platform(bazelrc)
+if __name__ == "__main__":
+  if len(sys.argv) > 1:
+    local_bazelrc = sys.argv[1]
+  else:
+    local_bazelrc = CURRENT_DIR.parent.parent / "configured.bazelrc"
 
-print("Wrote", local_bazelrc)
+  with open(local_bazelrc, "wt") as bazelrc:
+    write_platform(bazelrc)
+
+  print("Wrote", local_bazelrc)
