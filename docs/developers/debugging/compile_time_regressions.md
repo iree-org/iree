@@ -87,11 +87,37 @@ Other sample scripts:
 ```bash
 #!/bin/bash
 
-set -e
-set -o pipefail
+set -xeuo pipefail
 
-# Configure this based on what your thresholds are.
+# --------------------------------------------------------------------------- #
+# Settings                                                                    #
+# --------------------------------------------------------------------------- #
+
+INPUT_FILE_PATH="/path/to/program.mlirbc"
+TMP_DIR="../iree-tmp"
+
+declare -a COMPILER_FLAGS=(
+  "--iree-input-type=mhlo"
+  "--iree-hal-target-backends=cuda"
+  "--iree-hal-cuda-llvm-target-arch=sm_80"
+)
+
 TIMEOUT_SECONDS_FOR_COMPILING_EACH_SOURCE=10
+
+# --------------------------------------------------------------------------- #
+# Utility functions                                                           #
+# --------------------------------------------------------------------------- #
+
+# Call to have `git bisect` skip this commit (don't mark as good _or_ bad)
+# https://git-scm.com/docs/git-bisect#_bisect_run
+skip_on_error() {
+  >&2 echo "** Skipping due to error: $1 **"
+  exit 125  # Special exit code for `git bisect skip`
+}
+
+# --------------------------------------------------------------------------- #
+# Main script                                                                 #
+# --------------------------------------------------------------------------- #
 
 # Store git version hash, so we can dump artifacts to unique directories later.
 GIT_SHA="$(git rev-parse --short HEAD)"
@@ -102,16 +128,14 @@ echo "** Building iree-compile at ${GIT_SHA} **"
 git submodule update
 
 # Build the compiler. You'll want ccache configured to make this fast!
-cmake --build ../iree-build/ --target iree-compile
+cmake --build ../iree-build/ --target iree-compile || skip_on_error "CMake build failed"
 
 # Run the compiler, dumping executable sources and stopping.
-SOURCES_DIR="../iree-tmp/sources-${GIT_SHA}"
+SOURCES_DIR="${TMP_DIR}/sources-${GIT_SHA}"
 echo "** Running iree-compile at ${GIT_SHA}, dumping sources to ${SOURCES_DIR} **"
 ../iree-build/tools/iree-compile \
-    ~/code/iree-tmp/t5_large_imported_2023_04_20.mlirbc \
-    --iree-input-type=mhlo \
-    --iree-hal-target-backends=cuda \
-    --iree-hal-cuda-llvm-target-arch=sm_80 \
+    ${INPUT_FILE_PATH} \
+    ${COMPILER_FLAGS[@]} \
     --iree-hal-dump-executable-sources-to=${SOURCES_DIR} \
     --compile-to=executable-sources \
     -o /dev/null
@@ -123,9 +147,8 @@ for SOURCE in "${SOURCES[@]}"; do
   echo "  * Compiling: ${SOURCE} *"
   timeout --verbose ${TIMEOUT_SECONDS_FOR_COMPILING_EACH_SOURCE} \
    ../iree-build/tools/iree-compile ${SOURCES_DIR}/${SOURCE} \
+    ${COMPILER_FLAGS[@]} \
     --compile-mode=hal-executable \
-    --iree-hal-target-backends=cuda \
-    --iree-hal-cuda-llvm-target-arch=sm_80 \
     -o /dev/null
 done
 ```
