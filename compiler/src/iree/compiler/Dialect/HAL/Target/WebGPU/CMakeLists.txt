@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRIR
     MLIRSPIRVDialect
     MLIRSPIRVSerialization
+    MLIRSPIRVTransforms
     SPIRV-Tools
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::SPIRV
