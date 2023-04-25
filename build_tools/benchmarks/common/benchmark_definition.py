@@ -99,7 +99,6 @@ def execute_cmd(args: Sequence[Any],
   try:
     return subprocess.run(args, check=True, text=True, **kwargs)
   except subprocess.CalledProcessError as exc:
-    print(" \\\n".join(str(a) for a in args))
     print((f"\n\nThe following command failed:\n\n{args}"
            f"\n\nReturn code: {exc.returncode}\n\n"))
     if exc.stdout:
