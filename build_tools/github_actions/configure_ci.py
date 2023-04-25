@@ -14,6 +14,7 @@ The following environment variables are required:
 
 When GITHUB_EVENT_NAME is "pull_request", there are additional environment
 variables to be set:
+- PR_BRANCH (required): PR source branch.
 - PR_TITLE (required): PR title.
 - PR_BODY (optional): PR description.
 - PR_LABELS (optional): JSON list of PR label names.
@@ -34,6 +35,7 @@ import difflib
 import fnmatch
 import json
 import os
+import re
 import subprocess
 import textwrap
 from typing import Iterable, List, Mapping, Sequence, Tuple
@@ -76,6 +78,13 @@ RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
+
+# Patterns to detect LLVM integration PRs.
+LLVM_INTEGRATION_PR_TITLE_PATTERN = re.compile("^integrate.+llvm-project",
+                                               re.IGNORECASE)
+LLVM_INTEGRATION_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump",
+                                             re.IGNORECASE)
+LLVM_INTEGRATE_LABEL = "llvm-integrate"
 
 
 def skip_path(path: str) -> bool:
@@ -254,6 +263,11 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
   """
   if not is_pr:
     preset_options = ["all"]
+  elif (LLVM_INTEGRATION_PR_TITLE_PATTERN.search(os.environ["PR_TITLE"]) or
+        LLVM_INTEGRATION_BRANCH_PATTERN.search(os.environ["PR_BRANCH"]) or
+        LLVM_INTEGRATE_LABEL in labels):
+    # Always run all benchmark presets for LLVM integration PRs.
+    preset_options = ["all"]
   else:
     preset_options = set(
         label.split(":", maxsplit=1)[1]
@@ -264,7 +278,8 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
       preset_options = preset_options.union(
           option.strip() for option in trailer.split(","))
     preset_options = sorted(preset_options)
-    print(f"Using benchmark preset '{preset_options}' from trailers and labels")
+
+  print(f"Using benchmark preset '{preset_options}'")
 
   for preset_option in preset_options:
     if preset_option not in BENCHMARK_PRESET_OPTIONS:
