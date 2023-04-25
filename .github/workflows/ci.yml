@@ -1093,38 +1093,29 @@ jobs:
           BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
           BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
-          EXECUTION_BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ needs.execution_benchmarks.outputs.benchmark-config-gcs-artifact }}
           EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
-          COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.benchmark-config-gcs-artifact }}
           COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
-        # Github markdown doesn't support non-http hyperlink
-        # (https://github.com/github/markup/issues/933). So the GCS links are
-        # shown as plaintext. If the job of an artifact is skipped or failed, we
-        # show "Not exists" in the link.
+        # If the job of an artifact is skipped or failed, we show "Not present".
         run: |
           cat <<EOF >> "${GITHUB_STEP_SUMMARY}"
           ### :link: Artifact Links
 
           \`\`\`sh
-          # Compiler/host tools archive:
-          export BUILD_DIR_GCS_ARTIFACT="${BUILD_DIR_GCS_ARTIFACT:-Not exists}"
-          # E2E test artifacts directory:
-          export E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR:-Not exists}"
-          # Benchmark tool binaries directory:
-          export BENCHMARK_TOOLS_GCS_ARTIFACT_DIR="${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR:-Not exists}"
-          # Execution benchmark config:
-          export EXECUTION_BENCHMARK_CONFIG_GCS_ARTIFACT="${EXECUTION_BENCHMARK_CONFIG_GCS_ARTIFACT:-Not exists}"
-          # Execution benchmark results/traces directory
-          export EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR="${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR:-Not exists}"
-          # Compilation benchmark config:
-          export COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT="${COMPILATION_BENCHMARK_CONFIG_GCS_ARTIFACT:-Not exists}"
+          # Compiler and host tools archive:
+          export BUILD_DIR_URL="${BUILD_DIR_GCS_ARTIFACT:-Not present}"
+          # Directory of e2e test artifacts:
+          export E2E_TEST_ARTIFACTS_DIR_URL="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR:-Not present}"
+          # Directory of benchmark tool binaries:
+          export BENCHMARK_TOOLS_DIR_URL="${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR:-Not present}"
+          # Directory of execution benchmark results and traces:
+          export EXECUTION_BENCHMARK_RESULTS_DIR_URL="${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR:-Not present}"
           # Compilation benchmark results:
-          export COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT="${COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT:-Not exists}"
+          export COMPILATION_BENCHMARK_RESULTS_URL="${COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT:-Not present}"
           \`\`\`
 
-          You can list and download \`gs://\` URLs with [gcloud cli](
+          You can list \`gs://\` directories and download files with [gcloud cli](
           https://cloud.google.com/sdk/gcloud/reference/storage).
 
-          To run benchmarks locally with the CI-built E2E test artifacts, see [IREE Benchmark Suites](
+          To run benchmarks locally with the CI-built e2e test artifacts, see [IREE Benchmark Suites](
           https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/developers/developing_iree/benchmark_suites.md).
           EOF

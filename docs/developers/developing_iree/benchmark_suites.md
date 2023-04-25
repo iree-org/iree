@@ -193,12 +193,12 @@ by clicking the green check mark. Click the `Details` of job
 
 ![image](https://user-images.githubusercontent.com/2104162/223781032-c22e2922-2bd7-422d-abc2-d6ef0d31b0f8.png)
 
-#### 2. Get the GCS directory of the built artifacts
+#### 2. Get the URLs of the GCS artifacts
 
-On the job detail page, expand the step `Uploading e2 test artifacts`, you will
-see a bunch of lines like below. The
-URL`gs://iree-github-actions-<presubmit|postsubmit>-artifacts/<run_id>/<run_attempt>/`
-is the directory of artifacts:
+On the CI run page, click `Summary` on the top-left to open the summary page.
+Scroll down and the links to artifacts are listed in a section titled "Artifact
+Links". Pasting the content in your shell will define all needed variables for
+the following steps.
 
 ```
 Copying file://build-e2e-test-artifacts/e2e_test_artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb to gs://iree-github-actions-postsubmit-artifacts/4360950546/1/e2e-test-artifacts/iree_MobileBertSquad_fp32_module_fdff4caa105318036534bd28b76a6fe34e6e2412752c1a000f50fafe7f01ef07/module.vmfb
@@ -214,21 +214,17 @@ more usages). If you want to use CI artifacts to reproduce benchmarks locally,
 see
 [Find Compile and Run Commands to Reproduce Benchmarks](#find-compile-and-run-commands-to-reproduce-benchmarks).
 
-Set the GCS directory URL from the step
-[2. Get the GCS directory of the built artifacts](#2-get-the-gcs-directory-of-the-built-artifacts):
-
-```sh
-export GCS_URL="gs://iree-github-actions-<presubmit|postsubmit>-artifacts/<run_id>/<run_attempt>"
-```
+Assume you get the GCS URL variables from
+[2. Get the GCS directory of the built artifacts](#2-get-the-gcs-directory-of-the-built-artifacts).
 
 Download artifacts:
 
 ```sh
 # The GCS directory has the same structure as your local ${IREE_BUILD_DIR?}/e2e_test_artifacts.
-gcloud storage ls "${GCS_URL?}/e2e-test-artifacts"
+gcloud storage ls "${E2E_TEST_ARTIFACTS_DIR_URL?}"
 
 # Download all source and imported MLIR files:
-gcloud storage cp "${GCS_URL?}/e2e-test-artifacts/*.mlir" "<target_dir>"
+gcloud storage cp "${E2E_TEST_ARTIFACTS_DIR_URL?}/*.mlir" "<target_dir>"
 ```
 
 Execution and compilation benchmark configs can be downloaded at:
@@ -236,21 +232,24 @@ Execution and compilation benchmark configs can be downloaded at:
 ```sh
 # Execution benchmark config:
 gcloud storage cp \
-  "${GCS_URL?}/e2e-test-artifacts/execution-benchmark-config.json" \
+  "${E2E_TEST_ARTIFACTS_DIR_URL?}/execution-benchmark-config.json" \
   "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
 
 # Compilation benchmark config:
 gcloud storage cp \
-  "${GCS_URL?}/e2e-test-artifacts/compilation-benchmark-config.json" \
+  "${E2E_TEST_ARTIFACTS_DIR_URL?}/compilation-benchmark-config.json" \
   "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
 Benchmark raw results and traces can be downloaded at:
 
 ```sh
-# Benchmark raw results
-gcloud storage cp "${GCS_URL?}/benchmark-results/benchmark-results-*.json" .
+# Execution benchmark raw results
+gcloud storage cp "${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/benchmark-results-*.json" .
 
-# Benchmark traces
-gcloud storage cp "${GCS_URL?}/benchmark-results/benchmark-traces-*.tar.gz" .
+# Execution benchmark traces
+gcloud storage cp "${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/benchmark-traces-*.tar.gz" .
+
+# Compilation benchmark results
+gcloud storage cp "${COMPILATION_BENCHMARK_RESULTS_URL?}" .
 ```
