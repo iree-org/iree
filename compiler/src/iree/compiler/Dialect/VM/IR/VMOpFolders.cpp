@@ -521,7 +521,7 @@ template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
-static Attribute constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
+static TypedAttr constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
                                    const CalculationT &calculate) {
   if (auto lhs = rawLhs.dyn_cast_or_null<AttrElementT>()) {
     auto rhs = rawRhs.dyn_cast_or_null<AttrElementT>();
