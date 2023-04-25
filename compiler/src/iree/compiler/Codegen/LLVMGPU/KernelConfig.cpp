@@ -235,7 +235,8 @@ static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
                                        linalg::LinalgOp op,
                                        const TargetInfo &targetInfo) {
-  if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2)
+  if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2 ||
+      op.getNumParallelLoops() < op.getNumLoops())
     return failure();
   // Don't consider operations that don't have a broadcast, those should go
   // through reductions.
