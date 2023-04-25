@@ -14,7 +14,7 @@
 #include "iree/hal/drivers/webgpu/platform/webgpu.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 //===----------------------------------------------------------------------===//
 // Public API
@@ -470,11 +470,12 @@ static iree_status_t print_outputs_from_call(
   iree_vm_list_t* variants_list = iree_runtime_call_outputs(call);
   for (iree_host_size_t i = 0; i < iree_vm_list_size(variants_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variants_list, i, &variant),
-                         "variant %" PRIhsz " not present", i);
+    IREE_RETURN_IF_ERROR(
+        iree_vm_list_get_variant_assign(variants_list, i, &variant),
+        "variant %" PRIhsz " not present", i);
 
     if (iree_vm_variant_is_value(variant)) {
-      switch (variant.type.value_type) {
+      switch (iree_vm_type_def_as_value(variant.type)) {
         case IREE_VM_VALUE_TYPE_I8: {
           IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
               outputs_builder, "i8=%" PRIi8, variant.i8));
