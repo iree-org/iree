@@ -6,15 +6,17 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
-#include "iree/builtins/ukernel/mmt4d_tile.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 #define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
 
 static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
-  IREE_UK_ASSERT(!(params->flags & ~IREE_UK_FLAG_ACCUMULATE));
-  IREE_UK_ASSERT(params->type == iree_uk_mmt4d_type_f32f32f32 ||
-                 params->type == iree_uk_mmt4d_type_i8i8i32);
+  const iree_uk_uint32_t allflags =
+      IREE_UK_FLAG_MMT4D_TYPE_MASK | IREE_UK_FLAG_MMT4D_ACCUMULATE;
+  IREE_UK_ASSERT(!(params->flags & ~allflags));
+  iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
+  IREE_UK_ASSERT(mmt4d_type != iree_uk_mmt4d_type_none);
   // Some implementations may wish to avoid supporting absurdly wide types. For
   // instance, K is the innermost (i.e. hottest) loop bound, so some 32bit
   // targets may benefit from K being int32, not int64. We still let K be of
@@ -29,7 +31,7 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
   IREE_UK_ASSERT(IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(params->K0, 15));
   // Ensure iree_uk_mmt4d_tile_generic_max_bytes large enough for this tile.
   IREE_UK_ASSERT(params->M0 * params->N0 *
-                     iree_uk_type_size(iree_uk_mmt4d_out_type(params->type)) <=
+                     iree_uk_type_size(iree_uk_mmt4d_out_type(mmt4d_type)) <=
                  iree_uk_mmt4d_tile_generic_max_bytes);
 #endif  // IREE_UK_ENABLE_ASSERTS
 }
@@ -46,21 +48,25 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
   const iree_uk_int32_t K = params->K;
   const iree_uk_int16_t M0 = params->M0;
   const iree_uk_int16_t N0 = params->N0;
-  const iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(params->type);
-  const iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(params->type);
-  const iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params->type);
+  iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
+  const iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(mmt4d_type);
+  const iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(mmt4d_type);
+  const iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
   const iree_uk_int16_t lhs_elem_size_log2 = iree_uk_type_size_log2(lhs_type);
   const iree_uk_int16_t rhs_elem_size_log2 = iree_uk_type_size_log2(rhs_type);
   const iree_uk_int16_t out_elem_size_log2 = iree_uk_type_size_log2(out_type);
-  char* out_tile_row = params->out_buffer;
-  const char* lhs_panel = params->lhs_buffer;
+  char* out_tile_row =
+      (char*)params->out_buffer + (params->out_offset << out_elem_size_log2);
+  const char* lhs_panel = (const char*)params->lhs_buffer +
+                          (params->lhs_offset << lhs_elem_size_log2);
   iree_uk_int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
-  iree_uk_ssize_t lhs_panel_stride = params->lhs_stride << lhs_elem_size_log2;
-  iree_uk_ssize_t rhs_panel_stride = params->rhs_stride << rhs_elem_size_log2;
-  iree_uk_ssize_t out_stride = params->out_stride << out_elem_size_log2;
+  iree_uk_ssize_t lhs_panel_stride = params->lhs_stride0 << lhs_elem_size_log2;
+  iree_uk_ssize_t rhs_panel_stride = params->rhs_stride0 << rhs_elem_size_log2;
+  iree_uk_ssize_t out_stride = params->out_stride0 << out_elem_size_log2;
   for (iree_uk_int32_t i = 0; i < M; ++i) {
     char* out_tile = out_tile_row;
-    const char* rhs_panel = params->rhs_buffer;
+    const char* rhs_panel = (const char*)params->rhs_buffer +
+                            (params->rhs_offset << rhs_elem_size_log2);
     for (iree_uk_int32_t j = 0; j < N; ++j) {
       tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
       out_tile += out_tile_size;
@@ -73,12 +79,14 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
 
 // Helper for early-return path when K==0 and we just need to clear the output.
 static void iree_uk_mmt4d_zero_out(const iree_uk_mmt4d_params_t* params) {
-  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params->type);
-  int out_type_size_log2 = iree_uk_type_size_log2(out_type);
+  iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
+  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
+  int out_elem_size_log2 = iree_uk_type_size_log2(out_type);
   iree_uk_ssize_t contiguous_size = params->N * params->M0 * params->N0
-                                    << out_type_size_log2;
-  iree_uk_ssize_t stride = params->out_stride << out_type_size_log2;
-  char* out_ptr = params->out_buffer;
+                                    << out_elem_size_log2;
+  iree_uk_ssize_t stride = params->out_stride0 << out_elem_size_log2;
+  char* out_ptr =
+      (char*)params->out_buffer + (params->out_offset << out_elem_size_log2);
   for (iree_uk_ssize_t i = 0; i < params->M; ++i) {
     iree_uk_memset(out_ptr, 0, contiguous_size);
     out_ptr += stride;
@@ -95,7 +103,7 @@ static bool iree_uk_mmt4d_early(const iree_uk_mmt4d_params_t* params) {
     return true;
   }
   if (params->K == 0) {
-    if (params->flags & IREE_UK_FLAG_ACCUMULATE) {
+    if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
       // Nothing to do!
     } else {
       iree_uk_mmt4d_zero_out(params);

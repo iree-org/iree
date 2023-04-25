@@ -37,7 +37,7 @@ struct DispatchWithTransformDialect
     // clang-format off
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Flow::FlowDialect,
-                    AffineDialect,
+                    affine::AffineDialect,
                     arith::ArithDialect,
                     linalg::LinalgDialect,
                     pdl::PDLDialect,

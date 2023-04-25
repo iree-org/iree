@@ -31,6 +31,8 @@ iree_cc_library(
     common_arm_neon
   HDRS
     "common_arm_neon.h"
+  DEPS
+    iree::builtins::ukernel::internal_headers
 )
 
 if(IREE_UK_BUILD_ARM_64_DOTPROD)
@@ -80,7 +82,7 @@ iree_cc_library(
   DEPS
     iree::base::core_headers
     iree::schemas::cpu_data
-    iree::builtins::ukernel::headers
+    iree::builtins::ukernel::internal_headers
     ${IREE_UK_ARM_64_DEPS}
   PUBLIC
 )

@@ -74,6 +74,19 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
+  // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
+  // lower them and can't be optimized away anymore.
+  {
+    RewritePatternSet patterns(ctx);
+    SmallVector<Dialect *> dialects;
+    dialects.push_back(ctx->getLoadedDialect<vector::VectorDialect>());
+    dialects.push_back(ctx->getLoadedDialect<memref::MemRefDialect>());
+    dialects.push_back(ctx->getLoadedDialect<linalg::LinalgDialect>());
+    for (auto &dialect : dialects)
+      dialect->getCanonicalizationPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
+
   {
     RewritePatternSet patterns(ctx);
     vector::populateVectorTransferLoweringPatterns(patterns,

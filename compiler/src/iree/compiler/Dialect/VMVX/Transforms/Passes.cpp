@@ -90,7 +90,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());
   nestedModulePM.addPass(memref::createNormalizeMemRefsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createAffineScalarReplacementPass());
+      affine::createAffineScalarReplacementPass());
   nestedModulePM.addPass(createCanonicalizerPass());
 }
 

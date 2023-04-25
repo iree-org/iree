@@ -105,9 +105,9 @@ class ConversionPass
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Util::UtilDialect, IREE::VM::VMDialect, func::FuncDialect,
-                mlir::arith::ArithDialect, math::MathDialect, AffineDialect>();
+    registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
+                    func::FuncDialect, mlir::arith::ArithDialect,
+                    math::MathDialect, affine::AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -157,7 +157,7 @@ class ConversionPass
 
     conversionTarget
         .addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect>();
-    conversionTarget.addIllegalDialect<AffineDialect>();
+    conversionTarget.addIllegalDialect<affine::AffineDialect>();
     conversionTarget.addIllegalDialect<math::MathDialect>();
 
     // Populate patterns from all used dialects, providing the imports they

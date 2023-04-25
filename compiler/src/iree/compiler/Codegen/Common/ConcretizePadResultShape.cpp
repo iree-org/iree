@@ -84,8 +84,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
       // SSA values that would need invoking other patterns to simplify. We
       // cannot invoke patterns in patterns.
       AffineMap map = addMap;
-      fullyComposeAffineMapAndOperands(&map, &valueSizes);
-      canonicalizeMapAndOperands(&map, &valueSizes);
+      affine::fullyComposeAffineMapAndOperands(&map, &valueSizes);
+      affine::canonicalizeMapAndOperands(&map, &valueSizes);
 
       auto cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
       // Specially handle the case where we have both dimensions and symbols and
@@ -104,7 +104,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
         map = map.replace(dimToSymMap, /*numResultDims=*/0,
                           /*numResultSyms=*/numDims + numSyms);
 
-        canonicalizeMapAndOperands(&map, &valueSizes);
+        affine::canonicalizeMapAndOperands(&map, &valueSizes);
         cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
       }
       if (!cstExpr) return failure();

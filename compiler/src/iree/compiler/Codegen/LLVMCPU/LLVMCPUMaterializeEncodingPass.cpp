@@ -100,7 +100,8 @@ static MatmulTileParams chooseMatmulTileParams(MatmulType type,
 struct LLVMCPUMaterializeEncodingPass
     : public LLVMCPUMaterializeEncodingBase<LLVMCPUMaterializeEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, AffineDialect, IREE::Flow::FlowDialect,
+    registry.insert<arith::ArithDialect, affine::AffineDialect,
+                    IREE::Flow::FlowDialect,
                     IREE::LinalgExt::IREELinalgExtDialect>();
   }
   void runOnOperation() override;

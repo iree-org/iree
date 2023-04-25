@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/query_tile_sizes.h"
+#include "iree/builtins/ukernel/query_tile_sizes_internal.h"
 
 #if defined(IREE_UK_ARCH_ARM_64)
 #include "iree/builtins/ukernel/arch/arm_64/query_tile_sizes_arm_64.h"

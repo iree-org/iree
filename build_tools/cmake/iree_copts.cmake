@@ -335,14 +335,16 @@ if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
+# Find and add threads as dependency.
 if(NOT ANDROID AND IREE_ENABLE_THREADING)
-  iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
-    CLANG_OR_GCC
-      "-lpthread"
-  )
+  set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+  set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+  find_package(Threads)
+  set(IREE_THREADS_DEPS Threads::Threads)
 else()
   # Android provides its own pthreads support with no linking required.
 endif()
+
 
 # Emscripten needs -pthread specified in link _and_ compile options when using
 # atomics, shared memory, or pthreads. If we bring our own threading impl and
@@ -371,7 +373,6 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-lm"
-    ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"

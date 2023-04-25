@@ -506,7 +506,7 @@ struct ParamUnpack<std::array<U, S>> {
   using storage_type = std::array<element_type, S>;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     for (size_t i = 0; i < S; ++i) {
-      ParamUnpack::Load(status, ptr, out_param[i]);
+      ParamUnpack<element_type>::Load(status, ptr, out_param[i]);
     }
   }
 };

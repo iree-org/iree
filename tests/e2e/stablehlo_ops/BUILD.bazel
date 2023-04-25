@@ -1,0 +1,170 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests of end-to-end IREE support for individual ops in the StableHLO dialect.
+# Each test file should have a name matching the corresponding StableHLO op and test only the
+# functionality of that op (though may make use of other ops where necessary). Tests should be
+# written using the IREE Check framework and should always pass on the reference VMVX backend.
+# See https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+# TODO(#12678): Also run these tests under CUDA.
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_local-task",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "abs.mlir",
+            "add.mlir",
+            "bitcast_convert.mlir",
+            "broadcast.mlir",
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "compare.mlir",
+            "concatenate.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "convolution.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_bf16.mlir",
+            "dot_general.mlir",
+            "dynamic_slice.mlir",
+            "dynamic_update_slice.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [],
+    ),
+    compiler_flags = ["--iree-input-type=stablehlo_experimental"],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_local-task",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "abs.mlir",
+            "add.mlir",
+            "bitcast_convert.mlir",
+            "broadcast.mlir",
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "compare.mlir",
+            "concatenate.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "convolution.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_bf16.mlir",
+            "dot_general.mlir",
+            "dynamic_slice.mlir",
+            "dynamic_update_slice.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [],
+    ),
+    compiler_flags = ["--iree-input-type=stablehlo_experimental"],
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "abs.mlir",
+            "add.mlir",
+            "bitcast_convert.mlir",
+            "broadcast.mlir",
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "compare.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "convolution.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_general.mlir",
+            "dynamic_slice.mlir",
+            "dynamic_update_slice.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "concatenate.mlir",  # TODO(#12678): Investigate this failure.
+            "dot_bf16.mlir",  # Missing BF16 support on Vulkan backends
+        ],
+    ),
+    compiler_flags = ["--iree-input-type=stablehlo_experimental"],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+# Check host features compilation (LLVM backend with host cpu features).
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu-host_local-task",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "abs.mlir",
+            "add.mlir",
+            "bitcast_convert.mlir",
+            "broadcast.mlir",
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "compare.mlir",
+            "concatenate.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "convolution.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_bf16.mlir",
+            "dot_general.mlir",
+            "dynamic_slice.mlir",
+            "dynamic_update_slice.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [],
+    ),
+    compiler_flags = [
+        "--iree-input-type=stablehlo_experimental",
+        "--iree-llvmcpu-target-cpu-features=host",
+    ],
+    driver = "local-task",
+    # Building and testing must be on the same architecture, which doesn't work
+    # with remote execution in general.
+    tags = [
+        "hostonly",
+        "local",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+test_suite(
+    name = "check",
+    tests = [
+        ":check_llvm-cpu-host_local-task",
+        ":check_llvm-cpu_local-task",
+        ":check_vmvx_local-task",
+        ":check_vulkan-spirv_vulkan",
+    ],
+)

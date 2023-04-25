@@ -11,6 +11,7 @@
 # pylint: disable=undefined-variable
 
 import os
+import sys
 import tempfile
 
 import lit.formats
@@ -30,3 +31,7 @@ config.environment.update({
 config.test_exec_root = (os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR") or
                          os.environ.get("TEST_TMPDIR") or
                          os.path.join(tempfile.gettempdir(), "lit"))
+
+config.substitutions.extend([
+    ("%PYTHON", os.getenv("PYTHON", sys.executable)),
+])

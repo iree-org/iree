@@ -59,15 +59,15 @@ inline raw_ostream &operator<<(raw_ostream &os,
 }
 #endif
 
-static FailureOr<AffineApplyOp> canonicalizeMinMaxOp(
+static FailureOr<affine::AffineApplyOp> canonicalizeMinMaxOp(
     RewriterBase &rewriter, Operation *op,
-    FlatAffineValueConstraints constraints) {
+    affine::FlatAffineValueConstraints constraints) {
   RewriterBase::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(op);
-  FailureOr<AffineValueMap> simplified =
-      mlir::simplifyConstrainedMinMaxOp(op, std::move(constraints));
+  FailureOr<affine::AffineValueMap> simplified =
+      mlir::affine::simplifyConstrainedMinMaxOp(op, std::move(constraints));
   if (failed(simplified)) return failure();
-  return rewriter.replaceOpWithNewOp<AffineApplyOp>(
+  return rewriter.replaceOpWithNewOp<affine::AffineApplyOp>(
       op, simplified->getAffineMap(), simplified->getOperands());
 }
 
@@ -89,10 +89,10 @@ namespace {
 /// can reuse upstream utilities to prove that the `affine.min` ops are tightly
 /// bound so that we can replace them with the tight bound.
 struct FoldAffineMinOverDistributedLoopInductionVariable final
-    : public OpRewritePattern<AffineMinOp> {
+    : public OpRewritePattern<affine::AffineMinOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(AffineMinOp minOp,
+  LogicalResult matchAndRewrite(affine::AffineMinOp minOp,
                                 PatternRewriter &rewriter) const override {
     auto loopMatcher = [&](Value iv, OpFoldResult &lb, OpFoldResult &ub,
                            OpFoldResult &step) {
@@ -123,15 +123,15 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
 };
 
 struct FoldAffineMinOverWorkgroupIDs final
-    : public OpRewritePattern<AffineMinOp> {
+    : public OpRewritePattern<affine::AffineMinOp> {
   FoldAffineMinOverWorkgroupIDs(MLIRContext *context,
                                 ArrayRef<int64_t> numWorkgroup,
                                 PatternBenefit benefit = 1)
-      : OpRewritePattern<AffineMinOp>(context, benefit),
+      : OpRewritePattern<affine::AffineMinOp>(context, benefit),
         numWorkgroup(numWorkgroup) {}
-  LogicalResult matchAndRewrite(AffineMinOp minOp,
+  LogicalResult matchAndRewrite(affine::AffineMinOp minOp,
                                 PatternRewriter &rewriter) const override {
-    FlatAffineValueConstraints constraints;
+    affine::FlatAffineValueConstraints constraints;
     DenseSet<Value> allIds;
     // Find all iteration variables among `minOp`'s operands add constrain them.
     for (Value operand : minOp->getOperands()) {

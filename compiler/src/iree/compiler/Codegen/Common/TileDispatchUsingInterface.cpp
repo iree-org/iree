@@ -64,10 +64,10 @@ static std::tuple<Value, Value> getDistributeLBAndStep(OpBuilder &b,
   bindSymbols(b.getContext(), s0, s1, s2);
   auto offsetMap = AffineMap::get(0, 3, {s0 + s1 * s2});
   auto stepMap = AffineMap::get(0, 2, {s0 * s1});
-  Value distributeLB =
-      makeComposedAffineApply(b, loc, offsetMap, ValueRange{lb, procId, step});
-  Value distributeStep =
-      makeComposedAffineApply(b, loc, stepMap, ValueRange{step, nprocs});
+  Value distributeLB = affine::makeComposedAffineApply(
+      b, loc, offsetMap, ValueRange{lb, procId, step});
+  Value distributeStep = affine::makeComposedAffineApply(
+      b, loc, stepMap, ValueRange{step, nprocs});
   return {distributeLB, distributeStep};
 }
 
@@ -127,7 +127,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     if (isConstantIntValue(getAsOpFoldResult(tileSize), 1)) {
       return builder.getIndexAttr(1);
     }
-    return makeComposedFoldedAffineMin(
+    return affine::makeComposedFoldedAffineMin(
         builder, loc, minMap, ArrayRef<OpFoldResult>{iv, tileSize, size});
   };
 
@@ -206,7 +206,7 @@ static LogicalResult replaceStoresWithTiledVersion(
   SliceAndDynamicDims clonedSliceAndVals =
       cloneOffsetsSizesAndStrides(rewriter, storeOp);
 
-  if (failed(mergeOffsetsSizesAndStrides(
+  if (failed(affine::mergeOffsetsSizesAndStrides(
           rewriter, storeOp.getLoc(), clonedSliceAndVals.offsets,
           clonedSliceAndVals.sizes, clonedSliceAndVals.strides,
           storeOp.getDroppedDims(), tileOffsets, tileSizes, tileStrides,
@@ -552,7 +552,7 @@ struct SwapExtractSliceWithDispatchTensorLoad
     if (!loadOp) return failure();
 
     SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
-    if (failed(mergeOffsetsSizesAndStrides(
+    if (failed(affine::mergeOffsetsSizesAndStrides(
             rewriter, loadOp.getLoc(), loadOp, sliceOp, loadOp.getDroppedDims(),
             combinedOffsets, combinedSizes, combinedStrides))) {
       return rewriter.notifyMatchFailure(

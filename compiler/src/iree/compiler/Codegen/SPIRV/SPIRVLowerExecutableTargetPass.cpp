@@ -43,7 +43,7 @@ class SPIRVLowerExecutableTargetPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<IREE::Codegen::IREECodegenDialect, AffineDialect,
+        .insert<IREE::Codegen::IREECodegenDialect, affine::AffineDialect,
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
                 IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
                 bufferization::BufferizationDialect, scf::SCFDialect,

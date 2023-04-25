@@ -208,7 +208,8 @@ iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_arm_64(
   // At the moment, as sum-reductions are not yet part of pack ops,
   // no arithmetic whatsoever is being done here, so only the element type
   // size matters, not the type itself.
-  int esize = iree_uk_type_size(iree_uk_pack_out_type(params->type));
+  iree_uk_pack_type_t pack_type = iree_uk_pack_type(params->flags);
+  int esize = iree_uk_type_size(iree_uk_pack_out_type(pack_type));
   bool transpose = params->flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
   if (esize == 4 && params->out_size2 == 8 && params->out_size3 == 8) {
     // Currently only used for accumulators, which are never transposed.

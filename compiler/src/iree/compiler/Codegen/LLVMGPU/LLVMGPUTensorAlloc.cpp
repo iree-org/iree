@@ -19,15 +19,39 @@
 namespace mlir {
 namespace iree_compiler {
 
+// For optimal performance we always want to copy 128 bits
+static constexpr int copyVectorNumBits = 128;
+
 /// Filter to decide which contract ops need allocations.
 static bool contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) return false;
 
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return false;
+  }
+
   // The workgroup specialization already makes static shapes available for the
   // main tile part and makes the partial tile computation small, so promoting
   // to shared memory for the partial tile actually hurts the performance.
   if (linalgOp.hasDynamicShape()) return false;
+
+  // Check if the shape is tile-distributable. The leading dimension must be a
+  // multiple of the target vector size, which is 128b / the element bit width.
+  auto isTileDistributable = [&](OpOperand *v) {
+    ShapedType ty = v->get().getType().cast<ShapedType>();
+    unsigned bitWidth = ty.getElementTypeBitWidth();
+    int targetVectorSize = copyVectorNumBits / bitWidth;
+    return ty.getShape().back() % targetVectorSize == 0;
+  };
+
+  if (!llvm::all_of(linalgOp.getDpsInputOperands(), isTileDistributable)) {
+    return false;
+  }
+
+  if (!llvm::all_of(linalgOp.getDpsInitOperands(), isTileDistributable)) {
+    return false;
+  }
 
   SmallVector<unsigned> dims;
   linalgOp.getParallelDims(dims);
@@ -39,8 +63,7 @@ static bool contractOpFilter(Operation *op) {
       numNonUnitParallelLoop++;
     }
   }
-  return numNonUnitParallelLoop > 1 && linalg::isaContractionOpInterface(op) &&
-         linalgOp.getNumParallelLoops() >= 2 &&
+  return numNonUnitParallelLoop > 1 && linalgOp.getNumParallelLoops() >= 2 &&
          linalgOp.getNumParallelLoops() <= 3;
 }
 

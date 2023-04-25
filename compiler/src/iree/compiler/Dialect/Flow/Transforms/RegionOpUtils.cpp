@@ -113,8 +113,8 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
     Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
     Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
     Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
-    return builder.create<AffineApplyOp>(rootOp->getLoc(), workload,
-                                         ValueRange{offset, size, stride});
+    return builder.create<affine::AffineApplyOp>(
+        rootOp->getLoc(), workload, ValueRange{offset, size, stride});
   }));
 }
 
@@ -392,8 +392,9 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
-  if (isa<AffineApplyOp, arith::IndexCastOp, linalg::FillOp, tensor::EmptyOp,
-          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp>(op)) {
+  if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
+          tensor::EmptyOp, tensor::CastOp, tensor::ExtractOp,
+          tensor::ExtractSliceOp>(op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
