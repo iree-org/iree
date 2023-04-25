@@ -171,27 +171,6 @@ def wait_for_iree_benchmark_module_start(process: subprocess.Popen,
       break
 
 
-def get_google_benchmark_times(benchmark_json: Dict[str, Any],
-                               metric: str) -> Tuple[int, int]:
-  """Returns the Google Benchmark aggregate times for the given metric.
-
-    Args:
-    - benchmark_index: the benchmark's index.
-    - metric: what kind of aggregate time to get; choices:
-      'mean', 'median', 'stddev'.
-    Returns:
-      Real time and CPU time in nanoseconds.
-    """
-  for bench_case in benchmark_json["benchmarks"]:
-    if bench_case["name"].endswith(f"real_time_{metric}"):
-      if bench_case["time_unit"] != "ns":
-        raise ValueError(f"Expected ns as time unit")
-      real_time = int(round(bench_case["real_time"]))
-      cpu_time = int(round(bench_case["cpu_time"]))
-      return real_time, cpu_time
-  raise ValueError(f"Cannot found real_time_{metric} in benchmark results")
-
-
 class PlatformType(Enum):
   ANDROID = "Android"
   LINUX = "Linux"
@@ -434,6 +413,34 @@ class BenchmarkLatency:
         json_object["stddev"],
         json_object["unit"],
     )
+
+
+def get_google_benchmark_latencies(
+    benchmark_json: Dict[str,
+                         Any]) -> Tuple[BenchmarkLatency, BenchmarkLatency]:
+  """Returns the Google Benchmark aggregate latencies.
+
+    Args:
+      benchmark_json: The JSON string or object returned by Google Benchmark.
+
+    Returns:
+      Real time and CPU time BenchmarkLatency.
+    """
+  real_time_object = dict(unit="ns")
+  cpu_time_object = dict(unit="ns")
+  metrics = ["mean", "median", "stddev"]
+  for case in benchmark_json["benchmarks"]:
+    if any(case["name"].endswith(f"real_time_{m}") for m in metrics):
+      if case["time_unit"] != "ns":
+        raise ValueError(f"Expected ns as time unit")
+      metric = case["name"].split("_")[-1]
+      real_time_object[metric] = int(round(case["real_time"]))
+      cpu_time_object[metric] = int(round(case["cpu_time"]))
+
+  # from_json_object implicitly validates that all metrics were found.
+  real_time = BenchmarkLatency.from_json_object(real_time_object)
+  cpu_time = BenchmarkLatency.from_json_object(cpu_time_object)
+  return real_time, cpu_time
 
 
 @dataclass

@@ -13,7 +13,7 @@ from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
                                          BenchmarkLatency, BenchmarkMetrics,
                                          BenchmarkRun, DeviceInfo,
-                                         get_google_benchmark_times)
+                                         get_google_benchmark_latencies)
 
 
 class BenchmarkDriver(object):
@@ -253,15 +253,10 @@ class IreeBenchmarkDriver(BenchmarkDriver):
       self, results_filename: pathlib.Path,
       benchmark_stdout: str) -> BenchmarkMetrics:
     iree_benchmark_json = json.loads(benchmark_stdout)
-    real_times = dict(unit="ns")
-    cpu_times = dict(unit="ns")
-    for metric in ["mean", "median", "stddev"]:
-      real_times[metric], cpu_times[metric] = get_google_benchmark_times(
-          iree_benchmark_json, metric)
-
+    real_time, cpu_time = get_google_benchmark_latencies(iree_benchmark_json)
     benchmark_metrics = BenchmarkMetrics(
-        real_time=BenchmarkLatency.from_json_object(real_times),
-        cpu_time=BenchmarkLatency.from_json_object(cpu_times),
+        real_time=real_time,
+        cpu_time=cpu_time,
         raw_data=iree_benchmark_json,
     )
     with open(results_filename, "w") as f:
