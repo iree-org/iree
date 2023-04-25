@@ -260,9 +260,9 @@ class IreeBenchmarkDriver(BenchmarkDriver):
           iree_benchmark_json, metric)
 
     benchmark_metrics = BenchmarkMetrics(
-        context=iree_benchmark_json,
         real_time=BenchmarkLatency.from_json_object(real_times),
         cpu_time=BenchmarkLatency.from_json_object(cpu_times),
+        raw_data=iree_benchmark_json,
     )
     with open(results_filename, "w") as f:
       f.write(json.dumps(benchmark_metrics.to_json_object()))

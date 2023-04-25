@@ -440,22 +440,22 @@ class BenchmarkLatency:
 class BenchmarkMetrics(object):
   """An object describing the results from a single benchmark.
 
-  - context: additional JSON-compatible context and raw results returned by the
-      benchmarking framework.
   - real_time: the real time latency statistics returned by the benchmarking
       framework.
   - cpu_time: the cpu time latency statistics returned by the benchmarking
       framework.
+  - raw_data: additional JSON-compatible raw results returned by the
+      benchmarking framework.
   """
-  context: Dict[str, Any]
   real_time: BenchmarkLatency
   cpu_time: BenchmarkLatency
+  raw_data: Dict[str, Any]
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
-        "context": self.context,
         "real_time": self.real_time.to_json_object(),
         "cpu_time": self.cpu_time.to_json_object(),
+        "raw_data": self.raw_data,
     }
 
   def to_json_str(self) -> str:
@@ -464,9 +464,9 @@ class BenchmarkMetrics(object):
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkMetrics(
-        json_object["context"],
         BenchmarkLatency.from_json_object(json_object["real_time"]),
         BenchmarkLatency.from_json_object(json_object["cpu_time"]),
+        json_object["raw_data"],
     )
 
 
