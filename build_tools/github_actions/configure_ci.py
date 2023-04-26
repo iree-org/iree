@@ -84,10 +84,9 @@ PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
 # intended to be merged and should exclude test/draft PRs as well as
 # PRs that include temporary patches to the submodule during review.
 # See also: https://github.com/openxla/iree/issues/12268
-LLVM_INTEGRATION_PR_TITLE_PATTERN = re.compile("^integrate.+llvm-project",
-                                               re.IGNORECASE)
-LLVM_INTEGRATION_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump",
-                                             re.IGNORECASE)
+LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm-project",
+                                          re.IGNORECASE)
+LLVM_INTEGRATE_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump", re.IGNORECASE)
 LLVM_INTEGRATE_LABEL = "llvm-integrate"
 
 
@@ -252,8 +251,8 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
   return runner_env
 
 
-def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
-                          labels: Sequence[str]) -> str:
+def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
+                          is_pr: bool, is_llvm_integrate_pr: bool) -> str:
   """Parses and validates the benchmark presets from trailers.
 
   Args:
@@ -267,7 +266,7 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
   """
   if not is_pr:
     preset_options = ["all"]
-  elif is_llvm_integrate:
+  elif is_llvm_integrate_pr:
     # Always run all benchmark presets for LLVM integration PRs.
     preset_options = ["all"]
   else:
@@ -298,13 +297,23 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
 def main():
   is_pr = os.environ["GITHUB_EVENT_NAME"] == "pull_request"
   trailers, labels = get_trailers_and_labels(is_pr)
+  is_llvm_integrate_pr = bool(
+      LLVM_INTEGRATE_TITLE_PATTERN.search(os.environ.get("PR_TITLE", "")) or
+      LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get("PR_BRANCH", "")) or
+      LLVM_INTEGRATE_LABEL in labels)
   output = {
-      "should-run": json.dumps(should_run_ci(is_pr, trailers)),
-      "is-pr": json.dumps(is_pr),
-      "runner-env": get_runner_env(trailers),
-      "runner-group": "presubmit" if is_pr else "postsubmit",
-      "write-caches": "0" if is_pr else "1",
-      "benchmark-presets": get_benchmark_presets(is_pr, trailers, labels),
+      "should-run":
+          json.dumps(should_run_ci(is_pr, trailers)),
+      "is-pr":
+          json.dumps(is_pr),
+      "runner-env":
+          get_runner_env(trailers),
+      "runner-group":
+          "presubmit" if is_pr else "postsubmit",
+      "write-caches":
+          "0" if is_pr else "1",
+      "benchmark-presets":
+          get_benchmark_presets(trailers, labels, is_pr, is_llvm_integrate_pr),
   }
 
   set_output(output)
