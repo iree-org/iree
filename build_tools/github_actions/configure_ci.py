@@ -79,7 +79,11 @@ BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
 
-# Patterns to detect LLVM integration PRs.
+# Patterns to detect "LLVM integration" PRs, i.e. changes that update the
+# third_party/llvm-project submodule. This should only include PRs
+# intended to be merged and should exclude test/draft PRs as well as
+# PRs that include temporary patches to the submodule during review.
+# See also: https://github.com/openxla/iree/issues/12268
 LLVM_INTEGRATION_PR_TITLE_PATTERN = re.compile("^integrate.+llvm-project",
                                                re.IGNORECASE)
 LLVM_INTEGRATION_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump",
