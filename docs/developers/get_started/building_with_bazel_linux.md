@@ -59,7 +59,7 @@ $ python3 configure_bazel.py
 Run all core tests:
 
 ```shell
-$ bazel test -k iree/...
+$ bazel test -k compiler/... runtime/...
 ```
 
 > Tip:<br>
