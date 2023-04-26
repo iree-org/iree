@@ -103,7 +103,7 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    iree_hal_libmpi
+    libmpi
   HDRS
     "libmpi.h"
     "libmpi_dynamic_symbols.h"
@@ -123,7 +123,7 @@ iree_cc_test(
   SRCS
     "libmpi_test.cc"
   DEPS
-    ::iree_hal_libmpi
+    ::libmpi
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

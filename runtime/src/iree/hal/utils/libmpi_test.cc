@@ -18,7 +18,7 @@ TEST(libmpi, DynamicLoadLibraryAndSymbols) {
   iree_dynamic_library_t *library;
   iree_hal_mpi_dynamic_symbols_t *symbols;
 
-  iree_status_t status = iree_hal_mpi_initialize_library(
+  iree_status_t status = iree_hal_mpi_library_load(
       iree_allocator_system(), &library, &symbols);
 
   if (!iree_status_is_ok(status)) {

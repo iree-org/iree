@@ -31,7 +31,7 @@ static iree_status_t iree_hal_mpi_dynamic_symbols_resolve_all(
 }
 
 // Load the dynamic library and the symbols
-iree_status_t iree_hal_mpi_initialize_library(
+iree_status_t iree_hal_mpi_library_load(
     iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
     iree_hal_mpi_dynamic_symbols_t** out_syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -65,11 +65,16 @@ iree_status_t iree_hal_mpi_initialize_library(
 }
 
 // convert an MPI_Status result to an iree_status_t
+//
+// We convert MPI_SUCCESS to IREE_STATUS_SUCCESS, and MPI errors to
+// IREE_STATUS_INTERNAL and print the MPI error code.
+//
+// TODO(cascaval): use MPI_Error to print the actual error or consider
+// mapping to other error codes.
 iree_status_t iree_hal_mpi_result_to_status(
     iree_hal_mpi_dynamic_symbols_t* syms, int result, const char* file,
     uint32_t line) {
   iree_status_code_t code;
-
   switch (result) {
     case 0:  // MPI_SUCCESS
       return iree_ok_status();

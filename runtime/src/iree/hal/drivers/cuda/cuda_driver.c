@@ -103,7 +103,7 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
     status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
                                                            &driver->syms);
     if (iree_status_is_ok(status) && comm_world_size > 0) {
-      status = iree_hal_mpi_initialize_library(
+      status = iree_hal_mpi_library_load(
           host_allocator, &driver->syms.mpi_library, &driver->syms.mpi_symbols);
       if (iree_status_is_ok(status)) {
         iree_hal_mpi_dynamic_symbols_t* mpi_syms = driver->syms.mpi_symbols;

@@ -54,19 +54,19 @@ iree_status_t iree_hal_mpi_result_to_status(
   IREE_IGNORE_ERROR(iree_hal_mpi_result_to_status((syms), ((syms)->expr), \
                                                   __FILE__, __LINE__))
 
-// Dynamically loads libmpi and sets up the symbol table.
+// Dynamically loads the OpenMPI library and sets up the symbol table.
 //
-// Args:
-//  - host_allocator: the allocator to use to create the library and symbol
-//    objects.
-//  - out_library: out parameter -- on success, it holds a pointer to the
-//    dynamic library object.
-//  - out_syms: out parameter -- on success, it populates the list of symbols
-//    available from the MPI library
+// |out_library| - must be release by the caller with
+// `iree_dynamic_library_release`.
+// |out_syms| - only valid as long as the library is live. Must be released
+// by the caller with `iree_allocator_free`.
 //
 // Returns: IREE_STATUS_SUCCESS if it found the library, and fills in the
 // pointers to our_library and out_symbols
-iree_status_t iree_hal_mpi_initialize_library(
+//
+// Why only OpenMPI? Because we rely on internal symbols to access handles
+// to operators and data types. See libmpi_dynamic_symbols.h
+iree_status_t iree_hal_mpi_library_load(
     iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
     iree_hal_mpi_dynamic_symbols_t** out_syms);
 

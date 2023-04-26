@@ -93,7 +93,7 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "iree_hal_libmpi",
+    name = "libmpi",
     srcs = ["libmpi.c"],
     hdrs = [
         "libmpi.h",
@@ -112,7 +112,7 @@ iree_runtime_cc_test(
     name = "libmpi_test",
     srcs = ["libmpi_test.cc"],
     deps = [
-        ":iree_hal_libmpi",
+        ":libmpi",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
