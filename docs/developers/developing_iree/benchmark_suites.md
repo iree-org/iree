@@ -199,7 +199,7 @@ down and the links to artifacts are listed in a section titled "Artifact Links".
 Paste the content in your shell to define all needed variables for the following
 steps:
 
-![image](https://user-images.githubusercontent.com/2104162/234655723-0c5b1044-cbe9-411a-88af-3ed0478c9ce5.png)
+![image](https://user-images.githubusercontent.com/2104162/234716421-3a69b6ad-211d-4e39-8f9e-a4f22f91739d.png)
 
 #### 3. Fetch the benchmark artifacts
 
