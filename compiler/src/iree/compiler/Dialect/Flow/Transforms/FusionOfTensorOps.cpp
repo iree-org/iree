@@ -60,8 +60,11 @@ static std::optional<OpOperand *> getFusableUse(Operation *op,
 }
 
 /// Check if the producer generic op is fusable with the consumer generic op.
-static bool areFusableOps(MLIRContext *context, Operation *producerOp,
-                          Operation *consumerOp) {
+static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
+  Operation *producerOp = fusedOperand->get().getDefiningOp();
+  Operation *consumerOp = fusedOperand->getOwner();
+  if (!producerOp) return false;
+
   // Check for i1 return types, if so aggressively fuse to avoid `i1` buffers.
   if (llvm::all_of(producerOp->getResultTypes(), [](Type t) {
         if (t.isInteger(1)) return true;
@@ -82,12 +85,19 @@ static bool areFusableOps(MLIRContext *context, Operation *producerOp,
     }
   }
 
-  // If producer has a single user, always fuse
-  if (producerOp->hasOneUse()) return true;
-
   // If the generic op is "just" copy, then fuse always.
   Block &body = producerOp->getRegion(0).front();
   if (std::begin(body)->hasTrait<OpTrait::IsTerminator>()) return true;
+
+  // If producer does not have a single user, dont fuse.
+  if (!producerOp->hasOneUse()) return false;
+
+  // If the producer has a single use (this op), only fuse if the op
+  // has a permutation mapping in the consumer.
+  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+    return linalgConsumerOp.getMatchingIndexingMap(fusedOperand)
+        .isPermutation();
+  }
 
   // All other cases dont fuse.
   return false;
@@ -249,7 +259,7 @@ struct FusionOfTensorOpsPass
                             consumer->operand_end());
             if (operands.size() >= kIreeMaxOperandCount) return false;
 
-            return areFusableOps(context, producer, consumer);
+            return areFusableOps(context, fusedOperand);
           };
       linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
                                                    fuseElementwiseOpsControlFn);

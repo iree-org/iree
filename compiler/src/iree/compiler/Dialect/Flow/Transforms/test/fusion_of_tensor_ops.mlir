@@ -206,3 +206,71 @@ module {
 // CHECK-LABEL: func.func @fuse_only_projected_perm
 // CHECK:         linalg.generic
 // CHECK:         linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d2, d3, d0)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+module {
+  func.func @nofuse_broadcast_compute(%arg0: tensor<702x702x128xf32>, %arg1: tensor<702x702x128xf32>,
+      %arg2: tensor<702x702x128xf32>, %arg3: tensor<702x702x128xf32>) -> tensor<128x702x702xf32> {
+    %cst = arith.constant dense<1.000000e+00> : tensor<702x702x128xf32>
+    %cst_0 = arith.constant 0.000000e+00 : f32
+    %0 = tensor.empty() : tensor<702x702x128xf32>
+    %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg3 : tensor<702x702x128xf32>) outs(%0 : tensor<702x702x128xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %9 = math.exp %in : f32
+      linalg.yield %9 : f32
+    } -> tensor<702x702x128xf32>
+    %2 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%1, %cst : tensor<702x702x128xf32>, tensor<702x702x128xf32>) outs(%0 : tensor<702x702x128xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %9 = arith.addf %in, %in_1 : f32
+      linalg.yield %9 : f32
+    } -> tensor<702x702x128xf32>
+    %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%cst, %2 : tensor<702x702x128xf32>, tensor<702x702x128xf32>) outs(%0 : tensor<702x702x128xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %9 = arith.divf %in, %in_1 : f32
+      linalg.yield %9 : f32
+    } -> tensor<702x702x128xf32>
+    %4 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg2 : tensor<702x702x128xf32>, tensor<702x702x128xf32>) outs(%0 : tensor<702x702x128xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %9 = arith.mulf %in, %in_1 : f32
+      linalg.yield %9 : f32
+    } -> tensor<702x702x128xf32>
+    %5 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1, %3 : tensor<702x702x128xf32>, tensor<702x702x128xf32>) outs(%0 : tensor<702x702x128xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %9 = arith.mulf %in, %in_1 : f32
+      linalg.yield %9 : f32
+    } -> tensor<702x702x128xf32>
+    %6 = tensor.empty() : tensor<128x702x702xf32>
+    %7 = linalg.fill ins(%cst_0 : f32) outs(%6 : tensor<128x702x702xf32>) -> tensor<128x702x702xf32>
+    %8 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%5, %4 : tensor<702x702x128xf32>, tensor<702x702x128xf32>) outs(%7 : tensor<128x702x702xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %9 = arith.mulf %in, %in_1 : f32
+      %10 = arith.addf %out, %9 : f32
+      linalg.yield %10 : f32
+    } -> tensor<128x702x702xf32>
+    return %8 : tensor<128x702x702xf32>
+  }
+}
+// CHECK-LABEL: func @nofuse_broadcast_compute(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<702x702x128xf32>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<702x702x128xf32>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<702x702x128xf32>
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<702x702x128xf32>)
+//       CHECK:   %[[EMPTY0:.+]] = tensor.empty() : tensor<702x702x128xf32>
+//       CHECK:   %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG2]] :
+//  CHECK-SAME:       outs(%[[EMPTY0]] :
+//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[ARG1]], %[[ARG3]] :
+//  CHECK-SAME:       outs(%[[EMPTY0]] :
+//       CHECK:   %[[EMPTY1:.+]] = tensor.empty() : tensor<128x702x702xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:       outs(%[[EMPTY1]] :
+//       CHECK:   %[[GENERIC2:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[GENERIC1]], %[[GENERIC0]] :
+//  CHECK-SAME:       outs(%[[FILL]] :
+//       CHECK:   return %[[GENERIC2]]
