@@ -286,6 +286,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_F16_DISABLE=0 \
             --env IREE_CUDA_DISABLE=0 \
+            --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
             --env CTEST_PARALLEL_LEVEL=2 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
