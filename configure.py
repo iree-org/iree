@@ -53,10 +53,36 @@ def get_input(question, default_answer='', accepted_answers=None):
   return answer
 
 
-def print_header(header_name):
-  print("\n" + "-" * 80)
-  print(f"[*] {header_name} ...")
-  print("-" * 80)
+def format_description(title, description):
+  # Checking the title length.
+  if len(title) > 69:
+    raise ValueError(f"Title must be of length <= 69, received: {title}")
+  title += " ..."
+
+  # Trim any leading or trailing whitespace
+  description = description.strip()
+
+  # Split the description into chunks of up to 76 characters each
+  chunks = []
+  current_chunk = ""
+
+  for word in description.split():
+    if len(current_chunk) + len(word) + 1 > 76:
+      chunks.append(current_chunk)
+      current_chunk = ""
+    current_chunk += f" {word}" if current_chunk else word
+
+  if current_chunk:
+    chunks.append(current_chunk)
+
+  # Build the final formatted string
+  formatted_string = ""
+  for chunk in chunks:
+    formatted_string += "| " + chunk.ljust(76) + " |\n"
+
+  separator = "-" * 80
+  return (f"\n{separator}\n| [*] {title.ljust(73)}|\n"
+          f"|{''.ljust(78)}|\n{formatted_string}{separator}")
 
 
 if __name__ == "__main__":
@@ -64,7 +90,12 @@ if __name__ == "__main__":
   IREE_DIR = pathlib.Path(__file__).resolve().parent
 
   # ====================== VSCode Development Container ===================== #
-  print_header("VS Code Development Container")
+  print(
+      format_description(
+          title="VS Code Development Container",
+          description="Dev containers let you work with a well-defined tool and "
+          "runtime stack. See https://code.visualstudio.com/docs/devcontainers/containers."
+      ))
 
   if get_input(
       "Do you wish to use and configure VS Code Development Container [y/N]?",
@@ -74,7 +105,12 @@ if __name__ == "__main__":
     run_shell(f"{which('python3')} {IREE_DIR / '.devcontainer/configure.py'}")
 
   # ================================= Bazel ================================= #
-  print_header("Bazel")
+  print(
+      format_description(
+          title="Bazel",
+          description=
+          "While CMake is IREE's preferred build system, Bazel is also "
+          "supported."))
 
   if get_input("Do you wish to use and configure Bazel [y/N]?",
                default_answer="n",
@@ -86,4 +122,6 @@ if __name__ == "__main__":
 
   # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
 
-  print_header("Configuration finished")
+  print("\n" + "-" * 80)
+  print(f"| [*] {'Configuration finished ...'.ljust(72)} |")
+  print("-" * 80)
