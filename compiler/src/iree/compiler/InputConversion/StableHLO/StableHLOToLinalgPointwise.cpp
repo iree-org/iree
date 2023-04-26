@@ -120,7 +120,7 @@ struct PointwiseToLinalgMapConverter final : OpConversionPattern<OpTy> {
       if (getRank(input) == maxRank) {
         mappedInputs.push_back(coerceTensorShape(
             rewriter, loc, cast<TypedValue<ShapedType>>(input),
-            emptyTensor.getType()));
+            cast<ShapedType>(emptyTensor.getType())));
         scalarInputs.push_back(nullptr);
       } else {
         scalarInputs.push_back(rewriter.create<tensor::ExtractOp>(loc, input));

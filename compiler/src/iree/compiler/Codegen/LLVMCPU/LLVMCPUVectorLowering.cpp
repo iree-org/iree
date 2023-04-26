@@ -39,7 +39,7 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   auto funcOp = getOperation();
 
   // Per-function lowering pipeline.
-  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle;
+  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle1D;
   auto vectorMultiReductionLowering =
       vector::VectorMultiReductionLowering::InnerReduction;
   auto vectorContractLowering = vector::VectorContractLowering::OuterProduct;
