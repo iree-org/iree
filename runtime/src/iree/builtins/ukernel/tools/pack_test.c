@@ -204,21 +204,21 @@ int main(int argc, char** argv) {
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird tile shapes to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 3, 5, NULL);
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 4, 2, NULL);
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 3, 4, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 3, 5, "");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 4, 2, "");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 3, 4, "");
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, NULL);
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8, NULL);
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 1, NULL);
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 8, 8, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8, "");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 1, "");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 8, 8, "");
   // Tile size selected with CPU feature dotprod.
   // Not passing a cpu_features_list because the packing code itself
   // does not depend on any features.
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 4, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 4, "");
   // Tile size selected for CPU feature i8mm. Same comment as for dotprod.
-  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 8, NULL);
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 8, "");
 #elif defined(IREE_UK_ARCH_X86_64)
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "avx2_fma");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 2, "avx2_fma");
@@ -230,4 +230,6 @@ int main(int argc, char** argv) {
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 16, 16, "avx512_base");
   // avx512_vnni uses the same tile size and same pack code as avx512_base.
 #endif  // defined(IREE_UK_ARCH_ARM_64)
+
+  return EXIT_SUCCESS;  // failures are fatal
 }

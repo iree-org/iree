@@ -38,6 +38,18 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "util_test",
+    srcs = ["util_test.c"],
+    deps = [
+        ":test",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
+        "//runtime/src/iree/schemas:cpu_data",
+    ],
+)
+
 iree_runtime_cc_library(
     name = "benchmark",
     srcs = ["benchmark.c"],

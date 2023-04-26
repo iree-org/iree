@@ -8,8 +8,6 @@
 
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 
-#define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
-
 static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
   const iree_uk_uint32_t allflags =

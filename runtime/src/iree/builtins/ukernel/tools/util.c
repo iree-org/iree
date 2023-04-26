@@ -14,6 +14,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/call_once.h"
 #include "iree/base/internal/cpu.h"
+#include "iree/schemas/cpu_data.h"
 
 // Implementation of iree_uk_assert_fail failure is deferred to users code, i.e.
 // to us here, as core ukernel/ code can't use the standard library.
@@ -152,10 +153,25 @@ int iree_uk_type_triple_str(char* buf, int buf_length,
   return snprintf(buf, buf_length, "%s%s%s", type0_buf, type1_buf, type2_buf);
 }
 
+static bool iree_uk_map_cpu_feature_name_to_bit(const char* cpu_feature_ptr,
+                                                int cpu_feature_length,
+                                                int* out_field_index,
+                                                int* out_bit_pos) {
+#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
+  if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \
+    if (!strncmp(cpu_feature_ptr, llvm_name, cpu_feature_length)) {           \
+      *out_field_index = field_index;                                         \
+      *out_bit_pos = bit_pos;                                                 \
+      return true;                                                            \
+    }                                                                         \
+  }
+#include "iree/schemas/cpu_feature_bits.inl"
+#undef IREE_CPU_FEATURE_BIT
+  return false;
+}
+
 void iree_uk_make_cpu_data_for_features(const char* cpu_features,
                                         iree_uk_uint64_t* out_cpu_data_fields) {
-  // The caller should have checked for NULL prior to calling this function.
-  IREE_UK_ASSERT(cpu_features != NULL);
   const size_t data_fields_byte_size =
       IREE_CPU_DATA_FIELD_COUNT * sizeof(out_cpu_data_fields[0]);
   memset(out_cpu_data_fields, 0, data_fields_byte_size);
@@ -167,6 +183,7 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
     memcpy(out_cpu_data_fields, iree_cpu_data_fields(), data_fields_byte_size);
     return;
   }
+
   // Named feature sets.
 #if defined(IREE_UK_ARCH_X86_64)
   iree_uk_uint64_t avx2_fma =
@@ -189,33 +206,28 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
     return;
   }
 #endif  // defined(IREE_UK_ARCH_X86_64)
+
   // Fall back to interpreting cpu_features as a comma-separated list of LLVM
-  // feature names. TODO: actually support multiple comma-separated values. For
-  // now this only supports a single feature, so use cases that require multiple
-  // features currently go through one of the above named feature sets (feel
-  // free to add more).
-  if (strchr(cpu_features, ',')) {
-    fprintf(stderr,
-            "TODO: multiple comma-separated values currently unimplemented in "
-            "cpu_features \"%s\"\n",
-            cpu_features);
-    iree_abort();
-  }
-  bool cpu_feature_found = 0;
-#define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
-  if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \
-    if (!strcmp(cpu_features, llvm_name)) {                                   \
-      out_cpu_data_fields[field_index] |= (1ull << bit_pos);                  \
-      cpu_feature_found = true;                                               \
-    }                                                                         \
-  }
-#include "iree/schemas/cpu_feature_bits.inl"
-#undef IREE_CPU_FEATURE_BIT
-  // Diagnose unknown (e.g. misspelled) features.
-  if (!cpu_feature_found) {
-    fprintf(stderr, "CPU feature \"%s\" unknown on %s\n", cpu_features,
-            IREE_ARCH);
-    iree_abort();
+  // feature names.
+  const char* cpu_features_end = cpu_features + strlen(cpu_features);
+  while (true) {
+    const char* first_comma = strchr(cpu_features, ',');
+    const char* this_cpu_feature_end =
+        first_comma ? first_comma : cpu_features_end;
+    int this_cpu_feature_length = this_cpu_feature_end - cpu_features;
+    int field_index;
+    int bit_pos;
+    if (!iree_uk_map_cpu_feature_name_to_bit(
+            cpu_features, this_cpu_feature_length, &field_index, &bit_pos)) {
+      fprintf(stderr, "CPU feature \"%s\" unknown on %s\n", cpu_features,
+              IREE_ARCH);
+      iree_abort();
+    }
+    out_cpu_data_fields[field_index] |= (1ull << bit_pos);
+    if (this_cpu_feature_end == cpu_features_end) {
+      break;
+    }
+    cpu_features = this_cpu_feature_end + 1;
   }
 }
 
