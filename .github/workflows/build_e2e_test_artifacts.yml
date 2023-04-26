@@ -28,6 +28,9 @@ on:
       build-dir-gcs-artifact:
         required: true
         type: string
+      benchmark-presets:
+        required: true
+        type: string
     outputs:
       e2e-test-artifacts-dir:
         description: |
@@ -92,6 +95,21 @@ jobs:
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
           echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
+      - name: "Exporting benchmark configs"
+        id: export
+        if: inputs.benchmark-presets != ''
+        env:
+          COMPILATION_BENCHMARK_CONFIG: ${{ steps.build.outputs.e2e-test-artifacts-dir }}/compilation-benchmark-config.json
+          EXECUTION_BENCHMARK_CONFIG: ${{ steps.build.outputs.e2e-test-artifacts-dir }}/execution-benchmark-config.json
+          BENCHMARK_PRESETS: ${{ inputs.benchmark-presets }}
+        run: |
+          ./build_tools/benchmarks/export_benchmark_config.py \
+            compilation \
+            --output="${COMPILATION_BENCHMARK_CONFIG}"
+          ./build_tools/benchmarks/export_benchmark_config.py \
+            execution \
+            --benchmark_presets="${BENCHMARK_PRESETS}" \
+            --output="${EXECUTION_BENCHMARK_CONFIG}"
       - name: "Uploading e2e test artifacts"
         id: upload
         env:
@@ -105,7 +123,7 @@ jobs:
           # Not archiving the directory to allow fetching each file as needed
           # separately.
           find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
-            -name "iree_*" -o -name "model_*.mlir" | \
+            -name "iree_*" -o -name "model_*.mlir" -o -name "*.json" | \
             gcloud storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \

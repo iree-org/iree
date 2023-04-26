@@ -720,6 +720,7 @@ jobs:
       build-dir: ${{ needs.build_all.outputs.build-dir }}
       build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
@@ -745,7 +746,6 @@ jobs:
       e2e-test-artifacts-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
       benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
-      benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
 
   process_benchmark_results:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
