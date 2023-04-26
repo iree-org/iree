@@ -327,13 +327,16 @@ py_binary(
 ]]
 
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f32_gpu_large_%s" % vulkan_target_and_pipeline[0],
+    name = "e2e_matmul_direct_{0}_gpu_large_{1}".format(
+        lhs_rhs_type,
+        vulkan_target_and_pipeline[0],
+    ),
     compiler_flags = [
         "--iree-vulkan-target-triple=%s" % vulkan_target_and_pipeline[0],
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
-        "--lhs_rhs_type=f32",
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=gpu_large",
         "--compilation_info=%s" % vulkan_target_and_pipeline[1],
     ],
@@ -347,6 +350,9 @@ py_binary(
 ) for vulkan_target_and_pipeline in [
     ("valhall-unknown-android31", "SPIRVVectorizeMali"),
     ("ampere-unknown-linux", "SPIRVVectorizeNVIDIA"),
+] for lhs_rhs_type in [
+    "i8",
+    "f32",
 ]]
 
 # Check tests

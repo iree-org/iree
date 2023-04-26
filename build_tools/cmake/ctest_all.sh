@@ -33,6 +33,8 @@ export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
 # We test on SwiftShader as a baseline, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
+# Respect the user setting, but default to skipping tests that require Nvidia GPU.
+export IREE_NVIDIA_GPU_TESTS_DISABLE=${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}
 # Respect the user setting, default to no --repeat-until-fail.
 export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT=${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT:-}
 # Respect the user setting, default to no --tests-regex.
@@ -68,6 +70,9 @@ if [[ "${IREE_CUDA_DISABLE}" == 1 ]]; then
 fi
 if [[ "${IREE_VULKAN_F16_DISABLE}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
+fi
+if [[ "${IREE_NVIDIA_GPU_TESTS_DISABLE}" == 1 ]]; then
+  label_exclude_args+=("^requires-gpu-nvidia$")
 fi
 
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"

@@ -286,6 +286,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_F16_DISABLE=0 \
             --env IREE_CUDA_DISABLE=0 \
+            --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
             --env CTEST_PARALLEL_LEVEL=2 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
@@ -439,6 +440,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_LLVM_CPU_DISABLE=1 \
+            --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
             gcr.io/iree-oss/frontends-nvidia@sha256:b0df86dff8bfcf5f43eedb70d178703b4538f31a2bf45e3b2eb035724a7f6a42 \
