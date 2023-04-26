@@ -1116,6 +1116,22 @@ jobs:
           You can list \`gs://\` directories and download files with [gcloud cli](
           https://cloud.google.com/sdk/gcloud/reference/storage).
 
+          <details>
+          <summary>Click to show common usages</summary>
+
+          \`\`\`sh
+          # Download all artifacts
+          mkdir /tmp/iree_e2e_test_artifacts
+          gcloud storage cp -r "${E2E_TEST_ARTIFACTS_DIR_URL?}/*" /tmp/iree_e2e_test_artifacts
+          \`\`\`
+
+          \`\`\`sh
+          # Download execution benchmark results and traces
+          mkdir /tmp/iree_benchmark_results
+          gcloud storage cp -r "${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/*" /tmp/iree_benchmark_results
+          \`\`\`
+          </details>
+
           To run benchmarks locally with the CI-built e2e test artifacts, see [IREE Benchmark Suites](
-          https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/developers/developing_iree/benchmark_suites.md).
+          https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/developers/developing_iree/benchmark_suites.md#3-fetch-the-benchmark-artifacts).
           EOF
