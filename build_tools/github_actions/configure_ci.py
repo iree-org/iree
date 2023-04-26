@@ -14,6 +14,7 @@ The following environment variables are required:
 
 When GITHUB_EVENT_NAME is "pull_request", there are additional environment
 variables to be set:
+- PR_BRANCH (required): PR source branch.
 - PR_TITLE (required): PR title.
 - PR_BODY (optional): PR description.
 - PR_LABELS (optional): JSON list of PR label names.
@@ -34,6 +35,7 @@ import difflib
 import fnmatch
 import json
 import os
+import re
 import subprocess
 import textwrap
 from typing import Iterable, List, Mapping, Sequence, Tuple
@@ -76,6 +78,16 @@ RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
+
+# Patterns to detect "LLVM integration" PRs, i.e. changes that update the
+# third_party/llvm-project submodule. This should only include PRs
+# intended to be merged and should exclude test/draft PRs as well as
+# PRs that include temporary patches to the submodule during review.
+# See also: https://github.com/openxla/iree/issues/12268
+LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm-project",
+                                          re.IGNORECASE)
+LLVM_INTEGRATE_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump", re.IGNORECASE)
+LLVM_INTEGRATE_LABEL = "llvm-integrate"
 
 
 def skip_path(path: str) -> bool:
@@ -239,8 +251,8 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
   return runner_env
 
 
-def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
-                          labels: Sequence[str]) -> str:
+def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
+                          is_pr: bool, is_llvm_integrate_pr: bool) -> str:
   """Parses and validates the benchmark presets from trailers.
 
   Args:
@@ -254,6 +266,11 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
   """
   if not is_pr:
     preset_options = ["all"]
+    print(f"Using benchmark preset 'all' for non-PR run")
+  elif is_llvm_integrate_pr:
+    # Always run all benchmark presets for LLVM integration PRs.
+    preset_options = ["all"]
+    print(f"Using benchmark preset 'all' for LLVM integrate PR")
   else:
     preset_options = set(
         label.split(":", maxsplit=1)[1]
@@ -281,13 +298,23 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
 def main():
   is_pr = os.environ["GITHUB_EVENT_NAME"] == "pull_request"
   trailers, labels = get_trailers_and_labels(is_pr)
+  is_llvm_integrate_pr = bool(
+      LLVM_INTEGRATE_TITLE_PATTERN.search(os.environ.get("PR_TITLE", "")) or
+      LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get("PR_BRANCH", "")) or
+      LLVM_INTEGRATE_LABEL in labels)
   output = {
-      "should-run": json.dumps(should_run_ci(is_pr, trailers)),
-      "is-pr": json.dumps(is_pr),
-      "runner-env": get_runner_env(trailers),
-      "runner-group": "presubmit" if is_pr else "postsubmit",
-      "write-caches": "0" if is_pr else "1",
-      "benchmark-presets": get_benchmark_presets(is_pr, trailers, labels),
+      "should-run":
+          json.dumps(should_run_ci(is_pr, trailers)),
+      "is-pr":
+          json.dumps(is_pr),
+      "runner-env":
+          get_runner_env(trailers),
+      "runner-group":
+          "presubmit" if is_pr else "postsubmit",
+      "write-caches":
+          "0" if is_pr else "1",
+      "benchmark-presets":
+          get_benchmark_presets(trailers, labels, is_pr, is_llvm_integrate_pr),
   }
 
   set_output(output)
