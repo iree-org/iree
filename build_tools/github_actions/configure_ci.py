@@ -267,9 +267,7 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
   """
   if not is_pr:
     preset_options = ["all"]
-  elif (LLVM_INTEGRATION_PR_TITLE_PATTERN.search(os.environ["PR_TITLE"]) or
-        LLVM_INTEGRATION_BRANCH_PATTERN.search(os.environ["PR_BRANCH"]) or
-        LLVM_INTEGRATE_LABEL in labels):
+  elif is_llvm_integrate:
     # Always run all benchmark presets for LLVM integration PRs.
     preset_options = ["all"]
   else:
