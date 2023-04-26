@@ -1122,13 +1122,13 @@ jobs:
           \`\`\`sh
           # Download all artifacts
           mkdir /tmp/iree_e2e_test_artifacts
-          gcloud storage cp -r "${E2E_TEST_ARTIFACTS_DIR_URL?}/*" /tmp/iree_e2e_test_artifacts
+          gcloud storage cp -r "\${E2E_TEST_ARTIFACTS_DIR_URL?}/*" /tmp/iree_e2e_test_artifacts
           \`\`\`
 
           \`\`\`sh
           # Download execution benchmark results and traces
           mkdir /tmp/iree_benchmark_results
-          gcloud storage cp -r "${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/*" /tmp/iree_benchmark_results
+          gcloud storage cp -r "\${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/*" /tmp/iree_benchmark_results
           \`\`\`
           </details>
 
