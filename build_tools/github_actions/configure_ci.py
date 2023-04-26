@@ -266,9 +266,11 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
   """
   if not is_pr:
     preset_options = ["all"]
+    print(f"Using benchmark preset 'all' for non-PR run")
   elif is_llvm_integrate_pr:
     # Always run all benchmark presets for LLVM integration PRs.
     preset_options = ["all"]
+    print(f"Using benchmark preset 'all' for LLVM integrate PR")
   else:
     preset_options = set(
         label.split(":", maxsplit=1)[1]
@@ -279,8 +281,7 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
       preset_options = preset_options.union(
           option.strip() for option in trailer.split(","))
     preset_options = sorted(preset_options)
-
-  print(f"Using benchmark preset '{preset_options}'")
+    print(f"Using benchmark preset '{preset_options}' from trailers and labels")
 
   for preset_option in preset_options:
     if preset_option not in BENCHMARK_PRESET_OPTIONS:
