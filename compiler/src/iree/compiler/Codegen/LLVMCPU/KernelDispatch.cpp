@@ -635,11 +635,19 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   builder.setInsertionPoint(linalgOp);
   SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
   SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
-  auto loops = cast<PartitionableLoopsInterface>(linalgOp.getOperation())
-                   .getPartitionableLoops(kNumMaxParallelDims);
-  return getDefaultDistributedLevelTileSizes(loops, lbs, ubs, minTileSizes,
-                                             maxTileSizes, allowIncompleteTile,
-                                             vectorSizeHints);
+  auto partitionableLoopsOp =
+      cast<PartitionableLoopsInterface>(linalgOp.getOperation());
+  auto loops = partitionableLoopsOp.getPartitionableLoops(kNumMaxParallelDims);
+  auto res = getDefaultDistributedLevelTileSizes(
+      loops, lbs, ubs, minTileSizes, maxTileSizes, allowIncompleteTile,
+      vectorSizeHints);
+  if (clDisableDistribution) return res;
+  // Tile other partitionable loops with one to avoid unbounded stack
+  // allocations.
+  for (auto dim : partitionableLoopsOp.getPartitionableLoops(std::nullopt)) {
+    if (res[dim] == 0) res[dim] = 1;
+  }
+  return res;
 }
 
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
@@ -766,6 +774,15 @@ static LogicalResult setDefaultRootConfig(
 
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
+  // Tile other partitionable loops with one to avoid unbounded stack
+  // allocations.
+  if (!clDisableDistribution) {
+    for (auto dim :
+         partitionableLoopsInterfaceOp.getPartitionableLoops(std::nullopt)) {
+      if (flowTileSizes[dim] == 0) flowTileSizes[dim] = 1;
+    }
+  }
+
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(flowTileSizes));
   auto loweringConfig = IREE::Codegen::LoweringConfigAttr::get(
