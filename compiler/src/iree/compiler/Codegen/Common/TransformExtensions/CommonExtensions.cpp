@@ -802,9 +802,10 @@ DiagnosedSilenceableFailure transform_dialect::
                                      "Expect the for op to be normalized");
   }
   IRRewriter rewriter(target->getContext());
-  auto workgroupCount =
-      getMixedValues(forAllOp.getStaticUpperBound(),
-                     forAllOp.getDynamicUpperBound(), rewriter);
+  auto workgroupCountVals = getValueOrCreateConstantIndexOp(
+      rewriter, target->getLoc(), forAllOp.getMixedUpperBound());
+  auto workgroupCount = llvm::to_vector(llvm::map_range(
+      workgroupCountVals, [](Value v) -> OpFoldResult { return v; }));
 
   // Account for mapping attribute if present. The attribute used for mapping
   // provides a mapping ID that is ordered in `x` = 0, `y`=1, and `z` = 2. Use
