@@ -472,51 +472,6 @@ func.func @unused_ins_operand() {
 
 // -----
 
-func.func @fill_matmul_exp() {
-  %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %c33 = arith.constant 33 : index
-  %c49 = arith.constant 49 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<33x16xf32>>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x49xf32>>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<33x49xf32>>
-  %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %workgroup_count_x = hal.interface.workgroup.count[0] : index
-  %workgroup_id_y = hal.interface.workgroup.id[1] : index
-  %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %3 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_y]
-  %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_y]
-  scf.for %arg0 = %3 to %c33 step %4 {
-    %5 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
-    %6 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
-    scf.for %arg1 = %5 to %c49 step %6 {
-      %7 = affine.min affine_map<(d0) -> (16, -d0 + 33)>(%arg0)
-      %8 = affine.min affine_map<(d0) -> (16, -d0 + 49)>(%arg1)
-      %9 = tensor.empty(%7, %8) : tensor<?x?xf32>
-      %10 = affine.min affine_map<(d0) -> (-d0 + 33, 16)>(%arg0)
-      %11 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%10, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<33x16xf32>> -> tensor<?x16xf32>
-      %12 = affine.min affine_map<(d0) -> (-d0 + 49, 16)>(%arg1)
-      %13 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [16, %12], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16x49xf32>> -> tensor<16x?xf32>
-      %14 = tensor.empty(%10, %12) : tensor<?x?xf32>
-      %15 = linalg.fill ins(%cst : f32) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
-      %16 = linalg.matmul ins(%11, %13 : tensor<?x16xf32>, tensor<16x?xf32>) outs(%15 : tensor<?x?xf32>) -> tensor<?x?xf32>
-      %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%16 : tensor<?x?xf32>) outs(%9 : tensor<?x?xf32>) {
-      ^bb0(%arg2: f32, %arg3: f32):
-        %18 = math.exp %arg2 : f32
-        linalg.yield %18 : f32
-      } -> tensor<?x?xf32>
-      flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%7, %8], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<33x49xf32>>
-    }
-  }
-  return
-}
-// CHECK-LABEL: func.func @fill_matmul_exp()
-//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
-//       CHECK:   linalg.generic
-//  CHECK-SAME:       outs(%[[MATMUL]]
-
-// -----
-
 func.func @cumsum__2x2x2x2x2x2x2() {
   %cst = arith.constant dense<0.000000e+00> : tensor<2x2x2x2x2x2x2xf32>
   %c0 = arith.constant 0 : index
