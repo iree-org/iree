@@ -33,7 +33,7 @@ transform.sequence failures(propagate) {
     lowering_strategy = "outerproduct"
       : (!pdl.operation) -> !pdl.operation
   %func_e_3 = transform.vector.lower_transpose %func_e_2
-    lowering_strategy = "shuffle"
+    lowering_strategy = "shuffle_1d"
       : (!pdl.operation) -> !pdl.operation
 
   lower_to_llvm %module_op1 : (!pdl.operation) -> !pdl.operation
