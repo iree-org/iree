@@ -93,6 +93,7 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTosaDialect
     MLIRTosaToArith
+    MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorInterfaces

@@ -158,18 +158,14 @@ export E2E_TEST_ARTIFACTS_DIR="e2e_test_artifacts"
 # Download all artifacts
 mkdir "${E2E_TEST_ARTIFACTS_DIR?}"
 gcloud storage cp -r "${GCS_URL?}/e2e-test-artifacts" "${E2E_TEST_ARTIFACTS_DIR?}"
-
-# Download benchmark configs
-gcloud storage cp "${GCS_URL?}/benchmark-config.json" "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
-gcloud storage cp "${GCS_URL?}/compilation-config.json" "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
 Run the helper tool to dump benchmark commands from benchmark configs:
 
 ```sh
 build_tools/benchmarks/benchmark_helper.py dump-cmds \
-  --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
-  --compilation_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json" \
+  --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/execution-benchmark-config.json" \
+  --compilation_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/compilation-benchmark-config.json" \
   --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --benchmark_id="<benchmark_id>"
 ```
@@ -239,10 +235,14 @@ Execution and compilation benchmark configs can be downloaded at:
 
 ```sh
 # Execution benchmark config:
-gcloud storage cp "${GCS_URL?}/benchmark-config.json" "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
+gcloud storage cp \
+  "${GCS_URL?}/e2e-test-artifacts/execution-benchmark-config.json" \
+  "${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json"
 
 # Compilation benchmark config:
-gcloud storage cp "${GCS_URL?}/compilation-config.json" "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
+gcloud storage cp \
+  "${GCS_URL?}/e2e-test-artifacts/compilation-benchmark-config.json" \
+  "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
 Benchmark raw results and traces can be downloaded at:

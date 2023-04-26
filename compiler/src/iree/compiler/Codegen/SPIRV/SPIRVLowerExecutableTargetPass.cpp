@@ -18,6 +18,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -47,7 +48,8 @@ class SPIRVLowerExecutableTargetPass
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
                 IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
                 bufferization::BufferizationDialect, scf::SCFDialect,
-                spirv::SPIRVDialect, vector::VectorDialect>();
+                spirv::SPIRVDialect, transform::TransformDialect,
+                vector::VectorDialect>();
   }
 
   void runOnOperation() override;

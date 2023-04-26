@@ -95,12 +95,6 @@ static llvm::cl::opt<std::string> input_file_flag{
     llvm::cl::init("-"),
 };
 
-static llvm::cl::opt<bool> split_input_file_flag{
-    "split-input-file",
-    llvm::cl::desc("Split the input file into multiple modules"),
-    llvm::cl::init(true),
-};
-
 static llvm::cl::opt<bool> verify_passes_flag(
     "verify-each",
     llvm::cl::desc("Run the verifier after each transformation pass"),
@@ -544,42 +538,8 @@ Status RunFile(const std::string& mlir_filename,
         (int)mlir_filename.size(), mlir_filename.data(), error_message.c_str());
   }
 
-  if (!split_input_file_flag) {
-    // Use entire buffer as a single module.
-    return EvaluateFile(std::move(file), registry);
-  }
-
-  // Split the buffer into separate modules and evaluate independently.
-  // This matches the --split-input-file arg to mlir-opt.
-  const char kSplitMarker[] = "// -----";
-  auto* full_buffer = file.get();
-  llvm::SmallVector<llvm::StringRef, 8> source_buffers;
-  full_buffer->getBuffer().split(source_buffers, kSplitMarker);
-
-  // Add the original buffer to the source manager.
-  llvm::SourceMgr file_source_mgr;
-  file_source_mgr.AddNewSourceBuffer(std::move(file), llvm::SMLoc());
-
-  // Process each chunk in turn. Only return the first error (but log all).
-  Status any_failure;
-  for (auto& sub_source_buffer : source_buffers) {
-    auto split_loc = llvm::SMLoc::getFromPointer(sub_source_buffer.data());
-    unsigned split_line = file_source_mgr.getLineAndColumn(split_loc).first;
-    auto sub_buffer = llvm::MemoryBuffer::getMemBufferCopy(
-        sub_source_buffer, full_buffer->getBufferIdentifier() +
-                               llvm::Twine(" split at line #") +
-                               llvm::Twine(split_line));
-    auto sub_failure = EvaluateFile(std::move(sub_buffer), registry);
-    if (!sub_failure.ok()) {
-      fprintf(stderr, "Failure for split at line #%u: %s\n", split_line,
-              sub_failure.ToString().c_str());
-      if (any_failure.ok()) {
-        any_failure = std::move(sub_failure);
-      }
-    }
-  }
-
-  return any_failure;
+  // Use entire buffer as a single module.
+  return EvaluateFile(std::move(file), registry);
 }
 
 }  // namespace

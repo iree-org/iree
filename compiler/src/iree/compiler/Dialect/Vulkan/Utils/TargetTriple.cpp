@@ -182,16 +182,16 @@ void getExtensions(const TargetTriple &triple,
   }
 
   // Desktop GPUs typically support all extensions we care.
-  const std::array<Extension, 7> desktop = {
-      Extension::VK_KHR_16bit_storage,
-      Extension::VK_KHR_8bit_storage,
-      Extension::VK_KHR_shader_float16_int8,
-      Extension::VK_KHR_spirv_1_4,
-      Extension::VK_KHR_storage_buffer_storage_class,
-      Extension::VK_KHR_variable_pointers,
-      Extension::VK_EXT_subgroup_size_control};
+  const Extension desktop[] = {Extension::VK_KHR_16bit_storage,
+                               Extension::VK_KHR_8bit_storage,
+                               Extension::VK_KHR_shader_float16_int8,
+                               Extension::VK_KHR_shader_integer_dot_product,
+                               Extension::VK_KHR_spirv_1_4,
+                               Extension::VK_KHR_storage_buffer_storage_class,
+                               Extension::VK_KHR_variable_pointers,
+                               Extension::VK_EXT_subgroup_size_control};
 
-  extensions.append(desktop.begin(), desktop.end());
+  llvm::append_range(extensions, desktop);
   if (getVendor(triple) == spirv::Vendor::NVIDIA ||
       triple.getArch() == TargetTripleArch::AMD_RDNAv3) {
     extensions.push_back(Extension::VK_NV_cooperative_matrix);
@@ -271,6 +271,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       shaderFloat16 = shaderFloat64 = true;
       shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+      shaderIntegerDotProduct = true;
 
       storageBuffer16BitAccess = storagePushConstant16 = true;
       uniformAndStorageBuffer16BitAccess = true;
@@ -360,6 +362,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       shaderFloat16 = shaderFloat64 = true;
       shaderInt8 = shaderInt16 = shaderInt64 = true;
 
+      shaderIntegerDotProduct = true;
+
       storageBuffer16BitAccess = storagePushConstant16 = true;
       uniformAndStorageBuffer16BitAccess = true;
       storageBuffer8BitAccess = true, storagePushConstant8 = true;
@@ -401,6 +405,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       shaderFloat16 = shaderFloat64 = true;
       shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+      shaderIntegerDotProduct = true;
 
       storageBuffer16BitAccess = storagePushConstant16 = true;
       uniformAndStorageBuffer16BitAccess = true;
@@ -449,6 +455,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       shaderFloat64 = false;
       shaderInt8 = shaderInt16 = true;
       shaderInt64 = false;
+
+      shaderIntegerDotProduct = true;
 
       storageBuffer16BitAccess = storagePushConstant16 = true;
       uniformAndStorageBuffer16BitAccess = true;
