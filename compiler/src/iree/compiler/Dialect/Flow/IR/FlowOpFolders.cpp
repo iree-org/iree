@@ -749,19 +749,20 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
   if (!value) return {};
   if (auto target = operands.getTarget().dyn_cast_or_null<ElementsAttr>()) {
     // Store into the constant target tensor.
-    if (target.getType().getRank() == 0) {
-      return DenseElementsAttr::get(target.getType(), {value});
+    auto targetType = cast<ShapedType>(target.getType());
+    if (targetType.getRank() == 0) {
+      return DenseElementsAttr::get(targetType, {value});
     }
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
       uint64_t offset = getFlattenedIndex(
-          target.getType(),
+          targetType,
           llvm::to_vector<4>(
               llvm::map_range(operands.getIndices(), [](Attribute value) {
                 return value.cast<IntegerAttr>().getValue().getZExtValue();
               })));
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
       newContents[offset] = value;
-      return DenseElementsAttr::get(target.getType(), newContents);
+      return DenseElementsAttr::get(targetType, newContents);
     }
   }
   return {};
@@ -834,7 +835,8 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // Slices tensor from start to (start + length) exclusively at dim.
 static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
                                 uint64_t start, uint64_t length) {
-  auto shape = llvm::to_vector<4>(tensor.getType().getShape());
+  auto tensorType = cast<ShapedType>(tensor.getType());
+  auto shape = llvm::to_vector<4>(tensorType.getShape());
   if (length == shape[dim]) {
     // No need to slice.
     return tensor;
@@ -851,7 +853,7 @@ static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
                       /*init=*/1, /*op=*/std::multiplies<int64_t>());
   int64_t num = length * step / shape[dim];
   for (int64_t offset = step / shape[dim] * start,
-               numElements = tensor.getType().getNumElements();
+               numElements = tensorType.getNumElements();
        offset < numElements; offset += step) {
     newContents.append(valuesBegin + offset, valuesBegin + offset + num);
   }

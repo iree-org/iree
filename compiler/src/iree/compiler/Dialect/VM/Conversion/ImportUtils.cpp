@@ -137,7 +137,8 @@ std::optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
       elementValues.push_back(rewriter.createOrFold<mlir::arith::ConstantOp>(
-          loc, elementsAttr.getType().getElementType(), intAttr));
+          loc, elementsAttr.getType().getElementType(),
+          cast<TypedAttr>(intAttr)));
     }
     return elementValues;
   }

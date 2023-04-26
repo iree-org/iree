@@ -434,8 +434,8 @@ struct InlineConstantWorkgroupSizePattern
 
     uint64_t dimIdx = sizeOp.getDimension().getZExtValue();
     auto dimAttr = workgroupSizeAttr[dimIdx];
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(sizeOp, dimAttr,
-                                                   rewriter.getIndexType());
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+        sizeOp, rewriter.getIndexType(), cast<TypedAttr>(dimAttr));
     return success();
   }
 };

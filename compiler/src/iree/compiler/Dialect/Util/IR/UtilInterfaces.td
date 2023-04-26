@@ -756,7 +756,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   }];
 
   let verify = [{
-    return IREE::Util::detail::verifyTiedOp($_op);
+    return IREE::Util::detail::verifyTiedOp(cast<TiedOpInterface>($_op));
   }];
 }
 

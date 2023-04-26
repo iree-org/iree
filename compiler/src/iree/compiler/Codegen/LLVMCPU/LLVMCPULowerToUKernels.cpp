@@ -160,7 +160,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   // If the pack op didn't have a padding_value attribute, default to 0.
   if (!paddingVal) {
     paddingVal =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(i64), i64);
+        rewriter.create<arith::ConstantOp>(loc, i64, rewriter.getZeroAttr(i64));
   }
   int paddingValBitWidth = paddingVal.getType().getIntOrFloatBitWidth();
   // Non-integer element types get bitcast to integer of same bit width.

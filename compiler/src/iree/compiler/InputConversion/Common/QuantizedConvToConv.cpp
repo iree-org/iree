@@ -41,7 +41,7 @@ Value emptyZero(ImplicitLocOpBuilder &builder, RankedTensorType ty,
   Value empty =
       builder.create<tensor::EmptyOp>(ty.getShape(), ty.getElementType(), dyn);
 
-  Attribute attr = builder.getZeroAttr(ty.getElementType());
+  TypedAttr attr = builder.getZeroAttr(ty.getElementType());
   Value cnst = builder.create<arith::ConstantOp>(attr);
   return builder.create<linalg::FillOp>(ValueRange{cnst}, ValueRange{empty})
       .result();

@@ -111,8 +111,9 @@ struct ReduceOpToGenericConverter final
       initValue = rewriter.createOrFold<tensor::ExtractOp>(loc, initValue);
 
       SmallVector<Value, 8> dynShape = getReduceOpEmptyTensorDynSizes(
-          rewriter, loc, operand, resultType, reductionDims);
-      auto emptyTensor = getEmptyTensor(rewriter, loc, resultType, dynShape);
+          rewriter, loc, operand, cast<ShapedType>(resultType), reductionDims);
+      auto emptyTensor =
+          getEmptyTensor(rewriter, loc, cast<ShapedType>(resultType), dynShape);
       Value filledTensor =
           rewriter.create<linalg::FillOp>(loc, initValue, emptyTensor).result();
       outputs.push_back(filledTensor);

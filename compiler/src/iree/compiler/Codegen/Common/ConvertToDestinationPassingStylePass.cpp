@@ -505,7 +505,7 @@ struct RemoveCstOutsDependency
       if (!attr.isSplat()) continue;
       auto type = attr.getType().dyn_cast<RankedTensorType>();
       if (!type) continue;
-      Attribute scalarAttr = attr.getValues<Attribute>()[0];
+      TypedAttr scalarAttr = attr.getValues<TypedAttr>()[0];
 
       modifiedOutput = true;
       Value emptyTensor = rewriter.create<tensor::EmptyOp>(

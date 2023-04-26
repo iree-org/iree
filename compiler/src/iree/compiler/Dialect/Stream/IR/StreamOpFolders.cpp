@@ -1037,7 +1037,7 @@ static APInt computeRequiredPatternBits(APInt pattern) {
 // to be emulated - if we can avoid that here that's a big win. Some HAL
 // implementations (such as Metal) only support 8-bit fills and anything larger
 // needs to be implemented as well.
-static Attribute tryNarrowPatternBits(Attribute patternAttr) {
+static TypedAttr tryNarrowPatternBits(TypedAttr patternAttr) {
   // Get the old pattern bitcast to an APInt. Splats are bitwise operations
   // and we don't care what the value originally was.
   APInt oldPattern;
@@ -1066,7 +1066,7 @@ struct NarrowSplatPattern : public OpRewritePattern<TensorSplatOp> {
   LogicalResult matchAndRewrite(TensorSplatOp splatOp,
                                 PatternRewriter &rewriter) const override {
     // Try narrowing the pattern.
-    Attribute oldPatternAttr;
+    TypedAttr oldPatternAttr;
     if (!matchPattern(splatOp.getValue(), m_Constant(&oldPatternAttr))) {
       return failure();
     }
@@ -1159,7 +1159,7 @@ struct NarrowFillPattern : public OpRewritePattern<TensorFillOp> {
   LogicalResult matchAndRewrite(TensorFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
     // Try narrowing the pattern.
-    Attribute oldPatternAttr;
+    TypedAttr oldPatternAttr;
     if (!matchPattern(fillOp.getValue(), m_Constant(&oldPatternAttr))) {
       return failure();
     }

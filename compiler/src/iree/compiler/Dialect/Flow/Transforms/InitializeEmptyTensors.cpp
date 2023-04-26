@@ -20,13 +20,13 @@ namespace Flow {
 
 /// Returns a zero value attribute based on the `elementType`.
 /// Returns failure, when the type is not handled.
-static FailureOr<Attribute> getZero(OpBuilder &builder, Location loc,
+static FailureOr<TypedAttr> getZero(OpBuilder &builder, Location loc,
                                     Type elementType) {
   if (auto intType = elementType.dyn_cast<IntegerType>()) {
-    return builder.getIntegerAttr(intType, 0);
+    return cast<TypedAttr>(builder.getIntegerAttr(intType, 0));
   }
   if (auto floatType = elementType.dyn_cast<FloatType>()) {
-    return builder.getFloatAttr(floatType, 0.0);
+    return cast<TypedAttr>(builder.getFloatAttr(floatType, 0.0));
   }
   return failure();
 }
@@ -48,7 +48,7 @@ struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
     RankedTensorType resultType = emptyTensorOp.getType();
     Type elementType = resultType.getElementType();
     Location loc = emptyTensorOp.getLoc();
-    FailureOr<Attribute> zero = getZero(rewriter, loc, elementType);
+    FailureOr<TypedAttr> zero = getZero(rewriter, loc, elementType);
     if (failed(zero)) {
       return rewriter.notifyMatchFailure(
           emptyTensorOp, "unable to get zero value for element type");
