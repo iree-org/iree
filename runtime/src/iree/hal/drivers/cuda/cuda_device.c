@@ -315,6 +315,11 @@ IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_query_group_params(
         IREE_STATUS_UNIMPLEMENTED,
         "MPI should be loaded to use NCCL collective operations.");
   }
+  if (!syms->mpi_symbols) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "MPI symbols failed to load.");
+  }
+  iree_hal_mpi_dynamic_symbols_t* mpi_syms = syms->mpi_symbols;
 
   // Until we have multi channel support, we only create the default channel.
   IREE_ASSERT_EQ(out_params->rank, IREE_HAL_CHANNEL_RANK_DEFAULT);
@@ -322,10 +327,11 @@ IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_query_group_params(
 
   // Update the rank and count.
   MPI_RETURN_IF_ERROR(
-      syms, MPI_Comm_rank(syms->ompi_mpi_comm_world, &out_params->rank),
+      mpi_syms, MPI_Comm_rank(mpi_syms->ompi_mpi_comm_world, &out_params->rank),
       "MPI_Comm_rank");
   MPI_RETURN_IF_ERROR(
-      syms, MPI_Comm_size(syms->ompi_mpi_comm_world, &out_params->count),
+      mpi_syms,
+      MPI_Comm_size(mpi_syms->ompi_mpi_comm_world, &out_params->count),
       "MPI_Comm_size");
 
   iree_hal_cuda_nccl_id_t* id = (iree_hal_cuda_nccl_id_t*)id_storage.data;
@@ -335,10 +341,11 @@ IREE_API_EXPORT iree_status_t iree_hal_cuda_nccl_query_group_params(
     IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id(device, id));
   }
 
-  MPI_RETURN_IF_ERROR(syms,
-                      MPI_Bcast(id, id_storage.data_length, syms->ompi_mpi_byte,
-                                0, syms->ompi_mpi_comm_world),
-                      "MPI_Bcast");
+  MPI_RETURN_IF_ERROR(
+      mpi_syms,
+      MPI_Bcast(id, id_storage.data_length, mpi_syms->ompi_mpi_byte, 0,
+                mpi_syms->ompi_mpi_comm_world),
+      "MPI_Bcast");
   out_params->id = iree_const_cast_byte_span(id_storage);
 
   return iree_ok_status();

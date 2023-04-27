@@ -29,15 +29,6 @@ static const char* kNCCLLoaderSearchNames[] = {
 #endif  // IREE_PLATFORM_WINDOWS
 };
 
-// TODO(okkwon): move this to a place that can be used by other drivers.
-static const char* kMPILoaderSearchNames[] = {
-#if defined(IREE_PLATFORM_WINDOWS)
-    "mpi.dll",
-#else
-    "libmpi.so",
-#endif  // IREE_PLATFORM_WINDOWS
-};
-
 #define concat(A, B) A B
 
 // Load CUDA entry points, prefer _v2 version if it exists.
@@ -55,12 +46,10 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
   }
 #define NCCL_PFN_DECL(ncclSymbolName, ...)
 #define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
-#define MPI_PFN_DECL(mpiSymbolName, ...)
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
-#undef MPI_PFN_DECL
   return iree_ok_status();
 }
 
@@ -80,32 +69,10 @@ static iree_status_t iree_hal_cuda_nccl_dynamic_symbols_resolve_all(
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(        \
         syms->nccl_library, kName, (void**)&syms->ncclSymbolName)); \
   }
-#define MPI_PFN_DECL(mpiSymbolName, ...)
 #include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 #undef NCCL_PFN_DECL
 #undef NCCL_PFN_DECL_STR_RETURN
-#undef MPI_PFN_DECL
-  return iree_ok_status();
-}
-
-// Load MPI entry points.
-static iree_status_t iree_hal_mpi_dynamic_symbols_resolve_all(
-    iree_hal_cuda_dynamic_symbols_t* syms) {
-#define CU_PFN_DECL(cudaSymbolName, ...)
-#define NCCL_PFN_DECL(ncclSymbolName, ...)
-#define NCCL_PFN_DECL_STR_RETURN(ncclSymbolName, ...)
-#define MPI_PFN_DECL(mpiSymbolName, ...)                          \
-  {                                                               \
-    static const char* kName = #mpiSymbolName;                    \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(      \
-        syms->mpi_library, kName, (void**)&syms->mpiSymbolName)); \
-  }
-#include "iree/hal/drivers/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
-#undef CU_PFN_DECL
-#undef NCCL_PFN_DECL
-#undef NCCL_PFN_DECL_STR_RETURN
-#undef MPI_PFN_DECL
   return iree_ok_status();
 }
 
@@ -196,39 +163,14 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
   return status;
 }
 
-// FIXME(okkwon): it is unrelated to CUDA, but iree_hal_cuda_dynamic_symbols_t
-// is used.
-iree_status_t iree_hal_mpi_dynamic_symbols_initialize(
-    iree_allocator_t host_allocator,
-    iree_hal_cuda_dynamic_symbols_t* out_syms) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  out_syms->mpi_library = NULL;
-  iree_status_t status = iree_dynamic_library_load_from_files(
-      IREE_ARRAYSIZE(kMPILoaderSearchNames), kMPILoaderSearchNames,
-      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->mpi_library);
-  if (iree_status_is_not_found(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "MPI runtime library not available; ensure "
-                            "installed and on path");
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_mpi_dynamic_symbols_resolve_all(out_syms);
-  }
-  if (!iree_status_is_ok(status)) {
-    iree_hal_cuda_dynamic_symbols_deinitialize(out_syms);
-  }
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 void iree_hal_cuda_dynamic_symbols_deinitialize(
     iree_hal_cuda_dynamic_symbols_t* syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_dynamic_library_release(syms->cuda_library);
   iree_dynamic_library_release(syms->nccl_library);
   iree_dynamic_library_release(syms->mpi_library);
+  if (syms->mpi_symbols)
+    memset(syms->mpi_symbols, 0, sizeof(*syms->mpi_symbols));
   memset(syms, 0, sizeof(*syms));
   IREE_TRACE_ZONE_END(z0);
 }

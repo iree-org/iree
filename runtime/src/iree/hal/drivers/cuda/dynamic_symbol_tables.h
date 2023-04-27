@@ -107,14 +107,4 @@ NCCL_PFN_DECL(ncclRecv, void*, size_t, ncclDataType_t, int, ncclComm_t,
 NCCL_PFN_DECL(ncclGroupStart)
 NCCL_PFN_DECL(ncclGroupEnd)
 
-// MPI
 
-MPI_PFN_DECL(MPI_Init, int*, char***)
-MPI_PFN_DECL(MPI_Finalize)
-MPI_PFN_DECL(MPI_Bcast, void* buffer, int count, void* datatype, int root,
-             void* comm)
-MPI_PFN_DECL(MPI_Comm_rank, void* comm, int* rank)
-MPI_PFN_DECL(MPI_Comm_size, void* comm, int* size)
-MPI_PFN_DECL(MPI_Comm_split, void* comm, int color, int key, void** newcomm)
-MPI_PFN_DECL(ompi_mpi_byte)
-MPI_PFN_DECL(ompi_mpi_comm_world)

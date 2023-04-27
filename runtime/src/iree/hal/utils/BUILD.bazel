@@ -93,6 +93,33 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "libmpi",
+    srcs = ["libmpi.c"],
+    hdrs = [
+        "libmpi.h",
+        "libmpi_dynamic_symbols.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:dynamic_library",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "libmpi_test",
+    srcs = ["libmpi_test.cc"],
+    deps = [
+        ":libmpi",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "resource_set",
     srcs = ["resource_set.c"],
     hdrs = ["resource_set.h"],

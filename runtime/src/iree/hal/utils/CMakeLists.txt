@@ -103,6 +103,34 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    libmpi
+  HDRS
+    "libmpi.h"
+    "libmpi_dynamic_symbols.h"
+  SRCS
+    "libmpi.c"
+  DEPS
+    iree::base
+    iree::base::internal::dynamic_library
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    libmpi_test
+  SRCS
+    "libmpi_test.cc"
+  DEPS
+    ::libmpi
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     resource_set
   HDRS
     "resource_set.h"
