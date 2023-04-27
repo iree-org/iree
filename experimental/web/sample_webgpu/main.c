@@ -342,9 +342,12 @@ static void buffer_map_sync_callback(WGPUBufferMapAsyncStatus map_status,
 
   iree_hal_buffer_t* heap_buffer = NULL;
   if (iree_status_is_ok(status)) {
+    // The buffer we get from WebGPU may not be aligned to 64.
+    iree_hal_memory_access_t memory_access =
+        IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_UNALIGNED;
     status = iree_hal_heap_buffer_wrap(
         userdata->readback_buffer->device_allocator,
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_HAL_MEMORY_ACCESS_READ,
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL, memory_access,
         IREE_HAL_BUFFER_USAGE_MAPPING, data_length,
         iree_make_byte_span((void*)data_ptr, data_length),
         (iree_hal_buffer_release_callback_t){
