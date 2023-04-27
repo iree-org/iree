@@ -405,7 +405,7 @@ class BenchmarkLatency:
     return BenchmarkLatency(**json_object)
 
 
-def get_google_benchmark_latencies(
+def _get_google_benchmark_latencies(
     benchmark_json: Dict[str,
                          Any]) -> Tuple[BenchmarkLatency, BenchmarkLatency]:
   """Returns the Google Benchmark aggregate latencies.
@@ -475,7 +475,7 @@ def parse_iree_benchmark_metrics(benchmark_stdout: str) -> BenchmarkMetrics:
     A populated BenchmarkMetrics dataclass.
   """
   iree_benchmark_json = json.loads(benchmark_stdout)
-  real_time, cpu_time = get_google_benchmark_latencies(iree_benchmark_json)
+  real_time, cpu_time = _get_google_benchmark_latencies(iree_benchmark_json)
   return BenchmarkMetrics(
       real_time=real_time,
       cpu_time=cpu_time,
