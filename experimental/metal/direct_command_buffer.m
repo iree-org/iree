@@ -291,6 +291,19 @@ static iree_status_t iree_hal_metal_command_buffer_execution_barrier(
 
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
+
+  if (memory_barrier_count == 0 && buffer_barrier_count == 0) {
+    // There is no direct corresponding APIs for execution only barrier in Metal. We just signal and
+    // wait on the same value of a MTLEvent here.
+    iree_hal_metal_end_blit_encoder(command_buffer);
+    iree_hal_metal_end_compute_encoder(command_buffer);
+    id<MTLCommandBuffer> metal_handle = command_buffer->command_buffer;
+    uint64_t event_value = command_buffer->next_encoder_event_value++;
+    [metal_handle encodeSignalEvent:command_buffer->encoder_event value:event_value];
+    [metal_handle encodeWaitForEvent:command_buffer->encoder_event value:event_value];
+    return iree_ok_status();
+  }
+
   id<MTLComputeCommandEncoder> encoder =
       iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
 
