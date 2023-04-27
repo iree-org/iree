@@ -389,7 +389,7 @@ class BenchmarkInfo:
                          run_config_id=json_object.get("run_config_id"))
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class BenchmarkLatency:
   """Stores latency statistics for a benchmark run."""
   mean: int
@@ -433,7 +433,7 @@ def get_google_benchmark_latencies(
   return real_time, cpu_time
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class BenchmarkMetrics(object):
   """An object describing the results from a single benchmark.
 
@@ -483,7 +483,7 @@ def parse_iree_benchmark_metrics(benchmark_stdout: str) -> BenchmarkMetrics:
   )
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class BenchmarkRun(object):
   """An object describing a single run of the benchmark binary.
 
