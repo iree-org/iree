@@ -43,7 +43,8 @@ static iree_status_t iree_wait_primitive_clone(
                             "source wait handle must be a win32 HANDLE");
   }
 
-  iree_wait_primitive_value_t value = {0};
+  iree_wait_primitive_value_t value;
+  memset(&value, 0, sizeof(value));
   HANDLE process = GetCurrentProcess();
   if (!DuplicateHandle(process, (HANDLE)source_handle->value.win32.handle,
                        process, (LPHANDLE)&value.win32.handle, 0, FALSE,
@@ -324,7 +325,8 @@ static iree_status_t iree_wait_multi(iree_wait_set_t* set, bool require_all,
     // One (or more) handles were signaled sucessfully.
     if (out_wake_handle) {
       DWORD wake_index = result - WAIT_OBJECT_0;
-      iree_wait_primitive_value_t wake_value = {0};
+      iree_wait_primitive_value_t wake_value;
+      memset(&wake_value, 0, sizeof(wake_value));
       wake_value.win32.handle = (uintptr_t)set->native_handles[wake_index];
       iree_wait_handle_wrap_primitive(IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE,
                                       wake_value, out_wake_handle);
@@ -439,7 +441,8 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
 iree_status_t iree_event_initialize(bool initial_state,
                                     iree_event_t* out_event) {
   memset(out_event, 0, sizeof(*out_event));
-  iree_wait_primitive_value_t value = {0};
+  iree_wait_primitive_value_t value;
+  memset(&value, 0, sizeof(value));
   value.win32.handle =
       (uintptr_t)CreateEvent(NULL, TRUE, initial_state ? TRUE : FALSE, NULL);
   if (!value.win32.handle) {
