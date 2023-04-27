@@ -65,45 +65,6 @@ static int simple_mul_workgroup(void* context, void* params_ptr,
                                 void* reserved) {
   system_plugin_t* plugin = (system_plugin_t*)context;
   typedef struct {
-    // vvvv simplification pending (buffer + offset)
-    const float* restrict binding0;
-    const float* restrict binding0_aligned;
-    size_t binding0_offset;
-    size_t binding0_size;
-    size_t binding0_stride;
-    const float* restrict binding1;
-    const float* restrict binding1_aligned;
-    size_t binding1_offset;
-    size_t binding1_size;
-    size_t binding1_stride;
-    float* restrict binding2;
-    float* restrict binding2_aligned;
-    size_t binding2_offset;
-    size_t binding2_size;
-    size_t binding2_stride;
-    // ^^^^ simplification pending (buffer + offset)
-    size_t dim;
-    size_t tid;
-    uint32_t processor_id;
-    const uint64_t* restrict processor_data;
-  } params_t;
-  const params_t* params = (const params_t*)params_ptr;
-  fprintf(plugin->file, "processor_id=%u\nprocessor_data[0]=%" PRIX64 "\n",
-          params->processor_id, params->processor_data[0]);
-  size_t end = params->tid + 64;
-  if (end > params->dim) end = params->dim;
-  for (size_t i = params->tid; i < end; ++i) {
-    params->binding2[i] = params->binding0[i] * params->binding1[i];
-    fprintf(plugin->file, "mul[%zu](%g * %g = %g)\n", i, params->binding0[i],
-            params->binding1[i], params->binding2[i]);
-  }
-  return 0;
-}
-
-static int simple_mul_workgroup_ukernel(void* context, void* params_ptr,
-                                        void* reserved) {
-  system_plugin_t* plugin = (system_plugin_t*)context;
-  typedef struct {
     const float* restrict binding0;
     size_t binding0_offset;
     const float* restrict binding1;
@@ -112,8 +73,15 @@ static int simple_mul_workgroup_ukernel(void* context, void* params_ptr,
     size_t binding2_offset;
     size_t size;
     size_t tid;
+    uint32_t processor_id;
+    const uint64_t* restrict processor_data;
   } params_t;
   const params_t* params = (const params_t*)params_ptr;
+  fprintf(plugin->file, "processor_id=%u\n", params->processor_id);
+  if (params->processor_data) {
+    fprintf(plugin->file, "processor_data[0]=%" PRIX64 "\n",
+            params->processor_data[0]);
+  }
   // The operation `iree_codegen.ukernel.generic` always operates
   // on a slice of the inputs to produce a slice of the output,
   // so the loop here just needs to iterate from `0` to `size`,
@@ -193,11 +161,6 @@ static iree_hal_executable_plugin_status_t system_plugin_resolve(
     if (iree_hal_executable_plugin_strcmp(symbol_name,
                                           "simple_mul_workgroup") == 0) {
       params->out_fn_ptrs[i] = simple_mul_workgroup;
-      params->out_fn_contexts[i] =
-          plugin;  // passing plugin to each import call
-    } else if (iree_hal_executable_plugin_strcmp(
-                   symbol_name, "simple_mul_workgroup_ukernel") == 0) {
-      params->out_fn_ptrs[i] = simple_mul_workgroup_ukernel;
       params->out_fn_contexts[i] =
           plugin;  // passing plugin to each import call
     } else {
