@@ -46,6 +46,14 @@ typedef struct iree_hal_metal_command_buffer_t {
   id<MTLComputeCommandEncoder> compute_encoder;
   id<MTLBlitCommandEncoder> blit_encoder;
 
+  // MTLEven used for synchronization when we switch between blit and compute encoders.
+  // Normally we would use MTLFence objects, but the difference between IREE HAL and Metal API means
+  // we may see many encoder switches. It would require creating a lot GPU objects. In order to
+  // avoid the cost, we just use one MTLEvent with different values for different switches.
+  id<MTLEvent> encoder_event;
+  // The next available encoder event value to signal/wait to/on.
+  uint64_t next_encoder_event_value;
+
   // Metal APIs mandate we create argument bufffers (for descriptor sets) from compiled kernel
   // function. That means we need to bind the compute kernel first before setting descriptors and
   // binding buffers. So we need to cache the descriptor information by ourselves and apply them in
@@ -105,59 +113,56 @@ static void iree_hal_metal_end_blit_encoder(iree_hal_metal_command_buffer_t* com
 
 static id<MTLComputeCommandEncoder> iree_hal_metal_get_or_begin_compute_encoder(
     iree_hal_metal_command_buffer_t* command_buffer) {
-  id<MTLFence> encoder_fence = nil;
+  id<MTLCommandBuffer> metal_handle = command_buffer->command_buffer;
+
+  // If we are switching encoders, we would need to use a fence to synchronize "one or more
+  // resources across different passes within a command buffer."
+  // https://developer.apple.com/documentation/metal/resource_synchronization
+  uint64_t encoder_event_value = 0;
   if (command_buffer->blit_encoder) {
-    // We would need to use a fence to synchronize "one or more resources across different passes
-    // within a command buffer."
-    // https://developer.apple.com/documentation/metal/resource_synchronization
-    encoder_fence = [command_buffer->command_buffer.device newFence];  // +1
-    [command_buffer->command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-      [encoder_fence release];  // -1
-    }];
-    [command_buffer->blit_encoder updateFence:encoder_fence];
     iree_hal_metal_end_blit_encoder(command_buffer);
+    encoder_event_value = command_buffer->next_encoder_event_value++;
+    [metal_handle encodeSignalEvent:command_buffer->encoder_event value:encoder_event_value];
   }
 
-  @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
-    if (!command_buffer->compute_encoder) {
+  if (!command_buffer->compute_encoder) {
+    if (encoder_event_value != 0) {
+      [metal_handle encodeWaitForEvent:command_buffer->encoder_event value:encoder_event_value];
+    }
+    @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
       // We manage commands dependencies and insert barriers explicitly in IREE; so use the
       // concurrent dispatch type for compute encoders.
-      command_buffer->compute_encoder = [[command_buffer->command_buffer
+      command_buffer->compute_encoder = [[metal_handle
           computeCommandEncoderWithDispatchType:command_buffer->dispatch_type] retain];  // +1
     }
   }
 
-  if (encoder_fence != nil) {
-    [command_buffer->compute_encoder waitForFence:encoder_fence];
-  }
   return command_buffer->compute_encoder;
 }
 
 static id<MTLBlitCommandEncoder> iree_hal_metal_get_or_begin_blit_encoder(
     iree_hal_metal_command_buffer_t* command_buffer) {
-  id<MTLFence> encoder_fence = nil;
+  id<MTLCommandBuffer> metal_handle = command_buffer->command_buffer;
+
+  // If we are switching encoders, we would need to use a fence to synchronize "one or more
+  // resources across different passes within a command buffer."
+  // https://developer.apple.com/documentation/metal/resource_synchronization
+  uint64_t encoder_event_value = 0;
   if (command_buffer->compute_encoder) {
-    // We would need to use a fence to synchronize "one or more resources across different passes
-    // within a command buffer."
-    // https://developer.apple.com/documentation/metal/resource_synchronization
-    encoder_fence = [command_buffer->command_buffer.device newFence];  // +1
-    [command_buffer->command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
-      [encoder_fence release];  // -1
-    }];
-    [command_buffer->compute_encoder updateFence:encoder_fence];
     iree_hal_metal_end_compute_encoder(command_buffer);
+    encoder_event_value = command_buffer->next_encoder_event_value++;
+    [metal_handle encodeSignalEvent:command_buffer->encoder_event value:encoder_event_value];
   }
 
-  @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
-    if (!command_buffer->blit_encoder) {
-      command_buffer->blit_encoder =
-          [[command_buffer->command_buffer blitCommandEncoder] retain];  // +1
+  if (!command_buffer->blit_encoder) {
+    if (encoder_event_value != 0) {
+      [metal_handle encodeWaitForEvent:command_buffer->encoder_event value:encoder_event_value];
+    }
+    @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
+      command_buffer->blit_encoder = [[metal_handle blitCommandEncoder] retain];  // +1
     }
   }
 
-  if (encoder_fence != nil) {
-    [command_buffer->blit_encoder waitForFence:encoder_fence];
-  }
   return command_buffer->blit_encoder;
 }
 
@@ -208,6 +213,8 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
             : MTLDispatchTypeSerial;
     command_buffer->compute_encoder = nil;
     command_buffer->blit_encoder = nil;
+    command_buffer->encoder_event = [queue.device newEvent];  // +1
+    command_buffer->next_encoder_event_value = 1;
     memset(command_buffer->current_descriptors, 0,
            IREE_HAL_METAL_MAX_BINDING_COUNT * sizeof(command_buffer->current_descriptors[0]));
     command_buffer->current_total_binding_count = 0;
@@ -227,6 +234,7 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  [command_buffer->encoder_event release];  // -1
   IREE_ASSERT_EQ(command_buffer->compute_encoder, nil);
   IREE_ASSERT_EQ(command_buffer->blit_encoder, nil);
   [command_buffer->command_buffer release];  // -1
