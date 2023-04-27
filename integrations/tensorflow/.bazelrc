@@ -9,7 +9,7 @@
 # `--nosystem_rc --nohome_rc --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc`
 try-import %workspace%/build_tools/bazel/iree-tf.bazelrc
 
-# Run the configure_bazel.py script to generate.
+# Run the `build_tools/bazel/configure_bazel.py` script to generate.
 try-import %workspace%/../../configured.bazelrc
 
 # The user.bazelrc file is not checked in but available for local mods.

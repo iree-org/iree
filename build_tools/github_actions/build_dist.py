@@ -69,7 +69,8 @@ BUILD_REQUIREMENTS_TXT = os.path.join(IREESRC_DIR, "runtime", "bindings",
                                       "python", "iree", "runtime",
                                       "build_requirements.txt")
 CI_REQUIREMENTS_TXT = os.path.join(THIS_DIR, "ci_requirements.txt")
-CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
+CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "build_tools", "bazel",
+                                  "configure_bazel.py")
 INSTALL_TARGET = ("install"
                   if platform.system() == "Windows" else "install/strip")
 

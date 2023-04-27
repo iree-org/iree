@@ -78,7 +78,7 @@ def format_description(title, description):
   # Build the final formatted string
   formatted_string = ""
   for chunk in chunks:
-    formatted_string += "| " + chunk.ljust(76) + " |\n"
+    formatted_string += f"| {chunk.ljust(76)} |\n"
 
   separator = "-" * 80
   return (f"\n{separator}\n| [*] {title.ljust(73)}|\n"
@@ -93,9 +93,9 @@ if __name__ == "__main__":
   print(
       format_description(
           title="VS Code Development Container",
-          description="Dev containers let you work with a well-defined tool and "
-          "runtime stack. See https://code.visualstudio.com/docs/devcontainers/containers."
-      ))
+          description="Dev containers let you work with a well-defined tool "
+          "and runtime stack. See "
+          "https://code.visualstudio.com/docs/devcontainers/containers."))
 
   if get_input(
       "Do you wish to use and configure VS Code Development Container [y/N]?",
@@ -122,6 +122,6 @@ if __name__ == "__main__":
 
   # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% #
 
-  print("\n" + "-" * 80)
+  print(f"\n{'-' * 80}")
   print(f"| [*] {'Configuration finished ...'.ljust(72)} |")
   print("-" * 80)

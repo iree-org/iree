@@ -48,7 +48,7 @@ Clone the repository, initialize its submodules and configure:
 $ git clone https://github.com/openxla/iree.git
 $ cd iree
 $ git submodule update --init
-$ python3 configure_bazel.py
+$ python3 build_tools/bazel/configure_bazel.py
 ```
 
 > Tip:<br>

@@ -55,7 +55,7 @@ clone the repository, initialize its submodules, and configure:
 > git clone https://github.com/openxla/iree.git
 > cd iree
 > git submodule update --init
-> python configure_bazel.py
+> python build_tools/bazel/configure_bazel.py
 ```
 
 > Tip:<br>
@@ -67,7 +67,7 @@ clone the repository, initialize its submodules, and configure:
 > repository, just make sure that they initialize the submodules.
 
 > Tip:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;configure_bazel.py only detects that you have Windows
+> &nbsp;&nbsp;&nbsp;&nbsp;`build_tools/bazel/configure_bazel.py` only detects that you have Windows
 > and will output the default `--config=windows` to `configured.bazelrc`, which
 > assumes the latest version of MSVC. To avoid some warnings, you may want to
 > replace it with `--config=msvc2017`.

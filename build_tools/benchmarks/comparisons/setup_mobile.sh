@@ -67,7 +67,7 @@ cmake --build ../iree-build/
 
 export CC=clang
 export CXX=clang++
-python3 configure_bazel.py
+python3 build_tools/bazel/configure_bazel.py
 
 cd integrations/tensorflow
 bazel build -c opt iree_tf_compiler:iree-import-tflite

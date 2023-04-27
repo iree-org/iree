@@ -419,7 +419,7 @@ To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the [d
 ```bash
 export CC=clang
 export CXX=clang++
-python configure_bazel.py
+python build_tools/bazel/configure_bazel.py
 cd integrations/tensorflow
 bazel test ...
 ```
