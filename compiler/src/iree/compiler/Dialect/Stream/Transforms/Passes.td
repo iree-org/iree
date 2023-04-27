@@ -200,7 +200,7 @@ def FuseDispatchBindings :
   }];
   let options = [
     Option<"aliasMutableBindings", "alias-mutable-bindings",
-           "bool", /*default=*/"false",
+           "bool", /*default=*/"true",
            "Fuses bindings that are mutable instead of leaving them split.">
   ];
 }
