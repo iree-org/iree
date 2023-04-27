@@ -231,5 +231,5 @@ int main(int argc, char** argv) {
   // avx512_vnni uses the same tile size and same pack code as avx512_base.
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
-  return EXIT_SUCCESS;  // failures are fatal
+  return iree_uk_test_exit_status();
 }
