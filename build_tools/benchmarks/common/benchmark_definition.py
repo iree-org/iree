@@ -464,12 +464,10 @@ class BenchmarkMetrics(object):
     )
 
 
-def parse_and_serialize_iree_benchmark_metrics(
-    results_filename: pathlib.Path, benchmark_stdout: str) -> BenchmarkMetrics:
+def parse_iree_benchmark_metrics(benchmark_stdout: str) -> BenchmarkMetrics:
   """Extract benchmark metrics from the output of iree-benchmark-module.
 
   Args:
-    results_filename: The path to serialize the BenchmarkMetrics to.
     benchmark_stdout: The stdout of iree-benchmark-module with
       --benchmark_format=json.
 
@@ -478,14 +476,11 @@ def parse_and_serialize_iree_benchmark_metrics(
   """
   iree_benchmark_json = json.loads(benchmark_stdout)
   real_time, cpu_time = get_google_benchmark_latencies(iree_benchmark_json)
-  benchmark_metrics = BenchmarkMetrics(
+  return BenchmarkMetrics(
       real_time=real_time,
       cpu_time=cpu_time,
       raw_data=iree_benchmark_json,
   )
-  with open(results_filename, "w") as f:
-    f.write(json.dumps(benchmark_metrics.to_json_object()))
-  return benchmark_metrics
 
 
 @dataclasses.dataclass

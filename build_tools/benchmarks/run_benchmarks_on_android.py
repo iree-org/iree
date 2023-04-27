@@ -39,14 +39,17 @@ import atexit
 import subprocess
 import tarfile
 import shutil
+import json
 
 from typing import Any, Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_definition import (
-    DriverInfo, execute_cmd, execute_cmd_and_get_output, get_git_commit_hash,
-    get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start,
-    parse_and_serialize_iree_benchmark_metrics)
+from common.benchmark_definition import (DriverInfo, execute_cmd,
+                                         execute_cmd_and_get_output,
+                                         get_git_commit_hash,
+                                         get_iree_benchmark_module_arguments,
+                                         wait_for_iree_benchmark_module_start,
+                                         parse_iree_benchmark_metrics)
 from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
                                     BenchmarkSuite)
 from common.android_device_utils import (get_android_device_model,
@@ -233,10 +236,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     benchmark_stdout = adb_execute_and_get_output(cmd,
                                                   android_case_dir,
                                                   verbose=self.verbose)
-    benchmark_metrics = parse_and_serialize_iree_benchmark_metrics(
-        results_filename, benchmark_stdout)
+    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout)
     if self.verbose:
       print(benchmark_metrics)
+    results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
 
   def __run_capture(self, android_case_dir: pathlib.PurePosixPath,
                     tool_name: str, capture_filename: pathlib.Path,
