@@ -473,7 +473,7 @@ def _get_iree_memory_statistics(benchmark_stderr: str,
   for stat in ["peak", "allocated", "freed", "live"]:
     m = re.search(rf".*{device}:.*\s([0-9]+)B {stat}", benchmark_stderr)
     if m is None:
-      raise ValueError(f"Failed to find '{stat}' stat for device '{device}' in "
+      raise ValueError(f"Failed to find stat '{stat}' for device '{device}' in "
                        f"iree-benchmark-module stderr:\n{benchmark_stderr}")
     statistics[stat] = int(m.group(1))
   return BenchmarkMemory.from_json_object(statistics)
