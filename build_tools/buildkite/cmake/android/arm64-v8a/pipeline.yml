@@ -25,7 +25,7 @@ steps:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error"
+      - 'ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error --label-exclude "^requires-gpu-nvidia$"'
     agents:
       - "android-soc=google-tensor"
       - "queue=test-android"
@@ -57,7 +57,7 @@ steps:
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error"
+      - 'ctest -j 4 --test-dir build-android/ --timeout 900 --output-on-failure --no-tests=error --label-exclude "^requires-gpu-nvidia$"'
     agents:
       - "android-soc=snapdragon-8gen1"
       - "queue=test-android"
