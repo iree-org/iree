@@ -411,9 +411,68 @@ hal.executable private @mmt4d_ukernel {
     }
   }
 }
-//      CHECK: func.func private @[[UKERNELFUNC:.+]](
-// CHECK-SAME:     hal.import.static = true
-// CHECK-SAME:     llvm.bareptr
-// CHECK-SAME:     vm.import.module = "vmvx"
-//      CHECK: func @ukernel_dispatch()
-//      CHECK:   func.call @[[UKERNELFUNC]]
+// CHECK-LABEL: func @ukernel_dispatch()
+//       CHECK:   iree_codegen.ukernel.generic "vmvx.mmt4d"
+
+// -----
+
+hal.executable private @ukernel_pass_through {
+  hal.executable.variant public @embedded_elf_x86_64, target = <
+    "llvm-cpu", "embedded-elf-x86_64", {
+      cpu = "generic", cpu_features = "", 
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", 
+      native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf",
+      ukernels = false}> {
+    hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<
+      push_constants = 2, sets = [
+        <0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>,
+                        <2, storage_buffer>]>]>)
+        attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+      hal.return %arg1, %arg2, %arg2 : index, index, index
+    }
+    builtin.module {
+      func.func @dispatch() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = arith.index_castui %0 : i32 to index
+        %3 = arith.index_castui %1 : i32 to index
+        %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%2}
+        %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%3}
+        %6 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<?xf32>>{%2}
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %7 = affine.min affine_map<()[s0, s1, s2] -> (s0 - s1 * (s0 ceildiv s2), s0 ceildiv s2)>()[%2, %workgroup_id_x, %workgroup_count_x]
+        %8 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * (s1 ceildiv s2))>()[%workgroup_id_x, %2, %workgroup_count_x]
+        %9 = flow.dispatch.tensor.load %4, offsets = [%8], sizes = [%7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%2} -> tensor<?xf32>
+        %10 = flow.dispatch.tensor.load %5, offsets = [%8], sizes = [%7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%3} -> tensor<?xf32>
+        %11 = tensor.empty(%7) : tensor<?xf32>
+        %12 = iree_codegen.ukernel.generic "simple_mul_workgroup" ins(%9, %10 : tensor<?xf32>, tensor<?xf32>) outs(%11 : tensor<?xf32>) (%7 : index) -> tensor<?xf32>
+        flow.dispatch.tensor.store %12, %6, offsets = [%8], sizes = [%7], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<readwrite:tensor<?xf32>>{%2}
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: hal.executable private @ukernel_pass_through
+//       CHECK:   hal.executable.export public @dispatch
+//  CHECK-NEXT:       %[[ARG1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:       %[[ARG2:[a-zA-Z0-9]+]]: index
+//       CHECK:     hal.return %[[ARG1]], %[[ARG2]], %[[ARG2]]
+//       CHECK:   func @dispatch
+//       CHECK:     %[[INPUT0:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//  CHECK-SAME:         memref<?xf32>
+//       CHECK:     %[[INPUT1:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//  CHECK-SAME:         memref<?xf32>
+//       CHECK:     %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
+//  CHECK-SAME:         memref<?xf32>
+//   CHECK-DAG:     %[[OFFSET:.+]] = affine.apply
+//   CHECK-DAG:     %[[SIZE:.+]] = affine.min
+//   CHECK-DAG:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[OUTPUT]][%[[OFFSET]]] [%[[SIZE]]]
+//   CHECK-DAG:     %[[SUBVIEW_INPUT0:.+]] = memref.subview %[[INPUT0]][%[[OFFSET]]] [%[[SIZE]]]
+//   CHECK-DAG:     %[[SUBVIEW_INPUT1:.+]] = memref.subview %[[INPUT1]][%[[OFFSET]]] [%[[SIZE]]]
+//       CHECK:     iree_codegen.ukernel.generic "simple_mul_workgroup"
+//  CHECK-SAME:         ins(%[[SUBVIEW_INPUT0]], %[[SUBVIEW_INPUT1]]
+//  CHECK-SAME:         outs(%[[SUBVIEW_OUTPUT]]
+

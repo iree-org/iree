@@ -47,6 +47,21 @@ iree_lit_test_suite(
     "hostonly"
 )
 
+iree_lit_test_suite(
+  NAME
+    system_ukernel
+  SRCS
+    "system_ukernel.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_system_plugin
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
 endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 
 # embedded-elf plugin mechanism for standalone portable ELFs.
@@ -154,6 +169,22 @@ iree_lit_test_suite(
     standalone_example
   SRCS
     "standalone_example.mlir"
+  DATA
+    standalone_plugin.sos
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
+iree_lit_test_suite(
+  NAME
+    standalone_ukernel
+  SRCS
+    "standalone_ukernel.mlir"
   DATA
     standalone_plugin.sos
   TOOLS

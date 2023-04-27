@@ -76,8 +76,7 @@ static LogicalResult getTileAndDistributeConfig(
     }
   }
   if (!rootOp) {
-    // Just return. All the in-out vectors are empty that should default
-    // the number of workgroups to {1, 1, 1}
+    // THere is no lowering configuration. Return `null`.
     dispatchRootOp = nullptr;
     return success();
   }
@@ -326,7 +325,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
     IRRewriter rewriter(context);
     // If there are no compute ops, nothing more to do.
-    if (computeOps.empty()) {
+    if (!dispatchRootOp || computeOps.empty()) {
       if (failed(lowerWorkgroupCount(
               rewriter, funcOp,
               /*workgroupCountVals =*/ArrayRef<OpFoldResult>{},

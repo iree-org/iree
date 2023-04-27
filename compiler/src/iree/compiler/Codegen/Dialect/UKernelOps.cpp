@@ -61,7 +61,6 @@ static FailureOr<func::CallOp> createFunctionCall(RewriterBase &rewriter,
     // should be made more controllable based on the backend.
     fnDecl->setAttr("vm.import.module", rewriter.getStringAttr("vmvx"));
     fnDecl->setAttr("llvm.bareptr", rewriter.getBoolAttr(true));
-    fnDecl->setAttr("hal.import.static", rewriter.getBoolAttr(true));
   } else if (fnDecl.getFunctionType() != functionType) {
     return rewriter.notifyMatchFailure(
         op, llvm::formatv("mismatch in function type computed during lowering "

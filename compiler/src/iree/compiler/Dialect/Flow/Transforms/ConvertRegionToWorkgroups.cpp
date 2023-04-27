@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
@@ -149,6 +150,9 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     rewriter.inlineRegionBefore(regionOp.getWorkgroupCount(),
                                 workgroupsOp.getWorkgroupCount(),
                                 workgroupsOp.getWorkgroupCount().begin());
+    mlir::makeRegionIsolatedFromAbove(
+        rewriter, workgroupsOp.getWorkgroupCount(),
+        [](Operation *op) { return isa<arith::ConstantOp>(op); });
   }
 
   IRMapping bvm;

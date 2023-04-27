@@ -574,9 +574,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 
   addBufferizePasses(nestedModulePM);
 
-  if (enableMicrokernels) {
-    nestedModulePM.addPass(createLowerUKernelOpsToCallsPass());
-  } else {
+  if (!enableMicrokernels) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUMmt4dVectorLoweringPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -606,13 +604,6 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);
-  if (clEnablePadConsumerFusion) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createFuseTensorPadWithConsumerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createConcretizePadResultShapePass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
-  }
 }
 
 void addTransformDialectPasses(OpPassManager &passManager) {
@@ -630,6 +621,9 @@ void addTransformDialectPasses(OpPassManager &passManager) {
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
+  // Lower `ukernel.*` ops to function calls
+  passManager.addPass(createLowerUKernelOpsToCallsPass());
+
   // LinalgExt -> SCF
   passManager.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createLinalgExtToLoopsPass());
