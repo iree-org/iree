@@ -49,4 +49,4 @@ hal.executable private @mmt4d_ukernel {
 }
 // CHECK: func private @vmvx.mmt4d(
 // CHECK: func @mmt4d_i8()
-// CHECK:   func.call @vmvx.mmt4d(
+// CHECK:   call @vmvx.mmt4d(

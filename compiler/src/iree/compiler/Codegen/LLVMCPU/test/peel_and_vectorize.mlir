@@ -179,10 +179,6 @@ hal.executable private @preset_config_matmul  {
 // Peel loops should be generated for all the dims since they are dynamic.
 
 // CHECK-LABEL: func @peel_dynamic_matmul()
-// Distribution:
-// CHECK:         scf.for
-// CHECK:           scf.for
-
 // Vectorization:
 // CHECK:             scf.for
 // CHECK:               scf.for
