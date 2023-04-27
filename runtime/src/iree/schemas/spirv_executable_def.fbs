@@ -10,6 +10,12 @@ namespace iree;
 file_identifier "SPVE";
 file_extension "spve";
 
+// Source code location denoted by a file name and line within that file.
+table SpirVFileLineLocDef {
+  filename:string;
+  line:int32;
+}
+
 // A SPIR-V shader module and runtime pipeline layout description.
 // This information is used to create the VkShaderModule, VkPipelineLayout, and
 // any required VkDescriptorSetLayouts.
@@ -22,6 +28,11 @@ table SpirVExecutableDef {
 
   // SPIR-V code words.
   code:[uint32];
+
+  // A map of entry point ordinals to source locations.
+  // This information is optional and may be used by debuggers and profilers to
+  // associate executable entry points with the source that generated them.
+  source_locations:[SpirVFileLineLocDef];
 }
 
 root_type SpirVExecutableDef;
