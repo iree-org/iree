@@ -60,7 +60,7 @@ def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
   # TODO(#11703): Should use --first-parent here. See issue for the required
   # work.
-  count = benchmark_definition.execute_cmd_and_get_output(
+  count = benchmark_definition.execute_cmd_and_get_stdout(
       ['git', 'rev-list', '--count', commit],
       cwd=THIS_DIRECTORY,
       verbose=verbose)
@@ -115,7 +115,7 @@ def _find_comparable_benchmark_results(
       "git", "rev-list", "--first-parent",
       f"--max-count={MAX_BASE_COMMIT_QUERY_COUNT}", start_commit
   ]
-  output = benchmark_definition.execute_cmd_and_get_output(cmds,
+  output = benchmark_definition.execute_cmd_and_get_stdout(cmds,
                                                            cwd=THIS_DIRECTORY,
                                                            verbose=verbose)
   previous_commits = output.splitlines()
@@ -134,14 +134,14 @@ def _find_comparable_benchmark_results(
 
 def _get_git_commit_hash(ref: str, verbose: bool = False) -> str:
   """Gets the commit hash for the given commit."""
-  return benchmark_definition.execute_cmd_and_get_output(
+  return benchmark_definition.execute_cmd_and_get_stdout(
       ['git', 'rev-parse', ref], cwd=THIS_DIRECTORY, verbose=verbose)
 
 
 def _get_git_merge_base_commit(pr_commit: str,
                                target_branch: str,
                                verbose: bool = False) -> str:
-  return benchmark_definition.execute_cmd_and_get_output(
+  return benchmark_definition.execute_cmd_and_get_stdout(
       args=["git", "merge-base", target_branch, pr_commit],
       cwd=THIS_DIRECTORY,
       verbose=verbose)

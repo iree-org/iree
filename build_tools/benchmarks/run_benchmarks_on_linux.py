@@ -115,9 +115,10 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
               driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
-    benchmark_stdout = execute_cmd_and_get_output(
+    benchmark_stdout, benchmark_stderr = execute_cmd_and_get_output(
         cmd, cwd=benchmark_case.benchmark_case_dir, verbose=self.verbose)
-    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout)
+    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout,
+                                                     benchmark_stderr)
     if self.verbose:
       print(benchmark_metrics)
     results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
