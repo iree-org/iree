@@ -43,6 +43,8 @@ from typing import Iterable, List, Mapping, Sequence, Tuple
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
 BENCHMARK_PRESET_KEY = "benchmarks"
+# Trailer to prevent benchmarks from always running on LLVM integration PRs.
+SKIP_LLVM_INTEGRATE_BENCHMARK_KEY = "skip-llvm-integrate-benchmark"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
 # patterns because they don't treat '/' specially. The standard library doesn't
@@ -256,21 +258,28 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
   """Parses and validates the benchmark presets from trailers.
 
   Args:
-    is_pr: is pull request event.
     trailers: trailers from PR description.
     labels: list of PR labels.
+    is_pr: is pull request event.
+    is_llvm_integrate_pr: is LLVM integration PR.
 
   Returns:
     A comma separated preset string, which later will be parsed by
     build_tools/benchmarks/export_benchmark_config.py.
   """
+
+  skip_llvm_integrate_benchmark = SKIP_LLVM_INTEGRATE_BENCHMARK_KEY in trailers
+  if skip_llvm_integrate_benchmark:
+    print("Skipping default benchmarking on LLVM integration because PR "
+          f"description has '{SKIP_LLVM_INTEGRATE_BENCHMARK_KEY}' trailer.")
+
   if not is_pr:
     preset_options = ["all"]
     print(f"Using benchmark preset 'all' for non-PR run")
-  elif is_llvm_integrate_pr:
-    # Always run all benchmark presets for LLVM integration PRs.
+  elif is_llvm_integrate_pr and not skip_llvm_integrate_benchmark:
+    # Run all benchmark presets for LLVM integration PRs.
     preset_options = ["all"]
-    print(f"Using benchmark preset 'all' for LLVM integrate PR")
+    print("Using benchmark preset 'all' for LLVM integration PR")
   else:
     preset_options = set(
         label.split(":", maxsplit=1)[1]
