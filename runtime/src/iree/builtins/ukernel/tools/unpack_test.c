@@ -208,5 +208,5 @@ int main(int argc, char** argv) {
   iree_uk_test_unpack(IREE_UK_FLAG_UNPACK_TYPE_I32I32, 16, 16, "avx512_base");
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
-  return EXIT_SUCCESS;  // failures are fatal
+  return iree_uk_test_exit_status();
 }

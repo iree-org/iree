@@ -69,5 +69,5 @@ static void iree_uk_test_make_cpu_data_for_features(iree_uk_test_t* test,
 int main(int argc, char** argv) {
   iree_uk_test("make_cpu_data_for_features",
                iree_uk_test_make_cpu_data_for_features, NULL, "");
-  return EXIT_SUCCESS;  // failures are fatal
+  return iree_uk_test_exit_status();
 }

@@ -236,5 +236,5 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_vnni");
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
-  return EXIT_SUCCESS;  // failures are fatal
+  return iree_uk_test_exit_status();
 }
