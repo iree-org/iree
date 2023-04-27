@@ -104,11 +104,11 @@ iree_hal_webgpu_simple_allocator_query_buffer_compatibility(
 
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
-    if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+    if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
     }
-    if (iree_all_bits_set(params->usage,
-                          IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
+    if (iree_any_bit_set(params->usage,
+                         IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }
@@ -149,18 +149,20 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
     usage_flags |= WGPUBufferUsage_CopyDst;
   }
   if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
-    // If a buffer usage contains WGPUBufferUsage_MapWrite the only other
-    // allowed usage is WGPUBufferUsage_CopySrc.
+    // Requirements from https://gpuweb.github.io/gpuweb/#buffer-usage:
+    //   * MAP_WRITE can only be combined with COPY_SRC
+    //   * MAP_READ  can only be combined with COPY_DST
+    //
     // We don't have copy source/dest modeled in IREE's HAL (yet) so for now
     // we only enable mapping if transfer is set and hope it's not a copy dest.
+    // For now, any copy dest buffers (such as for readback) must be allocated
+    // externally.
     // DO NOT SUBMIT
     if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER) &&
         !iree_any_bit_set(params->usage,
                           IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
-      usage_flags |= WGPUBufferUsage_MapRead;
-      // usage_flags |= WGPUBufferUsage_MapWrite;
-      // Clear CopySrc
-      usage_flags &= ~(WGPUBufferUsage_CopySrc);
+      usage_flags |= WGPUBufferUsage_MapWrite;
+      usage_flags &= ~(WGPUBufferUsage_CopyDst);  // Clear CopyDst
     }
   }
   if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
