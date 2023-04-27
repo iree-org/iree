@@ -14,7 +14,9 @@ import unittest
 from common import benchmark_config
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_definition import IREE_DRIVERS_INFOS, DeviceInfo, PlatformType
+from common.benchmark_definition import (IREE_DRIVERS_INFOS, DeviceInfo,
+                                         PlatformType, BenchmarkLatency,
+                                         BenchmarkMetrics)
 
 
 class FakeBenchmarkDriver(BenchmarkDriver):
@@ -37,11 +39,13 @@ class FakeBenchmarkDriver(BenchmarkDriver):
     self.run_benchmark_cases.append(benchmark_case)
 
     if benchmark_results_filename:
+      fake_benchmark_metrics = BenchmarkMetrics(
+          real_time=BenchmarkLatency(0, 0, 0, "ns"),
+          cpu_time=BenchmarkLatency(0, 0, 0, "ns"),
+          raw_data={},
+      )
       benchmark_results_filename.write_text(
-          json.dumps({
-              "context": "fake_context",
-              "benchmarks": [],
-          }))
+          json.dumps(fake_benchmark_metrics.to_json_object()))
     if capture_filename:
       capture_filename.write_text("{}")
 
@@ -112,8 +116,8 @@ class BenchmarkDriverTest(unittest.TestCase):
 
     self.assertEqual(driver.get_benchmark_results().commit, "abcd")
     self.assertEqual(len(driver.get_benchmark_results().benchmarks), 2)
-    self.assertEqual(driver.get_benchmark_results().benchmarks[0].context,
-                     "fake_context")
+    self.assertEqual(
+        driver.get_benchmark_results().benchmarks[0].metrics.raw_data, {})
     self.assertEqual(driver.get_benchmark_result_filenames(), [
         self.benchmark_results_dir /
         "DeepNet (TFLite) 1-thread,full-inference with IREE-LLVM-CPU @ Unknown (CPU-ARMv8-A).json",

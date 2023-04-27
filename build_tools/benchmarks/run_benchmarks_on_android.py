@@ -39,6 +39,7 @@ import atexit
 import subprocess
 import tarfile
 import shutil
+import json
 
 from typing import Any, Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
@@ -47,7 +48,8 @@ from common.benchmark_definition import (DriverInfo, execute_cmd,
                                          execute_cmd_and_get_output,
                                          get_git_commit_hash,
                                          get_iree_benchmark_module_arguments,
-                                         wait_for_iree_benchmark_module_start)
+                                         wait_for_iree_benchmark_module_start,
+                                         parse_iree_benchmark_metrics)
 from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
                                     BenchmarkSuite)
 from common.android_device_utils import (get_android_device_model,
@@ -231,21 +233,13 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
               driver_info=driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
-    result_json = adb_execute_and_get_output(cmd,
-                                             android_case_dir,
-                                             verbose=self.verbose)
-
-    # Pull the result file back onto the host and set the filename for later
-    # return.
-    pull_cmd = [
-        "adb", "pull",
-        ANDROID_TMPDIR / android_case_dir / results_filename.name,
-        results_filename
-    ]
-    execute_cmd_and_get_output(pull_cmd, verbose=self.verbose)
-
+    benchmark_stdout = adb_execute_and_get_output(cmd,
+                                                  android_case_dir,
+                                                  verbose=self.verbose)
+    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout)
     if self.verbose:
-      print(result_json)
+      print(benchmark_metrics)
+    results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
 
   def __run_capture(self, android_case_dir: pathlib.PurePosixPath,
                     tool_name: str, capture_filename: pathlib.Path,
@@ -394,7 +388,7 @@ def main(args):
     print(benchmark_results.benchmarks)
 
   if trace_capture_config:
-    # Put all captures in a tarball and remove the origial files.
+    # Put all captures in a tarball and remove the original files.
     with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
       for capture_filename in benchmark_driver.get_capture_filenames():
         tar.add(capture_filename)

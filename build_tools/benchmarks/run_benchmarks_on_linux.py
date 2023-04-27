@@ -21,9 +21,15 @@ import subprocess
 import tarfile
 
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
+from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
+                                    BenchmarkSuite)
 from common.benchmark_config import BenchmarkConfig
-from common.benchmark_definition import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash, get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
+from common.benchmark_definition import (execute_cmd,
+                                         execute_cmd_and_get_output,
+                                         get_git_commit_hash,
+                                         get_iree_benchmark_module_arguments,
+                                         wait_for_iree_benchmark_module_start,
+                                         parse_iree_benchmark_metrics)
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_framework.definitions import iree_definitions
 from e2e_test_framework import serialization
@@ -109,10 +115,12 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
               driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
-    result_json = execute_cmd_and_get_output(
+    benchmark_stdout = execute_cmd_and_get_output(
         cmd, cwd=benchmark_case.benchmark_case_dir, verbose=self.verbose)
+    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout)
     if self.verbose:
-      print(result_json)
+      print(benchmark_metrics)
+    results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
 
   def __run_capture(self, benchmark_case: BenchmarkCase,
                     capture_filename: pathlib.Path):
@@ -120,7 +128,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     if capture_config is None:
       raise ValueError("capture_config can't be None.")
 
-    tool_path = capture_config.traced_benchmark_tool_dir / benchmark_case.benchmark_tool_name
+    tool_path = (capture_config.traced_benchmark_tool_dir /
+                 benchmark_case.benchmark_tool_name)
     cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
                                  tool_path=tool_path)
     process = subprocess.Popen(cmd,
@@ -189,7 +198,7 @@ def main(args):
 
   trace_capture_config = benchmark_config.trace_capture_config
   if trace_capture_config:
-    # Put all captures in a tarball and remove the origial files.
+    # Put all captures in a tarball and remove the original files.
     with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
       for capture_filename in benchmark_driver.get_capture_filenames():
         tar.add(capture_filename)

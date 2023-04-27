@@ -15,9 +15,9 @@ import pathlib
 import re
 import subprocess
 
-from dataclasses import dataclass
+import dataclasses
 from enum import Enum
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # A map from CPU ABI to IREE's benchmark target architecture.
 CPU_ABI_TO_TARGET_ARCH_MAP = {
@@ -43,7 +43,7 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
 CANONICAL_MICROARCHITECTURE_NAMES = {"CascadeLake", "Zen2"}
 
 
-@dataclass
+@dataclasses.dataclass
 class DriverInfo:
   """An object describing a IREE HAL driver.
 
@@ -176,7 +176,7 @@ class PlatformType(Enum):
   LINUX = "Linux"
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class DeviceInfo:
   """An object describing a device.
 
@@ -284,7 +284,7 @@ class DeviceInfo:
     return rev
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class BenchmarkInfo:
   """An object describing the current benchmark.
 
@@ -389,33 +389,122 @@ class BenchmarkInfo:
                          run_config_id=json_object.get("run_config_id"))
 
 
-@dataclass
-class BenchmarkRun(object):
-  """An object describing a single run of the benchmark binary.
+@dataclasses.dataclass(frozen=True)
+class BenchmarkLatency:
+  """Stores latency statistics for a benchmark run."""
+  mean: int
+  median: int
+  stddev: int
+  unit: str
 
-  - benchmark_info: a BenchmarkInfo object describing the benchmark setup.
-  - context: the benchmark context returned by the benchmarking framework.
-  - results: the benchmark results returned by the benchmarking framework.
+  def to_json_object(self) -> Dict[str, Any]:
+    return dataclasses.asdict(self)
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return BenchmarkLatency(**json_object)
+
+
+def _get_google_benchmark_latencies(
+    benchmark_json: Dict[str,
+                         Any]) -> Tuple[BenchmarkLatency, BenchmarkLatency]:
+  """Returns the Google Benchmark aggregate latencies.
+
+    Args:
+      benchmark_json: The JSON string or object returned by Google Benchmark.
+
+    Returns:
+      Real time and CPU time BenchmarkLatency.
+    """
+  real_time_object = dict(unit="ns")
+  cpu_time_object = dict(unit="ns")
+  metrics = ["mean", "median", "stddev"]
+  for case in benchmark_json["benchmarks"]:
+    if any(case["name"].endswith(f"real_time_{m}") for m in metrics):
+      if case["time_unit"] != "ns":
+        raise ValueError(f"Expected ns as time unit")
+      metric = case["name"].split("_")[-1]
+      real_time_object[metric] = int(round(case["real_time"]))
+      cpu_time_object[metric] = int(round(case["cpu_time"]))
+
+  # from_json_object implicitly validates that all metrics were found.
+  real_time = BenchmarkLatency.from_json_object(real_time_object)
+  cpu_time = BenchmarkLatency.from_json_object(cpu_time_object)
+  return real_time, cpu_time
+
+
+@dataclasses.dataclass(frozen=True)
+class BenchmarkMetrics(object):
+  """An object describing the results from a single benchmark.
+
+  - real_time: the real time latency statistics returned by the benchmarking
+      framework.
+  - cpu_time: the cpu time latency statistics returned by the benchmarking
+      framework.
+  - raw_data: additional JSON-compatible raw results returned by the
+      benchmarking framework.
   """
-  benchmark_info: BenchmarkInfo
-  context: Dict[str, Any]
-  results: Sequence[Dict[str, Any]]
+  real_time: BenchmarkLatency
+  cpu_time: BenchmarkLatency
+  raw_data: Dict[str, Any]
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
-        "benchmark_info": self.benchmark_info.to_json_object(),
-        "context": self.context,
-        "results": self.results,
+        "real_time": self.real_time.to_json_object(),
+        "cpu_time": self.cpu_time.to_json_object(),
+        "raw_data": self.raw_data,
     }
 
-  def to_json_str(self) -> str:
-    return json.dumps(self.to_json_object())
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return BenchmarkMetrics(
+        BenchmarkLatency.from_json_object(json_object["real_time"]),
+        BenchmarkLatency.from_json_object(json_object["cpu_time"]),
+        json_object["raw_data"],
+    )
+
+
+def parse_iree_benchmark_metrics(benchmark_stdout: str) -> BenchmarkMetrics:
+  """Extract benchmark metrics from the output of iree-benchmark-module.
+
+  Args:
+    benchmark_stdout: The stdout of iree-benchmark-module with
+      --benchmark_format=json.
+
+  Returns:
+    A populated BenchmarkMetrics dataclass.
+  """
+  iree_benchmark_json = json.loads(benchmark_stdout)
+  real_time, cpu_time = _get_google_benchmark_latencies(iree_benchmark_json)
+  return BenchmarkMetrics(
+      real_time=real_time,
+      cpu_time=cpu_time,
+      raw_data=iree_benchmark_json,
+  )
+
+
+@dataclasses.dataclass(frozen=True)
+class BenchmarkRun(object):
+  """An object describing a single run of the benchmark binary.
+
+  - info: a BenchmarkInfo object describing the benchmark setup.
+  - metrics: a BenchmarkMetrics object containing the results of the benchmark.
+  """
+  info: BenchmarkInfo
+  metrics: BenchmarkMetrics
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "info": self.info.to_json_object(),
+        "metrics": self.metrics.to_json_object(),
+    }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkRun(
-        BenchmarkInfo.from_json_object(json_object["benchmark_info"]),
-        json_object["context"], json_object["results"])
+        BenchmarkInfo.from_json_object(json_object["info"]),
+        BenchmarkMetrics.from_json_object(json_object["metrics"]),
+    )
 
 
 class BenchmarkResults(object):
@@ -427,8 +516,8 @@ class BenchmarkResults(object):
     """
 
   def __init__(self):
-    self.commit = "<unknown>"
-    self.benchmarks = []
+    self.commit: str = "<unknown>"
+    self.benchmarks: List[BenchmarkRun] = []
 
   def set_commit(self, commit: str):
     self.commit = commit
@@ -437,27 +526,6 @@ class BenchmarkResults(object):
     if self.commit != other.commit:
       raise ValueError("Inconsistent pull request commit")
     self.benchmarks.extend(other.benchmarks)
-
-  def get_aggregate_time(self, benchmark_index: int, kind: str) -> int:
-    """Returns the Google Benchmark aggreate time for the given kind.
-
-      Args:
-      - benchmark_index: the benchmark's index.
-      - kind: what kind of aggregate time to get; choices:
-        'mean', 'median', 'stddev'.
-      Returns:
-        Time in nanoseconds.
-      """
-    time = None
-    for bench_case in self.benchmarks[benchmark_index].results:
-      if bench_case["name"].endswith(f"real_time_{kind}"):
-        if bench_case["time_unit"] != "ns":
-          raise ValueError(f"Expected ns as time unit")
-        time = int(round(bench_case["real_time"]))
-        break
-    if time is None:
-      raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
-    return time
 
   def to_json_str(self) -> str:
     json_object = {"commit": self.commit, "benchmarks": []}
@@ -475,7 +543,7 @@ class BenchmarkResults(object):
     return results
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationInfo(object):
   name: str
   model_name: str
@@ -525,7 +593,7 @@ class CompilationInfo(object):
                            gen_config_id=json_object.get("gen_config_id"))
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class ModuleComponentSizes(object):
   file_bytes: int
   vm_component_bytes: int
@@ -537,7 +605,7 @@ class ModuleComponentSizes(object):
     return ModuleComponentSizes(**json_object)
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationStatistics(object):
   compilation_info: CompilationInfo
   # Module file and component sizes.
@@ -555,7 +623,7 @@ class CompilationStatistics(object):
         compilation_time_ms=json_object["compilation_time_ms"])
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationResults(object):
   commit: str
   compilation_statistics: Sequence[CompilationStatistics]
