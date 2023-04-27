@@ -49,7 +49,7 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_create(
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is a deferred command buffer.
-bool iree_hal_deferred_command_buffer_isa(
+IREE_API_EXPORT bool iree_hal_deferred_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer);
 
 // Replays a recorded |command_buffer| against a |target_command_buffer|.

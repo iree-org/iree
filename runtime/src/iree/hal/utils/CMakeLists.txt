@@ -131,6 +131,21 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    mpi_channel_provider
+  HDRS
+    "mpi_channel_provider.h"
+  SRCS
+    "mpi_channel_provider.c"
+  DEPS
+    ::libmpi
+    iree::base
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     resource_set
   HDRS
     "resource_set.h"

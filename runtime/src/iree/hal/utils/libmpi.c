@@ -8,15 +8,10 @@
 
 #include "iree/base/tracing.h"
 
-static const char* kMPILoaderSearchNames[] = {
-#if defined(IREE_PLATFORM_WINDOWS)
-    "mpi.dll",
-#else
-    "libmpi.so",
-#endif  // IREE_PLATFORM_WINDOWS
-};
+//===----------------------------------------------------------------------===//
+// Dynamic symbol table
+//===----------------------------------------------------------------------===//
 
-// Load MPI entry points.
 static iree_status_t iree_hal_mpi_dynamic_symbols_resolve_all(
     iree_dynamic_library_t* library, iree_hal_mpi_dynamic_symbols_t* syms) {
 #define MPI_PFN_DECL(mpiSymbolName, ...)                     \
@@ -30,42 +25,57 @@ static iree_status_t iree_hal_mpi_dynamic_symbols_resolve_all(
   return iree_ok_status();
 }
 
-// Load the dynamic library and the symbols
 iree_status_t iree_hal_mpi_library_load(
     iree_allocator_t host_allocator, iree_dynamic_library_t** out_library,
-    iree_hal_mpi_dynamic_symbols_t** out_syms) {
+    iree_hal_mpi_dynamic_symbols_t* out_syms) {
+  IREE_ASSERT_ARGUMENT(out_library);
+  IREE_ASSERT_ARGUMENT(out_syms);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_library = NULL;
-  *out_syms = NULL;
+  memset(out_syms, 0, sizeof(*out_syms));
+
+  static const char* kMPILoaderSearchNames[] = {
+#if defined(IREE_PLATFORM_WINDOWS)
+    "msmpi.dll",
+#else
+    "libmpi.so",
+#endif  // IREE_PLATFORM_WINDOWS
+  };
+
+  // Try to find and load the library. Will fail if the library is not found (in
+  // which case we want to report that specially) or with some other error
+  // (symbol conflicts, missing deps, etc).
+  iree_dynamic_library_t* library = NULL;
   iree_status_t status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(kMPILoaderSearchNames), kMPILoaderSearchNames,
-      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, out_library);
+      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &library);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "MPI runtime library not available; ensure "
-                            "installed and on path");
+    status = iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "MPI runtime library not available; ensure installed and the shared "
+        "library is on your PATH/LD_LIBRARY_PATH (msmpi.dll/libmpi.so)");
   }
+
+  // Resolve required symbols. Will fail if any required symbol is missing.
   if (iree_status_is_ok(status)) {
-    iree_hal_mpi_dynamic_symbols_t* syms = NULL;
-    status =
-        iree_allocator_malloc(host_allocator, sizeof(*syms), (void**)&syms);
-    if (iree_status_is_ok(status)) {
-      status = iree_hal_mpi_dynamic_symbols_resolve_all(*out_library, syms);
-      *out_syms = syms;
-    }
+    status = iree_hal_mpi_dynamic_symbols_resolve_all(library, out_syms);
   }
-  if (!iree_status_is_ok(status)) {
-    iree_dynamic_library_release(*out_library);
-    memset(*out_syms, 0, sizeof(**out_syms));
+
+  if (iree_status_is_ok(status)) {
+    *out_library = library;
+  } else {
+    memset(out_syms, 0, sizeof(*out_syms));
+    iree_dynamic_library_release(library);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-// convert an MPI_Status result to an iree_status_t
-//
+//===----------------------------------------------------------------------===//
+// Error handling utilities
+//===----------------------------------------------------------------------===//
+
 // We convert MPI_SUCCESS to IREE_STATUS_SUCCESS, and MPI errors to
 // IREE_STATUS_INTERNAL and print the MPI error code.
 //

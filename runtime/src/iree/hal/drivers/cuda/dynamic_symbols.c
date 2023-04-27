@@ -104,41 +104,45 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
 iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
     iree_allocator_t host_allocator,
     iree_hal_cuda_dynamic_symbols_t* out_syms) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
+  IREE_ASSERT_ARGUMENT(out_syms);
   if (!out_syms->cuda_library) {
-    iree_status_t status =
-        iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                         "CUDA dynamic symbols are not loaded first");
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, status, "iree_hal_cuda_nccl_dynamic_symbols_initialize");
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "CUDA dynamic symbols must be loaded prior to loading NCCL");
   }
 
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // TODO: rework this file - these functions are not safe as they mutate
+  // each other's state in hard to follow ways.
+  IREE_ASSERT(!out_syms->nccl_library);
   out_syms->nccl_library = NULL;
+
+  // Attempt to load the NCCL shared library.
   iree_status_t status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(kNCCLLoaderSearchNames), kNCCLLoaderSearchNames,
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->nccl_library);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "NCCL runtime library not available; ensure "
-                            "installed and on path");
+    status = iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "NCCL runtime library not available; ensure installed and the "
+        "shared library is on your PATH/LD_LIBRARY_PATH (nccl.dll/libnccl.so)");
   }
+
+  // Resolve all symbols; this will fail if any required symbols are missing.
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_nccl_dynamic_symbols_resolve_all(out_syms);
   }
 
   // Check the NCCL version compatibility
   int nccl_version = 0;
-
   if (iree_status_is_ok(status)) {
     status = NCCL_RESULT_TO_STATUS(out_syms, ncclGetVersion(&nccl_version));
   }
-
   if (iree_status_is_ok(status)) {
-    int major, minor;
-
+    int major = 0;
+    int minor = 0;
     if (nccl_version < 20000) {
       major = nccl_version / 1000;
       minor = (nccl_version % 1000) / 100;
@@ -146,10 +150,9 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
       major = nccl_version / 10000;
       minor = (nccl_version % 10000) / 100;
     }
-
     if (nccl_version < NCCL_VERSION(NCCL_MAJOR, NCCL_MINOR, 0) ||
         major != NCCL_MAJOR) {
-      return iree_make_status(
+      status = iree_make_status(
           IREE_STATUS_INTERNAL,
           "NCCL version %d.%d found but at least version %d.%d is required",
           major, minor, NCCL_MAJOR, NCCL_MINOR);
@@ -157,7 +160,8 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
   }
 
   if (!iree_status_is_ok(status)) {
-    iree_hal_cuda_dynamic_symbols_deinitialize(out_syms);
+    iree_dynamic_library_release(out_syms->nccl_library);
+    out_syms->nccl_library = NULL;
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -166,11 +170,10 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
 void iree_hal_cuda_dynamic_symbols_deinitialize(
     iree_hal_cuda_dynamic_symbols_t* syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_dynamic_library_release(syms->cuda_library);
   iree_dynamic_library_release(syms->nccl_library);
-  iree_dynamic_library_release(syms->mpi_library);
-  if (syms->mpi_symbols)
-    memset(syms->mpi_symbols, 0, sizeof(*syms->mpi_symbols));
   memset(syms, 0, sizeof(*syms));
+
   IREE_TRACE_ZONE_END(z0);
 }

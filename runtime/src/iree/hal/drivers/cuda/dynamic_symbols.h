@@ -10,7 +10,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/hal/drivers/cuda/cuda_headers.h"
-#include "iree/hal/utils/libmpi.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,8 +22,6 @@ extern "C" {
 typedef struct iree_hal_cuda_dynamic_symbols_t {
   iree_dynamic_library_t* cuda_library;
   iree_dynamic_library_t* nccl_library;
-  iree_dynamic_library_t* mpi_library;
-  iree_hal_mpi_dynamic_symbols_t* mpi_symbols;
 
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
@@ -48,12 +45,6 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
 // iree_hal_cuda_dynamic_symbols_deinitialize must be used to release the
 // library resources.
 iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
-    iree_allocator_t host_allocator, iree_hal_cuda_dynamic_symbols_t* out_syms);
-
-// Initializes |out_syms| in-place with dynamically loaded MPI symbols.
-// iree_hal_cuda_dynamic_symbols_deinitialize must be used to release the
-// library resources.
-iree_status_t iree_hal_mpi_dynamic_symbols_initialize(
     iree_allocator_t host_allocator, iree_hal_cuda_dynamic_symbols_t* out_syms);
 
 // Deinitializes |syms| by unloading the backing library. All function pointers
