@@ -356,8 +356,7 @@ iree_status_t iree_dynamic_library_attach_symbols_from_file(
   // get this (such as registering a LdrDllNotification callback and snooping
   // the values during LoadLibrary or using CreateToolhelp32Snapshot), however
   // EnumerateLoadedModules is in dbghelp which we are using anyway.
-  ModuleEnumCallbackState state;
-  memset(&state, 0, sizeof(state));
+  ModuleEnumCallbackState state = {0};
   state.module_path = library->module_path;
   EnumerateLoadedModules64(GetCurrentProcess(), EnumLoadedModulesCallback,
                            &state);

@@ -754,8 +754,7 @@ void iree_task_dispatch_shard_execute(
   // We perform all our shard statistics work locally here and only push back to
   // the dispatch at the end; this avoids contention from each shard trying to
   // update the statistics together.
-  iree_task_dispatch_statistics_t shard_statistics;
-  memset(&shard_statistics, 0, sizeof(shard_statistics));
+  iree_task_dispatch_statistics_t shard_statistics = {0};
   tile_context.statistics = &shard_statistics;
 
   // Hint as to which processor we are running on.

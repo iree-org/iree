@@ -214,8 +214,7 @@ py::str HalBufferView::Repr() {
 //------------------------------------------------------------------------------
 
 void HalDevice::BeginProfiling(const py::kwargs& kwargs) {
-  iree_hal_device_profiling_options_t options;
-  memset(&options, 0, sizeof(options));
+  iree_hal_device_profiling_options_t options = {};
 
   options.mode = IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
   if (kwargs.contains("mode")) {

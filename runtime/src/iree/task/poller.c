@@ -54,8 +54,7 @@ iree_status_t iree_task_poller_initialize(
     status = iree_wait_set_insert(out_poller->wait_set, out_poller->wake_event);
   }
 
-  iree_thread_create_params_t thread_params;
-  memset(&thread_params, 0, sizeof(thread_params));
+  iree_thread_create_params_t thread_params = {0};
   thread_params.name = iree_make_cstring_view("iree-poller");
   thread_params.create_suspended = false;
   // TODO(benvanik): make high so to reduce latency? The sooner we wake the

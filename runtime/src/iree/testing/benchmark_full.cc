@@ -97,8 +97,7 @@ static void iree_benchmark_run(const char* benchmark_name,
   IREE_TRACE_SCOPE_DYNAMIC(benchmark_name);
   IREE_TRACE_FRAME_MARK();
 
-  iree_benchmark_state_t state;
-  memset(&state, 0, sizeof(state));
+  iree_benchmark_state_t state = {};
   state.impl = &benchmark_state;
   state.host_allocator = iree_allocator_system();
 

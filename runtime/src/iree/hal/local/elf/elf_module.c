@@ -495,8 +495,7 @@ static iree_status_t iree_elf_module_verify_no_imports(
 static iree_status_t iree_elf_module_apply_relocations(
     iree_elf_module_load_state_t* load_state, iree_elf_module_t* module) {
   // Redirect to the architecture-specific handler.
-  iree_elf_relocation_state_t reloc_state;
-  memset(&reloc_state, 0, sizeof(reloc_state));
+  iree_elf_relocation_state_t reloc_state = {0};
   reloc_state.vaddr_bias = module->vaddr_bias;
   reloc_state.dyn_table = load_state->dyn_table;
   reloc_state.dyn_table_count = load_state->dyn_table_count;

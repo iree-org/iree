@@ -26,8 +26,7 @@ using iree::Status;
 
 TEST(ThreadTest, Lifetime) {
   // Default parameters:
-  iree_thread_create_params_t params;
-  memset(&params, 0, sizeof(params));
+  iree_thread_create_params_t params = {};
 
   // Our thread: do a bit of math and notify the main test thread when done.
   struct entry_data_t {
@@ -68,8 +67,7 @@ TEST(ThreadTest, Lifetime) {
 }
 
 TEST(ThreadTest, CreateSuspended) {
-  iree_thread_create_params_t params;
-  memset(&params, 0, sizeof(params));
+  iree_thread_create_params_t params = {};
   params.create_suspended = true;
 
   struct entry_data_t {
@@ -120,8 +118,7 @@ TEST(ThreadTest, CreateSuspended) {
 // the system. This is here to test the mechanics of the priority override code
 // on our side and assumes that if we tell the OS something it respects it.
 TEST(ThreadTest, PriorityOverride) {
-  iree_thread_create_params_t params;
-  memset(&params, 0, sizeof(params));
+  iree_thread_create_params_t params = {};
 
   struct entry_data_t {
     iree_atomic_int32_t value;

@@ -549,8 +549,7 @@ static iree_status_t iree_vm_bytecode_call_import(
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
                                                       import_ordinal, &import));
 
-  iree_vm_function_call_t call;
-  memset(&call, 0, sizeof(call));
+  iree_vm_function_call_t call = {0};
   call.function = import->function;
 
   // Marshal inputs from registers to the ABI arguments buffer.
@@ -586,8 +585,7 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
                                                       import_ordinal, &import));
 
-  iree_vm_function_call_t call;
-  memset(&call, 0, sizeof(call));
+  iree_vm_function_call_t call = {0};
   call.function = import->function;
 
   // Allocate ABI argument/result storage taking into account the variadic

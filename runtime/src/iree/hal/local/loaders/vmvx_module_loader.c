@@ -518,8 +518,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   // Direct call interface.
   // This only works because we know the exact signature and that these will
   // never block (if they do it'll be handled as if it's an error).
-  iree_vm_function_call_t call;
-  memset(&call, 0, sizeof(call));
+  iree_vm_function_call_t call = {0};
   call.function = entry_fn;
   call.arguments = iree_make_byte_span(&call_args, sizeof(call_args));
   call.results = iree_make_byte_span(NULL, 0);

@@ -885,8 +885,7 @@ iree_status_t iree_hal_vulkan_device_create(
                                              &physical_device_features);
 
   // Create device and its queues.
-  VkDeviceCreateInfo device_create_info;
-  memset(&device_create_info, 0, sizeof(device_create_info));
+  VkDeviceCreateInfo device_create_info = {};
   device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   device_create_info.enabledLayerCount = 0;
   device_create_info.ppEnabledLayerNames = NULL;
@@ -896,8 +895,7 @@ iree_status_t iree_hal_vulkan_device_create(
   device_create_info.pQueueCreateInfos = queue_create_info.data();
   device_create_info.pEnabledFeatures = NULL;
 
-  VkPhysicalDeviceFeatures2 features2;
-  memset(&features2, 0, sizeof(features2));
+  VkPhysicalDeviceFeatures2 features2 = {};
   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   device_create_info.pNext = &features2;
   if (physical_device_features.shaderInt64) {
@@ -914,8 +912,7 @@ iree_status_t iree_hal_vulkan_device_create(
     features2.features.robustBufferAccess = VK_TRUE;
   }
 
-  VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
-  memset(&semaphore_features, 0, sizeof(semaphore_features));
+  VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features = {};
   semaphore_features.sType =
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
   semaphore_features.pNext = features2.pNext;

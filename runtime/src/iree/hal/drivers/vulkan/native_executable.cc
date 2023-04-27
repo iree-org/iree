@@ -85,8 +85,7 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
                                                              create_info_size +
                                                              spec_map_size);
 
-  VkSpecializationInfo spec_info;
-  memset(&spec_info, 0, sizeof(spec_info));
+  VkSpecializationInfo spec_info = {};
   spec_info.mapEntryCount = executable_params->constant_count;
   spec_info.pMapEntries = spec_map_entries;
   spec_info.dataSize = executable_params->constant_count * sizeof(uint32_t);

@@ -526,8 +526,7 @@ TEST(WaitSet, WaitAnyPolling) {
   IREE_ASSERT_OK(
       iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
 
-  iree_wait_handle_t empty_handle;
-  memset(&empty_handle, 0, sizeof(empty_handle));
+  iree_wait_handle_t empty_handle = {};
 
   // Polls when empty should never block and return an empty wake handle.
   // This is so that if the caller touches the wake_handle they at least have
@@ -593,8 +592,7 @@ TEST(WaitSet, WaitAnyTimeout) {
   IREE_ASSERT_OK(
       iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
 
-  iree_wait_handle_t empty_handle;
-  memset(&empty_handle, 0, sizeof(empty_handle));
+  iree_wait_handle_t empty_handle = {};
 
   // Timeouts when empty should never block.
   iree_wait_set_clear(wait_set);

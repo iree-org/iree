@@ -52,8 +52,7 @@ iree_status_t iree_task_worker_initialize(
   iree_atomic_store_int32(&out_worker->state, initial_state,
                           iree_memory_order_release);
 
-  iree_thread_create_params_t thread_params;
-  memset(&thread_params, 0, sizeof(thread_params));
+  iree_thread_create_params_t thread_params = {0};
   thread_params.name = iree_make_cstring_view(topology_group->name);
   thread_params.create_suspended = false;
   thread_params.priority_class = IREE_THREAD_PRIORITY_CLASS_NORMAL;

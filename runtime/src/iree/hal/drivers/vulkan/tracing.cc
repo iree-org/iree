@@ -84,8 +84,7 @@ static VkCommandBuffer iree_hal_vulkan_tracing_begin_command_buffer(
     iree_hal_vulkan_tracing_context_t* context) {
   const auto& syms = context->logical_device->syms();
 
-  VkCommandBufferAllocateInfo command_buffer_info;
-  memset(&command_buffer_info, 0, sizeof(command_buffer_info));
+  VkCommandBufferAllocateInfo command_buffer_info = {};
   command_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   command_buffer_info.commandPool = *context->maintenance_command_pool;
   command_buffer_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -95,8 +94,7 @@ static VkCommandBuffer iree_hal_vulkan_tracing_begin_command_buffer(
       &command_buffer_info, &command_buffer));
   if (!command_buffer) return VK_NULL_HANDLE;
 
-  VkCommandBufferBeginInfo begin_info;
-  memset(&begin_info, 0, sizeof(begin_info));
+  VkCommandBufferBeginInfo begin_info = {};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   syms->vkBeginCommandBuffer(command_buffer, &begin_info);
@@ -112,8 +110,7 @@ static void iree_hal_vulkan_tracing_submit_command_buffer(
 
   syms->vkEndCommandBuffer(command_buffer);
 
-  VkSubmitInfo submit_info;
-  memset(&submit_info, 0, sizeof(submit_info));
+  VkSubmitInfo submit_info = {};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &command_buffer;
@@ -317,8 +314,7 @@ static void iree_hal_vulkan_tracing_prepare_query_pool(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Create a query pool with the largest query capacity it can provide.
-  VkQueryPoolCreateInfo pool_info;
-  memset(&pool_info, 0, sizeof(pool_info));
+  VkQueryPoolCreateInfo pool_info = {};
   pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
   pool_info.queryCount = IREE_HAL_VULKAN_TRACING_DEFAULT_QUERY_CAPACITY;
   pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;

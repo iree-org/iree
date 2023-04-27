@@ -68,8 +68,7 @@ static iree_status_t iree_vm_context_run_function(
     iree_vm_module_t* module, iree_string_view_t function_name) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_vm_function_call_t call;
-  memset(&call, 0, sizeof(call));
+  iree_vm_function_call_t call = {0};
   iree_status_t status = iree_vm_module_lookup_function_by_name(
       module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, &call.function);
   if (iree_status_is_not_found(status)) {
@@ -598,8 +597,7 @@ static iree_status_t iree_vm_context_call_module_notify(
     iree_vm_module_state_t* module_state, iree_vm_signal_t signal) {
   // Single i32 argument with the signal number.
   uint32_t signal_arg = (uint32_t)signal;
-  iree_vm_function_call_t call;
-  memset(&call, 0, sizeof(call));
+  iree_vm_function_call_t call = {0};
   call.arguments = iree_make_byte_span(&signal_arg, sizeof(signal_arg));
 
   // Try to find the function. Modules are not required to export it.

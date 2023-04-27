@@ -103,8 +103,7 @@ static iree_status_t RunFunction(benchmark::State& state,
   IREE_CHECK_OK(
       iree_vm_context_resolve_function(context, function_name, &function));
 
-  iree_vm_function_call_t call;
-  memset(&call, 0, sizeof(call));
+  iree_vm_function_call_t call = {};
   call.function = function;
   call.arguments =
       iree_make_byte_span(iree_alloca(i32_args.size() * sizeof(int32_t)),

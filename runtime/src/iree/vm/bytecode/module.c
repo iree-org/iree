@@ -798,8 +798,7 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
       signature_def
           ? iree_vm_FunctionSignatureDef_calling_convention(signature_def)
           : 0;
-  iree_vm_function_signature_t signature;
-  memset(&signature, 0, sizeof(signature));
+  iree_vm_function_signature_t signature = {0};
   signature.calling_convention.data = calling_convention;
   signature.calling_convention.size =
       flatbuffers_string_len(calling_convention);

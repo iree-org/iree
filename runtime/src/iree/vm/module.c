@@ -229,8 +229,7 @@ iree_vm_module_name(const iree_vm_module_t* module) {
 IREE_API_EXPORT iree_vm_module_signature_t
 iree_vm_module_signature(const iree_vm_module_t* module) {
   if (!module) {
-    iree_vm_module_signature_t empty;
-    memset(&empty, 0, sizeof(empty));
+    iree_vm_module_signature_t empty = {0};
     return empty;
   }
   return module->signature(module->self);
@@ -334,8 +333,7 @@ iree_vm_function_name(const iree_vm_function_t* function) {
 IREE_API_EXPORT iree_vm_function_signature_t
 iree_vm_function_signature(const iree_vm_function_t* function) {
   IREE_ASSERT_ARGUMENT(function);
-  iree_vm_function_signature_t signature;
-  memset(&signature, 0, sizeof(signature));
+  iree_vm_function_signature_t signature = {0};
   IREE_IGNORE_ERROR(function->module->get_function(
       function->module->self, function->linkage, function->ordinal,
       /*out_function=*/NULL,

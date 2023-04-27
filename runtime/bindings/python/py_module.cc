@@ -296,8 +296,7 @@ class PyModuleInterface {
           callable(std::move(callable)) {}
 
     iree_status_t ParseCconv() {
-      iree_vm_function_signature_t signature;
-      memset(&signature, 0, sizeof(signature));
+      iree_vm_function_signature_t signature = {};
       signature.calling_convention = {cconv.data(), cconv.size()};
       IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
           &signature, &cconv_arguments, &cconv_results));

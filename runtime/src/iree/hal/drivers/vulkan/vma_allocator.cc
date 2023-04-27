@@ -365,8 +365,7 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   allocator->device = device;
 
   const auto& syms = logical_device->syms();
-  VmaVulkanFunctions vulkan_fns;
-  memset(&vulkan_fns, 0, sizeof(vulkan_fns));
+  VmaVulkanFunctions vulkan_fns = {};
   vulkan_fns.vkGetPhysicalDeviceProperties =
       syms->vkGetPhysicalDeviceProperties;
   vulkan_fns.vkGetPhysicalDeviceMemoryProperties =
@@ -389,16 +388,14 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   vulkan_fns.vkDestroyImage = syms->vkDestroyImage;
   vulkan_fns.vkCmdCopyBuffer = syms->vkCmdCopyBuffer;
 
-  VmaDeviceMemoryCallbacks device_memory_callbacks;
-  memset(&device_memory_callbacks, 0, sizeof(device_memory_callbacks));
+  VmaDeviceMemoryCallbacks device_memory_callbacks = {};
   IREE_STATISTICS({
     device_memory_callbacks.pfnAllocate = iree_hal_vulkan_vma_allocate_callback;
     device_memory_callbacks.pfnFree = iree_hal_vulkan_vma_free_callback;
     device_memory_callbacks.pUserData = allocator;
   });
 
-  VmaAllocatorCreateInfo create_info;
-  memset(&create_info, 0, sizeof(create_info));
+  VmaAllocatorCreateInfo create_info = {};
   create_info.flags = 0;
   create_info.physicalDevice = physical_device;
   create_info.device = *logical_device;

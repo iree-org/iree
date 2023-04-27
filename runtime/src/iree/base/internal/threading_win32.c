@@ -285,8 +285,7 @@ void iree_thread_request_affinity(iree_thread_t* thread,
                                           affinity_desc_length);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-  GROUP_AFFINITY group_affinity;
-  memset(&group_affinity, 0, sizeof(group_affinity));
+  GROUP_AFFINITY group_affinity = {0};
   group_affinity.Group = affinity.group;
   KAFFINITY affinity_mask = 1ull << affinity.id;
   if (affinity.smt) {
@@ -299,8 +298,7 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   // in the scheduler alternating cores within the affinity mask; in theory it's
   // just an SMT ID change and doesn't have any impact on caches but it'd be
   // good to check.
-  PROCESSOR_NUMBER ideal_processor;
-  memset(&ideal_processor, 0, sizeof(ideal_processor));
+  PROCESSOR_NUMBER ideal_processor = {0};
   ideal_processor.Group = affinity.group;
   ideal_processor.Number = affinity.id;
   SetThreadIdealProcessorEx(thread->handle, &ideal_processor, NULL);

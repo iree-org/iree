@@ -73,8 +73,7 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldSequence) {
   uint32_t arg_value = 97;
   uint32_t ret_value = 0;
 
-  iree_vm_function_call_t call;
-  memset(&call, 0, sizeof(call));
+  iree_vm_function_call_t call = {};
   call.function = function;
   call.arguments = iree_make_byte_span(&arg_value, sizeof(arg_value));
   call.results = iree_make_byte_span(&ret_value, sizeof(ret_value));
@@ -128,8 +127,7 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldDivergent) {
   };
   uint32_t ret_value = 0;
 
-  iree_vm_function_call_t call;
-  memset(&call, 0, sizeof(call));
+  iree_vm_function_call_t call = {};
   call.function = function;
   call.arguments = iree_make_byte_span(&arg_values, sizeof(arg_values));
   call.results = iree_make_byte_span(&ret_value, sizeof(ret_value));

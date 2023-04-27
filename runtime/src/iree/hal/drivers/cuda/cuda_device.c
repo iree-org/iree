@@ -374,8 +374,7 @@ static iree_status_t iree_hal_cuda_device_create_channel(
   }
 
   // Ask for the defaults.
-  iree_hal_cuda_nccl_id_t id;
-  memset(&id, 0, sizeof(id));
+  iree_hal_cuda_nccl_id_t id = {0};
   if (device->params.channel_provider.query_group_params) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z0,
                                 "iree_hal_channel_provider_query_group_params");

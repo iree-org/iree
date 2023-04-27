@@ -178,8 +178,7 @@ iree_status_t iree_hal_vulkan_match_available_device_extensions(
 iree_hal_vulkan_instance_extensions_t
 iree_hal_vulkan_populate_enabled_instance_extensions(
     const iree_hal_vulkan_string_list_t* enabled_extensions) {
-  iree_hal_vulkan_instance_extensions_t extensions;
-  memset(&extensions, 0, sizeof(extensions));
+  iree_hal_vulkan_instance_extensions_t extensions = {};
   for (iree_host_size_t i = 0; i < enabled_extensions->count; ++i) {
     const char* extension_name = enabled_extensions->values[i];
     if (strcmp(extension_name, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0) {
@@ -192,8 +191,7 @@ iree_hal_vulkan_populate_enabled_instance_extensions(
 iree_hal_vulkan_device_extensions_t
 iree_hal_vulkan_populate_enabled_device_extensions(
     const iree_hal_vulkan_string_list_t* enabled_extensions) {
-  iree_hal_vulkan_device_extensions_t extensions;
-  memset(&extensions, 0, sizeof(extensions));
+  iree_hal_vulkan_device_extensions_t extensions = {};
   for (iree_host_size_t i = 0; i < enabled_extensions->count; ++i) {
     const char* extension_name = enabled_extensions->values[i];
     if (strcmp(extension_name, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME) == 0) {
@@ -218,8 +216,7 @@ iree_hal_vulkan_populate_enabled_device_extensions(
 iree_hal_vulkan_device_extensions_t
 iree_hal_vulkan_infer_enabled_device_extensions(
     const iree::hal::vulkan::DynamicSymbols* device_syms) {
-  iree_hal_vulkan_device_extensions_t extensions;
-  memset(&extensions, 0, sizeof(extensions));
+  iree_hal_vulkan_device_extensions_t extensions = {};
   if (device_syms->vkCmdPushDescriptorSetKHR) {
     extensions.push_descriptors = true;
   }
