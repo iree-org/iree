@@ -47,6 +47,7 @@ iree_cc_library(
     "StableHLOToLinalg.cpp"
     "StableHLOToLinalgConvolution.cpp"
     "StableHLOToLinalgDotProd.cpp"
+    "StableHLOToLinalgExt.cpp"
     "StableHLOToLinalgPointwise.cpp"
     "StableHLOToLinalgRandom.cpp"
     "StableHLOToLinalgReduce.cpp"
@@ -55,12 +56,14 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ChloOps
+    IREELinalgExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRComplexDialect
+    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
@@ -74,9 +77,15 @@ iree_cc_library(
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorUtils
     MLIRTransforms
     MLIRVectorDialect
     StablehloOps
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::InputConversion::Common
+    iree::compiler::Utils
   PUBLIC
 )
 
