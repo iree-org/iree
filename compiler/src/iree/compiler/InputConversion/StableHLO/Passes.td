@@ -18,4 +18,9 @@ def ConvertStableHloToLinalg :
                         "transpose) when possible, instead of linalg.generic">];
 }
 
+def LegalizeShapeComputations :
+    Pass<"iree-stablehlo-legalize-shape-computations", "func::FuncOp"> {
+  let summary = "Legalize StableHLO shape operations to core-mlir operations.";
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES

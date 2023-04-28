@@ -27,7 +27,6 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
     "Rewriters.h"
-    "TypeConversion.h"
   DEPS
     ::PassesIncGen
     MLIRPass
@@ -37,8 +36,9 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    StableHLOToLinalg
+    StableHLOLegalization
   SRCS
+    "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
@@ -50,6 +50,7 @@ iree_cc_library(
     "StableHLOToLinalgRandom.cpp"
     "StableHLOToLinalgReduce.cpp"
     "TypeConversion.cpp"
+    "TypeConversion.h"
   DEPS
     ::PassHeaders
     ChloOps
@@ -59,6 +60,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRComplexDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
@@ -86,7 +88,7 @@ iree_cc_library(
     "Passes.cpp"
   DEPS
     ::PassHeaders
-    ::StableHLOToLinalg
+    ::StableHLOLegalization
     LLVMSupport
     MLIRLinalgTransforms
     MLIRMLProgramDialect
