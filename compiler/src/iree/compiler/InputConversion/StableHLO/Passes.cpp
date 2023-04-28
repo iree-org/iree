@@ -99,9 +99,10 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
 
   // Convert to Linalg. After this point, StableHLO will be eliminated.
-  // TODO(#12678): Port StableHLO shape computation legalization.
+  passManager.addNestedPass<func::FuncOp>(
+      stablehlo::createLegalizeShapeComputations());
   // TODO(#12678): Port StableHLO to LinalgExt lowering.
-  passManager.addPass(createConvertStableHloToLinalg());
+  passManager.addPass(stablehlo::createConvertStableHloToLinalg());
   // Ensure conversion completed.
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
