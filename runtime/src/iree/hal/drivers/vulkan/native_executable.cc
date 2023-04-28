@@ -31,8 +31,8 @@ typedef struct iree_hal_vulkan_entry_point_t {
   iree_string_view_t name;
 
   // Optional debug information.
-  IREE_TRACE(iree_string_view_t source_filename;)
-  IREE_TRACE(uint32_t source_line;)
+  iree_string_view_t source_filename;
+  uint32_t source_line;
 } iree_hal_vulkan_entry_point_t;
 
 static iree_status_t iree_hal_vulkan_create_shader_module(
@@ -344,23 +344,21 @@ iree_status_t iree_hal_vulkan_native_executable_create(
     }
   }
 
-  IREE_TRACE({
-    if (iree_status_is_ok(status) &&
-        iree_SpirVExecutableDef_source_locations_is_present(executable_def)) {
-      iree_SpirVFileLineLocDef_vec_t source_locs_vec =
-          iree_SpirVExecutableDef_source_locations_get(executable_def);
-      for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
-        iree_SpirVFileLineLocDef_table_t source_loc =
-            iree_SpirVFileLineLocDef_vec_at(source_locs_vec, i);
-        flatbuffers_string_t filename =
-            iree_SpirVFileLineLocDef_filename_get(source_loc);
-        uint32_t line = iree_SpirVFileLineLocDef_line_get(source_loc);
-        executable->entry_points[i].source_filename =
-            iree_make_string_view(filename, flatbuffers_string_len(filename));
-        executable->entry_points[i].source_line = line;
-      }
+  if (iree_status_is_ok(status) &&
+      iree_SpirVExecutableDef_source_locations_is_present(executable_def)) {
+    iree_SpirVFileLineLocDef_vec_t source_locs_vec =
+        iree_SpirVExecutableDef_source_locations_get(executable_def);
+    for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
+      iree_SpirVFileLineLocDef_table_t source_loc =
+          iree_SpirVFileLineLocDef_vec_at(source_locs_vec, i);
+      flatbuffers_string_t filename =
+          iree_SpirVFileLineLocDef_filename_get(source_loc);
+      uint32_t line = iree_SpirVFileLineLocDef_line_get(source_loc);
+      executable->entry_points[i].source_filename =
+          iree_make_string_view(filename, flatbuffers_string_len(filename));
+      executable->entry_points[i].source_line = line;
     }
-  });
+  }
 
   if (iree_status_is_ok(status)) {
     *out_executable = (iree_hal_executable_t*)executable;
