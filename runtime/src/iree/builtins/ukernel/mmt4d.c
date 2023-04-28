@@ -10,8 +10,9 @@
 
 static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
-  const iree_uk_uint32_t allflags =
-      IREE_UK_FLAG_MMT4D_TYPE_MASK | IREE_UK_FLAG_MMT4D_ACCUMULATE;
+  const iree_uk_uint32_t allflags = IREE_UK_FLAG_MMT4D_TYPE_MASK |
+                                    IREE_UK_FLAG_MMT4D_ACCUMULATE |
+                                    IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
   IREE_UK_ASSERT(mmt4d_type != iree_uk_mmt4d_type_none);

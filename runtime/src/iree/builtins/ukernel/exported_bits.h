@@ -51,6 +51,7 @@
 #define IREE_UK_FLAG_MMT4D_ACCUMULATE 0x100
 #define IREE_UK_FLAG_MMT4D_ACCUMULATE_BIT_POS 8
 IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_MMT4D_ACCUMULATE);
+#define IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS 0x200
 
 //===----------------------------------------------------------------------===//
 // pack

@@ -207,6 +207,13 @@ extern "C" {
 #define IREE_UK_ASSUME_UNREACHABLE
 #endif
 
+#define IREE_UK_ASSUME(condition) \
+  do {                            \
+    if (!(condition)) {           \
+      IREE_UK_ASSUME_UNREACHABLE; \
+    }                             \
+  } while (false)
+
 #if IREE_UK_HAVE_ATTRIBUTE(noinline) || \
     (defined(__GNUC__) && !defined(__clang__))
 #define IREE_UK_ATTRIBUTE_NOINLINE __attribute__((noinline))
@@ -623,6 +630,36 @@ static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
 #define IREE_UK_PREFETCH_LOCALITY_L3 1    // Some locality. Try to keep in L3.
 #define IREE_UK_PREFETCH_LOCALITY_L2 2    // More locality. Try to keep in L2.
 #define IREE_UK_PREFETCH_LOCALITY_L1 3    // Most locality. Try to keep in L1.
+
+//===----------------------------------------------------------------------===//
+// Selection between inline asm and intrinsics code paths.
+//
+// Some ukernels have both intrinsics and inline asm code paths. This macro
+// helps select the one to use based on what's enabled in the build. If both
+// intrinsics and inline asm are enabled in the build, by default inline asm is
+// preferred, unless `prefer_intrinsics` is true --- that's useful for testing.
+//
+// This is a macro in order to avoid referencing undefined function symbols.
+//
+// This currently falls back on intrinsics as always enabled -- we can always
+// add an option for that, like IREE_UK_ENABLE_INLINE_ASM, if needed.
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_UK_ENABLE_INLINE_ASM) && \
+    defined(IREE_UK_ENABLE_INTRINSICS_EVEN_WHEN_INLINE_ASM_AVAILABLE)
+#define IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS
+#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
+                                                prefer_intrinsics)      \
+  ((prefer_intrinsics) ? (intrinsics) : (inline_asm))
+#elif defined(IREE_UK_ENABLE_INLINE_ASM)
+#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
+                                                prefer_intrinsics)      \
+  (inline_asm)
+#else  // not defined(IREE_UK_ENABLE_INLINE_ASM)
+#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
+                                                prefer_intrinsics)      \
+  (intrinsics)
+#endif  // not defined(IREE_UK_ENABLE_INLINE_ASM)
 
 #ifdef __cplusplus
 }  // extern "C"

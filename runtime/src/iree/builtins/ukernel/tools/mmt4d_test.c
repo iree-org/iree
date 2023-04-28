@@ -149,6 +149,11 @@ static void iree_uk_test_mmt4d_for_shape_params(
   // file explaining how we refrain from letting this grow into a 1000-line-long
   // fully-featured test.
   if (memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size)) {
+    fprintf(stderr, "M=%d N=%d K=%d flags=%x\n", (int)params.M, (int)params.N,
+            (int)params.K, (int)params.flags);
+    fprintf(stderr, "actual %f reference %f\n",
+            ((const float*)actual_out_buffer)[0],
+            ((const float*)reference_out_buffer)[0]);
     IREE_UK_TEST_FAIL(test);
   }
 
@@ -199,18 +204,33 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
   }
 }
 
-static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
-                               const char* cpu_features) {
-  iree_uk_mmt4d_params_t params = {
-      .flags = flags, .M0 = M0, .N0 = N0, .K0 = K0};
+static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
+                                    int K0, const char* cpu_features,
+                                    const char* code_path_suffix) {
   char types_str[32];
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(flags);
   iree_uk_type_triple_str(types_str, sizeof types_str, mmt4d_type);
+  iree_uk_mmt4d_params_t params = {
+      .flags = flags, .M0 = M0, .N0 = N0, .K0 = K0};
   char test_label_str[256];
-  snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%dx%d",
-           types_str, M0, N0, K0);
+  snprintf(test_label_str, sizeof test_label_str, "types:%s tile:%dx%dx%d%s",
+           types_str, M0, N0, K0, code_path_suffix);
   iree_uk_test(test_label_str, iree_uk_test_mmt4d_for_tile_params, &params,
                cpu_features);
+}
+
+static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
+                               const char* cpu_features) {
+  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
+}
+
+static void iree_uk_test_mmt4d_default_and_intrinsics(
+    iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
+  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
+#if defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
+  iree_uk_test_mmt4d_impl(flags | IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS, M0, N0,
+                          K0, cpu_features, " intrinsics");
+#endif  // defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
 }
 
 int main(int argc, char** argv) {
@@ -221,10 +241,13 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 9, 6, 3, "");
 
 #if defined(IREE_UK_ARCH_ARM_64)
+  // On arm64, some code paths have inline asm and intrinsics variants. For them
+  // we use iree_uk_test_mmt4d_default_and_intrinsics to test both.
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4, "dotprod");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 8, "i8mm");
+  iree_uk_test_mmt4d_default_and_intrinsics(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8,
+                                            8, 8, "i8mm");
 #elif defined(IREE_UK_ARCH_X86_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 4, 1, "");  // SSE
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
