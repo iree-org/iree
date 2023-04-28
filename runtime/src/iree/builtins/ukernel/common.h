@@ -207,6 +207,13 @@ extern "C" {
 #define IREE_UK_ASSUME_UNREACHABLE
 #endif
 
+#define IREE_UK_ASSUME(condition) \
+  do { \
+    if (!(condition)) { \
+      IREE_UK_ASSUME_UNREACHABLE; \
+    } \
+  } while(false)
+
 #if IREE_UK_HAVE_ATTRIBUTE(noinline) || \
     (defined(__GNUC__) && !defined(__clang__))
 #define IREE_UK_ATTRIBUTE_NOINLINE __attribute__((noinline))
