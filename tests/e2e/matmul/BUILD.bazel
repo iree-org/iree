@@ -342,6 +342,7 @@ py_binary(
     ],
     tags = [
         "requires-gpu-nvidia",
+        "vulkan_uses_vk_khr_shader_float16_int8",
     ],
     target_backends_and_drivers = [
         ("vulkan-spirv", "vulkan"),
@@ -352,6 +353,7 @@ py_binary(
     ("ampere-unknown-linux", "SPIRVVectorizeNVIDIA"),
 ] for lhs_rhs_type in [
     "i8",
+    "f16",
     "f32",
 ]]
 
