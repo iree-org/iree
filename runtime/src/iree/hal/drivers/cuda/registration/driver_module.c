@@ -21,13 +21,14 @@ IREE_FLAG(
     "Use CUDA streams for executing command buffers (instead of graphs).");
 
 IREE_FLAG(bool, cuda_allow_inline_execution, false,
-          "Allow command buffers to execute inline against CUDA streams when "
+          "Allow command buffers to execute inline against CUDA streams when\n"
           "possible.");
 
-IREE_FLAG(bool, cuda_tracing, true,
-          "Enables tracing of stream events when Tracy instrumentation is "
-          "enabled. Severely impacts benchmark timings and should only be used "
-          "when analyzing dispatch timings.");
+IREE_FLAG(
+    bool, cuda_tracing, true,
+    "Enables tracing of stream events when Tracy instrumentation is enabled.\n"
+    "Severely impacts benchmark timings and should only be used when\n"
+    "analyzing dispatch timings.");
 
 IREE_FLAG(int32_t, cuda_default_index, 0, "Index of the default CUDA device.");
 

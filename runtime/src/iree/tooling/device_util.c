@@ -374,14 +374,15 @@ iree_status_t iree_hal_create_device_from_flags(
 
 IREE_FLAG(
     string, device_profiling_mode, "",
-    "HAL device profiling mode (one of ['queue', 'dispatch', 'executable']) "
-    "or empty to disable profiling. HAL implementations may require additional "
-    "flags in order to configure profiling support on "
-    "their devices.");
+    "HAL device profiling mode (one of ['queue', 'dispatch', 'executable'])\n"
+    "or empty to disable profiling. HAL implementations may require\n"
+    "additional flags in order to configure profiling support on their\n"
+    "devices.");
 IREE_FLAG(
     string, device_profiling_file, "",
-    "Optional file path/prefix for profiling file output. Some implementations "
-    "may require a file name in order to capture profiling information.");
+    "Optional file path/prefix for profiling file output. Some\n"
+    "implementations may require a file name in order to capture profiling\n"
+    "information.");
 
 iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
   if (!device) return iree_ok_status();

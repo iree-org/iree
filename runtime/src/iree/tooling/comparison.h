@@ -7,9 +7,14 @@
 #ifndef IREE_TOOLING_COMPARISON_H_
 #define IREE_TOOLING_COMPARISON_H_
 
+#include <stdio.h>
+
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
-#include "stdio.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
 // Compares expected vs actual results and appends to |builder|.
 // Returns true if all values match and false otherwise.
@@ -26,5 +31,9 @@ bool iree_tooling_compare_variant_lists(iree_vm_list_t* expected_list,
                                         iree_vm_list_t* actual_list,
                                         iree_allocator_t host_allocator,
                                         FILE* file);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_TOOLING_COMPARISON_H_

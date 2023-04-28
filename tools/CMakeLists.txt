@@ -172,18 +172,14 @@ iree_cc_binary(
   NAME
     iree-run-module
   SRCS
-    "iree-run-module-main.cc"
+    "iree-run-module-main.c"
   DEPS
     iree::base
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
-    iree::modules::hal::types
-    iree::tooling::comparison
     iree::tooling::context_util
-    iree::tooling::device_util
-    iree::tooling::instrument_util
-    iree::tooling::vm_util
+    iree::tooling::run_module
     iree::vm
 )
 
@@ -300,29 +296,16 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-run-mlir-main.cc"
     DEPS
-      LLVMSupport
-      MLIRIR
-      MLIRParser
-      MLIRPass
-      MLIRSupport
-      MLIRTargetLLVMIRExport
       iree::base
       iree::base::internal::flags
       iree::base::tracing
-      iree::compiler::ConstEval
-      iree::compiler::Dialect::HAL::Target
-      iree::compiler::Dialect::VM::Target::Bytecode
-      iree::compiler::Dialect::VM::Target::init_targets
-      iree::compiler::Pipelines
-      iree::compiler::Tools::init_passes_and_dialects
-      iree::compiler::Tools::init_targets
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
       iree::hal
-      iree::modules::hal::types
       iree::tooling::context_util
       iree::tooling::device_util
-      iree::tooling::vm_util
+      iree::tooling::run_module
       iree::vm
-      iree::vm::bytecode::module
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
