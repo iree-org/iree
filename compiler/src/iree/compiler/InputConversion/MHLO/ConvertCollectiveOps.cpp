@@ -335,7 +335,7 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
   }
 };
 
-Value EmitTranspose(ConversionPatternRewriter &rewriter, const Location &loc,
+Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
                     Value input, const SmallVector<int64_t> &permutation) {
   DenseIntElementsAttr permutationAttr = rewriter.getI64VectorAttr(permutation);
   SmallVector<int64_t> resultShape;
@@ -351,8 +351,8 @@ Value EmitTranspose(ConversionPatternRewriter &rewriter, const Location &loc,
       .getResult();
 }
 
-Value RearrangeForAllToAll(ConversionPatternRewriter &rewriter,
-                           const Location &loc, Value input, uint64_t splitDim,
+Value rearrangeForAllToAll(ConversionPatternRewriter &rewriter,
+                           Location loc, Value input, uint64_t splitDim,
                            uint64_t concatDim, uint64_t splitCount) {
   // Helper function to rearrange data for all-to-all so that the splits are
   // contiguous in memory.
@@ -387,7 +387,7 @@ Value RearrangeForAllToAll(ConversionPatternRewriter &rewriter,
     }
     permutation.push_back(dimAfterReshape);
   }
-  result = EmitTranspose(rewriter, loc, result, permutation);
+  result = emitTranspose(rewriter, loc, result, permutation);
 
   // Reshape
   llvm::SmallVector<int64_t> finalShape(inputShape);
@@ -452,12 +452,12 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
       for (uint64_t i = moveDims; i < inputShape.size(); ++i)
         permutation.push_back(i);
       for (uint64_t i = 0; i < moveDims; ++i) permutation.push_back(i);
-      allToAllInput = EmitTranspose(rewriter, loc, allToAllInput, permutation);
+      allToAllInput = emitTranspose(rewriter, loc, allToAllInput, permutation);
       concatDim -= moveDims;
       splitDim -= moveDims;
     }
     if (requiresRearrange && rearrangeBefore) {
-      allToAllInput = RearrangeForAllToAll(rewriter, loc, allToAllInput,
+      allToAllInput = rearrangeForAllToAll(rewriter, loc, allToAllInput,
                                            splitDim, concatDim, splitCount);
     }
 
@@ -479,12 +479,12 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
         permutation.push_back(i);
       for (uint64_t i = 0; i <= moveDims; ++i) permutation.push_back(i);
       allToAllResult =
-          EmitTranspose(rewriter, loc, allToAllResult, permutation);
+          emitTranspose(rewriter, loc, allToAllResult, permutation);
       concatDim += moveDims;
       splitDim += moveDims;
     }
     if (requiresRearrange && !rearrangeBefore) {
-      allToAllResult = RearrangeForAllToAll(rewriter, loc, allToAllResult,
+      allToAllResult = rearrangeForAllToAll(rewriter, loc, allToAllResult,
                                             splitDim, concatDim, splitCount);
     }
 
