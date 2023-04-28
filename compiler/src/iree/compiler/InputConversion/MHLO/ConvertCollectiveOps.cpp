@@ -370,7 +370,7 @@ Value RearrangeForAllToAll(ConversionPatternRewriter &rewriter,
     newShape.push_back(splitCount);
     newShape.push_back(inputShape[i] / splitCount);
   }
-  auto result =
+  Value result =
       rewriter
           .create<mhlo::ReshapeOp>(
               loc, RankedTensorType::get(newShape, inputType.getElementType()),
@@ -387,7 +387,17 @@ Value RearrangeForAllToAll(ConversionPatternRewriter &rewriter,
     }
     permutation.push_back(dimAfterReshape);
   }
-  return EmitTranspose(rewriter, loc, result, permutation);
+  result = EmitTranspose(rewriter, loc, result, permutation);
+
+  // Reshape
+  llvm::SmallVector<int64_t> finalShape(inputShape);
+  finalShape[concatDim] *= splitCount;
+  finalShape[splitDim] /= splitCount;
+  return rewriter
+          .create<mhlo::ReshapeOp>(
+              loc, RankedTensorType::get(finalShape, inputType.getElementType()),
+              result)
+          .getResult();
 }
 
 struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
@@ -430,6 +440,7 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
         allToAllInput.getType().cast<RankedTensorType>().getShape();
     SmallVector<int64_t> allToAllResultShape(resultType.getShape());
 
+    const bool requiresRearrange = concatDim != splitDim;
     const bool rearrangeBefore = concatDim < splitDim;
     const bool requiresTranspose = concatDim != 0 && splitDim != 0;
 
@@ -445,7 +456,7 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
       concatDim -= moveDims;
       splitDim -= moveDims;
     }
-    if (rearrangeBefore && splitDim != concatDim) {
+    if (requiresRearrange && rearrangeBefore) {
       allToAllInput = RearrangeForAllToAll(rewriter, loc, allToAllInput,
                                            splitDim, concatDim, splitCount);
     }
@@ -472,19 +483,10 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
       concatDim += moveDims;
       splitDim += moveDims;
     }
-    if (!rearrangeBefore && splitDim != concatDim) {
+    if (requiresRearrange && !rearrangeBefore) {
       allToAllResult = RearrangeForAllToAll(rewriter, loc, allToAllResult,
                                             splitDim, concatDim, splitCount);
     }
-
-    // Reshape
-    allToAllResult = rewriter
-                         .create<mhlo::ReshapeOp>(
-                             loc,
-                             RankedTensorType::get(allToAllResultShape,
-                                                   resultType.getElementType()),
-                             allToAllResult)
-                         .getResult();
 
     rewriter.replaceOp(op, allToAllResult);
     return success();
