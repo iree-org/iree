@@ -368,9 +368,9 @@ static_assert(sizeof(iree_hal_collective_op_t) == sizeof(uint32_t),
 IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
     const iree_hal_collective_op_t* op, iree_bitfield_string_temp_t* out_temp);
 
-// Get the number of bytes each |element_type| consumes in memory.
-IREE_API_EXPORT iree_status_t iree_hal_collective_element_byte_count(
-    iree_hal_collective_element_type_t element_type, iree_device_size_t* out);
+// Returns the number of bytes each |element_type| consumes in memory.
+IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
+    iree_hal_collective_element_type_t element_type);
 
 // Describes a subrange of a buffer that can be bound to a binding slot.
 typedef struct iree_hal_buffer_binding_t {

@@ -136,34 +136,28 @@ IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
 // iree_hal_collective_element_t
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_hal_collective_element_byte_count(
-    iree_hal_collective_element_type_t element_type, iree_device_size_t* out) {
+IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
+    iree_hal_collective_element_type_t element_type) {
   switch (element_type) {
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_8:
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_8:
-      *out = 1;
-      break;
+      return 1;
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_16:
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_16:
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_16:
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_BFLOAT_16:
-      *out = 2;
-      break;
+      return 2;
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_32:
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_32:
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_32:
-      *out = 4;
-      break;
+      return 4;
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_64:
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_64:
     case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_64:
-      *out = 8;
-      break;
+      return 8;
     default:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "unhandled element type for collective op");
+      IREE_ASSERT(false, "unhandled element type for collective op");
   }
-  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

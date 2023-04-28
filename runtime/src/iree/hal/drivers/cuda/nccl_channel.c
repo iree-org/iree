@@ -306,11 +306,10 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
           iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
           entry->recv_binding.offset;
       iree_device_size_t send_count = entry->element_count / channel->count;
-      iree_device_size_t element_size_bytes;
-      IREE_RETURN_IF_ERROR(iree_hal_collective_element_byte_count(
-          entry->op.element_type, &element_size_bytes));
+      iree_device_size_t element_size_bytes =
+          iree_hal_collective_element_byte_count(entry->op.element_type);
       iree_device_size_t rank_offset = send_count * element_size_bytes;
-      NCCL_RETURN_IF_ERROR(syms, ncclGroupStart(), "ncclGroupStart");
+      // These calls are already grouped by iree_hal_cuda_nccl_submit_batch.
       for (iree_host_size_t r = 0; r < channel->count; ++r) {
         NCCL_RETURN_IF_ERROR(syms,
                              ncclSend((const void*)(sendbuff + r * rank_offset),
@@ -321,7 +320,6 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
                                       send_count, datatype, r, comm, stream),
                              "ncclRecv");
       }
-      NCCL_RETURN_IF_ERROR(syms, ncclGroupEnd(), "ncclGroupEnd");
       break;
     }
     case IREE_HAL_COLLECTIVE_KIND_BROADCAST: {
