@@ -351,9 +351,9 @@ Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
       .getResult();
 }
 
-Value rearrangeForAllToAll(ConversionPatternRewriter &rewriter,
-                           Location loc, Value input, uint64_t splitDim,
-                           uint64_t concatDim, uint64_t splitCount) {
+Value rearrangeForAllToAll(ConversionPatternRewriter &rewriter, Location loc,
+                           Value input, uint64_t splitDim, uint64_t concatDim,
+                           uint64_t splitCount) {
   // Helper function to rearrange data for all-to-all so that the splits are
   // contiguous in memory.
   auto inputType = input.getType().cast<RankedTensorType>();
@@ -394,10 +394,10 @@ Value rearrangeForAllToAll(ConversionPatternRewriter &rewriter,
   finalShape[concatDim] *= splitCount;
   finalShape[splitDim] /= splitCount;
   return rewriter
-          .create<mhlo::ReshapeOp>(
-              loc, RankedTensorType::get(finalShape, inputType.getElementType()),
-              result)
-          .getResult();
+      .create<mhlo::ReshapeOp>(
+          loc, RankedTensorType::get(finalShape, inputType.getElementType()),
+          result)
+      .getResult();
 }
 
 struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
