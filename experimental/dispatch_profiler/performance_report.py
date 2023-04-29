@@ -99,7 +99,6 @@ class PerformanceReport:
     """Write the header to the csv file."""
 
     # Create and write the header.
-    print(operation.get_dict_entry())
     operation_specific_header = list(operation.get_dict_entry().keys())
     configuration_specific_header = list(configuration.get_dict_entry().keys())
     performance_header = ['Verification', 'Runtime(ms)', 'GFLOPs']

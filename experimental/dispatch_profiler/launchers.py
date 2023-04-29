@@ -47,13 +47,13 @@ class IreeToolsLauncher:
     split_k_suffix = "_".join([
         "split_k_slice", str(operation.split_k_slices)
     ]) if operation.operation_kind == OperationKind.SplitkMatmul else ""
-    verify_vmfb = split_k_suffix + "_verify.vmfb"
-    benchmark_vmfb = split_k_suffix + "_profile.vmfb"
 
     self.vmfb_verify_filepath = os.path.join(
-        self.operation_path, "_".join([self.operation.name(), verify_vmfb]))
+        self.operation_path,
+        "_".join([self.operation.name(), split_k_suffix, "verify.vmfb"]))
     self.vmfb_benchmark_filepath = os.path.join(
-        self.operation_path, "_".join([self.operation.name(), benchmark_vmfb]))
+        self.operation_path,
+        "_".join([self.operation.name(), split_k_suffix, "profile.vmfb"]))
 
     # reference implementation for the operation_kind.
     self.reference_impl_map = {

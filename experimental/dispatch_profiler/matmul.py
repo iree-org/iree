@@ -74,8 +74,8 @@ class MatmulOperation:
 
   def get_argument_dict(self):
     """Returns the dictionary of matmul arguments (shape, datatypes, split_k_slices)."""
-    split_k_mode = "N/A" if self.operation_kind == OperationKind.Matmul else "parallel"
-    split_k_slices = "N/A" if self.operation_kind == OperationKind.Matmul else self.split_k_slices
+    split_k_mode = "parallel" if self.operation_kind == OperationKind.SplitkMatmul else "N/A"
+    split_k_slices = self.split_k_slices if self.operation_kind == OperationKind.SplitkMatmul else "N/A"
     return {
         "batch_count": self.batch_count,
         "M": self.M,
@@ -147,21 +147,19 @@ class MatmulCompilationInfo:
 
   def get_dict_entry(self):
     """Returns the dictionary entry for the matmul compilation info."""
+    if self.config_type == CompilationConfigType.Default:
+      return {
+          "Tile config": "Default",
+          "Core class": "Default",
+          "Instruction class": "Default"
+      }
+
     translation_info_name = TranslationInfoName[self.translation_info]
-    dict_entry = {
+    return {
         "Tile config": self.tile_description.name(),
         "Core class": translation_info_name.split('_')[0],
         "Instruction class": translation_info_name.split('_')[1],
     }
-
-    if self.config_type == CompilationConfigType.Default:
-      return dict_entry.update({
-          "Tile config": "Default",
-          "Core class": "Default",
-          "Instruction class": "Default"
-      })
-
-    return dict_entry
 
   def name(self):
     """Procedurally generated name for the matmul compilation info."""
@@ -467,11 +465,11 @@ class CudaMatmulGenerator:
 
     # List of pre-defined threadblock tile shapes for Tensor Core.
     self.tile_descriptions_tensor_cores_f16 = [
-        #TileDescription([256, 128, 32], 3, [64, 4, 1]),
-        #TileDescription([128, 256, 32], 3, [128, 2, 1]),
-        #TileDescription([128, 128, 64], 4, [64, 2, 1]),
-        #TileDescription([128, 128, 32], 5, [64, 2, 1]),
-        #TileDescription([128, 64, 32], 5, [64, 2, 1]),
+        TileDescription([256, 128, 32], 3, [64, 4, 1]),
+        TileDescription([128, 256, 32], 3, [128, 2, 1]),
+        TileDescription([128, 128, 64], 4, [64, 2, 1]),
+        TileDescription([128, 128, 32], 5, [64, 2, 1]),
+        TileDescription([128, 64, 32], 5, [64, 2, 1]),
         TileDescription([64, 64, 64], 5, [64, 2, 1]),
         TileDescription([64, 64, 32], 10, [64, 2, 1]),
     ]
@@ -482,16 +480,21 @@ class CudaMatmulGenerator:
         TileDescription([128, 128, 16], 5, [64, 2, 1]),
         TileDescription([128, 128, 32], 3, [64, 2, 1]),
         TileDescription([128, 128, 32], 4, [64, 2, 1]),
-        TileDescription([64, 64, 64], 3, [64, 2, 1]),
+        TileDescription([128, 64, 32], 3, [64, 2, 1]),
+        TileDescription([128, 64, 16], 5, [64, 2, 1]),
+        TileDescription([64, 64, 32], 3, [64, 2, 1]),
+        TileDescription([64, 64, 16], 10, [64, 2, 1]),
     ]
 
     # List of pre-defined matmul problem shapes.
-    """
     self.matmul_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
-                           [2560, 2560, 2560], [3456, 1024, 2048]]
-    """
+                          [2560, 2560, 2560], [3456, 1024, 2048]]
 
-    self.matmul_shapes = [[128, 128, 768]]
+    # T5 matmul shapes
+    """
+    self.matmul_shapes = [[512, 4096, 1024], [512, 1024, 1024],
+                          [512, 1024, 4096]]
+    """
 
     # List of pre-defined matmul dispatch collections.
     self.dispatches_collection_list = []
@@ -508,16 +511,24 @@ class CudaMatmulGenerator:
     # Return the supported configuration list.
     return supported_configuration_list
 
+  def _create_matmul_compilation_info(self, tile_descriptions,
+                                      translation_infos, operation_kind):
+    """Creates a *custom* list of matmul compilation info."""
+    configuration_list = []
+    for tile_description in tile_descriptions:
+      for translation_info in translation_infos:
+        configuration_list.append(
+            MatmulCompilationInfo(tile_description, translation_info,
+                                  operation_kind, CompilationConfigType.Custom))
+    return configuration_list
+
   def _cuda_matmul_tensor_cores_f16(self):
     """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
 
     # Create configuration list from the tile descriptions and translation infos.
-    configuration_list = []
-
-    for tile_description in self.tile_descriptions_tensor_cores_f16:
-      for translation_info in self.translation_infos:
-        configuration_list.append(
-            MatmulCompilationInfo(tile_description, translation_info))
+    configuration_list = self._create_matmul_compilation_info(
+        self.tile_descriptions_tensor_cores_f16, self.translation_infos,
+        OperationKind.Matmul)
 
     # Create dispatches collection for each problem shape with the configuration list.
     for matmul_shape in self.matmul_shapes:
@@ -534,7 +545,8 @@ class CudaMatmulGenerator:
       # Add default configuration if enabled.
       if self.args.default_config:
         supported_configuration_list.append(
-            MatmulCompilationInfo([], [], CompilationConfigType.Default))
+            MatmulCompilationInfo([], [], OperationKind.Matmul,
+                                  CompilationConfigType.Default))
 
       self.dispatches_collection_list.append(DispatchCollection(\
         operation, supported_configuration_list))
@@ -548,7 +560,9 @@ class CudaMatmulGenerator:
     for tile_description in self.tile_descriptions_tensor_cores_f32:
       for translation_info in self.translation_infos:
         configuration_list.append(
-            MatmulCompilationInfo(tile_description, translation_info))
+            MatmulCompilationInfo(tile_description, translation_info,
+                                  OperationKind.Matmul,
+                                  CompilationConfigType.Custom))
 
     for matmul_shape in self.matmul_shapes:
       operation = MatmulOperation(
@@ -564,7 +578,8 @@ class CudaMatmulGenerator:
       # Add default configuration if requested.
       if self.args.default_config:
         supported_configuration_list.append(
-            MatmulCompilationInfo([], [], CompilationConfigType.Default))
+            MatmulCompilationInfo([], [], OperationKind.Matmul,
+                                  CompilationConfigType.Default))
 
       self.dispatches_collection_list.append(DispatchCollection(\
         operation, supported_configuration_list))
@@ -572,5 +587,5 @@ class CudaMatmulGenerator:
   def generate(self):
     """Generates a list of matmul operations."""
     self._cuda_matmul_tensor_cores_f16()
-    #self._cuda_matmul_tensor_cores_f32()
+    self._cuda_matmul_tensor_cores_f32()
     return self.dispatches_collection_list

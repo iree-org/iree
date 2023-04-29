@@ -9,8 +9,8 @@ class BatchMatmulOperation(MatmulOperation):
 
   def __init__(self, bmm_shape, lhs, rhs, result):
     assert len(bmm_shape) == 4, "Batch matmul shape must be 4D"
-    super().__init__(bmm_shape[1:], lhs, rhs, result, bmm_shape[0])
-    self.operation_kind = OperationKind.BatchMatmul
+    super().__init__(bmm_shape[1:], lhs, rhs, result, bmm_shape[0], 1,
+                     OperationKind.BatchMatmul)
 
   def name(self):
     return f'{OperationKindNames[self.operation_kind]}_'\
@@ -181,7 +181,9 @@ class CudaBatchMatmulGenerator(CudaMatmulGenerator):
   def __init__(self, args):
     """Initializes the batch matmul dispatch generator."""
     super().__init__(args)
-    self.batch_matmul_shapes = [[16, 128, 128, 256]]
+
+    # T5 batch matmul shapes
+    self.batch_matmul_shapes = [[16, 512, 64, 512], [16, 512, 512, 64]]
     self.dispatches_collection_list = []
 
   def _cuda_matmul_tensor_cores_f16(self):
@@ -213,12 +215,41 @@ class CudaBatchMatmulGenerator(CudaMatmulGenerator):
       # Add default configuration if enabled.
       if self.args.default_config:
         supported_configuration_list.append(
-            MatmulCompilationInfo([], [], 1, OperationKind.BatchMatmul,
+            MatmulCompilationInfo([], [], OperationKind.BatchMatmul,
                                   CompilationConfigType.Default))
       self.dispatches_collection_list.append(DispatchCollection(\
-        operation, configuration_list))
+        operation, supported_configuration_list))
 
-  def generate(self):
-    """Generates a list of batch matmul operations."""
-    self._cuda_matmul_tensor_cores_f16()
-    return self.dispatches_collection_list
+  def _cuda_matmul_tensor_cores_f32(self):
+    """Appends a list of matmul dispatches for GPU TensorCore F32 data type."""
+
+    # Create configuration list from the tile descriptions and translation infos.
+    configuration_list = []
+
+    for tile_description in self.tile_descriptions_tensor_cores_f32:
+      for translation_info in self.translation_infos:
+        configuration_list.append(
+            MatmulCompilationInfo(tile_description, translation_info,
+                                  OperationKind.BatchMatmul,
+                                  CompilationConfigType.Custom))
+
+    # Create dispatches collection for each problem shape with the configuration list.
+    for bmm_shape in self.batch_matmul_shapes:
+      operation = BatchMatmulOperation(
+        bmm_shape,\
+        TensorDescription(DataType.f32, LayoutType.RowMajor), \
+        TensorDescription(DataType.f32, LayoutType.RowMajor), \
+        TensorDescription(DataType.f32, LayoutType.RowMajor))
+
+      # Filter out configurations that are not supported by LLVM GPU CUDA backend.
+      supported_configuration_list = []
+      supported_configuration_list = self._cuda_supported_configuration_list(
+          operation, configuration_list)
+
+      # Add default configuration if enabled.
+      if self.args.default_config:
+        supported_configuration_list.append(
+            MatmulCompilationInfo([], [], OperationKind.BatchMatmul,
+                                  CompilationConfigType.Default))
+      self.dispatches_collection_list.append(DispatchCollection(\
+        operation, supported_configuration_list))
