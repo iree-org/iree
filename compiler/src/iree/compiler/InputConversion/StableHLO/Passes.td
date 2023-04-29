@@ -18,6 +18,11 @@ def ConvertStableHloToLinalg :
                         "transpose) when possible, instead of linalg.generic">];
 }
 
+def LegalizeControlFlow :
+    Pass<"iree-stablehlo-legalize-control-flow", "func::FuncOp"> {
+  let summary = "Legalize from StableHLO control flow to SCF control flow";
+}
+
 def LegalizeShapeComputations :
     Pass<"iree-stablehlo-legalize-shape-computations", "func::FuncOp"> {
   let summary = "Legalize StableHLO shape operations to core-mlir operations.";

@@ -38,6 +38,7 @@ iree_cc_library(
   NAME
     StableHLOLegalization
   SRCS
+    "LegalizeControlFlow.cpp"
     "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
     "LegalizeToLinalgUtils.h"
