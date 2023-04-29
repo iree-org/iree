@@ -21,7 +21,7 @@ def ConvertStableHloToLinalg :
 def ConvertStableHloToLinalgExt :
     Pass<"iree-stablehlo-to-linalg-ext", "func::FuncOp"> {
   let summary =
-      "Convert from XLA-HLO ops to LinalgExt ops and distribute to Flow ops";
+      "Convert from StableHLO ops to LinalgExt ops and distribute to Flow ops";
 }
 
 def LegalizeControlFlow :

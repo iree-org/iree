@@ -261,7 +261,7 @@ struct ScatterOpConversion final
     Region &region = scatterOp.getRegion();
     TypeConverter::SignatureConversion signatureConverter(2);
     Type argType = getElementTypeOrSelf(original.getType());
-    // mhlo.scatter ops takes:
+    // stablehlo.scatter op takes:
     //   output[O] = update_computation(output[O], updates[U])
     // where output[O] maps to block args #1 in linalg_ext.scatter ops.
     signatureConverter.addInputs(1, argType);
