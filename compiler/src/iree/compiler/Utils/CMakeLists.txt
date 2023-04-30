@@ -17,6 +17,7 @@ iree_cc_library(
     "ConversionUtils.h"
     "FlatbufferUtils.h"
     "IndexSet.h"
+    "InterfaceUtils.h"
     "ModuleUtils.h"
     "OptionUtils.h"
     "PassUtils.h"
@@ -27,6 +28,7 @@ iree_cc_library(
   SRCS
     "ConversionUtils.cpp"
     "FlatbufferUtils.cpp"
+    "InterfaceUtils.cpp"
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
     "PassUtils.cpp"
