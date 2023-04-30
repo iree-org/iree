@@ -217,4 +217,5 @@ hal.executable private @pad_consumer_fusion {
 //         CHECK:               scf.yield
 //         CHECK:             scf.yield
 //         CHECK:           scf.yield
-// CHECK-COUNT-7:         vector.store %{{.+}}, %[[OUTPUT_SUBVIEW_0]]
+//         CHECK:         %[[OUTPUT_SUBVIEW_1:.+]] = memref.subview %[[OUTPUT_SUBVIEW_0]]
+// CHECK-COUNT-7:         vector.store %{{.+}}, %[[OUTPUT_SUBVIEW_1]]
