@@ -71,7 +71,7 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
       executable_params->constant_count * sizeof(VkSpecializationMapEntry);
   size_t subgroup_control_size =
       pipeline_count *
-      sizeof(VkPipelineShaderStageRequiredSubgroupSizeCreateInfo);
+      sizeof(VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT);
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       logical_device->host_allocator(),
       create_info_size + spec_map_size + subgroup_control_size,
@@ -80,10 +80,10 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
       (VkComputePipelineCreateInfo*)scratch_memory;
   VkSpecializationMapEntry* spec_map_entries =
       (VkSpecializationMapEntry*)(scratch_memory + create_info_size);
-  VkPipelineShaderStageRequiredSubgroupSizeCreateInfo* subgroup_control_entries =
-      (VkPipelineShaderStageRequiredSubgroupSizeCreateInfo*)(scratch_memory +
-                                                             create_info_size +
-                                                             spec_map_size);
+  VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT* subgroup_control_entries =
+      (VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT*)(scratch_memory +
+                                                                create_info_size +
+                                                                spec_map_size);
 
   VkSpecializationInfo spec_info;
   memset(&spec_info, 0, sizeof(spec_info));

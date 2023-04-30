@@ -932,7 +932,7 @@ iree_status_t iree_hal_vulkan_device_create(
     host_query_reset_features.hostQueryReset = VK_TRUE;
   }
 
-  VkPhysicalDeviceSubgroupSizeControlFeatures subgroup_control_features;
+  VkPhysicalDeviceSubgroupSizeControlFeaturesEXT subgroup_control_features;
   if (enabled_device_extensions.subgroup_size_control) {
     memset(&subgroup_control_features, 0, sizeof(subgroup_control_features));
     subgroup_control_features.sType =
