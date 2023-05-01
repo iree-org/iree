@@ -54,9 +54,9 @@ void registerStableHLOConversionPassPipeline() {
 
 // Prepare HLO for use as an input to the Flow dialect.
 void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
-  // TODO(#12678): Port StableHLO-StableHLO legalization.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
-  // TODO(#12678): Port StableHLO control flow legalization.
+  passManager.addNestedPass<func::FuncOp>(
+      stablehlo::createLegalizeControlFlow());
 
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf

@@ -17,7 +17,12 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext *context,
                                                  RewritePatternSet *patterns,
                                                  bool enablePrimitiveOps);
 
-// Collection of rewrite patterns for lowering of StableHLO dim operations.
+/// Collection of rewrite patterns for lowering of StableHLO ops to SCF control
+/// flow ops.
+void populateLegalizeControlFlowPatterns(MLIRContext *context,
+                                         RewritePatternSet *patterns);
+
+/// Collection of rewrite patterns for lowering of StableHLO dim operations.
 void populateLegalizeShapeComputationPatterns(MLIRContext *context,
                                               RewritePatternSet *patterns);
 
