@@ -108,17 +108,6 @@ def execute_cmd(args: Sequence[Any],
     raise exc
 
 
-def execute_cmd_and_get_stdout(args: Sequence[Any],
-                               verbose: bool = False,
-                               **kwargs) -> str:
-  """Executes a command and returns its stdout.
-
-  Same as execute_cmd except captures stdout (and not stderr).
-  """
-  return execute_cmd(args, verbose=verbose, stdout=subprocess.PIPE,
-                     **kwargs).stdout.strip()
-
-
 def execute_cmd_and_get_output(args: Sequence[Any],
                                verbose: bool = False,
                                **kwargs) -> Tuple[str, str]:
@@ -132,6 +121,17 @@ def execute_cmd_and_get_output(args: Sequence[Any],
                     stderr=subprocess.PIPE,
                     **kwargs)
   return exc.stdout.strip(), exc.stderr.strip()
+
+
+def execute_cmd_and_get_stdout(args: Sequence[Any],
+                               verbose: bool = False,
+                               **kwargs) -> str:
+  """Executes a command and returns its stdout.
+
+  Same as execute_cmd except captures stdout (and not stderr).
+  """
+  stdout, _ = execute_cmd_and_get_output(args, verbose=verbose, **kwargs)
+  return stdout
 
 
 def get_git_commit_hash(commit: str) -> str:
