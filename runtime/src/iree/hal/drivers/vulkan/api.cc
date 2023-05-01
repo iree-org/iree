@@ -15,8 +15,6 @@
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 
-using namespace iree::hal::vulkan;
-
 // TODO(benvanik): move these into the appropriate files and delete this .cc.
 
 //===----------------------------------------------------------------------===//
@@ -31,7 +29,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create(
   *out_syms = nullptr;
 
   iree::ref_ptr<iree::hal::vulkan::DynamicSymbols> syms;
-  IREE_RETURN_IF_ERROR(DynamicSymbols::Create(
+  IREE_RETURN_IF_ERROR(iree::hal::vulkan::DynamicSymbols::Create(
       [&vkGetInstanceProcAddr_fn](const char* function_name) {
         // Only resolve vkGetInstanceProcAddr, rely on syms->LoadFromInstance()
         // and/or syms->LoadFromDevice() for further loading.
@@ -54,14 +52,15 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create_from_system_loader(
   *out_syms = nullptr;
 
   iree::ref_ptr<iree::hal::vulkan::DynamicSymbols> syms;
-  IREE_RETURN_IF_ERROR(DynamicSymbols::CreateFromSystemLoader(&syms));
+  IREE_RETURN_IF_ERROR(
+      iree::hal::vulkan::DynamicSymbols::CreateFromSystemLoader(&syms));
   *out_syms = reinterpret_cast<iree_hal_vulkan_syms_t*>(syms.release());
   return iree_ok_status();
 }
 
 IREE_API_EXPORT void iree_hal_vulkan_syms_retain(iree_hal_vulkan_syms_t* syms) {
   IREE_ASSERT_ARGUMENT(syms);
-  auto* handle = reinterpret_cast<DynamicSymbols*>(syms);
+  auto* handle = reinterpret_cast<iree::hal::vulkan::DynamicSymbols*>(syms);
   if (handle) {
     handle->AddReference();
   }
@@ -70,7 +69,7 @@ IREE_API_EXPORT void iree_hal_vulkan_syms_retain(iree_hal_vulkan_syms_t* syms) {
 IREE_API_EXPORT void iree_hal_vulkan_syms_release(
     iree_hal_vulkan_syms_t* syms) {
   IREE_ASSERT_ARGUMENT(syms);
-  auto* handle = reinterpret_cast<DynamicSymbols*>(syms);
+  auto* handle = reinterpret_cast<iree::hal::vulkan::DynamicSymbols*>(syms);
   if (handle) {
     handle->ReleaseReference();
   }

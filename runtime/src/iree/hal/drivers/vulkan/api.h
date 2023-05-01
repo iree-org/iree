@@ -11,9 +11,10 @@
 
 #include <stdint.h>
 
-// clang-format off: must be included before all other headers.
-#include "iree/hal/drivers/vulkan/vulkan_headers.h"
-// clang-format on
+// Declare Vulkan symbols that are used, keeping implementation symbols private.
+typedef struct VkInstance_T* VkInstance;
+typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
+typedef struct VkDevice_T* VkDevice;
 
 #include <stdint.h>
 
