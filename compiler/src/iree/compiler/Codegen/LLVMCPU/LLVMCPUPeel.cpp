@@ -56,7 +56,7 @@ class LLVMCPUPeelPass : public LLVMCPUPeelBase<LLVMCPUPeelPass> {
 void LLVMCPUPeelPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-  SmallVector<Operation*> candidates;
+  SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::LinalgOp, tensor::PackOp>(op)) {
       candidates.push_back(op);
