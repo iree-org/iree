@@ -18,6 +18,12 @@ def ConvertStableHloToLinalg :
                         "transpose) when possible, instead of linalg.generic">];
 }
 
+def ConvertStableHloToLinalgExt :
+    Pass<"iree-stablehlo-to-linalg-ext", "func::FuncOp"> {
+  let summary =
+      "Convert from StableHLO ops to LinalgExt ops and distribute to Flow ops";
+}
+
 def LegalizeControlFlow :
     Pass<"iree-stablehlo-legalize-control-flow", "func::FuncOp"> {
   let summary = "Legalize from StableHLO control flow to SCF control flow";
