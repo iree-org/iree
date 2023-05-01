@@ -31,7 +31,12 @@ def LegalizeControlFlow :
 
 def LegalizeShapeComputations :
     Pass<"iree-stablehlo-legalize-shape-computations", "func::FuncOp"> {
-  let summary = "Legalize StableHLO shape operations to core-mlir operations.";
+  let summary = "Legalize StableHLO shape operations to core-mlir operations";
+}
+
+def VerifyCompilerStableHloInputLegality :
+    Pass<"iree-stablehlo-verify-compiler-input-legality", "ModuleOp"> {
+  let summary = "Verifies that only supported IR constructs are passed to the compiler";
 }
 
 #endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES
