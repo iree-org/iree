@@ -727,10 +727,10 @@ createSPIRVBreakDownLargeVectorPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVCreateFastSlowPathPass();
 
-/// Emulate 64-bit integer ops with 32-bit integer ops.
+/// Emulates 64-bit integer ops with 32-bit integer ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
 
-/// Emulate bfloat 16 ops with 32-bit float ops.
+/// Emulates bfloat 16 ops with 32-bit float ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateBf16Pass();
 
 /// Turns static shaped storage buffer subspan ops into dynamic shaped ones.

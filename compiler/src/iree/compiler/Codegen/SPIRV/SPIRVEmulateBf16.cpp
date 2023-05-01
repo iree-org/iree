@@ -38,10 +38,7 @@ namespace {
 
 class Bf16EmulationConverter : public TypeConverter {
  public:
-  explicit Bf16EmulationConverter();
-};
-
-Bf16EmulationConverter::Bf16EmulationConverter() {
+  explicit Bf16EmulationConverter() {
   // Allow unknown types.
   addConversion([](Type ty) -> std::optional<Type> { return ty; });
 
@@ -66,6 +63,7 @@ Bf16EmulationConverter::Bf16EmulationConverter() {
     return FunctionType::get(ty.getContext(), inputs, results);
   });
 }
+};
 
 //===----------------------------------------------------------------------===//
 // Rewrite patterns
