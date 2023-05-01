@@ -211,7 +211,7 @@ static void iree_hal_deferred_command_buffer_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-bool iree_hal_deferred_command_buffer_isa(
+IREE_API_EXPORT bool iree_hal_deferred_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
   return iree_hal_command_buffer_dyn_cast(
       command_buffer, &iree_hal_deferred_command_buffer_vtable);

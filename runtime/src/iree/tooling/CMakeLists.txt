@@ -119,6 +119,7 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers
     iree::hal::utils::allocators
+    iree::hal::utils::mpi_channel_provider
   PUBLIC
 )
 
