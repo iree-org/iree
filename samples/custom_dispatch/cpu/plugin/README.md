@@ -88,15 +88,16 @@ target_include_directories(...)
 ```
 
 3. The user (or compiler transforms) adds calls to their functions by declaring
-   them.
+   them. For each of the two inputs and one output, a `<baseptr, offset>` pair
+   is used to get the position to read from. It is essential for the
+   implementations of these functions to manually perform the
+   `baseptr + offset` before reading the data. The `memref` semantics in MLIR
+   only guarantee that the `baseptr + offset` represents the valid position to
+   read from. Also note that the `offset` here is in number of elements
+   (i.e. number of floats).
+
 
 ```mlir
-func.func private @simple_mul_workgroup(
-    %binding0_baseptr: memref<f32>, %binding0_offset: index,
-    %binding1_baseptr: memref<f32>, %binding2_offset: index,
-    %binding2_baseptr: memref<f32>, %binding2_offset: index,
-    %dim: index, %tid: index)
-...
 func.call @simple_mul_workgroup(
     %memref0_baseptr, %memref0_offset,
     %memref1_baseptr, %memref1_offset,
@@ -104,14 +105,6 @@ func.call @simple_mul_workgroup(
     %dim, %tid)
     : (memref<f32>, index, memref<f32>, index, memref<f32>, index, index, index) -> ()
 ```
-
-   For each of the two inputs and one output, a `<baseptr, offset>` pair is
-   used to get the position to read from. It is essential for the
-   implementations of these functions to manually perform the
-   `baseptr + offset` before reading the data. The `memref` semantics in
-   MLIR only guarantee that the `baseptr + offset` represents the valid
-   position to read from. Also note that the `offset` here is in number of
-   elements (i.e. number of floats).
 
 4. The user either programmatically registers the plugins via the plugin manager
    or when using IREE tools passes them using the `--executable_plugin=` flag.
