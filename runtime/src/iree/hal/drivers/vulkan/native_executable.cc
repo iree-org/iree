@@ -29,6 +29,10 @@ using namespace iree::hal::vulkan;
 typedef struct iree_hal_vulkan_entry_point_t {
   VkPipeline pipeline;
   iree_string_view_t name;
+
+  // Optional debug information.
+  IREE_TRACE(iree_string_view_t source_filename;)
+  IREE_TRACE(uint32_t source_line;)
 } iree_hal_vulkan_entry_point_t;
 
 static iree_status_t iree_hal_vulkan_create_shader_module(
@@ -340,6 +344,24 @@ iree_status_t iree_hal_vulkan_native_executable_create(
     }
   }
 
+  IREE_TRACE({
+    if (iree_status_is_ok(status) &&
+        iree_SpirVExecutableDef_source_locations_is_present(executable_def)) {
+      iree_SpirVFileLineLocDef_vec_t source_locs_vec =
+          iree_SpirVExecutableDef_source_locations_get(executable_def);
+      for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
+        iree_SpirVFileLineLocDef_table_t source_loc =
+            iree_SpirVFileLineLocDef_vec_at(source_locs_vec, i);
+        flatbuffers_string_t filename =
+            iree_SpirVFileLineLocDef_filename_get(source_loc);
+        uint32_t line = iree_SpirVFileLineLocDef_line_get(source_loc);
+        executable->entry_points[i].source_filename =
+            iree_make_string_view(filename, flatbuffers_string_len(filename));
+        executable->entry_points[i].source_line = line;
+      }
+    }
+  });
+
   if (iree_status_is_ok(status)) {
     *out_executable = (iree_hal_executable_t*)executable;
   } else {
@@ -376,11 +398,17 @@ void iree_hal_vulkan_native_executable_entry_point_source_location(
   if (entry_ordinal >= executable->entry_point_count) {
     return;
   }
-  out_source_location->func_name = executable->entry_points[entry_ordinal].name;
+  iree_hal_vulkan_entry_point_t entry_point =
+      executable->entry_points[entry_ordinal];
 
-  // TODO(benvanik): plumb through file name/line for the MLIR function.
+  out_source_location->func_name = entry_point.name;
+
   out_source_location->file_name = out_source_location->func_name;
   out_source_location->line = 0;
+  IREE_TRACE({
+    out_source_location->file_name = entry_point.source_filename;
+    out_source_location->line = entry_point.source_line;
+  });
 }
 
 iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(

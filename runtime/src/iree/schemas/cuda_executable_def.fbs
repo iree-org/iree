@@ -17,6 +17,12 @@ struct CUDABlockSizeDef {
   z:uint32;
 }
 
+// Source code location denoted by a file name and line within that file.
+table CUDAFileLineLocDef {
+  filename:string;
+  line:int32;
+}
+
 table CUDAExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
@@ -32,8 +38,13 @@ table CUDAExecutableDef {
 
   // PTX string of the module.
   ptx_image:string;
-  
+
   // TODO(thomasraoux): Add potential cuBin binary specialized for some targets.
+
+  // A map of entry point ordinals to source locations.
+  // This information is optional and may be used by debuggers and profilers to
+  // associate executable entry points with the source that generated them.
+  source_locations:[CUDAFileLineLocDef];
 }
 
 root_type CUDAExecutableDef;

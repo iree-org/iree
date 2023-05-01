@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
@@ -409,8 +410,12 @@ class CUDATargetBackend final : public TargetBackend {
       workgroupLocalMemories.push_back(workgroupLocalMemory);
     }
 
+    FlatbufferBuilder builder;
+    iree_CUDAExecutableDef_start_as_root(builder);
+
     SmallVector<std::string> entryPointNames;
     std::string ptxImage;
+    SmallVector<iree_CUDAFileLineLocDef_ref_t> sourceLocationRefs;
     if (variantOp.isExternal()) {
       if (!variantOp.getObjects().has_value()) {
         return variantOp.emitOpError()
@@ -486,6 +491,15 @@ class CUDATargetBackend final : public TargetBackend {
         setMetadataValueI32("maxntidx", workgroupSize[0]);
         setMetadataValueI32("maxntidy", workgroupSize[1]);
         setMetadataValueI32("maxntidz", workgroupSize[2]);
+
+        // Optional source location information for debugging/profiling.
+        if (options.debugLevel >= 1) {
+          if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
+            auto filenameRef = builder.createString(loc->getFilename());
+            sourceLocationRefs.push_back(iree_CUDAFileLineLocDef_create(
+                builder, filenameRef, loc->getLine()));
+          }
+        }
       }
 
       std::unique_ptr<llvm::TargetMachine> targetMachine;
@@ -554,10 +568,6 @@ class CUDATargetBackend final : public TargetBackend {
     }
 
     std::string gpuImage = produceGpuImage(ptxImage);
-
-    FlatbufferBuilder builder;
-    iree_CUDAExecutableDef_start_as_root(builder);
-
     auto gpuImageRef = flatbuffers_uint8_vec_create(
         builder, reinterpret_cast<const uint8_t *>(gpuImage.c_str()),
         gpuImage.size());
@@ -576,6 +586,11 @@ class CUDATargetBackend final : public TargetBackend {
     iree_CUDAExecutableDef_shared_memory_size_add(builder,
                                                   workgroupLocalMemoriesRef);
     iree_CUDAExecutableDef_ptx_image_add(builder, gpuImageRef);
+    if (!sourceLocationRefs.empty()) {
+      auto sourceLocationsRef =
+          builder.createOffsetVecDestructive(sourceLocationRefs);
+      iree_CUDAExecutableDef_source_locations_add(builder, sourceLocationsRef);
+    }
     iree_CUDAExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.

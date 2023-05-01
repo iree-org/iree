@@ -162,6 +162,22 @@ iree_status_t iree_hal_cuda_native_executable_create(
             iree_make_string_view(string_table_buffer, entry_name_length);
         string_table_buffer += entry_name_length;
       });
+
+      IREE_TRACE({
+        if (iree_CUDAExecutableDef_source_locations_is_present(
+                executable_def)) {
+          iree_CUDAFileLineLocDef_vec_t source_locs_vec =
+              iree_CUDAExecutableDef_source_locations_get(executable_def);
+          iree_CUDAFileLineLocDef_table_t source_loc =
+              iree_CUDAFileLineLocDef_vec_at(source_locs_vec, i);
+          flatbuffers_string_t filename =
+              iree_CUDAFileLineLocDef_filename_get(source_loc);
+          uint32_t line = iree_CUDAFileLineLocDef_line_get(source_loc);
+          params->source_filename =
+              iree_make_string_view(filename, flatbuffers_string_len(filename));
+          params->source_line = line;
+        }
+      });
     }
   }
 

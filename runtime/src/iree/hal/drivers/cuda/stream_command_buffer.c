@@ -492,9 +492,9 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
 
   IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->stream,
-      kernel_params.function_name.data, kernel_params.function_name.size,
-      /*line=*/0, /*func_name=*/NULL, 0, kernel_params.function_name.data,
-      kernel_params.function_name.size);
+      kernel_params.source_filename.data, kernel_params.source_filename.size,
+      kernel_params.source_line, /*func_name=*/NULL, 0,
+      kernel_params.function_name.data, kernel_params.function_name.size);
 
   // Patch the push constants in the kernel arguments.
   iree_host_size_t num_constants =
