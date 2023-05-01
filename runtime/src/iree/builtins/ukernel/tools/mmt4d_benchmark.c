@@ -13,7 +13,6 @@
 #include "iree/builtins/ukernel/tools/benchmark.h"
 #include "iree/builtins/ukernel/tools/util.h"
 
-IREE_FLAG(int32_t, batch_count, 1000, "Ops to run per benchmark iteration.");
 IREE_FLAG(int32_t, m_size, 1,
           "M-dimension of mmt4d ops. The overall number of rows of the "
           "accumulator is that times the M0 tile size.");
@@ -69,12 +68,13 @@ static iree_status_t iree_uk_benchmark_mmt4d(
   params.rhs_buffer = rhs_buffer;
   params.out_buffer = out_buffer;
   int64_t total_iterations = 0;
-  while (iree_benchmark_keep_running(benchmark_state,
-                                     /*batch_count=*/FLAG_batch_count)) {
-    for (int i = 0; i < FLAG_batch_count; ++i) {
+  int64_t batch_count = 1;
+  while (iree_benchmark_keep_running(benchmark_state, batch_count)) {
+    for (int i = 0; i < batch_count; ++i) {
       iree_uk_mmt4d(&params);
     }
-    total_iterations += FLAG_batch_count;
+    total_iterations += batch_count;
+    batch_count *= 2;
   }
   iree_benchmark_set_items_processed(
       benchmark_state, total_iterations * 2 * params.M * params.N * params.K *

@@ -14,9 +14,6 @@
 #include "iree/builtins/ukernel/tools/util.h"
 #include "iree/builtins/ukernel/unpack_internal.h"
 
-IREE_FLAG(int64_t, batch_min_traversal_size, 10000000,
-          "Minimum number of bytes to be traversed in each batch.");
-
 IREE_FLAG(
     int64_t, working_set_size, 10000,
     "Number of bytes to be traversed by the benchmark workload (input and "
@@ -84,20 +81,18 @@ static iree_status_t iree_uk_benchmark_unpack(
   params.in_buffer = in_buffer;
   params.out_buffer = out_buffer;
   int64_t total_iterations = 0;
-  int64_t batch_count =
-      (FLAG_batch_min_traversal_size + FLAG_working_set_size - 1) /
-      FLAG_working_set_size;
-  while (iree_benchmark_keep_running(benchmark_state,
-                                     /*batch_count=*/batch_count)) {
+  int64_t batch_count = 1;
+  while (iree_benchmark_keep_running(benchmark_state, batch_count)) {
     for (int i = 0; i < batch_count; ++i) {
       iree_uk_unpack(&params);
     }
     total_iterations += batch_count;
+    batch_count *= 2;
   }
   // Report bytes per second, so that can be easily compared to known memory
   // system performance metrics (e.g. RAM bandwidth, to tell whether this is
   // memory-bound).
-  iree_benchmark_set_items_processed(benchmark_state,
+  iree_benchmark_set_bytes_processed(benchmark_state,
                                      total_iterations * out_buffer_size);
   free(in_buffer);
   free(out_buffer);
@@ -143,8 +138,7 @@ int main(int argc, char** argv) {
 
   // The memcpy benchmark provides a useful comparison point, as pack is fairly
   // close to memory-bound.
-  iree_uk_benchmark_register_memcpy(FLAG_working_set_size,
-                                    FLAG_batch_min_traversal_size);
+  iree_uk_benchmark_register_memcpy(FLAG_working_set_size);
 
 #if defined(IREE_UK_ARCH_ARM_64)
   iree_uk_benchmark_register_unpack(IREE_UK_FLAG_UNPACK_TYPE_F32F32, 8, 8, "");
