@@ -413,9 +413,9 @@ class CUDATargetBackend final : public TargetBackend {
     FlatbufferBuilder builder;
     iree_CUDAExecutableDef_start_as_root(builder);
 
-    SmallVector<std::string, 8> entryPointNames;
+    SmallVector<std::string> entryPointNames;
     std::string ptxImage;
-    SmallVector<iree_CUDAFileLineLocDef_ref_t, 8> sourceLocationRefs;
+    SmallVector<iree_CUDAFileLineLocDef_ref_t> sourceLocationRefs;
     if (variantOp.isExternal()) {
       if (!variantOp.getObjects().has_value()) {
         return variantOp.emitOpError()

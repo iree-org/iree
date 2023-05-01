@@ -161,9 +161,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     // The runtime uses ordinals instead of names. We provide the list of entry
     // point names here that are then passed in VkShaderModuleCreateInfo.
-    SmallVector<StringRef, 8> entryPointNames;
-    SmallVector<uint32_t, 8> subgroupSizes;
-    SmallVector<iree_SpirVFileLineLocDef_ref_t, 8> sourceLocationRefs;
+    SmallVector<StringRef> entryPointNames;
+    SmallVector<uint32_t> subgroupSizes;
+    SmallVector<iree_SpirVFileLineLocDef_ref_t> sourceLocationRefs;
     bool hasAnySubgroupSizes = false;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
       entryPointNames.push_back(exportOp.getFn());
