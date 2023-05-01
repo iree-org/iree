@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/InputConversion/StableHLO/Preprocessing/Passes.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
@@ -123,6 +124,7 @@ void registerStableHLOConversionPasses() {
   // Generated.
   registerPasses();
 
+  registerStableHLOPreprocessingPasses();
   registerStableHLOConversionPassPipeline();
 }
 

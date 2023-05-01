@@ -114,6 +114,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
         "//compiler/src/iree/compiler/InputConversion/Common",
+        "//compiler/src/iree/compiler/InputConversion/StableHLO/Preprocessing",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MLProgramDialect",
