@@ -111,7 +111,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
   // canonicalization. See comments in the above pass and find a better way.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
-  // TODO(#12678): Port StableHLO input legality verification pass.
+  passManager.addPass(stablehlo::createVerifyCompilerStableHloInputLegality());
 }
 }  // namespace
 

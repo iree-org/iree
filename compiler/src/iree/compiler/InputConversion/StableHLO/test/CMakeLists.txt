@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "stablehlo_to_linalg_pointwise.mlir"
     "stablehlo_to_linalg_random.mlir"
     "stablehlo_to_linalg_reduce.mlir"
+    "verify_compiler_input_legality.mlir"
   TOOLS
     FileCheck
     iree-opt
