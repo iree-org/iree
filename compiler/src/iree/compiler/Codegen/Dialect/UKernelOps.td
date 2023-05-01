@@ -45,6 +45,13 @@ def IREECodegen_UKernelGenericOp :
     each memref. For memrefs of rank less than the value of
     `strided_outer_dims`, all strides are passed.
 
+    Note that `memref` semantics only guarantee that a `base_pointer + offset`
+    represents the position to read from. So all micro-kernel implementations
+    are expected to take at least a `base_pointer, offset` pair for each
+    operand (input or output) of `memref` type. The `offset` has to be added to
+    the `base_pointer` before dereferencing to read/write data. Also note that
+    the `offset` is in number of elements.
+
     All other operands are expected to be scalar types.
     TODO: `vector` types can be supported as well, but needs better
     ABI specification.
@@ -55,6 +62,7 @@ def IREECodegen_UKernelGenericOp :
     Variadic<AnyType>:$inputs,
     Variadic<AnyRankedTensorOrMemRefType>:$outputs,
     Variadic<AnyType>:$other_operands,
+    OptionalAttr<DictionaryAttr>:$fn_def_attrs,
     OptionalAttr<IndexAttr>:$strided_outer_dims);
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
@@ -62,6 +70,7 @@ def IREECodegen_UKernelGenericOp :
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     (`outs` `(` $outputs^  `:` type($outputs) `)`)?
     (`(` $other_operands^ `:` type($other_operands) `)`)?
+    ( `fn_def_attrs` $fn_def_attrs^ )?
     (`strided_outer_dims` `(` $strided_outer_dims^ `)`)? (`->` type($results)^)?
   }];
 }

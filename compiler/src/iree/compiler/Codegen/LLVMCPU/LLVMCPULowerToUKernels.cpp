@@ -86,6 +86,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, outType, "vmvx.mmt4d", ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
+      /*fn_def_attrs=*/nullptr,
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -195,6 +196,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       loc, outType, "vmvx.pack", in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
+      /*fn_def_attrs=*/nullptr,
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -269,6 +271,7 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
       loc, outType, "vmvx.unpack", in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
+      /*fn_def_attrs=*/nullptr,
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());

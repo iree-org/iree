@@ -42,11 +42,19 @@ module @example {
 
     builtin.module {
       // External function declaration using a user-chosen calling convention.
-      func.func private @simple_mul_workgroup(%binding0: memref<?xf32>, %binding1: memref<?xf32>, %binding2: memref<?xf32>, %dim: index, %tid: index) attributes {
+      func.func private @simple_mul_workgroup(
+            %binding0: memref<f32>, 
+            %binding0_offset : index,
+            %binding1: memref<f32>,
+            %binding1_offset : index,
+            %binding2: memref<f32>, 
+            %binding2_offset : index,
+            %dim: index, %tid: index) attributes {
         // We can include some additional fields on the parameters struct as
         // needed. Here we request which processor is executing the call and
         // its data fields as defined by runtime/src/iree/schemas/cpu_data.h.
-        hal.import.fields = ["processor_id", "processor_data"]
+        hal.import.fields = ["processor_id", "processor_data"],
+        llvm.bareptr = true
       }
 
       // IREE exported function using stream bindings and operands.
@@ -72,10 +80,22 @@ module @example {
         %memref1 = stream.binding.subspan %binding1[%c0] : !stream.binding -> memref<?xf32>{%dim}
         %memref2 = stream.binding.subspan %binding2[%c0] : !stream.binding -> memref<?xf32>{%dim}
 
+        // The default `memref` lowering contains additional fields that might not be
+        // always required. In this example, we only need the base and offset of the
+        // `memref`s. So extract the base and offset from the memrefs.
+        %base0, %offset0, %size0, %stride0 = memref.extract_strided_metadata %memref0
+            : memref<?xf32> -> memref<f32>, index, index, index
+        %base1, %offset1, %size1, %stride1 = memref.extract_strided_metadata %memref1
+            : memref<?xf32> -> memref<f32>, index, index, index
+        %base2, %offset2, %size2, %stride2 = memref.extract_strided_metadata %memref2
+            : memref<?xf32> -> memref<f32>, index, index, index
+        
         // Call the externally defined C function with an (almost) plain C
         // calling convention (see above for details about the mess memrefs
         // turn into). This will be fetched at runtime from the plugin binary.
-        func.call @simple_mul_workgroup(%memref0, %memref1, %memref2, %dim, %tid) : (memref<?xf32>, memref<?xf32>, memref<?xf32>, index, index) -> ()
+        func.call @simple_mul_workgroup(
+            %base0, %offset0, %base1, %offset1, %base2, %offset2, %dim, %workgroup_id_x)
+            : (memref<f32>, index, memref<f32>, index, memref<f32>, index, index, index) -> ()
 
         // NOTE: this is code generated as normal - other MLIR ops can be used
         // here for looping/control flow, vector operations, linalg, etc.

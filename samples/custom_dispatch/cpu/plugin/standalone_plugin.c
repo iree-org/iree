@@ -46,40 +46,6 @@
 static int simple_mul_workgroup(void* context, void* params_ptr,
                                 void* reserved) {
   typedef struct {
-    // vvvv simplification pending (buffer + offset)
-    const float* restrict binding0;
-    const float* restrict binding0_aligned;
-    size_t binding0_offset;
-    size_t binding0_size;
-    size_t binding0_stride;
-    const float* restrict binding1;
-    const float* restrict binding1_aligned;
-    size_t binding1_offset;
-    size_t binding1_size;
-    size_t binding1_stride;
-    float* restrict binding2;
-    float* restrict binding2_aligned;
-    size_t binding2_offset;
-    size_t binding2_size;
-    size_t binding2_stride;
-    // ^^^^ simplification pending (buffer + offset)
-    size_t dim;
-    size_t tid;
-    uint32_t processor_id;
-    const uint64_t* restrict processor_data;
-  } params_t;
-  const params_t* params = (const params_t*)params_ptr;
-  size_t end = params->tid + 64;
-  if (end > params->dim) end = params->dim;
-  for (size_t i = params->tid; i < end; ++i) {
-    params->binding2[i] = params->binding0[i] * params->binding1[i];
-  }
-  return 0;
-}
-
-static int simple_mul_workgroup_ukernel(void* context, void* params_ptr,
-                                        void* reserved) {
-  typedef struct {
     const float* restrict binding0;
     size_t binding0_offset;
     const float* restrict binding1;
@@ -88,6 +54,8 @@ static int simple_mul_workgroup_ukernel(void* context, void* params_ptr,
     size_t binding2_offset;
     size_t size;
     size_t tid;
+    uint32_t processor_id;
+    const uint64_t* restrict processor_data;
   } params_t;
   const params_t* params = (const params_t*)params_ptr;
   // The operation `iree_codegen.ukernel.generic` always operates
@@ -145,10 +113,6 @@ static iree_hal_executable_plugin_status_t standalone_plugin_resolve(
     if (iree_hal_executable_plugin_strcmp(symbol_name,
                                           "simple_mul_workgroup") == 0) {
       params->out_fn_ptrs[i] = simple_mul_workgroup;
-      params->out_fn_contexts[i] = NULL;  // no context used, could be self
-    } else if (iree_hal_executable_plugin_strcmp(
-                   symbol_name, "simple_mul_workgroup_ukernel") == 0) {
-      params->out_fn_ptrs[i] = simple_mul_workgroup_ukernel;
       params->out_fn_contexts[i] = NULL;  // no context used, could be self
     } else {
       if (is_optional) {

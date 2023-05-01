@@ -25,7 +25,7 @@ should be used with careful consideration.
 
 ## Workflow for System Dynamic Libraries
 
-```
+```text
 +----------+    +---------------+      +--------------+
 | plugin.c | -> | plugin.so/dll |-+    | example.mlir |
 +----------+    +---------------+ |    +--------------+
@@ -88,14 +88,22 @@ target_include_directories(...)
 ```
 
 3. The user (or compiler transforms) adds calls to their functions by declaring
-   them.
+   them. For each of the two inputs and one output, a `<baseptr, offset>` pair
+   is used to get the position to read from. It is essential for the
+   implementations of these functions to manually perform the
+   `baseptr + offset` before reading the data. The `memref` semantics in MLIR
+   only guarantee that the `baseptr + offset` represents the valid position to
+   read from. Also note that the `offset` here is in number of elements
+   (i.e. number of floats).
+
 
 ```mlir
-func.func private @simple_mul_workgroup(
-    %binding0: memref<?xf32>, %binding1: memref<?xf32>, %binding2: memref<?xf32>,
-    %dim: index, %tid: index)
-...
-func.call @simple_mul_workgroup(%memref0, %memref1, %memref2, %dim, %tid) : (memref<?xf32>, memref<?xf32>, memref<?xf32>, index, index) -> ()
+func.call @simple_mul_workgroup(
+    %memref0_baseptr, %memref0_offset,
+    %memref1_baseptr, %memref1_offset,
+    %memref2_baseptr, %memref2_offset,
+    %dim, %tid)
+    : (memref<f32>, index, memref<f32>, index, memref<f32>, index, index, index) -> ()
 ```
 
 4. The user either programmatically registers the plugins via the plugin manager
@@ -105,7 +113,7 @@ func.call @simple_mul_workgroup(%memref0, %memref1, %memref2, %dim, %tid) : (mem
    followed by more specialized plugins that may only handle a subset of
    imports.
 
-```
+```bash
 iree-run-module \
     --device=local-sync \
     --executable_plugin=my_plugins.so \
@@ -117,7 +125,7 @@ iree-run-module \
 
 ## Workflow for Embedded ELF Libraries
 
-```
+```text
 +----------+      +-------------------+       +--------------+
 | plugin.c | -+-> | plugin_aarch64.so | -+    | example.mlir |
 +----------+  |   +-------------------+  |    +--------------+
@@ -161,7 +169,7 @@ for instructions for CMake setup and building from source.
    [system_plugin.c](./system_plugin.c) sources to object files for aarch64 and
    x86_64 or the current target system:
 
-    ```
+    ```bash
     cmake --build ../iree-build/ --target iree-sample-deps
     ```
 
@@ -174,7 +182,7 @@ for instructions for CMake setup and building from source.
 2. Compile the [example module](./example.mlir) to a .vmfb file and pass
    the path to the build directory so the .spv files can be found:
 
-    ```
+    ```bash
     iree-compile \
         samples/custom_dispatch/cpu/plugin/example.mlir \
         -o=/tmp/example.vmfb
@@ -183,7 +191,7 @@ for instructions for CMake setup and building from source.
 3. Run the example program using the plugins for either platform-independent
    embedded ELF files or the system libraries:
 
-    ```
+    ```bash
     iree-run-module \
         --device=llvm-sync \
         --executable_plugin=samples/custom_dispatch/cpu/plugin/standalone_plugin.sos \
@@ -193,7 +201,7 @@ for instructions for CMake setup and building from source.
         /tmp/example.vmfb
     ```
 
-    ```
+    ```bash
     iree-run-module \
         --device=llvm-sync \
         --executable_plugin=samples/custom_dispatch/cpu/plugin/system_plugin.so \
