@@ -51,17 +51,6 @@ class Bf16EmulationConverter : public TypeConverter {
   addConversion([this](ShapedType ty) -> std::optional<Type> {
     return ty.clone(convertType(ty.getElementType()));
   });
-
-  // Function case.
-  addConversion([this](FunctionType ty) -> std::optional<Type> {
-    SmallVector<Type> inputs;
-    if (failed(convertTypes(ty.getInputs(), inputs))) return std::nullopt;
-
-    SmallVector<Type> results;
-    if (failed(convertTypes(ty.getResults(), results))) return std::nullopt;
-
-    return FunctionType::get(ty.getContext(), inputs, results);
-  });
 }
 };
 
@@ -161,7 +150,7 @@ std::optional<Value> materializeArithBitcast(OpBuilder &builder, Type resultTy,
 }
 
 static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
-                                              TypeConverter typeConverter) {
+                                              TypeConverter& typeConverter) {
   patterns.add<ConvertHalInterfaceBindingSubspan, ConvertMemRefAlloc,
                ConvertMemRefLoad, ConvertMemRefStore>(typeConverter,
                                                       patterns.getContext());
@@ -189,6 +178,7 @@ struct SPIRVEmulateBf16Pass final
     {
       ConversionTarget target(*ctx);
       target.addLegalOp<arith::BitcastOp>();
+      target.addLegalOp<func::ReturnOp>();
       target.addDynamicallyLegalOp<func::FuncOp>([&typeConverter](
                                                      Operation *op) {
         return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
