@@ -9,6 +9,15 @@
 
 include "mlir/Pass/PassBase.td"
 
+def StableHLOToStableHLOPreprocessing :
+    Pass<"iree-stablehlo-to-stablehlo-preprocessing", "func::FuncOp"> {
+  let summary = "Apply IREE-specific stablehlo to stablehlo preprocessing transformations";
+  let options = [
+    Option<"orderConvFeatures", "order-conv-features", "bool", /*default=*/"true",
+           "Guarantees input/output features ordered from conv kernel">
+  ];
+}
+
 def DotGeneralToDot :
     Pass<"iree-stablehlo-preprocessing-dot-general-to-dot", "func::FuncOp"> {
   let summary = "Lowers general dot to a non-batched dot when possible";

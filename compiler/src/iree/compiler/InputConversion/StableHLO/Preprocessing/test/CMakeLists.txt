@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "dot_general_to_dot.mlir"
     "einsum_to_dot_general.mlir"
     "gather_to_torch_index_select.mlir"
+    "stablehlo_to_stablehlo.mlir"
     "unfuse_batch_norm.mlir"
   TOOLS
     FileCheck

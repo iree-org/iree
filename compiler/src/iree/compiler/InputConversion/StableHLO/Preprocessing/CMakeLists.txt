@@ -58,6 +58,7 @@ iree_cc_library(
     "GatherToTorchIndexSelect.cpp"
     "LowerComplex.cpp"
     "Passes.cpp"
+    "StableHLOToStableHLO.cpp"
     "UnfuseBatchNorm.cpp"
   DEPS
     ::ComplexLoweringPatterns
