@@ -595,9 +595,6 @@ struct ConvertMHLOToLinalgExtPass
         [](mhlo::ComplexOp complexOp) {
           return !isInBodyOfLinalgExtOps(complexOp);
         });
-    // We deliberately allow unrealized casts to persist. These should fall away
-    // when the rest of MHLO is converted.
-    //target.addLegalOp<tensor::BitcastOp>();
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
