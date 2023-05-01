@@ -51,17 +51,18 @@ iree_status_t iree_hal_cuda_native_executable_create(
   // TODO: verify the flatbuffer.
   // WARNING: THIS IS CURRENTLY INSECURE. This code is not checking any of the
   // data from the flatbuffer.
-  iree_CUDAExecutableDef_table_t executable_def =
-      iree_CUDAExecutableDef_as_root(executable_params->executable_data.data);
+  iree_hal_cuda_ExecutableDef_table_t executable_def =
+      iree_hal_cuda_ExecutableDef_as_root(
+          executable_params->executable_data.data);
 
   flatbuffers_string_t ptx_image =
-      iree_CUDAExecutableDef_ptx_image_get(executable_def);
+      iree_hal_cuda_ExecutableDef_ptx_image_get(executable_def);
   flatbuffers_uint32_vec_t shared_memory_sizes =
-      iree_CUDAExecutableDef_shared_memory_size_get(executable_def);
+      iree_hal_cuda_ExecutableDef_shared_memory_size_get(executable_def);
   flatbuffers_string_vec_t entry_points_vec =
-      iree_CUDAExecutableDef_entry_points_get(executable_def);
-  iree_CUDABlockSizeDef_vec_t block_sizes_vec =
-      iree_CUDAExecutableDef_block_sizes_get(executable_def);
+      iree_hal_cuda_ExecutableDef_entry_points_get(executable_def);
+  iree_hal_cuda_BlockSizeDef_vec_t block_sizes_vec =
+      iree_hal_cuda_ExecutableDef_block_sizes_get(executable_def);
   iree_host_size_t entry_point_count =
       flatbuffers_string_vec_len(entry_points_vec);
 
@@ -164,15 +165,15 @@ iree_status_t iree_hal_cuda_native_executable_create(
       });
 
       IREE_TRACE({
-        if (iree_CUDAExecutableDef_source_locations_is_present(
+        if (iree_hal_cuda_ExecutableDef_source_locations_is_present(
                 executable_def)) {
-          iree_CUDAFileLineLocDef_vec_t source_locs_vec =
-              iree_CUDAExecutableDef_source_locations_get(executable_def);
-          iree_CUDAFileLineLocDef_table_t source_loc =
-              iree_CUDAFileLineLocDef_vec_at(source_locs_vec, i);
+          iree_hal_cuda_FileLineLocDef_vec_t source_locs_vec =
+              iree_hal_cuda_ExecutableDef_source_locations_get(executable_def);
+          iree_hal_cuda_FileLineLocDef_table_t source_loc =
+              iree_hal_cuda_FileLineLocDef_vec_at(source_locs_vec, i);
           flatbuffers_string_t filename =
-              iree_CUDAFileLineLocDef_filename_get(source_loc);
-          uint32_t line = iree_CUDAFileLineLocDef_line_get(source_loc);
+              iree_hal_cuda_FileLineLocDef_filename_get(source_loc);
+          uint32_t line = iree_hal_cuda_FileLineLocDef_line_get(source_loc);
           params->source_filename =
               iree_make_string_view(filename, flatbuffers_string_len(filename));
           params->source_line = line;

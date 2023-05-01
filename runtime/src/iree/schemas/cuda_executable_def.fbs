@@ -4,26 +4,26 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-namespace iree;
+namespace iree.hal.cuda;
 
 // 'CUDA Executable'.
 file_identifier "CUDA";
 file_extension "cuda";
 
 // A struct for the kernel block size along each dimensions.
-struct CUDABlockSizeDef {
+struct BlockSizeDef {
   x:uint32;
   y:uint32;
   z:uint32;
 }
 
 // Source code location denoted by a file name and line within that file.
-table CUDAFileLineLocDef {
+table FileLineLocDef {
   filename:string;
   line:int32;
 }
 
-table CUDAExecutableDef {
+table ExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
   entry_points:[string];
@@ -32,7 +32,7 @@ table CUDAExecutableDef {
   //
   // Currently the thread group size/block size is decided during code gen but
   // in CUDA it is set by the runtime.
-  block_sizes:[CUDABlockSizeDef];
+  block_sizes:[BlockSizeDef];
   // Size of dynamic shared memory.
   shared_memory_size:[uint32];
 
@@ -44,7 +44,7 @@ table CUDAExecutableDef {
   // A map of entry point ordinals to source locations.
   // This information is optional and may be used by debuggers and profilers to
   // associate executable entry points with the source that generated them.
-  source_locations:[CUDAFileLineLocDef];
+  source_locations:[FileLineLocDef];
 }
 
-root_type CUDAExecutableDef;
+root_type ExecutableDef;
