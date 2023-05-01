@@ -39,19 +39,19 @@ namespace {
 class Bf16EmulationConverter : public TypeConverter {
  public:
   explicit Bf16EmulationConverter() {
-  // Allow unknown types.
-  addConversion([](Type ty) -> std::optional<Type> { return ty; });
+    // Allow unknown types.
+    addConversion([](Type ty) -> std::optional<Type> { return ty; });
 
-  // Scalar case.
-  addConversion([](FloatType ty) -> std::optional<Type> {
-    if (ty.isBF16()) return IntegerType::get(ty.getContext(), 16);
-    return ty;
-  });
+    // Scalar case.
+    addConversion([](FloatType ty) -> std::optional<Type> {
+      if (ty.isBF16()) return IntegerType::get(ty.getContext(), 16);
+      return ty;
+    });
 
-  addConversion([this](ShapedType ty) -> std::optional<Type> {
-    return ty.clone(convertType(ty.getElementType()));
-  });
-}
+    addConversion([this](ShapedType ty) -> std::optional<Type> {
+      return ty.clone(convertType(ty.getElementType()));
+    });
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -150,7 +150,7 @@ std::optional<Value> materializeArithBitcast(OpBuilder &builder, Type resultTy,
 }
 
 static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
-                                              TypeConverter& typeConverter) {
+                                              TypeConverter &typeConverter) {
   patterns.add<ConvertHalInterfaceBindingSubspan, ConvertMemRefAlloc,
                ConvertMemRefLoad, ConvertMemRefStore>(typeConverter,
                                                       patterns.getContext());
