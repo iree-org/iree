@@ -1,6 +1,6 @@
 # Requirements for running TF tests
 # Temporarily pinning to nightly until TF 2.13 is released
-tf-nightly==2.13.0.dev20230406
+tf-nightly==2.13.0.dev20230501
 keras>=2.7.0
 Pillow>=9.2.0
 
