@@ -362,6 +362,16 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
   // Ensure CUDA is initialized before querying it.
   IREE_RETURN_IF_ERROR(iree_hal_cuda_init(driver));
 
+  // Query the number of available CUDA devices.
+  int device_count = 0;
+  CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetCount(&device_count),
+                       "cuDeviceGetCount");
+  if (device_index >= device_count) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "device %d not found (of %d enumerated)",
+                            device_index, device_count);
+  }
+
   CUdevice device = 0;
   CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGet(&device, device_index),
                        "cuDeviceGet");
