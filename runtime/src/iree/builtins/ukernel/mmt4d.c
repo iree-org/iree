@@ -57,14 +57,19 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
       (char*)params->out_buffer + (params->out_offset << out_elem_size_log2);
   const char* lhs_panel = (const char*)params->lhs_buffer +
                           (params->lhs_offset << lhs_elem_size_log2);
+  const char* rhs_panel_start = (const char*)params->rhs_buffer +
+                                (params->rhs_offset << rhs_elem_size_log2);
   iree_uk_int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
   iree_uk_ssize_t lhs_panel_stride = params->lhs_stride0 << lhs_elem_size_log2;
   iree_uk_ssize_t rhs_panel_stride = params->rhs_stride0 << rhs_elem_size_log2;
   iree_uk_ssize_t out_stride = params->out_stride0 << out_elem_size_log2;
   for (iree_uk_int32_t i = 0; i < M; ++i) {
     char* out_tile = out_tile_row;
-    const char* rhs_panel = (const char*)params->rhs_buffer +
-                            (params->rhs_offset << rhs_elem_size_log2);
+    const char* rhs_panel = rhs_panel_start;
+    // Prefetches needed on ARM Cortex-X2, Issue #13332.
+    IREE_UK_PREFETCH_RW(out_tile_row, IREE_UK_PREFETCH_LOCALITY_L3);
+    IREE_UK_PREFETCH_RO(lhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
+    IREE_UK_PREFETCH_RO(rhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
     for (iree_uk_int32_t j = 0; j < N; ++j) {
       tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
       out_tile += out_tile_size;
