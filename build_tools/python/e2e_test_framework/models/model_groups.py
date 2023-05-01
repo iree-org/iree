@@ -106,9 +106,8 @@ BERT_LARGE_TF_BATCHES = [
     tf_models.BERT_LARGE_48X384_FP32_TF,
     tf_models.BERT_LARGE_64X384_FP32_TF,
     tf_models.BERT_LARGE_512X384_FP32_TF,
-    # Disabled due to https://github.com/openxla/iree/issues/13211.
-    #tf_models.BERT_LARGE_1024X384_FP32_TF,
-    #tf_models.BERT_LARGE_1280X384_FP32_TF,
+    tf_models.BERT_LARGE_1024X384_FP32_TF,
+    tf_models.BERT_LARGE_1280X384_FP32_TF,
 ]
 
 RESNET50_TF_BATCHES = [
