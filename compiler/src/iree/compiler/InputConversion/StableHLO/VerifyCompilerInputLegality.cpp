@@ -8,8 +8,6 @@
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
