@@ -21,6 +21,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -227,6 +228,8 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 
   pm.addNestedPass<func::FuncOp>(createSPIRVMapMemRefStorageClassPass());
   pm.addPass(createSPIRVEmulateI64Pass());
+  pm.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
+  pm.addPass(createSPIRVEmulateBf16Pass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

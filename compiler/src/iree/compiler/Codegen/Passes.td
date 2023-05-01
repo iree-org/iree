@@ -846,8 +846,14 @@ def SPIRVCreateFastSlowPath :
 
 def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
-  let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
+  let summary = "Emulate 64-bit integer ops with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
+}
+
+def SPIRVEmulateBf16 :
+    Pass<"iree-spirv-emulate-bf16", "ModuleOp"> {
+  let summary = "Emulate bfloat 16 ops with 32-bit float ops";
+  let constructor = "mlir::iree_compiler::createSPIRVEmulateBf16Pass()";
 }
 
 def SPIRVEraseStorageBufferStaticShape :
