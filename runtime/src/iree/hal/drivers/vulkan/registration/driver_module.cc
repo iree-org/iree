@@ -6,10 +6,6 @@
 
 #include "iree/hal/drivers/vulkan/registration/driver_module.h"
 
-// clang-format off: must be included before all other headers.
-#include "iree/hal/drivers/vulkan/vulkan_headers.h"
-// clang-format on
-
 #include <cinttypes>
 #include <cstddef>
 

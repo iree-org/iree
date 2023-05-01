@@ -7,6 +7,10 @@
 #ifndef IREE_HAL_DRIVERS_VULKAN_REGISTRATION_DRIVER_MODULE_H_
 #define IREE_HAL_DRIVERS_VULKAN_REGISTRATION_DRIVER_MODULE_H_
 
+// clang-format off: must be included before all other headers.
+#include "iree/hal/drivers/vulkan/vulkan_headers.h"
+// clang-format on
+
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
