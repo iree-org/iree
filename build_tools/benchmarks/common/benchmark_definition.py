@@ -597,7 +597,7 @@ class BenchmarkResults(object):
   def to_json_str(self) -> str:
     json_object = {"commit": self.commit, "benchmarks": []}
     json_object["benchmarks"] = [b.to_json_object() for b in self.benchmarks]
-    return json.dumps(json_object, indent=4)
+    return json.dumps(json_object, indent=2)
 
   @staticmethod
   def from_json_str(json_str: str):
