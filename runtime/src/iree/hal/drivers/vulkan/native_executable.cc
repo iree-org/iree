@@ -64,7 +64,7 @@ static void iree_hal_vulkan_destroy_shader_module(
 static iree_status_t iree_hal_vulkan_create_pipelines(
     VkDeviceHandle* logical_device, VkPipelineCache pipeline_cache,
     const iree_hal_executable_params_t* executable_params,
-    iree_SpirVExecutableDef_table_t executable_def,
+    iree_hal_spirv_ExecutableDef_table_t executable_def,
     VkShaderModule shader_module, iree_host_size_t pipeline_count,
     iree_hal_vulkan_entry_point_t* out_entry_points) {
   IREE_TRACE_SCOPE();
@@ -102,9 +102,9 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
   }
 
   flatbuffers_string_vec_t entry_points_vec =
-      iree_SpirVExecutableDef_entry_points_get(executable_def);
+      iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
   flatbuffers_uint32_vec_t subgroup_sizes_vec =
-      iree_SpirVExecutableDef_subgroup_sizes_get(executable_def);
+      iree_hal_spirv_ExecutableDef_subgroup_sizes_get(executable_def);
   for (iree_host_size_t entry_ordinal = 0; entry_ordinal < pipeline_count;
        ++entry_ordinal) {
     VkComputePipelineCreateInfo* create_info = &create_infos[entry_ordinal];
@@ -206,7 +206,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
   // the FlatBuffer meet our expectations.
-  int verify_ret = iree_SpirVExecutableDef_verify_as_root(
+  int verify_ret = iree_hal_spirv_ExecutableDef_verify_as_root(
       flatbuffer_data.data, flatbuffer_data.data_length);
   if (verify_ret != flatcc_verify_ok) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -214,11 +214,11 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
                             flatcc_verify_error_string(verify_ret));
   }
 
-  iree_SpirVExecutableDef_table_t executable_def =
-      iree_SpirVExecutableDef_as_root(flatbuffer_data.data);
+  iree_hal_spirv_ExecutableDef_table_t executable_def =
+      iree_hal_spirv_ExecutableDef_as_root(flatbuffer_data.data);
 
   flatbuffers_string_vec_t entry_points_vec =
-      iree_SpirVExecutableDef_entry_points_get(executable_def);
+      iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
   size_t entry_point_count = flatbuffers_string_vec_len(entry_points_vec);
   if (entry_point_count != expected_entry_point_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -236,7 +236,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   }
 
   flatbuffers_uint32_vec_t subgroup_sizes_vec =
-      iree_SpirVExecutableDef_subgroup_sizes_get(executable_def);
+      iree_hal_spirv_ExecutableDef_subgroup_sizes_get(executable_def);
   if (subgroup_sizes_vec) {
     size_t subgroup_sizes_count = flatbuffers_vec_len(subgroup_sizes_vec);
     if (subgroup_sizes_count != expected_entry_point_count) {
@@ -248,7 +248,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   }
 
   if (flatbuffers_uint32_vec_len(
-          iree_SpirVExecutableDef_code_get(executable_def)) == 0) {
+          iree_hal_spirv_ExecutableDef_code_get(executable_def)) == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "executable SPIR-V code is missing/empty");
   }
@@ -290,12 +290,13 @@ iree_status_t iree_hal_vulkan_native_executable_create(
       z0, iree_hal_spirv_executable_flatbuffer_verify(
               executable_params->executable_data,
               executable_params->pipeline_layout_count));
-  iree_SpirVExecutableDef_table_t executable_def =
-      iree_SpirVExecutableDef_as_root(executable_params->executable_data.data);
+  iree_hal_spirv_ExecutableDef_table_t executable_def =
+      iree_hal_spirv_ExecutableDef_as_root(
+          executable_params->executable_data.data);
 
   // Create the shader module.
   flatbuffers_uint32_vec_t code_vec =
-      iree_SpirVExecutableDef_code_get(executable_def);
+      iree_hal_spirv_ExecutableDef_code_get(executable_def);
   VkShaderModule shader_module = VK_NULL_HANDLE;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_vulkan_create_shader_module(
@@ -307,7 +308,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
 
   // Create pipelines for each entry point.
   flatbuffers_string_vec_t entry_points_vec =
-      iree_SpirVExecutableDef_entry_points_get(executable_def);
+      iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
   iree_host_size_t entry_point_count =
       flatbuffers_string_vec_len(entry_points_vec);
 
@@ -334,7 +335,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
 
   if (iree_status_is_ok(status)) {
     flatbuffers_string_vec_t entry_points_vec =
-        iree_SpirVExecutableDef_entry_points_get(executable_def);
+        iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
     for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
       flatbuffers_string_t name =
           flatbuffers_string_vec_at(entry_points_vec, i);
@@ -346,15 +347,16 @@ iree_status_t iree_hal_vulkan_native_executable_create(
 
   IREE_TRACE({
     if (iree_status_is_ok(status) &&
-        iree_SpirVExecutableDef_source_locations_is_present(executable_def)) {
-      iree_SpirVFileLineLocDef_vec_t source_locs_vec =
-          iree_SpirVExecutableDef_source_locations_get(executable_def);
+        iree_hal_spirv_ExecutableDef_source_locations_is_present(
+            executable_def)) {
+      iree_hal_spirv_FileLineLocDef_vec_t source_locs_vec =
+          iree_hal_spirv_ExecutableDef_source_locations_get(executable_def);
       for (iree_host_size_t i = 0; i < entry_point_count; ++i) {
-        iree_SpirVFileLineLocDef_table_t source_loc =
-            iree_SpirVFileLineLocDef_vec_at(source_locs_vec, i);
+        iree_hal_spirv_FileLineLocDef_table_t source_loc =
+            iree_hal_spirv_FileLineLocDef_vec_at(source_locs_vec, i);
         flatbuffers_string_t filename =
-            iree_SpirVFileLineLocDef_filename_get(source_loc);
-        uint32_t line = iree_SpirVFileLineLocDef_line_get(source_loc);
+            iree_hal_spirv_FileLineLocDef_filename_get(source_loc);
+        uint32_t line = iree_hal_spirv_FileLineLocDef_line_get(source_loc);
         executable->entry_points[i].source_filename =
             iree_make_string_view(filename, flatbuffers_string_len(filename));
         executable->entry_points[i].source_line = line;

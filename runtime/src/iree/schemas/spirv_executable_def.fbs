@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-namespace iree;
+namespace iree.hal.spirv;
 
 // 'SPIR-V Executable'.
 file_identifier "SPVE";
 file_extension "spve";
 
 // Source code location denoted by a file name and line within that file.
-table SpirVFileLineLocDef {
+table FileLineLocDef {
   filename:string;
   line:int32;
 }
@@ -19,7 +19,7 @@ table SpirVFileLineLocDef {
 // A SPIR-V shader module and runtime pipeline layout description.
 // This information is used to create the VkShaderModule, VkPipelineLayout, and
 // any required VkDescriptorSetLayouts.
-table SpirVExecutableDef {
+table ExecutableDef {
   // A map of entry point ordinals to string names as used in the shader module.
   entry_points:[string];
 
@@ -32,7 +32,7 @@ table SpirVExecutableDef {
   // A map of entry point ordinals to source locations.
   // This information is optional and may be used by debuggers and profilers to
   // associate executable entry points with the source that generated them.
-  source_locations:[SpirVFileLineLocDef];
+  source_locations:[FileLineLocDef];
 }
 
-root_type SpirVExecutableDef;
+root_type ExecutableDef;
