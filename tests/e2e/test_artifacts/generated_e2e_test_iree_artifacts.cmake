@@ -2754,7 +2754,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vmvx"
     "--iree-input-type=tosa"
   FRIENDLY_NAME
-    "MobileNetV2_fp32(tflite) [vmvx-generic-vmvx-vmvx][default-flags]"
+    "MobileNetV2_fp32(tflite) [vmvx-generic-vmvx-vmvx][experimental-flags]"
   PUBLIC
 )
 
@@ -2769,7 +2769,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vmvx"
     "--iree-input-type=tosa"
   FRIENDLY_NAME
-    "MobileNetV3Small_fp32(tflite) [vmvx-generic-vmvx-vmvx][default-flags]"
+    "MobileNetV3Small_fp32(tflite) [vmvx-generic-vmvx-vmvx][experimental-flags]"
   PUBLIC
 )
 
@@ -5651,7 +5651,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_module_02b72f9538e4dfc9c789e63d722d5eab4333f3f55f8375503f433a790da119cc/scheduling_stats.json"
   FRIENDLY_NAME
-    "MobileNetV2_fp32(tflite) [vmvx-generic-vmvx-vmvx][default-flags,compile-stats]"
+    "MobileNetV2_fp32(tflite) [vmvx-generic-vmvx-vmvx][experimental-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5670,7 +5670,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_module_e7bd41e564750501f39ac9690c18d1a2e77dc7999da710d0c0bf80751dda84a0/scheduling_stats.json"
   FRIENDLY_NAME
-    "MobileNetV3Small_fp32(tflite) [vmvx-generic-vmvx-vmvx][default-flags,compile-stats]"
+    "MobileNetV3Small_fp32(tflite) [vmvx-generic-vmvx-vmvx][experimental-flags,compile-stats]"
   PUBLIC
 )
 
