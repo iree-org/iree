@@ -601,6 +601,29 @@ static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
   return n <= 1 ? 0 : (1 + iree_uk_floor_log2_u32(n - 1));
 }
 
+//===----------------------------------------------------------------------===//
+// Portable explicit prefetch hints
+//
+// Architecture-specific files may use architecture prefetch intrinsics instead.
+//
+// Any explicit prefetch should be justified by measurements on a specific CPU.
+//===----------------------------------------------------------------------===//
+
+#if IREE_UK_HAVE_BUILTIN(__builtin_prefetch) || defined(__GNUC__)
+#define IREE_UK_PREFETCH_RO(ptr, hint) __builtin_prefetch((ptr), /*rw=*/0, hint)
+#define IREE_UK_PREFETCH_RW(ptr, hint) __builtin_prefetch((ptr), /*rw=*/1, hint)
+#else
+#define IREE_UK_PREFETCH_RO(ptr, hint)
+#define IREE_UK_PREFETCH_RW(ptr, hint)
+#endif
+
+// This is how the 0--3 locality hint is interpreted by both Clang and GCC on
+// both arm64 and x86-64.
+#define IREE_UK_PREFETCH_LOCALITY_NONE 0  // No locality. Data accessed once.
+#define IREE_UK_PREFETCH_LOCALITY_L3 1    // Some locality. Try to keep in L3.
+#define IREE_UK_PREFETCH_LOCALITY_L2 2    // More locality. Try to keep in L2.
+#define IREE_UK_PREFETCH_LOCALITY_L1 3    // Most locality. Try to keep in L1.
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
