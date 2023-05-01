@@ -25,7 +25,7 @@ should be used with careful consideration.
 
 ## Workflow for System Dynamic Libraries
 
-```
+```text
 +----------+    +---------------+      +--------------+
 | plugin.c | -> | plugin.so/dll |-+    | example.mlir |
 +----------+    +---------------+ |    +--------------+
@@ -77,7 +77,7 @@ iree_hal_executable_plugin_query(
 }
 ```
 
-2. Source files are compiled to platform dynamic libraries via normal build
+1. Source files are compiled to platform dynamic libraries via normal build
    system goo. Each platform and architecture the user is targeting will need
    its own libraries. Note that only the header file is required to be included
    and no IREE runtime libraries need to be linked into the plugin.
@@ -87,7 +87,7 @@ add_library(my_plugin SHARED my_plugin.c)
 target_include_directories(...)
 ```
 
-3. The user (or compiler transforms) adds calls to their functions by declaring
+1. The user (or compiler transforms) adds calls to their functions by declaring
    them.
 
 ```mlir
@@ -105,21 +105,22 @@ func.call @simple_mul_workgroup(
     : (memref<f32>, index, memref<f32>, index, memref<f32>, index, index, index) -> ()
 ```
 
-For each of the two inputs and one output, a `<baseptr, offset>` pair is used
-to get the position to read from. It is essential for the implementations of
-these functions to manually perform the `baseptr + offset` before reading the
-data. The `memref` semantics in MLIR only guarantee that the `baseptr + offset`
-represents the valid position to read from. Also note that the `offset` here
-is in number of elements (i.e. number of floats).
+   For each of the two inputs and one output, a `<baseptr, offset>` pair is
+   used to get the position to read from. It is essential for the
+   implementations of these functions to manually perform the
+   `baseptr + offset` before reading the data. The `memref` semantics in
+   MLIR only guarantee that the `baseptr + offset` represents the valid
+   position to read from. Also note that the `offset` here is in number of
+   elements (i.e. number of floats).
 
-4. The user either programmatically registers the plugins via the plugin manager
+1. The user either programmatically registers the plugins via the plugin manager
    or when using IREE tools passes them using the `--executable_plugin=` flag.
    Note that imports are resolved in reverse registration order such that
    fallbacks can be supported; a reference plugin can be registered first
    followed by more specialized plugins that may only handle a subset of
    imports.
 
-```
+```bash
 iree-run-module \
     --device=local-sync \
     --executable_plugin=my_plugins.so \
@@ -131,7 +132,7 @@ iree-run-module \
 
 ## Workflow for Embedded ELF Libraries
 
-```
+```text
 +----------+      +-------------------+       +--------------+
 | plugin.c | -+-> | plugin_aarch64.so | -+    | example.mlir |
 +----------+  |   +-------------------+  |    +--------------+
@@ -175,7 +176,7 @@ for instructions for CMake setup and building from source.
    [system_plugin.c](./system_plugin.c) sources to object files for aarch64 and
    x86_64 or the current target system:
 
-    ```
+    ```bash
     cmake --build ../iree-build/ --target iree-sample-deps
     ```
 
@@ -188,7 +189,7 @@ for instructions for CMake setup and building from source.
 2. Compile the [example module](./example.mlir) to a .vmfb file and pass
    the path to the build directory so the .spv files can be found:
 
-    ```
+    ```bash
     iree-compile \
         samples/custom_dispatch/cpu/plugin/example.mlir \
         -o=/tmp/example.vmfb
@@ -197,7 +198,7 @@ for instructions for CMake setup and building from source.
 3. Run the example program using the plugins for either platform-independent
    embedded ELF files or the system libraries:
 
-    ```
+    ```bash
     iree-run-module \
         --device=llvm-sync \
         --executable_plugin=samples/custom_dispatch/cpu/plugin/standalone_plugin.sos \
@@ -207,7 +208,7 @@ for instructions for CMake setup and building from source.
         /tmp/example.vmfb
     ```
 
-    ```
+    ```bash
     iree-run-module \
         --device=llvm-sync \
         --executable_plugin=samples/custom_dispatch/cpu/plugin/system_plugin.so \
