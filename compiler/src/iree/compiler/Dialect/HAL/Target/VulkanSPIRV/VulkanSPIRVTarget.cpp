@@ -197,8 +197,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     }
     iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
     if (!sourceLocationRefs.empty()) {
-      iree_SpirVExecutableDef_source_locations_create(
-          builder, sourceLocationRefs.data(), sourceLocationRefs.size());
+      auto sourceLocationsRef =
+          builder.createOffsetVecDestructive(sourceLocationRefs);
+      iree_SpirVExecutableDef_source_locations_add(builder, sourceLocationsRef);
     }
     iree_SpirVExecutableDef_end_as_root(builder);
 

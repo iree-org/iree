@@ -587,8 +587,9 @@ class CUDATargetBackend final : public TargetBackend {
                                                   workgroupLocalMemoriesRef);
     iree_CUDAExecutableDef_ptx_image_add(builder, gpuImageRef);
     if (!sourceLocationRefs.empty()) {
-      iree_CUDAExecutableDef_source_locations_create(
-          builder, sourceLocationRefs.data(), sourceLocationRefs.size());
+      auto sourceLocationsRef =
+          builder.createOffsetVecDestructive(sourceLocationRefs);
+      iree_CUDAExecutableDef_source_locations_add(builder, sourceLocationsRef);
     }
     iree_CUDAExecutableDef_end_as_root(builder);
 
