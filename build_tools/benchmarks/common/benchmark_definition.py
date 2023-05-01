@@ -471,6 +471,8 @@ def _get_iree_memory_statistics(benchmark_stderr: str,
   """Extracts IREE's memory statistics for a given device."""
   statistics = dict(unit="bytes")
   for stat in ["peak", "allocated", "freed", "live"]:
+    # The memory statistics for each device are listed on their own line. E.g.
+    # HOST_LOCAL: 7675392B peak / 7675392B allocated / 0B freed / 7675392B live
     m = re.search(rf".*{device}:.*\s([0-9]+)B {stat}", benchmark_stderr)
     if m is None:
       raise ValueError(f"Failed to find stat '{stat}' for device '{device}' in "
