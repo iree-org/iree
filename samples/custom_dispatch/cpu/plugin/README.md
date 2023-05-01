@@ -77,7 +77,7 @@ iree_hal_executable_plugin_query(
 }
 ```
 
-1. Source files are compiled to platform dynamic libraries via normal build
+2. Source files are compiled to platform dynamic libraries via normal build
    system goo. Each platform and architecture the user is targeting will need
    its own libraries. Note that only the header file is required to be included
    and no IREE runtime libraries need to be linked into the plugin.
@@ -87,7 +87,7 @@ add_library(my_plugin SHARED my_plugin.c)
 target_include_directories(...)
 ```
 
-1. The user (or compiler transforms) adds calls to their functions by declaring
+3. The user (or compiler transforms) adds calls to their functions by declaring
    them.
 
 ```mlir
@@ -113,7 +113,7 @@ func.call @simple_mul_workgroup(
    position to read from. Also note that the `offset` here is in number of
    elements (i.e. number of floats).
 
-1. The user either programmatically registers the plugins via the plugin manager
+4. The user either programmatically registers the plugins via the plugin manager
    or when using IREE tools passes them using the `--executable_plugin=` flag.
    Note that imports are resolved in reverse registration order such that
    fallbacks can be supported; a reference plugin can be registered first
