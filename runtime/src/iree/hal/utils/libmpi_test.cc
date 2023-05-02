@@ -59,7 +59,7 @@ class LibmpiTest : public ::testing::Test {
   }
 
  protected:
-  static iree_dynamic_library_t *library;
+  static iree_dynamic_library_t* library;
   static iree_hal_mpi_dynamic_symbols_t symbols;
   int rank = 0;
   int world_size = 0;
