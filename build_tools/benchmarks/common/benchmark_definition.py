@@ -549,10 +549,7 @@ def parse_iree_benchmark_metrics(benchmark_stdout: str,
       host_memory=_get_iree_memory_statistics(benchmark_stderr, "HOST_LOCAL"),
       device_memory=_get_iree_memory_statistics(benchmark_stderr,
                                                 "DEVICE_LOCAL"),
-      raw_data=dict(
-          google_benchmark_json=benchmark_json,
-          benchmark_stderr=benchmark_stderr,
-      ),
+      raw_data=benchmark_json,
   )
 
 
