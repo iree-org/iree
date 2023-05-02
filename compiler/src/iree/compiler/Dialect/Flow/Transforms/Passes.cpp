@@ -35,7 +35,7 @@ static llvm::cl::opt<bool> clTraceDispatchTensors(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
 static llvm::cl::opt<std::string> clBreakOnDispatch(
-    "iree-flow-break-on-dispatch",
+    "iree-flow-break-dispatch",
     llvm::cl::desc(
         "Enables inserting a break after a specified dispatch. Supports two "
         "modes; breaking on the dispatch ordinal before deduplication "
@@ -46,7 +46,7 @@ static llvm::cl::opt<std::string> clTraceDispatch(
     llvm::cl::desc("Enables tracing tensors at specified dispatches. Supports "
                    "two modes; tracing the dispatch by ordinal before "
                    "deduplication (@function_name:<index>) and tracing all "
-                   "occurances of the dispatch symbol."),
+                   "occurrences of the dispatch symbol."),
     llvm::cl::init(""));
 static llvm::cl::opt<bool> clDemoteI64ToI32(
     "iree-flow-demote-i64-to-i32",

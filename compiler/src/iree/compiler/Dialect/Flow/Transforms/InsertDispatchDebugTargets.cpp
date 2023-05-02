@@ -1,4 +1,4 @@
-// Copyright 2020 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Regex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -93,8 +94,8 @@ static LogicalResult replaceReturnWithOpResults(mlir::ModuleOp moduleOp,
   for (auto retVal : op->getResults()) {
     if (retVal.getType().isa<TensorType>()) {
       auto type = IREE::HAL::BufferViewType::get(context);
-      auto exportOp =
-          builder.create<IREE::HAL::TensorExportOp>(loc, type, retVal);
+      auto exportOp = builder.create<IREE::HAL::TensorExportOp>(
+          loc, type, retVal, /*name=*/nullptr);
       exports.push_back(exportOp.getResult());
       newTypes.push_back(type);
     } else {
@@ -197,10 +198,19 @@ struct InsertDebugTargetAtSymbolPass
                                       pass.traceDebugTarget) {}
 
   void runOnOperation() override {
+    // Setup regex for matching symbol names.
+    llvm::Regex traceMatcher;
+    if (!traceDebugTarget.empty()) traceMatcher = llvm::Regex(traceDebugTarget);
+
+    llvm::Regex breakMatcher;
+    if (!breakDebugTarget.empty()) breakMatcher = llvm::Regex(breakDebugTarget);
+
     for (auto it :
          llvm::enumerate(getOperation().getOps<FunctionOpInterface>())) {
       FunctionOpInterface funcOp = it.value();
 
+      // Find the target dispatch to break on and trace on all matching
+      // dispatches.
       DispatchOp breakTarget = DispatchOp();
       funcOp.walk([&](DispatchOp dispatchOp) {
         std::string entryPointName =
@@ -209,12 +219,10 @@ struct InsertDebugTargetAtSymbolPass
              dispatchOp.getEntryPoint().getNestedReferences()) {
           entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
         }
-        if (!traceDebugTarget.empty() &&
-            entryPointName.find(traceDebugTarget) != std::string::npos)
+        if (traceMatcher.match(entryPointName))
           traceOpWithName(dispatchOp, entryPointName);
 
-        if (!breakTarget && !breakDebugTarget.empty() &&
-            entryPointName.find(breakDebugTarget) != std::string::npos)
+        if (!breakTarget && breakMatcher.match(entryPointName))
           breakTarget = dispatchOp;
       });
 
