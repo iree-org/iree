@@ -38,8 +38,8 @@ def main():
   tflite_to_tosa(
       flatbuffer=args.flatbuffer,
       bytecode=args.output_path,
-      ordered_input_arrays=input_arrays,
-      ordered_output_arrays=output_arrays,
+      ordered_input_arrays=args.input_arrays,
+      ordered_output_arrays=args.output_arrays,
   )
 
 
