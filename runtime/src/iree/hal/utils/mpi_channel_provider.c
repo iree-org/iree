@@ -145,12 +145,12 @@ static iree_status_t iree_hal_mpi_channel_provider_query_default_rank_and_count(
   MPI_RETURN_IF_ERROR(
       &channel_provider->symbols,
       MPI_Comm_rank(IREE_MPI_COMM_WORLD(&channel_provider->symbols),
-                    (int*)&out_rank),
+                    (int*)out_rank),
       "MPI_Comm_rank");
   MPI_RETURN_IF_ERROR(
       &channel_provider->symbols,
       MPI_Comm_size(IREE_MPI_COMM_WORLD(&channel_provider->symbols),
-                    (int*)&out_count),
+                    (int*)out_count),
       "MPI_Comm_size");
 
   return iree_ok_status();
