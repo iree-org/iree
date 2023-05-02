@@ -399,13 +399,6 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
-      - name: "Downloading TF binaries archive"
-        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-      - name: "Extracting TF binaries archive"
-        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
-      - name: "Symlinking TF binaries"
-        run: |
-          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
