@@ -83,7 +83,8 @@ def compile_file(fb_path: str, **kwargs):
     options = ImportOptions(**kwargs)
 
   with tempfile.NamedTemporaryFile(mode="w") as temp_file:
-    __main__.tflite_to_tosa(flatbuffer=fb_path, bytecode=temp_file.name,
+    __main__.tflite_to_tosa(flatbuffer=fb_path,
+                            bytecode=temp_file.name,
                             ordered_input_arrays=options.input_arrays,
                             ordered_output_arrays=options.output_arrays)
     if options.import_only:

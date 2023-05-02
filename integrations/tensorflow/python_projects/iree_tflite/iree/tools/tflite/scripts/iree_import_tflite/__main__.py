@@ -14,9 +14,7 @@ import iree.tools.tflite
 
 def main():
   parser = argparse.ArgumentParser()
-  parser.add_argument(
-      'flatbuffer', help='<TFLite FlatBuffer>'
-  )
+  parser.add_argument('flatbuffer', help='<TFLite FlatBuffer>')
   parser.add_argument(
       '-o',
       '--output-path',
@@ -53,7 +51,10 @@ def tflite_to_tosa(
     ordered_output_arrays=None,
 ):
   from tensorflow.python.pywrap_mlir import experimental_tflite_to_tosa_bytecode
-  experimental_tflite_to_tosa_bytecode(flatbuffer, bytecode, use_external_constant, ordered_input_arrays, ordered_output_arrays)
+  experimental_tflite_to_tosa_bytecode(flatbuffer, bytecode,
+                                       use_external_constant,
+                                       ordered_input_arrays,
+                                       ordered_output_arrays)
 
 
 if __name__ == "__main__":
