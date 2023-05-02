@@ -65,7 +65,7 @@ class LibmpiTest : public ::testing::Test {
   int world_size = 0;
 };
 
-iree_dynamic_library_t *LibmpiTest::library = NULL;
+iree_dynamic_library_t* LibmpiTest::library = NULL;
 iree_hal_mpi_dynamic_symbols_t LibmpiTest::symbols = {0};
 
 // An MPI "hello world" program to test library loading.
