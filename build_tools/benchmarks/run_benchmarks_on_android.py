@@ -57,7 +57,7 @@ from common.android_device_utils import (get_android_device_model,
 import common.common_arguments
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework import serialization
-from e2e_test_framework.definitions import iree_definitions
+from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_parameters
 
 # Root directory to perform benchmarks in on the Android device.
@@ -286,27 +286,27 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     stdout_redirect = None if self.verbose else subprocess.DEVNULL
     execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
 
+
+  # TODO(#13187): These logics are inherited from the legacy benchmark suites,
+  # which only work for a few specific phones. We should define the topology
+  # in their device specs.
   def __deduce_taskset_from_run_config(
       self, run_config: iree_definitions.E2EModelRunConfig) -> str:
     """Deduces the CPU mask according to device and execution config."""
-    # TODO(#13187): These logics are inherited from the legacy benchmark suites,
-    # which only work for a few specific phones. We should define the topology
-    # in their device specs.
-    exec_config = run_config.module_execution_config
-    single_thread = False
-    if exec_config.driver != iree_definitions.RuntimeDriver.LOCAL_TASK:
-      single_thread = True
-    if "1-thread" in exec_config.tags:
-      single_thread = True
 
-    device_params = run_config.target_device_spec.device_parameters
+    device_spec = run_config.target_device_spec
+    # For GPU benchmarks, use the most performant core.
+    if device_spec.architecture.type == common_definitions.ArchitectureType.GPU:
+      return "80"
+
+    device_params = device_spec.device_parameters
+    single_thread = "1-thread" in run_config.module_execution_config.tags
     if device_parameters.ARM_BIG_CORES in device_params:
       return "80" if single_thread else "f0"
     elif device_parameters.ARM_LITTLE_CORES in device_params:
       return "08" if single_thread else "0f"
 
-    # Not specified: use the 7th core for single thread; otherwise all cores.
-    return "80" if single_thread else "ff"
+    raise ValueError(f"Unsupported config to deduce taskset: '{run_config}'.")
 
   def __deduce_taskset(self, bench_mode: Sequence[str]) -> str:
     """Deduces the CPU affinity taskset mask according to benchmark modes."""
