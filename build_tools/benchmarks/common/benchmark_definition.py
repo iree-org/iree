@@ -24,7 +24,7 @@ from e2e_test_framework.definitions import common_definitions
 # A map from CPU ABI to IREE's legacy benchmark target architecture.
 CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP = {
     "arm64-v8a": "cpu-arm64-v8a",
-    "x86_64-CascadeLake": "cpu-x86_64-cascadelake",
+    "x86_64-cascadeLake": "cpu-x86_64-cascadelake",
 }
 
 # A map from GPU name to IREE's legacy benchmark target architecture.
