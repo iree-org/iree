@@ -11,19 +11,44 @@
 
 #include <stdint.h>
 
-// Declare Vulkan symbols that are used, keeping implementation symbols private.
-typedef struct VkInstance_T* VkInstance;
-typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
-typedef struct VkDevice_T* VkDevice;
-
-#include <stdint.h>
-
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+
+//===----------------------------------------------------------------------===//
+// vulkan.h declarations
+//===----------------------------------------------------------------------===//
+// By declaring the types we use on the API here we avoid pulling in the full
+// vulkan.h file and conflicting with the one a user may already have. Including
+// both can cause issues with different compile settings, different header
+// versions, or different linkage modes (IREE is always dynamically linked).
+//
+// The declarations here should exactly match those in the Vulkan headers and
+// use the VK_* naming prefix in order to consistently use any overridden
+// helpers in the top-level compiler configuration.
+
+#define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;
+#if !defined(VK_DEFINE_NON_DISPATCHABLE_HANDLE)
+#if defined(__LP64__) || defined(_WIN64) ||                            \
+    (defined(__x86_64__) && !defined(__ILP32__)) || defined(_M_X64) || \
+    defined(__ia64) || defined(_M_IA64) || defined(__aarch64__) ||     \
+    defined(__powerpc64__)
+#define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) \
+  typedef struct object##_T* object;
+#else
+#define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef uint64_t object;
+#endif  // 64-bit pointer check
+#endif  // !VK_DEFINE_NON_DISPATCHABLE_HANDLE
+
+VK_DEFINE_HANDLE(VkInstance);
+VK_DEFINE_HANDLE(VkPhysicalDevice);
+VK_DEFINE_HANDLE(VkDevice);
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkDeviceMemory);
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkBuffer);
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSemaphore);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_vulkan_device_t extensibility util
@@ -276,6 +301,30 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create_using_instance(
     const iree_hal_vulkan_driver_options_t* options,
     iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_vulkan_*_buffer_t
+//===----------------------------------------------------------------------===//
+
+// EXPERIMENTAL: until VMA is removed this is doing a shady reinterpret cast.
+// TODO(benvanik): make this safer (dyn_cast-like, lookup allocated buffer).
+// Returns the backing device memory and logical buffer handle of a HAL buffer
+// managed by the Vulkan HAL. Invalid to call on any buffer but a base allocated
+// Vulkan HAL buffer.
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_allocated_buffer_handle(
+    iree_hal_buffer_t* allocated_buffer, VkDeviceMemory* out_memory,
+    VkBuffer* out_handle);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_vulkan_*_semaphore_t
+//===----------------------------------------------------------------------===//
+
+// EXPERIMENTAL: need to rework semaphores to track resources. Until then this
+// may be returning something not all semaphores we work with can handle. It
+// also assumes the semaphore is a timeline semaphore and that may not be the
+// case on imported semaphores.
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_semaphore_handle(
+    iree_hal_semaphore_t* semaphore, VkSemaphore* out_handle);
 
 #ifdef __cplusplus
 }  // extern "C"

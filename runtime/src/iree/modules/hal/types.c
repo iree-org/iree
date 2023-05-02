@@ -225,3 +225,24 @@ IREE_API_EXPORT iree_status_t iree_vm_list_set_buffer_view_retain(
       iree_vm_ref_wrap_assign(value, iree_hal_buffer_view_type(), &value_ref));
   return iree_vm_list_set_ref_retain(list, i, &value_ref);
 }
+
+IREE_API_EXPORT iree_hal_fence_t* iree_vm_list_get_fence_assign(
+    const iree_vm_list_t* list, iree_host_size_t i) {
+  return (iree_hal_fence_t*)iree_vm_list_get_ref_deref(list, i,
+                                                       iree_hal_fence_type());
+}
+
+IREE_API_EXPORT iree_hal_fence_t* iree_vm_list_get_fence_retain(
+    const iree_vm_list_t* list, iree_host_size_t i) {
+  iree_hal_fence_t* value = iree_vm_list_get_fence_assign(list, i);
+  iree_hal_fence_retain(value);
+  return value;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_list_set_fence_retain(
+    iree_vm_list_t* list, iree_host_size_t i, iree_hal_fence_t* value) {
+  iree_vm_ref_t value_ref;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_ref_wrap_assign(value, iree_hal_fence_type(), &value_ref));
+  return iree_vm_list_set_ref_retain(list, i, &value_ref);
+}
