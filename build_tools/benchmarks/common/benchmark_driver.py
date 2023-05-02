@@ -68,17 +68,20 @@ class BenchmarkDriver(object):
 
     use_legacy_name = self.benchmark_suite.legacy_suite
 
+    target_architectures = []
     cpu_target_arch = self.device_info.get_iree_cpu_arch_name(use_legacy_name)
     if cpu_target_arch is None:
       print("WARNING: Detected unsupported CPU architecture in "
             f'"{self.device_info}", CPU benchmarking is disabled.')
-      cpu_target_arch = "unknown"
+    else:
+      target_architectures.append(cpu_target_arch)
 
     gpu_target_arch = self.device_info.get_iree_gpu_arch_name(use_legacy_name)
     if gpu_target_arch is None:
       print("WARNING: Detected unsupported GPU architecture in "
             f'"{self.device_info}", GPU benchmarking is disabled.')
-      gpu_target_arch = "unknown"
+    else:
+      target_architectures.append(gpu_target_arch)
 
     drivers, loaders = self.__get_available_drivers_and_loaders()
 
@@ -87,8 +90,7 @@ class BenchmarkDriver(object):
           category=category,
           available_drivers=drivers,
           available_loaders=loaders,
-          cpu_target_arch_filter=f"^{cpu_target_arch}$",
-          gpu_target_arch_filter=f"^{gpu_target_arch}$",
+          target_architectures=target_architectures,
           driver_filter=self.config.driver_filter,
           mode_filter=self.config.mode_filter,
           model_name_filter=self.config.model_name_filter)

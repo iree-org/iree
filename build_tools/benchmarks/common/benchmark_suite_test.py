@@ -58,8 +58,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         category="TFLite",
         available_drivers=["local-task", "vulkan"],
         available_loaders=["embedded-elf"],
-        cpu_target_arch_filter="cpu-armv8",
-        gpu_target_arch_filter="gpu-mali",
+        target_architectures=["cpu-armv8", "gpu-mali"],
         driver_filter=None,
         mode_filter=".*full-inference.*",
         model_name_filter="deepnet.*")
@@ -67,16 +66,14 @@ class BenchmarkSuiteTest(unittest.TestCase):
         category="TFLite",
         available_drivers=["local-task", "vulkan"],
         available_loaders=["embedded-elf"],
-        cpu_target_arch_filter="cpu-unknown",
-        gpu_target_arch_filter="gpu-mali",
+        target_architectures=["gpu-mali"],
         driver_filter="vulkan",
         mode_filter=".*full-inference.*",
         model_name_filter="deepnet.*")
     all_benchmarks = suite.filter_benchmarks_for_category(
         category="TFLite",
         available_drivers=None,
-        cpu_target_arch_filter=None,
-        gpu_target_arch_filter=None,
+        target_architectures=None,
         driver_filter=None,
         mode_filter=None,
         model_name_filter=None)
@@ -94,8 +91,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         category="PyTorch",
         available_drivers=[],
         available_loaders=[],
-        cpu_target_arch_filter="ARMv8",
-        gpu_target_arch_filter="Mali-G78")
+        target_architectures=["ARMv8", "Mali-G78"])
 
     self.assertEqual(benchmarks, [])
 
@@ -128,8 +124,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
               category="PyTorch",
               available_drivers=["vulkan"],
               available_loaders=[],
-              cpu_target_arch_filter="cpu-armv8",
-              gpu_target_arch_filter="gpu-mali"), [case2])
+              target_architectures=["cpu-armv8", "gpu-mali"]), [case2])
 
   def test_load_from_run_configs(self):
     model_tflite = common_definitions.Model(
@@ -234,7 +229,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
     self.assertEqual(
         suite.filter_benchmarks_for_category(
             category="exported_tf_v2",
-            cpu_target_arch_filter="riscv_32-generic",
+            target_architectures=["riscv_32-generic"],
             model_name_filter="model_tf.*fp32",
             mode_filter="defaults"),
         [
@@ -250,7 +245,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
     self.assertEqual(
         suite.filter_benchmarks_for_category(
             category="exported_tf_v2",
-            cpu_target_arch_filter="cpu-riscv_32-generic",
+            target_architectures=["cpu-riscv_32-generic"],
             mode_filter="experimental"), [])
 
   @staticmethod
