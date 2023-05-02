@@ -173,6 +173,30 @@ IREE_API_EXPORT iree_status_t iree_hal_mpi_channel_provider_exchange_default_id(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t
+iree_hal_mpi_channel_provider_exchange_id_for_group(
+    iree_hal_channel_provider_t* base_channel_provider, iree_byte_span_t id,
+    int32_t group, int32_t rank_in_group, int32_t count_in_group) {
+  iree_hal_mpi_channel_provider_t* channel_provider =
+      iree_hal_mpi_channel_provider_cast(base_channel_provider);
+
+  iree_hal_mpi_dynamic_symbols_t* syms = &channel_provider->symbols;
+  IREE_MPI_Comm group_comm = NULL;
+
+  // Exchange the ID with all other participants in the group. The root
+  // participant will send its ID while the others will receive it.
+  MPI_RETURN_IF_ERROR(syms,
+                      MPI_Comm_split(IREE_MPI_COMM_WORLD(syms), group,
+                                     rank_in_group, &group_comm),
+                      "MPI_Comm_split");
+  MPI_RETURN_IF_ERROR(
+      syms,
+      MPI_Bcast(id.data, id.data_length, IREE_MPI_BYTE(syms), 0, group_comm),
+      "MPI_Bcast");
+  MPI_RETURN_IF_ERROR(syms, MPI_Comm_free(&group_comm), "MPI_Comm_free");
+  return iree_ok_status();
+}
+
 static const iree_hal_channel_provider_vtable_t
     iree_hal_mpi_channel_provider_vtable = {
         .destroy = iree_hal_mpi_channel_provider_destroy,
@@ -180,4 +204,6 @@ static const iree_hal_channel_provider_vtable_t
             iree_hal_mpi_channel_provider_query_default_rank_and_count,
         .exchange_default_id =
             iree_hal_mpi_channel_provider_exchange_default_id,
+        .exchange_id_for_group =
+            iree_hal_mpi_channel_provider_exchange_id_for_group,
 };

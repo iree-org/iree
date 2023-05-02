@@ -44,3 +44,16 @@ IREE_API_EXPORT iree_status_t iree_hal_channel_provider_exchange_default_id(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+IREE_API_EXPORT iree_status_t iree_hal_channel_provider_exchange_id_for_group(
+    iree_hal_channel_provider_t* channel_provider, iree_byte_span_t id,
+    int32_t group, int32_t rank_in_group, int32_t count_in_group) {
+  IREE_ASSERT_ARGUMENT(channel_provider);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      _VTABLE_DISPATCH(channel_provider, exchange_id_for_group)(
+          channel_provider, id, group, rank_in_group, count_in_group);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+

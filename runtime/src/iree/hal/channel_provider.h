@@ -51,6 +51,15 @@ iree_hal_channel_provider_query_default_rank_and_count(
 IREE_API_EXPORT iree_status_t iree_hal_channel_provider_exchange_default_id(
     iree_hal_channel_provider_t* channel_provider, iree_byte_span_t id);
 
+// Exchanges the channel ID used during channel splitting.
+// The caller will provide adequate storage in |id| and group information, and
+// the implementation should do what it needs (ID exchange, etc). The root
+// participant of each group will provide an initialized ID and all others in
+// the same group will expect that ID to be populated upon return.
+IREE_API_EXPORT iree_status_t iree_hal_channel_provider_exchange_id_for_group(
+    iree_hal_channel_provider_t* channel_provider, iree_byte_span_t id,
+    int32_t group, int32_t rank_in_group, int32_t count_in_group);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_channel_provider_t implementation details
 //===----------------------------------------------------------------------===//
@@ -64,6 +73,10 @@ typedef struct iree_hal_channel_provider_vtable_t {
 
   iree_status_t(IREE_API_PTR* exchange_default_id)(
       iree_hal_channel_provider_t* channel_provider, iree_byte_span_t id);
+
+  iree_status_t(IREE_API_PTR* exchange_id_for_group)(
+      iree_hal_channel_provider_t* channel_provider, iree_byte_span_t id,
+      int32_t group, int32_t rank_in_group, int32_t count_in_group);
 } iree_hal_channel_provider_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_channel_provider_vtable_t);
 
