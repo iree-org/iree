@@ -22,13 +22,13 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from e2e_test_framework.definitions import common_definitions
 
 # A map from CPU ABI to IREE's legacy benchmark target architecture.
-LEGACY_CPU_ABI_TO_TARGET_ARCH_MAP = {
+CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP = {
     "arm64-v8a": "cpu-arm64-v8a",
     "x86_64-CascadeLake": "cpu-x86_64-cascadelake",
 }
 
 # A map from GPU name to IREE's legacy benchmark target architecture.
-LEGACY_GPU_NAME_TO_TARGET_ARCH_MAP = {
+GPU_NAME_TO_LEGACY_TARGET_ARCH_MAP = {
     "adreno-640": "gpu-adreno",
     "adreno-650": "gpu-adreno",
     "adreno-660": "gpu-adreno",
@@ -250,9 +250,11 @@ class DeviceInfo:
       name += f"-{self.cpu_uarch.lower()}"
 
     if use_legacy_name:
-      return LEGACY_CPU_ABI_TO_TARGET_ARCH_MAP.get(name)
+      return CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP.get(name)
 
     arch = CPU_ABI_TO_TARGET_ARCH_MAP.get(name)
+    # TODO(#11076): Return common_definitions.DeviceArchitecture instead after
+    # removing the legacy path.
     return None if arch is None else str(arch)
 
   def get_iree_gpu_arch_name(self,
@@ -260,7 +262,7 @@ class DeviceInfo:
     name = self.gpu_name.lower()
 
     if use_legacy_name:
-      return LEGACY_GPU_NAME_TO_TARGET_ARCH_MAP.get(name)
+      return GPU_NAME_TO_LEGACY_TARGET_ARCH_MAP.get(name)
 
     arch = GPU_NAME_TO_TARGET_ARCH_MAP.get(name)
     return None if arch is None else str(arch)
