@@ -277,7 +277,7 @@ build:remote_cache_bazel_ci --config=_remote_cache_base
 # included for clarity and so that this reference is automatically updated by
 # manage_images.py
 build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:b3cce73eb9f41d67981bc8f00e98fd66fe3487caec1bcbf38d4039dcc61e499d"}'
-build:remote_cache_bazel_tf_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/frontends-swiftshader@sha256:d9448f2760b1de0dfe4a1a1d46b7ef72f0430f5937d0164f43400fdf3f811abc"}'
+build:remote_cache_bazel_tf_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/frontends-swiftshader@sha256:da14cc93637d3bfad469a670d4d7a49982df5d107b775331965e3bacb981d4cf"}'
 
 
 ###############################################################################
