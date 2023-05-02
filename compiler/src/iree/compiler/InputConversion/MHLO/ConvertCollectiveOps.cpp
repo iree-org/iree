@@ -160,6 +160,24 @@ static LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
   return success();
 }
 
+Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
+                    Value input, int64_t srcDim, int64_t dstDim) {
+  // Creates a transpose op that swaps dimensions srcDim and dstDim in the
+  // input.
+  auto inputType = cast<RankedTensorType>(input.getType());
+  SmallVector<int64_t> inputShape(inputType.getShape());
+  SmallVector<int64_t> permutation =
+      llvm::to_vector(llvm::seq<int64_t>(0, inputShape.size()));
+  std::swap(permutation[srcDim], permutation[dstDim]);
+  std::swap(inputShape[srcDim], inputShape[dstDim]);
+  DenseIntElementsAttr permutationAttr = rewriter.getI64VectorAttr(permutation);
+  return rewriter
+      .create<mhlo::TransposeOp>(
+          loc, RankedTensorType::get(inputShape, inputType.getElementType()),
+          input, permutationAttr)
+      .getResult();
+}
+
 }  // namespace
 
 /// Converts mhlo.replica_id to flow.channel.default + flow.channel.rank.
@@ -213,31 +231,16 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
       return rewriter.notifyMatchFailure(
           op, "unsupported element type for collective op");
     }
+    uint64_t allGatherDim = op.getAllGatherDim();
+    Value gatherInput = op.getOperand();
+    SmallVector<int64_t> gatherResultShape(resultType.getShape());
 
     // When all_gather_dim != 0, we need to transpose between 0 and
     // all_gather_dim before and after the flow allgather op.
-    uint64_t allGatherDim = op.getAllGatherDim();
-    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
-    SmallVector<int64_t> gatherInputShape(inputType.getShape());
-    Value gatherInput = op.getOperand();
-    DenseIntElementsAttr permutationAttr;
-    SmallVector<int64_t> gatherResultShape(resultType.getShape());
-
-    if (allGatherDim != 0) {
-      SmallVector<int64_t> permutation =
-          llvm::to_vector(llvm::seq<int64_t>(0, gatherResultShape.size()));
-      std::swap(permutation[0], permutation[allGatherDim]);
-      permutationAttr = rewriter.getI64VectorAttr(permutation);
-      std::swap(gatherInputShape[0], gatherInputShape[allGatherDim]);
+    const bool requiresTranspose = allGatherDim != 0;
+    if (requiresTranspose) {
       std::swap(gatherResultShape[0], gatherResultShape[allGatherDim]);
-      // Transpose the input.
-      gatherInput = rewriter
-                        .create<mhlo::TransposeOp>(
-                            loc,
-                            RankedTensorType::get(gatherInputShape,
-                                                  resultType.getElementType()),
-                            gatherInput, permutationAttr)
-                        .getResult();
+      gatherInput = emitTranspose(rewriter, loc, gatherInput, 0, allGatherDim);
     }
 
     // Create an empty tensor for the result.
@@ -249,11 +252,9 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
                 op.getLoc(), elementTypeAttr, target, gatherInput, channel)
             .getResult();
 
-    if (allGatherDim != 0) {
-      gatherResult = rewriter
-                         .create<mhlo::TransposeOp>(
-                             loc, resultType, gatherResult, permutationAttr)
-                         .getResult();
+    if (requiresTranspose) {
+      gatherResult =
+          emitTranspose(rewriter, loc, gatherResult, allGatherDim, 0);
     }
 
     rewriter.replaceOp(op, gatherResult);
@@ -335,27 +336,10 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
   }
 };
 
-Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
-                    Value input, const SmallVector<int64_t> &permutation) {
-  DenseIntElementsAttr permutationAttr = rewriter.getI64VectorAttr(permutation);
-  SmallVector<int64_t> resultShape;
-  auto inputType = input.getType().cast<RankedTensorType>();
-  auto inputShape = inputType.getShape();
-  for (int64_t i = 0; i < permutation.size(); ++i) {
-    resultShape.push_back(inputShape[permutation[i]]);
-  }
-  return rewriter
-      .create<mhlo::TransposeOp>(
-          loc, RankedTensorType::get(resultShape, inputType.getElementType()),
-          input, permutationAttr)
-      .getResult();
-}
-
-Value rearrangeForAllToAll(ConversionPatternRewriter &rewriter, Location loc,
-                           Value input, uint64_t splitDim, uint64_t concatDim,
-                           uint64_t splitCount) {
-  // Helper function to rearrange data for all-to-all so that the splits are
-  // contiguous in memory.
+Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
+                                Location loc, Value input, uint64_t splitDim,
+                                uint64_t concatDim, uint64_t splitCount) {
+  // Helper function to rearrange data after all-to-all.
   auto inputType = input.getType().cast<RankedTensorType>();
   ArrayRef<int64_t> inputShape = inputType.getShape();
 
@@ -387,7 +371,17 @@ Value rearrangeForAllToAll(ConversionPatternRewriter &rewriter, Location loc,
     }
     permutation.push_back(dimAfterReshape);
   }
-  result = emitTranspose(rewriter, loc, result, permutation);
+  SmallVector<int64_t> transposeResultShape;
+  transposeResultShape.reserve(rank + 1);
+  for (int64_t i = 0; i < rank + 1; ++i)
+    transposeResultShape.push_back(newShape[permutation[i]]);
+  result = rewriter
+               .create<mhlo::TransposeOp>(
+                   loc,
+                   RankedTensorType::get(transposeResultShape,
+                                         inputType.getElementType()),
+                   result, rewriter.getI64VectorAttr(permutation))
+               .getResult();
 
   // Reshape
   llvm::SmallVector<int64_t> finalShape(inputShape);
@@ -436,34 +430,20 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
     uint64_t concatDim = *op.getConcatDimension();
     uint64_t splitCount = *op.getSplitCount();
     Value allToAllInput = op.getOperand().front();
-    ArrayRef<int64_t> inputShape =
-        allToAllInput.getType().cast<RankedTensorType>().getShape();
-    SmallVector<int64_t> allToAllResultShape(resultType.getShape());
 
-    const bool requiresRearrange = concatDim != splitDim;
-    const bool rearrangeBefore = concatDim < splitDim;
-    const bool requiresTranspose = concatDim != 0 && splitDim != 0;
-
-    const uint64_t moveDims = std::min(concatDim, splitDim);
+    // When splitDim != 0, we need to transpose splitDim to 0 before and after
+    // the all-to-all.
+    const bool requiresTranspose = splitDim != 0;
+    // When the concatDim != splitDim, we need to rearrange the data after the
+    // all-to-all.
+    const bool requiresSplitAndConcat = concatDim != splitDim;
     if (requiresTranspose) {
-      // Transpose so that concatDim or splitDim is at rank 0.
-      SmallVector<int64_t> permutation;
-      permutation.reserve(inputShape.size());
-      for (uint64_t i = moveDims; i < inputShape.size(); ++i)
-        permutation.push_back(i);
-      for (uint64_t i = 0; i < moveDims; ++i) permutation.push_back(i);
-      allToAllInput = emitTranspose(rewriter, loc, allToAllInput, permutation);
-      concatDim -= moveDims;
-      splitDim -= moveDims;
-    }
-    if (requiresRearrange && rearrangeBefore) {
-      allToAllInput = rearrangeForAllToAll(rewriter, loc, allToAllInput,
-                                           splitDim, concatDim, splitCount);
+      allToAllInput = emitTranspose(rewriter, loc, allToAllInput, 0, splitDim);
     }
 
     // Create an empty tensor for the result.
     Value target = rewriter.create<tensor::EmptyOp>(
-        loc, allToAllInput.getType().cast<RankedTensorType>().getShape(),
+        loc, cast<RankedTensorType>(allToAllInput.getType()).getShape(),
         resultType.getElementType());
     // Create all-to-all.
     Value allToAllResult = rewriter
@@ -473,19 +453,12 @@ struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
                                .getResult();
 
     if (requiresTranspose) {
-      SmallVector<int64_t> permutation;
-      permutation.reserve(inputShape.size());
-      for (uint64_t i = moveDims + 1; i < inputShape.size(); ++i)
-        permutation.push_back(i);
-      for (uint64_t i = 0; i <= moveDims; ++i) permutation.push_back(i);
       allToAllResult =
-          emitTranspose(rewriter, loc, allToAllResult, permutation);
-      concatDim += moveDims;
-      splitDim += moveDims;
+          emitTranspose(rewriter, loc, allToAllResult, splitDim, 0);
     }
-    if (requiresRearrange && !rearrangeBefore) {
-      allToAllResult = rearrangeForAllToAll(rewriter, loc, allToAllResult,
-                                            splitDim, concatDim, splitCount);
+    if (requiresSplitAndConcat) {
+      allToAllResult = splitAndConcatForAllToAll(
+          rewriter, loc, allToAllResult, splitDim, concatDim, splitCount);
     }
 
     rewriter.replaceOp(op, allToAllResult);
