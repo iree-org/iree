@@ -13,6 +13,7 @@ MPI_PFN_DECL(MPI_Comm_rank, IREE_MPI_Comm comm, int* rank)
 MPI_PFN_DECL(MPI_Comm_size, IREE_MPI_Comm comm, int* size)
 MPI_PFN_DECL(MPI_Comm_split, IREE_MPI_Comm comm, int color, int key,
              IREE_MPI_Comm* newcomm)
+MPI_PFN_DECL(MPI_Comm_free, IREE_MPI_Comm comm)
 
 #if IREE_MPI_TYPES_ARE_POINTERS
 MPI_PFN_DECL(ompi_mpi_byte)
