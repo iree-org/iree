@@ -471,10 +471,10 @@ def _get_iree_memory_statistics(benchmark_stderr: str,
   """Extracts IREE's memory statistics for a given device."""
   # The memory statistics for each device are listed on their own line.
   pattern = (rf"{device}:"
-             rf"\s*(?P<peak>\d+)B peak /"
-             rf"\s*(?P<allocated>\d+)B allocated /"
-             rf"\s*(?P<freed>\d+)B freed /"
-             rf"\s*(?P<live>\d+)B live")
+             r"\s*(?P<peak>\d+)B peak /"
+             r"\s*(?P<allocated>\d+)B allocated /"
+             r"\s*(?P<freed>\d+)B freed /"
+             r"\s*(?P<live>\d+)B live")
   match_ = re.search(pattern, benchmark_stderr)
   return BenchmarkMemory(
       peak=int(match_["peak"]),
