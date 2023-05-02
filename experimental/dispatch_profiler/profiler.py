@@ -7,7 +7,6 @@ from manifest import *
 from performance_report import *
 from launchers import *
 from options import parse_profiler_arguments
-from options import parse_profiler_arguments
 
 ###############################################################################
 # Profiler main : The main entry point for the profiler tool.
@@ -55,34 +54,26 @@ if __name__ == "__main__":
     for operation_collection in operation_collection_list:
 
       # Select and create an instance of operation_launcher for the operation with operation_kind.
-      # print(operation_collection.operation.name())
       operation_launcher = IreeToolsLauncher(args,
                                              operation_collection.operation)
       for configuration in operation_collection.configuration_list:
+        # Initialize verification and profiling results.
+        verification_result = 'Not verified' if not args.verification_enabled else 'Failed'
+        runtime = -1.0
 
-        # Compile the operation dispatches for verification and profiling.
-        if args.compile_only:
-          operation_launcher.iree_compile(CompilationMode.Verify)
-          operation_launcher.iree_compile(CompilationMode.Profile)
+        # Launch the operation dispatches for verification and profiling.
+        if args.verification_enabled:
+          verification_result = operation_launcher.verify(configuration)
+        if args.profiling_enabled:
+          runtime = operation_launcher.profile(configuration)
 
-        else:
-          # Initialize verification and profiling results.
-          verification_result = 'Not verified' if not args.verification_enabled else 'Failed'
-          runtime = -1.0
+        # Save and print the performance result.
+        if args.verification_enabled or args.profiling_enabled:
+          # Create and print a performance result.
+          result = PerformanceResult(operation_collection.operation,
+                                     configuration, verification_result,
+                                     runtime)
+          result.print()
 
-          # Launch the operation dispatches for verification and profiling.
-          if args.verification_enabled:
-            verification_result = operation_launcher.verify(configuration)
-          if args.profiling_enabled:
-            runtime = operation_launcher.profile(configuration)
-
-          # Save and print the performance result.
-          if args.verification_enabled or args.profiling_enabled:
-            # Create and print a performance result.
-            result = PerformanceResult(operation_collection.operation,
-                                       configuration, verification_result,
-                                       runtime)
-            result.print()
-
-            # Append the performance result to the performance report.
-            perf_report.append_perf_result(result)
+          # Append the performance result to the performance report.
+          perf_report.append_perf_result(result)

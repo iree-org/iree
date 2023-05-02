@@ -180,7 +180,7 @@ class Manifest:
       shutil.rmtree(generated_path)
 
     os.makedirs(generated_path)
-
+    print(self.operations)
     # For each operation_kind create a directory and emit the operations with
     # all the configurations in the configuration_list into their seperate directories.
     for operation_kind, dispatch_collection_list in self.operations.items():

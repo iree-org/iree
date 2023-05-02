@@ -44,13 +44,12 @@ def add_compilation_arguments(parser):
 
   compilation_parser = parser.add_argument_group(
       'Compilation', 'Compilation related options.')
-
+  compilation_parser.add_argument("--num-cpu", "--j", \
+                      dest="num_cpu", type=int, default=-1, \
+                      help="Number of cpu threads to use for compilation.")
   compilation_parser.add_argument("--force-compile", action='store_true', \
                       help="Force re-compilation of the operation even "\
                       "if .vmfb file is present.")
-  compilation_parser.add_argument("--compile-only", action='store_true', \
-                      help="Compiles the operation "\
-                      "without running verification and profiling.")
 
 
 def add_iree_compile_arguments(parser):
@@ -153,6 +152,15 @@ def parse_generator_arguments(parser):
   return args
 
 
+def parse_compile_arguments(parser):
+  """Adds and parse all the arguments for the *compile.py* script."""
+  add_typical_arguments(parser)
+  add_compilation_arguments(parser)
+  add_iree_compile_arguments(parser)
+  args = parser.parse_args()
+  return args
+
+
 def parse_profiler_arguments(parser):
   """Adds and parse all the arguments for the *profiler.py* script."""
   add_typical_arguments(parser)
@@ -167,16 +175,12 @@ def parse_profiler_arguments(parser):
   # The boolean arguments below are specified as `--argument=<true|false>`
   # For the particular arguments, it makes easier to read and
   # convey the meaning.
-  args.verification_enabled = False if args.verification_enabled in [
-      'False', 'false', '0'
-  ] else True
-  args.profiling_enabled = False if args.profiling_enabled in [
-      'False', 'false', '0'
-  ] else True
+  args.verification_enabled = False\
+    if args.verification_enabled in ['False', 'false', '0']\
+    else True
 
-  # Overwrite verification and profiling if compile_only is set.
-  if args.compile_only:
-    args.verification_enabled = False
-    args.profiling_enabled = False
+  args.profiling_enabled = False\
+    if args.profiling_enabled in ['False', 'false', '0']\
+    else True
 
   return args

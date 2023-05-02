@@ -44,16 +44,19 @@ class IreeToolsLauncher:
                                              'iree-run-module')
 
     # output vmfb files for verification and profiling.
-    split_k_suffix = "_".join([
-        "split_k_slice", str(operation.split_k_slices)
-    ]) if operation.operation_kind == OperationKind.SplitkMatmul else ""
+    split_k_suffix = "_".join(["split_k_slice", str(operation.split_k_slices)])
 
-    self.vmfb_verify_filepath = os.path.join(
-        self.operation_path,
-        "_".join([self.operation.name(), split_k_suffix, "verify.vmfb"]))
-    self.vmfb_benchmark_filepath = os.path.join(
-        self.operation_path,
-        "_".join([self.operation.name(), split_k_suffix, "profile.vmfb"]))
+    vmfb_verify_list = [ self.operation.name(), split_k_suffix, "verify.vmfb"] \
+      if operation.operation_kind == OperationKind.SplitkMatmul \
+      else [self.operation.name(), "verify.vmfb"]
+    vmfb_profile_list = [ self.operation.name(), split_k_suffix, "profile.vmfb"] \
+      if operation.operation_kind == OperationKind.SplitkMatmul \
+      else [self.operation.name(), "profile.vmfb"]
+
+    self.vmfb_verify_filepath = os.path.join(self.operation_path,
+                                             "_".join(vmfb_verify_list))
+    self.vmfb_benchmark_filepath = os.path.join(self.operation_path,
+                                                "_".join(vmfb_profile_list))
 
     # reference implementation for the operation_kind.
     self.reference_impl_map = {
