@@ -17,6 +17,8 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -335,10 +337,35 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
 
   // Get floats into integer form.
   auto patternType = pattern.getType();
-  unsigned bitWidth = patternType.getIntOrFloatBitWidth();
+  unsigned bitWidth = 0;
+  if (isa<ComplexType>(patternType)) {
+    bitWidth = dyn_cast<ComplexType>(patternType)
+                   .getElementType()
+                   .getIntOrFloatBitWidth();
+  } else {
+    bitWidth = patternType.getIntOrFloatBitWidth();
+  }
   if (patternType.isa<FloatType>()) {
     pattern = rewriter.createOrFold<arith::BitcastOp>(
         loc, rewriter.getIntegerType(bitWidth), pattern);
+  }
+
+  if (isa<ComplexType>(patternType)) {
+    std::int64_t value = bitWidth;
+    Type bwElemType = rewriter.getIntegerType(bitWidth);
+    Type bwType = rewriter.getIntegerType(bitWidth*2);
+    Value shiftAmount = rewriter.create<arith::ConstantOp>(loc, bwType, 
+      rewriter.getIntegerAttr(bwType, value));
+
+    Value real = rewriter.create<mlir::complex::ReOp>(loc, pattern);
+    Value realInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, real);
+    Value imag = rewriter.create<mlir::complex::ImOp>(loc, pattern);
+    Value imagInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, imag);
+    realInt = rewriter.create<arith::IndexCastOp>(loc, bwType, realInt);
+    imagInt = rewriter.create<arith::IndexCastOp>(loc, bwType, imagInt);
+    Value shiftReal = rewriter.create<arith::ShLIOp>(loc, bwType, realInt, shiftAmount);
+    Value orImag = rewriter.create<arith::OrIOp>(loc, shiftReal, imagInt);
+    return orImag;
   }
 
   // HACK: extend i1 to i8. This is really not something we should be doing here
@@ -373,7 +400,16 @@ struct EncodeTensorSplatOp
     if (!pattern) {
       return rewriter.notifyMatchFailure(
           op, "unsupported pattern width; encoding policy required");
-    } else if (pattern.getType().getIntOrFloatBitWidth() > 32) {
+    }
+    unsigned bitWidth = 0;
+    if (isa<ComplexType>(pattern.getType())) {
+      bitWidth = 2 * dyn_cast<ComplexType>(pattern.getType())
+                     .getElementType()
+                     .getIntOrFloatBitWidth();
+    } else {
+      bitWidth = pattern.getType().getIntOrFloatBitWidth();
+    }
+    if (bitWidth > 32) {
       // We emulate 64-bit support with a stream.builtin.splat.i64.
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinSplatI64Op>(
           op, op.getResult().getType(), pattern, op.getResultSize(),
@@ -478,7 +514,16 @@ struct EncodeTensorFillOp
     if (!pattern) {
       return rewriter.notifyMatchFailure(
           op, "unsupported pattern width; encoding policy required");
-    } else if (pattern.getType().getIntOrFloatBitWidth() > 32) {
+    }
+    unsigned bitWidth = 0;
+    if (isa<ComplexType>(pattern.getType())) {
+      bitWidth = dyn_cast<ComplexType>(pattern.getType())
+                     .getElementType()
+                     .getIntOrFloatBitWidth();
+    } else {
+      bitWidth = pattern.getType().getIntOrFloatBitWidth();
+    }
+    if (bitWidth > 32) {
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinFillI64Op>(
           op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
           targetOffset, targetEnd, targetLength, pattern, op.getAffinityAttr());
