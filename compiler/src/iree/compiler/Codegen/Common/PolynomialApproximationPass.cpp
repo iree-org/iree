@@ -35,6 +35,7 @@ class PolynomialApproximationPass
       mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
     } else {
       populateMathPolynomialApproximationPatterns(mathPatterns);
+      populateExpandRoundEvenPattern(mathPatterns);
     }
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(mathPatterns)))) {
