@@ -75,16 +75,27 @@ struct DecomposePackUnPackOpsPass
 void DecomposePackUnPackOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
+  // Generalization patterns for outer unit dims have higher priority because
+  // they do not generate reshape ops.
   {
     RewritePatternSet patterns(ctx);
-    // Generalization patterns for outer unit dims have higher prirority because
-    // they do not generate reshape ops.
     patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(
-        ctx,
-        /*benefit=*/10);
+                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      funcOp.emitError(
+          "failed to apply generalization patterns on pack/unpack ops for "
+          "outer unit dims cases");
+      return signalPassFailure();
+    }
+  }
+
+  {
+    RewritePatternSet patterns(ctx);
     patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      funcOp.emitError(
+          "failed to apply generalization patterns on pack/unpack ops for "
+          "general cases.");
       return signalPassFailure();
     }
   }
