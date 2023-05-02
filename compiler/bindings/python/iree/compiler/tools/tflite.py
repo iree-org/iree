@@ -117,4 +117,3 @@ def compile_str(input_bytes: bytes, **kwargs):
     tempfile.write(input_bytes)
     tempfile.close()
     return compile_file(tempfile.name, **kwargs)
-
