@@ -1,4 +1,4 @@
-// RUN: iree-opt --allow-unregistered-dialect --split-input-file --canonicalize %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --canonicalize --cse %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
 
 // CHECK-LABEL: func.func @dontInlineReadWrite
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
@@ -146,4 +146,33 @@ func.func @drop_unused_dispatch_region_result(
   }
   // CHECK: return %[[r]]
   return %r#0 : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @bubble_up_ordinal_ops(
+func.func @bubble_up_ordinal_ops(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
+  %result = flow.dispatch.workgroups[%arg0, %arg1](%arg0, %arg1) : (index, index) -> (tensor<?x?xf32>{%arg0, %arg1}) =
+      (%b0 : index, %b1 : index, %b2 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+    //      CHECK: flow.dispatch.workgroups
+    // CHECK-NEXT:     %[[B0:[a-zA-Z0-9]+]]: index,
+    // CHECK-SAME:     %[[B1:[a-zA-Z0-9]+]]: index,
+    // CHECK-SAME:     %[[B2:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>
+    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0 : index
+    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]] 1 : index
+    //      CHECK:   %[[BINDING:.+]] = flow.dispatch.tie_shape %[[B2]]
+    // CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[WL0]], %[[WL1]]}
+    //      CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[WL0]], %[[WL1]])
+    //      CHECK:   flow.dispatch.tensor.store %[[EMPTY]], %[[BINDING]]
+    // CHECK-SAME:       sizes = [%[[WL0]], %[[WL1]]]
+    // CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[WL0]], %[[WL1]]}
+    %binding = flow.dispatch.tie_shape %b2 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%b0, %b1}
+    %wl0 = flow.dispatch.workload.ordinal %b0 0 : index
+    %wl1 = flow.dispatch.workload.ordinal %b1 1 : index
+    %empty = tensor.empty(%wl0, %wl1) : tensor<?x?xf32>
+    flow.dispatch.tensor.store %empty, %binding, offsets = [0, 0], sizes = [%wl0, %wl1], strides = [1, 1]
+        : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%wl0, %wl1}
+    flow.return
+  }  
+  return %result : tensor<?x?xf32>
 }

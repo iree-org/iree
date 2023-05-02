@@ -220,6 +220,50 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.workload.ordinal
+//===----------------------------------------------------------------------===//
+
+// Bubble up the ordinal ops so that all uses go through this operation.
+struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchWorkloadOrdinalOp ordinalOp,
+                                PatternRewriter &rewriter) const override {
+    auto blockArg = ordinalOp.getOperand().dyn_cast<BlockArgument>();
+    if (!blockArg) {
+      return failure();
+    }
+    if (blockArg.hasOneUse()) {
+      // Nothing to do.
+      return failure();
+    }
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToStart(ordinalOp->getBlock());
+    // Adjust the insertion point to keep the ordinals in order
+    for (Operation &op : *ordinalOp->getBlock()) {
+      if (auto insertionPoint = dyn_cast<DispatchWorkloadOrdinalOp>(&op)) {
+        if (insertionPoint.getOrdinal().getZExtValue() <
+            ordinalOp.getOrdinal().getZExtValue()) {
+          rewriter.setInsertionPointAfter(insertionPoint);
+          continue;
+        }
+      }
+      break;
+    }
+    auto newOrdinalOp = rewriter.create<DispatchWorkloadOrdinalOp>(
+        ordinalOp.getLoc(), blockArg, ordinalOp.getOrdinalAttr());
+    rewriter.replaceAllUsesExcept(blockArg, newOrdinalOp, newOrdinalOp);
+    rewriter.replaceOp(ordinalOp, newOrdinalOp.getResult());
+    return success();
+  }
+};
+
+void DispatchWorkloadOrdinalOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<BubbleUpOrdinalOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
 
