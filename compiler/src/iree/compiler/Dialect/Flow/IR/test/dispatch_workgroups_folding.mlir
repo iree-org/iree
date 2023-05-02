@@ -27,7 +27,7 @@ func.func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
 // CHECK-LABEL: func.func @remove_unused_result
 func.func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
-  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
+  //      CHECK: flow.dispatch.workgroups[%c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:tensor<i32>>)
   //      CHECK: flow.dispatch.tensor.store
   //  CHECK-NOT: flow.dispatch.tensor.store
@@ -52,7 +52,7 @@ func.func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) ->
 // CHECK-LABEL: func.func @remove_unused_dynamic_result
 func.func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
-  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
+  //      CHECK: flow.dispatch.workgroups[%c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:tensor<i32>>)
   //  CHECK-NOT: flow.dispatch.tie_shape
   //      CHECK: flow.dispatch.tensor.store
@@ -81,7 +81,7 @@ func.func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
 // CHECK-LABEL: func.func @remove_unused_read_write_result
 func.func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
-  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
+  //      CHECK: flow.dispatch.workgroups[%c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:tensor<i32>>)
   //      CHECK: flow.dispatch.tensor.store %{{.+}},
   //  CHECK-NOT: flow.dispatch.tensor.store
@@ -106,7 +106,7 @@ func.func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor
 // CHECK-LABEL: func.func @keep_used_read_write_result
 func.func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
-  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> (tensor<i32>, tensor<i32>) =
+  //      CHECK: flow.dispatch.workgroups[%c1]() : () -> (tensor<i32>, tensor<i32>) =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:tensor<i32>>, %{{.+}}: !flow.dispatch.tensor<readwrite:tensor<i32>>)
   %0:2 = flow.dispatch.workgroups[%c1, %c1, %c1](%arg0, %arg1) : (tensor<9xi32>, tensor<9xi32>) -> (tensor<i32>, tensor<i32>) =
       (%arg0: !flow.dispatch.tensor<readonly:tensor<9xi32>>, %arg1: !flow.dispatch.tensor<readonly:tensor<9xi32>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<i32>>, %arg3: !flow.dispatch.tensor<readwrite:tensor<i32>>) {
@@ -175,4 +175,85 @@ func.func @bubble_up_ordinal_ops(%arg0 : index, %arg1 : index) -> tensor<?x?xf32
     flow.return
   }  
   return %result : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @dedup_workgroup_count_from_slice_operands(
+func.func @dedup_workgroup_count_from_slice_operands(
+  %arg0 : index, %arg1 : index, %arg2 : index) -> tensor<?x?x?x?x?xf32> {
+  %result = flow.dispatch.workgroups [%arg0, %arg1, %arg2](%arg0, %arg1, %arg2)
+      : (index, index, index) -> tensor<?x?x?x?x?xf32>{%arg0, %arg1, %arg2, %arg2, %arg0} =
+      (%b0 : index, %b1 : index, %b2 : index, %b3 : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>) {
+    //      CHECK: flow.dispatch.workgroups
+    // CHECK-NEXT:   (%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index, %[[B2:[a-zA-Z0-9]+]]: index
+    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0
+    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]] 1
+    //  CHECK-DAG:   %[[WL2:.+]] = flow.dispatch.workload.ordinal %[[B2]] 2
+    //  CHECK-DAG:   %[[WL3:.+]] = flow.dispatch.workload.ordinal %[[B2]] 2
+    //  CHECK-DAG:   %[[WL4:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0
+    //      CHECK:   tensor.empty(%[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]], %[[WL4]])
+    %wl0 = flow.dispatch.workload.ordinal %b0 0 : index
+    %wl1 = flow.dispatch.workload.ordinal %b1 1 : index
+    %wl2 = flow.dispatch.workload.ordinal %b2 2 : index
+    %wl3 = flow.dispatch.workload.ordinal %b2 3 : index
+    %wl4 = flow.dispatch.workload.ordinal %b0 4 : index
+    %out_binding = flow.dispatch.tie_shape %b3
+        : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>{%wl0, %wl1, %wl2, %wl3, %wl4}
+    %tensor = tensor.empty(%wl0, %wl1, %wl2, %wl3, %wl4) : tensor<?x?x?x?x?xf32>
+    flow.dispatch.tensor.store %tensor, %out_binding,
+        offsets = [0, 0, 0, 0, 0], sizes = [%wl0, %wl1, %wl2, %wl3, %wl4], strides = [1, 1, 1, 1, 1]
+        : tensor<?x?x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>{%wl0, %wl1, %wl2, %wl3, %wl4}
+    flow.return
+  } count(%b0 : index, %b1 : index, %b2 : index) -> (index, index, index) {
+    //     CHECK: count(%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index, %[[B2:[a-zA-Z0-9]+]]: index)
+    //     CHECK: flow.dispatch.workgroup_count_from_slice %[[B0]], %[[B1]], %[[B2]]
+    // CHECK-NOT: %[[B2]]
+    // CHECK-NOT: %[[B0]]
+    %x, %y, %z = flow.dispatch.workgroup_count_from_slice %b0, %b1, %b2, %b2, %b0
+    flow.return %x, %y, %z : index, index, index
+  }
+  return %result :tensor<?x?x?x?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @dedup_workload(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index)
+func.func @dedup_workload(
+  %arg0 : index, %arg1 : index, %arg2 : index) -> tensor<?x?x?x?x?xf32> {
+  %result = flow.dispatch.workgroups [%arg0, %arg1, %arg2, %arg2, %arg0](%arg0, %arg1, %arg2)
+      : (index, index, index) -> tensor<?x?x?x?x?xf32>{%arg0, %arg1, %arg2, %arg2, %arg0} =
+      (%b0 : index, %b1 : index, %b2 : index, %b3 : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>) {
+    //      CHECK: flow.dispatch.workgroups[%[[ARG0]], %[[ARG1]], %[[ARG2]]]
+    // CHECK-NEXT:   (%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index, %[[B2:[a-zA-Z0-9]+]]: index
+    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0
+    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]] 1
+    //  CHECK-DAG:   %[[WL2:.+]] = flow.dispatch.workload.ordinal %[[B2]] 2
+    //  CHECK-DAG:   %[[WL3:.+]] = flow.dispatch.workload.ordinal %[[B2]] 2
+    //  CHECK-DAG:   %[[WL4:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0
+    //      CHECK:   tensor.empty(%[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]], %[[WL4]])
+    %wl0 = flow.dispatch.workload.ordinal %b0 0 : index
+    %wl1 = flow.dispatch.workload.ordinal %b1 1 : index
+    %wl2 = flow.dispatch.workload.ordinal %b2 2 : index
+    %wl3 = flow.dispatch.workload.ordinal %b2 3 : index
+    %wl4 = flow.dispatch.workload.ordinal %b0 4 : index
+    %out_binding = flow.dispatch.tie_shape %b3
+        : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>{%wl0, %wl1, %wl2, %wl3, %wl4}
+    %tensor = tensor.empty(%wl0, %wl1, %wl2, %wl3, %wl4) : tensor<?x?x?x?x?xf32>
+    flow.dispatch.tensor.store %tensor, %out_binding,
+        offsets = [0, 0, 0, 0, 0], sizes = [%wl0, %wl1, %wl2, %wl3, %wl4], strides = [1, 1, 1, 1, 1]
+        : tensor<?x?x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>{%wl0, %wl1, %wl2, %wl3, %wl4}
+    flow.return
+  } count(%b0 : index, %b1 : index, %b2 : index, %b3 : index, %b4 : index) -> (index, index, index) {
+    //     CHECK: count(%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index, %[[B2:[a-zA-Z0-9]+]]: index)
+    //     CHECK: flow.dispatch.workgroup_count_from_slice %[[B0]], %[[B1]], %[[B2]]
+    // CHECK-NOT: %[[B2]]
+    // CHECK-NOT: %[[B0]]
+    %x, %y, %z = flow.dispatch.workgroup_count_from_slice %b0, %b1, %b2, %b3, %b4
+    flow.return %x, %y, %z : index, index, index
+  }
+  return %result :tensor<?x?x?x?x?xf32>
 }

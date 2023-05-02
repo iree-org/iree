@@ -215,6 +215,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     /// signature. In case an output is tied to an input, the return list
     /// overlaps with `getInputBlockArguments`.
     SmallVector<BlockArgument> getOutputBlockArguments();
+
+    /// Returns the tiedOperands attribute as a list of integers.
+    SmallVector<int64_t> getTiedOperandsAsIntegerList();
   }];
 
   let hasVerifier = 1;
@@ -1539,6 +1542,8 @@ def FLOW_DispatchWorkloadOrdinalOp :
   }];
 
   let hasCanonicalizer = 1;
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
