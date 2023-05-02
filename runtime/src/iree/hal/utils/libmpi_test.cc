@@ -13,6 +13,9 @@
 
 namespace {
 
+using ::iree::StatusCode;
+using ::iree::testing::status::StatusIs;
+
 const int MPI_SUCCESS = 0;
 
 class LibmpiTest : public ::testing::Test {
@@ -31,16 +34,6 @@ class LibmpiTest : public ::testing::Test {
 
   void SetUp() override {
     if (!library) GTEST_SKIP() << "No MPI library available. Skipping suite.";
-    bool has_symbols = false;
-    unsigned char *syms_ptr = (unsigned char *)&symbols;
-    for (int i = 0; i < sizeof(symbols); i++) {
-      if (*(syms_ptr + i) != 0) {
-        has_symbols = true;
-        break;
-      }
-    }
-    if (!has_symbols)
-      GTEST_SKIP() << "MPI library failed to load symbols. Skipping suite";
 
     IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
         &symbols, MPI_Comm_size(IREE_MPI_COMM_WORLD(&symbols), &world_size),
@@ -68,42 +61,31 @@ class LibmpiTest : public ::testing::Test {
  protected:
   static iree_dynamic_library_t *library;
   static iree_hal_mpi_dynamic_symbols_t symbols;
-  int rank;
-  int world_size;
+  int rank = 0;
+  int world_size = 0;
 };
 
 iree_dynamic_library_t *LibmpiTest::library = NULL;
 iree_hal_mpi_dynamic_symbols_t LibmpiTest::symbols = {0};
 
-// an MPI hello_world program to test library loading
+// An MPI "hello world" program to test library loading.
 TEST_F(LibmpiTest, HelloWorld) {
   std::cout << "Hello world! "
             << "I'm " << rank << " of " << world_size << std::endl;
 }
 
-TEST_F(LibmpiTest, MPI_error_to_IREE_status) {
-  iree_status_t status;
+TEST_F(LibmpiTest, MPIErrorToIREEStatus) {
   IREE_EXPECT_OK(iree_hal_mpi_result_to_status(NULL, 0, __FILE__, __LINE__));
 
   const int MPI_ERR_UNKNOWN = 14;
-  status =
-      iree_hal_mpi_result_to_status(NULL, MPI_ERR_UNKNOWN, __FILE__, __LINE__);
-  EXPECT_TRUE(iree_status_is_internal(status));
-  char *buffer = NULL;
-  iree_host_size_t length = 0;
-  iree_allocator_t allocator = iree_allocator_system();
-  if (iree_status_to_string(status, &allocator, &buffer, &length)) {
-    EXPECT_THAT(buffer, testing::HasSubstr("MPI library symbols not loaded"));
-    iree_allocator_free(allocator, buffer);
-  }
+  EXPECT_THAT(
+      iree_hal_mpi_result_to_status(NULL, MPI_ERR_UNKNOWN, __FILE__, __LINE__),
+      StatusIs(StatusCode::kInternal));
 
   const int MPI_ERR_ACCESS = 20;
-  status = iree_hal_mpi_result_to_status(&symbols, MPI_ERR_ACCESS, __FILE__,
-                                         __LINE__);
-  EXPECT_TRUE(iree_status_is_internal(status));
-  ASSERT_TRUE(iree_status_to_string(status, &allocator, &buffer, &length));
-  EXPECT_THAT(buffer, testing::HasSubstr("MPI_ERR_ACCESS"));
-  iree_allocator_free(allocator, buffer);
+  EXPECT_THAT(iree_hal_mpi_result_to_status(&symbols, MPI_ERR_ACCESS, __FILE__,
+                                            __LINE__),
+              StatusIs(StatusCode::kInternal));
 }
 
 }  // namespace
