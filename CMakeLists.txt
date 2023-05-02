@@ -126,6 +126,20 @@ option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
 
 #-------------------------------------------------------------------------------
+# IREE command-line tooling configuration
+#-------------------------------------------------------------------------------
+
+# External user modules linked into IREE tooling (iree-run-module/etc).
+# These are only available in the internal IREE tools and here for testing
+# custom modules in standard workflows. This is not a deployment mechanism and
+# users integrating IREE into their libraries or applications will need to
+# manage the building and registering/resolving the modules themselves.
+#
+# See runtime/src/iree/tooling/modules/CMakeLists.txt for more information on
+# how to declare external modules.
+set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
+
+#-------------------------------------------------------------------------------
 # Compiler plugins
 # IREE compiler plugins can be statically built into the compiler by adding
 # directories to IREE_COMPILER_PLUGIN_PATHS. If directories are relative, they
