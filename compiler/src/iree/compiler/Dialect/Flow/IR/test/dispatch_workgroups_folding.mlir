@@ -158,8 +158,8 @@ func.func @bubble_up_ordinal_ops(%arg0 : index, %arg1 : index) -> tensor<?x?xf32
     // CHECK-NEXT:     %[[B0:[a-zA-Z0-9]+]]: index,
     // CHECK-SAME:     %[[B1:[a-zA-Z0-9]+]]: index,
     // CHECK-SAME:     %[[B2:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>
-    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0 : index
-    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]] 1 : index
+    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]], 0 : index
+    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]], 1 : index
     //      CHECK:   %[[BINDING:.+]] = flow.dispatch.tie_shape %[[B2]]
     // CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[WL0]], %[[WL1]]}
     //      CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[WL0]], %[[WL1]])
@@ -167,8 +167,8 @@ func.func @bubble_up_ordinal_ops(%arg0 : index, %arg1 : index) -> tensor<?x?xf32
     // CHECK-SAME:       sizes = [%[[WL0]], %[[WL1]]]
     // CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[WL0]], %[[WL1]]}
     %binding = flow.dispatch.tie_shape %b2 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%b0, %b1}
-    %wl0 = flow.dispatch.workload.ordinal %b0 0 : index
-    %wl1 = flow.dispatch.workload.ordinal %b1 1 : index
+    %wl0 = flow.dispatch.workload.ordinal %b0, 0 : index
+    %wl1 = flow.dispatch.workload.ordinal %b1, 1 : index
     %empty = tensor.empty(%wl0, %wl1) : tensor<?x?xf32>
     flow.dispatch.tensor.store %empty, %binding, offsets = [0, 0], sizes = [%wl0, %wl1], strides = [1, 1]
         : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%wl0, %wl1}
@@ -187,17 +187,15 @@ func.func @dedup_workgroup_count_from_slice_operands(
       (%b0 : index, %b1 : index, %b2 : index, %b3 : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>) {
     //      CHECK: flow.dispatch.workgroups
     // CHECK-NEXT:   (%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index, %[[B2:[a-zA-Z0-9]+]]: index
-    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0
-    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]] 1
-    //  CHECK-DAG:   %[[WL2:.+]] = flow.dispatch.workload.ordinal %[[B2]] 2
-    //  CHECK-DAG:   %[[WL3:.+]] = flow.dispatch.workload.ordinal %[[B2]] 2
-    //  CHECK-DAG:   %[[WL4:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0
-    //      CHECK:   tensor.empty(%[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]], %[[WL4]])
-    %wl0 = flow.dispatch.workload.ordinal %b0 0 : index
-    %wl1 = flow.dispatch.workload.ordinal %b1 1 : index
-    %wl2 = flow.dispatch.workload.ordinal %b2 2 : index
-    %wl3 = flow.dispatch.workload.ordinal %b2 3 : index
-    %wl4 = flow.dispatch.workload.ordinal %b0 4 : index
+    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]], 0
+    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]], 1
+    //  CHECK-DAG:   %[[WL2:.+]] = flow.dispatch.workload.ordinal %[[B2]], 2
+    //      CHECK:   tensor.empty(%[[WL0]], %[[WL1]], %[[WL2]], %[[WL2]], %[[WL0]])
+    %wl0 = flow.dispatch.workload.ordinal %b0, 0 : index
+    %wl1 = flow.dispatch.workload.ordinal %b1, 1 : index
+    %wl2 = flow.dispatch.workload.ordinal %b2, 2 : index
+    %wl3 = flow.dispatch.workload.ordinal %b2, 3 : index
+    %wl4 = flow.dispatch.workload.ordinal %b0, 4 : index
     %out_binding = flow.dispatch.tie_shape %b3
         : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>{%wl0, %wl1, %wl2, %wl3, %wl4}
     %tensor = tensor.empty(%wl0, %wl1, %wl2, %wl3, %wl4) : tensor<?x?x?x?x?xf32>
@@ -229,17 +227,15 @@ func.func @dedup_workload(
       (%b0 : index, %b1 : index, %b2 : index, %b3 : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>) {
     //      CHECK: flow.dispatch.workgroups[%[[ARG0]], %[[ARG1]], %[[ARG2]]]
     // CHECK-NEXT:   (%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index, %[[B2:[a-zA-Z0-9]+]]: index
-    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0
-    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]] 1
-    //  CHECK-DAG:   %[[WL2:.+]] = flow.dispatch.workload.ordinal %[[B2]] 2
-    //  CHECK-DAG:   %[[WL3:.+]] = flow.dispatch.workload.ordinal %[[B2]] 2
-    //  CHECK-DAG:   %[[WL4:.+]] = flow.dispatch.workload.ordinal %[[B0]] 0
-    //      CHECK:   tensor.empty(%[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]], %[[WL4]])
-    %wl0 = flow.dispatch.workload.ordinal %b0 0 : index
-    %wl1 = flow.dispatch.workload.ordinal %b1 1 : index
-    %wl2 = flow.dispatch.workload.ordinal %b2 2 : index
-    %wl3 = flow.dispatch.workload.ordinal %b2 3 : index
-    %wl4 = flow.dispatch.workload.ordinal %b0 4 : index
+    //  CHECK-DAG:   %[[WL0:.+]] = flow.dispatch.workload.ordinal %[[B0]], 0
+    //  CHECK-DAG:   %[[WL1:.+]] = flow.dispatch.workload.ordinal %[[B1]], 1
+    //  CHECK-DAG:   %[[WL2:.+]] = flow.dispatch.workload.ordinal %[[B2]], 2
+    //      CHECK:   tensor.empty(%[[WL0]], %[[WL1]], %[[WL2]], %[[WL2]], %[[WL0]])
+    %wl0 = flow.dispatch.workload.ordinal %b0, 0 : index
+    %wl1 = flow.dispatch.workload.ordinal %b1, 1 : index
+    %wl2 = flow.dispatch.workload.ordinal %b2, 2 : index
+    %wl3 = flow.dispatch.workload.ordinal %b2, 3 : index
+    %wl4 = flow.dispatch.workload.ordinal %b0, 4 : index
     %out_binding = flow.dispatch.tie_shape %b3
         : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?x?xf32>>{%wl0, %wl1, %wl2, %wl3, %wl4}
     %tensor = tensor.empty(%wl0, %wl1, %wl2, %wl3, %wl4) : tensor<?x?x?x?x?xf32>

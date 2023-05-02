@@ -1538,7 +1538,7 @@ def FLOW_DispatchWorkloadOrdinalOp :
   }];
 
   let assemblyFormat = [{
-    attr-dict $operand $ordinal `:` type($operand)
+    attr-dict $operand `,` $ordinal `:` type($operand)
   }];
 
   let hasCanonicalizer = 1;

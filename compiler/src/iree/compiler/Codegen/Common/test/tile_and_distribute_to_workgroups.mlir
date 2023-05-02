@@ -28,9 +28,9 @@ hal.executable private @matmul_tensors {
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2}
         %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -126,8 +126,8 @@ hal.executable private @add {
       func.func @add() {
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
         %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
         %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -202,10 +202,10 @@ hal.executable private @add4D {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload.ordinal %cl_3 3  : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3, 3  : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%0, %1, %2, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32)
@@ -282,10 +282,10 @@ hal.executable private @add_distribute4D {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3, 3 : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%0, %1, %2, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32)
@@ -403,10 +403,10 @@ hal.executable private @add_distribute4D_zero_tile_size {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3, 3 : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%0, %1, %2, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32)
@@ -478,10 +478,10 @@ hal.executable private @batch_matmul_tensors {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3, 3 : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%0, %1, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32)
@@ -618,16 +618,16 @@ hal.executable public @copy_op {
         %cl_7 = hal.interface.constant.load[7] : index
         %cl_8 = hal.interface.constant.load[8] : index
         %cl_9 = hal.interface.constant.load[9] : index
-        %source_size_y = flow.dispatch.workload.ordinal %cl_0 0: index
-        %source_size_x = flow.dispatch.workload.ordinal %cl_1 1: index
-        %dest_size_y = flow.dispatch.workload.ordinal %cl_2 2: index
-        %dest_size_x = flow.dispatch.workload.ordinal %cl_3 3: index
-        %source_offset_y = flow.dispatch.workload.ordinal %cl_4 4: index
-        %source_offset_x = flow.dispatch.workload.ordinal %cl_5 5: index
-        %dest_offset_y = flow.dispatch.workload.ordinal %cl_6 6: index
-        %dest_offset_x = flow.dispatch.workload.ordinal %cl_7 7: index
-        %slice_size_y = flow.dispatch.workload.ordinal %cl_8 8: index
-        %slice_size_x = flow.dispatch.workload.ordinal %cl_9 9: index
+        %source_size_y = flow.dispatch.workload.ordinal %cl_0, 0: index
+        %source_size_x = flow.dispatch.workload.ordinal %cl_1, 1: index
+        %dest_size_y = flow.dispatch.workload.ordinal %cl_2, 2: index
+        %dest_size_x = flow.dispatch.workload.ordinal %cl_3, 3: index
+        %source_offset_y = flow.dispatch.workload.ordinal %cl_4, 4: index
+        %source_offset_x = flow.dispatch.workload.ordinal %cl_5, 5: index
+        %dest_offset_y = flow.dispatch.workload.ordinal %cl_6, 6: index
+        %dest_offset_x = flow.dispatch.workload.ordinal %cl_7, 7: index
+        %slice_size_y = flow.dispatch.workload.ordinal %cl_8, 8: index
+        %slice_size_x = flow.dispatch.workload.ordinal %cl_9, 9: index
         %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%source_size_y, %source_size_x}
         %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%dest_size_y, %dest_size_x}
         %source_subview = memref.subview %source[%source_offset_y, %source_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, strided<[?, ?], offset : ?>>
@@ -825,9 +825,9 @@ hal.executable private @outs_fusion {
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2}
         %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -914,15 +914,15 @@ hal.executable private @conv {
         %cl_6 = hal.interface.constant.load[6] : index
         %cl_7 = hal.interface.constant.load[7] : index
         %cl_8 = hal.interface.constant.load[8] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
-        %4 = flow.dispatch.workload.ordinal %cl_4 4 : index
-        %5 = flow.dispatch.workload.ordinal %cl_5 5 : index
-        %6 = flow.dispatch.workload.ordinal %cl_6 6 : index
-        %7 = flow.dispatch.workload.ordinal %cl_7 7 : index
-        %8 = flow.dispatch.workload.ordinal %cl_8 8 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3, 3 : index
+        %4 = flow.dispatch.workload.ordinal %cl_4, 4 : index
+        %5 = flow.dispatch.workload.ordinal %cl_5, 5 : index
+        %6 = flow.dispatch.workload.ordinal %cl_6, 6 : index
+        %7 = flow.dispatch.workload.ordinal %cl_7, 7 : index
+        %8 = flow.dispatch.workload.ordinal %cl_8, 8 : index
         %9 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%0, %1, %2, %3}
         %10 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -1331,8 +1331,8 @@ hal.executable private @gemm_unit_N {
         %c0 = arith.constant 0 : index
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
         %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) offset(%c0)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
         %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) offset(%c0)
@@ -1464,10 +1464,10 @@ hal.executable private @generic_unit_dims {
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
         %cl_3 = hal.interface.constant.load[3] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
-        %3 = flow.dispatch.workload.ordinal %cl_3 3 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
+        %3 = flow.dispatch.workload.ordinal %cl_3, 3 : index
         %4 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<1x?x1x1x?x?x1x?xf32>>{%0, %1, %2, %3}
         %5 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -1537,7 +1537,7 @@ hal.executable private @reduce_to_scalar {
     builtin.module {
       func.func @reduce_to_scalar() {
         %cl_0 = hal.interface.constant.load[0] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
         %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?xf32>>{%0}
         %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -1724,9 +1724,9 @@ hal.executable private @matmul_interchange {
         %cl_0 = hal.interface.constant.load[0] : index
         %cl_1 = hal.interface.constant.load[1] : index
         %cl_2 = hal.interface.constant.load[2] : index
-        %0 = flow.dispatch.workload.ordinal %cl_0 0 : index
-        %1 = flow.dispatch.workload.ordinal %cl_1 1 : index
-        %2 = flow.dispatch.workload.ordinal %cl_2 2 : index
+        %0 = flow.dispatch.workload.ordinal %cl_0, 0 : index
+        %1 = flow.dispatch.workload.ordinal %cl_1, 1 : index
+        %2 = flow.dispatch.workload.ordinal %cl_2, 2 : index
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2}
         %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -1791,11 +1791,11 @@ hal.executable private @no_compute {
         %2 = arith.index_cast %cl_2 : i32 to index
         %3 = arith.index_cast %cl_3 : i32 to index
         %4 = arith.index_cast %cl_4 : i32 to index
-        %5 = flow.dispatch.workload.ordinal %0 0 : index
-        %6 = flow.dispatch.workload.ordinal %1 1 : index
-        %7 = flow.dispatch.workload.ordinal %2 2 : index
-        %8 = flow.dispatch.workload.ordinal %3 3 : index
-        %9 = flow.dispatch.workload.ordinal %4 4 : index
+        %5 = flow.dispatch.workload.ordinal %0, 0 : index
+        %6 = flow.dispatch.workload.ordinal %1, 1 : index
+        %7 = flow.dispatch.workload.ordinal %2, 2 : index
+        %8 = flow.dispatch.workload.ordinal %3, 3 : index
+        %9 = flow.dispatch.workload.ordinal %4, 4 : index
         %10 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?x?x?xf32>{%5, %6, %7}
         memref.assume_alignment %10, 64 : memref<?x?x?xf32>
         %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1x?x?xf32>{%8, %9}
@@ -2050,10 +2050,10 @@ hal.executable private @clone_index_computations {
         %1 = arith.index_castui %cl_1 : i32 to index
         %2 = arith.index_castui %cl_2 : i32 to index
         %3 = arith.index_castui %cl_3 : i32 to index
-        %4 = flow.dispatch.workload.ordinal %0 0 : index
-        %5 = flow.dispatch.workload.ordinal %1 1 : index
-        %6 = flow.dispatch.workload.ordinal %2 2 : index
-        %7 = flow.dispatch.workload.ordinal %3 3 : index
+        %4 = flow.dispatch.workload.ordinal %0, 0 : index
+        %5 = flow.dispatch.workload.ordinal %1, 1 : index
+        %6 = flow.dispatch.workload.ordinal %2, 2 : index
+        %7 = flow.dispatch.workload.ordinal %3, 3 : index
         %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%4, %5}
         %9 = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%6]
@@ -2113,10 +2113,10 @@ hal.executable private @dynamic_unpack {
         %1 = arith.index_castui %cl_1 : i32 to index
         %2 = arith.index_castui %cl_2 : i32 to index
         %3 = arith.index_castui %cl_3 : i32 to index
-        %4 = flow.dispatch.workload.ordinal %0 0 : index
-        %5 = flow.dispatch.workload.ordinal %1 1 : index
-        %6 = flow.dispatch.workload.ordinal %2 2 : index
-        %7 = flow.dispatch.workload.ordinal %3 3 : index
+        %4 = flow.dispatch.workload.ordinal %0, 0 : index
+        %5 = flow.dispatch.workload.ordinal %1, 1 : index
+        %6 = flow.dispatch.workload.ordinal %2, 2 : index
+        %7 = flow.dispatch.workload.ordinal %3, 3 : index
         %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5}
         %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
@@ -2161,10 +2161,10 @@ hal.executable private @dynamic_unpack_dynamic_tile {
         %1 = arith.index_castui %cl_1 : i32 to index
         %2 = arith.index_castui %cl_2 : i32 to index
         %3 = arith.index_castui %cl_3 : i32 to index
-        %4 = flow.dispatch.workload.ordinal %0 0 : index
-        %5 = flow.dispatch.workload.ordinal %1 1 : index
-        %6 = flow.dispatch.workload.ordinal %2 2 : index
-        %7 = flow.dispatch.workload.ordinal %3 3 : index
+        %4 = flow.dispatch.workload.ordinal %0, 0 : index
+        %5 = flow.dispatch.workload.ordinal %1, 1 : index
+        %6 = flow.dispatch.workload.ordinal %2, 2 : index
+        %7 = flow.dispatch.workload.ordinal %3, 3 : index
         %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%4, %5, %c32, %c16}
         %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, %c32, %c16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%4, %5, %c32, %c16} -> tensor<?x?x?x?xi32>
