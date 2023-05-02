@@ -3,11 +3,11 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Utilities for describing Android benchmarks.
+"""Utilities for describing benchmarks.
 
-This file provides common and structured representation of Android devices,
-benchmark definitions, and benchmark result collections, so that they can be
-shared between different stages of the same benchmark pipeline.
+This file provides common and structured representation of devices, benchmark
+definitions, and benchmark result collections, so that they can be shared
+between different stages of the same benchmark pipeline.
 """
 
 import json
@@ -110,17 +110,32 @@ def execute_cmd(args: Sequence[Any],
 
 def execute_cmd_and_get_output(args: Sequence[Any],
                                verbose: bool = False,
+                               **kwargs) -> Tuple[str, str]:
+  """Executes a command and returns its stdout and stderr
+
+  Same as execute_cmd except captures stdout and stderr.
+  """
+  exc = execute_cmd(args,
+                    verbose=verbose,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    **kwargs)
+  return exc.stdout.strip(), exc.stderr.strip()
+
+
+def execute_cmd_and_get_stdout(args: Sequence[Any],
+                               verbose: bool = False,
                                **kwargs) -> str:
   """Executes a command and returns its stdout.
 
   Same as execute_cmd except captures stdout (and not stderr).
   """
-  return execute_cmd(args, verbose=verbose, stdout=subprocess.PIPE,
-                     **kwargs).stdout.strip()
+  stdout, _ = execute_cmd_and_get_output(args, verbose=verbose, **kwargs)
+  return stdout
 
 
 def get_git_commit_hash(commit: str) -> str:
-  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+  return execute_cmd_and_get_stdout(['git', 'rev-parse', commit],
                                     cwd=pathlib.Path(__file__).resolve().parent)
 
 
@@ -142,6 +157,7 @@ def get_iree_benchmark_module_arguments(
       "--benchmark_format=json",
       "--benchmark_out_format=json",
       f"--benchmark_out={results_filename}",
+      "--print_statistics=true",
   ]
   if benchmark_min_time:
     cmd.extend([
@@ -335,9 +351,8 @@ class BenchmarkInfo:
     elif driver_info.device_type == 'CPU':
       target_arch = "CPU-" + device_info.get_detailed_cpu_arch_name()
     else:
-      raise ValueError(
-          f"Unrecognized device type '{driver_info.device_type}' of the driver '{driver_info.pretty_name}'"
-      )
+      raise ValueError(f"Unrecognized device type '{driver_info.device_type}' "
+                       f"of the driver '{driver_info.pretty_name}'")
 
     if model_tags:
       tags = ",".join(model_tags)
@@ -347,7 +362,8 @@ class BenchmarkInfo:
     device_part = f"{device_info.model} ({target_arch})"
 
     mode_tags = ",".join(bench_mode)
-    name = f"{model_part} {mode_tags} with {driver_info.pretty_name} @ {device_part}"
+    name = (f"{model_part} {mode_tags} with {driver_info.pretty_name} "
+            f"@ {device_part}")
 
     return cls(name=name,
                model_name=model_name,
@@ -434,6 +450,42 @@ def _get_google_benchmark_latencies(
 
 
 @dataclasses.dataclass(frozen=True)
+class BenchmarkMemory:
+  """Stores memory statistics for a benchmark run."""
+  peak: int
+  allocated: int
+  freed: int
+  live: int
+  unit: str
+
+  def to_json_object(self) -> Dict[str, int]:
+    return dataclasses.asdict(self)
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, int]):
+    return BenchmarkMemory(**json_object)
+
+
+def _get_iree_memory_statistics(benchmark_stderr: str,
+                                device: str) -> BenchmarkMemory:
+  """Extracts IREE's memory statistics for a given device."""
+  # The memory statistics for each device are listed on their own line.
+  pattern = (rf"{device}:"
+             r"\s*(?P<peak>\d+)B peak /"
+             r"\s*(?P<allocated>\d+)B allocated /"
+             r"\s*(?P<freed>\d+)B freed /"
+             r"\s*(?P<live>\d+)B live")
+  match_ = re.search(pattern, benchmark_stderr)
+  return BenchmarkMemory(
+      peak=int(match_["peak"]),
+      allocated=int(match_["allocated"]),
+      freed=int(match_["freed"]),
+      live=int(match_["live"]),
+      unit="bytes",
+  )
+
+
+@dataclasses.dataclass(frozen=True)
 class BenchmarkMetrics(object):
   """An object describing the results from a single benchmark.
 
@@ -441,45 +493,63 @@ class BenchmarkMetrics(object):
       framework.
   - cpu_time: the cpu time latency statistics returned by the benchmarking
       framework.
+  - host_memory: the host memory statistics returned by the benchmarking
+      framework.
+  - device_memory: the device memory statistics returned by the benchmarking
+      framework.
   - raw_data: additional JSON-compatible raw results returned by the
       benchmarking framework.
   """
   real_time: BenchmarkLatency
   cpu_time: BenchmarkLatency
+  host_memory: BenchmarkMemory
+  device_memory: BenchmarkMemory
   raw_data: Dict[str, Any]
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
         "real_time": self.real_time.to_json_object(),
         "cpu_time": self.cpu_time.to_json_object(),
+        "host_memory": self.host_memory.to_json_object(),
+        "device_memory": self.device_memory.to_json_object(),
         "raw_data": self.raw_data,
     }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkMetrics(
-        BenchmarkLatency.from_json_object(json_object["real_time"]),
-        BenchmarkLatency.from_json_object(json_object["cpu_time"]),
-        json_object["raw_data"],
+        real_time=BenchmarkLatency.from_json_object(json_object["real_time"]),
+        cpu_time=BenchmarkLatency.from_json_object(json_object["cpu_time"]),
+        host_memory=BenchmarkMemory.from_json_object(
+            json_object["host_memory"]),
+        device_memory=BenchmarkMemory.from_json_object(
+            json_object["device_memory"]),
+        raw_data=json_object["raw_data"],
     )
 
 
-def parse_iree_benchmark_metrics(benchmark_stdout: str) -> BenchmarkMetrics:
+def parse_iree_benchmark_metrics(benchmark_stdout: str,
+                                 benchmark_stderr: str) -> BenchmarkMetrics:
   """Extract benchmark metrics from the output of iree-benchmark-module.
 
   Args:
     benchmark_stdout: The stdout of iree-benchmark-module with
       --benchmark_format=json.
+    benchmark_stdout: The stderr of iree-benchmark-module with
+      --print_statistics=true.
 
   Returns:
     A populated BenchmarkMetrics dataclass.
   """
-  iree_benchmark_json = json.loads(benchmark_stdout)
-  real_time, cpu_time = _get_google_benchmark_latencies(iree_benchmark_json)
+  benchmark_json = json.loads(benchmark_stdout)
+  real_time, cpu_time = _get_google_benchmark_latencies(benchmark_json)
   return BenchmarkMetrics(
       real_time=real_time,
       cpu_time=cpu_time,
-      raw_data=iree_benchmark_json,
+      host_memory=_get_iree_memory_statistics(benchmark_stderr, "HOST_LOCAL"),
+      device_memory=_get_iree_memory_statistics(benchmark_stderr,
+                                                "DEVICE_LOCAL"),
+      raw_data=benchmark_json,
   )
 
 
@@ -530,7 +600,7 @@ class BenchmarkResults(object):
   def to_json_str(self) -> str:
     json_object = {"commit": self.commit, "benchmarks": []}
     json_object["benchmarks"] = [b.to_json_object() for b in self.benchmarks]
-    return json.dumps(json_object)
+    return json.dumps(json_object, indent=2)
 
   @staticmethod
   def from_json_str(json_str: str):
