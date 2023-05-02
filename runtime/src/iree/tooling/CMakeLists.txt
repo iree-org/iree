@@ -97,7 +97,7 @@ iree_cc_library(
     iree::modules::hal
     iree::modules::hal::inline
     iree::modules::hal::loader
-    iree::modules::vmvx
+    iree::tooling::modules
     iree::vm
     iree::vm::bytecode::module
     iree::vm::dynamic::module
