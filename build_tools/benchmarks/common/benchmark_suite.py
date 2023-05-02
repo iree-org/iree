@@ -156,9 +156,9 @@ class BenchmarkSuite(object):
       driver_name = driver_info.driver_name
       matched_available_driver = (available_drivers is None or
                                   driver_name in available_drivers)
-      matched_drivler_filter = driver_filter is None or re.match(
+      matched_driver_filter = driver_filter is None or re.match(
           driver_filter, driver_name) is not None
-      matched_driver = matched_available_driver and matched_drivler_filter
+      matched_driver = matched_available_driver and matched_driver_filter
 
       matched_loader = not driver_info.loader_name or available_loaders is None or (
           driver_info.loader_name in available_loaders)
