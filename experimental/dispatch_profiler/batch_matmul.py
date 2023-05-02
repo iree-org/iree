@@ -183,7 +183,7 @@ class CudaBatchMatmulGenerator(CudaMatmulGenerator):
     super().__init__(args)
 
     # Predefined batch matmul problem shapes.
-    self.batch_matmul_shapes = [[16, 512, 64, 512], [16, 512, 512, 64]]
+    self.batch_matmul_shapes = [[16, 512, 64, 512]]
 
     # Batch matmul dispatches collection.
     self.dispatches_collection_list = []

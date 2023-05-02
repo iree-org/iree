@@ -49,7 +49,7 @@ if __name__ == "__main__":
   # Performance report
   perf_report = PerformanceReport(args)
 
-  # For all the operations in the manifest compile, verify, and profile.
+  # For all the operations in the manifest compile (if needed), verify, and profile.
   for operation_kind, operation_collection_list in manifest.operations.items():
     for operation_collection in operation_collection_list:
 
@@ -57,6 +57,7 @@ if __name__ == "__main__":
       operation_launcher = IreeToolsLauncher(args,
                                              operation_collection.operation)
       for configuration in operation_collection.configuration_list:
+
         # Initialize verification and profiling results.
         verification_result = 'Not verified' if not args.verification_enabled else 'Failed'
         runtime = -1.0
@@ -67,13 +68,12 @@ if __name__ == "__main__":
         if args.profiling_enabled:
           runtime = operation_launcher.profile(configuration)
 
-        # Save and print the performance result.
-        if args.verification_enabled or args.profiling_enabled:
-          # Create and print a performance result.
-          result = PerformanceResult(operation_collection.operation,
-                                     configuration, verification_result,
-                                     runtime)
-          result.print()
+        # Create performance result.
+        result = PerformanceResult(operation_collection.operation,
+                                   configuration, verification_result, runtime)
 
-          # Append the performance result to the performance report.
-          perf_report.append_perf_result(result)
+        # Print the performance result.
+        result.print()
+
+        # Append the performance result to the performance report.
+        perf_report.append_perf_result(result)

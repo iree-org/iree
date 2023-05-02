@@ -78,9 +78,9 @@ class MatmulOperation:
     split_k_slices = self.split_k_slices if self.operation_kind == OperationKind.SplitkMatmul else "N/A"
     return {
         "batch_count": self.batch_count,
-        "M": self.M,
-        "N": self.N,
-        "K": self.K,
+        "m": self.M,
+        "n": self.N,
+        "k": self.K,
         "lhs": self.lhs.name(),
         "rhs": self.rhs.name(),
         "result": self.result.name(),
@@ -352,7 +352,7 @@ class ReferenceMatmulOp(ReferenceOpInterface):
     return [self.filepath_lhs, self.filepath_rhs]
 
   def get_output_filepaths(self):
-    """Returns the list of output file paths."""
+    """Returns the list of expected output file paths."""
     return [self.filepath_reference_result]
 
   def __call__(self):
@@ -396,7 +396,6 @@ class CudaMatmulDispatchChecker:
     }
 
     self.cuda_arch = self.args.cuda_arch
-    self.cuda_warp_size = 32
     self.cuda_smem_capacity_in_bytes = self.sharedMemPerSm[self.cuda_arch] << 10
 
   def _is_tile_aligned_shape(self, dispatch):
@@ -431,16 +430,16 @@ class CudaMatmulDispatchChecker:
   def is_valid(self, dispatch):
     """Checks if the given dispatch is valid for CUDA."""
     if not self._is_tile_aligned_shape(dispatch):
-      print(f"Warning: {dispatch.name()} is not aligned is being skipped.")
+      print(f"[Warning]: {dispatch.name()} is not aligned is being skipped.")
       return False
     if not self._is_cuda_smem_avialable(dispatch):
-      print(f"Warning: {dispatch.name()} requires {self._cuda_smem_required_in_bytes(dispatch)} "\
+      print(f"[Warning]: {dispatch.name()} requires {self._cuda_smem_required_in_bytes(dispatch)} "\
             f"bytes of shared memory, which is larger than the {self.cuda_arch} capacity "\
             f"{self.cuda_smem_capacity_in_bytes} bytes.")
       return False
     if dispatch.operation.split_k_slices > 1 and \
       not self._is_problem_k_divisible_by_split_k(dispatch):
-      print(f"Warning: {dispatch.name()} problem k is not divisible by {dispatch.operation.split_k_slices} "\
+      print(f"[Warning]: {dispatch.name()} problem k is not divisible by {dispatch.operation.split_k_slices} "\
             f"split-k slices, which is not supported on LLVM GPU CUDA backend.")
       return False
     return True

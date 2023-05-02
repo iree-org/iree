@@ -11,7 +11,7 @@ class CudaSplitKMatmulGenerator(CudaMatmulGenerator):
     super().__init__(args)
 
     # Predefined matmul shapes for splitK matmul.
-    self.matmul_shapes = [[512, 1024, 4096]]
+    self.matmul_shapes = [[128, 128, 4096]]
 
     # Predefined split_k_slices list for splitK matmul.
     self.split_k_slices = [2, 16, 18]

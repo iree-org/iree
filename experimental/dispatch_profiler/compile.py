@@ -42,16 +42,15 @@ if __name__ == "__main__":
   with ThreadPoolExecutor(max_workers=cpu_count) as executor:
 
     # For all the operations in the manifest compile, verify, and profile.
-    for _, operation_collection_list in manifest.operations.items():
-      for operation_collection in operation_collection_list:
+    for _, op_collection_list in manifest.operations.items():
+      for op_collection in op_collection_list:
 
         # Create an instance of operation_launcher.
-        operation_launcher = IreeToolsLauncher(args,
-                                               operation_collection.operation)
-        for configuration in operation_collection.configuration_list:
+        operation_launcher = IreeToolsLauncher(args, op_collection.operation)
+        for configuration in op_collection.configuration_list:
           for compile_mode in [CompilationMode.Profile, CompilationMode.Verify]:
-            cmds.append(
-                executor.submit(operation_launcher.iree_compile, compile_mode))
+            cmds.append(executor.submit(\
+              operation_launcher.iree_compile, compile_mode))
 
   # Wait for all the commands to complete.
   results = [cmd.result() for cmd in cmds]

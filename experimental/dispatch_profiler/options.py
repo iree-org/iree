@@ -30,7 +30,6 @@ def add_typical_arguments(parser):
   parser.add_argument("--mlir-dialect", default='linalg', \
                       help="MLIR dialect entry point at which operation is emitter.",
                       choices=["linalg", "flow", "all"])
-
   parser.add_argument("--verbose", action='store_true', \
                       help='Prints verbose output and commands executed.')
   parser.add_argument("--default-config", action='store_true',
@@ -41,7 +40,6 @@ def add_typical_arguments(parser):
 
 def add_compilation_arguments(parser):
   """Adds compilation (not part of iree-compile) command line arguments to the parser."""
-
   compilation_parser = parser.add_argument_group(
       'Compilation', 'Compilation related options.')
   compilation_parser.add_argument("--num-cpu", "--j", \
@@ -171,10 +169,9 @@ def parse_profiler_arguments(parser):
   add_performance_report_arguments(parser)
   args = parser.parse_args()
 
-  # Boolenize the string arguments from command line.
-  # The boolean arguments below are specified as `--argument=<true|false>`
-  # For the particular arguments, it makes easier to read and
-  # convey the meaning.
+  # Boolenize the string arguments from command line. For these args, it makes easier
+  # to read and convey the meaning. The boolean arguments below are specified as:
+  # `--argument=<true|false>`
   args.verification_enabled = False\
     if args.verification_enabled in ['False', 'false', '0']\
     else True

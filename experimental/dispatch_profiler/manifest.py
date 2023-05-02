@@ -49,7 +49,7 @@ class EmitSourceMLIR:
     """Emit the op func.func for each dispatch (operation + configuration)"""
     for dispatch in self.dispatch_collection.get_dispatches():
       print(
-          f"    Emitting {OperationKindNames[self.operation_kind]} tuning parameters: "\
+          f"    Emitting tuning configuration : "\
           f"{dispatch.configuration.name()}"
       )
       self.operation_file.write(self.dispatch_emitter.emit(dispatch))
@@ -180,7 +180,7 @@ class Manifest:
       shutil.rmtree(generated_path)
 
     os.makedirs(generated_path)
-    print(self.operations)
+
     # For each operation_kind create a directory and emit the operations with
     # all the configurations in the configuration_list into their seperate directories.
     for operation_kind, dispatch_collection_list in self.operations.items():
@@ -204,8 +204,9 @@ class Manifest:
 
         with EmitSourceMLIR(operation_path,
                             dispatch_collection) as emit_mlir_source:
-
-          print(">> Generating MLIR operation: " +
-                dispatch_collection.operation.name())
+          full_path = os.path.join(
+              operation_path,
+              ".".join([dispatch_collection.operation.name(), 'mlir']))
+          print(f"[Generating]: {full_path}")
           # Emit mlir source file for the dispatch_collection.operation with all the configurations
           emit_mlir_source.emit()
