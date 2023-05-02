@@ -95,12 +95,7 @@ class CommandBufferFillBufferOpConversion
 
     // Record the original pattern length then extend it to a 32 bit integer.
     auto originalPatternType = op.getPattern().getType();
-    unsigned patternBitWidth = 0;
-    if (isa<ComplexType>(originalPatternType)) {
-      patternBitWidth = 2 * dyn_cast<ComplexType>(originalPatternType).getElementType().getIntOrFloatBitWidth();
-    } else {
-      patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
-    }
+    auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
     // The pattern length (in bytes) will be used at runtime to issue the fill
     // command. While the pattern itself will be stored in a 32 bit integer,
     // the fill operation will use this length to slice a potentially smaller
