@@ -469,16 +469,20 @@ class BenchmarkMemory:
 def _get_iree_memory_statistics(benchmark_stderr: str,
                                 device: str) -> BenchmarkMemory:
   """Extracts IREE's memory statistics for a given device."""
-  statistics = dict(unit="bytes")
-  for stat in ["peak", "allocated", "freed", "live"]:
-    # The memory statistics for each device are listed on their own line. E.g.
-    # HOST_LOCAL: 7675392B peak / 7675392B allocated / 0B freed / 7675392B live
-    m = re.search(rf".*{device}:.*\s([0-9]+)B {stat}", benchmark_stderr)
-    if m is None:
-      raise ValueError(f"Failed to find stat '{stat}' for device '{device}' in "
-                       f"iree-benchmark-module stderr:\n{benchmark_stderr}")
-    statistics[stat] = int(m.group(1))
-  return BenchmarkMemory.from_json_object(statistics)
+  # The memory statistics for each device are listed on their own line.
+  pattern = (rf"{device}:"
+             rf"\s*(?P<peak>\d+)B peak /"
+             rf"\s*(?P<allocated>\d+)B allocated /"
+             rf"\s*(?P<freed>\d+)B freed /"
+             rf"\s*(?P<live>\d+)B live")
+  match_ = re.search(pattern, benchmark_stderr)
+  return BenchmarkMemory(
+      peak=int(match_["peak"]),
+      allocated=int(match_["allocated"]),
+      freed=int(match_["freed"]),
+      live=int(match_["live"]),
+      unit="bytes",
+  )
 
 
 @dataclasses.dataclass(frozen=True)

@@ -102,7 +102,7 @@ def adb_execute_and_get_output(
       ANDROID_TMPDIR.
 
   Returns:
-    A string for the command output.
+    Strings for stdout and stderr.
   """
   cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
