@@ -113,22 +113,8 @@ def compile_str(input_bytes: bytes, **kwargs):
   """
   input_bytes = input_bytes.encode("utf-8") if isinstance(input_bytes,
                                                           str) else input_bytes
-  with TempFileSaver.implicit() as tfs:
-    options = ImportOptions(**kwargs)
-    import_cl = build_import_command_line("-", tfs, options)
-    if options.import_only:
-      # One stage tool pipeline.
+  with tempfile.NamedTemporaryFile(mode="w") as temp_file:
+    tempfile.write(input_bytes)
+    tempfile.close()
+    return compile_file(tempfile.name, **kwargs)
 
-      result = invoke_immediate(import_cl, immediate_input=input_bytes)
-      if options.output_file:
-        return None
-      result = result.decode("utf-8")
-      return result
-
-    # Full compilation pipeline.
-    compile_cl = build_compile_command_line("-", tfs, options)
-    result = invoke_pipeline([import_cl, compile_cl],
-                             immediate_input=input_bytes)
-    if options.output_file:
-      return None
-    return result.decode("utf-8") if result is not None else result
