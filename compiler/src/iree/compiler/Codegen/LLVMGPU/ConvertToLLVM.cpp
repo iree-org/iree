@@ -356,17 +356,6 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
     // Add the byte offset.
     Value llvmBufferBasePtr = llvmBufferArg;
 
-    // TODO(#12933): Because of regressions in CUDA backend the byte offsets
-    // of subspans are handled explicitly through a GEP (and subsequent memref
-    // having 0 offset). Once this issue is fixed. The `if` here should be
-    // removed.
-    if (adaptor.getByteOffset()) {
-      auto i8Type = typeConverter->convertType(rewriter.getI8Type());
-      llvmBufferBasePtr = rewriter.create<LLVM::GEPOp>(
-          loc, llvmBufferBasePtr.getType(), i8Type, llvmBufferBasePtr,
-          adaptor.getByteOffset());
-    }
-
     auto [strides, offset] = getStridesAndOffset(memrefType);
     if (memrefType.hasStaticShape() &&
         !llvm::any_of(strides, ShapedType::isDynamic) &&
@@ -389,13 +378,6 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
           typeConverter->convertType(IndexType::get(rewriter.getContext()));
       auto baseOffsetValue = adaptor.getByteOffset();
       if (ShapedType::isDynamic(offset)) {
-        // TODO(#12933): Because of regressions in CUDA backend the `memref`
-        // type of a subspan should never have dynamic offsets. Remove this
-        // assert once the issue is fixed.
-        assert(0 &&
-               "non-zero offset for result of subspan op is unexpected. See "
-               "#12933");
-
         int32_t elementWidth =
             IREE::Util::getRoundedElementByteWidth(memrefType.getElementType());
         Value elementWidthVal =
