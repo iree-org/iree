@@ -298,12 +298,12 @@ vm.module @my_module {
     // CHECK-SAME:     : () -> !emitc.opaque<"iree_string_view_t">
     // CHECK-NEXT: %[[MSGSIZE:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[MSG]]) {args = [0 : index, #emitc.opaque<"size">]}
     // CHECK-SAME:     : (!emitc.opaque<"iree_string_view_t">) -> !emitc.opaque<"iree_host_size_t">
-    // CHECK-NEXT: %[[MSGSIZEINT:.+]] = emitc.cast %[[MSGSIZE]] : !emitc.opaque<"iree_host_size_t"> to i32
+    // CHECK-NEXT: %[[MSGSIZEINT:.+]] = emitc.cast %[[MSGSIZE]] : !emitc.opaque<"iree_host_size_t"> to !emitc.opaque<"int">
     // CHECK-NEXT: %[[MSGDATA:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[MSG]]) {args = [0 : index, #emitc.opaque<"data">]}
     // CHECK-SAME:     : (!emitc.opaque<"iree_string_view_t">) -> !emitc.ptr<!emitc.opaque<"const char">>
     // CHECK-NEXT: %[[FAILSTATUS:.+]] = emitc.call "iree_status_allocate_f"(%[[MSGSIZEINT]], %[[MSGDATA]])
     // CHECK-SAME:     {args = [#emitc.opaque<"IREE_STATUS_FAILED_PRECONDITION">, #emitc.opaque<"\22<vm>\22">, 0 : i32, #emitc.opaque<"\22%.*s\22">, 0 : index, 1 : index]}
-    // CHECK-SAME:     : (i32, !emitc.ptr<!emitc.opaque<"const char">>) -> !emitc.opaque<"iree_status_t">
+    // CHECK-SAME:     : (!emitc.opaque<"int">, !emitc.ptr<!emitc.opaque<"const char">>) -> !emitc.opaque<"iree_status_t">
     // CHECK-NEXT: return %[[FAILSTATUS]] : !emitc.opaque<"iree_status_t">
     vm.fail %arg0, "message"
   }
