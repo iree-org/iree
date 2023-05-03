@@ -239,3 +239,21 @@ func.func @denseTensorStoreRank0(%arg0: !stream.resource<staging>, %arg1: index,
   // CHECK: return %[[RET]]
   return %0 : !stream.resource<staging>
 }
+
+// -----
+
+// CHECK-LABEL: @testSplat64
+func.func private @testSplat64(%arg0: !stream.resource<*>) -> (!stream.resource<*>, index) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c6 = arith.constant 6 : index
+    %cst = complex.constant [3.000000e+00 : f32, 1.000000e+01 : f32] : complex<f32>
+    %0 = stream.tensor.sizeof tensor<6xcomplex<f32>> : index
+    // CHECK: %[[I64NUMBER:.+]] = arith.constant 4629700418029486080
+    // CHECK: %[[SPLAT_RES:.+]] = stream.builtin.splat.i64 %[[I64NUMBER]]
+    %1 = stream.tensor.splat %cst : complex<f32> -> tensor<6xcomplex<f32>> in !stream.resource<*>{%0}
+    %2 = stream.tensor.sizeof tensor<2x6xcomplex<f32>> : index
+    %3 = stream.async.dispatch @_main_dispatch_0::@"_main_dispatch_0_generic_6x2_complex<f32>"[%c6, %c1](%arg0[%c0 to %2 for %2], %1[%c0 to %0 for %0]) : (!stream.resource<*>{%2}, !stream.resource<*>{%0}) -> %1{%0}
+    %4 = stream.tensor.sizeof tensor<2x3xcomplex<f32>> : index
+    return %3, %4 : !stream.resource<*>, index
+  }
