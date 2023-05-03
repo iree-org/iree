@@ -308,6 +308,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
     raise ValueError(f"Unsupported config to deduce taskset: '{run_config}'.")
 
+  # TODO(#11076): Remove legacy path.
   def __deduce_taskset(self, bench_mode: Sequence[str]) -> str:
     """Deduces the CPU affinity taskset mask according to benchmark modes."""
     # TODO: we actually should check the number of cores the phone have.
