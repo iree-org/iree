@@ -1,3 +1,4 @@
+#define IREE_UK_ENABLE_INLINE_ASM
 #define IREE_UK_POINTER_SIZE 8
 /* #undef IREE_UK_ARCH_ARM_64 */
 #define IREE_UK_ARCH_X86_64
