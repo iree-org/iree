@@ -547,7 +547,7 @@ def LLVMCPUVectorization :
 }
 
 def LLVMCPUVectorLowering :
-    Pass<"iree-llvmcpu-lower-vectors", "func::FuncOp"> {
+    Pass<"iree-llvmcpu-vector-lowering", "func::FuncOp"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
   let options = [
     Option<"splitVectorTransfersTo", "split-transfers", "std::string",

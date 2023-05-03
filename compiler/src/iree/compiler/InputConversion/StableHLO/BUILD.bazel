@@ -60,6 +60,7 @@ iree_compiler_cc_library(
         "StableHLOToLinalgReduce.cpp",
         "TypeConversion.cpp",
         "TypeConversion.h",
+        "VerifyCompilerInputLegality.cpp",
     ],
     deps = [
         ":PassHeaders",

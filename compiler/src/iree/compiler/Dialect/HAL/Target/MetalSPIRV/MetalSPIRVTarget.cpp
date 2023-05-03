@@ -176,25 +176,26 @@ class MetalSPIRVTargetBackend : public TargetBackend {
 
     // 4. Pack the MTLLibrary and metadata into a FlatBuffer.
     FlatbufferBuilder builder;
-    iree_MetalExecutableDef_start_as_root(builder);
+    iree_hal_metal_ExecutableDef_start_as_root(builder);
 
     auto shaderSourcesRef = builder.createStringVec(llvm::map_range(
         mslShaders, [&](const MetalShader &shader) { return shader.source; }));
 
-    iree_MetalThreadgroupSize_vec_start(builder);
+    iree_hal_metal_ThreadgroupSize_vec_start(builder);
     for (auto &shader : mslShaders) {
-      iree_MetalThreadgroupSize_vec_push_create(
+      iree_hal_metal_ThreadgroupSize_vec_push_create(
           builder, shader.threadgroupSize.x, shader.threadgroupSize.y,
           shader.threadgroupSize.z);
     }
-    auto threadgroupSizesRef = iree_MetalThreadgroupSize_vec_end(builder);
+    auto threadgroupSizesRef = iree_hal_metal_ThreadgroupSize_vec_end(builder);
 
     auto entryPointNamesRef = builder.createStringVec(entryPointNames);
 
-    iree_MetalExecutableDef_entry_points_add(builder, entryPointNamesRef);
-    iree_MetalExecutableDef_threadgroup_sizes_add(builder, threadgroupSizesRef);
-    iree_MetalExecutableDef_shader_sources_add(builder, shaderSourcesRef);
-    iree_MetalExecutableDef_end_as_root(builder);
+    iree_hal_metal_ExecutableDef_entry_points_add(builder, entryPointNamesRef);
+    iree_hal_metal_ExecutableDef_threadgroup_sizes_add(builder,
+                                                       threadgroupSizesRef);
+    iree_hal_metal_ExecutableDef_shader_sources_add(builder, shaderSourcesRef);
+    iree_hal_metal_ExecutableDef_end_as_root(builder);
 
     // 5. Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(

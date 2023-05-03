@@ -309,6 +309,7 @@ if(IREE_BUILD_COMPILER)
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
+    SETUP_INSTALL_RPATH
   )
 
   # Ensure FileCheck and associated binaries get built. Tests don't have

@@ -16,7 +16,7 @@ from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (IREE_DRIVERS_INFOS, DeviceInfo,
                                          PlatformType, BenchmarkLatency,
-                                         BenchmarkMetrics)
+                                         BenchmarkMemory, BenchmarkMetrics)
 
 
 class FakeBenchmarkDriver(BenchmarkDriver):
@@ -42,6 +42,8 @@ class FakeBenchmarkDriver(BenchmarkDriver):
       fake_benchmark_metrics = BenchmarkMetrics(
           real_time=BenchmarkLatency(0, 0, 0, "ns"),
           cpu_time=BenchmarkLatency(0, 0, 0, "ns"),
+          host_memory=BenchmarkMemory(0, 0, 0, 0, "bytes"),
+          device_memory=BenchmarkMemory(0, 0, 0, 0, "bytes"),
           raw_data={},
       )
       benchmark_results_filename.write_text(

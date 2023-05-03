@@ -31,7 +31,7 @@ IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/openxla/iree/commit'
 IREE_PROJECT_ID = 'IREE'
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 
-COMMON_DESCRIIPTION = """
+COMMON_DESCRIPTION = """
 <br>
 For the graph, the x axis is the Git commit index, and the y axis is the
 measured metrics. The unit for the numbers is shown in the "Unit" dropdown.
@@ -78,13 +78,13 @@ def get_model_description(model_name: str, model_source: str) -> Optional[str]:
 
 def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
   """Gets the commit hash for the given commit."""
-  return benchmark_definition.execute_cmd_and_get_output(
+  return benchmark_definition.execute_cmd_and_get_stdout(
       ['git', 'rev-parse', commit], cwd=THIS_DIRECTORY, verbose=verbose)
 
 
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
-  count = benchmark_definition.execute_cmd_and_get_output(
+  count = benchmark_definition.execute_cmd_and_get_stdout(
       ['git', 'rev-list', '--count', commit],
       cwd=THIS_DIRECTORY,
       verbose=verbose)
@@ -92,11 +92,11 @@ def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
 
 
 def get_git_commit_info(commit: str, verbose: bool = False) -> Dict[str, str]:
-  """Gets commit information dictory for the given commit."""
+  """Gets commit information dictionary for the given commit."""
   cmd = [
       'git', 'show', '--format=%H:::%h:::%an:::%ae:::%s', '--no-patch', commit
   ]
-  info = benchmark_definition.execute_cmd_and_get_output(cmd,
+  info = benchmark_definition.execute_cmd_and_get_stdout(cmd,
                                                          cwd=THIS_DIRECTORY,
                                                          verbose=verbose)
   segments = info.split(':::')
@@ -139,13 +139,13 @@ def compose_series_payload(project_id: str,
 
 
 def compose_build_payload(project_id: str,
-                          project_github_comit_url: str,
+                          project_github_commit_url: str,
                           build_id: int,
                           commit: str,
                           override: bool = False) -> Dict[str, Any]:
   """Composes the payload dictionary for a build."""
   commit_info = get_git_commit_info(commit)
-  commit_info['url'] = f'{project_github_comit_url}/{commit_info["hash"]}'
+  commit_info['url'] = f'{project_github_commit_url}/{commit_info["hash"]}'
   return {
       'projectId': project_id,
       'build': {
@@ -332,7 +332,7 @@ def main(args):
                                         benchmark_info.model_source)
     if description is None:
       description = ""
-    description += COMMON_DESCRIIPTION
+    description += COMMON_DESCRIPTION
 
     threshold = next(
         (threshold for threshold in benchmark_thresholds.BENCHMARK_THRESHOLDS
@@ -362,7 +362,7 @@ def main(args):
         compile_metrics.compilation_info.model_source)
     if description is None:
       description = ""
-    description += COMMON_DESCRIIPTION
+    description += COMMON_DESCRIPTION
 
     for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
       sample_value, _ = mapper.get_current_and_base_value(compile_metrics)

@@ -41,15 +41,14 @@ import tarfile
 import shutil
 import json
 
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Tuple
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_definition import (DriverInfo, execute_cmd,
-                                         execute_cmd_and_get_output,
-                                         get_git_commit_hash,
-                                         get_iree_benchmark_module_arguments,
-                                         wait_for_iree_benchmark_module_start,
-                                         parse_iree_benchmark_metrics)
+from common.benchmark_definition import (
+    DriverInfo, execute_cmd, execute_cmd_and_get_stdout,
+    execute_cmd_and_get_output, get_git_commit_hash,
+    get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start,
+    parse_iree_benchmark_metrics)
 from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
                                     BenchmarkSuite)
 from common.android_device_utils import (get_android_device_model,
@@ -91,7 +90,7 @@ def adb_push_to_tmp_dir(
 def adb_execute_and_get_output(
     cmd_args: Sequence[str],
     relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
-    verbose: bool = False) -> str:
+    verbose: bool = False) -> Tuple[str, str]:
   """Executes command with adb shell.
 
   Switches to `relative_dir` relative to the android tmp directory before
@@ -103,7 +102,7 @@ def adb_execute_and_get_output(
       ANDROID_TMPDIR.
 
   Returns:
-    A string for the command output.
+    Strings for stdout and stderr.
   """
   cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
@@ -133,7 +132,8 @@ def adb_execute(cmd_args: Sequence[str],
 
 def is_magisk_su():
   """Returns true if the Android device has a Magisk SU binary."""
-  return "MagiskSU" in adb_execute_and_get_output(["su", "--help"])
+  stdout, _ = adb_execute_and_get_output(["su", "--help"])
+  return "MagiskSU" in stdout
 
 
 def adb_execute_as_root(cmd_args: Sequence[Any]) -> subprocess.CompletedProcess:
@@ -233,10 +233,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
               driver_info=driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
-    benchmark_stdout = adb_execute_and_get_output(cmd,
-                                                  android_case_dir,
-                                                  verbose=self.verbose)
-    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout)
+    benchmark_stdout, benchmark_stderr = adb_execute_and_get_output(
+        cmd, android_case_dir, verbose=self.verbose)
+    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout,
+                                                     benchmark_stderr)
     if self.verbose:
       print(benchmark_metrics)
     results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
@@ -305,7 +305,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
 
 def set_cpu_frequency_scaling_governor(governor: str):
-  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
+  git_root = execute_cmd_and_get_stdout(["git", "rev-parse", "--show-toplevel"])
   cpu_script = (pathlib.Path(git_root) / "build_tools" / "benchmarks" /
                 "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
@@ -313,7 +313,7 @@ def set_cpu_frequency_scaling_governor(governor: str):
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
-  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
+  git_root = execute_cmd_and_get_stdout(["git", "rev-parse", "--show-toplevel"])
   device_model = get_android_device_model()
   gpu_name = get_android_gpu_name()
   benchmarks_tool_dir = pathlib.Path(git_root) / "build_tools" / "benchmarks"
@@ -355,12 +355,12 @@ def main(args):
 
   # Clear the benchmark directory on the Android device first just in case
   # there are leftovers from manual or failed runs.
-  execute_cmd_and_get_output(["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
+  execute_cmd_and_get_stdout(["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
                              verbose=args.verbose)
 
   if not args.no_clean:
     # Clear the benchmark directory on the Android device.
-    atexit.register(execute_cmd_and_get_output,
+    atexit.register(execute_cmd_and_get_stdout,
                     ["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
                     verbose=args.verbose)
     # Also clear temporary directory on the host device.
@@ -370,9 +370,9 @@ def main(args):
   # to capture traces along the way, forward port via adb.
   trace_capture_config = benchmark_config.trace_capture_config
   if trace_capture_config:
-    execute_cmd_and_get_output(["adb", "forward", "tcp:8086", "tcp:8086"],
+    execute_cmd_and_get_stdout(["adb", "forward", "tcp:8086", "tcp:8086"],
                                verbose=args.verbose)
-    atexit.register(execute_cmd_and_get_output,
+    atexit.register(execute_cmd_and_get_stdout,
                     ["adb", "forward", "--remove", "tcp:8086"],
                     verbose=args.verbose)
 

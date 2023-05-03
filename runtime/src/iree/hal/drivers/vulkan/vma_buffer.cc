@@ -80,7 +80,7 @@ iree_status_t iree_hal_vulkan_vma_buffer_wrap(
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_vulkan_vma_buffer_destroy(iree_hal_buffer_t* base_buffer) {
@@ -171,6 +171,19 @@ static iree_status_t iree_hal_vulkan_vma_buffer_flush_range(
   VK_RETURN_IF_ERROR(vmaFlushAllocation(buffer->vma, buffer->allocation,
                                         local_byte_offset, local_byte_length),
                      "vmaFlushAllocation");
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_allocated_buffer_handle(
+    iree_hal_buffer_t* allocated_buffer, VkDeviceMemory* out_memory,
+    VkBuffer* out_handle) {
+  IREE_ASSERT_ARGUMENT(allocated_buffer);
+  IREE_ASSERT_ARGUMENT(out_memory);
+  IREE_ASSERT_ARGUMENT(out_handle);
+  iree_hal_vulkan_vma_buffer_t* buffer =
+      iree_hal_vulkan_vma_buffer_cast(allocated_buffer);
+  *out_memory = buffer->allocation_info.deviceMemory;
+  *out_handle = buffer->handle;
   return iree_ok_status();
 }
 

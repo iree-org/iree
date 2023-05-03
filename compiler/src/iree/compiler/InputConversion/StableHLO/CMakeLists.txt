@@ -53,6 +53,7 @@ iree_cc_library(
     "StableHLOToLinalgReduce.cpp"
     "TypeConversion.cpp"
     "TypeConversion.h"
+    "VerifyCompilerInputLegality.cpp"
   DEPS
     ::PassHeaders
     ChloOps
