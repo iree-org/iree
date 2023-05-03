@@ -34,6 +34,13 @@ def main():
       action='append',
       help='Output tensor, if different from the default inputs',
   )
+
+  # Deprecated and unused.  Kept in place so callers of the old tool don't break
+  # when using the new tool.
+  parser.add_argument('--output-format',
+                      dest='_',
+                      required=False,
+                      help=argparse.SUPPRESS)
   args = parser.parse_args()
   tflite_to_tosa(
       flatbuffer=args.flatbuffer,
