@@ -111,11 +111,11 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
     if (!isa<ComplexType>(operand.getType())) {
       unsigned bitWidth = operand.getType().getIntOrFloatBitWidth();
       if (bitWidth < 31) {
-        operand = builder.createOrFold<arith::ExtUIOp>(loc, builder.getI32Type(),
-                                                     operand);
+        operand = builder.createOrFold<arith::ExtUIOp>(
+            loc, builder.getI32Type(), operand);
       } else if (bitWidth > 32 && bitWidth < 64) {
-        operand = builder.createOrFold<arith::ExtUIOp>(loc, builder.getI64Type(),
-                                                       operand);
+        operand = builder.createOrFold<arith::ExtUIOp>(
+            loc, builder.getI64Type(), operand);
       }
     }
 
