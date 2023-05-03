@@ -269,7 +269,6 @@ function(iree_benchmark_suite)
         TARGET_NAME "${_MODULE_SOURCE_TARGET}"
         SOURCE "${_MODULE_SOURCE}"
         IMPORT_FLAGS
-          "--output-format=mlir-bytecode"
           ${_MODULE_IMPORT_FLAGS}
         OUTPUT_MLIR_FILE "${_MODULE_SOURCE}.mlir"
       )
