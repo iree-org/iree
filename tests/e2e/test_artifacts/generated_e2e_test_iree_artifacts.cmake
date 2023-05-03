@@ -1914,7 +1914,6 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME
     "MobileNetV2_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d]"
   PUBLIC
@@ -1934,7 +1933,6 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
   FRIENDLY_NAME
     "MobileNetV3Small_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,mmt4d]"
   PUBLIC
@@ -4611,7 +4609,6 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4635,7 +4632,6 @@ iree_bytecode_module(
     "--iree-flow-enable-data-tiling"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-llvmcpu-fail-on-out-of-bounds-stack-allocation=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
