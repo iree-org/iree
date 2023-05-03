@@ -157,6 +157,7 @@ IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
       return 8;
     default:
       IREE_ASSERT(false, "unhandled element type for collective op");
+      return 0;
   }
 }
 
