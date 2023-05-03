@@ -22,7 +22,7 @@ class ConstantSplat<string value> : NativeCodeCall<
 def : Pat<(StableHLO_RealOp (StableHLO_ComplexOp $lhs, $rhs)),
           (replaceWithValue $lhs)>;
 
-// imag(complex x, y) -> x
+// imag(complex x, y) -> y
 def : Pat<(StableHLO_ImagOp (StableHLO_ComplexOp $lhs, $rhs)),
           (replaceWithValue $rhs)>;
 
