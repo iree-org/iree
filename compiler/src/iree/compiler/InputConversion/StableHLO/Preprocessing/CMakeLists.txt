@@ -51,6 +51,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRIR
     MLIRMathDialect
+    MLIRPass
     MLIRShapeDialect
     MLIRSupport
     MLIRTensorDialect
