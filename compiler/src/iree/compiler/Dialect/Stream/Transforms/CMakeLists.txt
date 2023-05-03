@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAnalysis
     MLIRArithDialect
+    MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
