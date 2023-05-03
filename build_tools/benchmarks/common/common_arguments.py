@@ -153,10 +153,11 @@ class Parser(argparse.ArgumentParser):
         " If not specified, a --benchmark_repetitions will be passed "
         "instead.")
     self.add_argument(
-        "--disable_compatible_filter",
+        "--compatible_only",
+        "--compatible-only",
         action="store_true",
-        help="Disable incompatible benchmark filtering based on the detected "
-        "device information")
+        help="Only run compatible benchmarks based on the detected device "
+        "information")
     self.add_argument("--execution_benchmark_config",
                       type=_check_file_path,
                       default=None,

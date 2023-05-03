@@ -43,7 +43,6 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
         --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
         --target_device_name="${TARGET_DEVICE_NAME}" \
         --output="${BENCHMARK_RESULTS}" \
-        --disable_compatible_filter \
         --verbose
 elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
   ${DOCKER_WRAPPER} \
@@ -59,7 +58,6 @@ elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
         --output="${BENCHMARK_RESULTS}" \
         --device_model=GCP-c2-standard-16 \
         --cpu_uarch=CascadeLake \
-        --disable_compatible_filter \
         --verbose
 elif [[ "${TARGET_DEVICE_NAME}" =~ ^(pixel-4|pixel-6-pro|moto-edge-x30)$ ]]; then
   ./build_tools/benchmarks/run_benchmarks_on_android.py \

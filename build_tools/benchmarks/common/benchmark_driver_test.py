@@ -79,7 +79,8 @@ class BenchmarkDriverTest(unittest.TestCase):
             traced_benchmark_tool_dir=self.tmp_dir,
             trace_capture_tool=self.tmp_dir / "capture_tool",
             capture_tarball=self.tmp_dir / "captures.tar",
-            capture_tmp_dir=self.captures_dir))
+            capture_tmp_dir=self.captures_dir),
+        use_compatible_filter=True)
 
     self.device_info = DeviceInfo(platform_type=PlatformType.LINUX,
                                   model="Unknown",
