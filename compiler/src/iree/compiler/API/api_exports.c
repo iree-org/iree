@@ -8,7 +8,6 @@
 
 #include <stdint.h>
 
-extern void ireeCompilerBuildIREEVMPassPipeline();
 extern void ireeCompilerEnumerateRegisteredHALTargetBackends();
 extern void ireeCompilerErrorDestroy();
 extern void ireeCompilerErrorGetMessage();
@@ -21,6 +20,7 @@ extern void ireeCompilerInvocationCreate();
 extern void ireeCompilerInvocationDestroy();
 extern void ireeCompilerInvocationEnableCallbackDiagnostics();
 extern void ireeCompilerInvocationEnableConsoleDiagnostics();
+extern void ireeCompilerInvocationImportModule();
 extern void ireeCompilerInvocationOutputHALExecutable();
 extern void ireeCompilerInvocationOutputIR();
 extern void ireeCompilerInvocationOutputVMBytecode();
@@ -30,10 +30,6 @@ extern void ireeCompilerInvocationPipeline();
 extern void ireeCompilerInvocationSetCompileToPhase();
 extern void ireeCompilerInvocationSetCrashHandler();
 extern void ireeCompilerInvocationSetVerifyIR();
-extern void ireeCompilerOptionsCreate();
-extern void ireeCompilerOptionsDestroy();
-extern void ireeCompilerOptionsGetFlags();
-extern void ireeCompilerOptionsSetFlags();
 extern void ireeCompilerOutputDestroy();
 extern void ireeCompilerOutputKeep();
 extern void ireeCompilerOutputMapMemory();
@@ -41,13 +37,11 @@ extern void ireeCompilerOutputOpenFD();
 extern void ireeCompilerOutputOpenFile();
 extern void ireeCompilerOutputOpenMembuffer();
 extern void ireeCompilerOutputWrite();
-extern void ireeCompilerRegisterAllDialects();
-extern void ireeCompilerRegisterAllPasses();
-extern void ireeCompilerRegisterTargetBackends();
 extern void ireeCompilerRunLldMain();
 extern void ireeCompilerRunMain();
 extern void ireeCompilerSessionCreate();
 extern void ireeCompilerSessionDestroy();
+extern void ireeCompilerSessionGetContext();
 extern void ireeCompilerSessionGetFlags();
 extern void ireeCompilerSessionSetFlags();
 extern void ireeCompilerSetupGlobalCL();
@@ -55,7 +49,6 @@ extern void ireeCompilerSourceDestroy();
 extern void ireeCompilerSourceOpenFile();
 extern void ireeCompilerSourceSplit();
 extern void ireeCompilerSourceWrapBuffer();
-extern void ireeCompilerTranslateModuletoVMBytecode();
 extern void ireeMlirLspServerRunMain();
 extern void ireeOptRunMain();
 extern void ireeRegisterTransformExtensions();
@@ -600,7 +593,6 @@ extern void mlirVectorTypeGetChecked();
 
 uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
-  x += (uintptr_t)&ireeCompilerBuildIREEVMPassPipeline;
   x += (uintptr_t)&ireeCompilerEnumerateRegisteredHALTargetBackends;
   x += (uintptr_t)&ireeCompilerErrorDestroy;
   x += (uintptr_t)&ireeCompilerErrorGetMessage;
@@ -613,6 +605,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerInvocationDestroy;
   x += (uintptr_t)&ireeCompilerInvocationEnableCallbackDiagnostics;
   x += (uintptr_t)&ireeCompilerInvocationEnableConsoleDiagnostics;
+  x += (uintptr_t)&ireeCompilerInvocationImportModule;
   x += (uintptr_t)&ireeCompilerInvocationOutputHALExecutable;
   x += (uintptr_t)&ireeCompilerInvocationOutputIR;
   x += (uintptr_t)&ireeCompilerInvocationOutputVMBytecode;
@@ -622,10 +615,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerInvocationSetCompileToPhase;
   x += (uintptr_t)&ireeCompilerInvocationSetCrashHandler;
   x += (uintptr_t)&ireeCompilerInvocationSetVerifyIR;
-  x += (uintptr_t)&ireeCompilerOptionsCreate;
-  x += (uintptr_t)&ireeCompilerOptionsDestroy;
-  x += (uintptr_t)&ireeCompilerOptionsGetFlags;
-  x += (uintptr_t)&ireeCompilerOptionsSetFlags;
   x += (uintptr_t)&ireeCompilerOutputDestroy;
   x += (uintptr_t)&ireeCompilerOutputKeep;
   x += (uintptr_t)&ireeCompilerOutputMapMemory;
@@ -633,13 +622,11 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerOutputOpenFile;
   x += (uintptr_t)&ireeCompilerOutputOpenMembuffer;
   x += (uintptr_t)&ireeCompilerOutputWrite;
-  x += (uintptr_t)&ireeCompilerRegisterAllDialects;
-  x += (uintptr_t)&ireeCompilerRegisterAllPasses;
-  x += (uintptr_t)&ireeCompilerRegisterTargetBackends;
   x += (uintptr_t)&ireeCompilerRunLldMain;
   x += (uintptr_t)&ireeCompilerRunMain;
   x += (uintptr_t)&ireeCompilerSessionCreate;
   x += (uintptr_t)&ireeCompilerSessionDestroy;
+  x += (uintptr_t)&ireeCompilerSessionGetContext;
   x += (uintptr_t)&ireeCompilerSessionGetFlags;
   x += (uintptr_t)&ireeCompilerSessionSetFlags;
   x += (uintptr_t)&ireeCompilerSetupGlobalCL;
@@ -647,7 +634,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerSourceOpenFile;
   x += (uintptr_t)&ireeCompilerSourceSplit;
   x += (uintptr_t)&ireeCompilerSourceWrapBuffer;
-  x += (uintptr_t)&ireeCompilerTranslateModuletoVMBytecode;
   x += (uintptr_t)&ireeMlirLspServerRunMain;
   x += (uintptr_t)&ireeOptRunMain;
   x += (uintptr_t)&ireeRegisterTransformExtensions;
