@@ -97,7 +97,9 @@ class CommandBufferFillBufferOpConversion
     auto originalPatternType = op.getPattern().getType();
     unsigned patternBitWidth = 0;
     if (isa<ComplexType>(originalPatternType)) {
-      patternBitWidth = 2 * dyn_cast<ComplexType>(originalPatternType).getElementType().getIntOrFloatBitWidth();
+      patternBitWidth = 2 * dyn_cast<ComplexType>(originalPatternType)
+                                .getElementType()
+                                .getIntOrFloatBitWidth();
     } else {
       patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
     }
