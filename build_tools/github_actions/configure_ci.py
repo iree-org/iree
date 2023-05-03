@@ -77,7 +77,12 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
+BENCHMARK_PRESET_OPTIONS = ["cuda", "x86_64", "comp-stats"]
+# Meta options to enable collections of benchmark presets.
+BENCHMARK_META_PRESETS = {
+    # Default benchmarks that excludes experimental and long benchmarks.
+    "defaults": ["cuda", "x86_64", "comp-stats"]
+}
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
 
@@ -274,12 +279,12 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
           f"description has '{SKIP_LLVM_INTEGRATE_BENCHMARK_KEY}' trailer.")
 
   if not is_pr:
-    preset_options = ["all"]
-    print(f"Using benchmark preset 'all' for non-PR run")
+    preset_options = {"defaults"}
+    print(f"Using benchmark preset 'defaults' for non-PR run")
   elif is_llvm_integrate_pr and not skip_llvm_integrate_benchmark:
-    # Run all benchmark presets for LLVM integration PRs.
-    preset_options = ["all"]
-    print("Using benchmark preset 'all' for LLVM integration PR")
+    # Run all default benchmark presets for LLVM integration PRs.
+    preset_options = {"defaults"}
+    print("Using benchmark preset 'defaults' for LLVM integration PR")
   else:
     preset_options = set(
         label.split(":", maxsplit=1)[1]
@@ -289,17 +294,20 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
     if trailer is not None:
       preset_options = preset_options.union(
           option.strip() for option in trailer.split(","))
-    preset_options = sorted(preset_options)
     print(f"Using benchmark preset '{preset_options}' from trailers and labels")
 
+  for meta_option, presets in BENCHMARK_META_PRESETS.items():
+    if meta_option in preset_options:
+      preset_options.remove(meta_option)
+      preset_options.update(presets)
+
+  preset_options = sorted(preset_options)
   for preset_option in preset_options:
     if preset_option not in BENCHMARK_PRESET_OPTIONS:
+      available_options = list(BENCHMARK_META_PRESETS.keys())
+      available_options += BENCHMARK_PRESET_OPTIONS
       raise ValueError(f"Unknown benchmark preset option: '{preset_option}'.\n"
-                       f"Available options: '{BENCHMARK_PRESET_OPTIONS}'.")
-
-  if "all" in preset_options:
-    preset_options = list(
-        option for option in BENCHMARK_PRESET_OPTIONS if option != "all")
+                       f"Available options: '{available_options}'.")
 
   return ",".join(preset_options)
 
