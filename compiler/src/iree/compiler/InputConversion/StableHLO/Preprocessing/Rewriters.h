@@ -20,8 +20,8 @@ void populatePreprocessingEinsumToDotGeneralPatterns(
     MLIRContext *context, RewritePatternSet *patterns);
 
 /// Collection of rewrite patterns to materialize 'batch_dimension' attributes.
-void populatePreprocessingUnfuseBatchNormPatterns(
-    MLIRContext *context, RewritePatternSet *patterns);
+void populatePreprocessingUnfuseBatchNormPatterns(MLIRContext *context,
+                                                  RewritePatternSet *patterns);
 
 }  // namespace mlir::iree_compiler::stablehlo
 
