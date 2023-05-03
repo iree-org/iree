@@ -92,15 +92,19 @@ EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP: Dict[Tuple[
 class BenchmarkSuite(object):
   """Represents the benchmarks in benchmark suite directory."""
 
-  def __init__(self, suite_map: Dict[pathlib.Path, List[BenchmarkCase]]):
+  def __init__(self,
+               suite_map: Dict[pathlib.Path, List[BenchmarkCase]],
+               legacy_suite: bool = False):
     """Construct a benchmark suite.
 
     Args:
       suites: the map of benchmark cases keyed by category directories.
+      legacy_suite: true if this is a legacy benchmark suite.
     """
     self.suite_map = suite_map
     self.category_map = dict((category_dir.name, category_dir)
                              for category_dir in self.suite_map.keys())
+    self.legacy_suite = legacy_suite
 
   def list_categories(self) -> List[Tuple[str, pathlib.Path]]:
     """Returns all categories and their directories.
@@ -113,13 +117,15 @@ class BenchmarkSuite(object):
     category_list.sort(key=lambda category: category[0])
     return category_list
 
+  # TODO(#11076): target_architectures should be a list of
+  # common_definitions.DeviceArchitecture instead of string, after removing the
+  # legacy path.
   def filter_benchmarks_for_category(
       self,
       category: str,
       available_drivers: Optional[Sequence[str]] = None,
       available_loaders: Optional[Sequence[str]] = None,
-      cpu_target_arch_filter: Optional[str] = None,
-      gpu_target_arch_filter: Optional[str] = None,
+      target_architectures: Optional[Sequence[str]] = None,
       driver_filter: Optional[str] = None,
       mode_filter: Optional[str] = None,
       model_name_filter: Optional[str] = None) -> Sequence[BenchmarkCase]:
@@ -130,8 +136,8 @@ class BenchmarkSuite(object):
           match any driver.
         available_loaders: list of executable loaders supported by the tools.
           None means to match any loader.
-        cpu_target_arch_filter: CPU target architecture filter regex.
-        gpu_target_arch_filter: GPU target architecture filter regex.
+        target_architectures: list of target architectures to be included. None
+          means no filter.
         driver_filter: driver filter regex.
         mode_filter: benchmark mode regex.
         model_name_filter: model name regex.
@@ -150,21 +156,19 @@ class BenchmarkSuite(object):
       driver_name = driver_info.driver_name
       matched_available_driver = (available_drivers is None or
                                   driver_name in available_drivers)
-      matched_drivler_filter = driver_filter is None or re.match(
+      matched_driver_filter = driver_filter is None or re.match(
           driver_filter, driver_name) is not None
-      matched_driver = matched_available_driver and matched_drivler_filter
+      matched_driver = matched_available_driver and matched_driver_filter
 
       matched_loader = not driver_info.loader_name or available_loaders is None or (
           driver_info.loader_name in available_loaders)
 
       target_arch = benchmark_case.target_arch.lower()
-      matched_cpu_arch = (cpu_target_arch_filter is not None and re.match(
-          cpu_target_arch_filter, target_arch) is not None)
-      matched_gpu_arch = (gpu_target_arch_filter is not None and re.match(
-          gpu_target_arch_filter, target_arch) is not None)
-      matched_arch = (matched_cpu_arch or matched_gpu_arch or
-                      (cpu_target_arch_filter is None and
-                       gpu_target_arch_filter is None))
+      if target_architectures is None:
+        matched_arch = True
+      else:
+        matched_arch = target_arch in target_architectures
+
       bench_mode = ','.join(benchmark_case.bench_mode)
       matched_mode = (mode_filter is None or
                       re.match(mode_filter, bench_mode) is not None)
@@ -172,16 +176,18 @@ class BenchmarkSuite(object):
       model_name_with_tags = benchmark_case.model_name
       if len(benchmark_case.model_tags) > 0:
         model_name_with_tags += f"-{','.join(benchmark_case.model_tags)}"
-      if benchmark_case.run_config is not None:
-        # For the new run option, we drop the obscure old semantic and only
-        # search on model name and its tags.
-        model_and_case_name = model_name_with_tags
-      elif benchmark_case.benchmark_case_dir is not None:
+      if self.legacy_suite:
+        if benchmark_case.benchmark_case_dir is None:
+          raise ValueError(
+              "Either run_config or benchmark_case_dir must be set.")
         # For backward compatibility, model_name_filter matches against the string:
         #   <model name with tags>/<benchmark case name>
         model_and_case_name = f"{model_name_with_tags}/{benchmark_case.benchmark_case_dir.name}"
       else:
-        raise ValueError("Either run_config or benchmark_case_dir must be set.")
+        # For the new run option, we drop the obscure old semantic and only
+        # search on model name and its tags.
+        model_and_case_name = model_name_with_tags
+
       matched_model_name = (model_name_filter is None or re.match(
           model_name_filter, model_and_case_name) is not None)
 
@@ -215,9 +221,7 @@ class BenchmarkSuite(object):
             f"Can't map execution config to driver info: {module_exec_config}.")
       driver_info = IREE_DRIVERS_INFOS[driver_info_key]
 
-      arch_info = target_device_spec.architecture
-      target_arch = f"{arch_info.type.value}-{arch_info.architecture}-{arch_info.microarchitecture}"
-
+      target_arch = str(target_device_spec.architecture)
       model = module_gen_config.imported_model.model
 
       benchmark_case = BenchmarkCase(model_name=model.name,
@@ -273,4 +277,4 @@ class BenchmarkSuite(object):
                         benchmark_case_dir=benchmark_case_dir,
                         benchmark_tool_name=tool_name))
 
-    return BenchmarkSuite(suite_map=suite_map)
+    return BenchmarkSuite(suite_map=suite_map, legacy_suite=True)

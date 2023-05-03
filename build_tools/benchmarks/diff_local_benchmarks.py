@@ -11,8 +11,13 @@ Example usage:
                                    --target=/path/to/target_benchmarks.json
 """
 
-import argparse
 import pathlib
+import sys
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
+
+import argparse
 
 from typing import Optional
 
