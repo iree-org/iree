@@ -69,7 +69,7 @@ endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 # compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/internal/EmbeddedLinkerTool.cpp
 if(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF)
 
-# This only builds for x86-64/aarch64 because that's all we have coded in here.
+# This only builds for x86-64/arm_64 because that's all we have coded in here.
 if(NOT IREE_ARCH STREQUAL "arm_64" AND NOT IREE_ARCH STREQUAL "x86_64")
   message(STATUS "IREE custom_dispatch/cpu/plugin standalone example ignored -- only builds for x86_64/arm_64 (today)")
   return()
@@ -153,11 +153,11 @@ add_custom_command(
   OUTPUT
     standalone_plugin.sos
   DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_aarch64.so
+    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_arm_64.so
     ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_x86_64.so
     iree-fatelf
   COMMAND iree-fatelf join
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_aarch64.so
+    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_arm_64.so
     ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_x86_64.so
     > ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin.sos
   VERBATIM
