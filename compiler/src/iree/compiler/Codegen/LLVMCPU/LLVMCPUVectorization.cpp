@@ -116,10 +116,9 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
     linalg::LinalgOp linalgOp) {
   LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << linalgOp << "\n");
 
-  auto idxMaps = linalgOp.getIndexingMapsArray();
+  SmallVector<int64_t> vectorSizes;
   unsigned numDims = linalgOp.getNumLoops();
 
-  SmallVector<int64_t> vectorSizes;
   for (int dim = 0; dim < numDims; ++dim) {
     // Map dimension `dim` to an operand dimension that we will use to
     // traverse the U-D chain to get `dim` vector size information.
