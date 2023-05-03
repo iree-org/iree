@@ -1130,7 +1130,7 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
-  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
+  SmallVector<int64_t> distTileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()));
 
   // The default function aims to returns the number of workload per workgroup,
@@ -1139,12 +1139,15 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
-    tileSizes[pos] = tileSizes[pos] / size;
-    tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    distTileSizes[pos] = distTileSizes[pos] / size;
+    distTileSizes[pos] = std::max<int64_t>(distTileSizes[pos], 1);
   }
 
-  TileSizesListType tileSizesList = {tileSizes};
+  SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
+  TileSizesListType tileSizesList = {distTileSizes};
+  tileSizesList.push_back(tileSizes);
+
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
       DispatchLoweringPassPipeline::CPUDataTiling);
@@ -1154,18 +1157,25 @@ static LogicalResult setUnPackOpRootConfig(
     func::FuncOp entryPointFn, tensor::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
-  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
+  SmallVector<int64_t> distTileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()));
 
-  // Fixup for making tileSizes be multiple of inner_tile_sizes.
+  // Fixup for making distTileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
-    tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
+    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
   }
 
-  TileSizesListType tileSizesList = {tileSizes};
+  SmallVector<int64_t> tileSizes(op.getDestRank(), 1);
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    tileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
+  }
+
+  TileSizesListType tileSizesList = {distTileSizes};
+  tileSizesList.push_back(tileSizes);
+
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizesList,
                                                pipeline);
 }

@@ -586,6 +586,8 @@ void addCPUDataTilingPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ParallelTiles)));
+  nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass());
 
   LLVMCPUVectorizationPassOptions options;
