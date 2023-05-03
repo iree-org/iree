@@ -88,7 +88,8 @@ def compile_file(fb_path: str, **kwargs):
       tfl_iree_input = options.output_file
     elif options.save_temp_iree_input:
       # Saving the file, use tfs.
-      tfl_iree_input = tfs.alloc_optional("tfl-iree-input.mlir", export_as=options.save_temp_iree_input)
+      tfl_iree_input = tfs.alloc_optional(
+          "tfl-iree-input.mlir", export_as=options.save_temp_iree_input)
     else:
       # Not saving the file, so generate a loose temp file without tfs.
       tfl_iree_input = os.path.join(tmpdir, 'tfl-iree-input.mlir')
