@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "complex_lowering.mlir"
     "einsum_to_dot_general.mlir"
     "unfuse_batch_norm.mlir"
   TOOLS

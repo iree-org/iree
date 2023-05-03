@@ -19,6 +19,11 @@ namespace mlir::iree_compiler::stablehlo {
 void populatePreprocessingEinsumToDotGeneralPatterns(
     MLIRContext *context, RewritePatternSet *patterns);
 
+/// Collection of rewrite patterns for lowering of StableHLO complex
+/// operations.
+void populatePreprocessingComplexPatterns(MLIRContext *context,
+                                          RewritePatternSet *patterns);
+
 /// Collection of rewrite patterns to materialize 'batch_dimension' attributes.
 void populatePreprocessingUnfuseBatchNormPatterns(MLIRContext *context,
                                                   RewritePatternSet *patterns);

@@ -14,6 +14,11 @@ def EinsumToDotGeneral :
   let summary = "Legalizes einsum ops to dot_general ops";
 }
 
+def LowerComplex :
+    Pass<"iree-stablehlo-preprocessing-lower-complex", "func::FuncOp"> {
+  let summary = "Lower complex operations into non-complex operations";
+}
+
 def UnfuseBatchNorm :
     Pass<"iree-stablehlo-preprocessing-unfuse-batch-norm", "func::FuncOp"> {
   let summary = "Materializes 'broadcast_dimensions' attributes";
