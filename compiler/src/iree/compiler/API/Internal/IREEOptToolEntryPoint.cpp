@@ -45,6 +45,21 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
 
   InitLLVM y(argc, argv);
 
+  // We support a limited form of the PluginManager, allowing it to perform
+  // global initialization and dialect registration.
+  mlir::iree_compiler::PluginManager pluginManager;
+  if (!pluginManager.loadAvailablePlugins()) {
+    llvm::errs() << "error: Failed to initialize IREE compiler plugins\n";
+    return failure();
+  }
+  // Initialization that applies to all global plugins must be done prior
+  // to CL parsing.
+  pluginManager.globalInitialize();
+  pluginManager.registerPasses();
+  pluginManager.registerGlobalDialects(registry);
+  pluginManager.initializeCLI();
+
+
   // Register any command line options.
   MlirOptMainConfig::registerCLOptions(registry);
   registerAsmPrinterCLOptions();
@@ -62,20 +77,6 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
     interleaveComma(registry.getDialectNames(), os,
                     [&](auto name) { os << name; });
   }
-
-  // We support a limited form of the PluginManager, allowing it to perform
-  // global initialization and dialect registration.
-  mlir::iree_compiler::PluginManager pluginManager;
-  if (!pluginManager.loadAvailablePlugins()) {
-    llvm::errs() << "error: Failed to initialize IREE compiler plugins\n";
-    return failure();
-  }
-  // Initialization that applies to all global plugins must be done prior
-  // to CL parsing.
-  pluginManager.globalInitialize();
-  pluginManager.registerPasses();
-  pluginManager.registerGlobalDialects(registry);
-  pluginManager.initializeCLI();
 
   // Parse pass names in main to ensure static initialization completed.
   cl::ParseCommandLineOptions(argc, argv, helpHeader);
