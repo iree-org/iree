@@ -57,11 +57,8 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   # Therefore __str__ is defined here instead of in _ArchitectureInfo to
   # override the default one.
   def __str__(self):
-    parts = [
-        part for part in (self.vendor, self.architecture,
-                          self.microarchitecture) if len(part) != 0
-    ]
-    return "-".join(parts)
+    parts = [self.vendor, self.architecture, self.microarchitecture]
+    return "-".join(part for part in parts if part != "")
 
 
 @dataclass(frozen=True)
