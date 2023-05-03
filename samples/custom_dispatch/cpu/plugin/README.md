@@ -179,12 +179,13 @@ for instructions for CMake setup and building from source.
     be used. Note that specific flags are required when producing the object
     files.
 
-2. Compile the [example module](./example.mlir) to a .vmfb file and pass
+2. Compile the [example module](./standalone_example.mlir) to a .vmfb file and pass
    the path to the build directory so the .spv files can be found:
 
     ```bash
     iree-compile \
-        samples/custom_dispatch/cpu/plugin/example.mlir \
+        --iree-hal-target-backends=llvm-cpu \
+        samples/custom_dispatch/cpu/plugin/standalone_example.mlir \
         -o=/tmp/example.vmfb
     ```
 
@@ -193,20 +194,20 @@ for instructions for CMake setup and building from source.
 
     ```bash
     iree-run-module \
-        --device=llvm-sync \
-        --executable_plugin=samples/custom_dispatch/cpu/plugin/standalone_plugin.sos \
+        --device=local-sync \
+        --executable_plugin=../iree-build/samples/custom_dispatch/cpu/plugin/standalone_plugin.sos \
         --function=mixed_invocation \
         --input=8xf32=2 \
         --input=8xf32=4 \
-        /tmp/example.vmfb
+        --module=/tmp/example.vmfb
     ```
 
     ```bash
     iree-run-module \
-        --device=llvm-sync \
-        --executable_plugin=samples/custom_dispatch/cpu/plugin/system_plugin.so \
+        --device=local-sync \
+        --executable_plugin=../iree-build/samples/custom_dispatch/cpu/plugin/system_plugin.so \
         --function=mixed_invocation \
         --input=8xf32=2 \
         --input=8xf32=4 \
-        /tmp/example.vmfb
+        --module=/tmp/example.vmfb
     ```
