@@ -61,6 +61,7 @@ iree_compiler_cc_library(
     name = "Preprocessing",
     srcs = [
         "EinsumToDotGeneral.cpp",
+        "GatherToTorchIndexSelect.cpp",
         "LowerComplex.cpp",
         "Passes.cpp",
         "UnfuseBatchNorm.cpp",

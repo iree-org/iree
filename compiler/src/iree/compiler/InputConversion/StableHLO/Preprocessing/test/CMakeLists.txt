@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "complex_lowering.mlir"
     "einsum_to_dot_general.mlir"
+    "gather_to_torch_index_select.mlir"
     "unfuse_batch_norm.mlir"
   TOOLS
     FileCheck

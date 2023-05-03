@@ -54,6 +54,7 @@ iree_cc_library(
     "Rewriters.h"
   SRCS
     "EinsumToDotGeneral.cpp"
+    "GatherToTorchIndexSelect.cpp"
     "LowerComplex.cpp"
     "Passes.cpp"
     "UnfuseBatchNorm.cpp"
