@@ -240,6 +240,7 @@ def prepare_installation():
         "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON",
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
+        "-DIREE_EMBEDDED_RELEASE_INFO=ON",
         get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
         # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU here (and in env)
         get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
