@@ -98,6 +98,9 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
 
+  // Annotate ABI now post all type lowerings.
+  passManager.addNestedPass<func::FuncOp>(createEmitDefaultIREEABIPass());
+
   // Convert to Linalg. After this point, StableHLO will be eliminated.
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createLegalizeShapeComputations());

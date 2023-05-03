@@ -21,6 +21,12 @@ def ImportMLProgram :
   let constructor = "mlir::iree_compiler::createImportMLProgramPass()";
 }
 
+def EmitDefaultIREEABI :
+    Pass<"iree-emit-default-abi", "func::FuncOp"> {
+  let summary = "Imports IREE public dialect to internal implementation.";
+  let constructor = "mlir::iree_compiler::createEmitDefaultIREEABIPass()";
+}
+
 def LinalgQuantizedConvToConvPass
     : Pass<"iree-linalg-quantized-conv-to-conv", "func::FuncOp"> {
   let summary = "lower quantized_conv to conv";

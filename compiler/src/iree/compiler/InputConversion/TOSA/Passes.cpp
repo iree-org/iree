@@ -38,6 +38,9 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToSCF());
   passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
 
+  // Annotate default ABI if missing.
+  passManager.addNestedPass<func::FuncOp>(createEmitDefaultIREEABIPass());
+
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
