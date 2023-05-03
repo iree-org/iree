@@ -53,15 +53,16 @@ static inline iree_uk_type_t iree_uk_mmt4d_out_type(iree_uk_mmt4d_type_t type) {
 // good, because it's hard to get the struct field offsets right in assembly
 // and keep that in sync with future struct changes.
 typedef void (*iree_uk_mmt4d_tile_func_t)(
-    void* /*out_tile*/, const void* /*lhs_panel*/, const void* /*rhs_panel*/,
-    iree_uk_int32_t /*K*/, iree_uk_uint32_t /*flags*/,
-    const iree_uk_mmt4d_params_t* /*params*/);
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
+    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params);
 
 // Tile kernel declarations. Prototype matches iree_uk_mmt4d_tile_func_t.
-#define IREE_UK_MMT4D_TILE_FUNC_DECL(NAME)                                \
-  void NAME(void* out_tile, const void* lhs_panel, const void* rhs_panel, \
-            iree_uk_int32_t K, iree_uk_uint32_t flags,                    \
-            const iree_uk_mmt4d_params_t* params);
+#define IREE_UK_MMT4D_TILE_FUNC_DECL(NAME)                             \
+  void NAME(void* IREE_UK_RESTRICT out_tile,                           \
+            const void* IREE_UK_RESTRICT lhs_panel,                    \
+            const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K, \
+            iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params);
 
 // In order to be helpful as a reference for future architecture-specific
 // kernels, the generic kernels are structured like an actual optimized kernel,

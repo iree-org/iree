@@ -85,18 +85,35 @@ static iree_status_t iree_uk_benchmark_mmt4d(
   return iree_ok_status();
 }
 
-static void iree_uk_benchmark_register_mmt4d(iree_uk_uint32_t flags, int M0,
-                                             int N0, int K0,
-                                             const char* cpu_features) {
+static void iree_uk_benchmark_register_mmt4d_impl(
+    iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features,
+    const char* code_path_suffix) {
   char type_str[32];
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(flags);
   iree_uk_type_triple_str(type_str, sizeof type_str, mmt4d_type);
   char name[128];
-  snprintf(name, sizeof name, "mmt4d_%s_tile_%dx%dx%d", type_str, M0, N0, K0);
+  snprintf(name, sizeof name, "mmt4d_%s_tile_%dx%dx%d%s", type_str, M0, N0, K0,
+           code_path_suffix);
   iree_uk_mmt4d_params_t params = {
       .flags = flags, .M0 = M0, .N0 = N0, .K0 = K0};
   iree_uk_benchmark_register(name, iree_uk_benchmark_mmt4d, &params,
                              sizeof params, cpu_features);
+}
+
+static void iree_uk_benchmark_register_mmt4d(iree_uk_uint32_t flags, int M0,
+                                             int N0, int K0,
+                                             const char* cpu_features) {
+  iree_uk_benchmark_register_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
+}
+
+static void iree_uk_benchmark_register_mmt4d_default_and_intrinsics(
+    iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
+  iree_uk_benchmark_register_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
+#ifdef IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS
+  iree_uk_benchmark_register_mmt4d_impl(
+      flags | IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS, M0, N0, K0, cpu_features,
+      "_intrinsics");
+#endif  // defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
 }
 
 int main(int argc, char** argv) {
@@ -106,14 +123,17 @@ int main(int argc, char** argv) {
   iree_uk_benchmark_initialize(&argc, argv);
 
 #if defined(IREE_UK_ARCH_ARM_64)
+  // On arm64, some code paths have inline asm and intrinsics variants. For them
+  // we use iree_uk_benchmark_register_mmt4d_default_and_intrinsics to benchmark
+  // both.
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
                                    "");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1,
                                    "");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4,
                                    "dotprod");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 8,
-                                   "i8mm");
+  iree_uk_benchmark_register_mmt4d_default_and_intrinsics(
+      IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 8, "i8mm");
 #elif defined(IREE_UK_ARCH_X86_64)
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
                                    "avx2_fma");

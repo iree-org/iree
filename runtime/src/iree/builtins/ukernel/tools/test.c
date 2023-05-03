@@ -61,8 +61,8 @@ static const char* iree_uk_test_status_header(iree_uk_test_status_t status) {
 static void iree_uk_test_log_status(const iree_uk_test_t* test) {
   fprintf(stderr, "%s %s", iree_uk_test_status_header(test->status),
           test->name);
-  if (test->cpu_features) {
-    fprintf(stderr, ", cpu_features:%s", test->cpu_features);
+  if (strlen(test->cpu_features)) {
+    fprintf(stderr, " cpu_features:%s", test->cpu_features);
   }
   if (test->status != IREE_UK_TEST_STATUS_RUN) {
     fprintf(stderr, " (%" PRIi64 " ms)",
