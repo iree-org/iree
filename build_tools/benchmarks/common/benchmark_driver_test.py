@@ -140,6 +140,7 @@ class BenchmarkDriverTest(unittest.TestCase):
         bench_mode=["sync"],
         target_arch="x86_64-cascadelake",
         driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
+        benchmark_case_dir=pathlib.Path("case1"),
         benchmark_tool_name="tool",
         run_config=run_config_a)
     self.case2 = BenchmarkCase(model_name="model_tflite",
@@ -147,6 +148,7 @@ class BenchmarkDriverTest(unittest.TestCase):
                                bench_mode=["task"],
                                target_arch="x86_64-cascadelake",
                                driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
+                               benchmark_case_dir=pathlib.Path("case2"),
                                benchmark_tool_name="tool",
                                run_config=run_config_b)
     self.benchmark_suite = BenchmarkSuite({

@@ -36,6 +36,7 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
+from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 
 # All benchmarks' relative path against root build directory.
@@ -66,7 +67,7 @@ class BenchmarkCase:
   target_arch: str
   driver_info: DriverInfo
   benchmark_tool_name: str
-  benchmark_case_dir: Optional[pathlib.Path] = None
+  benchmark_case_dir: pathlib.Path
   run_config: Optional[iree_definitions.E2EModelRunConfig] = None
 
 
@@ -177,9 +178,6 @@ class BenchmarkSuite(object):
       if len(benchmark_case.model_tags) > 0:
         model_name_with_tags += f"-{','.join(benchmark_case.model_tags)}"
       if self.legacy_suite:
-        if benchmark_case.benchmark_case_dir is None:
-          raise ValueError(
-              "Either run_config or benchmark_case_dir must be set.")
         # For backward compatibility, model_name_filter matches against the string:
         #   <model name with tags>/<benchmark case name>
         model_and_case_name = f"{model_name_with_tags}/{benchmark_case.benchmark_case_dir.name}"
@@ -187,7 +185,6 @@ class BenchmarkSuite(object):
         # For the new run option, we drop the obscure old semantic and only
         # search on model name and its tags.
         model_and_case_name = model_name_with_tags
-
       matched_model_name = (model_name_filter is None or re.match(
           model_name_filter, model_and_case_name) is not None)
 
@@ -199,7 +196,8 @@ class BenchmarkSuite(object):
 
   @staticmethod
   def load_from_run_configs(
-      run_configs: Sequence[iree_definitions.E2EModelRunConfig]):
+      run_configs: Sequence[iree_definitions.E2EModelRunConfig],
+      root_benchmark_dir: pathlib.Path):
     """Loads the benchmarks from the run configs.
 
     Args:
@@ -224,12 +222,18 @@ class BenchmarkSuite(object):
       target_arch = str(target_device_spec.architecture)
       model = module_gen_config.imported_model.model
 
+      module_dir_path = iree_artifacts.get_module_dir_path(
+          module_generation_config=module_gen_config,
+          root_path=root_benchmark_dir)
+      module_dir_path = pathlib.Path(module_dir_path)
+
       benchmark_case = BenchmarkCase(model_name=model.name,
                                      model_tags=model.tags,
                                      bench_mode=module_exec_config.tags,
                                      target_arch=target_arch,
                                      driver_info=driver_info,
                                      benchmark_tool_name=run_config.tool.value,
+                                     benchmark_case_dir=module_dir_path,
                                      run_config=run_config)
       category = pathlib.Path(model.source_type.value)
       suite_map[category].append(benchmark_case)

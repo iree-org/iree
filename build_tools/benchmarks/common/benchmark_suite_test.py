@@ -5,7 +5,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import os
 import pathlib
 import tempfile
 import unittest
@@ -201,12 +200,23 @@ class BenchmarkSuiteTest(unittest.TestCase):
         input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
         tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_configs = [run_config_a, run_config_b, run_config_c]
+    root_dir = pathlib.Path("root")
 
-    suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs)
+    suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs,
+                                                 root_benchmark_dir=root_dir)
 
     self.assertEqual(suite.list_categories(),
                      [("exported_tf_v2", pathlib.Path("exported_tf_v2")),
                       ("exported_tflite", pathlib.Path("exported_tflite"))])
+    run_config_a_case_dir = pathlib.Path(
+        iree_artifacts.get_module_dir_path(
+            run_config_a.module_generation_config, root_dir))
+    run_config_b_case_dir = pathlib.Path(
+        iree_artifacts.get_module_dir_path(
+            run_config_b.module_generation_config, root_dir))
+    run_config_c_case_dir = pathlib.Path(
+        iree_artifacts.get_module_dir_path(
+            run_config_c.module_generation_config, root_dir))
     self.assertEqual(
         suite.filter_benchmarks_for_category(category="exported_tflite"), [
             BenchmarkCase(model_name=model_tflite.name,
@@ -215,7 +225,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           target_arch="riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=run_config_a_case_dir,
                           run_config=run_config_a),
             BenchmarkCase(model_name=model_tflite.name,
                           model_tags=model_tflite.tags,
@@ -223,7 +233,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           target_arch="riscv_64-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=run_config_b_case_dir,
                           run_config=run_config_b)
         ])
     self.assertEqual(
@@ -239,7 +249,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           target_arch="riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=run_config_c_case_dir,
                           run_config=run_config_c)
         ])
     self.assertEqual(
