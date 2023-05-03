@@ -52,8 +52,9 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   CUDA_SM70 = (ArchitectureType.GPU, "cuda", "sm_70")
   CUDA_SM80 = (ArchitectureType.GPU, "cuda", "sm_80")
 
-  # Starting from 3.11, enum members are defined before the subclasses (doesn't
-  # follow MRO). So __str__ is defined here instead of in _ArchitectureInfo to
+  # Starting from 3.11, enum members are defined before the subclasses (don't
+  # follow MRO, see https://docs.python.org/3/whatsnew/3.11.html#enum).
+  # Therefore __str__ is defined here instead of in _ArchitectureInfo to
   # override the default one.
   def __str__(self):
     parts = [
