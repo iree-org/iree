@@ -774,11 +774,24 @@ static LogicalResult setDefaultRootConfig(
   return success();
 }
 
+static void getDefaultMatmulCacheSizes(linalg::LinalgOp op,
+                                       SmallVectorImpl<int64_t> &sizes) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  if (isX86(targetAttr)) {
+    sizes.append({8, 32, 16});
+    return;
+  }
+
+  sizes.append({0, 0, 0});
+  return;
+}
+
 static LogicalResult setMatmulPadRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> workgroupTileSizes,
     int vectorSize) {
   // The tiling for parallel dims and reduction dims should be separated.
+  int numTiledDims = workgroupTileSizes.size();
   SmallVector<int64_t> parallelTileSizes(workgroupTileSizes.begin(),
                                          workgroupTileSizes.end());
   parallelTileSizes.back() = 0;
@@ -794,15 +807,34 @@ static LogicalResult setMatmulPadRootConfig(
 
   // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
   // if the dim size is small (e.g., K=24).
-  SmallVector<int64_t> reductionTileSizes(workgroupTileSizes.size() - 1, 0);
+  SmallVector<int64_t> reductionTileSizes(numTiledDims - 1, 0);
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
+  SmallVector<int64_t> defaultCacheTileSizes;
+  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+  getDefaultMatmulCacheSizes(linalgOp, defaultCacheTileSizes);
+  ArrayRef<int64_t> cacheTileSizes(defaultCacheTileSizes.end() - numTiledDims,
+                                   defaultCacheTileSizes.end());
+
+  SmallVector<int64_t> parallelCacheTileSizes(numTiledDims, 0);
+  SmallVector<int64_t> reductionCacheTileSizes(numTiledDims, 0);
+  for (const auto &[index, flowSize] : llvm::enumerate(flowTileSizes)) {
+    // Make sure the cache tile sizes are within the distributed tile size
+    // range. If dim is not distributed we still apply cache level tiling.
+    parallelCacheTileSizes[index] =
+        flowSize == 0 ? cacheTileSizes[index]
+                      : std::min(cacheTileSizes[index], flowSize);
+  }
+  std::swap(parallelCacheTileSizes.back(), reductionCacheTileSizes.back());
+
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
+  tileSizes.push_back(parallelCacheTileSizes);
   tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionCacheTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -917,7 +949,7 @@ static void getDefaultMatmulWorkgroupSizes(linalg::LinalgOp op,
                                            int64_t vectorSize) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
-    sizes.append({8, 32, 16});
+    sizes.append({4, 32, 4});
     return;
   }
 
@@ -1918,11 +1950,11 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 
 /// Find the root operation for the dispatch region. The priority is:
 ///   1. A Linalg operation that has reduction loops.
-///   2. Any other Lainlg op or LinalgExt op.
+///   2. Any other Linalg op or LinalgExt op.
 ///   3. An operation that implements TilingInterface.
 /// If there are multiple operations meeting the same priority, the one closer
 /// to the end of the function is the root op.
-static FailureOr<Operation *> getRootOperation(
+static FailureOr<Operation *> getRootOperationForKernelDispatch(
     ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
   for (auto op : llvm::reverse(computeOps)) {
@@ -2104,7 +2136,7 @@ static LogicalResult setTranslationInfoAndRootConfig(
     if (getLoweringConfig(computeOp)) return failure();
   }
 
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+  FailureOr<Operation *> rootOp = getRootOperationForKernelDispatch(computeOps);
   if (failed(rootOp)) return failure();
   Operation *rootOperation = rootOp.value();
 

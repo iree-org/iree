@@ -24,12 +24,20 @@
 namespace mlir {
 namespace iree_compiler {
 
+class TilingConfig;
+
 /// Registers all conversion passes in this directory.
 void registerCodegenPasses();
 
 /// Verify that the configuration used for compilation is valid.
 LogicalResult verifyLoweringConfiguration(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
+
+/// Verify that the configuration used for compilation is valid.
+LogicalResult verifyLoweringConfiguration(
+    Operation *op, TilingConfig &tilingConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
 
@@ -275,6 +283,13 @@ createRematerializeParallelOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createInstrumentMemoryAccessesPass();
 
+/// Returns the op that contains lowering config. Checks whether the provided op
+/// contains the lowering config and returns it. Otherwise, tries to find the
+/// lowering config nested within the provided operation. If there are multiple
+/// ops with the same lowering configs, returns the first one found. Returns
+/// failure if there are multiple op with different lowering config.
+FailureOr<Operation *> getRootOperation(Operation *op);
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -417,7 +432,8 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes to lower ops through data tiling transformations.
-void addCPUDataTilingPipeline(OpPassManager &passManager);
+void addCPUDataTilingPipeline(OpPassManager &passManager,
+                              TilingConfig &tilingConfig);
 
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.
@@ -428,6 +444,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
 /// pipeline is only used for dispatches that just copy data from input
 /// interfaces to output interface.
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
+                                             TilingConfig &tilingConfig,
                                              bool enableVectorMasking);
 
 /// Populates the passes needed to multi level tile and lowering of linalg ops
@@ -441,23 +458,26 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
 
 /// Populates the passes needed to do two-level tile + vectorize of linalg ops.
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    Operation *op, TilingConfig &tilingConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
 void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
-                                      int64_t numLevels, bool enablePeeling,
+                                      TilingConfig &tilingConfig,
+                                      bool enablePeeling,
                                       bool enableVectorMasking,
                                       bool lowerToAVX2);
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
+                                          TilingConfig &tilingConfig,
                                           bool enableVectorMasking);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    Operation *op, TilingConfig &tilingConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
+                                               TilingConfig &tilingConfig,
                                                bool enableVectorMasking);
 
 /// Transform dialect-based common.
@@ -466,6 +486,7 @@ void addTransformDialectPasses(OpPassManager &passManager);
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
+                                      TilingConfig &tilingConfig,
                                       bool enableMicrokernels);
 
 //----------------------------------------------------------------------------//

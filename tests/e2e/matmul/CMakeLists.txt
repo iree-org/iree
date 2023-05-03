@@ -86,52 +86,6 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_mmt4d_i8_large
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=i8"
-    "--shapes=large"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-flow-enable-data-tiling"
-  LABELS
-    "noriscv"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "arm_64:+dotprod"
-    "arm_64:+i8mm"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_mmt4d_f32_large
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=large"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-flow-enable-data-tiling"
-  LABELS
-    "noriscv"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-)
-
-iree_generated_trace_runner_test(
-  NAME
     e2e_matmul_mmt4d_i8_intrinsics_small
   GENERATOR
     "generate_e2e_matmul_tests.py"

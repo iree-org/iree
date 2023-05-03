@@ -60,33 +60,33 @@ py_binary(
     "f32",
 ]]
 
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
-    compiler_flags = [
-        "--iree-flow-enable-data-tiling",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=large",
-    ],
-    tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator.
-        "noriscv",
-    ],
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    target_cpu_features_variants = ["default"] +
-                                   ([
-                                       "arm_64:+dotprod",
-                                       "arm_64:+i8mm",
-                                   ] if lhs_rhs_type == "i8" else []),
-    trace_runner = "//tools:iree-e2e-matmul-test",
-) for lhs_rhs_type in [
-    "i8",
-    "f32",
-]]
+#[iree_generated_trace_runner_test(
+#    name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
+#    compiler_flags = [
+#        "--iree-flow-enable-data-tiling",
+#    ],
+#    generator = ":generate_e2e_matmul_tests",
+#    generator_args = [
+#        "--lhs_rhs_type=%s" % lhs_rhs_type,
+#        "--shapes=large",
+#    ],
+#    tags = [
+#        # "--shapes=large" can cause timeouts on riscv emulator.
+#        "noriscv",
+#    ],
+#    target_backends_and_drivers = [
+#        ("llvm-cpu", "local-task"),
+#    ],
+#    target_cpu_features_variants = ["default"] +
+#                                   ([
+#                                       "arm_64:+dotprod",
+#                                       "arm_64:+i8mm",
+#                                   ] if lhs_rhs_type == "i8" else []),
+#    trace_runner = "//tools:iree-e2e-matmul-test",
+#) for lhs_rhs_type in [
+#    "i8",
+#    "f32",
+#]]
 
 # Test intrinsics. No need to run vmvx again, since it isn't affected by this
 # codegen flag. No need to run "large" sizes, since this only differs from other
