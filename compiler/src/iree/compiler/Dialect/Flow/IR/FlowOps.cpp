@@ -1122,6 +1122,14 @@ DispatchWorkgroupsOp::getTiedOperandsIndexAndLength() {
   return getODSOperandIndexAndLength(1);
 }
 
+SmallVector<int64_t> DispatchWorkgroupsOp::getTiedOperandsAsIntegerList() {
+  ArrayAttr attr = getTiedOperandsAttr();
+  if (!attr) return {};
+  return llvm::to_vector(llvm::map_range(attr, [](Attribute intAttr) {
+    return intAttr.cast<IntegerAttr>().getInt();
+  }));
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.workgroup.*
 //===----------------------------------------------------------------------===//

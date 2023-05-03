@@ -15,10 +15,15 @@ Example usage:
   python3 upload_benchmarks.py /path/to/benchmark/json/file
 """
 
+import pathlib
+import sys
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
+
 import argparse
 import json
 import os
-import pathlib
 import requests
 
 from typing import Any, Dict, Optional, Union
