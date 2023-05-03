@@ -70,6 +70,9 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "comp-stats":
         lambda _config: False,
 }
+# TODO(#13392): "all" should be called "defaults". Keep it as it is and we will
+# drop it when removing "benchmarks:" git trailer (with announcement).
+META_BENCHMARK_PRESETS = {"all": ["x86_64", "cuda", "comp-stats"]}
 
 
 def filter_and_group_run_configs(
@@ -167,8 +170,15 @@ def _parse_and_strip_list_argument(arg) -> List[str]:
 
 
 def _parse_benchmark_presets(arg) -> List[PresetMatcher]:
+  presets = set(_parse_and_strip_list_argument(arg))
+  for meta_preset, sub_presets in META_BENCHMARK_PRESETS.items():
+    if meta_preset in presets:
+      presets.remove(meta_preset)
+      presets.update(sub_presets)
+
+  presets = sorted(presets)
   matchers = []
-  for preset in _parse_and_strip_list_argument(arg):
+  for preset in presets:
     matcher = BENCHMARK_PRESET_MATCHERS.get(preset)
     if matcher is None:
       raise argparse.ArgumentTypeError(

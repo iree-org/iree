@@ -297,10 +297,6 @@ def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
       raise ValueError(f"Unknown benchmark preset option: '{preset_option}'.\n"
                        f"Available options: '{BENCHMARK_PRESET_OPTIONS}'.")
 
-  if "all" in preset_options:
-    preset_options = list(
-        option for option in BENCHMARK_PRESET_OPTIONS if option != "all")
-
   return ",".join(preset_options)
 
 
