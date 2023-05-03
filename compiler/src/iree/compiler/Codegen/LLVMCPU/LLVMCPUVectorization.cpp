@@ -110,18 +110,14 @@ static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
   return canonicalVectorShape;
 }
 
-/// Tries to infer the vector sizes from an IR that has been tiled for
-/// vectorization. Returns failure if vector sizes can't be inferred. For know
-/// this utility is only able to extract tile size information from
-/// `tensor.extract_slice` and `affine.min` ops, which should cover most but not
-/// all the cases.
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis.
+/// Returns failure if vector sizes can't be inferred.
 static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
     linalg::LinalgOp linalgOp) {
   LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << linalgOp << "\n");
 
   auto idxMaps = linalgOp.getIndexingMapsArray();
-  assert(!idxMaps.empty());
-  unsigned numDims = idxMaps[0].getNumDims();
+  unsigned numDims = linalgOp.getNumLoops();
 
   SmallVector<int64_t> vectorSizes;
   for (int dim = 0; dim < numDims; ++dim) {
@@ -141,6 +137,8 @@ static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
         firstOperand.getType().cast<ShapedType>().getShape()[firstOperandDim];
     if (!ShapedType::isDynamic(dimSize)) {
       vectorSizes.push_back(dimSize);
+      LLVM_DEBUG(VEC_DBGS() << "Inferred vector size '" << dimSize
+                            << "' for dimension '" << dim << "'\n");
       continue;
     }
 
