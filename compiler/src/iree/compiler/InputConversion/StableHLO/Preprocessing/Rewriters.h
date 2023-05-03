@@ -15,7 +15,7 @@ namespace mlir::iree_compiler::stablehlo {
 // General StableHLO/CHLO preprocessing patterns.
 //===----------------------------------------------------------------------===//
 
-/// Collection of rewrite patterns for lowering of StableHLO dim operations.
+/// Collection of rewrite patterns for lowering of StableHLO einsum operations.
 void populatePreprocessingEinsumToDotGeneralPatterns(
     MLIRContext *context, RewritePatternSet *patterns);
 
@@ -23,6 +23,10 @@ void populatePreprocessingEinsumToDotGeneralPatterns(
 /// operations.
 void populatePreprocessingComplexPatterns(MLIRContext *context,
                                           RewritePatternSet *patterns);
+
+/// Collection of rewrite patterns for lowering of StableHLO gather operations.
+void populatePreprocessingGatherToTorchIndexSelectPatterns(
+    MLIRContext *context, RewritePatternSet *patterns);
 
 /// Collection of rewrite patterns to materialize 'batch_dimension' attributes.
 void populatePreprocessingUnfuseBatchNormPatterns(MLIRContext *context,

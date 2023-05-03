@@ -14,6 +14,11 @@ def EinsumToDotGeneral :
   let summary = "Legalizes einsum ops to dot_general ops";
 }
 
+def GatherToTorchIndexSelect :
+    Pass<"iree-stablehlo-preprocessing-gather-to-torch-index-select", "func::FuncOp"> {
+  let summary = "Legalizes gathers to a torch index select";
+}
+
 def LowerComplex :
     Pass<"iree-stablehlo-preprocessing-lower-complex", "func::FuncOp"> {
   let summary = "Lower complex operations into non-complex operations";
