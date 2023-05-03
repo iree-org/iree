@@ -41,10 +41,27 @@ iree_compiler_cc_library(
     ],
 )
 
+iree_gentbl_cc_library(
+    name = "ComplexLoweringPatterns",
+    tbl_outs = [
+        (
+            ["--gen-rewriters"],
+            "ComplexLoweringPatterns.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "ComplexLoweringPatterns.td",
+    deps = [
+        "@llvm-project//mlir:FuncTdFiles",
+        "@mlir-hlo//stablehlo:stablehlo_ops_td_files",
+    ],
+)
+
 iree_compiler_cc_library(
     name = "Preprocessing",
     srcs = [
         "EinsumToDotGeneral.cpp",
+        "LowerComplex.cpp",
         "Passes.cpp",
         "UnfuseBatchNorm.cpp",
     ],
@@ -53,6 +70,7 @@ iree_compiler_cc_library(
         "Rewriters.h",
     ],
     deps = [
+        ":ComplexLoweringPatterns",
         ":PassHeaders",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
