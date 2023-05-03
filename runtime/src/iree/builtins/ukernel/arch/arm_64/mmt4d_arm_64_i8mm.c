@@ -156,6 +156,11 @@ void iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm_intrinsics(
 }
 
 #if defined(IREE_UK_ENABLE_INLINE_ASM)
+// Compared to the intrinsics code path, this asm code has optimizations (loop
+// pipelining, 2x partial unrolling) that were introduced in #10552. An attempt
+// to bring these optimizations to the intrinsics code path ran into LLVM ARM
+// backend issues: https://github.com/llvm/llvm-project/issues/62527, so for now
+// we retain this asm code path.
 void iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm_inline_asm(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
@@ -227,7 +232,7 @@ void iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm_inline_asm(
       "    b.eq 6f                                                         \n"
       "                                                                    \n"
       "  3:                                                                \n"
-      "    // Prologue of main loop, 2x partially unrolled, for when K>=2.  \n"
+      "    // Prologue of main loop, 2x partially unrolled, for when K>=2. \n"
       "    //                                                              \n"
       "    // Decrement the loop counter K.                                \n"
       "    subs w3, w3, 2                                                  \n"
