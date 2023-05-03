@@ -53,7 +53,7 @@ iree_gentbl_cc_library(
     td_file = "ComplexLoweringPatterns.td",
     deps = [
         "@llvm-project//mlir:FuncTdFiles",
-        "@mlir-hlo//stablehlo:stablehlo_ops",
+        "@mlir-hlo//stablehlo:stablehlo_ops_td_files",
     ],
 )
 
