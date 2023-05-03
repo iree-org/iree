@@ -1756,6 +1756,33 @@ void CollectiveAllReduceOp::build(OpBuilder &builder, OperationState &state,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.collective.all_to_all
+//===----------------------------------------------------------------------===//
+
+Value CollectiveAllToAllOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::llvm::Optional<unsigned> CollectiveAllToAllOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // target
+}
+
+SmallVector<int64_t, 4> CollectiveAllToAllOp::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
+void CollectiveAllToAllOp::build(OpBuilder &builder, OperationState &state,
+                                 CollectiveElementTypeAttr elementType,
+                                 Value target, Value source, Value channel) {
+  auto targetDims =
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
+
+  build(builder, state, elementType, target, targetDims, source, channel,
+        builder.getIndexArrayAttr({0}));
+}
+
+//===----------------------------------------------------------------------===//
 // flow.collective.reduce_scatter
 //===----------------------------------------------------------------------===//
 
