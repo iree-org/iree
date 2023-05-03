@@ -31,7 +31,7 @@ def is_available():
   """Determine if the TFLite frontend is available."""
   try:
     import iree.tools.tflite.scripts.iree_import_tflite.__main__
-  except ValueError:
+  except ModuleNotFoundError:
     logging.warning("Unable to find IREE tool iree-import-tflite")
     return False
   return True
@@ -82,19 +82,30 @@ def compile_file(fb_path: str, **kwargs):
   with TempFileSaver.implicit() as tfs:
     options = ImportOptions(**kwargs)
 
-  with tempfile.NamedTemporaryFile(mode="w") as temp_file:
+  with TempFileSaver.implicit() as tfs, tempfile.TemporaryDirectory() as tmpdir:
+    if options.import_only and options.output_file:
+      # Importing to a file and stopping, write to that file directly.
+      tfl_iree_input = options.output_file
+    elif options.save_temp_iree_input:
+      # Saving the file, use tfs.
+      tfl_iree_input = tfs.alloc_optional("tfl-iree-input.mlir", export_as=options.save_temp_iree_input)
+    else:
+      # Not saving the file, so generate a loose temp file without tfs.
+      tfl_iree_input = os.path.join(tmpdir, 'tfl-iree-input.mlir')
+
     __main__.tflite_to_tosa(flatbuffer=fb_path,
-                            bytecode=temp_file.name,
+                            bytecode=tfl_iree_input,
                             ordered_input_arrays=options.input_arrays,
                             ordered_output_arrays=options.output_arrays)
+
     if options.import_only:
-      # One stage tool pipeline.
       if options.output_file:
         return None
-      return temp_file.read()
+      with open(tf_iree_input, "r") as f:
+        return f.read()
 
-    # Full compilation pipeline.
-    compile_cl = build_compile_command_line(temp_file.name, tfs, options)
+    # Run IREE compilation pipeline
+    compile_cl = build_compile_command_line(tf_iree_input, tfs, options)
     result = invoke_pipeline([compile_cl])
     if options.output_file:
       return None
