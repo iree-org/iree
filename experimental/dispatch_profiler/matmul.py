@@ -7,6 +7,7 @@ import collections
 import subprocess
 from library import *
 from dispatch import *
+from options import get_cmd_line_argument_list
 
 
 ################################################################################
@@ -389,10 +390,10 @@ class CudaMatmulDispatchChecker:
   def __init__(self, args):
     self.args = args
 
-    # CUDA shared memory capacity per SM in Kbytes.
+    # CUDA shared memory capacity per SM in KB.
     self.sharedMemPerSm = {
-        "sm_80": 163,
-        "sm_86": 99,
+        "sm_80": 163,  # 1KB is reserved for the driver.
+        "sm_86": 99,  # 1KB is reserved for the driver
     }
 
     self.cuda_arch = self.args.cuda_arch
@@ -430,17 +431,20 @@ class CudaMatmulDispatchChecker:
   def is_valid(self, dispatch):
     """Checks if the given dispatch is valid for CUDA."""
     if not self._is_tile_aligned_shape(dispatch):
-      print(f"[Warning]: {dispatch.name()} is not aligned is being skipped.")
+      if self.args.verbose:
+        print(f"[Warning]: {dispatch.name()} is not aligned is being skipped.")
       return False
     if not self._is_cuda_smem_avialable(dispatch):
-      print(f"[Warning]: {dispatch.name()} requires {self._cuda_smem_required_in_bytes(dispatch)} "\
-            f"bytes of shared memory, which is larger than the {self.cuda_arch} capacity "\
-            f"{self.cuda_smem_capacity_in_bytes} bytes.")
+      if self.args.verbose:
+        print(f"[Warning]: {dispatch.name()} requires {self._cuda_smem_required_in_bytes(dispatch)} "\
+              f"bytes of shared memory, which is larger than the {self.cuda_arch} capacity "\
+              f"{self.cuda_smem_capacity_in_bytes} bytes.")
       return False
     if dispatch.operation.split_k_slices > 1 and \
       not self._is_problem_k_divisible_by_split_k(dispatch):
-      print(f"[Warning]: {dispatch.name()} problem k is not divisible by {dispatch.operation.split_k_slices} "\
-            f"split-k slices, which is not supported on LLVM GPU CUDA backend.")
+      if self.args.verbose:
+        print(f"[Warning]: {dispatch.name()} problem k is not divisible by {dispatch.operation.split_k_slices} "\
+              f"split-k slices, which is not supported on LLVM GPU CUDA backend.")
       return False
     return True
 
@@ -485,9 +489,15 @@ class CudaMatmulGenerator:
         TileDescription([64, 64, 16], 10, [64, 2, 1]),
     ]
 
-    # Predefined matmul problem shapes.
+    # Create a list of matmul problem and initialize with some *default* shapes.
     self.matmul_shapes = [[128, 128, 256], [256, 512, 128], [1024, 512, 2048],
                           [2560, 2560, 2560], [3456, 1024, 2048]]
+
+    # Append matmul problem with *user* provided shapes.
+    for m in get_cmd_line_argument_list(self.args.problem_m):
+      for n in get_cmd_line_argument_list(self.args.problem_n):
+        for k in get_cmd_line_argument_list(self.args.problem_k):
+          self.matmul_shapes.append([m, n, k])
 
     # Matmul dispatches collection.
     self.dispatches_collection_list = []

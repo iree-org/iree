@@ -98,8 +98,9 @@ class IreeToolsLauncher:
       cmd += [f"--mlir-print-ir-after-all"]
 
     if not os.path.exists(vmfb_file) or self.args.force_compile:
-      print(f">> Compilation command for "
-            f"{CompilationModeNames[compilation_mode]} : {' '.join(cmd)}")
+      print(
+          f"[Compiling to ({CompilationModeNames[compilation_mode]})] {' '.join(cmd)}"
+      )
 
       compile_log_filename = f"{self.operation_path}/iree_compile_logs.mlir"
       with open(compile_log_filename, "w") as fp:

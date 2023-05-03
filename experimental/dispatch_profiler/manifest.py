@@ -176,10 +176,8 @@ class Manifest:
     generated_path = os.path.join(self.args.build_dir, 'generated',
                                   MlirDialectNames[mlir_dialect])
 
-    if os.path.exists(generated_path):
-      shutil.rmtree(generated_path)
-
-    os.makedirs(generated_path)
+    if not os.path.exists(generated_path):
+      os.makedirs(generated_path)
 
     # For each operation_kind create a directory and emit the operations with
     # all the configurations in the configuration_list into their seperate directories.
@@ -188,25 +186,26 @@ class Manifest:
       operation_kind_path = os.path.join(generated_path,
                                          OperationKindNames[operation_kind])
 
-      # If the directory with generated mlir already exists, delete it and create a new one.
-      if os.path.exists(operation_kind_path):
-        shutil.rmtree(operation_kind_path)
-      os.makedirs(operation_kind_path)
+      # If the operation_kind_path does not exists, create it.
+      if not os.path.exists(operation_kind_path):
+        os.makedirs(operation_kind_path)
 
       for dispatch_collection in dispatch_collection_list:
 
         operation_path = os.path.join(operation_kind_path,
                                       dispatch_collection.operation.name())
 
-        if os.path.exists(operation_path):
-          shutil.rmtree(operation_path)
-        os.makedirs(operation_path)
+        # If the operation_path does not exists, create it.
+        if not os.path.exists(operation_path):
+          os.makedirs(operation_path)
 
         with EmitSourceMLIR(operation_path,
                             dispatch_collection) as emit_mlir_source:
-          full_path = os.path.join(
+          mlir_file_path = os.path.join(
               operation_path,
               ".".join([dispatch_collection.operation.name(), 'mlir']))
-          print(f"[Generating]: {full_path}")
+
+          print(f"[Generating]: {mlir_file_path}")
+
           # Emit mlir source file for the dispatch_collection.operation with all the configurations
           emit_mlir_source.emit()

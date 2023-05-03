@@ -11,10 +11,10 @@ class CudaSplitKMatmulGenerator(CudaMatmulGenerator):
     super().__init__(args)
 
     # Predefined matmul shapes for splitK matmul.
-    self.matmul_shapes = [[128, 128, 4096]]
+    self.matmul_shapes = [[128, 128, 12288]]
 
     # Predefined split_k_slices list for splitK matmul.
-    self.split_k_slices = [2, 16, 18]
+    self.split_k_slices = [2, 4, 16, 18]
 
     # SplitK matmul dispatches collection list.
     self.dispatches_collection_list = []
@@ -50,7 +50,7 @@ class CudaSplitKMatmulGenerator(CudaMatmulGenerator):
           operation, supported_configuration_list))
 
   def _cuda_matmul_tensor_cores_f16(self):
-    """Appends a list of matmul dispatches for GPU TensorCore F16 data type."""
+    """Appends a list of matmul split-k dispatches for GPU TensorCore F16 data type."""
     configuration_list = self._get_matmul_custom_compilation_info_list(
         self.tile_descriptions_tensor_cores_f16, self.translation_infos,
         OperationKind.SplitkMatmul)
@@ -60,7 +60,7 @@ class CudaSplitKMatmulGenerator(CudaMatmulGenerator):
                                             configuration_list)
 
   def _cuda_matmul_tensor_cores_f32(self):
-    """Appends a list of matmul dispatches for GPU TensorCore F32 data type."""
+    """Appends a list of matmul split-k dispatches for GPU TensorCore F32 data type."""
     configuration_list = self._get_matmul_custom_compilation_info_list(
         self.tile_descriptions_tensor_cores_f32, self.translation_infos,
         OperationKind.SplitkMatmul)

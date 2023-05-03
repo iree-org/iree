@@ -29,7 +29,7 @@ class PerformanceResult:
     print(f'Operation     : {self.operation.name()}')
     print(f'Configuration : {self.configuration.name()}')
     # Operation specific arguments.
-    arg_str = ', '.join([
+    arg_str = ' '.join([
         f'--{key}={value}'
         for key, value in self.operation.get_argument_dict().items()
     ])
