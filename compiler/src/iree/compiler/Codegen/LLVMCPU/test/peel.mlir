@@ -105,4 +105,4 @@ module {
 // CHECK:           scf.for
 // CHECK:             tensor.pack {{.*}} : tensor<16x16xf32> -> tensor<1x16x16x1xf32>
 // CHECK:           scf.for
-// CHECK:             tensor.pack {{.*}} : tensor<?x?x16x1xf32> to tensor<1x?x16x1xf32>
+// CHECK:             tensor.pack {{.*}} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>
