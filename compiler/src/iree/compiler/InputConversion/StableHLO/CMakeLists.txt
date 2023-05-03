@@ -114,6 +114,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::InputConversion::Common
+    iree::compiler::InputConversion::StableHLO::Preprocessing
   PUBLIC
 )
 
