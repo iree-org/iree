@@ -9,6 +9,7 @@
 from dataclasses import dataclass
 from enum import Enum
 import logging
+import os
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
 
@@ -102,11 +103,11 @@ def compile_file(fb_path: str, **kwargs):
     if options.import_only:
       if options.output_file:
         return None
-      with open(tf_iree_input, "r") as f:
+      with open(tfl_iree_input, "r") as f:
         return f.read()
 
     # Run IREE compilation pipeline
-    compile_cl = build_compile_command_line(tf_iree_input, tfs, options)
+    compile_cl = build_compile_command_line(tfl_iree_input, tfs, options)
     result = invoke_pipeline([compile_cl])
     if options.output_file:
       return None
