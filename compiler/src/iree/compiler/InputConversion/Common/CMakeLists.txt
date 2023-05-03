@@ -40,7 +40,6 @@ iree_cc_library(
     "Passes.h"
     "Utils.h"
   SRCS
-    "EmitDefaultIREEABI.cpp"
     "IREEImportPublic.cpp"
     "ImportMLProgram.cpp"
     "Passes.cpp"
