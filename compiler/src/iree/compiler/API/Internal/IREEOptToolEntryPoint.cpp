@@ -59,7 +59,6 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   pluginManager.registerGlobalDialects(registry);
   pluginManager.initializeCLI();
 
-
   // Register any command line options.
   MlirOptMainConfig::registerCLOptions(registry);
   registerAsmPrinterCLOptions();
