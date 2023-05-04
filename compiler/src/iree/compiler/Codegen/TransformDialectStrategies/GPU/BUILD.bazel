@@ -45,6 +45,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransformOps",
+        "@llvm-project//mlir:NVGPUDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:SCFDialect",

@@ -78,7 +78,7 @@ class IREEComprehensiveBufferizePass
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
-        .insert<AffineDialect,
+        .insert<affine::AffineDialect,
                 arith::ArithDialect,
                 bufferization::BufferizationDialect,
                 func::FuncDialect,

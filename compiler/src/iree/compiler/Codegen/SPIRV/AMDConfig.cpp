@@ -89,7 +89,8 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
     const int multipler = 32 / bitwidth;
     bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
     const int bestTilingFactor = (hasPaddedInput ? 16 : 32) * multipler;
-    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
   }
 
   return failure();

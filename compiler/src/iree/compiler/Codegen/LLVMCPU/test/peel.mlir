@@ -72,3 +72,37 @@ func.func @peel_static_matmul() {
 // CHECK:                 linalg.fill {{.*}} -> tensor<?x?xf32>
 // CHECK:                 %[[T2:.+]] = scf.for
 // CHECK:                   linalg.matmul {{.*}} tensor<?x?xf32>
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[4, 64], [1, 16]]>
+#map = affine_map<(d0)[s0] -> (-d0 + s0, 16)>
+#map1 = affine_map<(d0) -> (d0 * 16)>
+module {
+  func.func @peel_pack(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?x16x1xf32>) -> tensor<?x?x16x1xf32> {
+    %c16 = arith.constant 16 : index
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %dim = tensor.dim %arg1, %c0 : tensor<?x?x16x1xf32>
+    %dim_0 = tensor.dim %arg1, %c1 : tensor<?x?x16x1xf32>
+    %0 = scf.for %arg2 = %c0 to %dim step %c1 iter_args(%arg3 = %arg1) -> (tensor<?x?x16x1xf32>) {
+      %1 = scf.for %arg4 = %c0 to %dim_0 step %c16 iter_args(%arg5 = %arg3) -> (tensor<?x?x16x1xf32>) {
+        %2 = affine.min #map(%arg4)[%dim_0]
+        %3 = affine.apply #map1(%arg2)
+        %extracted_slice = tensor.extract_slice %arg0[%3, %arg4] [16, %2] [1, 1] : tensor<?x?xf32> to tensor<16x?xf32>
+        %extracted_slice_1 = tensor.extract_slice %arg5[%arg2, %arg4, 0, 0] [1, %2, 16, 1] [1, 1, 1, 1] : tensor<?x?x16x1xf32> to tensor<1x?x16x1xf32>
+        %pack = tensor.pack %extracted_slice inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %extracted_slice_1 {lowering_config = #config} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>
+        %inserted_slice = tensor.insert_slice %pack into %arg5[%arg2, %arg4, 0, 0] [1, %2, 16, 1] [1, 1, 1, 1] : tensor<1x?x16x1xf32> into tensor<?x?x16x1xf32>
+        scf.yield %inserted_slice : tensor<?x?x16x1xf32>
+      }
+      scf.yield %1 : tensor<?x?x16x1xf32>
+    }
+    return %0 : tensor<?x?x16x1xf32>
+  }
+}
+// CHECK-LABEL: func.func @peel_pack
+// CHECK:         scf.for
+// CHECK:           scf.for
+// CHECK:             tensor.pack {{.*}} : tensor<16x16xf32> -> tensor<1x16x16x1xf32>
+// CHECK:           scf.for
+// CHECK:             tensor.pack {{.*}} : tensor<16x?xf32> -> tensor<1x?x16x1xf32>

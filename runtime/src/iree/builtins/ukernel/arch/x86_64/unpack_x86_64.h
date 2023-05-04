@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_ARCH_X86_64_UNPACK_X86_64_H_
 #define IREE_BUILTINS_UKERNEL_ARCH_X86_64_UNPACK_X86_64_H_
 
-#include "iree/builtins/ukernel/unpack.h"
+#include "iree/builtins/ukernel/unpack_internal.h"
 
 // Returns the x86_64 tile function to use for the unpack op with given params,
 // or NULL if none is available, so the caller may fall back to generic code.

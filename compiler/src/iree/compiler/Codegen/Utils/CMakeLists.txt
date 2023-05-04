@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRViewLikeInterface
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
+    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC

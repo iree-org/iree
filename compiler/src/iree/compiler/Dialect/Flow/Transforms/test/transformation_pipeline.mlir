@@ -16,8 +16,8 @@ func.func @elementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 }
 
 // CHECK-LABEL: flow.executable private @elementwiseOps_dispatch_0 {
-//  CHECK-NEXT:   flow.executable.export public @elementwiseOps_dispatch_0{{.*}} workgroups(%[[ARG0:.+]]: index) -> (index, index, index) {
-//       CHECK:     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %[[ARG0]]
+//  CHECK-NEXT:   flow.executable.export public @elementwiseOps_dispatch_0{{.*}} workgroups() -> (index, index, index) {
+//       CHECK:     %x, %y, %z = flow.dispatch.workgroup_count_from_slice
 //       CHECK:     flow.return %x, %y, %z
 //       CHECK:   module {
 //  CHECK-NEXT:     func.func @elementwiseOps_dispatch_0{{.*}}(%arg0: !flow.dispatch.tensor<readonly:tensor<4xf32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<4xf32>>) {
@@ -26,7 +26,6 @@ func.func @elementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 //  CHECK-NEXT:         %{{.+}} = arith.subf %{{.+}}, %{{.+}} : f32
 //  CHECK-NEXT:         %{{.+}} = arith.mulf %{{.+}}, %{{.+}} : f32
 //       CHECK: func.func @elementwiseOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-NEXT:   %0 = flow.dispatch @elementwiseOps_dispatch_0::@elementwiseOps_dispatch_0{{.*}}[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+//  CHECK-NEXT:   %0 = flow.dispatch @elementwiseOps_dispatch_0::@elementwiseOps_dispatch_0{{.*}}(%arg0) : (tensor<4xf32>) -> tensor<4xf32>
 //  CHECK-NEXT:   return %0 : tensor<4xf32>
 //  CHECK-NEXT: }

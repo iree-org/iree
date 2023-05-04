@@ -17,6 +17,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -33,6 +35,48 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 namespace {
+
+Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
+                         Location loc) {
+  Type eTy = getElementTypeOrSelf(type);
+  Type inputETy = getElementTypeOrSelf(inputs[0].getType());
+  if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
+
+  if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
+    return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
+  }
+
+  if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
+    return builder.create<arith::ExtFOp>(loc, type, inputs[0]);
+  }
+
+  return nullptr;
+};
+
+Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
+                           Location loc) {
+  Type eTy = getElementTypeOrSelf(type);
+  Type inputETy = getElementTypeOrSelf(inputs[0].getType());
+  if (!getElementTypeOrSelf(type).isa<FloatType>()) return nullptr;
+  bool isUnsigned = eTy.isUnsignedInteger();
+
+  int64_t inBitwidth = inputETy.getIntOrFloatBitWidth();
+  int64_t outBitwidth = eTy.getIntOrFloatBitWidth();
+
+  if (inBitwidth > outBitwidth) {
+    return builder.create<arith::TruncIOp>(loc, type, inputs[0]);
+  }
+
+  if (inBitwidth < outBitwidth && isUnsigned) {
+    return builder.create<arith::ExtUIOp>(loc, type, inputs[0]);
+  }
+
+  if (inBitwidth < outBitwidth && !isUnsigned) {
+    return builder.create<arith::ExtSIOp>(loc, type, inputs[0]);
+  }
+
+  return nullptr;
+};
 
 // Converts from |SourceType| to |TargetType|.
 template <typename SourceType, typename TargetType>
@@ -51,6 +95,10 @@ struct PrimitiveTypeConverter : public TypeConverter {
                                    convertType(type.getElementType()),
                                    type.getEncoding());
     });
+    addConversion([&](VectorType type) {
+      return VectorType::get(type.getShape(),
+                             convertType(type.getElementType()));
+    });
     addConversion([&](IREE::Util::PtrType ptrType) {
       return IREE::Util::PtrType::get(convertType(ptrType.getTargetType()));
     });
@@ -65,6 +113,26 @@ struct PrimitiveTypeConverter : public TypeConverter {
   // Returns the newly converted type of |type|.
   // Subclasses can override to pass additional type parameters.
   virtual Type getTargetType(SourceType type) = 0;
+};
+
+template <typename SourceType, typename TargetType>
+struct FloatTypeConverter
+    : public PrimitiveTypeConverter<SourceType, TargetType> {
+  explicit FloatTypeConverter() {
+    this->addArgumentMaterialization(convertRankedFloat);
+    this->addSourceMaterialization(convertRankedFloat);
+    this->addTargetMaterialization(convertRankedFloat);
+  }
+};
+
+template <typename SourceType, typename TargetType>
+struct IntegerTypeConverter
+    : public PrimitiveTypeConverter<SourceType, TargetType> {
+  explicit IntegerTypeConverter() {
+    this->addArgumentMaterialization(convertRankedInteger);
+    this->addSourceMaterialization(convertRankedInteger);
+    this->addTargetMaterialization(convertRankedInteger);
+  }
 };
 
 // Tries to completely convert a generic Operation.
@@ -122,16 +190,17 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   LogicalResult matchAndRewrite(
       OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto resultType = this->getTypeConverter()
-                          ->convertType(op.getResult().getType())
-                          .template cast<TypeTy>();
-    auto operandType = this->getTypeConverter()
-                           ->convertType(op.getOperand().getType())
-                           .template cast<TypeTy>();
+    auto resultType =
+        this->getTypeConverter()->convertType(op.getResult().getType());
+    auto operandType =
+        this->getTypeConverter()->convertType(op.getOperand().getType());
+
+    auto resultEType = cast<TypeTy>(getElementTypeOrSelf(resultType));
+    auto operandEType = cast<TypeTy>(getElementTypeOrSelf(operandType));
     // If post-conversion, the types would be equal, then the op becomes a
     // no-op. Note that the op does not itself allow such a configuration, so we
     // have to catch this before creating the new op.
-    if (resultType == operandType) {
+    if (resultEType == operandEType) {
       rewriter.replaceOp(op, adaptor.getOperands()[0]);
       return success();
     }
@@ -140,8 +209,8 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
     // TODO: In some cases, we can repair the situation here, but for integer
     // truncation, we don't know whether we should invert with signed or
     // unsigned extension.
-    if (!OperandToResultWidthLegalityRelation()(operandType.getWidth(),
-                                                resultType.getWidth())) {
+    if (!OperandToResultWidthLegalityRelation()(operandEType.getWidth(),
+                                                resultEType.getWidth())) {
       return rewriter.notifyMatchFailure(op, "invalid width combination");
     }
     rewriter.replaceOpWithNewOp<OpTy>(op, resultType, op.getOperand());
@@ -151,6 +220,7 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
 
 template <typename Base, typename Converter>
 struct ConvertTypesPass : public Base {
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
@@ -170,9 +240,10 @@ struct ConvertTypesPass : public Base {
     patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtSIOp, IntegerType,
                                                     std::less<unsigned>>>(
         typeConverter, context);
+    ConversionTarget target(*context);
+
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
-    ConversionTarget target(*context);
 
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
@@ -199,6 +270,57 @@ struct ConvertTypesPass : public Base {
     });
 
     // Note that this will fail if we can't convert any types.
+    if (failed(applyFullConversion(this->getOperation(), target,
+                                   std::move(patterns)))) {
+      return this->signalPassFailure();
+    }
+  }
+
+  Converter typeConverter;
+};
+
+template <typename Base, typename Converter>
+struct ConvertArithTypesPass : public Base {
+  using Base::Base;
+  void runOnOperation() override {
+    MLIRContext *context = &this->getContext();
+    RewritePatternSet patterns(context);
+    patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::TruncFOp, FloatType,
+                                                    std::greater<unsigned>>>(
+        typeConverter, context);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtFOp, FloatType,
+                                                    std::less<unsigned>>>(
+        typeConverter, context);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<
+        arith::TruncIOp, IntegerType, std::less<unsigned>>>(typeConverter,
+                                                            context);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtUIOp, IntegerType,
+                                                    std::less<unsigned>>>(
+        typeConverter, context);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtSIOp, IntegerType,
+                                                    std::less<unsigned>>>(
+        typeConverter, context);
+    ConversionTarget target(*context);
+    target.markUnknownOpDynamicallyLegal([](Operation *op) { return true; });
+
+    auto checkOp = [&](Operation *op) {
+      for (Type type : op->getResultTypes()) {
+        if (!typeConverter.isLegal(type)) return false;
+      }
+      for (Type type : op->getOperandTypes()) {
+        if (!typeConverter.isLegal(type)) return false;
+      }
+      for (auto &region : op->getRegions()) {
+        if (!typeConverter.isLegal(&region)) return false;
+      }
+      return true;
+    };
+
+    // Operations are legal if they don't contain any illegal type.
+    target.addDynamicallyLegalDialect<arith::ArithDialect>(checkOp);
+    target.addDynamicallyLegalDialect<math::MathDialect>(checkOp);
+
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {
       return this->signalPassFailure();
@@ -261,7 +383,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass() {
 
 namespace {
 struct PromoteBF16ToF32Converter
-    : public PrimitiveTypeConverter<BFloat16Type, Float32Type> {
+    : public FloatTypeConverter<BFloat16Type, Float32Type> {
   Type getTargetType(BFloat16Type type) override {
     return Float32Type::get(type.getContext());
   }
@@ -269,10 +391,19 @@ struct PromoteBF16ToF32Converter
 struct PromoteBF16ToF32Pass
     : public ConvertTypesPass<PromoteBF16ToF32Base<PromoteBF16ToF32Pass>,
                               PromoteBF16ToF32Converter> {};
+struct PromoteArithBF16ToF32Pass
+    : public ConvertArithTypesPass<
+          PromoteArithBF16ToF32Base<PromoteArithBF16ToF32Pass>,
+          PromoteBF16ToF32Converter> {};
 }  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass() {
   return std::make_unique<PromoteBF16ToF32Pass>();
+}
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createPromoteArithBF16ToF32Pass() {
+  return std::make_unique<PromoteArithBF16ToF32Pass>();
 }
 
 namespace {

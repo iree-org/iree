@@ -22,8 +22,9 @@ transform.sequence failures(propagate) {
   // Step 2. First level of tiling + fusion parallelizes to blocks. Tile the
   // trailing elementwise the same way we want to tile the reduction.
   // ===========================================================================
-  %grid_loop, %eltwise_grid_op = transform.iree.tile_to_forall_and_workgroup_count_region %eltwise 
+  %grid_loop, %eltwise_grid_op = transform.structured.tile_to_forall_op %eltwise 
     tile_sizes [1] (mapping = [#gpu.block<x>])
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %grid_loop : (!pdl.operation) -> ()
   %not_eltwise = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op, %combiner_op 
     : !pdl.operation
   transform.structured.fuse_into_containing_op %not_eltwise into %grid_loop

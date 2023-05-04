@@ -14,12 +14,16 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "legalize_control_flow.mlir"
+    "legalize_shape_computations.mlir"
     "stablehlo_to_linalg.mlir"
     "stablehlo_to_linalg_convolution.mlir"
     "stablehlo_to_linalg_dot_prod.mlir"
+    "stablehlo_to_linalg_ext.mlir"
     "stablehlo_to_linalg_pointwise.mlir"
     "stablehlo_to_linalg_random.mlir"
     "stablehlo_to_linalg_reduce.mlir"
+    "verify_compiler_input_legality.mlir"
   TOOLS
     FileCheck
     iree-opt

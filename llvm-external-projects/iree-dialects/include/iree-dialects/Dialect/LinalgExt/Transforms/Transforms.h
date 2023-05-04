@@ -263,7 +263,7 @@ struct LinalgBasePromotionPattern : public RewritePattern {
     // needs more investigation.
     rewriter.startRootUpdate(op);
     std::optional<linalg::LinalgOp> promotedOp =
-        promoteSubViews(rewriter, op, options);
+        promoteSubViews(rewriter, cast<linalg::LinalgOp>(op), options);
     if (!promotedOp) {
       rewriter.cancelRootUpdate(op);
       return op->emitError("subview promotion failed");

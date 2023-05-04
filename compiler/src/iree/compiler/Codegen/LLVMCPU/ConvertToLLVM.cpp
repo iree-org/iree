@@ -38,6 +38,7 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
@@ -759,10 +760,11 @@ class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
 
     Type wideType = rewriter.getIntegerType(64);
     // Shift amount necessary to extract the high bits from widened result.
-    Attribute shiftValAttr = rewriter.getI64IntegerAttr(32);
+    TypedAttr shiftValAttr = rewriter.getI64IntegerAttr(32);
     if (auto vecTy = resultType.dyn_cast<VectorType>()) {
       wideType = VectorType::get(vecTy.getShape(), wideType);
-      shiftValAttr = SplatElementsAttr::get(wideType, shiftValAttr);
+      shiftValAttr =
+          SplatElementsAttr::get(cast<ShapedType>(wideType), shiftValAttr);
     }
     Value shiftVal = rewriter.create<arith::ConstantOp>(loc, shiftValAttr);
 
@@ -913,6 +915,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
   populateFuncToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
+  arith::populateExpandBFloat16Patterns(patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(

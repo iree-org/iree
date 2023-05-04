@@ -187,13 +187,15 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
                             stride.cast<IntegerAttr>().getInt();
     Value dimId = id;
     if (infos.size() != parallelLoopRanges.size() - 1)
-      dimId = makeComposedAffineApply(b, loc, d0 % numThreadsDim, {dimId});
+      dimId =
+          affine::makeComposedAffineApply(b, loc, d0 % numThreadsDim, {dimId});
     info.procId = dimId;
     info.nprocs = b.create<arith::ConstantIndexOp>(loc, numThreadsDim);
     info.distributionMethod =
         linalg::DistributionMethod::CyclicNumProcsEqNumIters;
     infos.push_back(info);
-    id = makeComposedAffineApply(b, loc, d0.floorDiv(numThreadsDim), {id});
+    id = affine::makeComposedAffineApply(b, loc, d0.floorDiv(numThreadsDim),
+                                         {id});
   }
   std::reverse(infos.begin(), infos.end());
   return infos;
@@ -277,7 +279,7 @@ static Value createFlatId(func::FuncOp funcOp,
       b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::y);
   Value threadZ =
       b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::z);
-  Value flatThreadId = makeComposedAffineApply(
+  Value flatThreadId = affine::makeComposedAffineApply(
       b, funcOp.getLoc(),
       d0 + workgroupSize[0] * d1 + (workgroupSize[0] * workgroupSize[1]) * d2,
       {threadX, threadY, threadZ});

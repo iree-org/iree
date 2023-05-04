@@ -68,54 +68,43 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Exporting configs"
-        id: "export"
-        env:
-          COMPILATION_CONFIG: "compilation-config.json"
-        run: |
-          ./build_tools/benchmarks/export_benchmark_config.py \
-            compilation \
-            --output="${COMPILATION_CONFIG}"
-          echo "compilation-config=${COMPILATION_CONFIG}" >> "${GITHUB_OUTPUT}"
       - name: "Downloading assets"
         id: "download-assets"
         env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
+          BENCHMARK_CONFIG: ${{ env.E2E_TEST_ARTIFACTS_DIR }}/compilation-benchmark-config.json
+          BENCHMARK_CONFIG_GCS_ARTIFACT: ${{ env.E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR }}/compilation-benchmark-config.json
         run: |
+          mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
+          gcloud storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}"
           gcloud storage cp \
             "${E2E_TEST_ARTIFACTS_BUILD_LOG_GCS_ARTIFACT}" \
             "${E2E_TEST_ARTIFACTS_BUILD_LOG}"
-          mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
           jq -r \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
             '.module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
-            "${COMPILATION_CONFIG}" | \
+            "${BENCHMARK_CONFIG}" | \
             gcloud storage cp -r --read-paths-from-stdin \
               "${E2E_TEST_ARTIFACTS_DIR}"
+          echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
       - name: "Collecting compilation statistics"
         id: collect
         env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
-          GENERATION_CONFIG: generation-config.json
+          BENCHMARK_CONFIG: ${{ steps.download-assets.outputs.benchmark-config }}
           COMPILE_STATS_RESULTS: benchmark-results/compile-stats-results.json
         run: |
           mkdir -p benchmark-results
           ./build_tools/benchmarks/collect_compilation_statistics.py alpha \
             --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
             --build_log="${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
-            --compilation_benchmark_config="${COMPILATION_CONFIG}" \
+            --compilation_benchmark_config="${BENCHMARK_CONFIG}" \
             --output="${COMPILE_STATS_RESULTS}"
           echo "compile-stats-results=${COMPILE_STATS_RESULTS}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading benchmark results"
         id: upload
         env:
-          COMPILATION_CONFIG: ${{ steps.export.outputs.compilation-config }}
           COMPILE_STATS_RESULTS: ${{ steps.collect.outputs.compile-stats-results }}
           COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.collect.outputs.compile-stats-results }}
         run: |
-          # Upload files with two commands since they go into different GCS
-          # directories.
-          gcloud storage cp "${COMPILATION_CONFIG}" "${GCS_DIR}"
           gcloud storage cp \
             "${COMPILE_STATS_RESULTS}" \
             "${COMPILE_STATS_RESULTS_GCS_ARTIFACT}"

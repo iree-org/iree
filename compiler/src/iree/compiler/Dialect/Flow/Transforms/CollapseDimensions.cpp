@@ -168,13 +168,7 @@ static LogicalResult generateNewDispatchRegion(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(regionOp->getParentOp());
 
-  auto maybeBuilder =
-      iree_compiler::IREE::Flow::getWorkloadBuilder(rewriter,
-                                                    /*rootOp=*/newGenericOp);
-  if (failed(maybeBuilder)) return failure();
-
-  auto maybeRegionOp =
-      Flow::wrapOpInDispatchRegion(rewriter, newGenericOp, *maybeBuilder);
+  auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, newGenericOp);
   if (failed(maybeRegionOp)) return failure();
 
   // Replace old regionOp with the result of collapse

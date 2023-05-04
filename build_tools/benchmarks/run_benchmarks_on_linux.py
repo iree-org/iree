@@ -21,9 +21,15 @@ import subprocess
 import tarfile
 
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
+from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
+                                    BenchmarkSuite)
 from common.benchmark_config import BenchmarkConfig
-from common.benchmark_definition import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash, get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
+from common.benchmark_definition import (execute_cmd,
+                                         execute_cmd_and_get_output,
+                                         get_git_commit_hash,
+                                         get_iree_benchmark_module_arguments,
+                                         wait_for_iree_benchmark_module_start,
+                                         parse_iree_benchmark_metrics)
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_framework.definitions import iree_definitions
 from e2e_test_framework import serialization
@@ -84,9 +90,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         run_config.target_device_spec)
     cmds.append(tool_path)
 
-    module_dir_path = iree_artifacts.get_module_dir_path(
-        run_config.module_generation_config,
-        root_path=self.config.root_benchmark_dir)
+    module_dir_path = benchmark_case.benchmark_case_dir
     cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
     cmds += run_config.materialize_run_flags(gpu_id=self.gpu_id)
 
@@ -109,10 +113,16 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
               driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
-    result_json = execute_cmd_and_get_output(
-        cmd, cwd=benchmark_case.benchmark_case_dir, verbose=self.verbose)
+    # TODO(#11076): Legacy mode need to switch CWD, remove it in the cleanup.
+    cwd = (benchmark_case.benchmark_case_dir
+           if benchmark_case.run_config is None else None)
+    benchmark_stdout, benchmark_stderr = execute_cmd_and_get_output(
+        cmd, cwd=cwd, verbose=self.verbose)
+    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout,
+                                                     benchmark_stderr)
     if self.verbose:
-      print(result_json)
+      print(benchmark_metrics)
+    results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
 
   def __run_capture(self, benchmark_case: BenchmarkCase,
                     capture_filename: pathlib.Path):
@@ -120,12 +130,17 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     if capture_config is None:
       raise ValueError("capture_config can't be None.")
 
-    tool_path = capture_config.traced_benchmark_tool_dir / benchmark_case.benchmark_tool_name
+    tool_path = (capture_config.traced_benchmark_tool_dir /
+                 benchmark_case.benchmark_tool_name)
     cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
                                  tool_path=tool_path)
+
+    # TODO(#11076): Legacy mode need to switch CWD, remove it in the cleanup.
+    cwd = (benchmark_case.benchmark_case_dir
+           if benchmark_case.run_config is None else None)
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
-                               cwd=benchmark_case.benchmark_case_dir,
+                               cwd=cwd,
                                stdout=subprocess.PIPE,
                                text=True)
 
@@ -160,7 +175,8 @@ def main(args):
         data=benchmark_group["run_configs"],
         root_type=typing.List[iree_definitions.E2EModelRunConfig])
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
-        run_configs=run_configs)
+        run_configs=run_configs,
+        root_benchmark_dir=benchmark_config.root_benchmark_dir)
 
   benchmark_driver = LinuxBenchmarkDriver(gpu_id=args.gpu_id,
                                           device_info=device_info,
@@ -189,7 +205,7 @@ def main(args):
 
   trace_capture_config = benchmark_config.trace_capture_config
   if trace_capture_config:
-    # Put all captures in a tarball and remove the origial files.
+    # Put all captures in a tarball and remove the original files.
     with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
       for capture_filename in benchmark_driver.get_capture_filenames():
         tar.add(capture_filename)

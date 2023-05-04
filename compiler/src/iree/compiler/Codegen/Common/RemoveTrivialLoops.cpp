@@ -92,7 +92,7 @@ static bool isWorkgroupLoop(const LoopTilingAndDistributionInfo &info) {
   auto forOp = cast<scf::ForOp>(info.loop);
   Operation *lbOp = forOp.getLowerBound().getDefiningOp();
   if (isa<IREE::HAL::InterfaceWorkgroupIDOp>(lbOp)) return true;
-  auto applyOp = dyn_cast<AffineApplyOp>(lbOp);
+  auto applyOp = dyn_cast<affine::AffineApplyOp>(lbOp);
   return applyOp && llvm::any_of(applyOp.getMapOperands(), [](Value operand) {
            return operand.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>();
          });

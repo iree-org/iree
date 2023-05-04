@@ -414,9 +414,9 @@ namespace {
 struct TileAndDecomposeAttentionPass
     : public TileAndDecomposeAttentionBase<TileAndDecomposeAttentionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                    linalg::LinalgDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
+    registry.insert<
+        affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
+        linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;

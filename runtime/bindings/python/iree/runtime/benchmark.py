@@ -88,6 +88,7 @@ def benchmark_module(module, entry_functiong=None, inputs=[], **kwargs):
       values = ",".join([str(v) for v in values])
 
     args.append(f"--input={shape}x{abitype}={values}")
+  args.append(f"--module=-")
 
   call = subprocess.Popen(args=args,
                           stdin=subprocess.PIPE,

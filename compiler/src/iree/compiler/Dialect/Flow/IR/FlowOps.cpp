@@ -1122,6 +1122,14 @@ DispatchWorkgroupsOp::getTiedOperandsIndexAndLength() {
   return getODSOperandIndexAndLength(1);
 }
 
+SmallVector<int64_t> DispatchWorkgroupsOp::getTiedOperandsAsIntegerList() {
+  ArrayAttr attr = getTiedOperandsAttr();
+  if (!attr) return {};
+  return llvm::to_vector(llvm::map_range(attr, [](Attribute intAttr) {
+    return intAttr.cast<IntegerAttr>().getInt();
+  }));
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.workgroup.*
 //===----------------------------------------------------------------------===//
@@ -1596,7 +1604,7 @@ struct FoldTensorLoadWithExtractSlice
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.extract_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.load1 (i.e. the consumer).
-    if (failed(mergeOffsetsSizesAndStrides(
+    if (failed(affine::mergeOffsetsSizesAndStrides(
             rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
             extractSliceOp, dispatchTensorLoadOp.getDroppedDims(), offsets,
             sizes, strides))) {
@@ -1640,7 +1648,7 @@ struct FoldInsertSliceWithTensorStoreOp
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.insert_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.store` (i.e. the consumer).
-    if (failed(mergeOffsetsSizesAndStrides(
+    if (failed(affine::mergeOffsetsSizesAndStrides(
             rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
             insertSliceOp, dispatchTensorStoreOp.getDroppedDims(), offsets,
             sizes, strides))) {
@@ -1745,6 +1753,33 @@ void CollectiveAllReduceOp::build(OpBuilder &builder, OperationState &state,
       IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
   build(builder, state, reductionOp, elementType, target, targetDims, source,
         channel, builder.getIndexArrayAttr({0}));
+}
+
+//===----------------------------------------------------------------------===//
+// flow.collective.all_to_all
+//===----------------------------------------------------------------------===//
+
+Value CollectiveAllToAllOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::llvm::Optional<unsigned> CollectiveAllToAllOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // target
+}
+
+SmallVector<int64_t, 4> CollectiveAllToAllOp::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
+void CollectiveAllToAllOp::build(OpBuilder &builder, OperationState &state,
+                                 CollectiveElementTypeAttr elementType,
+                                 Value target, Value source, Value channel) {
+  auto targetDims =
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
+
+  build(builder, state, elementType, target, targetDims, source, channel,
+        builder.getIndexArrayAttr({0}));
 }
 
 //===----------------------------------------------------------------------===//

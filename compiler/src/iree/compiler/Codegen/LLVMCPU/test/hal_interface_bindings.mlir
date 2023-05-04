@@ -3,7 +3,6 @@
 // CHECK-LABEL: llvm.func @binding_ptrs(
 func.func @binding_ptrs() {
   // CHECK-DAG: %[[C2:.+]] = llvm.mlir.constant(2
-  // CHECK-DAG: %[[C18:.+]] = llvm.mlir.constant(18
   // CHECK-DAG: %[[C5:.+]] = llvm.mlir.constant(5
   // CHECK-DAG: %[[C1:.+]] = llvm.mlir.constant(1
 
@@ -15,11 +14,11 @@ func.func @binding_ptrs() {
   %c128 = arith.constant 128 : index
   %memref = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c72) : memref<?x2xf32, strided<[2, 1], offset: 18>>{%c128}
 
+  // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][18]
   // CHECK: %[[OFFSET_D0:.+]] = llvm.mul %[[C5]], %[[C2]]
-  // CHECK: %[[INDEX0:.+]] = llvm.add %[[OFFSET_D0]], %[[C18]]
-  // CHECK: %[[INDEX1:.+]] = llvm.add %[[INDEX0]], %[[C1]]
-  // CHECK: %[[OFFSET_PTR:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[INDEX1]]]
-  // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR]]
+  // CHECK: %[[INDEX1:.+]] = llvm.add %[[OFFSET_D0]], %[[C1]]
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr %[[OFFSET_PTR0]][%[[INDEX1]]] 
+  // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c1 = arith.constant 1 : index
   %c5 = arith.constant 5 : index
   %value = memref.load %memref[%c5, %c1] : memref<?x2xf32, strided<[2, 1], offset: 18>>
@@ -71,13 +70,13 @@ func.func @binding_ptrs_dynamic() {
   // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[OFFSET_ZEXT]], %[[C4]]
   // CHECK: %[[STRIDE1:.+]] = llvm.mul %[[DIM2_ZEXT]], %[[C1]]
   // CHECK: %[[STRIDE2:.+]] = llvm.mul %[[STRIDE1]], %[[DIM1_ZEXT]]
+  // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[BASE_OFFSET]]]
   // CHECK: %[[INDEX2:.+]] = llvm.mul %[[STRIDE2]], %[[C7]]
-  // CHECK: %[[T0:.+]] = llvm.add %[[BASE_OFFSET]], %[[INDEX2]]
   // CHECK: %[[INDEX1:.+]] = llvm.mul %[[STRIDE1]], %[[C5]]
-  // CHECK: %[[T1:.+]] = llvm.add %[[T0]], %[[INDEX1]]
+  // CHECK: %[[T1:.+]] = llvm.add %[[INDEX2]], %[[INDEX1]]
   // CHECK: %[[T2:.+]] = llvm.add %[[T1]], %[[C3]]
-  // CHECK: %[[OFFSET_PTR:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[T2]]]
-  // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR]]
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr %[[OFFSET_PTR0]][%[[T2]]]
+  // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c3 = arith.constant 3 : index
   %c5 = arith.constant 5 : index
   %c7 = arith.constant 7 : index

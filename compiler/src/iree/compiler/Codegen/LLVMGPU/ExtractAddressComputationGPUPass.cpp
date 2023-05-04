@@ -59,8 +59,8 @@ SmallVector<OpFoldResult> getLdMatrixOpViewSizeForEachDim(
   AffineExpr s1 = rewriter.getAffineSymbolExpr(1);
 
   for (auto [srcSize, indice] : llvm::zip(srcSizes, indices)) {
-    finalSizes.push_back(makeComposedFoldedAffineApply(rewriter, loc, s0 - s1,
-                                                       {srcSize, indice}));
+    finalSizes.push_back(affine::makeComposedFoldedAffineApply(
+        rewriter, loc, s0 - s1, {srcSize, indice}));
   }
   return finalSizes;
 }

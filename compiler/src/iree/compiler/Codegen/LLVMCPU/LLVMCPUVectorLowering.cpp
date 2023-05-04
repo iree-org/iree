@@ -39,11 +39,17 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   auto funcOp = getOperation();
 
   // Per-function lowering pipeline.
-  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle;
+  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle1D;
   auto vectorMultiReductionLowering =
       vector::VectorMultiReductionLowering::InnerReduction;
   auto vectorContractLowering = vector::VectorContractLowering::OuterProduct;
-  auto vectorTransferSplit = vector::VectorTransferSplit::None;
+  auto vectorTransferSplit =
+      llvm::StringSwitch<vector::VectorTransferSplit>(
+          splitVectorTransfersTo.getValue())
+          .Case("none", vector::VectorTransferSplit::None)
+          .Case("linalg-copy", vector::VectorTransferSplit::LinalgCopy)
+          .Case("vector-transfers", vector::VectorTransferSplit::VectorTransfer)
+          .Default(vector::VectorTransferSplit::None);
   auto vectorTransformOptions =
       vector::VectorTransformsOptions()
           .setVectorTransposeLowering(vectorTransposeLowering)
@@ -73,6 +79,19 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
+
+  // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
+  // lower them and can't be optimized away anymore.
+  {
+    RewritePatternSet patterns(ctx);
+    SmallVector<Dialect *> dialects;
+    dialects.push_back(ctx->getLoadedDialect<vector::VectorDialect>());
+    dialects.push_back(ctx->getLoadedDialect<memref::MemRefDialect>());
+    dialects.push_back(ctx->getLoadedDialect<linalg::LinalgDialect>());
+    for (auto &dialect : dialects)
+      dialect->getCanonicalizationPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 
   {
     RewritePatternSet patterns(ctx);

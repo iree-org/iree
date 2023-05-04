@@ -7,9 +7,10 @@ transform.sequence failures(propagate) {
   // Step 1. Tile to forall with tile_sizes [2].
   // ===================================================
   %forall, %tiled_generic =
-    transform.iree.tile_to_forall_and_workgroup_count_region %matmul tile_sizes [2]
-      // TODO: IREE needs own workgroup mapping attribute.
+    transform.structured.tile_to_forall_op %matmul tile_sizes [2]
       ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
+    : (!pdl.operation) -> ()
 
   // Step 2. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================

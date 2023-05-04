@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -42,7 +43,7 @@ struct LLVMGPUVectorToGPUPass
   LLVMGPUVectorToGPUPass(GPUTensorCoreType tensorCoreType)
       : tensorCoreType(tensorCoreType) {}
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect, AffineDialect,
+    registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect, affine::AffineDialect,
                     memref::MemRefDialect>();
   }
 
@@ -85,6 +86,13 @@ struct LLVMGPUVectorToGPUPass
     createAsyncGroups(rewriter, funcOp, targetMmaSync);
 
     if (targetMmaSync) {
+      // Fold subview on memory copy to enable the application of shared memory
+      // swizzling optimization.
+      RewritePatternSet pattern(funcOp.getContext());
+      memref::populateFoldMemRefAliasOpPatterns(pattern);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(pattern)))) {
+        return signalPassFailure();
+      }
       swizzleSharedMemory(funcOp);
     }
   }

@@ -46,6 +46,7 @@ iree_cc_library(
     MLIRLinalgTransformOps
     MLIRMemRefDialect
     MLIRMemRefTransformOps
+    MLIRNVGPUDialect
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRParser

@@ -261,26 +261,29 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
 
 Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                           Type type, Location loc) {
-  if (ConstI32Op::isBuildableWith(value, type)) {
-    auto convertedValue = ConstI32Op::convertConstValue(value);
+  auto typedValue = dyn_cast<TypedAttr>(value);
+  if (!typedValue) return nullptr;
+
+  if (ConstI32Op::isBuildableWith(typedValue, type)) {
+    auto convertedValue = ConstI32Op::convertConstValue(typedValue);
     if (convertedValue.cast<IntegerAttr>().getValue() == 0) {
       return builder.create<VM::ConstI32ZeroOp>(loc);
     }
     return builder.create<VM::ConstI32Op>(loc, convertedValue);
-  } else if (ConstI64Op::isBuildableWith(value, type)) {
-    auto convertedValue = ConstI64Op::convertConstValue(value);
+  } else if (ConstI64Op::isBuildableWith(typedValue, type)) {
+    auto convertedValue = ConstI64Op::convertConstValue(typedValue);
     if (convertedValue.cast<IntegerAttr>().getValue() == 0) {
       return builder.create<VM::ConstI64ZeroOp>(loc);
     }
     return builder.create<VM::ConstI64Op>(loc, convertedValue);
-  } else if (ConstF32Op::isBuildableWith(value, type)) {
-    auto convertedValue = ConstF32Op::convertConstValue(value);
+  } else if (ConstF32Op::isBuildableWith(typedValue, type)) {
+    auto convertedValue = ConstF32Op::convertConstValue(typedValue);
     if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
       return builder.create<VM::ConstF32ZeroOp>(loc);
     }
     return builder.create<VM::ConstF32Op>(loc, convertedValue);
-  } else if (ConstF64Op::isBuildableWith(value, type)) {
-    auto convertedValue = ConstF64Op::convertConstValue(value);
+  } else if (ConstF64Op::isBuildableWith(typedValue, type)) {
+    auto convertedValue = ConstF64Op::convertConstValue(typedValue);
     if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
       return builder.create<VM::ConstF64ZeroOp>(loc);
     }

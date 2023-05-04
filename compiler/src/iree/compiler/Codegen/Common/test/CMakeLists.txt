@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "affinemin_canonicalization.mlir"
+    "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
     "convert_to_destination_passing_style.mlir"
@@ -52,7 +53,6 @@ iree_lit_test_suite(
     "tile_reduction.mlir"
     "transform_buffer_opt.mlir"
     "transform_dialect_apply_pattern_op.mlir"
-    "transform_im2col_workgroup.mlir"
     "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"

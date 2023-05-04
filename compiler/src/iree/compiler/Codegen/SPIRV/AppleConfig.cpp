@@ -56,7 +56,8 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
     if (bitwidth > 32) return failure();
     const int multipler = 32 / bitwidth;
     const int bestTilingFactor = 16 * multipler;
-    return setConvOpConfig(rootOp, subgroupSize, bestTilingFactor);
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
   }
 
   return failure();

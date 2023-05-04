@@ -13,6 +13,11 @@ include "mlir/Pass/PassBase.td"
 // Common/misc passes
 //------------------------------------------------------------------------------
 
+def BubbleUpOrdinalOps : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
+  let summary = "Bubbles op ordinal ops to allow for workgroup count computation";
+  let constructor = "mlir::iree_compiler::createBubbleUpOrdinalOpsPass()";
+}
+
 def CleanupBufferAllocView :
     Pass<"iree-codegen-cleanup-buffer-alloc-view", "func::FuncOp"> {
   let summary =
@@ -99,7 +104,7 @@ def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   }];
   let constructor = "mlir::iree_compiler::createDecomposeAffineOpsPass()";
   let dependentDialects = [
-      "AffineDialect"
+      "affine::AffineDialect"
   ];
 }
 
@@ -134,7 +139,7 @@ def ExtractAddressComputationGPU: Pass<"extract-address-computation-gpu"> {
   }];
   let constructor = "mlir::iree_compiler::createExtractAddressComputationGPUPass()";
   let dependentDialects = [
-      "memref::MemRefDialect", "nvgpu::NVGPUDialect", "AffineDialect"
+      "memref::MemRefDialect", "nvgpu::NVGPUDialect", "affine::AffineDialect"
   ];
 }
 
@@ -173,7 +178,7 @@ def BufferizeCopyOnlyDispatches :
     Option<"embedSubspanOffsetIntoMemRefType",
            "embed-subspan-offset-into-memref-type", "bool", /*default=*/"true",
            "Embeds the offset information on subspan ops into the type."
-           "Is a work-around for #12933">,    
+           "Is a work-around for #12933">,
   ];
 }
 
@@ -274,7 +279,7 @@ def TileAndDistributeToWorkgroups :
       "Maximum number of dims to distribute workgroups across.">,
     Option<"distributionMethod", "distribution-method", "int32_t",
       /*default=*/ "0",
-      "Pick the distribution method">      
+      "Pick the distribution method">
   ];
 }
 
@@ -542,7 +547,7 @@ def LLVMCPUVectorization :
 }
 
 def LLVMCPUVectorLowering :
-    Pass<"iree-llvmcpu-lower-vectors", "func::FuncOp"> {
+    Pass<"iree-llvmcpu-vector-lowering", "func::FuncOp"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
   let options = [
     Option<"splitVectorTransfersTo", "split-transfers", "std::string",
@@ -841,8 +846,14 @@ def SPIRVCreateFastSlowPath :
 
 def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
-  let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
+  let summary = "Emulate 64-bit integer ops with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
+}
+
+def SPIRVEmulateBf16 :
+    Pass<"iree-spirv-emulate-bf16", "ModuleOp"> {
+  let summary = "Emulate bfloat 16 ops with 32-bit float ops";
+  let constructor = "mlir::iree_compiler::createSPIRVEmulateBf16Pass()";
 }
 
 def SPIRVEraseStorageBufferStaticShape :

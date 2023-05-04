@@ -3215,7 +3215,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       auto messageSizeIntOp = rewriter.create<emitc::CastOp>(
           /*location=*/loc,
-          /*type=*/rewriter.getIntegerType(32),
+          /*type=*/emitc::OpaqueType::get(ctx, "int"),
           /*operand=*/messageSizeOp);
 
       auto messageDataOp = emitc_builders::structMember(

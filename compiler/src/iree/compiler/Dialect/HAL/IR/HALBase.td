@@ -236,15 +236,17 @@ def HAL_AccessScopeBitfieldAttr :
 
 def HAL_CollectiveKind_AllGather : I32EnumAttrCase<"AllGather", 0, "all_gather">;
 def HAL_CollectiveKind_AllReduce : I32EnumAttrCase<"AllReduce", 1, "all_reduce">;
-def HAL_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 2, "broadcast">;
-def HAL_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 3, "reduce">;
-def HAL_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 4, "reduce_scatter">;
-def HAL_CollectiveKind_Send : I32EnumAttrCase<"Send", 5, "send">;
-def HAL_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 6, "recv">;
+def HAL_CollectiveKind_AllToAll : I32EnumAttrCase<"AllToAll", 2, "all_to_all">;
+def HAL_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 3, "broadcast">;
+def HAL_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 4, "reduce">;
+def HAL_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 5, "reduce_scatter">;
+def HAL_CollectiveKind_Send : I32EnumAttrCase<"Send", 6, "send">;
+def HAL_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 7, "recv">;
 def HAL_CollectiveKindAttr :
     I32EnumAttr<"CollectiveKind", "valid CollectiveKind", [
       HAL_CollectiveKind_AllGather,
       HAL_CollectiveKind_AllReduce,
+      HAL_CollectiveKind_AllToAll,
       HAL_CollectiveKind_Broadcast,
       HAL_CollectiveKind_Reduce,
       HAL_CollectiveKind_ReduceScatter,

@@ -7,6 +7,7 @@ VER_0 {
     ireeCompilerErrorGetMessage;
     ireeCompilerGetAPIVersion;
     ireeCompilerGetProcessCLArgs;
+    ireeCompilerGetRevision;
     ireeCompilerGlobalInitialize;
     ireeCompilerGlobalShutdown;
     ireeCompilerInvocationCreate;
@@ -586,6 +587,7 @@ VER_0 {
     mlirValueIsABlockArgument;
     mlirValueIsAOpResult;
     mlirValuePrint;
+    mlirValueReplaceAllUsesOfWith;
     mlirVectorTypeGet;
     mlirVectorTypeGetChecked;
   local:

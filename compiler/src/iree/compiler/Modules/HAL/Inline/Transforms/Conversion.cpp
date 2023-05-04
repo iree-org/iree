@@ -38,7 +38,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::HAL::Inline::HALInlineDialect,
-                    mlir::arith::ArithDialect, mlir::AffineDialect>();
+                    mlir::arith::ArithDialect, mlir::affine::AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -46,9 +46,9 @@ class ConversionPass : public ConversionBase<ConversionPass> {
 
     // Ensure all input dialects go away.
     ConversionTarget conversionTarget(*context);
-    conversionTarget
-        .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
-                         mlir::arith::ArithDialect, mlir::AffineDialect>();
+    conversionTarget.addLegalDialect<
+        mlir::func::FuncDialect, mlir::scf::SCFDialect,
+        mlir::arith::ArithDialect, mlir::affine::AffineDialect>();
 
     TypeConverter typeConverter;
     RewritePatternSet patterns(context);

@@ -21,7 +21,11 @@ hal.executable.source public @executable {
   // Exported functions are declared with the layout they use and may optionally
   // contain other information - though when hand-authoring that's usually
   // omitted.
-  hal.executable.export public @mul layout(#pipeline_layout)
+  hal.executable.export public @mul layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+  }
 
   // The inner module defining the executable. This may have any number of
   // private functions and only those with declared entry points will be

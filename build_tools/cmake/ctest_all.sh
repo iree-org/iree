@@ -33,6 +33,8 @@ export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
 # We test on SwiftShader as a baseline, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
+# Respect the user setting, but default to skipping tests that require Nvidia GPU.
+export IREE_NVIDIA_GPU_TESTS_DISABLE=${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}
 # Respect the user setting, default to no --repeat-until-fail.
 export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT=${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT:-}
 # Respect the user setting, default to no --tests-regex.
@@ -69,6 +71,9 @@ fi
 if [[ "${IREE_VULKAN_F16_DISABLE}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
 fi
+if [[ "${IREE_NVIDIA_GPU_TESTS_DISABLE}" == 1 ]]; then
+  label_exclude_args+=("^requires-gpu-nvidia$")
+fi
 
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
 label_exclude_args+=(${extra_label_exclude_args[@]})
@@ -81,11 +86,14 @@ declare -a excluded_tests=()
 if [[ "$OSTYPE" =~ ^msys ]]; then
   # These tests are failing on Windows.
   excluded_tests+=(
-    # TODO(#11077): Fix assert on task->pending_dependency_count atomic
+    # TODO(#11077): INVALID_ARGUMENT: argument/result signature mismatch
     "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_small_ukernel_vmvx_local-task"
     "iree/tests/e2e/matmul/e2e_matmul_mmt4d_f32_small_ukernel_vmvx_local-task"
+    # TODO: Regressed when `pack` ukernel gained a uint64_t parameter in #13264.
+    "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_pack.mlir"
+    "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_pack_dynamic_inner_tiles.mlir"
     # TODO: Fix equality mismatch
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch

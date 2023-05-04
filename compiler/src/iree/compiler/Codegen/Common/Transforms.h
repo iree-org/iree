@@ -35,6 +35,7 @@ LogicalResult runIREEOneShotBufferize(
 struct IREETileAndFuseResult {
   SmallVector<Operation *> tiledAndFusedOps;
   SmallVector<scf::ForOp> loops;
+  SmallVector<Value> workgroupCount;
 };
 
 FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(

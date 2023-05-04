@@ -462,107 +462,34 @@ def ShareForallOperandsOp : Op<
   }];
 }
 
-def TileToForallAndWorkgroupCountRegionOp :
-    Op<Transform_Dialect, "iree.tile_to_forall_and_workgroup_count_region",
-      [AttrSizedOperandSegments,
-       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
+    Op<Transform_Dialect, "iree.populate_workgroup_count_region_using_num_threads_slice",
+      [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       TransformEachOpTrait,
        TransformOpInterface]> {
   let description = [{
-    Wrapper around `structured.tile_to_forall_op` for use within IREE.
+    Populate the workgroup_count region on the `hal.executable.export` op.
 
-    In addition to tile and distribute using `scf.forall`, lowers the
-    the `workgroup_count` region of the export op corresponding to the parent
-    `func.func` of the target to return the number of workgroups.
-    Please see the doc of `structured.tile_to_forall_op` for full
-    description of op semantics.
+    The default dispatch region formation expects that the workgroup count
+    be computed from within the dispatch by using a program slice. The utility
+    method `lowerWorkgroupCountFromSliceOp` handles populating the
+    workgroup count region given the values in the dispatch that represent the
+    number of workgroups. This transform op calls the underlying function using
+    the `num_threads` value from the `scf.for_all` op that distributes the work
+    to different workgroups.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                   Variadic<PDL_Operation>:$num_threads,
-                   Variadic<PDL_Operation>:$tile_sizes,
-                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_num_threads,
-                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$static_tile_sizes,
-                   OptionalAttr<DeviceMappingArrayAttr>:$mapping);
-  let results = (outs PDL_Operation:$forall_op,
-                      PDL_Operation:$tiled_op);
+  let arguments = (ins PDL_Operation:$for_all_op);
+  let results = (outs);
   let assemblyFormat = [{
-    $target oilist(
-        `num_threads` custom<DynamicIndexList>($num_threads,
-                                               $static_num_threads) |
-         `tile_sizes` custom<DynamicIndexList>($tile_sizes,
-                                               $static_tile_sizes))
-    (`(` `mapping` `=` $mapping^ `)`)? attr-dict
+    attr-dict $for_all_op `:` functional-type($for_all_op, results)
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let hasVerifier = 1;
-
-  let builders = [
-    OpBuilder<(ins "Value":$target,
-                   "ArrayRef<int64_t>":$staticTileSizes,
-                   CArg<"::mlir::transform::TileSizesSpec",
-                        "::mlir::transform::TileSizesSpec()">,
-                   CArg<"ArrayAttr", "{}">:$mapping)>,
-    OpBuilder<(ins "Value":$target,
-                   "ArrayRef<OpFoldResult>":$mixedTileSizes,
-                   CArg<"::mlir::transform::TileSizesSpec",
-                        "::mlir::transform::TileSizesSpec()">,
-                   CArg<"ArrayAttr", "{}">:$mapping)>,
-    OpBuilder<(ins "Value":$target,
-                   "ArrayRef<int64_t>":$staticNumThreads,
-                   CArg<"::mlir::transform::NumThreadsSpec",
-                        "::mlir::transform::NumThreadsSpec()">,
-                   CArg<"ArrayAttr", "{}">:$mapping)>,
-    OpBuilder<(ins "Value":$target,
-                   "ArrayRef<OpFoldResult>":$mixedNumThreads,
-                   CArg<"::mlir::transform::NumThreadsSpec",
-                        "::mlir::transform::NumThreadsSpec()">,
-                   CArg<"ArrayAttr", "{}">:$mapping)>,
-  ];
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
-
-    ::llvm::SmallVector<::mlir::OpFoldResult> getMixedNumThreads();
-    ::llvm::SmallVector<::mlir::OpFoldResult> getMixedTileSizes();
-  }];
-}
-
-def ConvertConv2DToImg2ColAndAdjustWorkgroupCountOp : Op<Transform_Dialect,
-    "iree.convert_conv2d_to_img2col_and_adjust_workgroup_count_region",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformOpInterface,
-     TransformEachOpTrait]> {
-  let description = [{
-    Wrapper around `structured.convert_conv2d_to_img2col` for use within IREE.
-
-    In addition to converting the conv2d to img2col, updates the
-    `workgroup_count` region of the export op corresponding to the
-    parent `func.func` of the target to match the changes to the problem
-    shape introduced by the conversion to img2col.
-    Please see the doc of `structured.convert_conv2d_to_img2col` for full
-    description of op semantics.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs TransformHandleTypeInterface:$img2col_tensor,
-                      TransformHandleTypeInterface:$transformed);
-
-  let assemblyFormat =
-    "$target attr-dict `:` functional-type($target, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::linalg::LinalgOp target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
+      ::mlir::Operation *target,
+      ::mlir::transform::ApplyToEachResultList &results,
+      ::mlir::transform::TransformState &state);
   }];
 }
 

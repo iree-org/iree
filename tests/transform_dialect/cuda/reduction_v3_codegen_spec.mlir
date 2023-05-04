@@ -10,8 +10,10 @@ transform.sequence failures(propagate) {
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
   %forall_grid, %grid_reduction =
-    transform.iree.tile_to_forall_and_workgroup_count_region %reduction tile_sizes [1]
+    transform.structured.tile_to_forall_op %reduction tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
+
   transform.structured.fuse_into_containing_op %fill into %forall_grid
 
   // Canonicalizations.

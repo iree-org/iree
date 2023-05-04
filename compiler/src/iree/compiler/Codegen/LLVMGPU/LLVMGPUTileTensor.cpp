@@ -209,7 +209,7 @@ struct LLVMGPUTileTensorPass
   LLVMGPUTileTensorPass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
+    registry.insert<affine::AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();

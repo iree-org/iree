@@ -21,7 +21,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:synchronization",
-        "//runtime/src/iree/builtins/ukernel:headers",
+        "//runtime/src/iree/builtins/ukernel",
         "//runtime/src/iree/schemas:cpu_data",
     ],
 )
@@ -33,7 +33,19 @@ iree_runtime_cc_library(
     deps = [
         ":util",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/builtins/ukernel:headers",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/schemas:cpu_data",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "util_test",
+    srcs = ["util_test.c"],
+    deps = [
+        ":test",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/schemas:cpu_data",
     ],
 )
@@ -45,7 +57,7 @@ iree_runtime_cc_library(
     deps = [
         ":util",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/builtins/ukernel:headers",
+        "//runtime/src/iree/builtins/ukernel",
         "//runtime/src/iree/schemas:cpu_data",
         "//runtime/src/iree/testing:benchmark",
     ],
@@ -58,7 +70,7 @@ iree_runtime_cc_library(
     deps = [
         ":benchmark",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/builtins/ukernel:headers",
+        "//runtime/src/iree/builtins/ukernel",
         "//runtime/src/iree/testing:benchmark",
     ],
 )
@@ -72,6 +84,7 @@ cc_binary_benchmark(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
         "//runtime/src/iree/testing:benchmark",
     ],
 )
@@ -85,6 +98,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
     ],
 )
 
@@ -98,6 +112,7 @@ cc_binary_benchmark(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
         "//runtime/src/iree/testing:benchmark",
     ],
 )
@@ -111,6 +126,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
     ],
 )
 
@@ -124,6 +140,7 @@ cc_binary_benchmark(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
         "//runtime/src/iree/testing:benchmark",
     ],
 )
@@ -138,6 +155,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
     ],
 )
 
@@ -150,6 +168,7 @@ cc_binary_benchmark(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
         "//runtime/src/iree/testing:benchmark",
     ],
 )

@@ -39,7 +39,7 @@ static llvm::cl::opt<bool> clPromoteBF16ToF32(
     "iree-mhlo-promote-bf16-to-f32",
     llvm::cl::desc(
         "Converts all MHLO bf16 ops and values into f32 counterparts."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 void registerMHLOConversionPassPipeline() {
   PassPipelineRegistration<> mhlo(

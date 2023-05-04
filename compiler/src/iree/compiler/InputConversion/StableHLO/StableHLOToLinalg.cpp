@@ -8,11 +8,7 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <memory>
-#include <numeric>
-#include <optional>
 #include <string>
-#include <utility>
 
 #include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
@@ -23,7 +19,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -33,7 +28,6 @@
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -45,7 +39,6 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -1565,8 +1558,8 @@ class DynamicSliceConverter
     }
 
     SmallVector<OpFoldResult, 3> startIndices, sizes;
-    Type originalStartIndexType =
-        dynamicSliceOp.getStartIndices().front().getType();
+    auto originalStartIndexType =
+        dynamicSliceOp.getStartIndices().front().getType().cast<ShapedType>();
     for (const auto& en : llvm::enumerate(
              llvm::zip(adaptor.getStartIndices(),
                        dynamicSliceOp.getSliceSizes().getValues<int64_t>()))) {
@@ -1643,9 +1636,9 @@ class DynamicUpdateSliceConverter
       // By mhlo.DynamicUpdateSlice definition:
       //   `start_indices[i] = clamp(start_indices[i],
       //       0, operand.dimension_size[i] - update.dimension_size[i])`
-      Value startIndex =
-          extractIndexFromTensor(rewriter, loc, en.value(),
-                                 op.getStartIndices()[en.index()].getType());
+      Value startIndex = extractIndexFromTensor(
+          rewriter, loc, en.value(),
+          cast<ShapedType>(op.getStartIndices()[en.index()].getType()));
       Value ub = rewriter.create<arith::ConstantIndexOp>(
           loc, operandType.getDimSize(en.index()) -
                    updateType.getDimSize(en.index()));
@@ -1731,7 +1724,7 @@ class MapOpToMapConverter : public OpConversionPattern<mlir::stablehlo::MapOp> {
     for (Value operand : llvm::drop_begin(adaptor.getOperands(), 1)) {
       coercedOperands.push_back(coerceTensorShape(
           rewriter, loc, cast<TypedValue<ShapedType>>(operand),
-          operand0.getType()));
+          cast<ShapedType>(operand0.getType())));
     }
     Value output = rewriter.create<tensor::EmptyOp>(
         loc, tensor::getMixedSizes(rewriter, loc, operand0),
@@ -2215,8 +2208,8 @@ struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
 
     // We have interior padding, which can be lowered to tensor.insert_slice.
     // Start by filling a result-sized tensor with the pad value.
-    auto emptyTensor =
-        getEmptyTensorFor(rewriter, loc, resultType, op, adaptor.getOperands());
+    auto emptyTensor = getEmptyTensorFor(
+        rewriter, loc, cast<ShapedType>(resultType), op, adaptor.getOperands());
     auto fill =
         rewriter.create<linalg::FillOp>(loc, paddingVal, emptyTensor).result();
 

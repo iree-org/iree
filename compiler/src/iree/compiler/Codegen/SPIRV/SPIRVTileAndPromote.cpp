@@ -319,7 +319,7 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   // If there are no fused elementwise ops, we can avoid promoting C matrix.
   if (linalgOps.size() <= 1) return success();
 
-  linalg::LinalgOp matmulOp = linalgOps.front();
+  auto matmulOp = cast<linalg::LinalgOp>(linalgOps.front());
   auto genericOp = cast<linalg::GenericOp>(*linalgOps.back());
 
   auto matmulType =

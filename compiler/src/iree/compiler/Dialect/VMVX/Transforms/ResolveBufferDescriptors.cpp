@@ -56,7 +56,7 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForSubview(
   // Apply stride multipliers.
   AffineMap mulMap = getMulMap(rewriter.getContext());
   for (auto [index, stride] : llvm::enumerate(subview.getMixedStrides())) {
-    OpFoldResult currentStride = makeComposedFoldedAffineApply(
+    OpFoldResult currentStride = affine::makeComposedFoldedAffineApply(
         rewriter, loc, mulMap, {sourceStrides[index], stride});
     resultDescriptor.strides.push_back(currentStride);
   }
@@ -65,9 +65,9 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForSubview(
   resultDescriptor.offset = sourceOffset;
   AffineMap addMap = getAddMap(rewriter.getContext());
   for (auto [index, offset] : llvm::enumerate(subview.getMixedOffsets())) {
-    OpFoldResult physicalOffset = makeComposedFoldedAffineApply(
+    OpFoldResult physicalOffset = affine::makeComposedFoldedAffineApply(
         rewriter, loc, mulMap, {offset, resultDescriptor.strides[index]});
-    resultDescriptor.offset = makeComposedFoldedAffineApply(
+    resultDescriptor.offset = affine::makeComposedFoldedAffineApply(
         rewriter, loc, addMap, {resultDescriptor.offset, physicalOffset});
   }
   return resultDescriptor;
@@ -87,8 +87,8 @@ static SmallVector<OpFoldResult> getStridesFromSizes(
   }
   AffineMap mulMap = getMulMap(rewriter.getContext());
   for (int i = sizes.size() - 2; i >= 0; --i) {
-    strides[i] = makeComposedFoldedAffineApply(rewriter, loc, mulMap,
-                                               {strides[i + 1], sizes[i + 1]});
+    strides[i] = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulMap, {strides[i + 1], sizes[i + 1]});
   }
   return strides;
 }
@@ -401,7 +401,7 @@ class ResolveBufferDescriptorsPass
   ResolveBufferDescriptorsPass() = default;
   ResolveBufferDescriptorsPass(const ResolveBufferDescriptorsPass &) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::VMVX::VMVXDialect>();
+    registry.insert<affine::AffineDialect, IREE::VMVX::VMVXDialect>();
   }
 
   void runOnOperation() override {

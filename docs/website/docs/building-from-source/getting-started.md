@@ -143,8 +143,7 @@ settings can improve compile and link times substantially.
     when rebuilding the compiler. To use it, configure CMake with:
 
     ``` shell
-    -DCMAKE_C_COMPILER_LAUNCHER=ccache
-    -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+    -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
     ```
 
     See also our [developer documentation for ccache](https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/ccache.md).

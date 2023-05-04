@@ -14,6 +14,7 @@ extern void ireeCompilerErrorDestroy();
 extern void ireeCompilerErrorGetMessage();
 extern void ireeCompilerGetAPIVersion();
 extern void ireeCompilerGetProcessCLArgs();
+extern void ireeCompilerGetRevision();
 extern void ireeCompilerGlobalInitialize();
 extern void ireeCompilerGlobalShutdown();
 extern void ireeCompilerInvocationCreate();
@@ -593,6 +594,7 @@ extern void mlirValueGetType();
 extern void mlirValueIsABlockArgument();
 extern void mlirValueIsAOpResult();
 extern void mlirValuePrint();
+extern void mlirValueReplaceAllUsesOfWith();
 extern void mlirVectorTypeGet();
 extern void mlirVectorTypeGetChecked();
 
@@ -604,6 +606,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerErrorGetMessage;
   x += (uintptr_t)&ireeCompilerGetAPIVersion;
   x += (uintptr_t)&ireeCompilerGetProcessCLArgs;
+  x += (uintptr_t)&ireeCompilerGetRevision;
   x += (uintptr_t)&ireeCompilerGlobalInitialize;
   x += (uintptr_t)&ireeCompilerGlobalShutdown;
   x += (uintptr_t)&ireeCompilerInvocationCreate;
@@ -1183,6 +1186,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirValueIsABlockArgument;
   x += (uintptr_t)&mlirValueIsAOpResult;
   x += (uintptr_t)&mlirValuePrint;
+  x += (uintptr_t)&mlirValueReplaceAllUsesOfWith;
   x += (uintptr_t)&mlirVectorTypeGet;
   x += (uintptr_t)&mlirVectorTypeGetChecked;
   return x;
