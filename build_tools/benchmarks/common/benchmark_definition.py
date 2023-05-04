@@ -50,15 +50,24 @@ CPU_ABI_TO_TARGET_ARCH_MAP = {
 
 # A map from GPU name to IREE's benchmark target architecture.
 GPU_NAME_TO_TARGET_ARCH_MAP = {
-    "adreno-640": common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
-    "adreno-650": common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
-    "adreno-660": common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
-    "adreno-730": common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
-    "mali-g77": common_definitions.DeviceArchitecture.ARM_VALHALL,
-    "mali-g78": common_definitions.DeviceArchitecture.ARM_VALHALL,
-    "tesla-v100-sxm2-16gb": common_definitions.DeviceArchitecture.CUDA_SM70,
-    "nvidia-a100-sxm4-40gb": common_definitions.DeviceArchitecture.CUDA_SM80,
-    "nvidia-geforce-rtx-3090": common_definitions.DeviceArchitecture.CUDA_SM80,
+    "adreno-640":
+        common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
+    "adreno-650":
+        common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
+    "adreno-660":
+        common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
+    "adreno-730":
+        common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
+    "mali-g77":
+        common_definitions.DeviceArchitecture.ARM_VALHALL,
+    "mali-g78":
+        common_definitions.DeviceArchitecture.ARM_VALHALL,
+    "tesla-v100-sxm2-16gb":
+        common_definitions.DeviceArchitecture.NVIDIA_PASCAL,
+    "nvidia-a100-sxm4-40gb":
+        common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
+    "nvidia-geforce-rtx-3090":
+        common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
 }
 
 
