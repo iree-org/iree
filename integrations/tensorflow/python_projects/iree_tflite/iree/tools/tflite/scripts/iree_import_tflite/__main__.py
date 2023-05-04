@@ -6,6 +6,7 @@
 
 import argparse
 import inspect
+import logging
 from pathlib import Path
 import re
 import sys
@@ -38,10 +39,15 @@ def main():
   # Deprecated and unused.  Kept in place so callers of the old tool don't break
   # when using the new tool.
   parser.add_argument('--output-format',
-                      dest='_',
+                      dest='output_format',
                       required=False,
+                      default="mlir-bytecode",
                       help=argparse.SUPPRESS)
   args = parser.parse_args()
+
+  if args.output_format != "mlir-bytecode":
+    logging.warning("output-format option is deprecated, emitting MLIR bytecode")
+
   tflite_to_tosa(
       flatbuffer=args.flatbuffer,
       bytecode=args.output_path,
