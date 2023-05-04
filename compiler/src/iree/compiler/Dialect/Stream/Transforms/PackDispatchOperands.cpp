@@ -109,7 +109,7 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
     // TODO(benvanik): don't extend here but instead pack as we can fit 4 i8's
     // into a single i32 and save 4x our push constant capacity.
     if (!isa<ComplexType>(operand.getType())) {
-      unsigned bitWidth = operand.getType().getIntOrFloatBitWidth();
+      unsigned bitWidth = 2 * operand.getType().getIntOrFloatBitWidth();
       if (bitWidth < 31) {
         operand = builder.createOrFold<arith::ExtUIOp>(
             loc, builder.getI32Type(), operand);

@@ -336,25 +336,25 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
 
   // Get floats into integer form.
   auto patternType = pattern.getType();
-  unsigned bitWidth = 0;
+  unsigned elemBitWidth = 0;
   if (isa<ComplexType>(patternType)) {
-    bitWidth = dyn_cast<ComplexType>(patternType)
-                   .getElementType()
-                   .getIntOrFloatBitWidth();
+    elemBitWidth = dyn_cast<ComplexType>(patternType)
+                       .getElementType()
+                       .getIntOrFloatBitWidth();
   } else {
-    bitWidth = patternType.getIntOrFloatBitWidth();
+    elemBitWidth = patternType.getIntOrFloatBitWidth();
   }
   if (patternType.isa<FloatType>()) {
     pattern = rewriter.createOrFold<arith::BitcastOp>(
-        loc, rewriter.getIntegerType(bitWidth), pattern);
+        loc, rewriter.getIntegerType(elemBitWidth), pattern);
   }
 
   if (isa<ComplexType>(patternType)) {
-    std::int64_t value = bitWidth;
-    Type bwElemType = rewriter.getIntegerType(bitWidth);
-    Type bwType = rewriter.getIntegerType(bitWidth * 2);
+    int64_t complexBitWidth = elemBitWidth;
+    Type bwElemType = rewriter.getIntegerType(elemBitWidth);
+    Type bwType = rewriter.getIntegerType(elemBitWidth * 2);
     Value shiftAmount = rewriter.create<arith::ConstantOp>(
-        loc, bwType, rewriter.getIntegerAttr(bwType, value));
+        loc, bwType, rewriter.getIntegerAttr(bwType, complexBitWidth));
 
     Value real = rewriter.create<mlir::complex::ReOp>(loc, pattern);
     Value realInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, real);
@@ -373,7 +373,7 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
   if (patternType.isInteger(1)) {
     return rewriter.createOrFold<arith::ExtUIOp>(loc, rewriter.getI8Type(),
                                                  pattern);
-  } else if ((bitWidth % 8) != 0) {
+  } else if ((elemBitWidth % 8) != 0) {
     // We'd need some policy to determine how to handle non-byte-aligned widths.
     return {};
   }
@@ -530,7 +530,7 @@ struct EncodeTensorFillOp
       // occupying the rest. At this moment, splats with size > 64 is not
       // implemented so we error out here.
       return rewriter.notifyMatchFailure(
-          op, "unsupported bitWith; encoding policy required");
+          op, "unsupported bitWidth greater than 64; encoding policy required");
     }
     if (bitWidth > 32) {
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinFillI64Op>(
