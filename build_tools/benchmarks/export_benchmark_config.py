@@ -50,12 +50,12 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "x86_64":
         lambda config: config.target_device_spec.architecture.architecture ==
         "x86_64",
-    "cuda":
-        lambda config: config.target_device_spec.architecture.architecture ==
-        "cuda" and "long-running" not in config.tags,
+    "cuda": (lambda config: "cuda" in config.tags and "long-running" not in
+             config.tags),
     "cuda-long":
-        lambda config: config.target_device_spec.architecture.architecture ==
-        "cuda" and "long-running" in config.tags,
+        lambda config: "cuda" in config.tags and "long-running" in config.tags,
+    "vulkan-nvidia":
+        lambda config: "vulkan-nvidia" in config.tags,
     # TODO(#9855): Enable benchmarks on Pixel-6-Pro and XT2201-2.
     "experimental-android-cpu":
         lambda config:

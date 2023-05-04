@@ -73,18 +73,21 @@ class Linux_CUDA_Benchmarks(object):
     """Generates IREE compile and run configs."""
     gen_configs, run_configs = self._generate_configs(model_groups.CUDA_MODELS,
                                                       self.SM_80_COMPILE_CONFIG)
+    # The `cuda` tag is required to put them into the CUDA benchmark preset.
     ubench_gen_configs, ubench_run_configs = self._generate_configs(
         model_groups.MICRO_MATMUL,
         self.SM_80_UBENCH_MATMUL_COMPILE_CONFIG,
-        execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG)
+        execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
+        run_tags=["cuda"])
     ubench_splitk_gen_configs, ubench_splitk_run_configs = self._generate_configs(
         model_groups.MICRO_MATMUL_SPLITK,
         self.SM_80_UBENCH_MATMUL_SPLITK_COMPILE_CONFIG,
-        execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG)
+        execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
+        run_tags=["cuda"])
     long_running_gen_configs, long_running_module_configs = self._generate_configs(
         model_groups.CUDA_MODELS_LONG,
         self.SM_80_COMPILE_CONFIG,
-        run_tags=["long-running"])
+        run_tags=["cuda", "long-running"])
     return (gen_configs + ubench_gen_configs + ubench_splitk_gen_configs +
             long_running_gen_configs, run_configs + ubench_run_configs +
             ubench_splitk_run_configs + long_running_module_configs)
