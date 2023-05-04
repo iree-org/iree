@@ -2756,7 +2756,7 @@ iree_bytecode_module(
     "--iree-vm-target-index-bits=64"
     "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
   FRIENDLY_NAME
-    "ClipTextSeqLen64PT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][tensorcore]"
+    "ClipTextSeqLen64PT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][experimental-flags,tensorcore]"
   PUBLIC
 )
 
@@ -2775,7 +2775,7 @@ iree_bytecode_module(
     "--iree-vm-target-index-bits=64"
     "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
   FRIENDLY_NAME
-    "Unet2dPT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][tensorcore]"
+    "Unet2dPT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][experimental-flags,tensorcore]"
   PUBLIC
 )
 
@@ -2794,7 +2794,7 @@ iree_bytecode_module(
     "--iree-vm-target-index-bits=64"
     "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
   FRIENDLY_NAME
-    "ClipTextSeqLen64PT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][simt]"
+    "ClipTextSeqLen64PT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][experimental-flags,simt]"
   PUBLIC
 )
 
@@ -2813,7 +2813,7 @@ iree_bytecode_module(
     "--iree-vm-target-index-bits=64"
     "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
   FRIENDLY_NAME
-    "Unet2dPT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][simt]"
+    "Unet2dPT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][experimental-flags,simt]"
   PUBLIC
 )
 
@@ -5727,7 +5727,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_b975b6877510291f2ee4ca814bd9b6a5cd2a2bf90c506627eb69b305835f1197/scheduling_stats.json"
   FRIENDLY_NAME
-    "ClipTextSeqLen64PT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][tensorcore,compile-stats]"
+    "ClipTextSeqLen64PT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][experimental-flags,tensorcore,compile-stats]"
   PUBLIC
 )
 
@@ -5750,7 +5750,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_6dd24b8caef78a32f9aaa8d86557e7fff7feca016887de56c20d89d5e6e466f6/scheduling_stats.json"
   FRIENDLY_NAME
-    "Unet2dPT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][tensorcore,compile-stats]"
+    "Unet2dPT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][experimental-flags,tensorcore,compile-stats]"
   PUBLIC
 )
 
@@ -5773,7 +5773,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_85216f0b904906cd9508018c3644350882b72bc4702e875d9e31f33cc751de06/scheduling_stats.json"
   FRIENDLY_NAME
-    "ClipTextSeqLen64PT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][simt,compile-stats]"
+    "ClipTextSeqLen64PT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][experimental-flags,simt,compile-stats]"
   PUBLIC
 )
 
@@ -5796,7 +5796,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_824ac4e9e8621e344eca176c4c3e066acf8e460cff9337f94701de3e37c86e1a/scheduling_stats.json"
   FRIENDLY_NAME
-    "Unet2dPT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][simt,compile-stats]"
+    "Unet2dPT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][experimental-flags,simt,compile-stats]"
   PUBLIC
 )
 
