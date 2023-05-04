@@ -472,7 +472,7 @@ hal.executable private @mmt4d_ukernel {
   }
 }
 // CHECK-LABEL: func @ukernel_dispatch()
-//       CHECK:   iree_codegen.ukernel.generic "vmvx.mmt4d"
+//       CHECK:   iree_codegen.ukernel.generic "ukernel.mmt4d"
 
 // -----
 

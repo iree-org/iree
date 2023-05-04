@@ -92,6 +92,29 @@ else()
   message(SEND_ERROR "Unrecognized target architecture ${_IREE_UNNORMALIZED_ARCH_LOWERCASE}")
 endif()
 
+# iree_arch_to_llvm_arch()
+#
+# Helper mapping an architecture in IREE's naming scheme (as in IREE_ARCH)
+# to an architecture in LLVM's naming scheme (as in LLVM target triples).
+function(iree_arch_to_llvm_arch DST_LLVM_ARCH_VARIABLE SRC_ARCH)
+  if ("${SRC_ARCH}" STREQUAL "arm_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "aarch64" PARENT_SCOPE)
+  elseif ("${SRC_ARCH}" STREQUAL "arm_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "arm" PARENT_SCOPE)
+  elseif ("${SRC_ARCH}" STREQUAL "x86_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "x86_64" PARENT_SCOPE)
+  elseif ("${SRC_ARCH}" STREQUAL "x86_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "i386" PARENT_SCOPE)
+  elseif ("${SRC_ARCH}" STREQUAL "riscv_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "riscv64" PARENT_SCOPE)
+  elseif ("${SRC_ARCH}" STREQUAL "riscv_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "riscv32" PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "What is the LLVM name of the architecture that we call ${SRC_ARCH} ?")
+    set(${DST_LLVM_ARCH_VARIABLE} "unknown" PARENT_SCOPE)
+  endif()
+endfunction()
+
 #-------------------------------------------------------------------------------
 # General utilities
 #-------------------------------------------------------------------------------
