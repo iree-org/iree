@@ -158,3 +158,16 @@ jobs:
           # pick up new files that have been added.
           git add -A
           git diff HEAD --exit-code
+
+  build_file_names:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+      - name: Check BUILD files are not named BUILD (prefer BUILD.bazel)
+        run: exit $(git ls-files '**/BUILD' | wc -l)
+      - name: Instructions for fixing the above linting error
+        if: ${{ failure() }}
+        run: |
+          echo "failure: found files named BUILD. Please rename the following files to BUILD.bazel:"
+          git ls-files '**/BUILD'

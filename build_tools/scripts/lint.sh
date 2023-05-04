@@ -139,6 +139,13 @@ echo "***** Generates CMake files *****"
 git add -A
 git diff HEAD --exit-code
 
+echo "***** Check BUILD files are not named BUILD (prefer BUILD.bazel) *****"
+if [[ $(git ls-files '**/BUILD') ]]; then
+  echo "failure: found files named BUILD. Please rename the following files to BUILD.bazel:"
+  git ls-files '**/BUILD'
+  (exit 1)
+fi
+
 if (( "${FINAL_RET}" != 0 )); then
   echo "Encountered failures. Check error messages and changes to the working" \
        "directory and git index (which may contain fixes) and try again."
