@@ -3,8 +3,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-93c0f75188363af77647cb2f1deb41446575c9cd084d86119287156eb181d850"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_93c0f75188363af77647cb2f1deb41446575c9cd084d86119287156eb181d850.mlir"
 )
@@ -14,8 +12,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-394878992fb35f2ed531b7f0442c05bde693346932f049cbb3614e06b3c82337"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_394878992fb35f2ed531b7f0442c05bde693346932f049cbb3614e06b3c82337.mlir"
 )
@@ -25,8 +21,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-05c50f54ffea1fce722d07588e7de026ce10324eccc5d83d1eac2c5a9f5d639d"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_05c50f54ffea1fce722d07588e7de026ce10324eccc5d83d1eac2c5a9f5d639d.mlir"
 )
@@ -36,8 +30,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-3f492fde47abecd3640f1e04c14f2bfc24940f1cf11f66e72128c590bc711025"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_3f492fde47abecd3640f1e04c14f2bfc24940f1cf11f66e72128c590bc711025.mlir"
 )
@@ -47,8 +39,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-a359c8f1e19b6f476e843bdc5566f9554e329cbfb3b4437995ad9cccfb381aee"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_a359c8f1e19b6f476e843bdc5566f9554e329cbfb3b4437995ad9cccfb381aee.mlir"
 )
@@ -58,8 +48,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-a56388db344366834963ce4295c7695bd3f75b6840962c0b4aec857f34575ded"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_a56388db344366834963ce4295c7695bd3f75b6840962c0b4aec857f34575ded.mlir"
 )
@@ -69,8 +57,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-7f3f1c653a612b1a7c13af9e9e6a3b0d0d12ae159e5e4e619d00717b0686bc9a"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_3dd5a95e-92a9-4486-9062-9a33224f28db_MobileNetV2_int8.0_224_quantized.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_7f3f1c653a612b1a7c13af9e9e6a3b0d0d12ae159e5e4e619d00717b0686bc9a.mlir"
 )
@@ -80,8 +66,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-2b9d79769b2b1ece7dd4a4bccd146a99fc3c38c4427a179d37308146adfc5c0e"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_MobileSSD_fp32_2b9d79769b2b1ece7dd4a4bccd146a99fc3c38c4427a179d37308146adfc5c0e.mlir"
 )
@@ -91,8 +75,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-3ea5b376aec708e6c6827b0a9da7135fc50f20400dc0d55f16a3378a08fa5cf4"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_PoseNet_fp32_3ea5b376aec708e6c6827b0a9da7135fc50f20400dc0d55f16a3378a08fa5cf4.mlir"
 )
@@ -102,8 +84,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-4afb465f351db6dbf3d06a03d98f0e77c9cc1e284d89f6db6367969793e44a59"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16_4afb465f351db6dbf3d06a03d98f0e77c9cc1e284d89f6db6367969793e44a59.mlir"
 )
@@ -113,8 +93,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-af95be67ed750381753ca4fe4341853e7e2884d4c4bd1dd9a17d8ceab3ee8882"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_af95be67ed750381753ca4fe4341853e7e2884d4c4bd1dd9a17d8ceab3ee8882.mlir"
 )
@@ -124,8 +102,6 @@ iree_import_tflite_model(
     "${PACKAGE_NAME}_iree-imported-model-3bda9f3a5eb6a0fd3adc80187495d7ab840e409f379c70e3fd687934fafdd3b6"
   SOURCE
     "${ROOT_ARTIFACTS_DIR}/model_e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
-  IMPORT_FLAGS
-    "--output-format=mlir-bytecode"
   OUTPUT_MLIR_FILE
     "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_3bda9f3a5eb6a0fd3adc80187495d7ab840e409f379c70e3fd687934fafdd3b6.mlir"
 )

@@ -354,19 +354,10 @@ jobs:
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
   ################################# Tensorflow #################################
-  # Jobs that build the IREE-Tensorflow integrations
+  # Jobs that test the IREE-Tensorflow integrations
   ##############################################################################
-  build_tf_integrations:
-    needs: setup
-    if: fromJson(needs.setup.outputs.should-run)
-    uses: ./.github/workflows/build_tf_integrations.yml
-    with:
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-      write-caches: ${{ needs.setup.outputs.write-caches }}
-
   test_tf_integrations:
-    needs: [setup, build_all, build_tf_integrations]
+    needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted # must come first
@@ -378,21 +369,11 @@ jobs:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
-      - name: "Downloading TF binaries archive"
-        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-      - name: "Extracting TF binaries archive"
-        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
-      - name: "Symlinking TF binaries"
-        run: |
-          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -405,7 +386,7 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    needs: [setup, build_all, build_tf_integrations]
+    needs: [setup, build_all]
     if: fromJson(needs.setup.outputs.should-run)
     runs-on:
       - self-hosted # must come first
@@ -417,21 +398,11 @@ jobs:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
-      - name: "Downloading TF binaries archive"
-        run: gcloud storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-      - name: "Extracting TF binaries archive"
-        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
-      - name: "Symlinking TF binaries"
-        run: |
-          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -1038,7 +1009,6 @@ jobs:
       - build_test_runtime_windows
 
       # Tensorflow
-      - build_tf_integrations
       - test_tf_integrations
       - test_tf_integrations_gpu
 
