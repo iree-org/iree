@@ -256,7 +256,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
         SmallVector<unsigned> partitionedLoops =
             cast<PartitionableLoopsInterface>(op.getOperation())
-                .getPartitionableLoops(kNumMaxParallelDims);
+                .getPartitionableLoops(/*maxNumPartitionedLoops=*/std::nullopt);
         llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
         partitionedLoopsSet.insert(partitionedLoops.begin(),
                                    partitionedLoops.end());
