@@ -103,8 +103,8 @@ class BenchmarkDriver(object):
         benchmark_name = str(benchmark_info)
 
         if benchmark_case.target_arch not in detected_architectures:
-          print(f"WARNING: Benchmark '{benchmark_name}' may be incompatible on"
-                f" '{self.device_info}'. Pass --compatible-only to skip"
+          print(f"WARNING: Benchmark '{benchmark_name}' may be incompatible"
+                f" with '{self.device_info}'. Pass --compatible-only to skip"
                 f" benchmarks.")
 
         # Sanity check for the uniqueness of benchmark names.
