@@ -196,7 +196,7 @@ jobs:
         # We need coreutils for `realpath` used in scripts.
         # We need bash because the default one on macOS is fairly old and lacks
         # features we use in scripts.
-        run: brew install ninja coreutils bash
+        run: brew install ninja ccache coreutils bash
       # Finally: build and run tests.
       - name: "Building IREE"
         env:
