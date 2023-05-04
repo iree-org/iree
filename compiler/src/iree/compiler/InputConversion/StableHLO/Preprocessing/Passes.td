@@ -9,9 +9,14 @@
 
 include "mlir/Pass/PassBase.td"
 
+def DotGeneralToDot :
+    Pass<"iree-stablehlo-preprocessing-dot-general-to-dot", "func::FuncOp"> {
+  let summary = "Lowers general dot to a non-batched dot when possible";
+}
+
 def EinsumToDotGeneral :
     Pass<"iree-stablehlo-preprocessing-einsum-to-dot-general", "func::FuncOp"> {
-  let summary = "Legalizes einsum ops to dot_general ops";
+  let summary = "Legalizes einsum ops to general dot ops";
 }
 
 def GatherToTorchIndexSelect :

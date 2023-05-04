@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "complex_lowering.mlir"
+    "dot_general_to_dot.mlir"
     "einsum_to_dot_general.mlir"
     "gather_to_torch_index_select.mlir"
     "unfuse_batch_norm.mlir"

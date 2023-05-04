@@ -60,6 +60,7 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "Preprocessing",
     srcs = [
+        "DotGeneralToDot.cpp",
         "EinsumToDotGeneral.cpp",
         "GatherToTorchIndexSelect.cpp",
         "LowerComplex.cpp",
@@ -80,6 +81,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:ShapeDialect",
+        "@llvm-project//mlir:SparseTensorDialect",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
