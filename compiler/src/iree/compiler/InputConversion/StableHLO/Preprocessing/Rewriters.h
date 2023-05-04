@@ -15,6 +15,11 @@ namespace mlir::iree_compiler::stablehlo {
 // General StableHLO/CHLO preprocessing patterns.
 //===----------------------------------------------------------------------===//
 
+/// Collection of rewrite patterns for lowering of StableHLO dot general
+/// operations.
+void populatePreprocessingDotGeneralToDotPatterns(MLIRContext *context,
+                                                  RewritePatternSet *patterns);
+
 /// Collection of rewrite patterns for lowering of StableHLO einsum operations.
 void populatePreprocessingEinsumToDotGeneralPatterns(
     MLIRContext *context, RewritePatternSet *patterns);

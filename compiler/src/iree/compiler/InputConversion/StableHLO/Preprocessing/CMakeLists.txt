@@ -53,6 +53,7 @@ iree_cc_library(
     "Passes.h"
     "Rewriters.h"
   SRCS
+    "DotGeneralToDot.cpp"
     "EinsumToDotGeneral.cpp"
     "GatherToTorchIndexSelect.cpp"
     "LowerComplex.cpp"
@@ -69,6 +70,7 @@ iree_cc_library(
     MLIRMathDialect
     MLIRPass
     MLIRShapeDialect
+    MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTransforms
