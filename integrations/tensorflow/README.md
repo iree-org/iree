@@ -51,19 +51,20 @@ lit -v -D DISABLE_FEATURES=llvmcpu -D FEATURES=vulkan test/
 lit -v $(find test -name '*softplus*')
 ```
 
-## Updating Tenserflow Importers in CI
+## Updating Tensorflow Importers in CI
 
-CI uses Tenserflow importers to run integration tests and benchmarks. They might
-need an update in CI if you want new features/bugfixes from the frontends.
+CI uses Tensorflow importers to run integration tests and benchmarks. They might
+need an update in CI if you want new features or bugfixes from the frontends.
 
-Tenserflow importers are wrappers which call Tensorflow Python API to do
+Tensorflow importers are wrappers which call Tensorflow Python API to do
 conversion. CI installs a pinned version of Tensorflow in the docker images. To
-bump the Tenserflow version, you need to:
+bump the Tensorflow version, you need to:
 
-1.  Update the Tensorflow pinned version in
-    [integrations/tensorflow/test/requirements.txt](integrations/tensorflow/test/requirements.txt).
-2.  Follow [build_tools/docker/README.md](build_tools/docker/README.md) to
-    rebuild the `frontends` docker image and its descendants.
+1.  Update the pinned version of Tensorflow in
+    [integrations/tensorflow/test/requirements.txt](/integrations/tensorflow/test/requirements.txt).
+2.  Follow
+    [Adding or Updating an Image](/build_tools/docker/README.md#adding-or-updating-an-image)
+    to rebuild the `frontends` docker image and its descendants.
 
 Here is the command to rebuild and update the docker images:
 
@@ -72,5 +73,5 @@ python3 build_tools/docker/manage_images.py --image frontends
 ```
 
 To modify the import tools themselves, you can directly change their code in
-[integrations/tensorflow/python_projects](integrations/tensorflow/python_projects)
+[integrations/tensorflow/python_projects](/integrations/tensorflow/python_projects)
 without updating the dockers.

@@ -17,11 +17,11 @@ To add a new source model, see
 
 ## Updating TF/TFLite Importer in Benchmark CI
 
-For TF and TFLite source models, the benchmark CI installs
-`iree-import-tf/tflite` from
-[integrations/tensorflow/python_projects](integrations/tensorflow/python_projects)
+For TF and TFLite source models, benchmark CI installs `iree-import-tf/tflite`
+from
+[integrations/tensorflow/python_projects](/integrations/tensorflow/python_projects)
 to import models. See
-[Updating Tenserflow Importers in CI](integrations/tensorflow/README.md#updating-tenserflow-importers-in-ci)
+[Updating Tensorflow Importers in CI](/integrations/tensorflow/README.md#updating-tensorflow-importers-in-ci)
 to learn about the update procedure.
 
 ## Benchmark Suites Design
