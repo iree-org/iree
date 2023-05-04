@@ -41,6 +41,12 @@ echo "Configuring to build e2e test artifacts"
   -DIREE_BUILD_SAMPLES=OFF \
   -DIREE_BUILD_TESTS=OFF
 
+echo "Importing e2e test models"
+"${CMAKE_BIN}" \
+  --build "${BUILD_DIR}" \
+  --target iree-benchmark-import-models \
+  -- -k 0
+
 echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
   --build "${BUILD_DIR}" \
