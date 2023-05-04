@@ -76,7 +76,8 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
     // and otherwise defer reporting.
     status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
                                                            &driver->syms);
-    if (iree_status_is_unavailable(status)) {
+    if (iree_status_is_unavailable(status) ||
+        iree_status_is_not_found(status)) {
       status = iree_status_ignore(status);
     }
   }

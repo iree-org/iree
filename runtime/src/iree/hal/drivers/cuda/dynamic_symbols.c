@@ -153,7 +153,7 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
     if (nccl_version < NCCL_VERSION(NCCL_MAJOR, NCCL_MINOR, 0) ||
         major != NCCL_MAJOR) {
       status = iree_make_status(
-          IREE_STATUS_INTERNAL,
+          IREE_STATUS_NOT_FOUND,
           "NCCL version %d.%d found but at least version %d.%d is required",
           major, minor, NCCL_MAJOR, NCCL_MINOR);
     }
