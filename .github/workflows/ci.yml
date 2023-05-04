@@ -381,7 +381,7 @@ jobs:
   #     - name: "Running TF integrations tests"
   #       run: |
   #         ./build_tools/github_actions/docker_run.sh \
-  #           gcr.io/iree-oss/frontends-swiftshader@sha256:da14cc93637d3bfad469a670d4d7a49982df5d107b775331965e3bacb981d4cf \
+  #           gcr.io/iree-oss/frontends-swiftshader@sha256:aa814bb35270384d5174e72f3e3a8b817b686fd661a15b52d07a8c91e402e157 \
   #           build_tools/cmake/run_tf_tests.sh \
   #           "${BUILD_DIR}"
 
@@ -414,7 +414,7 @@ jobs:
   #           --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
   #           --gpus all \
   #           --env NVIDIA_DRIVER_CAPABILITIES=all \
-  #           gcr.io/iree-oss/frontends-nvidia@sha256:00d8c8882643030a93f25e8c20e4349331a8f735ba02a1b0cfc93312fd403bc8 \
+  #           gcr.io/iree-oss/frontends-nvidia@sha256:c23b93fb941b4568df04abc7623c9aac1be97813439e077cf06416303ed2256c \
   #           bash -euo pipefail -c \
   #             "./build_tools/scripts/check_cuda.sh
   #             ./build_tools/scripts/check_vulkan.sh
@@ -453,7 +453,7 @@ jobs:
   #         build_tools/github_actions/docker_run.sh \
   #           --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
   #           --env "IREE_BUILD_BENCHMARKS_DIR=${BUILD_BENCHMARKS_DIR}" \
-  #           gcr.io/iree-oss/frontends@sha256:c123d9e54e5179ef49345271e5535bcd618ce8d5f20c1353741b81715c3bee33 \
+  #           gcr.io/iree-oss/frontends@sha256:9e44ee3b53345054ac8c29d35ebef5e1dc7d78b41bad48f7dbbeedddb8a4cf3a \
   #           build_tools/cmake/build_benchmarks.sh
 
   # ############################### Configurations ###############################

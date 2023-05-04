@@ -30,9 +30,6 @@ IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_tf_python.sh
 
-apt-get update
-apt-get install -y parallel
-
 echo "Configuring to build e2e test artifacts"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \

@@ -16,7 +16,7 @@ steps:
         --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
         --workdir="$$IREE_DOCKER_WORKDIR" \
         --rm \
-        gcr.io/iree-oss/frontends@sha256:c123d9e54e5179ef49345271e5535bcd618ce8d5f20c1353741b81715c3bee33 \
+        gcr.io/iree-oss/frontends@sha256:9e44ee3b53345054ac8c29d35ebef5e1dc7d78b41bad48f7dbbeedddb8a4cf3a \
         build_tools/cmake/build_android_benchmark.sh
       tar --exclude='*.tar.gz' \
         --exclude='*.tgz' \

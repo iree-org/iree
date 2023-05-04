@@ -8,6 +8,10 @@ FROM gcr.io/iree-oss/android@sha256:3f641d25786b1e5e430ee4cacb8bfe57540fda5ecaa7
 
 WORKDIR /pip-install
 
+RUN apt-get update \
+  && apt-get install -y \
+    parallel
+
 COPY integrations/tensorflow/test/requirements.txt ./
 
 # Versions for things required to build IREE should match the minimum versions
