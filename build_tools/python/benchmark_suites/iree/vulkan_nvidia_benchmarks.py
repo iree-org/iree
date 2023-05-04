@@ -43,12 +43,12 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
 
   SIMT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_VULKAN_SD_SIMT,
-      tags=["simt"],
+      tags=["experimental-flags", "simt"],
       compile_targets=[PASCAL_TARGET],
       extra_flags=_get_compile_flag())
   TENSORCORE_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_VULKAN_SD_TENSORCORE,
-      tags=["tensorcore"],
+      tags=["experimental-flags", "tensorcore"],
       compile_targets=[AMPERE_TARGET],
       extra_flags=_get_compile_flag())
 
