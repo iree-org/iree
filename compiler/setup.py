@@ -149,10 +149,13 @@ if not PACKAGE_VERSION:
 
 
 def get_cmake_version_info_args():
-  return [
+  version_info_args = [
       f"-DIREE_RELEASE_VERSION:STRING={PACKAGE_VERSION}",
       f"-DIREE_RELEASE_REVISION:STRING={git_versions.get('IREE') or '0'}",
   ]
+  if version_info:
+    version_info_args.append("-DIREE_EMBEDDED_RELEASE_INFO=ON")
+  return version_info_args
 
 
 def maybe_nuke_cmake_cache():
