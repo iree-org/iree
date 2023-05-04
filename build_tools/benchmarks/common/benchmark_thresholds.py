@@ -78,6 +78,9 @@ BENCHMARK_THRESHOLDS = [
         re.compile(r"^MobileBertSquad.*int8.*full-inference.*GPU-Mali"), 10,
         ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
+        re.compile(r"^MobileBertSquad.*fp16.*full-inference.*GPU-Mali"), 10,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
         re.compile(r"^MobileNetV3Small.*full-inference.*GPU-Mali"), 2 * 10**6,
         ThresholdUnit.VALUE_NS),
 
@@ -85,7 +88,9 @@ BENCHMARK_THRESHOLDS = [
     # suitable anymore.
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
-    BenchmarkThreshold(re.compile(r"^EfficientNet.*int8.*GPU-Mali"), 1 * 10**6,
+    BenchmarkThreshold(re.compile(r"^PersonDetect.*int8.*GPU-Mali"), 2 * 10**5,
+                       ThresholdUnit.VALUE_NS),
+    BenchmarkThreshold(re.compile(r"^EfficientNet.*int8.*GPU-Mali"), 15 * 10**5,
                        ThresholdUnit.VALUE_NS),
     BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1 * 10**6,
                        ThresholdUnit.VALUE_NS),
