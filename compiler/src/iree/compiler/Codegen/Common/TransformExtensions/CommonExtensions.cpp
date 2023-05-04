@@ -1068,12 +1068,6 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
-  if (getTargetGpu()) {
-    // TODO(#12933): Because of regressions in CUDA backend, there is an
-    // option to keep a legacy mode of not representing the offset in the
-    // type. Remove once the bug is fixed.
-    options.embedSubspanOffsetIntoMemRefType = false;
-  }
   if (failed(runIREEOneShotBufferize(state.getTopLevel(), options)))
     return listener.check(loc, emitDefaultDefiniteFailure(target));
 
