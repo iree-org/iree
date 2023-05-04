@@ -164,7 +164,7 @@ jobs:
 
   build_test_all_macos_x86_64:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
+    # if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on: macos-12-xl
     env:
       BUILD_DIR: build-macos
