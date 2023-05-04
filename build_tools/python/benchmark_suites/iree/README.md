@@ -15,27 +15,14 @@ configrations. To run the benchmark suites, see
 To add a new source model, see
 [Adding a new model](/build_tools/python/e2e_test_framework/models/README.md#adding-a-new-model)
 
-## Updating TF/TFLite Importer in CI
+## Updating TF/TFLite Importer in Benchmark CI
 
-For TF/TFLite source models, benchmark CI uses `iree-import-tf/tflite` to import
-models into MLIR files. These tools are just wrappers which call Tensorflow
-Python API to do conversion. CI installs a pinned version of Tensorflow in its
-docker images. To bump the Tenserflow version, you need to:
-
-1.  Update the Tensorflow pinned version in
-    [integrations/tensorflow/test/requirements.txt](integrations/tensorflow/test/requirements.txt).
-2.  Follow [build_tools/docker/README.md](build_tools/docker/README.md) to
-    rebuild the `frontends` docker image and its descendants.
-
-Here is the command to rebuild and update the docker images:
-
-```sh
-python3 build_tools/docker/manage_images.py --image frontends
-```
-
-To modify the import tools themselves, you can directly change their code in
+For TF and TFLite source models, the benchmark CI installs
+`iree-import-tf/tflite` from
 [integrations/tensorflow/python_projects](integrations/tensorflow/python_projects)
-without updating the dockers.
+to import models. See
+[Updating Tenserflow Importers in CI](integrations/tensorflow/README.md#updating-tenserflow-importers-in-ci)
+to learn about the update procedure.
 
 ## Benchmark Suites Design
 
