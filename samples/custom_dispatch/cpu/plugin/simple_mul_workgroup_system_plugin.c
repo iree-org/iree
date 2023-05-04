@@ -191,10 +191,9 @@ iree_hal_executable_plugin_query(
       // loading older plugins but newer plugins cannot load on older runtimes.
       .version = IREE_HAL_EXECUTABLE_PLUGIN_VERSION_LATEST,
       // Name and description are used for tracing/logging/diagnostics.
-      .name = "sample_system",
+      .name = "sample_simple_mul_workgroup_system_plugin",
       .description =
-          "system plugin sample "
-          "(custom_dispatch/cpu/plugin/system_plugin.c)",
+          "system plugin sample (" __FILE__ ")",
       .features = 0,
       // Let the runtime know what sanitizer this plugin was compiled with.
       .sanitizer = IREE_HAL_EXECUTABLE_PLUGIN_SANITIZER_KIND,

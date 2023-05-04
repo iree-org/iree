@@ -142,10 +142,9 @@ iree_hal_executable_plugin_query(
       // loading older plugins but newer plugins cannot load on older runtimes.
       .version = IREE_HAL_EXECUTABLE_PLUGIN_VERSION_LATEST,
       // Name and description are used for tracing/logging/diagnostics.
-      .name = "sample_standalone",
+      .name = "sample_simple_mul_workgroup_standalone_plugin",
       .description =
-          "standalone plugin sample "
-          "(custom_dispatch/cpu/plugin/standalone_plugin.c)",
+          "standalone plugin sample (" __FILE__ ")",
       // Standalone plugins must declare that they are standalone so that the
       // runtime can verify support.
       .features = IREE_HAL_EXECUTABLE_PLUGIN_FEATURE_STANDALONE,
