@@ -88,6 +88,8 @@ class Linux_Vulkan_NVIDIA_Benchmarks(object):
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
+    # The `vulkan-nvidia` tag is required to put them into the Vulkan NVIDIA
+    # benchmark preset.
     tensorcore_gen_configs, tensorcore_run_configs = self._generate_configs(
         model_groups.VULKAN_MODELS,
         self.TENSORCORE_COMPILE_CONFIG,
