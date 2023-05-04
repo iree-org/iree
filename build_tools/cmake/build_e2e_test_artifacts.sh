@@ -45,4 +45,4 @@ echo "Building e2e test artifacts"
 "${CMAKE_BIN}" \
   --build "${BUILD_DIR}" \
   --target iree-e2e-test-artifacts \
-  -- -k 0
+  -- -k 0 -j 1
