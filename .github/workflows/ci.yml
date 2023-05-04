@@ -799,13 +799,17 @@ jobs:
         env:
           EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
           IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
+        # TODO(#9855): Specify CPU and GPU benchmark results to exclude mobile
+        # results until we migrate the dashboard. The tool ignores the file path
+        # if it doesn't exist.
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_DASHBOARD_API_TOKEN=${IREE_DASHBOARD_API_TOKEN}" \
             gcr.io/iree-oss/benchmark-report@sha256:7498c6f32f63f13faf085463cc38656d4297519c824e63e1c99c8c258147f6ff \
             ./build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
               --verbose \
-              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_PATTERN}" \
+              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-c2-standard-16.json" \
+              --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-a2-highgpu-1g.json" \
               --compile_stats_files="${COMPILE_STATS_RESULTS}"
 
   ############################## Crosscompilation ##############################

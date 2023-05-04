@@ -72,6 +72,11 @@ jobs:
             docker_image: "gcr.io/iree-oss/riscv@sha256:2e71c052d11b2526651af16e64816a30d164efcdfe6fb64623fb4737c37c466a"
             build_script: "./build_tools/cmake/build_riscv.sh"
             tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
+          - platform: "android"
+            arch: "armv8.2-a"
+            docker_image: "gcr.io/iree-oss/android@sha256:3f641d25786b1e5e430ee4cacb8bfe57540fda5ecaa7ca2802c179c26e77ce09"
+            build_script: "./build_tools/cmake/build_android.sh"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-arm_64-52b6af88"
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
