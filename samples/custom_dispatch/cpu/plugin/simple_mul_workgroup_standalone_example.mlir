@@ -10,27 +10,15 @@
 // RUN: iree-compile --iree-hal-target-backends=llvm-cpu %s | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
-// RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/system_plugin$IREE_DYLIB_EXT \
+// RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/simple_mul_workgroup_standalone_plugin.sos \
 // RUN:     --module=- \
 // RUN:     --function=mixed_invocation \
 // RUN:     --input=8xf32=2 \
 // RUN:     --input=8xf32=4 | \
-// RUN: FileCheck %s --check-prefix=CHECK-SYSTEM
+// RUN: FileCheck %s --check-prefix=CHECK-STANDALONE
 
-// CHECK-SYSTEM: EXEC @mixed_invocation
-// simple_mul_workgroup
-// CHECK-SYSTEM: processor_id=
-// CHECK-SYSTEM: processor_data[0]=
-// CHECK-SYSTEM: mul[0:0](2 * 4 = 8)
-// CHECK-SYSTEM: mul[0:1](2 * 4 = 8)
-// CHECK-SYSTEM: mul[0:2](2 * 4 = 8)
-// CHECK-SYSTEM: mul[0:3](2 * 4 = 8)
-// CHECK-SYSTEM: mul[0:4](2 * 4 = 8)
-// CHECK-SYSTEM: mul[0:5](2 * 4 = 8)
-// CHECK-SYSTEM: mul[0:6](2 * 4 = 8)
-// CHECK-SYSTEM: mul[0:7](2 * 4 = 8)
-// arith.addf 8 + 4 = 12
-// CHECK-SYSTEM: 8xf32=12 12 12 12 12 12 12 12
+// CHECK-STANDALONE: EXEC @mixed_invocation
+// CHECK-STANDALONE: 8xf32=12 12 12 12 12 12 12 12
 
 module @example {
 
@@ -55,12 +43,13 @@ module @example {
     builtin.module {
       // External function declaration using a user-chosen calling convention.
       func.func private @simple_mul_workgroup(
-          %binding0: memref<f32>,
-          %binding0_offset : index,
-          %binding1: memref<f32>,
-          %binding1_offset : index,
-          %binding2: memref<f32>,
-          %binding2_offset : index, %dim: index, %tid : index) attributes {
+            %binding0: memref<f32>, 
+            %binding0_offset : index,
+            %binding1: memref<f32>,
+            %binding1_offset : index,
+            %binding2: memref<f32>, 
+            %binding2_offset : index,
+            %dim: index, %tid: index) attributes {
         // We can include some additional fields on the parameters struct as
         // needed. Here we request which processor is executing the call and
         // its data fields as defined by runtime/src/iree/schemas/cpu_data.h.
@@ -91,6 +80,9 @@ module @example {
         %memref1 = stream.binding.subspan %binding1[%c0] : !stream.binding -> memref<?xf32>{%dim}
         %memref2 = stream.binding.subspan %binding2[%c0] : !stream.binding -> memref<?xf32>{%dim}
 
+        // The default `memref` lowering contains additional fields that might not be
+        // always required. In this example, we only need the base and offset of the
+        // `memref`s. So extract the base and offset from the memrefs.
         %base0, %offset0, %size0, %stride0 = memref.extract_strided_metadata %memref0
             : memref<?xf32> -> memref<f32>, index, index, index
         %base1, %offset1, %size1, %stride1 = memref.extract_strided_metadata %memref1
@@ -98,9 +90,9 @@ module @example {
         %base2, %offset2, %size2, %stride2 = memref.extract_strided_metadata %memref2
             : memref<?xf32> -> memref<f32>, index, index, index
         
-
         // Call the externally defined C function with an (almost) plain C
-        // calling convention. This will be fetched at runtime from the plugin binary.
+        // calling convention (see above for details about the mess memrefs
+        // turn into). This will be fetched at runtime from the plugin binary.
         func.call @simple_mul_workgroup(
             %base0, %offset0, %base1, %offset1, %base2, %offset2, %dim, %workgroup_id_x)
             : (memref<f32>, index, memref<f32>, index, memref<f32>, index, index, index) -> ()
@@ -118,7 +110,7 @@ module @example {
   // Function demonstrating executable plugins and mixing plugins and codegen.
   // Invoke with:
   //  --device=local-sync
-  //  --executable_plugin=system_plugin.so
+  //  --executable_plugin=standalone_plugin.sos
   //  --function=mixed_invocation
   //  --input=8xf32=2
   //  --input=8xf32=4

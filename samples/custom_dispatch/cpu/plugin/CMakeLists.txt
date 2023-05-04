@@ -10,38 +10,64 @@ if(NOT IREE_TARGET_BACKEND_LLVM_CPU OR
   return()
 endif()
 
-# system-library plugin mechanism using the system dynamic library loader.
+# System plugins using iree_samples_system_plugin_cc_library.
 if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
 
-add_library(iree_samples_custom_dispatch_cpu_system_plugin SHARED
-  system_plugin.c
-)
-target_include_directories(iree_samples_custom_dispatch_cpu_system_plugin
-  PRIVATE
-    ${IREE_SOURCE_DIR}/runtime/src/
-)
+# Creates a system plugin library, that is built using the host toolchain for
+# the host architecture and may be loaded with the system dynamic library
+# loader.
+#
+# Contrast with: iree_samples_standalone_plugin_cc_library.
+function(iree_samples_system_plugin_cc_library)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME"
+    "SRCS"
+    ${ARGN}
+  )
 
-# NOTE: this is only required because we want this sample to run on all
-# platforms without needing to change the library name (libfoo.so/foo.dll).
-set_target_properties(iree_samples_custom_dispatch_cpu_system_plugin
-  PROPERTIES
-    WINDOWS_EXPORT_ALL_SYMBOLS ON
-    PREFIX ""
-    OUTPUT_NAME "system_plugin"
-)
+  iree_cc_library(
+    NAME
+      ${_RULE_NAME}
+    SRCS
+      ${_RULE_SRCS}
+    INCLUDES
+      "${IREE_SOURCE_DIR}/runtime/src/"
+    SHARED
+  )
 
-add_dependencies(iree-sample-deps iree_samples_custom_dispatch_cpu_system_plugin)
+  # NOTE: this is only required because we want this sample to run on all
+  # platforms without needing to change the library name (libfoo.so/foo.dll).
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  set_target_properties("${_NAME}"
+    PROPERTIES
+      WINDOWS_EXPORT_ALL_SYMBOLS ON
+      PREFIX ""
+      OUTPUT_NAME "${_RULE_NAME}"
+  )
+
+  add_dependencies(iree-sample-deps "${_NAME}")
+endfunction()
+
+iree_samples_system_plugin_cc_library(
+  NAME
+    simple_mul_workgroup_system_plugin
+  SRCS
+    simple_mul_workgroup_system_plugin.c
+)
 
 iree_lit_test_suite(
   NAME
-    system_example
+    simple_mul_workgroup_system_example
   SRCS
-    "system_example.mlir"
+    "simple_mul_workgroup_system_example.mlir"
   TOOLS
     FileCheck
     iree-compile
     iree-run-module
-    iree_samples_custom_dispatch_cpu_system_plugin
+    iree_samples_custom_dispatch_cpu_plugin_simple_mul_workgroup_system_plugin
   LABELS
     "driver=local-sync"
     "hostonly"
@@ -49,14 +75,14 @@ iree_lit_test_suite(
 
 iree_lit_test_suite(
   NAME
-    system_ukernel
+    simple_mul_workgroup_system_ukernel
   SRCS
-    "system_ukernel.mlir"
+    "simple_mul_workgroup_system_ukernel.mlir"
   TOOLS
     FileCheck
     iree-compile
     iree-run-module
-    iree_samples_custom_dispatch_cpu_system_plugin
+    iree_samples_custom_dispatch_cpu_plugin_simple_mul_workgroup_system_plugin
   LABELS
     "driver=local-sync"
     "hostonly"
@@ -81,42 +107,60 @@ if(MSVC)
   return()
 endif()
 
-function(standalone_plugin_library _ARCH)
-  set(_NAME iree_samples_custom_dispatch_cpu_standalone_plugin_${_ARCH})
-  if (_ARCH STREQUAL "arm_64")
+# Helper for iree_samples_standalone_plugin_cc_library, building one
+# architecture.
+function(iree_samples_standalone_plugin_cc_library_arch)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;ARCH"
+    "SRCS"
+    ${ARGN}
+  )
+
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}_${_RULE_ARCH}")
+
+  if (_RULE_ARCH STREQUAL "arm_64")
     set(LLVM_ARCH "aarch64")
   else()
-    set(LLVM_ARCH "${_ARCH}")
+    set(LLVM_ARCH "${_RULE_ARCH}")
   endif()
+
+  foreach(_SRC_FILE IN LISTS _RULE_SRCS)
+    set(_OBJECT_FILE "${_SRC_FILE}_${_RULE_ARCH}.o")
+    list(APPEND _OBJECT_FILES "${CMAKE_CURRENT_BINARY_DIR}/${_OBJECT_FILE}")
+    add_custom_command(
+      OUTPUT
+        "${_OBJECT_FILE}"
+      DEPENDS
+        "${_SRC_FILE}"
+        "${IREE_CLANG_TARGET}"
+      COMMAND "${IREE_CLANG_TARGET}"
+        -target "${LLVM_ARCH}-unknown-unknown-eabi-elf"
+        -isystem "${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/17/include"
+        -std=c17
+        -fPIC
+        -ffreestanding
+        -fvisibility=hidden
+        -fno-plt
+        -fno-rtti
+        -fno-exceptions
+        -fdata-sections
+        -ffunction-sections
+        -funique-section-names
+        -I "${IREE_SOURCE_DIR}/runtime/src/"
+        -c "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC_FILE}"
+        -o "${CMAKE_CURRENT_BINARY_DIR}/${_OBJECT_FILE}"
+      VERBATIM
+    )
+  endforeach()
+  set (_OUTPUT_SO_FILE "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_${_RULE_ARCH}.so")
   add_custom_command(
     OUTPUT
-      standalone_plugin_${_ARCH}.o
+      ${_OUTPUT_SO_FILE}
     DEPENDS
-      standalone_plugin.c
-      ${IREE_CLANG_TARGET}
-    COMMAND ${IREE_CLANG_TARGET}
-      -target ${LLVM_ARCH}-unknown-unknown-eabi-elf
-      -isystem ${IREE_BINARY_DIR}/third_party/llvm-project/llvm/lib/clang/17/include
-      -std=c17
-      -fPIC
-      -ffreestanding
-      -fvisibility=hidden
-      -fno-plt
-      -fno-rtti
-      -fno-exceptions
-      -fdata-sections
-      -ffunction-sections
-      -funique-section-names
-      -I ${IREE_SOURCE_DIR}/runtime/src/
-      -c ${CMAKE_CURRENT_SOURCE_DIR}/standalone_plugin.c
-      -o ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.o
-    VERBATIM
-  )
-  add_custom_command(
-    OUTPUT
-      standalone_plugin_${_ARCH}.so
-    DEPENDS
-      standalone_plugin_${_ARCH}.o
+      ${_OBJECT_FILES}
       ${IREE_LLD_TARGET}
     COMMAND ${IREE_LLD_TARGET}
       -flavor gnu
@@ -136,45 +180,77 @@ function(standalone_plugin_library _ARCH)
       --ignore-function-address-equality
       --hash-style=sysv
       --strip-debug
-      ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.o
-      -o ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.so
+      ${_OBJECT_FILES}
+      -o "${_OUTPUT_SO_FILE}"
     VERBATIM
   )
   add_custom_target(${_NAME} DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_${_ARCH}.so
+    "${_OUTPUT_SO_FILE}"
   )
 endfunction()
 
-# Build the standalone_plugin_*.so files for each architecture we target.
-standalone_plugin_library(arm_64)
-standalone_plugin_library(x86_64)
+# Creates a standalone plugin library, that is built using our in-tree Clang
+# toolchain for multiple target architectures, generating a fat embedded-elf,
+# and may be loaded with the embedded dynamic library loaded. 
+#
+# Contrast with: iree_samples_system_plugin_cc_library.
+function(iree_samples_standalone_plugin_cc_library)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME"
+    "SRCS;ARCHS"
+    ${ARGN}
+  )
 
-add_custom_command(
-  OUTPUT
-    standalone_plugin.sos
-  DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_arm_64.so
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_x86_64.so
-    iree-fatelf
-  COMMAND iree-fatelf join
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_arm_64.so
-    ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin_x86_64.so
-    > ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin.sos
-  VERBATIM
-)
-add_custom_target(iree_samples_custom_dispatch_cpu_standalone_plugin DEPENDS
-  ${CMAKE_CURRENT_BINARY_DIR}/standalone_plugin.sos
-)
+  foreach(_ARCH IN LISTS _RULE_ARCHS)
+    iree_samples_standalone_plugin_cc_library_arch(
+      NAME
+        "${_RULE_NAME}"
+      ARCH
+        "${_ARCH}"
+      SRCS
+        "${_RULE_SRCS}"
+    )
+    list(APPEND _ARCH_SO_FILES "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_${_ARCH}.so")
+  endforeach()
 
-add_dependencies(iree-sample-deps iree_samples_custom_dispatch_cpu_standalone_plugin)
+  add_custom_command(
+    OUTPUT
+      "${_RULE_NAME}.sos"
+    DEPENDS
+      ${_ARCH_SO_FILES}
+      iree-fatelf
+    COMMAND iree-fatelf join
+      ${_ARCH_SO_FILES}
+      > ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.sos
+    VERBATIM
+  )
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  add_custom_target("${_NAME}" DEPENDS
+    "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.sos"
+  )
+  add_dependencies(iree-sample-deps "${_NAME}")
+endfunction()
+
+iree_samples_standalone_plugin_cc_library(
+  NAME
+    simple_mul_workgroup_standalone_plugin
+  ARCHS
+    arm_64
+    x86_64
+  SRCS
+    simple_mul_workgroup_standalone_plugin.c
+)
 
 iree_lit_test_suite(
   NAME
-    standalone_example
+    simple_mul_workgroup_standalone_example
   SRCS
-    "standalone_example.mlir"
+    "simple_mul_workgroup_standalone_example.mlir"
   DATA
-    standalone_plugin.sos
+    simple_mul_workgroup_standalone_plugin.sos
   TOOLS
     FileCheck
     iree-compile
@@ -186,11 +262,11 @@ iree_lit_test_suite(
 
 iree_lit_test_suite(
   NAME
-    standalone_ukernel
+  simple_mul_workgroup_standalone_ukernel
   SRCS
-    "standalone_ukernel.mlir"
+    "simple_mul_workgroup_standalone_ukernel.mlir"
   DATA
-    standalone_plugin.sos
+    simple_mul_workgroup_standalone_plugin.sos
   TOOLS
     FileCheck
     iree-compile

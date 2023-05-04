@@ -1,30 +1,21 @@
 // This example demonstrates calling dynamically imported functions in the
 // runtime through the use of ukernels. This is calling the same function
-// as `system_example.mlir`, but using the `iree_codegen.ukernel.generic`.
+// as `standalone_example.mlir`, but using the `iree_codegen.ukernel.generic`.
 // This is an example of how ukernels can be called from code generated
 // by IREE.
 
 // RUN: iree-compile --iree-hal-target-backends=llvm-cpu %s | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
-// RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/system_plugin$IREE_DYLIB_EXT \
+// RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/plugin/simple_mul_workgroup_standalone_plugin.sos \
 // RUN:     --function=ukernel_example \
 // RUN:     --module=- \
 // RUN:     --input=8xf32=2 \
 // RUN:     --input=8xf32=4 | \
-// RUN: FileCheck %s --check-prefix=CHECK-SYSTEM
+// RUN: FileCheck %s --check-prefix=CHECK-STANDALONE
 
-// CHECK-SYSTEM: EXEC @ukernel_example
-// simple_mul_workgroup
-// CHECK-SYSTEM-DAG: mul[0:0](2 * 4 = 8)
-// CHECK-SYSTEM-DAG: mul[0:1](2 * 4 = 8)
-// CHECK-SYSTEM-DAG: mul[0:2](2 * 4 = 8)
-// CHECK-SYSTEM-DAG: mul[0:3](2 * 4 = 8)
-// CHECK-SYSTEM-DAG: mul[1:0](2 * 4 = 8)
-// CHECK-SYSTEM-DAG: mul[1:1](2 * 4 = 8)
-// CHECK-SYSTEM-DAG: mul[1:2](2 * 4 = 8)
-// CHECK-SYSTEM-DAG: mul[1:3](2 * 4 = 8)
-// CHECK-SYSTEM: 8xf32=8 8 8 8 8 8 8 8
+// CHECK-STANDALONE: EXEC @ukernel_example
+// CHECK-STANDALONE: 8xf32=8 8 8 8 8 8 8 8
 
 func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
@@ -38,14 +29,14 @@ func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tens
   %0 = flow.dispatch.region[%c2] -> (tensor<?xf32>{%d0}) {
     %id = flow.dispatch.workgroup.id[0] : index
     %count = flow.dispatch.workgroup.count[0] : index
-
+    
     // Each thread has to perform a slice of the computation.
     %tilesize = affine.apply affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%d0, %count]
-
+    
     // Compute the offset and size of the slice
     %offset = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%id, %tilesize]
     %size = affine.min affine_map<(d0)[s0, s1] -> (s1 - d0, s0)>(%offset)[%tilesize, %d0]
-
+    
     // Extract slices of the inputs and outputs.
     %1 = tensor.extract_slice %arg0[%offset] [%size] [1] : tensor<?xf32> to tensor<?xf32>
     %2 = tensor.extract_slice %arg1[%offset] [%size] [1] : tensor<?xf32> to tensor<?xf32>
@@ -55,7 +46,7 @@ func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tens
     %4 = iree_codegen.ukernel.generic "simple_mul_workgroup"
       ins(%1, %2 : tensor<?xf32>, tensor<?xf32>)
       outs(%3 : tensor<?xf32>)
-      (%size, %id : index, index)
+      (%size, %id : index, index) 
       // We can include some additional fields on the parameters struct as
       // needed. Here we request which processor is executing the call and
       // its data fields as defined by runtime/src/iree/schemas/cpu_data.h.
