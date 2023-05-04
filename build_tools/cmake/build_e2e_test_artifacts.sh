@@ -30,6 +30,9 @@ IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_tf_python.sh
 
+apt-get update
+apt-get install -y parallel
+
 echo "Configuring to build e2e test artifacts"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -G Ninja \
@@ -48,7 +51,7 @@ echo "Importing e2e test models"
   -- -k 0
 
 echo "Building e2e test artifacts"
-"${CMAKE_BIN}" \
-  --build "${BUILD_DIR}" \
-  --target iree-e2e-test-artifacts \
-  -- -k 0 -j 1
+
+ninja -C "${BUILD_DIR}" -t query iree-e2e-compile-stats-suites | tail -n +3 | head -n -2 | tr -d ' ' > target-list
+
+cat target-list | parallel -j 12 taskset --cpu-list '$((( ({%}-1)*4 )))-$((( {%}*4-1 ))),$((( ({%}-1)*4+48 )))-$((( {%}*4+48-1 )))' ninja -C "${BUILD_DIR}" -j 1 '{}'
