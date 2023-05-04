@@ -86,6 +86,10 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.tosa
   MLIRPythonSources.Dialects.transform
   MLIRPythonSources.Dialects.vector
+
+  # iree-dialects project.
+  IREEDialectsPythonSources
+  IREEDialectsPythonExtensions
 )
 
 add_mlir_python_modules(IREECompilerPythonModules
