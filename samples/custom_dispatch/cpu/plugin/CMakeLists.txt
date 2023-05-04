@@ -23,7 +23,7 @@ function(iree_samples_system_plugin_cc_library)
     _RULE
     ""
     "NAME"
-    "SRCS"
+    "SRCS;DEPS"
     ${ARGN}
   )
 
@@ -32,6 +32,9 @@ function(iree_samples_system_plugin_cc_library)
       ${_RULE_NAME}
     SRCS
       ${_RULE_SRCS}
+    DEPS
+      ${_RULE_DEPS}
+      iree::hal::local::executable_plugin
     INCLUDES
       "${IREE_SOURCE_DIR}/runtime/src/"
     SHARED
@@ -56,6 +59,15 @@ iree_samples_system_plugin_cc_library(
     simple_mul_workgroup_system_plugin
   SRCS
     simple_mul_workgroup_system_plugin.c
+)
+
+iree_samples_system_plugin_cc_library(
+  NAME
+    builtin_ukernel_system_plugin
+  SRCS
+    builtin_ukernel_system_plugin.c
+  DEPS
+    iree::builtins::ukernel
 )
 
 iree_lit_test_suite(
@@ -83,6 +95,20 @@ iree_lit_test_suite(
     iree-compile
     iree-run-module
     iree_samples_custom_dispatch_cpu_plugin_simple_mul_workgroup_system_plugin
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
+iree_lit_test_suite(
+  NAME
+    builtin_ukernel_system_plugin_test
+  SRCS
+    "builtin_ukernel_system_plugin_test.mlir"
+  TOOLS
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_plugin_builtin_ukernel_system_plugin
   LABELS
     "driver=local-sync"
     "hostonly"

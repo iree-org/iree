@@ -78,15 +78,31 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 0);
   Value k = rewriter.create<tensor::DimOp>(loc, rhs, 1);
-  Value m0 = rewriter.create<tensor::DimOp>(loc, lhs, 2);
-  Value n0 = rewriter.create<tensor::DimOp>(loc, rhs, 2);
-  Value k0 = rewriter.create<tensor::DimOp>(loc, rhs, 3);
+
+  auto getDimAsI32 = [](RewriterBase& rewriter, Location loc, Value value, int dim) -> Value {
+    return rewriter.create<arith::IndexCastOp>(loc, rewriter.getI32Type(),
+                                                     rewriter.create<tensor::DimOp>(loc, value, dim));
+  };
+  Value m0 = getDimAsI32(rewriter, loc, lhs, 2);
+  Value n0 = getDimAsI32(rewriter, loc, rhs, 2);
+  Value k0 = getDimAsI32(rewriter, loc, rhs, 3);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
+  const char *fnName = "";
+  SmallVector<NamedAttribute> fnDefAttrs;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  if (isVMVXBackend(targetAttr)) {
+    fnName = "vmvx.mmt4d";
+  } else {
+    fnName = "uk.mmt4d";
+    fnDefAttrs.emplace_back(
+        rewriter.getStringAttr("hal.import.fields"),
+        rewriter.getArrayAttr({rewriter.getStringAttr("processor_data")}));
+  }
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, "vmvx.mmt4d", ValueRange{lhs, rhs}, out,
+      loc, outType, fnName, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
-      /*fn_def_attrs=*/nullptr,
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fnDefAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -192,11 +208,22 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value out_size3 = rewriter.create<tensor::DimOp>(loc, out, 3);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
+  const char *fnName = "";
+  SmallVector<NamedAttribute> fnDefAttrs;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  if (isVMVXBackend(targetAttr)) {
+    fnName = "vmvx.pack";
+  } else {
+    fnName = "uk.pack";
+    fnDefAttrs.emplace_back(
+        rewriter.getStringAttr("hal.import.fields"),
+        rewriter.getArrayAttr({rewriter.getStringAttr("processor_data")}));
+  }
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, "vmvx.pack", in, out,
+      loc, outType, fnName, in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
-      /*fn_def_attrs=*/nullptr,
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fnDefAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -267,11 +294,22 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value out_size1 = rewriter.create<tensor::DimOp>(loc, out, 1);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
+  const char *fnName = "";
+  SmallVector<NamedAttribute> fnDefAttrs;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  if (isVMVXBackend(targetAttr)) {
+    fnName = "vmvx.unpack";
+  } else {
+    fnName = "uk.unpack";
+    fnDefAttrs.emplace_back(
+        rewriter.getStringAttr("hal.import.fields"),
+        rewriter.getArrayAttr({rewriter.getStringAttr("processor_data")}));
+  }
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, "vmvx.unpack", in, out,
+      loc, outType, fnName, in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
-      /*fn_def_attrs=*/nullptr,
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fnDefAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
