@@ -63,7 +63,6 @@ static void buildMHLOInputConversionPassPipelineImpl(OpPassManager &passManager,
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(
       mhlo::createLegalizeControlFlowPass());
-  passManager.addNestedPass<func::FuncOp>(createEmitDefaultIREEABIPass());
 
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf
