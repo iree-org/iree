@@ -188,19 +188,13 @@ iree_status_t iree_hal_cuda_device_create(
   return status;
 }
 
-bool iree_hal_cuda_device_isa(iree_hal_device_t* base_device) {
-  return iree_hal_resource_is(base_device, &iree_hal_cuda_device_vtable);
-}
-
 CUcontext iree_hal_cuda_device_context(iree_hal_device_t* base_device) {
-  if (!iree_hal_cuda_device_isa(base_device)) return NULL;
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return device->context_wrapper.cu_context;
 }
 
 iree_hal_cuda_dynamic_symbols_t* iree_hal_cuda_device_dynamic_symbols(
     iree_hal_device_t* base_device) {
-  if (!iree_hal_cuda_device_isa(base_device)) return NULL;
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return device->context_wrapper.syms;
 }

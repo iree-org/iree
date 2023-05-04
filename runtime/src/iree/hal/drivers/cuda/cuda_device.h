@@ -23,9 +23,6 @@ iree_status_t iree_hal_cuda_device_create(
     iree_hal_cuda_dynamic_symbols_t* syms, CUdevice device,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
-// Returns true if |device| is a CUDA device.
-bool iree_hal_cuda_device_isa(iree_hal_device_t* device);
-
 // Returns a CUDA context bound to the given |device| if it is a CUDA device
 // and otherwise returns NULL.
 //

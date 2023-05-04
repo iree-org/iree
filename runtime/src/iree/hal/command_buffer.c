@@ -222,13 +222,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
   return status;
 }
 
-IREE_API_EXPORT void* iree_hal_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  IREE_ASSERT_ARGUMENT(command_buffer);
-  if (iree_hal_resource_is(command_buffer, vtable)) return command_buffer;
-  return _VTABLE_DISPATCH(command_buffer, dyn_cast)(command_buffer, vtable);
-}
-
 IREE_API_EXPORT iree_hal_command_buffer_mode_t
 iree_hal_command_buffer_mode(const iree_hal_command_buffer_t* command_buffer) {
   IREE_ASSERT_ARGUMENT(command_buffer);

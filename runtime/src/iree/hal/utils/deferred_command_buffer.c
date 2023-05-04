@@ -213,17 +213,8 @@ static void iree_hal_deferred_command_buffer_destroy(
 
 IREE_API_EXPORT bool iree_hal_deferred_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(
-      command_buffer, &iree_hal_deferred_command_buffer_vtable);
-}
-
-static void* iree_hal_deferred_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_deferred_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_deferred_command_buffer_vtable);
 }
 
 static iree_status_t iree_hal_deferred_command_buffer_begin(
@@ -919,8 +910,7 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_deferred_command_buffer_t* command_buffer =
-      (iree_hal_deferred_command_buffer_t*)iree_hal_command_buffer_dyn_cast(
-          base_command_buffer, &iree_hal_deferred_command_buffer_vtable);
+      iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
 
   iree_status_t status = iree_hal_command_buffer_begin(target_command_buffer);
@@ -953,7 +943,6 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_deferred_command_buffer_vtable = {
         .destroy = iree_hal_deferred_command_buffer_destroy,
-        .dyn_cast = iree_hal_deferred_command_buffer_dyn_cast,
         .begin = iree_hal_deferred_command_buffer_begin,
         .end = iree_hal_deferred_command_buffer_end,
         .execution_barrier = iree_hal_deferred_command_buffer_execution_barrier,
