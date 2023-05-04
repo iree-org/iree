@@ -33,6 +33,7 @@ class TargetABI(Enum):
   # compiler/src/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
   VULKAN_ANDROID30 = "android30"
   VULKAN_ANDROID31 = "android31"
+  VULKAN_LINUX = "linux"
 
 
 class RuntimeLoader(Enum):

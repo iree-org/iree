@@ -44,9 +44,11 @@ class DeviceArchitecture(_ArchitectureInfo, Enum):
   RV64_GENERIC = (ArchitectureType.CPU, "riscv_64", "generic")
   RV32_GENERIC = (ArchitectureType.CPU, "riscv_32", "generic")
 
-  # Mobile GPUs
+  # Vulkan GPUs
   QUALCOMM_ADRENO = (ArchitectureType.GPU, "adreno", "", "qualcomm")
   ARM_VALHALL = (ArchitectureType.GPU, "valhall", "", "arm")
+  NVIDIA_AMPERE = (ArchitectureType.GPU, "ampere", "", "nvidia")
+  NVIDIA_PASCAL = (ArchitectureType.GPU, "pascal", "", "nvidia")
 
   # CUDA GPUs
   CUDA_SM70 = (ArchitectureType.GPU, "cuda", "sm_70")

@@ -2719,6 +2719,82 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-63a1dd898daa56fc3a0bff652cb5b2e0483cfe90e9dcd7994b73183b7ce106b2"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8_ClipTextSeqLen64PT.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_63a1dd898daa56fc3a0bff652cb5b2e0483cfe90e9dcd7994b73183b7ce106b2/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=ampere-unknown-linux"
+    "--iree-stream-resource-index-bits=64"
+    "--iree-vm-target-index-bits=64"
+    "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][experimental-flags,tensorcore]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-d0d1a869e3f3901f6f60afaf57160ce888a852f6703efc79756415d43cfcd13e"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_340553d1-e6fe-41b6-b2c7-687c74ccec56_Unet2dPT.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_d0d1a869e3f3901f6f60afaf57160ce888a852f6703efc79756415d43cfcd13e/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=ampere-unknown-linux"
+    "--iree-stream-resource-index-bits=64"
+    "--iree-vm-target-index-bits=64"
+    "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
+  FRIENDLY_NAME
+    "Unet2dPT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][experimental-flags,tensorcore]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-337a3ab92a878301dc4bdd2554739b59ebf7925d85af42ee16780ba6c6dee0d8"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8_ClipTextSeqLen64PT.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_337a3ab92a878301dc4bdd2554739b59ebf7925d85af42ee16780ba6c6dee0d8/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=pascal-unknown-linux"
+    "--iree-stream-resource-index-bits=64"
+    "--iree-vm-target-index-bits=64"
+    "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][experimental-flags,simt]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-b5d399322ea7d5e831efb647928974f7f3abce21b2220af9cf9344ccea411545"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_340553d1-e6fe-41b6-b2c7-687c74ccec56_Unet2dPT.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_b5d399322ea7d5e831efb647928974f7f3abce21b2220af9cf9344ccea411545/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=pascal-unknown-linux"
+    "--iree-stream-resource-index-bits=64"
+    "--iree-vm-target-index-bits=64"
+    "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
+  FRIENDLY_NAME
+    "Unet2dPT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][experimental-flags,simt]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-86ce8dfe2979d777a7f9eb0d3b6f8dcd4b594f46e9d610ad8a73edc89a006b26"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_a56388db344366834963ce4295c7695bd3f75b6840962c0b4aec857f34575ded.mlir"
@@ -5610,6 +5686,98 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    "iree-module-b975b6877510291f2ee4ca814bd9b6a5cd2a2bf90c506627eb69b305835f1197"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8_ClipTextSeqLen64PT.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_b975b6877510291f2ee4ca814bd9b6a5cd2a2bf90c506627eb69b305835f1197/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=ampere-unknown-linux"
+    "--iree-stream-resource-index-bits=64"
+    "--iree-vm-target-index-bits=64"
+    "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_b975b6877510291f2ee4ca814bd9b6a5cd2a2bf90c506627eb69b305835f1197/scheduling_stats.json"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][experimental-flags,tensorcore,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-6dd24b8caef78a32f9aaa8d86557e7fff7feca016887de56c20d89d5e6e466f6"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_340553d1-e6fe-41b6-b2c7-687c74ccec56_Unet2dPT.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_6dd24b8caef78a32f9aaa8d86557e7fff7feca016887de56c20d89d5e6e466f6/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=ampere-unknown-linux"
+    "--iree-stream-resource-index-bits=64"
+    "--iree-vm-target-index-bits=64"
+    "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_6dd24b8caef78a32f9aaa8d86557e7fff7feca016887de56c20d89d5e6e466f6/scheduling_stats.json"
+  FRIENDLY_NAME
+    "Unet2dPT(linalg) [nvidia-ampere-vulkan_linux-vulkan_spirv][experimental-flags,tensorcore,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-85216f0b904906cd9508018c3644350882b72bc4702e875d9e31f33cc751de06"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8_ClipTextSeqLen64PT.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_85216f0b904906cd9508018c3644350882b72bc4702e875d9e31f33cc751de06/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=pascal-unknown-linux"
+    "--iree-stream-resource-index-bits=64"
+    "--iree-vm-target-index-bits=64"
+    "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_ClipTextSeqLen64PT_module_85216f0b904906cd9508018c3644350882b72bc4702e875d9e31f33cc751de06/scheduling_stats.json"
+  FRIENDLY_NAME
+    "ClipTextSeqLen64PT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][experimental-flags,simt,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    "iree-module-824ac4e9e8621e344eca176c4c3e066acf8e460cff9337f94701de3e37c86e1a"
+  SRC
+    "${ROOT_ARTIFACTS_DIR}/model_340553d1-e6fe-41b6-b2c7-687c74ccec56_Unet2dPT.mlir"
+  MODULE_FILE_NAME
+    "${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_824ac4e9e8621e344eca176c4c3e066acf8e460cff9337f94701de3e37c86e1a/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=pascal-unknown-linux"
+    "--iree-stream-resource-index-bits=64"
+    "--iree-vm-target-index-bits=64"
+    "--iree-preprocessing-pass-pipeline=builtin.module(func.func(iree-flow-detach-elementwise-from-named-ops,iree-preprocessing-convert-conv2d-to-img2col,iree-flow-convert-1x1-filter-conv2d-to-matmul,iree-preprocessing-pad-linalg-ops{pad-size=32}))"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_824ac4e9e8621e344eca176c4c3e066acf8e460cff9337f94701de3e37c86e1a/scheduling_stats.json"
+  FRIENDLY_NAME
+    "Unet2dPT(linalg) [nvidia-pascal-vulkan_linux-vulkan_spirv][experimental-flags,simt,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     "iree-module-02b72f9538e4dfc9c789e63d722d5eab4333f3f55f8375503f433a790da119cc"
   SRC
     "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_a56388db344366834963ce4295c7695bd3f75b6840962c0b4aec857f34575ded.mlir"
@@ -5828,6 +5996,10 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-e52ef218d6b5b16f35c420fca42ff31c5cf733bc075ed235ce57cf4662824606
   ${PACKAGE_NAME}_iree-module-1202e44fbbde0a9581c641d124452363273f0d4395445dc06e60c8e49a27357b
   ${PACKAGE_NAME}_iree-module-3c1fbaa12bbd37bf2a17d8a605cdeca75c0e8cc9c6f7e95359d13e47a4270dc3
+  ${PACKAGE_NAME}_iree-module-63a1dd898daa56fc3a0bff652cb5b2e0483cfe90e9dcd7994b73183b7ce106b2
+  ${PACKAGE_NAME}_iree-module-d0d1a869e3f3901f6f60afaf57160ce888a852f6703efc79756415d43cfcd13e
+  ${PACKAGE_NAME}_iree-module-337a3ab92a878301dc4bdd2554739b59ebf7925d85af42ee16780ba6c6dee0d8
+  ${PACKAGE_NAME}_iree-module-b5d399322ea7d5e831efb647928974f7f3abce21b2220af9cf9344ccea411545
   ${PACKAGE_NAME}_iree-module-86ce8dfe2979d777a7f9eb0d3b6f8dcd4b594f46e9d610ad8a73edc89a006b26
   ${PACKAGE_NAME}_iree-module-bd0ea10065a27dea6875ceb70f769e7e0f67a08e857920ca0d0322593441e9ed
 )
@@ -5967,6 +6139,10 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-6e207112c3da58908537a07d168c78e7d166fe6803659d4b9f07848c968d6d12
   ${PACKAGE_NAME}_iree-module-75259bfdbf7eb331691860ffb18e04a146168a72b7b10cf070d5db7f67dd2378
   ${PACKAGE_NAME}_iree-module-5ef6657fb694df545b7f87fbb78dfa99af891778790ac0924c08a87d335c1bf9
+  ${PACKAGE_NAME}_iree-module-b975b6877510291f2ee4ca814bd9b6a5cd2a2bf90c506627eb69b305835f1197
+  ${PACKAGE_NAME}_iree-module-6dd24b8caef78a32f9aaa8d86557e7fff7feca016887de56c20d89d5e6e466f6
+  ${PACKAGE_NAME}_iree-module-85216f0b904906cd9508018c3644350882b72bc4702e875d9e31f33cc751de06
+  ${PACKAGE_NAME}_iree-module-824ac4e9e8621e344eca176c4c3e066acf8e460cff9337f94701de3e37c86e1a
   ${PACKAGE_NAME}_iree-module-02b72f9538e4dfc9c789e63d722d5eab4333f3f55f8375503f433a790da119cc
   ${PACKAGE_NAME}_iree-module-e7bd41e564750501f39ac9690c18d1a2e77dc7999da710d0c0bf80751dda84a0
 )
