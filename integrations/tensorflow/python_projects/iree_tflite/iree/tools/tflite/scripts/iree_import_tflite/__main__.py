@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import sys
 import iree.tools.tflite
+from tensorflow.python.pywrap_mlir import experimental_tflite_to_tosa_bytecode
 
 
 def main():
@@ -38,15 +39,18 @@ def main():
 
   # Deprecated and unused.  Kept in place so callers of the old tool don't break
   # when using the new tool.
-  parser.add_argument('--output-format',
-                      dest='output_format',
-                      required=False,
-                      default="mlir-bytecode",
-                      help=argparse.SUPPRESS)
+  parser.add_argument(
+      '--output-format',
+      dest='output_format',
+      required=False,
+      default='mlir-bytecode',
+      help=argparse.SUPPRESS,
+  )
   args = parser.parse_args()
 
-  if args.output_format != "mlir-bytecode":
-    logging.warning("output-format option is deprecated, emitting MLIR bytecode")
+  if args.output_format != 'mlir-bytecode':
+    logging.warning(
+        'output-format option is deprecated, emitting MLIR bytecode')
 
   tflite_to_tosa(
       flatbuffer=args.flatbuffer,
@@ -63,12 +67,14 @@ def tflite_to_tosa(
     ordered_input_arrays=None,
     ordered_output_arrays=None,
 ):
-  from tensorflow.python.pywrap_mlir import experimental_tflite_to_tosa_bytecode
-  experimental_tflite_to_tosa_bytecode(flatbuffer, bytecode,
-                                       use_external_constant,
-                                       ordered_input_arrays,
-                                       ordered_output_arrays)
+  experimental_tflite_to_tosa_bytecode(
+      flatbuffer,
+      bytecode,
+      use_external_constant,
+      ordered_input_arrays,
+      ordered_output_arrays,
+  )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   main()
