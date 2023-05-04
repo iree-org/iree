@@ -140,9 +140,7 @@ git add -A
 git diff HEAD --exit-code
 
 echo "***** Check BUILD files are not named BUILD (prefer BUILD.bazel) *****"
-disable_update_ret
 if [[ $(git ls-files '**/BUILD') ]]; then
-  enable_update_ret
   echo "failure: found files named BUILD. Please rename the following files to BUILD.bazel:"
   git ls-files '**/BUILD'
   (exit 1)
