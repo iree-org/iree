@@ -51,4 +51,4 @@ echo "Building e2e test artifacts"
 
 ninja -C "${BUILD_DIR}" -t query iree-e2e-compile-stats-suites | tail -n +3 | head -n -2 | tr -d ' ' > target-list
 
-cat target-list | parallel -j 2 taskset --cpu-list '$((( ({%}-1)*24 )))-$((( {%}*24-1 ))),$((( ({%}-1)*24+48 )))-$((( {%}*24+48-1 )))' ninja -C "${BUILD_DIR}" -j 1 '{}'
+cat target-list | parallel -j 6 taskset --cpu-list '$((( ({%}-1)*8 )))-$((( {%}*8-1 ))),$((( ({%}-1)*8+48 )))-$((( {%}*8+48-1 )))' ninja -C "${BUILD_DIR}" -j 1 '{}'
