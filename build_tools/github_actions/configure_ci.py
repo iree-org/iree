@@ -77,7 +77,7 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-DEFAULT_BENCHMARK_PRESETS = ["cuda", "x86_64", "comp-stats"]
+DEFAULT_BENCHMARK_PRESETS = ["cuda", "x86_64", "vulkan-nvidia", "comp-stats"]
 BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESETS + [
     "experimental-android-cpu"
 ]
