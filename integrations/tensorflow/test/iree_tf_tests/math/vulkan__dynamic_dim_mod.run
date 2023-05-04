@@ -1,4 +1,0 @@
-# REQUIRES: vulkan
-# REQUIRES: bugfix
-#           Fails on NVIDIA Turing
-# RUN: %PYTHON -m iree_tf_tests.math.math_test --target_backends=iree_vulkan --dynamic_dims=true --functions=mod --artifacts_dir=%t

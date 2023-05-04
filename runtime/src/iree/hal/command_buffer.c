@@ -43,6 +43,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
       kind_names[IREE_HAL_COLLECTIVE_KIND_MAX_VALUE + 1] = {
           [IREE_HAL_COLLECTIVE_KIND_ALL_GATHER] = IREE_SVL("all_gather"),
           [IREE_HAL_COLLECTIVE_KIND_ALL_REDUCE] = IREE_SVL("all_reduce"),
+          [IREE_HAL_COLLECTIVE_KIND_ALL_TO_ALL] = IREE_SVL("all_to_all"),
           [IREE_HAL_COLLECTIVE_KIND_BROADCAST] = IREE_SVL("broadcast"),
           [IREE_HAL_COLLECTIVE_KIND_REDUCE] = IREE_SVL("reduce"),
           [IREE_HAL_COLLECTIVE_KIND_REDUCE_SCATTER] =
@@ -129,6 +130,35 @@ IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
   };
   return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_collective_element_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
+    iree_hal_collective_element_type_t element_type) {
+  switch (element_type) {
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_8:
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_8:
+      return 1;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_16:
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_16:
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_16:
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_BFLOAT_16:
+      return 2;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_32:
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_32:
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_32:
+      return 4;
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_SINT_64:
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_UINT_64:
+    case IREE_HAL_COLLECTIVE_ELEMENT_TYPE_FLOAT_64:
+      return 8;
+    default:
+      IREE_ASSERT(false, "unhandled element type for collective op");
+      return 0;
+  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -26,6 +26,40 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+/// A warpper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
+/// a tensor.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
+struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PackOp op,
+                                PatternRewriter &rewriter) const override {
+    FailureOr<linalg::LowerPackResult> res = linalg::lowerPack(rewriter, op);
+    if (failed(res)) {
+      return rewriter.notifyMatchFailure(
+          op, "cannot lower to pad + expand + transpose");
+    }
+    return success();
+  }
+};
+
+/// A warpper pattern that calls linalg::lowerUnPack on tensor::UnPackOp. It
+/// lowers a tensor.unpack op to tensor.empty + linalg.transpose +
+/// tensor.collapse_shape + tensor.extract_slice ops.
+struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
+  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::UnPackOp op,
+                                PatternRewriter &rewriter) const override {
+    FailureOr<linalg::LowerUnPackOpResult> res =
+        linalg::lowerUnPack(rewriter, op);
+    if (failed(res)) {
+      return rewriter.notifyMatchFailure(
+          op, "cannot lower to empty + transpose + reshape + extract_slice");
+    }
+    return success();
+  }
+};
+
 struct DecomposePackUnPackOpsPass
     : public DecomposePackUnPackOpsBase<DecomposePackUnPackOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -41,6 +75,34 @@ struct DecomposePackUnPackOpsPass
 void DecomposePackUnPackOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
+  // Generalization patterns for outer unit dims have higher priority because
+  // they do not generate reshape ops.
+  {
+    RewritePatternSet patterns(ctx);
+    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
+                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      funcOp.emitError(
+          "failed to apply generalization patterns on pack/unpack ops for "
+          "outer unit dims cases");
+      return signalPassFailure();
+    }
+  }
+
+  {
+    RewritePatternSet patterns(ctx);
+    patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      funcOp.emitError(
+          "failed to apply generalization patterns on pack/unpack ops for "
+          "general cases.");
+      return signalPassFailure();
+    }
+  }
+
+  // TODO(hanchung): Below is a fallback solution for tensor.pack/unpack
+  // decomposition. They will be retired after lowerPack and lowerUnPack handle
+  // all the cases.
 
   // Apply tiling to make outer dims be all 1s.
   {
@@ -97,34 +159,41 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       if (failed(tilingResult)) return signalPassFailure();
       rewriter.replaceOp(op, tilingResult->replacements);
     });
+
+    LLVM_DEBUG({
+      llvm::dbgs()
+          << "--- After applying tiling that makes outer dims be all 1s ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs()
-        << "--- After applying tiling that makes outer dims be all 1s ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  // Generalize pack and unpack ops and canonicalize tiled ops.
+  // Canonicalize tiled ops.
   {
     RewritePatternSet patterns(ctx);
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
-    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    ctx->getOrLoadDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
+        patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 
   LLVM_DEBUG({
-    llvm::dbgs()
-        << "--- After generalizing tensor.pack and tensor.unpack ops ---\n";
+    llvm::dbgs() << "--- After canonicalizing tiled ops ---\n";
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
+
+  {
+    RewritePatternSet patterns(ctx);
+    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
+                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

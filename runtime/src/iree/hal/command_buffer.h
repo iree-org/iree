@@ -233,6 +233,15 @@ enum iree_hal_collective_kind_e {
   //   ncclAllReduce
   IREE_HAL_COLLECTIVE_KIND_ALL_REDUCE,
 
+  // Gathers |element_count| elements of the specified type in |recv_binding| by
+  // sourcing N parts of |element_count|/N elements, one from the |send_binding|
+  // of each rank, and concatenating them.
+  //
+  // |param|: unused
+  // |send_binding|: local elements to split and send to all ranks
+  // |recv_binding|: concatenated results from all ranks
+  IREE_HAL_COLLECTIVE_KIND_ALL_TO_ALL,
+
   // Copies |element_count| elements of the specified type from |send_binding|
   // on the specified rank |param| to all other ranks |recv_binding|s.
   //
@@ -358,6 +367,10 @@ static_assert(sizeof(iree_hal_collective_op_t) == sizeof(uint32_t),
 // a string view into the storage of the resulting value.
 IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
     const iree_hal_collective_op_t* op, iree_bitfield_string_temp_t* out_temp);
+
+// Returns the number of bytes each |element_type| consumes in memory.
+IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
+    iree_hal_collective_element_type_t element_type);
 
 // Describes a subrange of a buffer that can be bound to a binding slot.
 typedef struct iree_hal_buffer_binding_t {

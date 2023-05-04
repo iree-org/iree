@@ -174,12 +174,6 @@ def BufferizeCopyOnlyDispatches :
   let summary =
       "Bufferize dispatches that copy to/from interfaces to convert to a linalg.copy op";
   let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
-  let options = [
-    Option<"embedSubspanOffsetIntoMemRefType",
-           "embed-subspan-offset-into-memref-type", "bool", /*default=*/"true",
-           "Embeds the offset information on subspan ops into the type."
-           "Is a work-around for #12933">,
-  ];
 }
 
 def EliminateEmptyTensors :
@@ -205,10 +199,6 @@ def IREEComprehensiveBufferize :
     Option<"printConflicts", "print-conflicts", "bool",
             /*default=*/"false",
            "Annotates IR with RaW conflicts. Requires test-analysis-only.">,
-    Option<"embedSubspanOffsetIntoMemRefType",
-           "embed-subspan-offset-into-memref-type", "bool", /*default=*/"true",
-           "Embeds the offset information on subspan ops into the type."
-           "Is a work-around for #12933">,
   ];
 }
 

@@ -294,10 +294,10 @@ func.func @main(%arg0: tensor<?x?xf32>, %arg1: index, %arg2: index, %arg3: tenso
   %1 = flow.tensor.tie_shape %arg3 : tensor<?x?xf32>{%arg4, %arg5}
   %2 = flow.dispatch.workgroups[%arg1, %arg2, %arg4, %arg5](%0, %1, %arg1, %arg2, %arg4, %arg5) : (tensor<?x?xf32>{%arg1, %arg2}, tensor<?x?xf32>{%arg4, %arg5}, index, index, index, index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>{%arg4, %arg5} =
       (%arg6: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg7: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg8: index, %arg9: index, %arg10: index, %arg11: index, %arg12: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>) {
-    %arg8_0 = flow.dispatch.workload.ordinal %arg8 0 : index
-    %arg9_0 = flow.dispatch.workload.ordinal %arg9 1 : index
-    %arg10_0 = flow.dispatch.workload.ordinal %arg10 2 : index
-    %arg11_0 = flow.dispatch.workload.ordinal %arg11 3 : index
+    %arg8_0 = flow.dispatch.workload.ordinal %arg8, 0 : index
+    %arg9_0 = flow.dispatch.workload.ordinal %arg9, 1 : index
+    %arg10_0 = flow.dispatch.workload.ordinal %arg10, 2 : index
+    %arg11_0 = flow.dispatch.workload.ordinal %arg11, 3 : index
     %4 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg8_0, %arg9_0}
     %5 = flow.dispatch.tie_shape %arg7 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg10_0, %arg11_0}
     %6 = flow.dispatch.tie_shape %arg12 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<MATMUL_F32F32F32_LHS>>>{%arg10_0, %arg11_0}

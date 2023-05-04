@@ -215,6 +215,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     /// signature. In case an output is tied to an input, the return list
     /// overlaps with `getInputBlockArguments`.
     SmallVector<BlockArgument> getOutputBlockArguments();
+
+    /// Returns the tiedOperands attribute as a list of integers.
+    SmallVector<int64_t> getTiedOperandsAsIntegerList();
   }];
 
   let hasVerifier = 1;
@@ -1535,8 +1538,12 @@ def FLOW_DispatchWorkloadOrdinalOp :
   }];
 
   let assemblyFormat = [{
-    attr-dict $operand $ordinal `:` type($operand)
+    attr-dict $operand `,` $ordinal `:` type($operand)
   }];
+
+  let hasCanonicalizer = 1;
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1677,6 +1684,43 @@ def FLOW_CollectiveAllReduceOp : FLOW_Op<"collective.all_reduce", [
   let builders = [
     OpBuilder<(ins
       "CollectiveReductionOpAttr":$reduction_op,
+      "CollectiveElementTypeAttr":$element_type,
+      "Value":$target,
+      "Value":$source,
+      "Value":$channel)>,
+  ];
+}
+
+def FLOW_CollectiveAllToAllOp : FLOW_Op<"collective.all_to_all", [
+  AllTypesMatch<["target", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{performs all-to-all operation}];
+  let description = [{This operation mutually exchanges data acrosss all of the ranks in the channel.}];
+
+  let arguments = (ins
+    FLOW_CollectiveElementTypeAttr:$element_type,
+    FLOW_Tensor:$target,
+    FLOW_ShapeDynamicDims:$target_dims,
+    FLOW_Tensor:$source,
+    FLOW_Channel:$channel,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+  let assemblyFormat = [{
+    $element_type `,` $target `,` $source `,` $channel `:`
+    `(` type($target) `,` type($source) `,` type($channel) `)` `->`
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    attr-dict-with-keyword
+  }];
+  let builders = [
+    OpBuilder<(ins
       "CollectiveElementTypeAttr":$element_type,
       "Value":$target,
       "Value":$source,

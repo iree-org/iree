@@ -90,9 +90,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         run_config.target_device_spec)
     cmds.append(tool_path)
 
-    module_dir_path = iree_artifacts.get_module_dir_path(
-        run_config.module_generation_config,
-        root_path=self.config.root_benchmark_dir)
+    module_dir_path = benchmark_case.benchmark_case_dir
     cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
     cmds += run_config.materialize_run_flags(gpu_id=self.gpu_id)
 
@@ -115,8 +113,11 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
               driver_info=benchmark_case.driver_info,
               benchmark_min_time=self.config.benchmark_min_time))
 
+    # TODO(#11076): Legacy mode need to switch CWD, remove it in the cleanup.
+    cwd = (benchmark_case.benchmark_case_dir
+           if benchmark_case.run_config is None else None)
     benchmark_stdout, benchmark_stderr = execute_cmd_and_get_output(
-        cmd, cwd=benchmark_case.benchmark_case_dir, verbose=self.verbose)
+        cmd, cwd=cwd, verbose=self.verbose)
     benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout,
                                                      benchmark_stderr)
     if self.verbose:
@@ -133,9 +134,13 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                  benchmark_case.benchmark_tool_name)
     cmd = self.__build_tool_cmds(benchmark_case=benchmark_case,
                                  tool_path=tool_path)
+
+    # TODO(#11076): Legacy mode need to switch CWD, remove it in the cleanup.
+    cwd = (benchmark_case.benchmark_case_dir
+           if benchmark_case.run_config is None else None)
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
-                               cwd=benchmark_case.benchmark_case_dir,
+                               cwd=cwd,
                                stdout=subprocess.PIPE,
                                text=True)
 
@@ -170,7 +175,8 @@ def main(args):
         data=benchmark_group["run_configs"],
         root_type=typing.List[iree_definitions.E2EModelRunConfig])
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
-        run_configs=run_configs)
+        run_configs=run_configs,
+        root_benchmark_dir=benchmark_config.root_benchmark_dir)
 
   benchmark_driver = LinuxBenchmarkDriver(gpu_id=args.gpu_id,
                                           device_info=device_info,

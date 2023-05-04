@@ -156,6 +156,113 @@ func.func @all_gather_dim_0_optional_attrs(%input : tensor<512xf32>) -> tensor<1
 
 // -----
 
+// CHECK-LABEL: @all_to_all_split_concat_same
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<1024xf32>) -> tensor<1024xf32>
+func.func @all_to_all_split_concat_same(%input : tensor<1024xf32>) -> tensor<1024xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<1024xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_to_all f32, [[EMPTY]], [[ARG0]], %channel_default  : (tensor<1024xf32>, tensor<1024xf32>, !flow.channel) -> [[EMPTY]] as tensor<1024xf32>
+  // CHECK: return [[OP]] : tensor<1024xf32>
+  %out = "mhlo.all_to_all"(%input) {
+     split_dimension = 0 : i64,
+     concat_dimension = 0 : i64,
+     split_count = 2 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<1024xf32>) -> tensor<1024xf32>
+  return %out : tensor<1024xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @all_to_all_split_concat_same_dim_1
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<2x4xf32>) -> tensor<2x4xf32>
+func.func @all_to_all_split_concat_same_dim_1(%input : tensor<2x4xf32>) -> tensor<2x4xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<4x2xf32>
+  // CHECK: [[TRANSPOSE_ARG:%.+]] = linalg.generic
+  // CHECK: [[OP:%.+]] = flow.collective.all_to_all f32, [[EMPTY]], [[TRANSPOSE_ARG]], %channel_default  : (tensor<4x2xf32>, tensor<4x2xf32>, !flow.channel) -> [[EMPTY]] as tensor<4x2xf32>
+  // CHECK: [[TRANSPOSE_OUT:%.+]] = linalg.generic
+  // CHECK: return [[TRANSPOSE_OUT]] : tensor<2x4xf32>
+  %out = "mhlo.all_to_all"(%input) {
+     split_dimension = 1 : i64,
+     concat_dimension = 1 : i64,
+     split_count = 2 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<2x4xf32>) -> tensor<2x4xf32>
+  return %out : tensor<2x4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @all_to_all_split_dim_0
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x4xf32>) -> tensor<2x8xf32>
+func.func @all_to_all_split_dim_0(%input : tensor<4x4xf32>) -> tensor<2x8xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<4x4xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.all_to_all f32, [[EMPTY]], [[ARG0]], [[CHANNEL]]  : (tensor<4x4xf32>, tensor<4x4xf32>, !flow.channel) -> [[EMPTY]] as tensor<4x4xf32>
+  // CHECK: [[REARRANGE_RESHAPE:%.+]] = tensor.expand_shape [[OP]] {{\[}}[0, 1], [2]] : tensor<4x4xf32> into tensor<2x2x4xf32>
+  // CHECK: [[REARRANGE_TRANSPOSE:%.+]] = linalg.generic
+  // CHECK: [[RESHAPE_OUT:%.+]] = tensor.collapse_shape [[REARRANGE_TRANSPOSE]] {{\[}}[0], [1, 2]] : tensor<2x2x4xf32> into tensor<2x8xf32> 
+  // CHECK: return [[RESHAPE_OUT]] : tensor<2x8xf32>
+  %out = "mhlo.all_to_all"(%input) {
+     split_dimension = 0 : i64,
+     concat_dimension = 1 : i64,
+     split_count = 2 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<4x4xf32>) -> tensor<2x8xf32>
+  return %out : tensor<2x8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @all_to_all_split_dim_1
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x4xf32>) -> tensor<8x2xf32>
+func.func @all_to_all_split_dim_1(%input : tensor<4x4xf32>) -> tensor<8x2xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<4x4xf32>
+  // CHECK: [[TRANSPOSE_ARG:%.+]] = linalg.generic
+  // CHECK: [[OP:%.+]] = flow.collective.all_to_all f32, [[EMPTY]], [[TRANSPOSE_ARG]], [[CHANNEL]]  : (tensor<4x4xf32>, tensor<4x4xf32>, !flow.channel) -> [[EMPTY]] as tensor<4x4xf32>
+  // CHECK: [[TRANSPOSE_OUT:%.+]] = linalg.generic
+  // CHECK: [[REARRANGE_RESHAPE1:%.+]] = tensor.expand_shape [[TRANSPOSE_OUT]] {{\[}}[0], [1, 2]] : tensor<4x4xf32> into tensor<4x2x2xf32>
+  // CHECK: [[EMPTY2:%.+]] = tensor.empty() : tensor<2x4x2xf32>
+  // CHECK: [[REARRANGE_TRANSPOSE:%.+]] = linalg.generic
+  // CHECK: [[REARRANGE_RESHAPE2:%.+]] = tensor.collapse_shape [[REARRANGE_TRANSPOSE]] {{\[}}[0, 1], [2]] : tensor<2x4x2xf32> into tensor<8x2xf32>
+  // CHECK: return [[REARRANGE_RESHAPE2]] : tensor<8x2xf32>
+  %out = "mhlo.all_to_all"(%input) {
+     split_dimension = 1 : i64,
+     concat_dimension = 0 : i64,
+     split_count = 2 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<4x4xf32>) -> tensor<8x2xf32>
+  return %out : tensor<8x2xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @all_to_all_3d_split_dim_1
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<4x4x4xf32>) -> tensor<4x2x8xf32>
+func.func @all_to_all_3d_split_dim_1(%input : tensor<4x4x4xf32>) -> tensor<4x2x8xf32> {
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<4x4x4xf32>
+  // CHECK: [[TRANSPOSE_ARG:%.+]] = linalg.generic
+  // CHECK: [[OP:%.+]] = flow.collective.all_to_all f32, [[EMPTY]], [[TRANSPOSE_ARG]], %channel_default  : (tensor<4x4x4xf32>, tensor<4x4x4xf32>, !flow.channel) -> [[EMPTY]] as tensor<4x4x4xf32>
+  // CHECK: [[TRANSPOSE_OUT:%.+]] = linalg.generic
+  // CHECK: [[REARRANGE_RESHAPE1:%.+]] = tensor.expand_shape [[TRANSPOSE_OUT]] {{\[}}[0], [1, 2], [3]] : tensor<4x4x4xf32> into tensor<4x2x2x4xf32> 
+  // CHECK: [[EMPTY_1:%.+]] = tensor.empty() : tensor<4x2x2x4xf32>
+  // CHECK: [[REARRANGE_TRANSPOSE:%.+]] = linalg.generic
+  // CHECK: [[REARRANGE_RESHAPE2:%.+]] = tensor.collapse_shape [[REARRANGE_TRANSPOSE]] {{\[}}[0], [1], [2, 3]] : tensor<4x2x2x4xf32> into tensor<4x2x8xf32> 
+  // CHECK: return [[REARRANGE_RESHAPE2]] : tensor<4x2x8xf32>
+  %out = "mhlo.all_to_all"(%input) {
+     split_dimension = 1 : i64,
+     concat_dimension = 2 : i64,
+     split_count = 2 : i64,
+     channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+     replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>} : (tensor<4x4x4xf32>) -> tensor<4x2x8xf32>
+  return %out : tensor<4x2x8xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @reduce_scatter_dim_0
 // CHECK-SAME: ([[ARG0:%.+]]: tensor<4x2xf32>) -> tensor<2x2xf32>
 func.func @reduce_scatter_dim_0(%input : tensor<4x2xf32>) -> tensor<2x2xf32> {

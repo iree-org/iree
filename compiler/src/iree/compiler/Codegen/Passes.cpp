@@ -84,12 +84,10 @@ LogicalResult verifyLoweringConfiguration(
   return success();
 }
 
-void addCommonTargetExecutablePreprocessingPasses(
-    OpPassManager &passManager, bool embedSubspanOffsetIntoMemRefType) {
+void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createTypePropagationPass());
   passManager.addPass(createBubbleUpOrdinalOpsPass());
-  passManager.addPass(
-      createBufferizeCopyOnlyDispatchesPass(embedSubspanOffsetIntoMemRefType));
+  passManager.addPass(createBufferizeCopyOnlyDispatchesPass());
   passManager.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createDecomposeSoftmaxPass());
   // Temporary solution to avoid large allocations due to softmax lowering.

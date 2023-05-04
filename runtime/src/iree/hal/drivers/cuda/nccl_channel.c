@@ -294,6 +294,34 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
           "ncclAllReduce");
       break;
     }
+    case IREE_HAL_COLLECTIVE_KIND_ALL_TO_ALL: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      iree_device_size_t send_count = entry->element_count / channel->count;
+      iree_device_size_t element_size_bytes =
+          iree_hal_collective_element_byte_count(entry->op.element_type);
+      iree_device_size_t rank_offset = send_count * element_size_bytes;
+      // These calls are already grouped by iree_hal_cuda_nccl_submit_batch.
+      for (iree_host_size_t r = 0; r < channel->count; ++r) {
+        NCCL_RETURN_IF_ERROR(syms,
+                             ncclSend((const void*)(sendbuff + r * rank_offset),
+                                      send_count, datatype, r, comm, stream),
+                             "ncclSend");
+        NCCL_RETURN_IF_ERROR(syms,
+                             ncclRecv((void*)(recvbuff + r * rank_offset),
+                                      send_count, datatype, r, comm, stream),
+                             "ncclRecv");
+      }
+      break;
+    }
     case IREE_HAL_COLLECTIVE_KIND_BROADCAST: {
       CUdeviceptr sendbuff =
           iree_hal_cuda_buffer_device_pointer(
