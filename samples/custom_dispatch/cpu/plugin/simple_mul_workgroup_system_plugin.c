@@ -192,8 +192,7 @@ iree_hal_executable_plugin_query(
       .version = IREE_HAL_EXECUTABLE_PLUGIN_VERSION_LATEST,
       // Name and description are used for tracing/logging/diagnostics.
       .name = "sample_simple_mul_workgroup_system_plugin",
-      .description =
-          "system plugin sample (" __FILE__ ")",
+      .description = "system plugin sample (" __FILE__ ")",
       .features = 0,
       // Let the runtime know what sanitizer this plugin was compiled with.
       .sanitizer = IREE_HAL_EXECUTABLE_PLUGIN_SANITIZER_KIND,
