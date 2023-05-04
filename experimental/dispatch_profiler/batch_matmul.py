@@ -141,7 +141,7 @@ class ReferenceBatchMatmulOp(ReferenceOpInterface):
     return [self.filepath_lhs, self.filepath_rhs]
 
   def get_output_filepaths(self):
-    """Returns the list of output file paths."""
+    """Returns the list of expected output file paths."""
     return [self.filepath_reference_result]
 
   def __call__(self):

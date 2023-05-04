@@ -29,13 +29,13 @@ def add_typical_arguments(parser):
                       "configuration.")
   parser.add_argument("--mlir-dialect", default='linalg', \
                       help="MLIR dialect entry point at which operation is emitter.",
-                      choices=["linalg", "flow", "all"])
+                      choices=["linalg"])
   parser.add_argument("--verbose", action='store_true', \
                       help='Prints verbose output and commands executed.')
   parser.add_argument("--default-config", action='store_true',
                       help="Adds a dispatch without a pre-defined "\
-                      "tuning configuration and uses default configuration "\
-                      "from KernelsConfig.cpp.")
+                      "tuning configuration. This dispatch will use "\
+                      "default configuration from KernelsConfig.cpp.")
 
 
 def add_compilation_arguments(parser):
@@ -99,7 +99,7 @@ def add_verification_arguments(parser):
                       type=str, help="Verify the operation.")
   verification_parser.add_argument(
                      "--verification-providers", default='numpy', \
-                      choices=["numpy", "triton"],
+                      choices=["numpy"],
                       help="Comma delimited list of verification providers.")
 
 
@@ -145,7 +145,7 @@ def add_matmul_arguments(parser):
                       "--problem-m==<value>,<value_start:value_end:increment>*")
   matmul_parser.add_argument("--problem-n", default='256', \
                       help="N dimension of the matrix."\
-                      "--problem-m==<value>,<value_start:value_end:increment>*")
+                      "--problem-n==<value>,<value_start:value_end:increment>*")
   matmul_parser.add_argument("--problem-k", default='256', \
                       help="K dimension of the matrix."\
                       "--problem-k==<value>,<value_start:value_end:increment>*")
@@ -211,8 +211,11 @@ def get_cmd_line_argument_ranges(arg):
     return []
   if ':' not in arg:
     return [int(arg)]
-  start, end, increment = arg.split(':')
-  return range(int(start), int(end), int(increment))
+  range_elements = arg.split(':')
+  start = int(range_elements[0])
+  end = int(range_elements[1])
+  increment = int(range_elements[2]) if len(range_elements) == 3 else 1
+  return range(start, end, increment)
 
 
 def get_cmd_line_argument_list(arg):

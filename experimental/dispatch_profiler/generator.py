@@ -18,7 +18,7 @@ if __name__ == "__main__":
   manifest = Manifest(args)
 
   # Load all the pre-defined dispatches in a manifest.
-  manifest.load()
+  manifest.initialize()
 
   # Emit the dispatches in MLIR source files.
-  manifest.emit(MlirDialect.Linalg)
+  manifest.emit()

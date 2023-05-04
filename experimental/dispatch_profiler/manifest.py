@@ -1,7 +1,4 @@
-import enum
-import os.path
-import shutil
-
+import enum, os, shutil, pickle
 from library import *
 from matmul import *
 from batch_matmul import *
@@ -61,15 +58,32 @@ class EmitSourceMLIR:
 ###############################################################################
 class Manifest:
   """Manifest collects, filters, and stores dispatches in a data structure.
-     Manifest organizes the dispatches in a dictionary of `OperationKind` 
-     to a list of `DispatchCollection`.
+     Manifest organizes the dispatches in a dictionary. The usage of the is 
+      as follows:
+      1. Create a manifest object with the command line arguments.
+      2(a). Generate dispatches, append them in the manifest, and 
+            serialize them into a file.
+      2(b). Load dispatches from a serialized file.
+      ```
+      # generator.py usage:
+      manifest = Manifest(args)
+      manifest.initialize()
 
-     OperationKind -> [DispatchCollection]
+      # compile.py or profile.py usage:
+      manifest = Manifest(args)
+      manifest.load()
+      ```
   """
 
   def __init__(self, args):
     self.args = args
-    self.operations = {}
+
+    # Dictionary of operation kind to a list of dispatch collections. We
+    # initialize the dictionary during the generation of dispatches and
+    # serialize it to a file. The serialized file is used to load the
+    # dispatches for compilation and profiling.
+    # Datatype: OperationKind -> [DispatchCollection]
+    self.dispatch_collection_map = {}
 
     # For operation kind-based filtering of dispatches.
     self.operation_kind_enabled = []
@@ -95,6 +109,18 @@ class Manifest:
     else:
       self.dispatch_names = [x for x in args.dispatches.split(',') if x != '']
 
+    # Paths to the generated directory (e.g. `./generated/linalg`).
+    self.generated_path = os.path.join(self.args.build_dir, 'generated',
+                                       self.args.mlir_dialect)
+
+    # Create the directories in self.generated_path, if it does not exist.
+    if not os.path.exists(self.generated_path):
+      os.makedirs(self.generated_path)
+
+    # Path to the serialized file.
+    self.serialized_file_path = os.path.join(self.generated_path,
+                                             'serialized_file.pkl')
+
   def _filter_string_matches(self, filter_string, haystack):
     """Returns true if all substrings appear in the haystack in order"""
     substrings = filter_string.split('*')
@@ -105,8 +131,8 @@ class Manifest:
       haystack = haystack[idx + len(sub):]
     return True
 
-  def filter(self, dispatch):
-    """Filters Dispatche based various criteria."""
+  def is_enabled(self, dispatch):
+    """Rerturns true if pass through filters based various criteria."""
 
     # Get the operation and configuration from the dispatch.
     operation = dispatch.operation
@@ -140,8 +166,8 @@ class Manifest:
   def append_dispatch_collection(self, dispatch_collection):
     """Appends one instance of DispatchCollection to the manifest."""
     operation_kind = dispatch_collection.operation.operation_kind
-    if operation_kind not in self.operations.keys():
-      self.operations[operation_kind] = []
+    if operation_kind not in self.dispatch_collection_map.keys():
+      self.dispatch_collection_map[operation_kind] = []
 
     # Get all the dispatches from the dispatch_collection.
     dispatches = dispatch_collection.get_dispatches()
@@ -150,40 +176,52 @@ class Manifest:
     filtered_dispatch_collection = DispatchCollection(
         dispatch_collection.operation, [])
     for dispatch in dispatches:
-      if self.filter(dispatch):
+      if self.is_enabled(dispatch):
         filtered_dispatch_collection.append(dispatch)
 
     # Only append the filtered_dispatch_collection if it has an unfiltered configuration.
     if len(filtered_dispatch_collection.configuration_list):
-      self.operations[operation_kind].append(filtered_dispatch_collection)
+      self.dispatch_collection_map[operation_kind].append(
+          filtered_dispatch_collection)
 
   def append(self, dispatch_collection_list):
     """Appends one instance of DispatchCollection to the manifest."""
     for dispatch_collection in dispatch_collection_list:
       self.append_dispatch_collection(dispatch_collection)
 
-  def load(self):
-    """Loads the manifest with pre-defined dispatches for supported operations."""
+  def initialize(self):
+    """Initialize the mainfest object by generating dispatches for supported operations."""
     self.append(CudaMatmulGenerator(self.args).generate())
     self.append(CudaSplitKMatmulGenerator(self.args).generate())
     self.append(CudaBatchMatmulGenerator(self.args).generate())
 
-  def emit(self, mlir_dialect=MlirDialect.Linalg):
+    # Serialize the initialized mainfest state.
+    self.dump()
+
+  def dump(self):
+    """Serialize (dump) the self.dispatch_collection_map to a pickle file."""
+    with open(self.serialized_file_path, 'wb') as f:
+      pickle.dump(self.dispatch_collection_map, f)
+
+  def load(self):
+    """Deserialize (load) the self.dispatch_collection_map from a pickle file."""
+    if not os.path.exists(self.serialized_file_path):
+      raise ValueError(f"Could not find : {self.serialized_file_path}")
+
+    with open(self.serialized_file_path, 'rb') as load_file:
+      self.dispatch_collection_map = pickle.load(load_file)
+
+  def emit(self):
     """Emits the operations in the Manifest to the build directory as MLIR source files.
         The operations are emitted in the dialect specified by the `mlir_dialect` flag.
     """
 
-    generated_path = os.path.join(self.args.build_dir, 'generated',
-                                  MlirDialectNames[mlir_dialect])
-
-    if not os.path.exists(generated_path):
-      os.makedirs(generated_path)
-
     # For each operation_kind create a directory and emit the operations with
     # all the configurations in the configuration_list into their seperate directories.
-    for operation_kind, dispatch_collection_list in self.operations.items():
+    for operation_kind, dispatch_collection_list\
+      in self.dispatch_collection_map.items():
 
-      operation_kind_path = os.path.join(generated_path,
+      operation_kind_path = os.path.join(self.generated_path,
                                          OperationKindNames[operation_kind])
 
       # If the operation_kind_path does not exists, create it.

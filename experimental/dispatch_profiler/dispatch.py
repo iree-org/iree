@@ -28,9 +28,8 @@ class DispatchCollection:
     configurations but not in their operations. For example, a collection 
     of matmul dispatches with different tile sizes. 
     
-    The idea is that we can emit a single MLIR file for all the dispatches 
-    in the collection and compile with single run of iree-compile and them 
-    into a single executable
+    We can emit a single MLIR file for all the dispatches in a collection
+    and compile with single run of iree-compile and them into a single executable
   """
 
   def __init__(self, operation, configuration_list):

@@ -27,8 +27,6 @@ if __name__ == "__main__":
 
   # Manifests metadata for a group of accompanying operations and configurations.
   manifest = Manifest(args)
-
-  # Load all the pre-defined dispatches in a manifest.
   manifest.load()
 
   # Try and use all CPUs to launch iree-compile in parallel.
@@ -42,12 +40,12 @@ if __name__ == "__main__":
   with ThreadPoolExecutor(max_workers=cpu_count) as executor:
 
     # For all the operations in the manifest compile, verify, and profile.
-    for _, op_collection_list in manifest.operations.items():
-      for op_collection in op_collection_list:
-
+    for _, dispatch_collection_list in manifest.dispatch_collection_map.items():
+      for dispatch_collection in dispatch_collection_list:
         # Create an instance of operation_launcher.
-        operation_launcher = IreeToolsLauncher(args, op_collection.operation)
-        for configuration in op_collection.configuration_list:
+        operation = dispatch_collection.operation
+        operation_launcher = IreeToolsLauncher(args, operation)
+        for configuration in dispatch_collection.configuration_list:
           for compile_mode in [CompilationMode.Profile, CompilationMode.Verify]:
             cmds.append(executor.submit(\
               operation_launcher.iree_compile, compile_mode))
