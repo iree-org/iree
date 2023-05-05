@@ -94,8 +94,6 @@ test_exclude_args+=(
   "iree/tests/e2e/tensor_ops/check_llvm-cpu_local-task_pack.mlir"
   "iree/tests/e2e/tensor_ops/check_llvm-cpu_local-task_pack_dynamic_inner_tiles.mlir"
   # TODO(#13421): Enable the tests
-  "iree/tests/e2e/models/efficientnet_int8_correctness_test"
-  "iree/tests/e2e/models/deeplab_v3_fp32_correctness_test"
   "iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_dot.mlir"
   "iree/tests/e2e/xla_ops/check_llvm-cpu_local-task_dot.mlir"
   "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_llvm-cpu_local-task"
