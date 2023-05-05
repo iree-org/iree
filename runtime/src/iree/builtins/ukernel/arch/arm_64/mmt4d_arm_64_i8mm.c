@@ -167,8 +167,7 @@ void iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm_inline_asm(
     iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
   (void)params;
   asm("    // Do we accumulate into or clear the accumulator tile?         \n"
-      "    // Note: 8 == IREE_UK_FLAG_MMT4D_ACCUMULATE_BIT_POS.            \n"
-      "    tbnz w4, 8, 1f                                                  \n"
+      "    tbnz w4, %[accumulate_bit_pos], 1f                              \n"
       "                                                                    \n"
       "0:                                                                  \n"
       "    // No-accumulate case. Clear the 8x8 accumulator tile.          \n"
@@ -430,7 +429,8 @@ void iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm_inline_asm(
       "    stp q14, q15, [x0, 224]                                         \n"
       : /*modified*/[K] "+r"(K), [lhs_ptr] "+r"(lhs_panel),
         [rhs_ptr] "+r"(rhs_panel)
-      : /*unmodified*/[flags] "r"(flags), [out_ptr] "r"(out_tile)
+      : /*unmodified*/[flags] "r"(flags), [out_ptr] "r"(out_tile),
+        [accumulate_bit_pos] "i"(IREE_UK_FLAG_MMT4D_ACCUMULATE_BIT_POS)
       : /*clobbers*/ "cc", "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6",
         "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16",
         "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24", "v25", "v26",
