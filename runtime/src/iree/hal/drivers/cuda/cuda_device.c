@@ -72,6 +72,11 @@ static iree_hal_cuda_device_t* iree_hal_cuda_device_cast(
   return (iree_hal_cuda_device_t*)base_value;
 }
 
+static iree_hal_cuda_device_t* iree_hal_cuda_device_cast_unsafe(
+    iree_hal_device_t* base_value) {
+  return (iree_hal_cuda_device_t*)base_value;
+}
+
 IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
     iree_hal_cuda_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
@@ -189,13 +194,15 @@ iree_status_t iree_hal_cuda_device_create(
 }
 
 CUcontext iree_hal_cuda_device_context(iree_hal_device_t* base_device) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_cuda_device_t* device =
+      iree_hal_cuda_device_cast_unsafe(base_device);
   return device->context_wrapper.cu_context;
 }
 
 iree_hal_cuda_dynamic_symbols_t* iree_hal_cuda_device_dynamic_symbols(
     iree_hal_device_t* base_device) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_cuda_device_t* device =
+      iree_hal_cuda_device_cast_unsafe(base_device);
   return device->context_wrapper.syms;
 }
 
