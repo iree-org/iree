@@ -544,14 +544,16 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
     if (indexVectorDim < indicesTy.getRank() - 1) {
       llvm::SmallVector<int64_t> perm;
       perm.reserve(indicesTy.getRank());
-      for (int i = 0, s = indicesTy.getRank(); i < s; ++i)
+      for (int i = 0, s = indicesTy.getRank(); i < s; ++i) {
         if (i != indexVectorDim) perm.push_back(i);
+      }
 
       if (perm.size() < indicesTy.getRank()) perm.push_back(indexVectorDim);
 
       llvm::SmallVector<int64_t> newShape;
-      for (int i = 0, s = perm.size(); i < s; ++i)
+      for (int i = 0, s = perm.size(); i < s; ++i) {
         newShape.push_back(indicesTy.getDimSize(perm[i]));
+      }
 
       indices = builder.create<mlir::stablehlo::TransposeOp>(
           indicesTy.clone(newShape), indices, builder.getI64TensorAttr(perm));
@@ -784,7 +786,7 @@ bool isFromBool(Value val) {
   }
 }
 
-// StableHLO of non-finite values (e.g. NaN, inf) and 0.0 produce 0.0 for XLA.
+// Mul of non-finite values (e.g. NaN, inf) and 0.0 produce 0.0 in StableHLO.
 // For linalg we need to convert these to select operations.
 struct MulCastOfBool final : OpRewritePattern<mlir::stablehlo::MulOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1285,11 +1287,12 @@ struct StableHLOToStableHLOPreprocessing final
                     ScatterImplicitBatch, ScatterMaterializeInsertedDim,
                     ScatterCollapseBatch, ScatterBatchFirst>(context);
 
-    // dot_general canoncalization patterns.
+    // dot_general canonicalization patterns.
     populatePreprocessingDotGeneralToDotPatterns(context, &patterns);
     patterns.insert<DotGeneralIsMul>(context, /*benefit=*/300);
 
     // Fusion operations.
+    // TODO: Reconsider performing this optimization in preprocessing.
     patterns.insert<FuseWidenOperands<mlir::stablehlo::DotOp>,
                     FuseWidenOperands<mlir::stablehlo::DotGeneralOp>,
                     FuseWidenOperands<mlir::stablehlo::ConvolutionOp>>(
