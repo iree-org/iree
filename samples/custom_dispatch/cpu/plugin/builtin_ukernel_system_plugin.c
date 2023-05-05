@@ -28,10 +28,6 @@ void iree_uk_assert_fail(const char* file, int line, const char* function,
 }
 #endif  // not defined(NDEBUG)
 
-typedef struct {
-  iree_hal_executable_plugin_allocator_t host_allocator;
-} system_plugin_t;
-
 // Plugin entry points wrapping the actual ukernels.
 static int iree_uk_mmt4d_plugin(void* context, void* params_ptr,
                                 void* reserved) {
@@ -55,28 +51,12 @@ static iree_hal_executable_plugin_status_t system_plugin_load(
     const iree_hal_executable_plugin_environment_v0_t* environment,
     size_t param_count, const iree_hal_executable_plugin_string_pair_t* params,
     void** out_self) {
-  // Allocate the plugin state.
-  system_plugin_t* plugin = NULL;
-  iree_hal_executable_plugin_status_t status =
-      iree_hal_executable_plugin_allocator_malloc(
-          environment->host_allocator, sizeof(*plugin), (void**)&plugin);
-  if (status) return status;
-  plugin->host_allocator = environment->host_allocator;
-
-  // Pass back the plugin instance that'll be passed to resolve.
-  *out_self = plugin;
+  *out_self = NULL;  // no state in this plugin
   return iree_hal_executable_plugin_ok_status();
 }
 
 // Called to free any plugin state allocated in load.
-static void system_plugin_unload(void* self) {
-  system_plugin_t* plugin = (system_plugin_t*)self;
-  iree_hal_executable_plugin_allocator_t host_allocator =
-      plugin->host_allocator;
-
-  // Free the plugin state using the same allocator it came from.
-  iree_hal_executable_plugin_allocator_free(host_allocator, plugin);
-}
+static void system_plugin_unload(void* self) {}
 
 #define ARRAYSIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -95,7 +75,6 @@ static iree_hal_executable_plugin_status_t system_plugin_resolve(
       {"uk.pack", iree_uk_pack_plugin},
       {"uk.unpack", iree_uk_unpack_plugin},
   };
-  system_plugin_t* plugin = (system_plugin_t*)self;
   *out_resolution = 0;
   bool any_required_not_found = false;
   for (size_t i = 0; i < params->count; ++i) {
@@ -110,7 +89,7 @@ static iree_hal_executable_plugin_status_t system_plugin_resolve(
       if (iree_hal_executable_plugin_strcmp(symbol_name,
                                             entry_point->symbol_name) == 0) {
         params->out_fn_ptrs[i] = (void*)(entry_point->fn_ptr);
-        params->out_fn_contexts[i] = plugin;
+        params->out_fn_contexts[i] = NULL;
         found = true;
         break;
       }
