@@ -180,6 +180,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # warnings turned off above.
     "-Wc++20-extensions"  # Enable until we use C++20 across all compilers
     "-Wctad-maybe-unsupported"
+    "-Wgnu-empty-struct"
     "-Wfloat-overflow-conversion"
     "-Wfloat-zero-conversion"
     "-Wfor-loop-analysis"
