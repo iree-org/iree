@@ -62,8 +62,16 @@ if __name__ == "__main__":
       operation_launcher = IreeToolsLauncher(args, operation)
       for configuration in dispatch_collection.configuration_list:
 
+        # Create a dispatch object.
+        dispatch = Dispatch(operation, configuration)
+
         # Skip the dispatch if filter returns false.
-        if not manifest.is_enabled(Dispatch(operation, configuration)):
+        if not manifest.is_enabled(dispatch):
+          continue
+
+        # If dry run is enabled, skip the dispatch.
+        if args.dry_run:
+          print(f'[Dry run] : {dispatch.name()}')
           continue
 
         # Initialize verification and profiling results.

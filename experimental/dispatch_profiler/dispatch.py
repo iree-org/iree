@@ -24,7 +24,7 @@ class Dispatch:
     self.is_fused_dispatch = False
 
   def name(self):
-    return f"{self.operation.name()}'_'{self.configuration.name()}"
+    return f"{self.operation.name()}_{self.configuration.name()}"
 
 
 ################################################################################

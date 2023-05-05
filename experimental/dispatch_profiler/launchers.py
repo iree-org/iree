@@ -154,6 +154,14 @@ class IreeToolsLauncher:
     # Launch verification.
     cmd_output = subprocess.check_output(cmd, text=True)
 
+    # Save the verification command and the output, only if requested
+    # (file writing could slow down the verification).
+    if self.args.save_cmds:
+      filepath = os.path.join(self.operation_path, "iree_run_module.stdout")
+      with open(filepath, "w") as fp:
+        fp.write(f"[Command] $ {' '.join(cmd)}\n")
+        fp.write(cmd_output)
+
     # Parse the verification output.
     m = re.search(r"\[(?P<verification_result>[a-zA-Z]+)\]", cmd_output)
     if m is None:
@@ -196,6 +204,15 @@ class IreeToolsLauncher:
     cmd_output = subprocess.check_output(cmd,
                                          text=True,
                                          stderr=subprocess.STDOUT)
+
+    # Save the profiling command and the output, only if requested
+    # (file writing could slow down the profiling).
+    if self.args.save_cmds:
+      filepath = os.path.join(self.operation_path,
+                              "iree_benchmark_module.stdout")
+      with open(filepath, "w") as fp:
+        fp.write(f"[Command] $ {' '.join(cmd)}\n")
+        fp.write(cmd_output)
 
     # Parse the profiling output.
     m = re.search(r"real_time_median\s+(?P<runtime>\d+.\d+)\s+ms", cmd_output)

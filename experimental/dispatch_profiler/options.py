@@ -38,6 +38,9 @@ def add_typical_arguments(parser):
                       choices=["linalg"])
   parser.add_argument("--verbose", action='store_true', \
                       help='Prints verbose output and commands executed.')
+  parser.add_argument("--dry-run", action='store_true', \
+                      help='Prints commands that will be executed without actually '\
+                      'executing them.')
   parser.add_argument("--default-config", action='store_true',
                       help="Adds a dispatch without a pre-defined "\
                       "tuning configuration. This dispatch will use "\
@@ -176,7 +179,6 @@ def parse_generator_arguments(parser):
 def parse_compile_arguments(parser):
   """Adds and parse all the arguments for the *compile.py* script."""
   add_typical_arguments(parser)
-  add_matmul_arguments(parser)
   add_compilation_arguments(parser)
   add_iree_compile_arguments(parser)
   args = parser.parse_args()
@@ -186,24 +188,29 @@ def parse_compile_arguments(parser):
 def parse_profiler_arguments(parser):
   """Adds and parse all the arguments for the *profiler.py* script."""
   add_typical_arguments(parser)
-  add_matmul_arguments(parser)
   add_compilation_arguments(parser)
   add_iree_compile_arguments(parser)
   add_verification_arguments(parser)
   add_profiling_arguments(parser)
   add_performance_report_arguments(parser)
+
+  # Additional arguments for the profiler.
+  parser.add_argument("--save-cmds", action='store_true', \
+                      help='Saves commands and their output that are executed '\
+                      'by the profiler in a file.')
+
   args = parser.parse_args()
 
   # Boolenize the string arguments from command line. For these args, it makes easier
   # to read and convey the meaning. The boolean arguments below are specified as:
   # `--argument=<true|false>`
-  args.verification_enabled = False\
-    if args.verification_enabled in ['False', 'false', '0']\
-    else True
+  args.verification_enabled = False if args.verification_enabled in [
+      'False', 'false', '0'
+  ] else True
 
-  args.profiling_enabled = False\
-    if args.profiling_enabled in ['False', 'false', '0']\
-    else True
+  args.profiling_enabled = False if args.profiling_enabled in [
+      'False', 'false', '0'
+  ] else True
 
   return args
 
