@@ -107,10 +107,14 @@ static iree_status_t iree_hal_cuda_nccl_check_version(
 
   ncclResult_t (*ncclGetVersion)(int*) = NULL;
 
-  IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(
-      nccl_library, "ncclGetVersion", (void**)&ncclGetVersion));
+  iree_status_t status = iree_dynamic_library_lookup_symbol(
+      nccl_library, "ncclGetVersion", (void**)&ncclGetVersion);
+  if (!iree_status_is_ok(status)) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "ncclGetVersion() not found");
+  }
 
-  // Check the NCCL version compatibility
+  // Check the NCCL version compatibility.
   int nccl_version = 0;
   ncclResult_t result = ncclGetVersion(&nccl_version);
   if (result != ncclSuccess) {
