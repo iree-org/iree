@@ -120,20 +120,29 @@ class BufferInstance {
 };
 
 //===----------------------------------------------------------------------===//
-// DeviceInstance
+// DeviceDescription
 //===----------------------------------------------------------------------===//
 
-class DeviceInstance {
+class DeviceDescription {
  public:
-  DeviceInstance(int client_id, ClientInstance& client,
-                 iree_hal_driver_t* driver, iree_hal_device_info_t* info)
-      : client_id_(client_id), client_(client), driver_(driver), info_(info) {}
-  ~DeviceInstance();
-  operator PJRT_Device*() { return reinterpret_cast<PJRT_Device*>(this); }
-  static void BindApi(PJRT_Api* api);
-  static DeviceInstance* Unwrap(PJRT_Device* device) {
-    return reinterpret_cast<DeviceInstance*>(device);
+  DeviceDescription(int32_t client_id, iree_hal_device_info_t* info)
+      : client_id_(client_id), info_(info) {
+    // Initialize debug strings.
+    user_string_ = std::string(info_->path.data, info_->path.size);
+    debug_string_ = std::string(info_->name.data, info_->name.size);
+    kind_string_ = std::string(info_->name.data, info_->name.size);
   }
+  ~DeviceDescription();
+  operator PJRT_DeviceDescription*() {
+    return reinterpret_cast<PJRT_DeviceDescription*>(this);
+  }
+  static void BindApi(PJRT_Api* api);
+
+  static DeviceDescription* Unwrap(PJRT_DeviceDescription* device) {
+    return reinterpret_cast<DeviceDescription*>(device);
+  }
+
+  int64_t device_id() { return info_->device_id; }
 
   // Since the PJRT device id is a simple int and the IREE device_id is
   // a pointer-sized value, we just assign a synthetic id. Currently, this
@@ -141,18 +150,48 @@ class DeviceInstance {
   // revisited if ever supporting re-scanning (but many things would seem to
   // need updates then).
   int client_id() { return client_id_; }
-  iree_hal_device_info_t* info() { return info_; }
-
   // Not yet implemented but plumbed through.
-  bool is_addressable() { return true; }
   int process_index() { return 0; }
-  int local_hardware_id() { return -1; }
 
   // Various debug descriptions of the device. Backing string data owned by
-  // the device.
+  // the device description.
   std::string_view kind_string() { return kind_string_; }
   std::string_view debug_string() { return debug_string_; }
   std::string_view user_string() { return user_string_; }
+
+ private:
+  int client_id_;
+  iree_hal_device_info_t* info_;
+
+  // Debug strings (owned by device description).
+  std::string kind_string_;
+  std::string debug_string_;
+  std::string user_string_;
+};
+
+//===----------------------------------------------------------------------===//
+// DeviceInstance
+//===----------------------------------------------------------------------===//
+
+class DeviceInstance {
+ public:
+  DeviceInstance(int client_id, ClientInstance& client,
+                 iree_hal_driver_t* driver, iree_hal_device_info_t* info)
+      : client_(client), driver_(driver), info_(client_id, info) {}
+  ~DeviceInstance();
+  operator PJRT_Device*() { return reinterpret_cast<PJRT_Device*>(this); }
+  static void BindApi(PJRT_Api* api);
+
+  static DeviceInstance* Unwrap(PJRT_Device* device) {
+    return reinterpret_cast<DeviceInstance*>(device);
+  }
+
+  static DeviceInstance* Unwrap(PJRT_DeviceDescription* device_description) {
+    return reinterpret_cast<DeviceInstance*>(device_description);
+  }
+
+  bool is_addressable() { return true; }
+  int local_hardware_id() { return -1; }
 
   // Copies a host buffer to the device.
   // See PJRT_Client_BufferFromHostBuffer
@@ -165,6 +204,8 @@ class DeviceInstance {
 
   // TODO(laurenzo): Eagerly set up device to allow simple access.
   iree_status_t GetHalDevice(iree_hal_device_t** out_device);
+
+  DeviceDescription* device_description() { return &info_; }
 
   // Only valid once device opened.
   iree_hal_semaphore_t* main_timeline() { return main_timeline_.get(); }
@@ -184,7 +225,6 @@ class DeviceInstance {
       bool snapshot_initial_contents_now, bool* initial_contents_snapshotted,
       iree_hal_buffer_t** out_buffer);
 
-  int client_id_;
   ClientInstance& client_;
   iree_hal_driver_t* driver_;  // Owned by client.
   iree::vm::ref<iree_hal_device_t> device_;
@@ -195,12 +235,7 @@ class DeviceInstance {
   iree::vm::ref<iree_hal_fence_t> transfer_now_fence_;
   // The timepoint of the last transfer.
   uint64_t last_transfer_timepoint_ = 0;
-  iree_hal_device_info_t* info_;
-
-  // Debug strings (owned by device).
-  std::string kind_string_;
-  std::string debug_string_;
-  std::string user_string_;
+  DeviceDescription info_;
 };
 
 //===----------------------------------------------------------------------===//

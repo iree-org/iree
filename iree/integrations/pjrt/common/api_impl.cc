@@ -577,39 +577,67 @@ iree_status_t BufferInstance::AdvanceDoneFence(iree_hal_semaphore_t* semaphore,
 }
 
 //===----------------------------------------------------------------------===//
+// DeviceDescription
+//===----------------------------------------------------------------------===//
+
+DeviceDescription::~DeviceDescription() = default;
+
+void DeviceDescription::BindApi(PJRT_Api* api) {
+  api->PJRT_DeviceDescription_Id =
+      +[](PJRT_DeviceDescription_Id_Args* args) -> PJRT_Error* {
+    args->id = DeviceDescription::Unwrap(args->device_description)->client_id();
+    return nullptr;
+  };
+  api->PJRT_DeviceDescription_ProcessIndex =
+      +[](PJRT_DeviceDescription_ProcessIndex_Args* args) -> PJRT_Error* {
+    args->process_index =
+        DeviceDescription::Unwrap(args->device_description)->process_index();
+    return nullptr;
+  };
+  api->PJRT_DeviceDescription_Attributes =
+      +[](PJRT_DeviceDescription_Attributes_Args* args) -> PJRT_Error* {
+    // TODO: Implement something.
+    args->num_attributes = 0;
+    args->attributes = nullptr;
+    return nullptr;
+  };
+  api->PJRT_DeviceDescription_Kind =
+      +[](PJRT_DeviceDescription_Kind_Args* args) -> PJRT_Error* {
+    auto sv =
+        DeviceDescription::Unwrap(args->device_description)->kind_string();
+    args->device_kind = sv.data();
+    args->device_kind_size = sv.size();
+    return nullptr;
+  };
+  api->PJRT_DeviceDescription_DebugString =
+      +[](PJRT_DeviceDescription_DebugString_Args* args) -> PJRT_Error* {
+    auto sv =
+        DeviceDescription::Unwrap(args->device_description)->debug_string();
+    args->debug_string = sv.data();
+    args->debug_string_size = sv.size();
+    return nullptr;
+  };
+  api->PJRT_DeviceDescription_ToString =
+      +[](PJRT_DeviceDescription_ToString_Args* args) -> PJRT_Error* {
+    auto sv =
+        DeviceDescription::Unwrap(args->device_description)->user_string();
+    args->to_string = sv.data();
+    args->to_string_size = sv.size();
+    return nullptr;
+  };
+}
+
+//===----------------------------------------------------------------------===//
 // DeviceInstance
 //===----------------------------------------------------------------------===//
 
 DeviceInstance::~DeviceInstance() = default;
 
 void DeviceInstance::BindApi(PJRT_Api* api) {
-  api->PJRT_Device_Id = +[](PJRT_Device_Id_Args* args) -> PJRT_Error* {
-    args->id = DeviceInstance::Unwrap(args->device)->client_id();
-    return nullptr;
-  };
-  api->PJRT_Device_ProcessIndex =
-      +[](PJRT_Device_ProcessIndex_Args* args) -> PJRT_Error* {
-    args->process_index = DeviceInstance::Unwrap(args->device)->process_index();
-    return nullptr;
-  };
   api->PJRT_Device_IsAddressable =
       +[](PJRT_Device_IsAddressable_Args* args) -> PJRT_Error* {
     args->is_addressable =
         DeviceInstance::Unwrap(args->device)->is_addressable();
-    return nullptr;
-  };
-
-  api->PJRT_Device_Attributes =
-      +[](PJRT_Device_Attributes_Args* args) -> PJRT_Error* {
-    // TODO: Implement something.
-    args->num_attributes = 0;
-    args->attributes = nullptr;
-    return nullptr;
-  };
-  api->PJRT_Device_Kind = +[](PJRT_Device_Kind_Args* args) -> PJRT_Error* {
-    auto sv = DeviceInstance::Unwrap(args->device)->kind_string();
-    args->device_kind = sv.data();
-    args->device_kind_size = sv.size();
     return nullptr;
   };
   api->PJRT_Device_LocalHardwareId =
@@ -618,18 +646,10 @@ void DeviceInstance::BindApi(PJRT_Api* api) {
         DeviceInstance::Unwrap(args->device)->local_hardware_id();
     return nullptr;
   };
-  api->PJRT_Device_DebugString =
-      +[](PJRT_Device_DebugString_Args* args) -> PJRT_Error* {
-    auto sv = DeviceInstance::Unwrap(args->device)->debug_string();
-    args->debug_string = sv.data();
-    args->debug_string_size = sv.size();
-    return nullptr;
-  };
-  api->PJRT_Device_ToString =
-      +[](PJRT_Device_ToString_Args* args) -> PJRT_Error* {
-    auto sv = DeviceInstance::Unwrap(args->device)->user_string();
-    args->to_string = sv.data();
-    args->to_string_size = sv.size();
+  api->PJRT_Device_GetDescription =
+      +[](PJRT_Device_GetDescription_Args* args) -> PJRT_Error* {
+    args->device_description = reinterpret_cast<PJRT_DeviceDescription*>(
+        DeviceInstance::Unwrap(args->device)->device_description());
     return nullptr;
   };
 }
@@ -642,18 +662,13 @@ iree_status_t DeviceInstance::CreateFence(iree_hal_fence_t** out_fence) {
 iree_status_t DeviceInstance::OpenDevice() {
   if (device_) return iree_ok_status();
   IREE_RETURN_IF_ERROR(iree_hal_driver_create_device_by_id(
-      driver_, /*device_id=*/info_->device_id,
+      driver_, /*device_id=*/info_.device_id(),
       /*param_count=*/0, /*params=*/nullptr, client_.host_allocator(),
       &device_));
   IREE_RETURN_IF_ERROR(
       iree_hal_semaphore_create(device(), 0ull, &main_timeline_));
   IREE_RETURN_IF_ERROR(
       iree_hal_semaphore_create(device(), 0ull, &transfer_timeline_));
-
-  // Initialize debug strings.
-  user_string_ = std::string(info_->path.data, info_->path.size);
-  debug_string_ = std::string(info_->name.data, info_->name.size);
-  kind_string_ = std::string(info_->name.data, info_->name.size);
 
   return iree_ok_status();
 }
@@ -1613,6 +1628,7 @@ void BindMonomorphicApi(PJRT_Api* api) {
   // Bind by object types.
   BufferInstance::BindApi(api);
   ClientInstance::BindApi(api);
+  DeviceDescription::BindApi(api);
   DeviceInstance::BindApi(api);
   ErrorInstance::BindApi(api);
   EventInstance::BindApi(api);
