@@ -48,7 +48,7 @@ def add_compilation_arguments(parser):
   """Adds compilation (not part of iree-compile) command line arguments to the parser."""
   compilation_parser = parser.add_argument_group(
       'Compilation', 'Compilation related options.')
-  compilation_parser.add_argument("--num-cpu", "--j", \
+  compilation_parser.add_argument("--num-cpu", "-j", \
                       dest="num_cpu", type=int, default=-1, \
                       help="Number of cpu threads to use for compilation.")
   compilation_parser.add_argument("--force-compile", action='store_true', \

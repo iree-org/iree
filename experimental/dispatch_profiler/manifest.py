@@ -21,7 +21,7 @@ class EmitSourceMLIR:
     self.operation = dispatch_collection.operation
     self.operation_kind = self.operation.operation_kind
     self.configuration_list = dispatch_collection.configuration_list
-    self.operation_filepath = os.path.join(self.operation_path, \
+    self.operation_filepath = os.path.join(self.operation_path,
                                            self.operation.name() + ".mlir")
 
     mlir_configuration_emitter = {
@@ -52,8 +52,7 @@ class EmitSourceMLIR:
     """Emit the op func.func for each dispatch (operation + configuration)"""
     for dispatch in self.dispatch_collection.get_dispatches():
       print(
-          f"    Emitting tuning configuration : "\
-          f"{dispatch.configuration.name()}"
+          f"    Emitting tuning configuration : {dispatch.configuration.name()}"
       )
       self.operation_file.write(self.dispatch_emitter.emit(dispatch))
 
@@ -64,13 +63,14 @@ class EmitSourceMLIR:
 ###############################################################################
 class Manifest:
   """Manifest collects, filters, and stores dispatches in a data structure.
-     Manifest organizes the dispatches in a dictionary. The usage of the is 
-      as follows:
+     Manifest organizes the dispatches in a dictionary. 
+     Usage:
       1. Create a manifest object with the command line arguments.
       2(a). Generate dispatches, append them in the manifest, and 
             serialize them into a file.
       2(b). Load dispatches from a serialized file.
-      ```
+      
+      ```python
       # generator.py usage:
       manifest = Manifest(args)
       manifest.initialize()
@@ -106,9 +106,10 @@ class Manifest:
           OperationKind.SplitkMatmul,
           OperationKind.BatchMatmul,
       ]
-      self.operation_kind_enabled = [x for x in operations_kind_list\
-                                     if OperationKindNames[x] in\
-                                     args.operation_kind.split(',')]
+      self.operation_kind_enabled = [
+          x for x in operations_kind_list
+          if OperationKindNames[x] in args.operation_kind.split(',')
+      ]
 
     if args.dispatches == 'all':
       self.dispatch_names = []

@@ -381,14 +381,6 @@ class ReferenceMatmulOp(ReferenceOpInterface):
     np.save(self.filepath_reference_result,
             np.array(result, dtype=self.dtype_result))
 
-  def is_cached(self):
-    """Checks if the reference run is cached."""
-    if not os.path.exists(self.filepath_lhs) or \
-       not os.path.exists(self.filepath_rhs) or \
-       not os.path.exists(self.filepath_reference_result):
-      return False
-    return True
-
 
 class CudaMatmulDispatchChecker:
   """Given a matmul dispatch, checks if the dispatch is supported by the target GPU."""
@@ -410,8 +402,8 @@ class CudaMatmulDispatchChecker:
     matmul_shape = dispatch.operation.matmul_shape
     threadblock_shape = dispatch.configuration.tile_description.threadblock_shape
     if len(matmul_shape) != len(threadblock_shape):
-      raise ValueError("Problem shape and threadblock shape must have the "\
-                       "same rank.")
+      raise ValueError(
+          "Problem shape and threadblock shape must have the same rank.")
     is_aligned = all(
         a % b == 0 for a, b in zip(matmul_shape, threadblock_shape))
     return is_aligned
@@ -422,8 +414,10 @@ class CudaMatmulDispatchChecker:
     num_stages = dispatch.configuration.tile_description.stages
     tile_shape_lhs = threadblock_shape[0] * threadblock_shape[2]
     tile_shape_rhs = threadblock_shape[2] * threadblock_shape[1]
-    return ((tile_shape_lhs * DataTypeSizeInBits[dispatch.operation.lhs.datatype] + \
-             tile_shape_rhs * DataTypeSizeInBits[dispatch.operation.rhs.datatype]) * num_stages) // 8
+    return (
+        (tile_shape_lhs * DataTypeSizeInBits[dispatch.operation.lhs.datatype] +
+         tile_shape_rhs * DataTypeSizeInBits[dispatch.operation.rhs.datatype]) *
+        num_stages) // 8
 
   def _is_problem_k_divisible_by_split_k(self, dispatch):
     """Checks if the given dispatch is valid for CUDA."""
@@ -446,8 +440,8 @@ class CudaMatmulDispatchChecker:
               f"bytes of shared memory, which is larger than the {self.cuda_arch} capacity "\
               f"{self.cuda_smem_capacity_in_bytes} bytes.")
       return False
-    if dispatch.operation.split_k_slices > 1 and \
-      not self._is_problem_k_divisible_by_split_k(dispatch):
+    if (dispatch.operation.split_k_slices >
+        1) and (not self._is_problem_k_divisible_by_split_k(dispatch)):
       if self.args.verbose:
         print(f"[Warning]: {dispatch.name()} problem k is not divisible by {dispatch.operation.split_k_slices} "\
               f"split-k slices, which is not supported on LLVM GPU CUDA backend.")

@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
   args = parse_generator_arguments(parser)
 
-  # Manifests dispatches for a group of accompanying operations and configurations.
+  # Manifest dispatches for a group of accompanying operations and configurations.
   manifest = Manifest(args)
 
   # Load all the pre-defined dispatches in a manifest.

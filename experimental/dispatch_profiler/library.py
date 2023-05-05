@@ -4,9 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import enum
+import enum, os, re
 from enum import auto
-import re
 import numpy as np
 from abc import ABC, abstractmethod
 from collections import namedtuple
@@ -335,9 +334,20 @@ class ReferenceOpInterface(ABC):
     """Runs the reference implementation."""
     pass
 
-  @abstractmethod
   def is_cached(self):
     """Returns whether the reference run is cached."""
-    pass
+
+    # Returns False if any of the reference input are missing.
+    for input_file in self.get_input_filepaths():
+      if not os.path.exists(input_file):
+        return False
+
+    # Returns False if any of the reference output are missing.
+    for output_file in self.get_output_filepaths():
+      if not os.path.exists(output_file):
+        return False
+
+    # Returns True if all the reference inputs and outputs are cached.
+    return True
 
   ###################################################################################################

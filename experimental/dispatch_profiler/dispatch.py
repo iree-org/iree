@@ -24,7 +24,7 @@ class Dispatch:
     self.is_fused_dispatch = False
 
   def name(self):
-    return self.operation.name() + '_' + self.configuration.name()
+    return f"{self.operation.name()}'_'{self.configuration.name()}"
 
 
 ################################################################################
@@ -52,11 +52,9 @@ class DispatchCollection:
   def append(self, dispatch):
     """Appends a dispatch to the collection."""
     if dispatch.operation != self.operation:
-      print(self.operation.name())
-      print(dispatch.operation.name())
-      raise ValueError("operation (%s) does not match the "\
-                       "dispatch collection operation name (%s)."\
-                       % (self.operation.name(), dispatch.operation.name()))
+      raise ValueError(
+          f"operation {self.operation.name()} does not match the dispatch "
+          f"collection operation name {dispatch.operation.name()}.")
     self.configuration_list.append(dispatch.configuration)
 
   def num_of_dispatches(self):

@@ -52,12 +52,14 @@ class IreeToolsLauncher:
     # output vmfb files for verification and profiling.
     split_k_suffix = "_".join(["split_k_slice", str(operation.split_k_slices)])
 
-    vmfb_verify_list = [ self.operation.name(), split_k_suffix, "verify.vmfb"] \
-      if operation.operation_kind == OperationKind.SplitkMatmul \
-      else [self.operation.name(), "verify.vmfb"]
-    vmfb_profile_list = [ self.operation.name(), split_k_suffix, "profile.vmfb"] \
-      if operation.operation_kind == OperationKind.SplitkMatmul \
-      else [self.operation.name(), "profile.vmfb"]
+    # vmfb files for verification and profiling.
+    vmfb_verify_list = [self.operation.name(), "verify.vmfb"]
+    vmfb_profile_list = [self.operation.name(), "profile.vmfb"]
+    if operation.operation_kind == OperationKind.SplitkMatmul:
+      vmfb_verify_list = [self.operation.name(), split_k_suffix, "verify.vmfb"]
+      vmfb_profile_list = [
+          self.operation.name(), split_k_suffix, "profile.vmfb"
+      ]
 
     self.vmfb_verify_filepath = os.path.join(self.operation_path,
                                              "_".join(vmfb_verify_list))
@@ -104,17 +106,20 @@ class IreeToolsLauncher:
       cmd += [f"--mlir-print-ir-after-all"]
 
     if not os.path.exists(vmfb_file) or self.args.force_compile:
-      print(
-          f"[Compiling to ({CompilationModeNames[compilation_mode]})] {' '.join(cmd)}"
-      )
+      complie_mode_str = CompilationModeNames[compilation_mode]
 
-      compile_log_filename = f"{self.operation_path}/iree_compile_logs.mlir"
-      with open(compile_log_filename, "w") as fp:
+      print(f"[Compiling ({complie_mode_str})] {' '.join(cmd)}")
+
+      iree_compile_stdout_filepath = os.path.join(
+          self.operation_path, "iree_compile_cmd_stdout.mlir")
+
+      with open(iree_compile_stdout_filepath, "w") as fp:
         subprocess.run(cmd, stderr=fp)
 
     elif self.args.verbose:
-      print("Skipping compilation of operation: " + vmfb_file +
-            " since it already exists.")
+      print(
+          f"Skipping compilation of operation: {vmfb_file} since it already exists."
+      )
 
   def verify(self, configuration):
     """Verifies the operation with a given configuration."""
@@ -122,8 +127,9 @@ class IreeToolsLauncher:
     self.iree_compile(CompilationMode.Verify)
 
     # Verify using random data distribution.
-    reference_run = self.reference_impl_map[self.operation.operation_kind](\
-        self.operation, self.op_reference_cache_path, Distribution.Random, Distribution.Random)
+    reference_run = self.reference_impl_map[self.operation.operation_kind](
+        self.operation, self.op_reference_cache_path, Distribution.Random,
+        Distribution.Random)
 
     if not reference_run.is_cached():
       reference_run()
@@ -143,7 +149,7 @@ class IreeToolsLauncher:
 
     # Print the command if verbose.
     if self.args.verbose:
-      print(">> Verification command: " + ' '.join(cmd))
+      print(f"[Verification] {' '.join(cmd)}")
 
     # Launch verification.
     cmd_output = subprocess.check_output(cmd, text=True)
@@ -152,8 +158,8 @@ class IreeToolsLauncher:
     m = re.search(r"\[(?P<verification_result>[a-zA-Z]+)\]", cmd_output)
     if m is None:
       raise Exception(
-          "Failed to parse verification output by iree-run-module: " +
-          cmd_output)
+          f"Failed to parse verification output by iree-run-module: {cmd_output}"
+      )
     verification_result = m.group('verification_result')
 
     if self.args.verbose or verification_result != "SUCCESS":
@@ -184,7 +190,7 @@ class IreeToolsLauncher:
 
     # Print the command if verbose.
     if self.args.verbose:
-      print(">> Profiling command: " + ' '.join(cmd))
+      print(f"[Profiling] {' '.join(cmd)}")
 
     # Launch profiling.
     cmd_output = subprocess.check_output(cmd,
@@ -194,7 +200,7 @@ class IreeToolsLauncher:
     # Parse the profiling output.
     m = re.search(r"real_time_median\s+(?P<runtime>\d+.\d+)\s+ms", cmd_output)
     if m is None:
-      raise Exception("Failed to parse runtime from benchmark result: " +
-                      cmd_output)
+      raise Exception(
+          f"Failed to parse runtime from benchmark result: {cmd_output}")
     runtime_in_ms = float(m.group('runtime'))
     return runtime_in_ms

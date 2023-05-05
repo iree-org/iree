@@ -170,14 +170,6 @@ class ReferenceBatchMatmulOp(ReferenceOpInterface):
     np.save(self.filepath_reference_result,
             np.array(result, dtype=self.dtype_result))
 
-  def is_cached(self):
-    """Checks if the reference run is cached."""
-    if not os.path.exists(self.filepath_lhs) or \
-       not os.path.exists(self.filepath_rhs) or \
-       not os.path.exists(self.filepath_reference_result):
-      return False
-    return True
-
 
 ##############################################################################
 class CudaBatchMatmulGenerator(CudaMatmulGenerator):
