@@ -82,6 +82,14 @@ jobs:
       e2e-test-artifacts-gcs-artifact-dir: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
       benchmark-tools-gcs-artifact-dir: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
 
+  benchmark_db_import:
+    needs: [setup, compilation_benchmarks, execution_benchmarks]
+    if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
+    uses: ./.github/workflows/benchmark_db_import.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+
   summary:
     # Even if you have an explicit if condition, you still need to override
     # GitHub's default behavior of not running if any dependencies failed.
@@ -94,6 +102,7 @@ jobs:
       - build_e2e_test_artifacts
       - compilation_benchmarks
       - execution_benchmarks
+      - benchmark_db_import
     steps:
       - name: Getting failed jobs
         id: failed_jobs
