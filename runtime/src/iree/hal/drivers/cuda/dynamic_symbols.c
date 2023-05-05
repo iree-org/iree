@@ -170,8 +170,10 @@ iree_status_t iree_hal_cuda_nccl_dynamic_symbols_initialize(
     iree_status_ignore(status);
     status = iree_make_status(
         IREE_STATUS_UNAVAILABLE,
-        "NCCL runtime library not available; ensure installed and the "
-        "shared library is on your PATH/LD_LIBRARY_PATH (nccl.dll/libnccl.so)");
+        "NCCL runtime library (%d.%d.%d) not available; ensure installed and "
+        "the shared library is on your PATH/LD_LIBRARY_PATH "
+        "(nccl.dll/libnccl.so)",
+        NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
   }
 
   if (iree_status_is_ok(status)) {
