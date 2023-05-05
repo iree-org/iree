@@ -37,6 +37,7 @@ iree_lit_test_suite(
             "infer_numeric_narrowing.mlir",
             "initialize_empty_tensors.mlir",
             "inject_dispatch_tracing.mlir",
+            "insert_dispatch_debug_markers.mlir",
             "interchange_generic_ops.mlir",
             "interchange_transpose_generic_ops.mlir",
             "optimize_numerics.mlir",

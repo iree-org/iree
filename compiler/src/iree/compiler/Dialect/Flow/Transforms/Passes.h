@@ -193,6 +193,16 @@ createOutlineDispatchRegionsPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createInjectDispatchTracingPass();
 
+// Crops the program and inserts trace markers at the specified symbols.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createInsertDebugTargetAtSymbolPass(std::string breakDebugTarget = "",
+                                    std::string traceDebugTarget = "");
+
+// Crops the program and inserts trace markers at the specified ordinals.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createInsertDebugTargetAtOrdinalPass(std::string breakDebugTarget = "",
+                                     std::string traceDebugTarget = "");
+
 // Exports all functions and dispatch executables as `() -> ()` benchmark funcs.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
 
