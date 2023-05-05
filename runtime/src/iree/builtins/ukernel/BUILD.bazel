@@ -4,7 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library", "iree_link_bitcode")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -69,4 +71,114 @@ iree_runtime_cc_library(
         "//runtime/src/iree/builtins/ukernel/arch:config",
         "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
     ],
+)
+
+#===------------------------------------------------------------------------===#
+# UKernel bitcode files
+#===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
+""",
+    inline = True,
+)
+
+BITCODE_COPTS = [
+    # C17 with no system deps.
+    "-std=c17",
+    "-nostdinc",
+    "-ffreestanding",
+
+    # Optimized and unstamped.
+    "-O3",
+    "-DNDEBUG",
+    "-fno-ident",
+    "-fdiscard-value-names",
+
+    # Object file only in bitcode format:
+    "-c",
+    "-emit-llvm",
+
+    # Force the library into standalone mode (not depending on build-directory
+    # configuration).
+    "-DIREE_UK_STANDALONE=1",
+
+    # Force configure for X86_64 with own Clang
+    "-DIREE_UK_ARCH_X86_64",
+    "-DIREE_UK_POINTER_SIZE=8",
+    "-DIREE_UK_BUILD_X86_64_AVX2_FMA",
+    "-DIREE_UK_BUILD_X86_64_AVX512_BASE",
+    "-DIREE_UK_BUILD_X86_64_AVX512_VNNI",
+]
+
+UKERNEL_BASE_SRCS = [
+    "mmt4d.c",
+    "mmt4d_tile.c",
+    "pack.c",
+    "pack_tile.c",
+    "query_tile_sizes.c",
+    "unpack_tile.c",
+]
+
+UKERNEL_HDRS = [
+    "//runtime/src/iree/builtins/ukernel:common.h",
+    "//runtime/src/iree/builtins/ukernel:pack.h",
+    "//runtime/src/iree/builtins/ukernel:exported_bits.h",
+    "//runtime/src/iree/builtins/ukernel:static_assert.h",
+    "//runtime/src/iree/builtins/ukernel:api.h",
+    "//runtime/src/iree/builtins/ukernel:unpack.h",
+    "//runtime/src/iree/builtins/ukernel:query_tile_sizes.h",
+    "//runtime/src/iree/builtins/ukernel:unpack_internal.h",
+    "//runtime/src/iree/builtins/ukernel:mmt4d.h",
+    "//runtime/src/iree/builtins/ukernel:mmt4d_internal.h",
+    "//runtime/src/iree/builtins/ukernel:pack_internal.h",
+    "//runtime/src/iree/builtins/ukernel:elementwise.h",
+    "//runtime/src/iree/builtins/ukernel:query_tile_sizes_internal.h",
+    "//runtime/src/iree/builtins/ukernel/arch/x86_64:query_tile_sizes_x86_64.h",
+    "//runtime/src/iree/builtins/ukernel/arch/x86_64:unpack_x86_64.h",
+    "//runtime/src/iree/builtins/ukernel/arch/x86_64:pack_x86_64.h",
+    "//runtime/src/iree/builtins/ukernel/arch/x86_64:common_x86_64.h",
+    "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64.h",
+    "//runtime/src/iree/schemas:cpu_data.h",
+    "//runtime/src/iree/schemas:cpu_feature_bits.inl",
+]
+
+iree_bitcode_library(
+    name = "ukernel_bitcode_base",
+    srcs = UKERNEL_BASE_SRCS,
+    hdrs = UKERNEL_HDRS,
+    copts = BITCODE_COPTS,
+)
+
+iree_link_bitcode(
+    name = "ukernel_bitcode",
+    bitcode_files = [
+        "ukernel_bitcode_base.bc",
+        "arch/x86_64:ukernel_bitcode_x86_64_base.bc",
+        "arch/x86_64:ukernel_bitcode_x86_64_avx2_fma.bc",
+        "arch/x86_64:ukernel_bitcode_x86_64_avx512_base.bc",
+        "arch/x86_64:ukernel_bitcode_x86_64_avx512_vnni.bc",
+    ],
+)
+
+c_embed_data(
+    name = "libukernel_bitcode",
+    srcs = [
+        ":ukernel_bitcode.bc",
+    ],
+    c_file_output = "libukernel.c",
+    flatten = True,
+    h_file_output = "libukernel.h",
+    identifier = "iree_builtins_libukernel",
+    deps = [
+        "//runtime/src:runtime_defines",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()  # IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU
+""",
+    inline = True,
 )
