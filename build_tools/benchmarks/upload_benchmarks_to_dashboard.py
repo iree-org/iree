@@ -277,14 +277,14 @@ def parse_arguments():
       '--benchmark_files',
       metavar='<benchmark-json-files>',
       default=[],
-      nargs='+',
+      action="append",
       help=("Paths to the JSON files containing benchmark results, "
             "accepts wildcards"))
   parser.add_argument(
       "--compile_stats_files",
       metavar="<compile-stats-json-files>",
       default=[],
-      nargs="+",
+      action="append",
       help=("Paths to the JSON files containing compilation statistics, "
             "accepts wildcards"))
   parser.add_argument("--dry-run",
