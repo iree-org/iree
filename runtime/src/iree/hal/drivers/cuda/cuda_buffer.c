@@ -23,15 +23,13 @@ typedef struct iree_hal_cuda_buffer_t {
 
 static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable;
 
-static iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_cast(
+static iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_cast_unsafe(
     iree_hal_buffer_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_buffer_vtable);
   return (iree_hal_cuda_buffer_t*)base_value;
 }
 
-static const iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_const_cast(
+static const iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_const_cast_unsafe(
     const iree_hal_buffer_t* base_value) {
-  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_buffer_vtable);
   return (const iree_hal_cuda_buffer_t*)base_value;
 }
 
@@ -69,7 +67,8 @@ iree_status_t iree_hal_cuda_buffer_wrap(
 }
 
 static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
-  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
+  iree_hal_cuda_buffer_t* buffer =
+      iree_hal_cuda_buffer_cast_unsafe(base_buffer);
   iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   if (buffer->release_callback.fn) {
@@ -85,7 +84,8 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
-  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
+  iree_hal_cuda_buffer_t* buffer =
+      iree_hal_cuda_buffer_cast_unsafe(base_buffer);
 
   // TODO(benvanik): add upload/download for unmapped buffers.
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
@@ -134,20 +134,20 @@ static iree_status_t iree_hal_cuda_buffer_flush_range(
 iree_hal_cuda_buffer_type_t iree_hal_cuda_buffer_type(
     const iree_hal_buffer_t* base_buffer) {
   const iree_hal_cuda_buffer_t* buffer =
-      iree_hal_cuda_buffer_const_cast(base_buffer);
+      iree_hal_cuda_buffer_const_cast_unsafe(base_buffer);
   return buffer->type;
 }
 
 CUdeviceptr iree_hal_cuda_buffer_device_pointer(
     const iree_hal_buffer_t* base_buffer) {
   const iree_hal_cuda_buffer_t* buffer =
-      iree_hal_cuda_buffer_const_cast(base_buffer);
+      iree_hal_cuda_buffer_const_cast_unsafe(base_buffer);
   return buffer->device_ptr;
 }
 
 void* iree_hal_cuda_buffer_host_pointer(const iree_hal_buffer_t* base_buffer) {
   const iree_hal_cuda_buffer_t* buffer =
-      iree_hal_cuda_buffer_const_cast(base_buffer);
+      iree_hal_cuda_buffer_const_cast_unsafe(base_buffer);
   return buffer->host_ptr;
 }
 
