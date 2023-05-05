@@ -12,7 +12,6 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -574,7 +573,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 
   addBufferizePasses(nestedModulePM);
 
-  if (!enableMicrokernels) {
+  if (enableMicrokernels) {
+    nestedModulePM.addPass(createLowerUKernelOpsToCallsPass());
+  } else {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUMmt4dVectorLoweringPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -585,8 +586,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 void addCPUDataTilingPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ParallelTiles)));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass());
 
@@ -606,6 +605,13 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);
+  if (clEnablePadConsumerFusion) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createFuseTensorPadWithConsumerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createConcretizePadResultShapePass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
+  }
 }
 
 void addTransformDialectPasses(OpPassManager &passManager) {
@@ -623,9 +629,6 @@ void addTransformDialectPasses(OpPassManager &passManager) {
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
-  // Lower `ukernel.*` ops to function calls
-  passManager.addPass(createLowerUKernelOpsToCallsPass());
-
   // LinalgExt -> SCF
   passManager.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createLinalgExtToLoopsPass());
@@ -636,7 +639,6 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
     passManager.addNestedPass<func::FuncOp>(
         createLLVMCPUEmitVectorizationRemarksPass());
   }
-  passManager.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
@@ -689,9 +691,18 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
-  addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
+  passManager.addNestedPass<ModuleOp>(
+      createVerifyLinalgTransformLegalityPass());
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createTypePropagationPass());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createLLVMCPUMaterializeEncodingPass());
+  passManager.addNestedPass<ModuleOp>(createBufferizeCopyOnlyDispatchesPass());
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
+  // Temporary solution to avoid large allocations due to softmax lowering.
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(

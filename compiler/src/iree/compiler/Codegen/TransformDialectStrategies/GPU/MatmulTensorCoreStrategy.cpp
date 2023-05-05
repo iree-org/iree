@@ -11,14 +11,11 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
-#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -42,8 +39,6 @@ using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
     IREEEraseHALDescriptorTypeFromMemRefOp;
-using iree_compiler::IREE::transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
@@ -55,8 +50,8 @@ using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
 
 using iree_compiler::buildSelectFirstNonEmpty;
+using iree_compiler::buildTileFuseDistToForallAndWorkgroupCountWithTileSizes;
 using iree_compiler::buildTileFuseDistToForallWithNumThreads;
-using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
@@ -68,125 +63,28 @@ using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
 
-/// Options to set the default values of the matmul strategy.
-
-/// Block tile size X, Y, Z.
-static llvm::cl::opt<int64_t> clBlockTileSizeX(
-    "td-matmul-strategy-blk-size-x",
-    llvm::cl::desc("block tile size for dim X (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(128));
-static llvm::cl::opt<int64_t> clBlockTileSizeY(
-    "td-matmul-strategy-blk-size-y",
-    llvm::cl::desc("block tile size for dim Y (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(128));
-static llvm::cl::opt<int64_t> clBlockTileSizeZ(
-    "td-matmul-strategy-blk-size-z",
-    llvm::cl::desc("block tile size for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
-static llvm::cl::opt<int64_t> clReductionTileSize(
-    "td-matmul-strategy-reduc-size",
-    llvm::cl::desc(
-        "reduction tile sized for the transform dialect matmul strategy"),
-    llvm::cl::init(16));
-
-/// Number of threads X, Y, Z.
-static llvm::cl::opt<int64_t> clNumThreadsX(
-    "td-matmul-strategy-num-threads-x",
-    llvm::cl::desc("number of threads for dim X (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(64));
-static llvm::cl::opt<int64_t> clNumThreadsY(
-    "td-matmul-strategy-num-threads-y",
-    llvm::cl::desc("number of threads for dim Y (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumThreadsZ(
-    "td-matmul-strategy-num-threads-z",
-    llvm::cl::desc("number of threads for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
-/// Number of warps X, Y, Z.
-static llvm::cl::opt<int64_t> clNumWarpsX(
-    "td-matmul-strategy-num-warps-x",
-    llvm::cl::desc("number of warps for dim X (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumWarpsY(
-    "td-matmul-strategy-num-warps-y",
-    llvm::cl::desc("number of warps for dim Y (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(2));
-static llvm::cl::opt<int64_t> clNumWarpsZ(
-    "td-matmul-strategy-num-warps-z",
-    llvm::cl::desc("number of warps for dim z (x,y,z) for the transform "
-                   "dialect matmul strategy"),
-    llvm::cl::init(1));
-
-static llvm::cl::opt<bool> clUseAsyncCopies(
-    "td-matmul-strategy-use-async-copies",
-    llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
-    llvm::cl::init(true));
-
-static llvm::cl::opt<bool> clUseMmaSync(
-    "td-matmul-strategy-use-mma-sync",
-    llvm::cl::desc("use mma sync for the transform dialect matmul strategy"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<int64_t> clPipelineDepth(
-    "td-matmul-strategy-pipeline-depth",
-    llvm::cl::desc("pipeline depth for the transform dialect matmul strategy"),
-    llvm::cl::init(3));
-
-void MatmulStrategy::initDefaultValues() {
-  blockTileSizes = {clBlockTileSizeX, clBlockTileSizeY, clBlockTileSizeZ};
-  reductionTileSize = clReductionTileSize;
-  numThreads = {clNumThreadsX, clNumThreadsY, clNumThreadsZ};
-  numWarps = {clNumWarpsX, clNumThreadsY, clNumThreadsZ};
-  useAsyncCopies = clUseAsyncCopies;
-  useMmaSync = clUseMmaSync;
-  pipelineDepth = clPipelineDepth;
+static SmallVector<Attribute> getGridAttrs(MLIRContext *context) {
+  auto blockX =
+      mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimX);
+  auto blockY =
+      mlir::gpu::GPUBlockMappingAttr::get(context, mlir::gpu::Blocks::DimY);
+  return SmallVector<Attribute>{blockY, blockX};
 }
 
-LLVM_DUMP_METHOD void MatmulStrategy::dump() const { print(llvm::errs()); }
+static SmallVector<Attribute> getBlockAttrs(MLIRContext *context) {
+  auto threadX =
+      mlir::gpu::GPUThreadMappingAttr::get(context, mlir::gpu::Threads::DimX);
+  auto threadY =
+      mlir::gpu::GPUThreadMappingAttr::get(context, mlir::gpu::Threads::DimY);
+  return SmallVector<Attribute>{threadY, threadX};
+}
 
-void MatmulStrategy::print(llvm::raw_ostream &os) const {
-  os << "\n--- Matmul strategy ---\n";
-  os << "- block tile sizes: {";
-  bool isFirst = true;
-  for (int64_t blockTileSize : blockTileSizes) {
-    if (!isFirst) os << ", ";
-    os << blockTileSize;
-    isFirst = false;
-  }
-  os << "}\n";
-  os << "- reduction tile size: " << reductionTileSize << '\n';
-
-  os << "- number of threads: {";
-  isFirst = true;
-  for (int64_t numThreadsForDim : numThreads) {
-    if (!isFirst) os << ", ";
-    os << numThreadsForDim;
-    isFirst = false;
-  }
-  os << "}\n";
-
-  os << "- number of warps: {";
-  isFirst = true;
-  for (int64_t numWarpsForDim : numWarps) {
-    if (!isFirst) os << ", ";
-    os << numWarpsForDim;
-    isFirst = false;
-  }
-  os << "}\n";
-
-  os << "- use async copies: " << useAsyncCopies << '\n';
-  os << "- use mma sync: " << useMmaSync << '\n';
-  os << "- pipeline depth: " << pipelineDepth << '\n';
+static SmallVector<Attribute> getWarpAttrs(MLIRContext *context) {
+  auto warpX =
+      mlir::gpu::GPUWarpMappingAttr::get(context, mlir::gpu::Warps::DimX);
+  auto warpY =
+      mlir::gpu::GPUWarpMappingAttr::get(context, mlir::gpu::Warps::DimY);
+  return SmallVector<Attribute>{warpY, warpX};
 }
 
 /// Build the transform IR to pad a matmul op `matmulOpH`.
@@ -226,13 +124,11 @@ static Value buildHoistOutputPaddingOp(ImplicitLocOpBuilder &b, Value variantH,
 
   // Perform a pass of canonicalization cleanups + folding fill + pad into pad
   // by applying `foldTensorSubsets` and `tilingCanonicalization`.
-  {
-    ApplyPatternsOpPatterns config;
-    config.foldTensorSubsets = true;
-    config.tilingCanonicalization = true;
-    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config,
-                                                              variantH);
-  }
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b,
+      ApplyPatternsOpPatterns{.foldTensorSubsets = true,
+                              .tilingCanonicalization = true},
+      variantH);
 
   // The canonicalization above should have rewritten hoistPad into a FillOp.
   // Unfortunately, the listener drops handles if the op types don't match. We
@@ -285,28 +181,23 @@ static std::tuple<Value, Value, Value> buildDistributeCopies(
       variantH, tensor::ParallelInsertSliceOp::getOperationName());
   Value copyBackOpH = b.create<transform::InsertSliceToCopyOp>(
       insertSliceH.getType(), insertSliceH);
-
+  // TODO: Get various tile sizes and mapping decisions from strategy.
+  SmallVector<Attribute> tYtX = getBlockAttrs(b.getContext());
+  Attribute tX = tYtX[1];
+  Attribute tY = tYtX[0];
   Value lhsH = b.create<transform::GetProducerOfOperand>(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(0));
   Value rhsH = b.create<transform::GetProducerOfOperand>(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(1));
-
-  MatmulStrategy::MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
   Value lhsCopyOpH = buildDistributeOnePadOrCopy(
-      b, variantH, lhsH, /*numThreads=*/lhsCopyMapping.numThreads,
-      /*threadDimMapping=*/lhsCopyMapping.threadMapping, /*foldIfBranch=*/true);
-
-  MatmulStrategy::MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
+      b, variantH, lhsH, /*numThreads=*/{32, 4},
+      /*threadDimMapping=*/ArrayRef<Attribute>{tX, tY}, /*foldIfBranch=*/true);
   Value rhsCopyOpH = buildDistributeOnePadOrCopy(
-      b, variantH, rhsH, /*numThreads=*/rhsCopyMapping.numThreads,
-      /*threadDimMapping=*/rhsCopyMapping.threadMapping, /*foldIfBranch=*/true);
-
-  MatmulStrategy::MappingInfo resCopyMapping = strategy.resCopyMapping();
-  copyBackOpH = buildDistributeOnePadOrCopy(
-      b, variantH, copyBackOpH,
-      /*numThreads=*/resCopyMapping.numThreads,
-      /*threadDimMapping=*/rhsCopyMapping.threadMapping);
-
+      b, variantH, rhsH, /*numThreads=*/{4, 32},
+      /*threadDimMapping=*/tYtX, /*foldIfBranch=*/true);
+  copyBackOpH = buildDistributeOnePadOrCopy(b, variantH, copyBackOpH,
+                                            /*numThreads=*/{4, 32},
+                                            /*threadDimMapping=*/tYtX);
   return std::make_tuple(lhsCopyOpH, rhsCopyOpH, copyBackOpH);
 }
 
@@ -328,15 +219,13 @@ static void buildMatmulVectorization(ImplicitLocOpBuilder &b, Value variantH,
         b, configuration, variantH);
   }
   // Apply vector masking.
-  MatmulStrategy::MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
+  // TODO: extract information from strategy.
   b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
-                                         lhsCopyMapping.tileSizes);
-  MatmulStrategy::MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
+                                         ArrayRef<int64_t>({4, 4}));
   b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), false,
-                                         rhsCopyMapping.tileSizes);
-  MatmulStrategy::MappingInfo resCopyMapping = strategy.resCopyMapping();
+                                         ArrayRef<int64_t>({4, 4}));
   b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
-                                         resCopyMapping.tileSizes);
+                                         ArrayRef<int64_t>({32, 4}));
 
   // TODO: don't rematch, apply on the variant op directly.
   Value funcH =
@@ -374,26 +263,14 @@ static Value buildConvertToTensorCoreOp(ImplicitLocOpBuilder &b, Value funcH,
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
   b.create<iree_compiler::IREE::transform_dialect::HoistStaticAllocOp>(funcH);
-  {
-    ApplyPatternsOpPatterns config;
-    config.foldMemrefAliases = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
-  {
-    ApplyPatternsOpPatterns config;
-    config.extractAddressComputations = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
+  b.create<ApplyPatternsOp>(funcH,
+                            ApplyPatternsOpPatterns{.foldMemrefAliases = true});
+  b.create<ApplyPatternsOp>(
+      funcH, ApplyPatternsOpPatterns{.extractAddressComputations = true});
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
-  {
-    ApplyPatternsOpPatterns config;
-    if (strategy.useMmaSync)
-      config.unrollVectorsGpuMmaSync = true;
-    else
-      config.unrollVectorsGpuWmma = true;
-    b.create<ApplyPatternsOp>(funcH, config);
-  }
+  b.create<ApplyPatternsOp>(
+      funcH, ApplyPatternsOpPatterns{.unrollVectorsGpuWmma = true});
   // TODO: not a functional style transform and avoid returning funcH.
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
       pdl::OperationType::get(b.getContext()), funcH);
@@ -404,10 +281,8 @@ static Value buildConvertToTensorCoreOp(ImplicitLocOpBuilder &b, Value funcH,
       b.create<iree_compiler::IREE::transform_dialect::VectorToMMAConversionOp>(
           funcH);
   // TODO: proper builder instead of a setting post-hoc.
-  if (strategy.useMmaSync)
-    vectorToMMaConversionOp.setUseMmaSync(true);
-  else
-    vectorToMMaConversionOp.setUseWmma(true);
+  // TODO: extract from strategy.
+  vectorToMMaConversionOp.setUseWmma(true);
   return funcH;
 }
 
@@ -415,9 +290,8 @@ static void buildMultiBuffering(ImplicitLocOpBuilder &b, Value funcH,
                                 const MatmulStrategy &strategy) {
   iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, ApplyPatternsOpPatterns(), funcH);
-  ApplyPatternsOpPatterns config;
-  config.foldMemrefAliases = true;
-  b.create<ApplyPatternsOp>(funcH, config);
+  b.create<ApplyPatternsOp>(funcH,
+                            ApplyPatternsOpPatterns{.foldMemrefAliases = true});
   // TODO: Avoid brittle matching here.
   // TODO: Better builder after integrate.
   Value allocH = b.create<transform::MatchOp>(
@@ -429,7 +303,7 @@ static void buildMultiBuffering(ImplicitLocOpBuilder &b, Value funcH,
   // TODO: Better builder instead of setting post-hoc.
   auto multiBufferOp = b.create<transform::MemRefMultiBufferOp>(
       pdl::OperationType::get(b.getContext()), allocH);
-  multiBufferOp.setFactor(strategy.pipelineDepth);
+  multiBufferOp.setFactor(3);
   multiBufferOp.setSkipAnalysis(true);
 }
 
@@ -449,33 +323,26 @@ static Value buildConvertToAsyncCopies(ImplicitLocOpBuilder &b, Value funcH,
       b.create<iree_compiler::IREE::transform_dialect::CreateAsyncGroupsOp>(
           TypeRange{}, funcH);
   // TODO: proper builder instead of a setting post-hoc.
-  createAsyncGroupOp.setUseMmaSync(strategy.useMmaSync);
-  ApplyPatternsOpPatterns config;
-  config.foldMemrefAliases = true;
-  iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config, funcH);
+  createAsyncGroupOp.setUseMmaSync(false);
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, ApplyPatternsOpPatterns{.foldMemrefAliases = true}, funcH);
   return funcH;
 }
 
 static void buildPipelineSharedMemoryCopies(ImplicitLocOpBuilder &b,
                                             Value funcH,
                                             const MatmulStrategy &strategy) {
-  Value computeOpH;
-  if (strategy.useMmaSync) {
-    computeOpH = b.create<transform::MatchOp>(
-        funcH, mlir::nvgpu::MmaSyncOp::getOperationName());
-  } else {
-    computeOpH = b.create<transform::MatchOp>(
-        funcH, mlir::gpu::SubgroupMmaComputeOp::getOperationName());
-  }
+  Value subgroupMmaOpH = b.create<transform::MatchOp>(
+      funcH, mlir::gpu::SubgroupMmaComputeOp::getOperationName());
   // TODO: Better builder.
   Value forOpH = b.create<transform::GetParentForOp>(
-      pdl::OperationType::get(b.getContext()), computeOpH);
+      pdl::OperationType::get(b.getContext()), subgroupMmaOpH);
   // TODO: Better builder instead of setting post-hoc.
   auto pipelineOp = b.create<
       iree_compiler::IREE::transform_dialect::PipelineSharedMemoryCopiesOp>(
       pdl::OperationType::get(b.getContext()), forOpH);
   // TODO: depth from strategy, or directly from individual buffers.
-  pipelineOp.setDepth(strategy.pipelineDepth);
+  pipelineOp.setDepth(3);
 }
 
 static std::tuple<Value, Value, Value, Value>
@@ -487,24 +354,21 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
   auto [fillH, matmulH, maybeTrailingH] = unpackRegisteredMatchCallback<3>(
       b, "matmul", transform::FailurePropagationMode::Propagate, variantH);
 
+  // TODO: get from strategy.
+  SmallVector<int64_t> tileSizes = {128, 128};
   // Step 2. Create the block/mapping tiling level and fusee.
   // auto [fusionTargetH, fusionGroupH] =
   //     buildSelectFirstNonEmpty(b, maybeTrailingH, matmulH);
-  MatmulStrategy::MappingInfo blockMapping = strategy.getBlockMapping();
   TileToForallAndFuseAndDistributeResult tileResult =
-      buildTileFuseDistToForallWithTileSizes(
+      buildTileFuseDistToForallAndWorkgroupCountWithTileSizes(
           /*builder=*/b,
           /*isolatedParentOpH=*/variantH,
           /*rootH=*/matmulH,
           /*opsToFuseH=*/fillH,
           /*tileSizes=*/
-          getAsOpFoldResult(b.getI64ArrayAttr(blockMapping.tileSizes)),
+          getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)),
           /*threadDimMapping=*/
-          b.getArrayAttr(blockMapping.threadMapping));
-
-  // Handle the workgroup count region.
-  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
-      tileResult.forallH);
+          b.getArrayAttr(getGridAttrs(b.getContext())));
 
   // TODO: handle trailing op.
   return std::make_tuple(tileResult.resultingFusedOpsHandles.front(),
@@ -530,22 +394,18 @@ static Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH) {
 
 void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
     ImplicitLocOpBuilder &b, Value variantH, const MatmulStrategy &strategy) {
-  assert(strategy.totalNumThreads() ==
-             strategy.totalNumWarps() * kCudaWarpSize &&
-         "Number of threads specified by warps must match total number of "
-         "threads");
   // Step 1. Apply block-level part of the strategy, keeps everything fused.
   auto [fillH, matmulH, maybeTiledTrailingHBlock, forall] =
       buildMatmulStrategyBlockDistribution(b, variantH, strategy);
   // Tile reduction loop.
-  SmallVector<int64_t> tileSizes{0, 0, strategy.reductionTileSize};
-  auto tileReductionResult =
+  SmallVector<int64_t> tileSizes(2, 0);
+  tileSizes.push_back(16);
+  auto res =
       buildTileFuseToScfFor(b, variantH, matmulH, {},
                             getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
 
   // Step 2. Pad the matmul op.
-  auto paddedMatmulOpH =
-      buildPadMatmul(b, tileReductionResult.tiledOpH, strategy);
+  auto paddedMatmulOpH = buildPadMatmul(b, res.tiledOpH, strategy);
 
   // Step 3. Hoist the padding of the output operand above the reduction loop.
   // The resulting fillOp will be mapped with the contraction using an SIMD
@@ -558,15 +418,15 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
 
   // Step 5. Distribute to warps: SIMD programming model.
   // TODO: get the number of warps from strategy.
-  MatmulStrategy::MappingInfo computeMapping = strategy.computeMapping();
+  std::array<int64_t, 2> numThreads = {2, 2};
   buildTileFuseDistToForallWithNumThreads(
       b, variantH, paddedMatmulOpH, ValueRange(),
-      getAsOpFoldResult(b.getI64ArrayAttr(computeMapping.numThreads)),
-      b.getArrayAttr(computeMapping.threadMapping));
+      getAsOpFoldResult(b.getI64ArrayAttr(numThreads)),
+      b.getArrayAttr(getWarpAttrs(b.getContext())));
   buildTileFuseDistToForallWithNumThreads(
       b, variantH, fillOpH, ValueRange(),
-      getAsOpFoldResult(b.getI64ArrayAttr(computeMapping.numThreads)),
-      b.getArrayAttr(computeMapping.threadMapping));
+      getAsOpFoldResult(b.getI64ArrayAttr(numThreads)),
+      b.getArrayAttr(getWarpAttrs(b.getContext())));
 
   // Step 6. Rank-reduce and vectorize.
   buildMatmulVectorization(b, variantH, lhsCopyOpH, rhsCopyOpH, copyBackOpH,
@@ -580,24 +440,22 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // TODO: assumes a single func::FuncOp to transform, needs hardening.
   // TODO: extract info from strategy.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads,
-                                    strategy.numWarps);
+  funcH = buildMapToBlockAndThreads(b, funcH, ArrayRef<int64_t>{32, 4, 1},
+                                    ArrayRef<int64_t>{2, 2, 1});
 
   // Step 9. Convert to tensor core ops.
   // TODO: avoid consuming handles and returning here.
   funcH = buildConvertToTensorCoreOp(b, funcH, strategy);
 
-  if (strategy.useAsyncCopies) {
-    // Step 10. Multi-buffering.
-    buildMultiBuffering(b, funcH, strategy);
+  // Step 10. Multi-buffering.
+  buildMultiBuffering(b, funcH, strategy);
 
-    // Step 11. Convert to async copies.
-    // TODO: avoid consuming handles and returning here.
-    funcH = buildConvertToAsyncCopies(b, funcH, strategy);
+  // Step 11. Convert to async copies.
+  // TODO: avoid consuming handles and returning here.
+  funcH = buildConvertToAsyncCopies(b, funcH, strategy);
 
-    // Step 12. Pipeline shared memory copies.
-    buildPipelineSharedMemoryCopies(b, funcH, strategy);
-  }
+  // Step 12. Pipeline shared memory copies.
+  buildPipelineSharedMemoryCopies(b, funcH, strategy);
 
   // Step 13. Late lowerings and cleanups.
   // TODO: not a functional style op to avoid invalidating artificially.
@@ -606,9 +464,6 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // TODO: not a functional style op to avoid invalidating artificially.
   funcH = b.create<transform::MaterializeMasksOp>(
       pdl::OperationType::get(b.getContext()), funcH);
-  {
-    ApplyPatternsOpPatterns config;
-    config.foldMemrefAliases = true;
-    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config, funcH);
-  }
+  iree_compiler::buildCanonicalizationAndEnablingTransforms(
+      b, ApplyPatternsOpPatterns{.foldMemrefAliases = true}, funcH);
 }

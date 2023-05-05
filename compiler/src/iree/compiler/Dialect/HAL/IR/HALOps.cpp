@@ -996,8 +996,7 @@ void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
   ArrayRef<Type> argTypes = getArgumentTypes();
   ArrayRef<Type> resultTypes = getResultTypes();
   mlir::function_interface_impl::printFunctionSignature(
-      p, cast<FunctionOpInterface>(op), argTypes, /*isVariadic=*/false,
-      resultTypes);
+      p, op, argTypes, /*isVariadic=*/false, resultTypes);
   p << " as ";
   if (resultTypes.size() != 1) p << '(';
   llvm::interleaveComma(getKeys().getValue(), p,

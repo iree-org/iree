@@ -18,6 +18,8 @@
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
+namespace stablehlo = mlir::stablehlo;
+
 enum class DotOperationType {
   kVectorDot = 0,
   kMatrixVector,
@@ -26,7 +28,7 @@ enum class DotOperationType {
   kUnsupported
 };
 
-DotOperationType getDotOperationType(mlir::stablehlo::DotOp dotOp) {
+DotOperationType getDotOperationType(stablehlo::DotOp dotOp) {
   ArrayRef<int64_t> lhsShape =
       cast<ShapedType>(dotOp.getLhs().getType()).getShape();
   ArrayRef<int64_t> rhsShape =
@@ -83,12 +85,12 @@ SmallVector<Value, 2> getDotOpEmptyTensorDynSizes(OpBuilder& b, Location loc,
 }
 
 template <DotOperationType op_type, typename LinalgOp>
-struct DotOpConversion final : OpConversionPattern<mlir::stablehlo::DotOp> {
-  using OpConversionPattern<mlir::stablehlo::DotOp>::OpConversionPattern;
-  using OpAdaptor = mlir::stablehlo::DotOp::Adaptor;
+struct DotOpConversion final : OpConversionPattern<stablehlo::DotOp> {
+  using OpConversionPattern<stablehlo::DotOp>::OpConversionPattern;
+  using OpAdaptor = stablehlo::DotOp::Adaptor;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::DotOp op, OpAdaptor adaptor,
+      stablehlo::DotOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) {
       return failure();
@@ -99,7 +101,7 @@ struct DotOpConversion final : OpConversionPattern<mlir::stablehlo::DotOp> {
     // Convert unsigned to signed. This works because signed and unsigned
     // integer matmul is the same operation in two's complement.
     auto outputType =
-        cast<ShapedType>(getTypeConverter()->convertType(op.getType()));
+        cast<ShapedType>(typeConverter->convertType(op.getType()));
     SmallVector<Value, 2> dynShape = getDotOpEmptyTensorDynSizes(
         rewriter, loc, adaptor.getLhs(), adaptor.getRhs(), op_type);
     Value emptyTensor =
@@ -116,11 +118,11 @@ struct DotOpConversion final : OpConversionPattern<mlir::stablehlo::DotOp> {
 };
 
 struct DotGeneralBatchMatMulOpConversion final
-    : OpConversionPattern<mlir::stablehlo::DotGeneralOp> {
+    : OpConversionPattern<stablehlo::DotGeneralOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::DotGeneralOp op, OpAdaptor adaptor,
+      stablehlo::DotGeneralOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) {
       return failure();
@@ -129,8 +131,7 @@ struct DotGeneralBatchMatMulOpConversion final
       return rewriter.notifyMatchFailure(op, "expected a batch matmul");
     }
 
-    mlir::stablehlo::DotDimensionNumbersAttr dimNumbers =
-        op.getDotDimensionNumbers();
+    stablehlo::DotDimensionNumbersAttr dimNumbers = op.getDotDimensionNumbers();
     ArrayRef<int64_t> lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
     ArrayRef<int64_t> rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
     ArrayRef<int64_t> lhsContractingDims =
@@ -174,18 +175,17 @@ struct DotGeneralBatchMatMulOpConversion final
 };
 
 struct DotGeneralOpConversion final
-    : OpConversionPattern<mlir::stablehlo::DotGeneralOp> {
+    : OpConversionPattern<stablehlo::DotGeneralOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::DotGeneralOp op, OpAdaptor adaptor,
+      stablehlo::DotGeneralOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) {
       return failure();
     }
 
     // Get various dimension iterator information
-    mlir::stablehlo::DotDimensionNumbersAttr dimNumbers =
-        op.getDotDimensionNumbers();
+    stablehlo::DotDimensionNumbersAttr dimNumbers = op.getDotDimensionNumbers();
     ArrayRef<int64_t> lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
     ArrayRef<int64_t> rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
     ArrayRef<int64_t> lhsContractingDims =

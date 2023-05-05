@@ -131,13 +131,10 @@ int main(int argc, char **argv) {
   printf("Library loaded: %s\n", argv[1]);
 
   int version = ireeCompilerGetAPIVersion();
-  printf("API Version: 0x%x\n", version);
+  printf("Version: %d\n", version);
 
   ireeCompilerGlobalInitialize();
   printf("Initialized\n");
-
-  const char *revision = ireeCompilerGetRevision();
-  printf("Revision: %s\n", revision);
 
   // Session.
   iree_compiler_session_t *session = ireeCompilerSessionCreate();

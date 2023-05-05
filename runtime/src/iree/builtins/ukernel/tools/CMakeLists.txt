@@ -21,7 +21,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::cpu
     iree::base::internal::synchronization
-    iree::builtins::ukernel
+    iree::builtins::ukernel::headers
     iree::schemas::cpu_data
   PUBLIC
 )
@@ -36,22 +36,9 @@ iree_cc_library(
   DEPS
     ::util
     iree::base
-    iree::builtins::ukernel
+    iree::builtins::ukernel::headers
     iree::schemas::cpu_data
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    util_test
-  SRCS
-    "util_test.c"
-  DEPS
-    ::test
-    ::util
-    iree::base
-    iree::base::internal::cpu
-    iree::schemas::cpu_data
 )
 
 iree_cc_library(
@@ -64,7 +51,7 @@ iree_cc_library(
   DEPS
     ::util
     iree::base
-    iree::builtins::ukernel
+    iree::builtins::ukernel::headers
     iree::schemas::cpu_data
     iree::testing::benchmark
   PUBLIC
@@ -80,7 +67,7 @@ iree_cc_library(
   DEPS
     ::benchmark
     iree::base
-    iree::builtins::ukernel
+    iree::builtins::ukernel::headers
     iree::testing::benchmark
   PUBLIC
 )
@@ -96,7 +83,6 @@ iree_cc_binary_benchmark(
     iree::base
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::builtins::ukernel::internal_headers
     iree::testing::benchmark
   TESTONLY
 )
@@ -112,7 +98,6 @@ iree_cc_test(
     iree::base
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::builtins::ukernel::internal_headers
 )
 
 iree_cc_binary_benchmark(
@@ -127,7 +112,6 @@ iree_cc_binary_benchmark(
     iree::base
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::builtins::ukernel::internal_headers
     iree::testing::benchmark
   TESTONLY
 )
@@ -143,7 +127,6 @@ iree_cc_test(
     iree::base
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::builtins::ukernel::internal_headers
 )
 
 iree_cc_binary_benchmark(
@@ -158,7 +141,6 @@ iree_cc_binary_benchmark(
     iree::base
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::builtins::ukernel::internal_headers
     iree::testing::benchmark
   TESTONLY
 )
@@ -175,7 +157,6 @@ iree_cc_test(
     iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::builtins::ukernel::internal_headers
 )
 
 iree_cc_binary_benchmark(
@@ -189,7 +170,6 @@ iree_cc_binary_benchmark(
     iree::base
     iree::base::internal::flags
     iree::builtins::ukernel
-    iree::builtins::ukernel::internal_headers
     iree::testing::benchmark
   TESTONLY
 )

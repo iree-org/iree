@@ -27,6 +27,7 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
     "Rewriters.h"
+    "TypeConversion.h"
   DEPS
     ::PassesIncGen
     MLIRPass
@@ -36,28 +37,25 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    StableHLOLegalization
-  SRCS
-    "LegalizeControlFlow.cpp"
-    "LegalizeShapeComputations.cpp"
-    "LegalizeToLinalgUtils.cpp"
+    StableHLO
+  HDRS
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
+    "Passes.h"
+  SRCS
+    "LegalizeToLinalgUtils.cpp"
+    "Passes.cpp"
     "StableHLOToArith.cpp"
     "StableHLOToLinalg.cpp"
-    "StableHLOToLinalgConvolution.cpp"
     "StableHLOToLinalgDotProd.cpp"
-    "StableHLOToLinalgExt.cpp"
     "StableHLOToLinalgPointwise.cpp"
     "StableHLOToLinalgRandom.cpp"
     "StableHLOToLinalgReduce.cpp"
     "TypeConversion.cpp"
-    "TypeConversion.h"
-    "VerifyCompilerInputLegality.cpp"
   DEPS
     ::PassHeaders
+    ::PassesIncGen
     ChloOps
-    IREELinalgExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
@@ -66,55 +64,30 @@ iree_cc_library(
     MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
+    MLIRFuncTransforms
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
+    MLIRMLProgramDialect
     MLIRMathDialect
     MLIRMemRefDialect
+    MLIRPass
+    MLIRReconcileUnrealizedCasts
     MLIRSCFDialect
+    MLIRSCFToControlFlow
+    MLIRSCFTransforms
     MLIRShapeDialect
     MLIRShapeOpsTransforms
+    MLIRShapeToStandard
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTransforms
     MLIRVectorDialect
+    StablehloBroadcastUtils
     StablehloOps
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Util::IR
-    iree::compiler::Dialect::Util::Transforms
-    iree::compiler::InputConversion::Common
-    iree::compiler::Utils
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    StableHLO
-  HDRS
-    "Passes.h"
-  SRCS
-    "Passes.cpp"
-  DEPS
-    ::PassHeaders
-    ::StableHLOLegalization
-    LLVMSupport
-    MLIRLinalgTransforms
-    MLIRMLProgramDialect
-    MLIRPass
-    MLIRReconcileUnrealizedCasts
-    MLIRSCFToControlFlow
-    MLIRSCFTransforms
-    MLIRShapeOpsTransforms
-    MLIRShapeToStandard
-    MLIRTransforms
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Util::IR
-    iree::compiler::Dialect::Util::Transforms
-    iree::compiler::InputConversion::Common
-    iree::compiler::InputConversion::StableHLO::Preprocessing
   PUBLIC
 )
 

@@ -16,8 +16,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define DBGSNL() (llvm::dbgs() << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
 
@@ -59,7 +57,7 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
         builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]);
     if (i == 0) {
       mlir::AffineExpr d0 = builder.getAffineDimExpr(0);
-      subgroupId = mlir::affine::makeComposedAffineApply(
+      subgroupId = mlir::makeComposedAffineApply(
           builder, loc, d0.floorDiv(builder.getAffineConstantExpr(warpSize)),
           {subgroupId});
     }
@@ -385,7 +383,7 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
 
 // List of identity elements by operation.
 // https://en.wikipedia.org/wiki/Identity_element
-static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
+static Attribute getCombiningKindIdentity(OpBuilder &builder,
                                           vector::CombiningKind combiningKind,
                                           Type type) {
   switch (combiningKind) {
@@ -419,7 +417,7 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
       return builder.getFloatAttr(type, negInfApFloat);
     }
   }
-  return TypedAttr();
+  return Attribute();
 }
 
 /// Compute the value on a single thread to get per lane reduction value.
@@ -463,11 +461,11 @@ static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
   } else {
     // In cases where vecSize < unrollCount, we would pad the vector
     // with identity elements until it's total bit size is 32.
-    TypedAttr identityAttr =
+    Attribute identityAttr =
         getCombiningKindIdentity(builder, kind, elementType);
     identityAttr = DenseElementsAttr::get(unrolledLaneValType, identityAttr);
-    Value identity = builder.create<arith::ConstantOp>(loc, unrolledLaneValType,
-                                                       identityAttr);
+    Value identity = builder.create<arith::ConstantOp>(loc, identityAttr,
+                                                       unrolledLaneValType);
     perLaneReduction = builder.create<vector::InsertStridedSliceOp>(
         loc, input, identity, /*offsets=*/ArrayRef<int64_t>{0},
         /*strides=*/ArrayRef<int64_t>{1});
@@ -484,13 +482,13 @@ static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
   if (vectorType) {
     elementType = vectorType.getElementType();
   }
-  TypedAttr identityAttr = getCombiningKindIdentity(builder, kind, elementType);
+  Attribute identityAttr = getCombiningKindIdentity(builder, kind, elementType);
   if (vectorType) {
     identityAttr = DenseElementsAttr::get(vectorType, identityAttr);
   }
   assert(identityAttr && "Unknown identity value for the reduction");
   Value identity =
-      builder.create<arith::ConstantOp>(loc, identityType, identityAttr);
+      builder.create<arith::ConstantOp>(loc, identityAttr, identityType);
   return identity;
 }
 
@@ -615,19 +613,10 @@ static std::optional<int> getVectorContractOpOperandIdForVectorReadOp(
     Operation *op) {
   vector::ContractionOp contractOp;
 
-  // Check if the vector::TransferReadOp is consumed directly by
-  // vector::ContractionOp.
-  if (op->use_empty()) return std::nullopt;
   Operation *firstLevelUser = *((op->getUsers()).begin());
-  if (!firstLevelUser) return std::nullopt;
   if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser))
     return getVectorContractOpOperandId(contractOp, op->getResult(0));
-
-  // Check if the vector::TransferReadOp is consumed indirectly by
-  // vector::ContractionOp. Only check until the second level of use-def chain.
-  if (firstLevelUser->use_empty()) return std::nullopt;
   Operation *secondLevelUser = *((firstLevelUser->getUsers()).begin());
-  if (!secondLevelUser) return std::nullopt;
   if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser))
     return getVectorContractOpOperandId(contractOp,
                                         firstLevelUser->getResult(0));
@@ -679,10 +668,9 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     std::optional<int> operandId =
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
-      LLVM_DEBUG({
-        DBGS() << "Failed to get operandId for vector::TransferReadOp: " << *op
-               << "\n";
-      });
+      op->emitError() << "Cannot determine operandId this "
+                         "vector::TransferReadOp is used as in the "
+                         "vector::TransferContractOp";
       return std::nullopt;
     }
 

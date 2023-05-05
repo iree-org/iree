@@ -16,4 +16,7 @@ func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> (tensor<4xf
 // CHECK-NOT: hal.fence
 // CHECK-NOT: hal.pipeline_layout
 // CHECK-NOT: hal.semaphore
-// CHECK-NOT: hal.executable private
+// CHECK-NOT: hal.executable
+
+// TODO(#12586): Remove this after the issue is fixed.
+// XFAIL: *

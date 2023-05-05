@@ -16,8 +16,10 @@ namespace iree_compiler {
 
 struct IREEOneShotBufferizationOptions
     : public mlir::bufferization::OneShotBufferizationOptions {
-  // For now this has no extra fields. Keeping this anyway in case this is
-  // needed in future.
+  // TODO(#12933): Because of regressions in CUDA backend, there is an
+  // option to keep a legacy mode of not representing the offset in the
+  // type. Remove once the bug is fixed.
+  bool embedSubspanOffsetIntoMemRefType = true;
 };
 
 // Register all interfaces needed for bufferization.

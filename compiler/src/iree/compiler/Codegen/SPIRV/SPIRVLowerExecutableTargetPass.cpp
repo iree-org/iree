@@ -18,7 +18,6 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -44,12 +43,11 @@ class SPIRVLowerExecutableTargetPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<IREE::Codegen::IREECodegenDialect, affine::AffineDialect,
+        .insert<IREE::Codegen::IREECodegenDialect, AffineDialect,
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
                 IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
                 bufferization::BufferizationDialect, scf::SCFDialect,
-                spirv::SPIRVDialect, transform::TransformDialect,
-                vector::VectorDialect>();
+                spirv::SPIRVDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;

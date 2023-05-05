@@ -20,9 +20,12 @@
 #include "iree/modules/hal/loader/module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/modules/resolver.h"
 #include "iree/vm/bytecode/module.h"
 #include "iree/vm/dynamic/module.h"
+
+#if defined(IREE_HAVE_VMVX_MODULE)
+#include "iree/modules/vmvx/module.h"
+#endif  // IREE_HAVE_VMVX_MODULE
 
 //===----------------------------------------------------------------------===//
 // Module loading
@@ -380,7 +383,7 @@ typedef struct {
   iree_hal_device_t* device;
   iree_hal_allocator_t* device_allocator;
 } iree_tooling_resolve_state_t;
-static iree_status_t iree_tooling_resolve_module_dependency_callback(
+static iree_status_t iree_tooling_resolve_module_dependency(
     void* user_data_ptr, const iree_vm_module_dependency_t* dependency) {
   iree_tooling_resolve_state_t* state =
       (iree_tooling_resolve_state_t*)user_data_ptr;
@@ -390,8 +393,9 @@ static iree_status_t iree_tooling_resolve_module_dependency_callback(
     return iree_ok_status();
   }
 
-  // Register one of the known modules. Note that today this is not recursive
-  // but it could be in the future.
+  // Register one of the known modules. If we had a factory mechanism for
+  // resolving the modules we'd call out to that. Note that today this is not
+  // recursive but it could be in the future.
   iree_vm_module_t* module = NULL;
   if (iree_string_view_equal(dependency->name, IREE_SV("hal"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_async_module(
@@ -404,12 +408,20 @@ static iree_status_t iree_tooling_resolve_module_dependency_callback(
   } else if (iree_string_view_equal(dependency->name, IREE_SV("hal_loader"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_loader_module(
         state->instance, state->host_allocator, &module));
+  } else if (iree_string_view_equal(dependency->name, IREE_SV("vmvx"))) {
+    IREE_RETURN_IF_ERROR(iree_vmvx_module_create(
+        state->instance, state->host_allocator, &module));
+  } else if (iree_all_bits_set(dependency->flags,
+                               IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED)) {
+    // Required but not found; fail.
+    return iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "required module '%.*s' not registered on the context",
+        (int)dependency->name.size, dependency->name.data);
   } else {
-    // Defer to the generic module resolver registry.
-    IREE_RETURN_IF_ERROR(iree_tooling_resolve_module_dependency(
-        state->instance, dependency, state->host_allocator, &module));
+    // Optional and not found; skip.
+    return iree_ok_status();
   }
-  if (!module) return iree_ok_status();
 
   iree_status_t status =
       iree_tooling_module_list_push_back(state->resolved_list, module);
@@ -451,8 +463,7 @@ iree_status_t iree_tooling_resolve_modules(
   for (iree_host_size_t i = 0; i < user_module_count; ++i) {
     iree_vm_module_t* user_module = user_modules[i];
     status = iree_vm_module_enumerate_dependencies(
-        user_module, iree_tooling_resolve_module_dependency_callback,
-        &resolve_state);
+        user_module, iree_tooling_resolve_module_dependency, &resolve_state);
     if (!iree_status_is_ok(status)) {
       iree_string_view_t module_name = iree_vm_module_name(user_module);
       (void)module_name;
@@ -484,44 +495,6 @@ iree_status_t iree_tooling_resolve_modules(
   return status;
 }
 
-iree_status_t iree_tooling_find_single_exported_function(
-    iree_vm_module_t* module, iree_vm_function_t* out_function) {
-  memset(out_function, 0, sizeof(*out_function));
-  iree_vm_module_signature_t module_signature =
-      iree_vm_module_signature(module);
-  iree_host_size_t exported_functions = 0;
-  for (iree_host_size_t i = 0; i < module_signature.export_function_count;
-       ++i) {
-    iree_vm_function_t function = {0};
-    IREE_RETURN_IF_ERROR(
-        iree_vm_module_lookup_function_by_ordinal(
-            module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function),
-        "looking up function export %zu", i);
-    iree_string_view_t function_name = iree_vm_function_name(&function);
-    if (iree_string_view_starts_with(function_name,
-                                     iree_make_cstring_view("__")) ||
-        iree_string_view_find_char(function_name, '$', 0) !=
-            IREE_STRING_VIEW_NPOS) {
-      // Function was either internal or special; we don't want to run these
-      // as they have special ABI requirements or must only be called in
-      // specific situations (module initializers, etc).
-      continue;
-    }
-    if (exported_functions == 0) *out_function = function;
-    ++exported_functions;
-  }
-  if (exported_functions == 0) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "no exported functions found in module; at least one must be present");
-  } else if (exported_functions > 1) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "more than one exported function present; "
-                            "--function= must be specified explicitly");
-  }
-  return iree_ok_status();
-}
-
 //===----------------------------------------------------------------------===//
 // Context management
 //===----------------------------------------------------------------------===//
@@ -542,9 +515,6 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
   // HACK: to load modules we need the types registered even though we don't
   // know if the types are used.
   iree_status_t status = iree_hal_module_register_all_types(instance);
-  if (iree_status_is_ok(status)) {
-    status = iree_tooling_register_all_module_types(instance);
-  }
 
   if (iree_status_is_ok(status)) {
     *out_instance = instance;

@@ -617,12 +617,12 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Return the output type.
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return getOutput().getType();
     }
 
     // Return the input type.
     ShapedType getInputType() {
-      return getInput().getType().cast<ShapedType>();
+      return getInput().getType();
     }
 
     // Return the output shape.
@@ -764,12 +764,12 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 
     // Return the output type.
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return getOutput().getType();
     }
 
     // Return the input type.
     ShapedType getInputType() {
-      return getInput().getType().cast<ShapedType>();
+      return getInput().getType();
     }
 
     // Return the output shape.

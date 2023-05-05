@@ -32,8 +32,8 @@ static void combineAndSimplifyMap(AffineMap &map, SmallVectorImpl<Value> &dims,
   operands.append(symbols.begin(), symbols.end());
   // Pull in affine.apply operations and compose them fully into the
   // result.
-  affine::fullyComposeAffineMapAndOperands(&map, &operands);
-  affine::canonicalizeMapAndOperands(&map, &operands);
+  fullyComposeAffineMapAndOperands(&map, &operands);
+  canonicalizeMapAndOperands(&map, &operands);
   map = simplifyAffineMap(map);
   // Assign the results.
   dims.assign(operands.begin(), operands.begin() + map.getNumDims());
@@ -62,7 +62,7 @@ static AffineMap substituteMin(AffineMap map, SmallVectorImpl<Value> &dims,
         // the max expression depending on whether the value is used with a
         // positive or negative  coefficient.
         AffineExpr substitutedExpr =
-            affine::substWithMin(expr, dimExpr, minMax->first, minMax->second);
+            substWithMin(expr, dimExpr, minMax->first, minMax->second);
         LLVM_DEBUG(DBGS() << "After: " << substitutedExpr << "\n");
         substituted = (substitutedExpr != expr);
         expr = substitutedExpr;
@@ -76,7 +76,7 @@ static AffineMap substituteMin(AffineMap map, SmallVectorImpl<Value> &dims,
         LLVM_DEBUG(DBGS() << "Subst: " << sym << " @ " << symExpr << "\n");
         LLVM_DEBUG(DBGS() << "Before: " << expr << "\n");
         AffineExpr substitutedExpr =
-            affine::substWithMin(expr, symExpr, minMax->first, minMax->second);
+            substWithMin(expr, symExpr, minMax->first, minMax->second);
         LLVM_DEBUG(DBGS() << "After: " << substitutedExpr << "\n");
         substituted = (substitutedExpr != expr);
         expr = substitutedExpr;

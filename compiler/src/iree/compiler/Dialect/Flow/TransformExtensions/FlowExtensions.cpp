@@ -181,12 +181,13 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
       continue;
 
     // Do not clone ParallelInsertSliceOp destinations.
-    bool isDestination = any_of(
-        forallOp.getTerminator().getYieldingOps(), [&](Operation &insertOp) {
-          return cast<tensor::ParallelInsertSliceOp>(&insertOp)
-                     .getDest()
-                     .getDefiningOp() == op;
-        });
+    bool isDestination =
+        any_of(forallOp.getTerminator().getYieldingOps(),
+               [&](Operation &insertOp) {
+                 return cast<tensor::ParallelInsertSliceOp>(&insertOp)
+                            .getDest()
+                            .getDefiningOp() == op;
+               });
     if (isDestination) continue;
 
     opsToClone.push_back(op);
@@ -825,7 +826,16 @@ transform_dialect::WrapInDispatchRegionOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(target->getContext());
-  auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, target);
+  std::optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt;
+  if (getGenerateWorkload()) {
+    auto maybeBuilder = Flow::getWorkloadBuilder(rewriter, target);
+    if (failed(maybeBuilder)) {
+      return emitDefaultDefiniteFailure(target);
+    }
+    workloadBuilder = *maybeBuilder;
+  }
+  auto regionOp =
+      Flow::wrapOpInDispatchRegion(rewriter, target, workloadBuilder);
   if (failed(regionOp)) return emitDefaultDefiniteFailure(target);
 
   results.push_back(*regionOp);

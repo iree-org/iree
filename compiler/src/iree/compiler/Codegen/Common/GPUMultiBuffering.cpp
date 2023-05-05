@@ -20,7 +20,7 @@ struct GPUMultiBufferingPass
   GPUMultiBufferingPass(unsigned numBuffers) : numBuffers(numBuffers) {}
 
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<affine::AffineDialect>();
+    registry.insert<AffineDialect>();
   }
 
   void runOnOperation() override {

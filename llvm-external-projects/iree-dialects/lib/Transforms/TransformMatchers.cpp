@@ -611,8 +611,7 @@ void transform_ext::StructuredOpMatcher::addOutputMatcher(
   predicates.push_back([position, optional, matcher = std::move(matcher)](
                            linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position
-                      << (optional.value ? " (optional match) "
-                                         : " (mandatory match) ")
+                      << (optional.value ? " (optional match) " : " ")
                       << "is produced by\n");
     int64_t transformedPosition =
         position >= 0 ? position : linalgOp.getNumDpsInits() + position;
@@ -768,8 +767,7 @@ void transform_ext::StructuredOpMatcher::addResultMatcher(
   predicates.push_back([matcher = std::move(matcher), optional,
                         position](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "result #" << position
-                      << (optional.value ? " (optional match) "
-                                         : " (mandatory match) ")
+                      << (optional.value ? " (optional match) " : " ")
                       << "has a use\n");
     int64_t transformedPosition =
         position >= 0 ? position : linalgOp->getNumResults() + position;

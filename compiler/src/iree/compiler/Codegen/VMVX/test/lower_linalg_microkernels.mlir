@@ -53,6 +53,56 @@ func.func @fill2d(%arg0 : memref<384x128xf32>, %arg1 : f32) {
   func.return
 }
 
+// CHECK-LABEL: @matmul_f32f32f32_row_major
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %arg1
+//   CHECK-DAG: %[[BB2:.*]], %[[OFFSET2:.*]], %[[SIZES2:.*]]:2, %[[STRIDES2:.*]]:2 = vmvx.get_buffer_descriptor %arg2
+//       CHECK: vmvx.matmul lhs(%[[BB1]] offset %[[OFFSET1]] row_stride %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   rhs(%[[BB2]] offset %[[OFFSET2]] row_stride %[[STRIDES2]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] row_stride %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   mnk(%[[SIZES1]]#0, %[[SIZES2]]#1, %[[SIZES2]]#0)
+//  CHECK-SAME:   flags(1)
+func.func @matmul_f32f32f32_row_major(%arg0 : memref<64x64xf32>, %arg1 : memref<64x384xf32>, %arg2 : memref<384x64xf32>) {
+  linalg.matmul
+      ins(%arg1, %arg2 : memref<64x384xf32>, memref<384x64xf32>)
+      outs(%arg0 : memref<64x64xf32>)
+  func.return
+}
+
+// CHECK-LABEL: @matmul_i8i8i32_row_major
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %arg1
+//   CHECK-DAG: %[[BB2:.*]], %[[OFFSET2:.*]], %[[SIZES2:.*]]:2, %[[STRIDES2:.*]]:2 = vmvx.get_buffer_descriptor %arg2
+//       CHECK: vmvx.matmul lhs(%[[BB1]] offset %[[OFFSET1]] row_stride %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   rhs(%[[BB2]] offset %[[OFFSET2]] row_stride %[[STRIDES2]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] row_stride %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   mnk(%[[SIZES1]]#0, %[[SIZES2]]#1, %[[SIZES2]]#0)
+//  CHECK-SAME:   flags(1)
+func.func @matmul_i8i8i32_row_major(%arg0 : memref<64x64xi32>, %arg1 : memref<64x384xi8>, %arg2 : memref<384x64xi8>) {
+  linalg.matmul
+      ins(%arg1, %arg2 : memref<64x384xi8>, memref<384x64xi8>)
+      outs(%arg0 : memref<64x64xi32>)
+  func.return
+}
+
+// CHECK-LABEL: @matmul_i8i8i32_row_major_clear
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %arg1
+//   CHECK-DAG: %[[BB2:.*]], %[[OFFSET2:.*]], %[[SIZES2:.*]]:2, %[[STRIDES2:.*]]:2 = vmvx.get_buffer_descriptor %arg2
+//  CHECK-NEXT: vmvx.matmul lhs(%[[BB1]] offset %[[OFFSET1]] row_stride %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   rhs(%[[BB2]] offset %[[OFFSET2]] row_stride %[[STRIDES2]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] row_stride %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   mnk(%[[SIZES1]]#0, %[[SIZES2]]#1, %[[SIZES2]]#0)
+//  CHECK-SAME:   flags(0)
+func.func @matmul_i8i8i32_row_major_clear(%arg0 : memref<64x64xi32>, %arg1 : memref<64x384xi8>, %arg2 : memref<384x64xi8>) {
+  %c0 = arith.constant 0 : i32
+  linalg.fill ins(%c0 : i32) outs(%arg0 : memref<64x64xi32>)
+  linalg.matmul
+      ins(%arg1, %arg2 : memref<64x384xi8>, memref<384x64xi8>)
+      outs(%arg0 : memref<64x64xi32>)
+  func.return
+}
+
 // CHECK-LABEL: @addf2d_rank_broadcast
 //   CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
@@ -338,5 +388,98 @@ func.func @rsqrt(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
     %12 = math.rsqrt %arg2 : f32
     linalg.yield %12 : f32
   }
+  func.return
+}
+
+// CHECK-LABEL: @pack_i8i8
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:4, %[[STRIDES1:.*]]:4 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.pack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1, %[[SIZES1]]#2, %[[SIZES1]]#3)
+//  CHECK-SAME:   padding_value(%arg2 : i8)
+//  CHECK-SAME:   flags(0)
+func.func @pack_i8i8(%arg0 : memref<34x47xi8>, %arg1 : memref<5x6x7x8xi8>, %arg2 : i8) {
+  iree_linalg_ext.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+      : (memref<34x47xi8> memref<5x6x7x8xi8>)
+  func.return
+}
+
+// CHECK-LABEL: @pack_i32i32_transpose_inner_dims
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:4, %[[STRIDES1:.*]]:4 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.pack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1, %[[SIZES1]]#2, %[[SIZES1]]#3)
+//  CHECK-SAME:   padding_value(%arg2 : i32)
+//  CHECK-SAME:   flags(65536)
+func.func @pack_i32i32_transpose_inner_dims(%arg0 : memref<34x47xi32>, %arg1 : memref<5x6x8x7xi32>, %arg2 : i32) {
+  iree_linalg_ext.pack %arg0 padding_value(%arg2 : i32) inner_dims_pos = [1, 0] inner_tiles = [8, 7] into %arg1
+      : (memref<34x47xi32> memref<5x6x8x7xi32>)
+  func.return
+}
+
+// CHECK-LABEL: @pack_f32f32_transpose_inner_and_outer_dims
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:4, %[[STRIDES1:.*]]:4 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.pack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1, %[[SIZES1]]#2, %[[SIZES1]]#3)
+//  CHECK-SAME:   padding_value(%arg2 : f32)
+//  CHECK-SAME:   flags(196608)
+func.func @pack_f32f32_transpose_inner_and_outer_dims(%arg0 : memref<34x47xf32>, %arg1 : memref<6x5x8x7xf32>, %arg2 : f32) {
+  iree_linalg_ext.pack %arg0 padding_value(%arg2 : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 7] into %arg1
+      : (memref<34x47xf32> memref<6x5x8x7xf32>)
+  func.return
+}
+
+// CHECK-LABEL: @unpack_i8i8
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:4, %[[STRIDES0:.*]]:4 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.unpack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1, %[[SIZES0]]#2, %[[SIZES0]]#3)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1)
+//  CHECK-SAME:   flags(0)
+func.func @unpack_i8i8(%arg0 : memref<5x6x7x8xi8>, %arg1 : memref<34x47xi8>) {
+  iree_linalg_ext.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+      : (memref<5x6x7x8xi8> memref<34x47xi8>)
+  func.return
+}
+
+// CHECK-LABEL: @unpack_i32i32_transpose_inner_dims
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:4, %[[STRIDES0:.*]]:4 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.unpack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1, %[[SIZES0]]#2, %[[SIZES0]]#3)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1)
+//  CHECK-SAME:   flags(65536)
+func.func @unpack_i32i32_transpose_inner_dims(%arg0 : memref<5x6x8x7xi32>, %arg1 : memref<34x47xi32>) {
+  iree_linalg_ext.unpack %arg0  inner_dims_pos = [1, 0] inner_tiles = [8, 7] into %arg1
+      : (memref<5x6x8x7xi32> memref<34x47xi32>)
+  func.return
+}
+
+// CHECK-LABEL: @unpack_f32f32_transpose_inner_and_outer_dims
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:4, %[[STRIDES0:.*]]:4 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.unpack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1, %[[SIZES0]]#2, %[[SIZES0]]#3)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1)
+//  CHECK-SAME:   flags(196608)
+func.func @unpack_f32f32_transpose_inner_and_outer_dims(%arg0 : memref<6x5x8x7xf32>, %arg1 : memref<34x47xf32>) {
+  iree_linalg_ext.unpack %arg0  outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 7] into %arg1
+      : (memref<6x5x8x7xf32> memref<34x47xf32>)
   func.return
 }

@@ -46,10 +46,7 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
         , clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
                      "Legalize from MHLO ops.")
         , clEnumValN(InputDialectOptions::Type::xla, "xla",
-            "Legalize from MHLO ops (with XLA cleanup preprocessing).")
-        , clEnumValN(InputDialectOptions::Type::stablehlo_experimental,
-            "stablehlo_experimental",
-            "Legalize from StableHLO ops. WARNING: This is work in progress.")
+              "Legalize from MHLO ops (with XLA cleanup preprocessing).")
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
         , clEnumValN(InputDialectOptions::Type::tm_tensor, "tm_tensor",

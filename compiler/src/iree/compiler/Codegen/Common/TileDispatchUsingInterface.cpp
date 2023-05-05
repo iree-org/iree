@@ -64,10 +64,10 @@ static std::tuple<Value, Value> getDistributeLBAndStep(OpBuilder &b,
   bindSymbols(b.getContext(), s0, s1, s2);
   auto offsetMap = AffineMap::get(0, 3, {s0 + s1 * s2});
   auto stepMap = AffineMap::get(0, 2, {s0 * s1});
-  Value distributeLB = affine::makeComposedAffineApply(
-      b, loc, offsetMap, ValueRange{lb, procId, step});
-  Value distributeStep = affine::makeComposedAffineApply(
-      b, loc, stepMap, ValueRange{step, nprocs});
+  Value distributeLB =
+      makeComposedAffineApply(b, loc, offsetMap, ValueRange{lb, procId, step});
+  Value distributeStep =
+      makeComposedAffineApply(b, loc, stepMap, ValueRange{step, nprocs});
   return {distributeLB, distributeStep};
 }
 
@@ -103,7 +103,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     ArrayRef<Value> tileSizeVals,
     ArrayRef<linalg::DistributionMethod> distributionMethod,
     ArrayRef<linalg::ProcInfo> procInfo, SmallVector<OpFoldResult> &offsets,
-    SmallVector<OpFoldResult> &sizes, SmallVector<Value> &workgroupCount) {
+    SmallVector<OpFoldResult> &sizes) {
   assert(!loopRanges.empty() && "expected at least one loop range");
   assert(loopRanges.size() == tileSizeVals.size() &&
          "expected as many tile sizes as loop ranges");
@@ -118,22 +118,20 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
   // The tile size to use (to avoid out of bounds access) is  minimum of
   // `tileSize` and `ub - iv`, where `iv` is the induction variable
   // of the tiled loop.
-  AffineExpr s0, s1, d0, s2;
+  AffineExpr s0, s1, d0;
   bindDims(builder.getContext(), d0);
-  bindSymbols(builder.getContext(), s0, s1, s2);
+  bindSymbols(builder.getContext(), s0, s1);
   AffineMap minMap = AffineMap::get(1, 2, {s0, s1 - d0}, builder.getContext());
   auto createBoundedTileSize = [&](Value iv, Value tileSize,
                                    Value size) -> OpFoldResult {
     if (isConstantIntValue(getAsOpFoldResult(tileSize), 1)) {
       return builder.getIndexAttr(1);
     }
-    return affine::makeComposedFoldedAffineMin(
+    return makeComposedFoldedAffineMin(
         builder, loc, minMap, ArrayRef<OpFoldResult>{iv, tileSize, size});
   };
 
   unsigned procDim = 0;
-  AffineMap numIterationsMap =
-      AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2), builder.getContext());
   for (auto [idx, loopRange] : llvm::enumerate(loopRanges)) {
     // Capturing structured bindings in lambdas is a c++20 feature, so we have
     // to declare a local variable for it.
@@ -141,6 +139,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     Value lb = loopRange.offset;
     Value ub = loopRange.size;
     Value step = tileSizeVals[index];
+
     // No loops if tile size is zero. Set offset and size to the loop
     // offset and size.
     if (matchPattern(tileSizeVals[index], m_Zero())) {
@@ -151,14 +150,6 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
 
     auto method = distributionMethod[index];
     if (method != linalg::DistributionMethod::None) {
-      Value numWorkgroups = getValueOrCreateConstantIndexOp(
-          builder, loc,
-          affine::makeComposedFoldedAffineApply(
-              builder, loc, numIterationsMap,
-              {getAsOpFoldResult(loopRange.offset),
-               getAsOpFoldResult(loopRange.size),
-               getAsOpFoldResult(tileSizeVals[index])}));
-      workgroupCount.push_back(numWorkgroups);
       std::tie(lb, step) = getDistributeLBAndStep(builder, loc, lb, step,
                                                   procInfo[procDim].procId,
                                                   procInfo[procDim].nprocs);
@@ -215,7 +206,7 @@ static LogicalResult replaceStoresWithTiledVersion(
   SliceAndDynamicDims clonedSliceAndVals =
       cloneOffsetsSizesAndStrides(rewriter, storeOp);
 
-  if (failed(affine::mergeOffsetsSizesAndStrides(
+  if (failed(mergeOffsetsSizesAndStrides(
           rewriter, storeOp.getLoc(), clonedSliceAndVals.offsets,
           clonedSliceAndVals.sizes, clonedSliceAndVals.strides,
           storeOp.getDroppedDims(), tileOffsets, tileSizes, tileStrides,
@@ -263,9 +254,6 @@ struct IREETilingResult {
   SmallVector<Operation *> tiledOps;
   SmallVector<Value> tiledValues;
   SmallVector<scf::ForOp> loops;
-  SmallVector<Value> workgroupCount;
-  // TODO(ravishankarm): Cleanup the following returns. We should not need
-  // these.
   llvm::SmallBitVector tiledLoops;
   SmallVector<OpFoldResult> tileOffsets;
   SmallVector<OpFoldResult> tileSizes;
@@ -324,7 +312,6 @@ static FailureOr<IREETilingResult> tileDispatchUsingSCFFopOp(
 
   {
     SmallVector<OpFoldResult> offsets, sizes;
-    SmallVector<Value> workgroupCount;
     // If there is an interchange specified, permute the iteration domain and
     // the tile sizes.
     SmallVector<int64_t> interchangeVector;
@@ -376,9 +363,9 @@ static FailureOr<IREETilingResult> tileDispatchUsingSCFFopOp(
     // 3. Materialize an empty loop nest that iterates over the tiles. These
     // loops for now do not return any values even if the original operation has
     // results.
-    tilingResult.loops = generateTileLoopNest(
-        rewriter, loc, iterationDomain, tileSizeVector, distributionMethods,
-        procInfo, offsets, sizes, workgroupCount);
+    tilingResult.loops =
+        generateTileLoopNest(rewriter, loc, iterationDomain, tileSizeVector,
+                             distributionMethods, procInfo, offsets, sizes);
 
     if (!interchangeVector.empty()) {
       auto inversePermutation = invertPermutationVector(interchangeVector);
@@ -416,7 +403,6 @@ static FailureOr<IREETilingResult> tileDispatchUsingSCFFopOp(
     });
     std::swap(tilingResult.tileOffsets, offsets);
     std::swap(tilingResult.tileSizes, sizes);
-    std::swap(tilingResult.workgroupCount, workgroupCount);
   }
 
   if (op->getNumResults() == 0) {
@@ -495,7 +481,6 @@ FailureOr<IREETileAndFuseResult> tileAndFuseDispatchUsingSCFForOp(
   }
   tileAndFuseResult.tiledAndFusedOps = tilingResult->tiledOps;
   tileAndFuseResult.loops = tilingResult->loops;
-  tileAndFuseResult.workgroupCount = tilingResult->workgroupCount;
 
   // If there is no tiling then there is nothing to do for fusion.
   if (!tilingResult->tiledLoops.any()) {
@@ -567,7 +552,7 @@ struct SwapExtractSliceWithDispatchTensorLoad
     if (!loadOp) return failure();
 
     SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
-    if (failed(affine::mergeOffsetsSizesAndStrides(
+    if (failed(mergeOffsetsSizesAndStrides(
             rewriter, loadOp.getLoc(), loadOp, sliceOp, loadOp.getDroppedDims(),
             combinedOffsets, combinedSizes, combinedStrides))) {
       return rewriter.notifyMatchFailure(

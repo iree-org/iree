@@ -31,13 +31,18 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
   // Tensor-level optimization, kernel dispatch and lower to buffers.
   // ---------------------------------------------------------------------------
-  addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
+  passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
+      createTypePropagationPass());
+  passManager.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
+  // Decompose linalg.ext.softmax before bufferization.
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createVMVXMaterializeEncodingPass());
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createEraseHALDescriptorTypeFromMemRefPass());
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createVMVXMaterializeEncodingPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -85,7 +90,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());
   nestedModulePM.addPass(memref::createNormalizeMemRefsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      affine::createAffineScalarReplacementPass());
+      createAffineScalarReplacementPass());
   nestedModulePM.addPass(createCanonicalizerPass());
 }
 

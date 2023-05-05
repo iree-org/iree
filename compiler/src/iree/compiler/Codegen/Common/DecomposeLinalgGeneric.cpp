@@ -20,7 +20,7 @@ namespace {
 class DecomposeLinalgGenericPass
     : public DecomposeLinalgGenericBase<DecomposeLinalgGenericPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, linalg::LinalgDialect>();
+    registry.insert<AffineDialect, linalg::LinalgDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();

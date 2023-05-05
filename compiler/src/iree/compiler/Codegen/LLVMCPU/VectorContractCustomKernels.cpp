@@ -941,7 +941,7 @@ class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
     VectorType flatAccVectorType =
         VectorType::get({accType.getNumElements()}, accType.getElementType());
     ;
-    TypedAttr resultInitializer;
+    Attribute resultInitializer;
     if (accElemType.isSignlessInteger()) {
       resultInitializer = DenseIntElementsAttr::get(flatAccVectorType, 0);
     } else if (accElemType.isF32()) {

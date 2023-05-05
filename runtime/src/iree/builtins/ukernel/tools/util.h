@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_TOOLS_UTIL_H_
 #define IREE_BUILTINS_UKERNEL_TOOLS_UTIL_H_
 
-#include "iree/builtins/ukernel/api.h"
+#include "iree/builtins/ukernel/common.h"
 
 // Helper to determine the length of test buffers to allocate.
 iree_uk_ssize_t iree_uk_2d_buffer_length(iree_uk_type_t type,
@@ -27,8 +27,6 @@ static inline iree_uk_random_engine_t iree_uk_random_engine_init(void) {
   return (iree_uk_random_engine_t){.state = 1};
 }
 
-iree_uk_uint32_t iree_uk_random_engine_get_uint32(iree_uk_random_engine_t* e);
-iree_uk_uint64_t iree_uk_random_engine_get_uint64(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_0_65535(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_0_1(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_minus16_plus15(iree_uk_random_engine_t* e);

@@ -209,8 +209,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 struct FusionOfTensorOpsPass
     : public FusionOfTensorOpsBase<FusionOfTensorOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, linalg::LinalgDialect,
-                    math::MathDialect>();
+    registry.insert<AffineDialect, linalg::LinalgDialect, math::MathDialect>();
   }
   FusionOfTensorOpsPass(bool fuseMultiUse, unsigned multiUseFusionIteration) {
     this->fuseMultiUse = fuseMultiUse;
@@ -280,8 +279,7 @@ struct FusionOfTensorOpsPass
       linalg::populateConstantFoldLinalgOperations(fusionPatterns,
                                                    constantFoldControlFn);
 
-      affine::AffineApplyOp::getCanonicalizationPatterns(fusionPatterns,
-                                                         context);
+      AffineApplyOp::getCanonicalizationPatterns(fusionPatterns, context);
       linalg::GenericOp::getCanonicalizationPatterns(fusionPatterns, context);
       tensor::ExpandShapeOp::getCanonicalizationPatterns(fusionPatterns,
                                                          context);

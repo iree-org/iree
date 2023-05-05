@@ -34,7 +34,6 @@ iree_lit_test_suite(
     "convert_to_spirv.mlir"
     "create_fast_slow_path.mlir"
     "distribute_to_invocations.mlir"
-    "emulate_bf16.mlir"
     "emulate_i64.mlir"
     "erase_storage_buffer_static_shape.mlir"
     "illegal_configuration.mlir"
@@ -45,7 +44,6 @@ iree_lit_test_suite(
     "pipeline_matmul_promotion.mlir"
     "pipeline_matmul_vectorization.mlir"
     "pipeline_reduction_subgroup.mlir"
-    "set_transform_strategy.mlir"
     "tile_and_distribute.mlir"
     "tile_and_distribute_scatter.mlir"
     "tile_and_distribute_sort.mlir"
@@ -66,8 +64,6 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
-  DATA
-    transform_dialect_dummy_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

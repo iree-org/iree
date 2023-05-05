@@ -13,10 +13,6 @@
 #include "iree/hal/device.h"
 #include "iree/hal/resource.h"
 
-//===----------------------------------------------------------------------===//
-// iree_hal_channel_t
-//===----------------------------------------------------------------------===//
-
 #define _VTABLE_DISPATCH(channel, method_name) \
   IREE_HAL_VTABLE_DISPATCH(channel, iree_hal_channel, method_name)
 

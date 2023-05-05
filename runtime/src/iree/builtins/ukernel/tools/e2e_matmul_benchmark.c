@@ -9,7 +9,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/builtins/ukernel/api.h"
-#include "iree/builtins/ukernel/mmt4d_internal.h"
 #include "iree/builtins/ukernel/tools/benchmark.h"
 #include "iree/builtins/ukernel/tools/util.h"
 
@@ -34,10 +33,11 @@ IREE_FLAG(
     "architecture baseline (e.g. on x86-64 that would be SSE2).");
 
 typedef struct iree_uk_benchmark_e2e_matmul_params_t {
-  iree_uk_uint32_t mmt4d_flags;
+  iree_uk_mmt4d_type_t type;
   int M;
   int K;
   int N;
+  bool accumulate;
 } iree_uk_benchmark_e2e_matmul_params_t;
 
 static iree_uk_uint32_t iree_uk_qts_op_flag(iree_uk_mmt4d_type_t type) {
@@ -64,8 +64,7 @@ static void iree_uk_query_tile_sizes_for_all_operands(
     const iree_uk_benchmark_e2e_matmul_params_t* params,
     const iree_uk_uint64_t* cpu_data, int* M0, int* K0, int* N0) {
   int M0_lhs = 0, M0_out = 0, K0_lhs = 0, K0_rhs = 0, N0_rhs = 0, N0_out = 0;
-  iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->mmt4d_flags);
-  iree_uk_uint32_t qts_op_flag = iree_uk_qts_op_flag(mmt4d_type);
+  iree_uk_uint32_t qts_op_flag = iree_uk_qts_op_flag(params->type);
   iree_uk_query_tile_sizes_for_one_operand(
       qts_op_flag | IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS, params->M,
       params->K, cpu_data, &M0_lhs, &K0_lhs);
@@ -89,34 +88,35 @@ static int iree_uk_ceildiv(int a, int b) {
   return (a + b - 1) / b;
 }
 
-static void iree_uk_reference_rowmajor_matmul_f32f32f32(
-    const iree_uk_benchmark_e2e_matmul_params_t* params, const float* lhs,
-    const float* rhs, float* out) {
-  bool accumulate = params->mmt4d_flags & IREE_UK_FLAG_MMT4D_ACCUMULATE;
-  for (int i = 0; i < params->M; ++i) {
-    for (int j = 0; j < params->N; ++j) {
-      float* out_ptr = out + i * params->N + j;
+static void iree_uk_reference_rowmajor_matmul_f32f32f32(int M, int K, int N,
+                                                        bool accumulate,
+                                                        const float* lhs,
+                                                        const float* rhs,
+                                                        float* out) {
+  for (int i = 0; i < M; ++i) {
+    for (int j = 0; j < N; ++j) {
+      float* out_ptr = out + i * N + j;
       float acc = accumulate ? *out_ptr : 0.f;
-      for (int k = 0; k < params->K; ++k) {
-        acc += lhs[i * params->K + k] * rhs[k * params->N + j];
+      for (int k = 0; k < K; ++k) {
+        acc += lhs[i * K + k] * rhs[k * N + j];
       }
       *out_ptr = acc;
     }
   }
 }
 
-static void iree_uk_reference_rowmajor_matmul_i8i8i32(
-    const iree_uk_benchmark_e2e_matmul_params_t* params,
-    const iree_uk_int8_t* lhs, const iree_uk_int8_t* rhs,
-    iree_uk_int32_t* out) {
-  bool accumulate = params->mmt4d_flags & IREE_UK_FLAG_MMT4D_ACCUMULATE;
-  for (int i = 0; i < params->M; ++i) {
-    for (int j = 0; j < params->N; ++j) {
-      iree_uk_int32_t* out_ptr = out + i * params->N + j;
+static void iree_uk_reference_rowmajor_matmul_i8i8i32(int M, int K, int N,
+                                                      bool accumulate,
+                                                      const iree_uk_int8_t* lhs,
+                                                      const iree_uk_int8_t* rhs,
+                                                      iree_uk_int32_t* out) {
+  for (int i = 0; i < M; ++i) {
+    for (int j = 0; j < N; ++j) {
+      iree_uk_int32_t* out_ptr = out + i * N + j;
       iree_uk_int32_t acc = accumulate ? *out_ptr : 0;
-      for (int k = 0; k < params->K; ++k) {
-        iree_uk_int32_t lhs_val = lhs[i * params->K + k];
-        iree_uk_int32_t rhs_val = rhs[k * params->N + j];
+      for (int k = 0; k < K; ++k) {
+        iree_uk_int32_t lhs_val = lhs[i * K + k];
+        iree_uk_int32_t rhs_val = rhs[k * N + j];
         acc += lhs_val * rhs_val;
       }
       *out_ptr = acc;
@@ -124,47 +124,19 @@ static void iree_uk_reference_rowmajor_matmul_i8i8i32(
   }
 }
 
-static void iree_uk_reference_rowmajor_matmul(
-    const iree_uk_benchmark_e2e_matmul_params_t* params, const void* lhs,
-    const void* rhs, void* out) {
-  switch (params->mmt4d_flags & IREE_UK_FLAG_MMT4D_TYPE_MASK) {
-    case IREE_UK_FLAG_MMT4D_TYPE_F32F32F32:
-      iree_uk_reference_rowmajor_matmul_f32f32f32(
-          params, (const float*)lhs, (const float*)rhs, (float*)out);
-      break;
-    case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
-      iree_uk_reference_rowmajor_matmul_i8i8i32(
-          params, (const iree_uk_int8_t*)lhs, (const iree_uk_int8_t*)rhs,
-          (iree_uk_int32_t*)out);
-      break;
-    default:
-      IREE_UK_ASSERT(false);
-  }
-}
-
-static uint32_t iree_uk_pack_flags(iree_uk_type_t type) {
-  switch (type) {
-    case IREE_UK_TYPE_FLOAT_32:
-      return IREE_UK_FLAG_PACK_TYPE_F32F32;
-    case IREE_UK_TYPE_INT_32:
-      return IREE_UK_FLAG_PACK_TYPE_I32I32;
-    case IREE_UK_TYPE_INT_8:
-      return IREE_UK_FLAG_PACK_TYPE_I8I8;
-    default:
-      IREE_UK_ASSERT(false);
-      return IREE_UK_FLAG_PACK_TYPE_NONE;
-  }
-}
-
-static uint32_t iree_uk_unpack_flags(iree_uk_type_t type) {
-  switch (type) {
-    case IREE_UK_TYPE_FLOAT_32:
-      return IREE_UK_FLAG_UNPACK_TYPE_F32F32;
-    case IREE_UK_TYPE_INT_32:
-      return IREE_UK_FLAG_UNPACK_TYPE_I32I32;
-    default:
-      IREE_UK_ASSERT(false);
-      return IREE_UK_FLAG_UNPACK_TYPE_NONE;
+static void iree_uk_reference_rowmajor_matmul(iree_uk_mmt4d_type_t type, int M,
+                                              int K, int N, bool accumulate,
+                                              const void* lhs, const void* rhs,
+                                              void* out) {
+  if (type == iree_uk_mmt4d_type_f32f32f32) {
+    iree_uk_reference_rowmajor_matmul_f32f32f32(
+        M, K, N, accumulate, (const float*)lhs, (const float*)rhs, (float*)out);
+  } else if (type == iree_uk_mmt4d_type_i8i8i32) {
+    iree_uk_reference_rowmajor_matmul_i8i8i32(
+        M, K, N, accumulate, (const iree_uk_int8_t*)lhs,
+        (const iree_uk_int8_t*)rhs, (iree_uk_int32_t*)out);
+  } else {
+    iree_abort();
   }
 }
 
@@ -176,7 +148,7 @@ static void iree_uk_e2e_matmul(
     const iree_uk_unpack_params_t* unpack_out_params) {
   iree_uk_pack(pack_lhs_params);
   iree_uk_pack(pack_rhs_params);
-  if (mmt4d_params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+  if (mmt4d_params->flags & IREE_UK_FLAG_ACCUMULATE) {
     iree_uk_pack(pack_out_params);
   }
   iree_uk_mmt4d(mmt4d_params);
@@ -191,10 +163,9 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
   const iree_uk_benchmark_e2e_matmul_params_t* params =
       iree_uk_benchmark_params(user_data);
 
-  iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->mmt4d_flags);
-  iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(mmt4d_type);
-  iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(mmt4d_type);
-  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
+  iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(params->type);
+  iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(params->type);
+  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params->type);
 
   int M0 = 0, K0 = 0, N0 = 0;
   iree_uk_query_tile_sizes_for_all_operands(params, cpu_data, &M0, &K0, &N0);
@@ -204,22 +175,27 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
   int N1 = iree_uk_ceildiv(params->N, N0);
 
   iree_uk_mmt4d_params_t mmt4d_params = {
-      .flags = params->mmt4d_flags,
+      .type = params->type,
       .cpu_data = cpu_data,
+      .flags = params->accumulate ? IREE_UK_FLAG_ACCUMULATE : 0,
       .M = M1,
       .K = K1,
       .N = N1,
       .M0 = M0,
       .K0 = K0,
       .N0 = N0,
-      .lhs_stride0 = K1 * M0 * K0,
-      .rhs_stride0 = K1 * N0 * K0,
-      .out_stride0 = N1 * M0 * N0,
+      .lhs_stride = K1 * M0 * K0,
+      .rhs_stride = K1 * N0 * K0,
+      .out_stride = N1 * M0 * N0,
   };
 
+  char padding_value_buf[4] = {0};
+  IREE_UK_ASSERT(sizeof padding_value_buf >= iree_uk_type_size(out_type));
+
   iree_uk_pack_params_t pack_lhs_params = {
+      .type = iree_uk_tie_2_types(lhs_type, lhs_type),
       .cpu_data = cpu_data,
-      .flags = iree_uk_pack_flags(lhs_type),
+      .flags = 0,
       .in_size0 = params->M,
       .in_size1 = params->K,
       .out_size0 = M1,
@@ -227,15 +203,15 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = M0,
       .out_size3 = K0,
       .in_stride0 = params->K,
-      .out_stride0 = mmt4d_params.lhs_stride0,
-      .padding_value = 0,
+      .out_stride0 = mmt4d_params.lhs_stride,
+      .padding_value = padding_value_buf,
   };
 
   iree_uk_pack_params_t pack_rhs_params = {
+      .type = iree_uk_tie_2_types(rhs_type, rhs_type),
       .cpu_data = cpu_data,
-      .flags = iree_uk_pack_flags(rhs_type) |
-               IREE_UK_FLAG_PACK_TRANSPOSE_INNER |
-               IREE_UK_FLAG_PACK_TRANSPOSE_OUTER,
+      .flags =
+          IREE_UK_FLAG_PACK_TRANSPOSE_INNER | IREE_UK_FLAG_PACK_TRANSPOSE_OUTER,
       .in_size0 = params->K,
       .in_size1 = params->N,
       .out_size0 = N1,
@@ -243,13 +219,14 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = N0,
       .out_size3 = K0,
       .in_stride0 = params->N,
-      .out_stride0 = mmt4d_params.rhs_stride0,
-      .padding_value = 0,
+      .out_stride0 = mmt4d_params.rhs_stride,
+      .padding_value = padding_value_buf,
   };
 
   iree_uk_pack_params_t pack_out_params = {
+      .type = iree_uk_tie_2_types(out_type, out_type),
       .cpu_data = cpu_data,
-      .flags = iree_uk_pack_flags(out_type),
+      .flags = 0,
       .in_size0 = params->M,
       .in_size1 = params->N,
       .out_size0 = M1,
@@ -257,13 +234,14 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = M0,
       .out_size3 = N0,
       .in_stride0 = params->N,
-      .out_stride0 = mmt4d_params.out_stride0,
-      .padding_value = 0,
+      .out_stride0 = mmt4d_params.out_stride,
+      .padding_value = padding_value_buf,
   };
 
   iree_uk_unpack_params_t unpack_out_params = {
+      .type = iree_uk_tie_2_types(out_type, out_type),
       .cpu_data = cpu_data,
-      .flags = iree_uk_unpack_flags(out_type),
+      .flags = 0,
       .out_size0 = params->M,
       .out_size1 = params->N,
       .in_size0 = M1,
@@ -271,7 +249,7 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .in_size2 = M0,
       .in_size3 = N0,
       .out_stride0 = params->N,
-      .in_stride0 = mmt4d_params.out_stride0,
+      .in_stride0 = mmt4d_params.out_stride,
   };
 
   iree_uk_ssize_t rowmajor_lhs_buffer_size =
@@ -281,11 +259,11 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
   iree_uk_ssize_t rowmajor_out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params->M, params->N);
   iree_uk_ssize_t packed_lhs_buffer_size =
-      iree_uk_2d_buffer_length(lhs_type, M1, mmt4d_params.lhs_stride0);
+      iree_uk_2d_buffer_length(lhs_type, M1, mmt4d_params.lhs_stride);
   iree_uk_ssize_t packed_rhs_buffer_size =
-      iree_uk_2d_buffer_length(rhs_type, N1, mmt4d_params.rhs_stride0);
+      iree_uk_2d_buffer_length(rhs_type, N1, mmt4d_params.rhs_stride);
   iree_uk_ssize_t packed_out_buffer_size =
-      iree_uk_2d_buffer_length(out_type, M1, mmt4d_params.out_stride0);
+      iree_uk_2d_buffer_length(out_type, M1, mmt4d_params.out_stride);
   void* rowmajor_lhs_buffer = malloc(rowmajor_lhs_buffer_size);
   void* rowmajor_rhs_buffer = malloc(rowmajor_rhs_buffer_size);
   void* rowmajor_init_out_buffer = malloc(rowmajor_out_buffer_size);
@@ -335,8 +313,9 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
     void* rowmajor_reference_out_buffer = malloc(rowmajor_out_buffer_size);
     memcpy(rowmajor_reference_out_buffer, rowmajor_init_out_buffer,
            rowmajor_out_buffer_size);
-    iree_uk_reference_rowmajor_matmul(params, rowmajor_lhs_buffer,
-                                      rowmajor_rhs_buffer,
+    iree_uk_reference_rowmajor_matmul(params->type, params->M, params->K,
+                                      params->N, params->accumulate,
+                                      rowmajor_lhs_buffer, rowmajor_rhs_buffer,
                                       rowmajor_reference_out_buffer);
     // Rationale for bit-exact compare: same as in mmt4d_test.
     if (memcmp(rowmajor_out_buffer, rowmajor_reference_out_buffer,
@@ -371,12 +350,12 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
   return iree_ok_status();
 }
 
-iree_uk_uint32_t iree_uk_mmt4d_parse_type_into_flag(const char* type) {
+iree_uk_mmt4d_type_t iree_uk_mmt4d_type_parse(const char* type) {
   if (!strcmp(type, "f32f32f32")) {
-    return IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
+    return iree_uk_mmt4d_type_f32f32f32;
   }
   if (!strcmp(type, "i8i8i32")) {
-    return IREE_UK_FLAG_MMT4D_TYPE_I8I8I32;
+    return iree_uk_mmt4d_type_i8i8i32;
   }
   fprintf(stderr, "Unhandled type: %s\n", type);
   iree_abort();
@@ -388,10 +367,9 @@ static void iree_uk_benchmark_register_e2e_matmul(const char* type_str, int M,
                                                   const char* cpu_features) {
   char name[128];
   snprintf(name, sizeof name, "e2e_matmul_%s_%dx%dx%d", type_str, M, K, N);
-  iree_uk_uint32_t mmt4d_flags = iree_uk_mmt4d_parse_type_into_flag(type_str);
-  if (accumulate) mmt4d_flags |= IREE_UK_FLAG_MMT4D_ACCUMULATE;
+  iree_uk_mmt4d_type_t type = iree_uk_mmt4d_type_parse(type_str);
   iree_uk_benchmark_e2e_matmul_params_t params = {
-      .mmt4d_flags = mmt4d_flags, .M = M, .K = K, .N = N};
+      .type = type, .M = M, .K = K, .N = N, .accumulate = accumulate};
   iree_uk_benchmark_register(name, iree_uk_benchmark_e2e_matmul, &params,
                              sizeof params, cpu_features);
 }

@@ -20,26 +20,15 @@ namespace Flow {
 
 /// Returns a zero value attribute based on the `elementType`.
 /// Returns failure, when the type is not handled.
-static FailureOr<TypedAttr> getZero(OpBuilder &builder, Location loc,
+static FailureOr<Attribute> getZero(OpBuilder &builder, Location loc,
                                     Type elementType) {
   if (auto intType = elementType.dyn_cast<IntegerType>()) {
-    return cast<TypedAttr>(builder.getIntegerAttr(intType, 0));
+    return builder.getIntegerAttr(intType, 0);
   }
   if (auto floatType = elementType.dyn_cast<FloatType>()) {
-    return cast<TypedAttr>(builder.getFloatAttr(floatType, 0.0));
+    return builder.getFloatAttr(floatType, 0.0);
   }
   return failure();
-}
-
-/// Returns true for the `tensor.empty` op has to be converted to a
-/// `flow.tensor.*` op.
-static bool shouldBeConvertedToFlowTensorOp(tensor::EmptyOp emptyTensorOp) {
-  return !(llvm::all_of(emptyTensorOp->getUsers(),
-                        [](Operation *user) -> bool {
-                          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp,
-                                     tensor::PackOp, tensor::UnPackOp>(user);
-                        }) ||
-           emptyTensorOp->getParentOfType<Flow::DispatchWorkgroupsOp>());
 }
 
 namespace {
@@ -49,13 +38,17 @@ struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
   using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
-    if (!shouldBeConvertedToFlowTensorOp(emptyTensorOp)) {
+    if (llvm::all_of(emptyTensorOp->getUsers(), [](Operation *user) -> bool {
+          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp, tensor::PackOp,
+                     tensor::UnPackOp>(user);
+        })) {
       return failure();
     }
+
     RankedTensorType resultType = emptyTensorOp.getType();
     Type elementType = resultType.getElementType();
     Location loc = emptyTensorOp.getLoc();
-    FailureOr<TypedAttr> zero = getZero(rewriter, loc, elementType);
+    FailureOr<Attribute> zero = getZero(rewriter, loc, elementType);
     if (failed(zero)) {
       return rewriter.notifyMatchFailure(
           emptyTensorOp, "unable to get zero value for element type");
@@ -73,7 +66,10 @@ struct RewriteTensorEmptyToEmpty : public OpRewritePattern<tensor::EmptyOp> {
   using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
-    if (!shouldBeConvertedToFlowTensorOp(emptyTensorOp)) {
+    if (llvm::all_of(emptyTensorOp->getUsers(), [](Operation *user) -> bool {
+          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp, tensor::PackOp,
+                     tensor::UnPackOp>(user);
+        })) {
       return failure();
     }
     RankedTensorType resultType = emptyTensorOp.getType();

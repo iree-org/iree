@@ -54,8 +54,8 @@ static SmallVector<OpFoldResult> getStridesFromSizes(
   }
   AffineMap mulMap = getMulMap(rewriter.getContext());
   for (int i = sizes.size() - 2; i >= 0; --i) {
-    strides[i] = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, mulMap, {strides[i + 1], sizes[i + 1]});
+    strides[i] = makeComposedFoldedAffineApply(rewriter, loc, mulMap,
+                                               {strides[i + 1], sizes[i + 1]});
   }
   return strides;
 }
@@ -168,11 +168,11 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     AffineMap mulMap = getMulMap(rewriter.getContext());
     OpFoldResult linearizedMemrefSize = rewriter.getIndexAttr(1);
     for (auto size : resultDescriptor->sizes) {
-      linearizedMemrefSize = affine::makeComposedFoldedAffineApply(
+      linearizedMemrefSize = makeComposedFoldedAffineApply(
           rewriter, loc, mulMap, {linearizedMemrefSize, size});
     }
     AffineMap addMap = getAddMap(rewriter.getContext());
-    linearizedMemrefSize = affine::makeComposedFoldedAffineApply(
+    linearizedMemrefSize = makeComposedFoldedAffineApply(
         rewriter, loc, addMap,
         {linearizedMemrefSize, resultDescriptor->offset});
 
@@ -219,7 +219,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
 struct IREEExpandStridedMetadataPass
     : public IREEExpandStridedMetadataBase<IREEExpandStridedMetadataPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, arith::ArithDialect,
+    registry.insert<AffineDialect, arith::ArithDialect,
                     IREE::Codegen::IREECodegenDialect>();
   }
 

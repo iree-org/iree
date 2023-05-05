@@ -60,7 +60,7 @@ struct WorkGroupSwizzlePass
       : swizzleLogTile(swizzleLogTile) {}
 
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<affine::AffineDialect>();
+    registry.insert<AffineDialect>();
   }
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) {

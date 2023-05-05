@@ -47,17 +47,17 @@ static Type getElementTypeOrType(Type t) {
 /// Returns a constant 0 of type `elementType`.
 static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
                                 Type elementType) {
-  TypedAttr zeroVal =
-      TypeSwitch<Type, TypedAttr>(elementType)
+  Attribute zeroVal =
+      TypeSwitch<Type, Attribute>(elementType)
           .Case<FloatType>([&](FloatType floatType) -> Attribute {
-            return cast<TypedAttr>(builder.getFloatAttr(floatType, 0));
+            return builder.getFloatAttr(floatType, 0);
           })
           .Case<IntegerType>([&](IntegerType intType) -> Attribute {
-            return cast<TypedAttr>(builder.getIntegerAttr(intType, 0));
+            return builder.getIntegerAttr(intType, 0);
           })
           .Default([](Type type) { return nullptr; });
   if (!zeroVal) return failure();
-  return builder.create<arith::ConstantOp>(loc, elementType, zeroVal)
+  return builder.create<arith::ConstantOp>(loc, zeroVal, elementType)
       .getResult();
 }
 
@@ -86,7 +86,7 @@ static FailureOr<Value> padIfNeeded(
   AffineExpr highPadExpr =
       shapeExpr.ceilDiv(paddingExpr) * paddingExpr - shapeExpr;
   for (auto shape : llvm::enumerate(shape.value())) {
-    highPad[shape.index()] = affine::makeComposedFoldedAffineApply(
+    highPad[shape.index()] = makeComposedFoldedAffineApply(
         builder, loc, highPadExpr, {paddingOfr, shape.value()});
   }
 

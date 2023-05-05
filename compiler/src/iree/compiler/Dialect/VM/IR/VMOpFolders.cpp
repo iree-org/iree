@@ -486,7 +486,7 @@ static Attribute constFoldUnaryOp(Attribute rawOperand,
     return DenseElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand = rawOperand.dyn_cast_or_null<ElementsAttr>()) {
     return operand.cast<DenseIntOrFPElementsAttr>().mapValues(
-        cast<ShapedType>(operand.getType()).getElementType(),
+        operand.getType().getElementType(),
         llvm::function_ref<ElementValueT(const ElementValueT &)>(
             [&](const ElementValueT &value) { return calculate(value); }));
   }
@@ -506,7 +506,7 @@ static Attribute constFoldFloatUnaryOp(
     return DenseElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand = rawOperand.dyn_cast_or_null<ElementsAttr>()) {
     return operand.cast<DenseIntOrFPElementsAttr>().mapValues(
-        cast<ShapedType>(operand.getType()).getElementType(),
+        operand.getType().getElementType(),
         llvm::function_ref<APInt(const APFloat &)>([&](const APFloat &value) {
           return calculate(value).bitcastToAPInt();
         }));
@@ -521,7 +521,7 @@ template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
-static TypedAttr constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
+static Attribute constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
                                    const CalculationT &calculate) {
   if (auto lhs = rawLhs.dyn_cast_or_null<AttrElementT>()) {
     auto rhs = rawRhs.dyn_cast_or_null<AttrElementT>();
@@ -550,7 +550,7 @@ static TypedAttr constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
       ++lhsIt;
       ++rhsIt;
     }
-    return DenseElementsAttr::get(cast<ShapedType>(lhs.getType()), resultAttrs);
+    return DenseElementsAttr::get(lhs.getType(), resultAttrs);
   }
   return {};
 }
@@ -602,7 +602,7 @@ static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
       ++bIt;
       ++cIt;
     }
-    return DenseElementsAttr::get(cast<ShapedType>(a.getType()), resultAttrs);
+    return DenseElementsAttr::get(a.getType(), resultAttrs);
   }
   return {};
 }
@@ -2128,7 +2128,7 @@ template <class AttrElementT,
           class ElementValueT = typename AttrElementT::ValueType,
           class CalculationT =
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
-static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
+static Attribute constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
                                        const CalculationT &calculate) {
   if (auto lhs = rawLhs.dyn_cast_or_null<AttrElementT>()) {
     auto rhs = rawRhs.dyn_cast_or_null<AttrElementT>();
@@ -2143,9 +2143,8 @@ static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
         lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>(),
         calculate);
     if (!elementResult) return {};
-    auto resultType = lhs.getType().clone(
-        std::nullopt, IntegerType::get(lhs.getContext(), 32));
-    return DenseElementsAttr::get(resultType, elementResult);
+    return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
+                                  elementResult);
   } else if (auto lhs = rawLhs.dyn_cast_or_null<ElementsAttr>()) {
     auto rhs = rawRhs.dyn_cast_or_null<ElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
@@ -2159,9 +2158,8 @@ static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
       ++lhsIt;
       ++rhsIt;
     }
-    auto resultType = lhs.getShapedType().clone(
-        std::nullopt, IntegerType::get(lhs.getContext(), 32));
-    return DenseElementsAttr::get(resultType, resultAttrs);
+    return DenseElementsAttr::get(IntegerType::get(lhs.getContext(), 32),
+                                  resultAttrs);
   }
   return {};
 }

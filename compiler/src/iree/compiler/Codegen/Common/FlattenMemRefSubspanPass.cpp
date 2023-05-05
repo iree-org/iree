@@ -138,7 +138,7 @@ static Value createTotalElementCountValue(ShapedType type,
       dims.push_back(builder.create<arith::ConstantIndexOp>(loc, shape[i]));
     }
   }
-  return affine::makeComposedAffineApply(builder, loc, sizeExpr, dims);
+  return makeComposedAffineApply(builder, loc, sizeExpr, dims);
 }
 
 // Flattens memref allocation ops with more than 1 dimensions to 1 dimension.
@@ -255,8 +255,8 @@ struct FlattenBindingSubspan final
           rewriter, loc, byteOffset, oldType.getElementType());
       AffineExpr s0, s1;
       bindSymbols(rewriter.getContext(), s0, s1);
-      linearShape = affine::makeComposedFoldedAffineApply(
-          rewriter, loc, s0 + s1, {linearShape, elementOffset});
+      linearShape = makeComposedFoldedAffineApply(rewriter, loc, s0 + s1,
+                                                  {linearShape, elementOffset});
     }
 
     SmallVector<int64_t, 1> staticShape;
@@ -350,8 +350,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
     // Dynamic strides/offset will create symbols. There should be none for the
     // static case.
     if (linearLayoutMap.getNumSymbols() == 0) {
-      return affine::makeComposedAffineApply(builder, loc, linearLayoutMap,
-                                             indices);
+      return makeComposedAffineApply(builder, loc, linearLayoutMap, indices);
     }
   }
 
@@ -398,7 +397,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
 
   Value linearIndex = indices.front();
   for (int i = 1; i < indices.size(); ++i) {
-    linearIndex = builder.create<affine::AffineApplyOp>(
+    linearIndex = builder.create<AffineApplyOp>(
         loc, mulAddMap, ValueRange{linearIndex, dims[i], indices[i]});
   }
   return linearIndex;
@@ -727,7 +726,7 @@ struct FlattenMemRefSubspanPass
   FlattenMemRefSubspanPass(const FlattenMemRefSubspanPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, memref::MemRefDialect>();
+    registry.insert<AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {

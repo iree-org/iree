@@ -63,19 +63,6 @@ class WrapEntryPointsPass
            "bindings";
   }
 
-  static StringAttr getArgId(func::FuncOp funcOp, int i) {
-    StringAttr id =
-        funcOp.getArgAttrOfType<StringAttr>(i, "ml_program.identifier");
-    return id ? id : funcOp.getArgAttrOfType<StringAttr>(i, "iree.identifier");
-  }
-
-  static StringAttr getResultId(func::FuncOp funcOp, int i) {
-    StringAttr id =
-        funcOp.getResultAttrOfType<StringAttr>(i, "ml_program.identifier");
-    return id ? id
-              : funcOp.getResultAttrOfType<StringAttr>(i, "iree.identifier");
-  }
-
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -153,7 +140,8 @@ class WrapEntryPointsPass
     SmallVector<std::string, 4> inputNames;
     SmallVector<std::string, 4> outputNames;
     for (unsigned i = 0; i < funcType.getNumInputs(); ++i) {
-      auto identifier = getArgId(funcOp, i);
+      auto identifier =
+          funcOp.getArgAttrOfType<StringAttr>(i, "iree.identifier");
       if (identifier) {
         inputNames.push_back(identifier.getValue().str());
       } else {
@@ -161,7 +149,8 @@ class WrapEntryPointsPass
       }
     }
     for (unsigned i = 0; i < funcType.getNumResults(); ++i) {
-      auto identifier = getResultId(funcOp, i);
+      auto identifier =
+          funcOp.getResultAttrOfType<StringAttr>(i, "iree.identifier");
       if (identifier) {
         outputNames.push_back(identifier.getValue().str());
       } else {
@@ -620,11 +609,12 @@ class WrapEntryPointsPass
   // Constructs an attribute containing all of the input and output identifiers:
   //   tfl.io.names=arg0;arg1;ret0;ret1
   //
-  // Default names will be used if no identifiers are set on the function.
+  // Default names will be used if no iree.identifiers are set on the function.
   NamedAttribute buildIONamesAttr(mlir::func::FuncOp entryFuncOp) {
     SmallVector<std::string, 4> pieces;
     for (int i = 0; i < entryFuncOp.getNumArguments(); ++i) {
-      auto identifierAttr = getArgId(entryFuncOp, i);
+      auto identifierAttr =
+          entryFuncOp.getArgAttrOfType<StringAttr>(i, "iree.identifier");
       if (!identifierAttr || identifierAttr.getValue().empty()) {
         pieces.push_back("arg" + std::to_string(i));
       } else {
@@ -632,7 +622,8 @@ class WrapEntryPointsPass
       }
     }
     for (int i = 0; i < entryFuncOp.getNumResults(); ++i) {
-      auto identifierAttr = getResultId(entryFuncOp, i);
+      auto identifierAttr =
+          entryFuncOp.getResultAttrOfType<StringAttr>(i, "iree.identifier");
       if (!identifierAttr || identifierAttr.getValue().empty()) {
         pieces.push_back("ret" + std::to_string(i));
       } else {

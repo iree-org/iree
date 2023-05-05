@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
-#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -163,8 +162,7 @@ static bool isaAffineExprOfType(AffineExpr expr) {
 
 /// Returns a Value that represents the value for symbol or dim expr for the map
 /// in the `applyOp`.
-static Value getValueForDimOrSymbol(affine::AffineApplyOp applyOp,
-                                    AffineExpr expr) {
+static Value getValueForDimOrSymbol(AffineApplyOp applyOp, AffineExpr expr) {
   unsigned numDims = applyOp.getAffineMap().getNumDims();
   if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
     return applyOp.getOperand(dimExpr.getPosition());
@@ -175,7 +173,7 @@ static Value getValueForDimOrSymbol(affine::AffineApplyOp applyOp,
   return nullptr;
 }
 static SmallVector<Value> getValuesForDimsOrSymbols(
-    affine::AffineApplyOp applyOp, ArrayRef<AffineExpr> exprs) {
+    AffineApplyOp applyOp, ArrayRef<AffineExpr> exprs) {
   SmallVector<Value> vals;
   for (auto expr : exprs) {
     vals.push_back(getValueForDimOrSymbol(applyOp, expr));
@@ -230,7 +228,7 @@ namespace {
 class LowerBoundExprVisitor
     : public AffineExprVisitor<LowerBoundExprVisitor, LogicalResult> {
  public:
-  LowerBoundExprVisitor(affine::AffineApplyOp applyOp,
+  LowerBoundExprVisitor(AffineApplyOp applyOp,
                         LoopTilingAndDistributionInfo &loopInfo)
       : applyOp(applyOp), loopInfo(loopInfo) {}
 
@@ -306,7 +304,7 @@ class LowerBoundExprVisitor
   }
 
  private:
-  affine::AffineApplyOp applyOp;
+  AffineApplyOp applyOp;
   LoopTilingAndDistributionInfo &loopInfo;
 };
 
@@ -317,7 +315,7 @@ class LowerBoundExprVisitor
 class StepExprVisitor
     : public AffineExprVisitor<StepExprVisitor, LogicalResult> {
  public:
-  StepExprVisitor(affine::AffineApplyOp applyOp,
+  StepExprVisitor(AffineApplyOp applyOp,
                   LoopTilingAndDistributionInfo &loopInfo)
       : applyOp(applyOp), loopInfo(loopInfo) {}
 
@@ -421,7 +419,7 @@ class StepExprVisitor
     return failure();
   }
 
-  affine::AffineApplyOp applyOp;
+  AffineApplyOp applyOp;
   LoopTilingAndDistributionInfo &loopInfo;
 };
 }  // namespace
@@ -453,8 +451,8 @@ std::optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   loopInfo.loop = forOp;
   loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.getUpperBound());
 
-  auto lbApplyOp = forOp.getLowerBound().getDefiningOp<affine::AffineApplyOp>();
-  auto stepApplyOp = forOp.getStep().getDefiningOp<affine::AffineApplyOp>();
+  auto lbApplyOp = forOp.getLowerBound().getDefiningOp<AffineApplyOp>();
+  auto stepApplyOp = forOp.getStep().getDefiningOp<AffineApplyOp>();
 
   if (!lbApplyOp || !stepApplyOp) {
     // Try to see if this is a specical case where we have:
@@ -508,10 +506,8 @@ SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
     forOps = body->getOps<scf::ForOp>();
   }
   SmallVector<Operation *> computeOps;
-  for (Operation &op : *body) {
-    if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(&op)) {
-      computeOps.push_back(&op);
-    }
+  for (auto op : body->getOps<TilingInterface>()) {
+    computeOps.push_back(op);
   }
   return computeOps;
 }
@@ -591,16 +587,16 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
         AffineExpr d0, d1;
         int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
         bindSymbols(builder.getContext(), d0, d1);
-        Value numTiles = affine::makeComposedAffineApply(
+        Value numTiles = makeComposedAffineApply(
             builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
         Value dimValue;
         if (dim == numParallelDims - 1)
           dimValue = splitDim;
         else {
-          dimValue = affine::makeComposedAffineApply(builder, loc, (d0 % d1),
-                                                     {splitDim, numTiles});
-          splitDim = affine::makeComposedAffineApply(
-              builder, loc, (d0).floorDiv(d1), {splitDim, numTiles});
+          dimValue = makeComposedAffineApply(builder, loc, (d0 % d1),
+                                             {splitDim, numTiles});
+          splitDim = makeComposedAffineApply(builder, loc, (d0).floorDiv(d1),
+                                             {splitDim, numTiles});
         }
         procInfo[numParallelDims - dim - 1] = {dimValue, numTiles,
                                                distributionMethod};
@@ -638,8 +634,8 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
           });
   AffineExpr s0, s1;
   bindSymbols(rewriter.getContext(), s0, s1);
-  return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
-                                               {byteOffset, elementWidth});
+  return makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
+                                       {byteOffset, elementWidth});
 }
 
 //===---------------------------------------------------------------------===//

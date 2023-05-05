@@ -37,7 +37,7 @@ class DeviceQueryIntCastOpConversion
     auto queryOp = rewriter.create<IREE::HAL::DeviceQueryOp>(
         op.getLoc(), rewriter.getI1Type(), rewriter.getI64Type(),
         adaptor.getDevice(), op.getCategoryAttr(), op.getKeyAttr(),
-        TypedAttr{});
+        Attribute{});
     auto ok = queryOp.getOk().cast<Value>();
     auto value = queryOp.getValue();
 

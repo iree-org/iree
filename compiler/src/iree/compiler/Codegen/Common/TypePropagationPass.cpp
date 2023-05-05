@@ -137,8 +137,8 @@ struct ConstantOpTypeConversion
     auto newAttrType = RankedTensorType::get(attrType.getShape(),
                                              legalizedElementType.value());
     auto newAttr = DenseElementsAttr::get(newAttrType, legalizedValues);
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constantOp, newAttrType,
-                                                   newAttr);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constantOp, newAttr,
+                                                   newAttrType);
     return success();
   }
 };

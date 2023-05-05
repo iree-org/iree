@@ -148,16 +148,6 @@ if not PACKAGE_VERSION:
   PACKAGE_VERSION = f"0.dev0+{git_versions.get('IREE') or '0'}"
 
 
-def get_cmake_version_info_args():
-  version_info_args = [
-      f"-DIREE_RELEASE_VERSION:STRING={PACKAGE_VERSION}",
-      f"-DIREE_RELEASE_REVISION:STRING={git_versions.get('IREE') or '0'}",
-  ]
-  if version_info:
-    version_info_args.append("-DIREE_EMBEDDED_RELEASE_INFO=ON")
-  return version_info_args
-
-
 def maybe_nuke_cmake_cache():
   # From run to run under pip, we can end up with different paths to ninja,
   # which isn't great and will confuse cmake. Detect if the location of
@@ -247,7 +237,6 @@ def prepare_installation():
         # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU here (and in env)
         get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ]
-    cmake_args.extend(get_cmake_version_info_args())
 
     # These usually flow through the environment, but we add them explicitly
     # so that they show clearly in logs (getting them wrong can have bad
@@ -404,6 +393,7 @@ setup(
     ext_modules=[
         CMakeExtension("iree.compiler._mlir_libs._mlir"),
         CMakeExtension("iree.compiler._mlir_libs._ireeDialects"),
+        CMakeExtension("iree.compiler._mlir_libs._ireecTransforms"),
         # TODO: MHLO has been broken for a while so disabling. If re-enabling,
         # it also needs to be enabled on the build side.
         # CMakeExtension("iree.compiler._mlir_libs._mlirHlo"),

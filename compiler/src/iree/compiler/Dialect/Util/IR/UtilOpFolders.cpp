@@ -138,8 +138,9 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
     }
     if (constantValue != initialValue) {
       operands.insert(rewriter.create<arith::ConstantOp>(
-          op.getLoc(), op.getResult().getType(),
-          rewriter.getIntegerAttr(op.getResult().getType(), constantValue)));
+          op.getLoc(),
+          rewriter.getIntegerAttr(op.getResult().getType(), constantValue),
+          op.getResult().getType()));
     }
     rewriter.replaceOpWithNewOp<OpT>(op, op.getResult().getType(),
                                      operands.takeVector());
@@ -175,7 +176,7 @@ static Value makeRangeEnd(Location loc, Value offset, Value length,
   return makeRangeEnd(
       loc, offset, length,
       builder.create<arith::ConstantOp>(
-          loc, offset.getType(), builder.getIntegerAttr(offset.getType(), 1)),
+          loc, builder.getIntegerAttr(offset.getType(), 1), offset.getType()),
       builder);
 }
 
@@ -223,12 +224,14 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
     // Min/max with constant ranges. This allows for normal folding to happen
     // downstream of the op.
     auto constantMinOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), op.getMin().getType(),
-        rewriter.getIntegerAttr(op.getMin().getType(), constantMin));
+        op.getLoc(),
+        rewriter.getIntegerAttr(op.getMin().getType(), constantMin),
+        op.getMin().getType());
     auto constantMaxOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), op.getMax().getType(),
+        op.getLoc(),
         rewriter.getIntegerAttr(op.getMax().getType(),
-                                constantMax - constantMin + 1));
+                                constantMax - constantMin + 1),
+        op.getMax().getType());
     min = min ? rewriter.create<arith::MinUIOp>(op.getLoc(), min, constantMinOp)
                     .getResult()
               : constantMinOp.getResult();
@@ -257,8 +260,8 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
       minValue = rewriter.create<arith::MinUIOp>(loc, op.getOffsets().front(),
                                                  op.getOffsets().back());
       auto one = rewriter.create<arith::ConstantOp>(
-          loc, op.getMin().getType(),
-          rewriter.getIntegerAttr(op.getMin().getType(), 1));
+          loc, rewriter.getIntegerAttr(op.getMin().getType(), 1),
+          op.getMin().getType());
       auto endLhs = makeRangeEnd(loc, op.getOffsets().front(),
                                  op.getLengths().front(), one, rewriter);
       auto endRhs = makeRangeEnd(loc, op.getOffsets().back(),
@@ -413,8 +416,8 @@ struct ExpandUnfoldableConstantOp
   using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto stdConst = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), cast<TypedAttr>(op.getValue()));
+    auto stdConst =
+        rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
     rewriter.replaceOpWithNewOp<OptimizationBarrierOp>(op,
                                                        stdConst.getResult());
     return success();

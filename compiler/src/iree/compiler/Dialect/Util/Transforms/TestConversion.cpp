@@ -31,7 +31,7 @@ class TestConversionPass : public TestConversionBase<TestConversionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, func::FuncDialect,
                     mlir::arith::ArithDialect, math::MathDialect,
-                    mlir::affine::AffineDialect, memref::MemRefDialect>();
+                    mlir::AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {

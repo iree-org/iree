@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvironment.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
-#include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/schemas/spirv_executable_def_builder.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
@@ -143,7 +142,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     auto spvModuleOp = *spirvModuleOps.begin();
 
     FlatbufferBuilder builder;
-    iree_hal_spirv_ExecutableDef_start_as_root(builder);
+    iree_SpirVExecutableDef_start_as_root(builder);
 
     // Serialize the spirv::ModuleOp into the binary that we will embed in the
     // final FlatBuffer.
@@ -159,15 +158,14 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
                                                     spvBinary.size());
 
-    // The runtime uses ordinals instead of names. We provide the list of entry
-    // point names here that are then passed in VkShaderModuleCreateInfo.
-    SmallVector<StringRef> entryPointNames;
-    SmallVector<uint32_t> subgroupSizes;
-    SmallVector<iree_hal_spirv_FileLineLocDef_ref_t> sourceLocationRefs;
+    // The sequencer and runtime use ordinals instead of names. We provide the
+    // list of entry point names here that are then passed in
+    // VkShaderModuleCreateInfo.
+    SmallVector<StringRef, 8> entryPointNames;
+    SmallVector<uint32_t, 8> subgroupSizes;
     bool hasAnySubgroupSizes = false;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
       entryPointNames.push_back(exportOp.getFn());
-
       auto fn = spvModuleOp.lookupSymbol<spirv::FuncOp>(exportOp.getFn());
       auto abi = fn->getAttrOfType<spirv::EntryPointABIAttr>(
           spirv::getEntryPointABIAttrName());
@@ -177,33 +175,17 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
       } else {
         subgroupSizes.push_back(0);
       }
-
-      // Optional source location information for debugging/profiling.
-      if (options.debugLevel >= 1) {
-        if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
-          auto filenameRef = builder.createString(loc->getFilename());
-          sourceLocationRefs.push_back(iree_hal_spirv_FileLineLocDef_create(
-              builder, filenameRef, loc->getLine()));
-        }
-      }
     });
     auto entryPointsRef = builder.createStringVec(entryPointNames);
     flatbuffers_int32_vec_ref_t subgroupSizesRef =
         hasAnySubgroupSizes ? builder.createInt32Vec(subgroupSizes) : 0;
 
-    iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
     if (subgroupSizesRef) {
-      iree_hal_spirv_ExecutableDef_subgroup_sizes_add(builder,
-                                                      subgroupSizesRef);
+      iree_SpirVExecutableDef_subgroup_sizes_add(builder, subgroupSizesRef);
     }
-    iree_hal_spirv_ExecutableDef_code_add(builder, spvCodeRef);
-    if (!sourceLocationRefs.empty()) {
-      auto sourceLocationsRef =
-          builder.createOffsetVecDestructive(sourceLocationRefs);
-      iree_hal_spirv_ExecutableDef_source_locations_add(builder,
-                                                        sourceLocationsRef);
-    }
-    iree_hal_spirv_ExecutableDef_end_as_root(builder);
+    iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
+    iree_SpirVExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
@@ -254,7 +236,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     }
 
     FlatbufferBuilder builder;
-    iree_hal_spirv_ExecutableDef_start_as_root(builder);
+    iree_SpirVExecutableDef_start_as_root(builder);
 
     auto spvCodeRef = flatbuffers_uint32_vec_create(
         builder, reinterpret_cast<const uint32_t *>(spvBinary.data()),
@@ -262,9 +244,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
-    iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_hal_spirv_ExecutableDef_code_add(builder, spvCodeRef);
-    iree_hal_spirv_ExecutableDef_end_as_root(builder);
+    iree_SpirVExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_SpirVExecutableDef_code_add(builder, spvCodeRef);
+    iree_SpirVExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(

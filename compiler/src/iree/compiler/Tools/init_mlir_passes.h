@@ -39,9 +39,9 @@ inline void registerMlirPasses() {
   registerCSEPass();
   registerInlinerPass();
   registerLocationSnapshotPass();
-  affine::registerLoopCoalescingPass();
+  registerLoopCoalescingPass();
   registerLoopInvariantCodeMotionPass();
-  affine::registerAffineScalarReplacementPass();
+  registerAffineScalarReplacementPass();
   registerPrintOpStatsPass();
   registerViewOpGraphPass();
   registerStripDebugInfoPass();
@@ -51,9 +51,9 @@ inline void registerMlirPasses() {
   registerReconcileUnrealizedCastsPass();
 
   // Affine
-  affine::registerAffinePasses();
-  affine::registerAffineLoopFusionPass();
-  affine::registerAffinePipelineDataTransferPass();
+  registerAffinePasses();
+  registerAffineLoopFusionPass();
+  registerAffinePipelineDataTransferPass();
   registerConvertAffineToStandardPass();
 
   // Linalg

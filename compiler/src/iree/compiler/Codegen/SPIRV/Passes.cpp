@@ -21,7 +21,6 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -228,8 +227,6 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 
   pm.addNestedPass<func::FuncOp>(createSPIRVMapMemRefStorageClassPass());
   pm.addPass(createSPIRVEmulateI64Pass());
-  pm.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
-  pm.addPass(createSPIRVEmulateBf16Pass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -249,13 +246,10 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   spirvPM.addPass(spirv::createSPIRVUpdateVCEPass());
 }
 
-extern llvm::cl::opt<std::string> clSPIRVTransformDialectFileName;
-
 void addSPIRVTransformDialectPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clSPIRVTransformDialectFileName));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -558,7 +552,13 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 //===----------------------------------------------------------------------===//
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
-  addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
+  pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
+  pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
+  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
+  // Temporary solution to avoid large allocations due to softmax lowering.
+  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());

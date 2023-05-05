@@ -186,29 +186,6 @@ static SmallVector<Value, 4> refreshDimsOnTypeChange(
 // flow.dispatch.workgroups
 //===----------------------------------------------------------------------===//
 
-/// Helper method to take a list of values to be deduped and returns
-/// - list of deduped values.
-/// - mapping for a value from its position in the original list to
-///   the deduped list.
-static std::tuple<SmallVector<Value>, llvm::MapVector<int, int>>
-dedupAndGetOldToNewPosMapping(ValueRange values) {
-  llvm::MapVector<int, int> oldPosToNewPos;
-  SmallVector<Value> uniquedList;
-  int numUnique = 0;
-  llvm::MapVector<Value, int> oldValueToNewPos;
-  for (auto [index, val] : llvm::enumerate(values)) {
-    if (oldValueToNewPos.count(val)) {
-      oldPosToNewPos[index] = oldValueToNewPos[val];
-      continue;
-    }
-    oldPosToNewPos[index] = numUnique;
-    oldValueToNewPos[val] = numUnique;
-    uniquedList.push_back(val);
-    numUnique++;
-  }
-  return {uniquedList, oldPosToNewPos};
-}
-
 struct ReplaceDispatchResultIfZeroElements
     : public OpRewritePattern<DispatchWorkgroupsOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -231,135 +208,6 @@ struct ReplaceDispatchResultIfZeroElements
   }
 };
 
-/// Deduplicate redundant workload values of a dispatch.workgroups op. This
-/// requires modifying the `count` region of the op to match the new workloads.
-struct ElideRedundantWorkloadValues
-    : public OpRewritePattern<DispatchWorkgroupsOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
-                                PatternRewriter &rewriter) const override {
-    ValueRange workload = op.getWorkload();
-    auto [newWorkload, oldWorkloadPosToNewWorkloadPos] =
-        dedupAndGetOldToNewPosMapping(workload);
-    if (newWorkload.size() == workload.size()) {
-      // Nothing to do.
-      return failure();
-    }
-
-    // Create a new flow.dispatch.workgroup op with new workloads.
-    Location loc = op.getLoc();
-    auto newWorkgroupsOp = rewriter.create<DispatchWorkgroupsOp>(
-        loc, newWorkload, op.getResultTypes(), op.getResultDims(),
-        op.getArguments(), op.getArgumentDims(),
-        op.getTiedOperandsAsIntegerList(),
-        getPrunedAttributeList(op, /*elidedAttrs=*/{}));
-
-    // Move the body over.
-    Region &body = op.getWorkgroupBody();
-    if (!body.empty()) {
-      Region &newBody = newWorkgroupsOp.getWorkgroupBody();
-      rewriter.inlineRegionBefore(body, newBody, newBody.begin());
-    }
-
-    // Move the workgroup count region over.
-    Region &count = op.getWorkgroupCount();
-    if (!count.empty()) {
-      Region &newCount = newWorkgroupsOp.getWorkgroupCount();
-      rewriter.inlineRegionBefore(count, newCount, newCount.begin());
-
-      // Create a new entry basic block with as many arguments as the workload
-      // and then merge this block with the original entry block.
-      auto newWorkloadTypes = llvm::to_vector(
-          llvm::map_range(newWorkload, [](Value v) { return v.getType(); }));
-      auto newWorkloadLocs = llvm::to_vector(
-          llvm::map_range(newWorkload, [](Value v) { return v.getLoc(); }));
-      Block *oldCountBlock = &newCount.front();
-      Block *newCountBlock = rewriter.createBlock(
-          &newCount.front(), newWorkloadTypes, newWorkloadLocs);
-      auto newCountBlockArgs = newCountBlock->getArguments();
-      SmallVector<Value> replacements;
-      replacements.resize(oldCountBlock->getNumArguments());
-      for (auto [index, val] : llvm::enumerate(oldCountBlock->getArguments())) {
-        replacements[index] =
-            newCountBlockArgs[oldWorkloadPosToNewWorkloadPos.lookup(index)];
-      }
-      rewriter.mergeBlocks(oldCountBlock, newCountBlock, replacements);
-    }
-
-    // Replace the old workgroups op with the new workgroups op.
-    rewriter.replaceOp(op, newWorkgroupsOp.getResults());
-    return success();
-  }
-};
-
-/// Deduplicate operands of the `dispatch.workgroup_count_from_slice` op. This
-/// requires updating the `flow.dispatch.workload.ordinal` operation in
-/// the body of the `dispatch.workgroups` op to match the new positions
-/// of the operands in the `dispatch.workgroup_count_from_slice`.
-struct ElideRedundantOperandsOfWorkgroupCountFromSliceOp
-    : OpRewritePattern<DispatchWorkgroupsOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
-                                PatternRewriter &rewriter) const override {
-    Region &count = op.getWorkgroupCount();
-    if (count.empty()) {
-      return failure();
-    }
-
-    assert(
-        llvm::hasSingleElement(count) &&
-        "expected dispatch.workgroup op count region to have a single block");
-
-    // Check for `dispatch.workgroup_count_from_slice` operations in the count
-    // region.
-    Block &countBody = count.front();
-    auto countFromSliceOps =
-        countBody.getOps<DispatchWorkgroupCountFromSliceOp>();
-    if (countFromSliceOps.empty()) {
-      return failure();
-    }
-    assert(llvm::hasSingleElement(countFromSliceOps) &&
-           "expected only one dispatch.workgroup_count_from_slice op in count "
-           "region");
-    auto countFromSliceOp = *countFromSliceOps.begin();
-
-    // Deduplicate the operands and get a mapping from old position to new
-    // position.
-    auto [newOrdinals, oldOrdinalPosToNewOrdinalPos] =
-        dedupAndGetOldToNewPosMapping(countFromSliceOp.getOperands());
-    if (newOrdinals.size() == countFromSliceOp.getNumOperands()) {
-      return failure();
-    }
-
-    // Replace the old `dispatch.workgroup_count_from_slice` with a new op
-    // with deduped operands.
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(countFromSliceOp);
-    rewriter.replaceOpWithNewOp<DispatchWorkgroupCountFromSliceOp>(
-        countFromSliceOp, newOrdinals);
-
-    // Adjust the flow.dispatch.workload.ordinal ops in the body to use
-    // the new ordinal numbers.
-    Region &body = op.getWorkgroupBody();
-    SmallVector<DispatchWorkloadOrdinalOp> ordinalOps;
-    body.walk([&](DispatchWorkloadOrdinalOp ordinalOp) {
-      ordinalOps.push_back(ordinalOp);
-    });
-
-    for (auto ordinalOp : ordinalOps) {
-      int oldOrdinalPos = ordinalOp.getOrdinal().getSExtValue();
-      rewriter.setInsertionPoint(ordinalOp);
-      rewriter.replaceOpWithNewOp<DispatchWorkloadOrdinalOp>(
-          ordinalOp, ordinalOp.getOperand(),
-          rewriter.getIndexAttr(
-              oldOrdinalPosToNewOrdinalPos.lookup(oldOrdinalPos)));
-    }
-    rewriter.updateRootInPlace(op, []() {});
-    return success();
-  }
-};
-
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   // Disable constant inlining as we have done it during dispatch region
@@ -368,71 +216,7 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
   closureOptions.maxInlinedConstantBytes = 0;
   results.insert<IREE::Util::ClosureOptimizationPattern<DispatchWorkgroupsOp>>(
       context, closureOptions);
-  results.insert<ElideRedundantWorkloadValues,
-                 ElideRedundantOperandsOfWorkgroupCountFromSliceOp,
-                 ReplaceDispatchResultIfZeroElements>(context);
-}
-
-//===----------------------------------------------------------------------===//
-// flow.dispatch.workload.ordinal
-//===----------------------------------------------------------------------===//
-
-// Bubble up the ordinal ops so that all uses go through this operation.
-struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(DispatchWorkloadOrdinalOp ordinalOp,
-                                PatternRewriter &rewriter) const override {
-    auto blockArg = ordinalOp.getOperand().dyn_cast<BlockArgument>();
-    if (!blockArg) {
-      return failure();
-    }
-    if (blockArg.hasOneUse()) {
-      // Nothing to do.
-      return failure();
-    }
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPointToStart(ordinalOp->getBlock());
-    // Adjust the insertion point to keep the ordinals in order
-    for (Operation &op : *ordinalOp->getBlock()) {
-      if (auto insertionPoint = dyn_cast<DispatchWorkloadOrdinalOp>(&op)) {
-        if (insertionPoint.getOrdinal().getZExtValue() <
-            ordinalOp.getOrdinal().getZExtValue()) {
-          rewriter.setInsertionPointAfter(insertionPoint);
-          continue;
-        }
-      }
-      break;
-    }
-    auto newOrdinalOp = rewriter.create<DispatchWorkloadOrdinalOp>(
-        ordinalOp.getLoc(), blockArg, ordinalOp.getOrdinalAttr());
-    rewriter.replaceAllUsesExcept(blockArg, newOrdinalOp, newOrdinalOp);
-    rewriter.replaceOp(ordinalOp, newOrdinalOp.getResult());
-    return success();
-  }
-};
-
-/// Fold away following sequence of `flow.dispatch.workload.ordinal`.
-///
-/// ```mlir
-/// %1 = flow.dispatch.workload.ordinal %0 2
-/// %2 = flow.dispatch.workload.ordinal %1 2
-/// ```
-///
-/// This can happen when the operands get deduped.
-OpFoldResult DispatchWorkloadOrdinalOp::fold(FoldAdaptor operands) {
-  if (auto producerOrdinalOp = dyn_cast_or_null<DispatchWorkloadOrdinalOp>(
-          getOperand().getDefiningOp())) {
-    if (producerOrdinalOp.getOrdinal() == getOrdinal()) {
-      return producerOrdinalOp.getOperand();
-    }
-  }
-  return {};
-}
-
-void DispatchWorkloadOrdinalOp::getCanonicalizationPatterns(
-    RewritePatternSet &results, MLIRContext *context) {
-  results.insert<BubbleUpOrdinalOp>(context);
+  results.insert<ReplaceDispatchResultIfZeroElements>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -965,20 +749,19 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
   if (!value) return {};
   if (auto target = operands.getTarget().dyn_cast_or_null<ElementsAttr>()) {
     // Store into the constant target tensor.
-    auto targetType = cast<ShapedType>(target.getType());
-    if (targetType.getRank() == 0) {
-      return DenseElementsAttr::get(targetType, {value});
+    if (target.getType().getRank() == 0) {
+      return DenseElementsAttr::get(target.getType(), {value});
     }
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
       uint64_t offset = getFlattenedIndex(
-          targetType,
+          target.getType(),
           llvm::to_vector<4>(
               llvm::map_range(operands.getIndices(), [](Attribute value) {
                 return value.cast<IntegerAttr>().getValue().getZExtValue();
               })));
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
       newContents[offset] = value;
-      return DenseElementsAttr::get(targetType, newContents);
+      return DenseElementsAttr::get(target.getType(), newContents);
     }
   }
   return {};
@@ -1051,8 +834,7 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // Slices tensor from start to (start + length) exclusively at dim.
 static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
                                 uint64_t start, uint64_t length) {
-  auto tensorType = cast<ShapedType>(tensor.getType());
-  auto shape = llvm::to_vector<4>(tensorType.getShape());
+  auto shape = llvm::to_vector<4>(tensor.getType().getShape());
   if (length == shape[dim]) {
     // No need to slice.
     return tensor;
@@ -1069,7 +851,7 @@ static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
                       /*init=*/1, /*op=*/std::multiplies<int64_t>());
   int64_t num = length * step / shape[dim];
   for (int64_t offset = step / shape[dim] * start,
-               numElements = tensorType.getNumElements();
+               numElements = tensor.getType().getNumElements();
        offset < numElements; offset += step) {
     newContents.append(valuesBegin + offset, valuesBegin + offset + num);
   }

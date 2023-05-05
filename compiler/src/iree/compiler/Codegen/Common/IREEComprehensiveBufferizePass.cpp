@@ -59,20 +59,26 @@ class EliminateEmptyTensorsPass
 class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
+  // TODO(#12933): Because of regressions in CUDA backend, there is an
+  // option to keep a legacy mode of not representing the offset in the
+  // type. Remove once the bug is fixed.
   explicit IREEComprehensiveBufferizePass(
       std::optional<BufferizationOptions::AllocationFn> allocationFn =
           std::nullopt,
       std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
           std::nullopt,
-      std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
+      std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
+      bool embedSubspanOffsetIntoMemRefType = true)
       : allocationFn(allocationFn),
         deallocationFn(deallocationFn),
-        memCpyFn(memCpyFn) {}
+        memCpyFn(memCpyFn) {
+    this->embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
-        .insert<affine::AffineDialect,
+        .insert<AffineDialect,
                 arith::ArithDialect,
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
@@ -201,6 +207,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
+  options.embedSubspanOffsetIntoMemRefType = embedSubspanOffsetIntoMemRefType;
 
   if (failed(runIREEOneShotBufferize(moduleOp, options))) {
     return signalPassFailure();
@@ -223,12 +230,13 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
+    bool embedSubspanOffsetIntoMemRefType) {
   if (!allocationFn) allocationFn = defaultAllocationFn;
   if (!deallocationFn) deallocationFn = defaultDeallocationFn;
   if (!memCpyFn) memCpyFn = defaultMemCpyFn;
   return std::make_unique<IREEComprehensiveBufferizePass>(
-      allocationFn, deallocationFn, memCpyFn);
+      allocationFn, deallocationFn, memCpyFn, embedSubspanOffsetIntoMemRefType);
 }
 
 void addIREEPostBufferizationPasses(OpPassManager &passManager) {
@@ -246,11 +254,13 @@ void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
+    bool embedSubspanOffsetIntoMemRefType) {
   passManager.addPass(createEliminateEmptyTensorsPass());
   passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   passManager.addPass(createIREEComprehensiveBufferizePass(
-      allocationFn, deallocationFn, memCpyFn));
+      allocationFn, deallocationFn, memCpyFn,
+      embedSubspanOffsetIntoMemRefType));
   addIREEPostBufferizationPasses(passManager);
 }
 

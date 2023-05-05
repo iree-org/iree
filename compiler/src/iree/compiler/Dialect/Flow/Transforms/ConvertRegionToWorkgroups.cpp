@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
@@ -137,24 +136,10 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       arguments.append(dims.begin(), dims.end());
     }
   }
-
-  // Create the shell dispatch.workgroup ops.
   auto workgroupsOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
       loc, regionOp.getWorkload(), regionOp.getResultTypes(),
       regionOp.getResultDims(), arguments, argumentDims, tiedArguments);
   workgroupsOp->setDialectAttrs(regionOp->getDialectAttrs());
-
-  // Populate the workgroup count region.
-  if (!regionOp.getWorkgroupCount().empty()) {
-    // Move DispatchRegion's workload_count region to DispatchWorkgroupOp's
-    rewriter.inlineRegionBefore(regionOp.getWorkgroupCount(),
-                                workgroupsOp.getWorkgroupCount(),
-                                workgroupsOp.getWorkgroupCount().begin());
-    mlir::makeRegionIsolatedFromAbove(
-        rewriter, workgroupsOp.getWorkgroupCount(),
-        [](Operation *op) { return isa<arith::ConstantOp>(op); });
-  }
-
   IRMapping bvm;
   bvm.map(arguments, workgroupsOp.getInputBlockArguments());
 
@@ -215,6 +200,13 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   // Delete the old terminator and create a new one.
   rewriter.create<IREE::Flow::ReturnOp>(loc);
   rewriter.eraseOp(terminator);
+
+  // Move DispatchRegion's workload_count region to DispatchWorkgroupOp's
+  if (!regionOp.getWorkgroupCount().empty()) {
+    rewriter.inlineRegionBefore(regionOp.getWorkgroupCount(),
+                                workgroupsOp.getWorkgroupCount(),
+                                workgroupsOp.getWorkgroupCount().begin());
+  }
 
   rewriter.replaceOp(regionOp, workgroupsOp.getResults());
   return workgroupsOp;

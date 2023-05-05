@@ -36,29 +36,24 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import atexit
-import json
-import shutil
 import subprocess
 import tarfile
-from typing import Any, List, Optional, Sequence, Tuple
+import shutil
 
+from typing import Any, Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_definition import (
-    DriverInfo, execute_cmd, execute_cmd_and_get_stdout,
-    execute_cmd_and_get_output, get_git_commit_hash,
-    get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start,
-    parse_iree_benchmark_metrics)
+from common.benchmark_definition import (DriverInfo, execute_cmd,
+                                         execute_cmd_and_get_output,
+                                         get_git_commit_hash,
+                                         get_iree_benchmark_module_arguments,
+                                         wait_for_iree_benchmark_module_start)
 from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
                                     BenchmarkSuite)
 from common.android_device_utils import (get_android_device_model,
                                          get_android_device_info,
                                          get_android_gpu_name)
 import common.common_arguments
-from e2e_test_artifacts import iree_artifacts
-from e2e_test_framework import serialization
-from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.device_specs import device_parameters
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
@@ -94,7 +89,7 @@ def adb_push_to_tmp_dir(
 def adb_execute_and_get_output(
     cmd_args: Sequence[str],
     relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
-    verbose: bool = False) -> Tuple[str, str]:
+    verbose: bool = False) -> str:
   """Executes command with adb shell.
 
   Switches to `relative_dir` relative to the android tmp directory before
@@ -106,7 +101,7 @@ def adb_execute_and_get_output(
       ANDROID_TMPDIR.
 
   Returns:
-    Strings for stdout and stderr.
+    A string for the command output.
   """
   cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
   cmd.extend(cmd_args)
@@ -136,8 +131,7 @@ def adb_execute(cmd_args: Sequence[str],
 
 def is_magisk_su():
   """Returns true if the Android device has a Magisk SU binary."""
-  stdout, _ = adb_execute_and_get_output(["su", "--help"])
-  return "MagiskSU" in stdout
+  return "MagiskSU" in adb_execute_and_get_output(["su", "--help"])
 
 
 def adb_execute_as_root(cmd_args: Sequence[Any]) -> subprocess.CompletedProcess:
@@ -192,68 +186,70 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
     benchmark_case_dir = benchmark_case.benchmark_case_dir
+    # TODO(#11076): Support run_config.
+    if benchmark_case_dir is None:
+      raise ValueError("benchmark_case_dir can't be None.")
+
     android_case_dir = pathlib.PurePosixPath(
         benchmark_case_dir.relative_to(self.config.root_benchmark_dir))
 
-    run_config = benchmark_case.run_config
-    if run_config is None:
-      # TODO(#11076): Remove legacy path.
-      self.__push_vmfb_file(benchmark_case_dir)
-      self.__check_and_push_file(benchmark_case_dir / MODEL_FLAGFILE_NAME,
-                                 android_case_dir)
-      taskset = self.__deduce_taskset(benchmark_case.bench_mode)
-      run_args = [f"--flagfile={MODEL_FLAGFILE_NAME}"]
-    else:
-      self.__check_and_push_file(
-          benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir)
-      taskset = self.__deduce_taskset_from_run_config(run_config)
-      run_args = run_config.materialize_run_flags()
-      run_args.append(f"--module={iree_artifacts.MODULE_FILENAME}")
+    self.__push_vmfb_file(benchmark_case_dir)
+    self.__check_and_push_file(benchmark_case_dir / MODEL_FLAGFILE_NAME,
+                               android_case_dir)
+
+    taskset = self.__deduce_taskset(benchmark_case.bench_mode)
 
     if benchmark_results_filename is not None:
       self.__run_benchmark(android_case_dir=android_case_dir,
                            tool_name=benchmark_case.benchmark_tool_name,
                            driver_info=benchmark_case.driver_info,
-                           run_args=run_args,
                            results_filename=benchmark_results_filename,
                            taskset=taskset)
 
     if capture_filename is not None:
       self.__run_capture(android_case_dir=android_case_dir,
                          tool_name=benchmark_case.benchmark_tool_name,
-                         run_args=run_args,
                          capture_filename=capture_filename,
                          taskset=taskset)
 
   def __run_benchmark(self, android_case_dir: pathlib.PurePosixPath,
                       tool_name: str, driver_info: DriverInfo,
-                      run_args: Sequence[str], results_filename: pathlib.Path,
-                      taskset: str):
+                      results_filename: pathlib.Path, taskset: str):
     if self.config.normal_benchmark_tool_dir is None:
       raise ValueError("normal_benchmark_tool_dir can't be None.")
 
     host_tool_path = self.config.normal_benchmark_tool_dir / tool_name
     android_tool = self.__check_and_push_file(host_tool_path,
                                               NORMAL_TOOL_REL_DIR)
-    cmd = ["taskset", taskset, android_tool]
-    cmd += run_args
+    cmd = [
+        "taskset", taskset, android_tool, f"--flagfile={MODEL_FLAGFILE_NAME}"
+    ]
     if tool_name == "iree-benchmark-module":
-      cmd += get_iree_benchmark_module_arguments(
-          results_filename=f"'{results_filename.name}'",
-          driver_info=driver_info,
-          benchmark_min_time=self.config.benchmark_min_time)
+      cmd.extend(
+          get_iree_benchmark_module_arguments(
+              results_filename=f"'{results_filename.name}'",
+              driver_info=driver_info,
+              benchmark_min_time=self.config.benchmark_min_time))
 
-    benchmark_stdout, benchmark_stderr = adb_execute_and_get_output(
-        cmd, android_case_dir, verbose=self.verbose)
-    benchmark_metrics = parse_iree_benchmark_metrics(benchmark_stdout,
-                                                     benchmark_stderr)
+    result_json = adb_execute_and_get_output(cmd,
+                                             android_case_dir,
+                                             verbose=self.verbose)
+
+    # Pull the result file back onto the host and set the filename for later
+    # return.
+    pull_cmd = [
+        "adb", "pull",
+        ANDROID_TMPDIR / android_case_dir / results_filename.name,
+        results_filename
+    ]
+    execute_cmd_and_get_output(pull_cmd, verbose=self.verbose)
+
     if self.verbose:
-      print(benchmark_metrics)
-    results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
+      print(result_json)
 
   def __run_capture(self, android_case_dir: pathlib.PurePosixPath,
                     tool_name: str, capture_filename: pathlib.Path,
-                    run_args: Sequence[str], taskset: str):
+                    taskset: str):
     capture_config = self.config.trace_capture_config
     if capture_config is None:
       raise ValueError("capture_config can't be None.")
@@ -263,9 +259,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                                               TRACED_TOOL_REL_DIR)
     run_cmd = [
         "TRACY_NO_EXIT=1", f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMPDIR}",
-        "taskset", taskset, android_tool
+        "taskset", taskset, android_tool, f"--flagfile={MODEL_FLAGFILE_NAME}"
     ]
-    run_cmd += run_args
 
     # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
     # waiting for the adb command to complete as that won't happen.
@@ -286,29 +281,6 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     stdout_redirect = None if self.verbose else subprocess.DEVNULL
     execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
 
-
-  # TODO(#13187): These logics are inherited from the legacy benchmark suites,
-  # which only work for a few specific phones. We should define the topology
-  # in their device specs.
-  def __deduce_taskset_from_run_config(
-      self, run_config: iree_definitions.E2EModelRunConfig) -> str:
-    """Deduces the CPU mask according to device and execution config."""
-
-    device_spec = run_config.target_device_spec
-    # For GPU benchmarks, use the most performant core.
-    if device_spec.architecture.type == common_definitions.ArchitectureType.GPU:
-      return "80"
-
-    device_params = device_spec.device_parameters
-    single_thread = "1-thread" in run_config.module_execution_config.tags
-    if device_parameters.ARM_BIG_CORES in device_params:
-      return "80" if single_thread else "f0"
-    elif device_parameters.ARM_LITTLE_CORES in device_params:
-      return "08" if single_thread else "0f"
-
-    raise ValueError(f"Unsupported config to deduce taskset: '{run_config}'.")
-
-  # TODO(#11076): Remove legacy path.
   def __deduce_taskset(self, bench_mode: Sequence[str]) -> str:
     """Deduces the CPU affinity taskset mask according to benchmark modes."""
     # TODO: we actually should check the number of cores the phone have.
@@ -339,7 +311,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
 
 def set_cpu_frequency_scaling_governor(governor: str):
-  git_root = execute_cmd_and_get_stdout(["git", "rev-parse", "--show-toplevel"])
+  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   cpu_script = (pathlib.Path(git_root) / "build_tools" / "benchmarks" /
                 "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
@@ -347,7 +319,7 @@ def set_cpu_frequency_scaling_governor(governor: str):
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
-  git_root = execute_cmd_and_get_stdout(["git", "rev-parse", "--show-toplevel"])
+  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   device_model = get_android_device_model()
   gpu_name = get_android_gpu_name()
   benchmarks_tool_dir = pathlib.Path(git_root) / "build_tools" / "benchmarks"
@@ -367,24 +339,13 @@ def main(args):
   if args.verbose:
     print(device_info)
 
+  if args.execution_benchmark_config is not None:
+    raise ValueError("Run config option isn't supported yet.")
+
   commit = get_git_commit_hash("HEAD")
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
-  if args.execution_benchmark_config is None:
-    # TODO(#11076): Remove legacy path.
-    benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
-        benchmark_config.root_benchmark_dir)
-  else:
-    benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    benchmark_group = benchmark_groups.get(args.target_device_name)
-    if benchmark_group is None:
-      raise ValueError("Target device not found in the benchmark config.")
-    run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group["run_configs"],
-        root_type=List[iree_definitions.E2EModelRunConfig])
-    benchmark_suite = BenchmarkSuite.load_from_run_configs(
-        run_configs=run_configs,
-        root_benchmark_dir=benchmark_config.root_benchmark_dir)
-
+  benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
+      benchmark_config.root_benchmark_dir)
   benchmark_driver = AndroidBenchmarkDriver(device_info=device_info,
                                             benchmark_config=benchmark_config,
                                             benchmark_suite=benchmark_suite,
@@ -400,12 +361,12 @@ def main(args):
 
   # Clear the benchmark directory on the Android device first just in case
   # there are leftovers from manual or failed runs.
-  execute_cmd_and_get_stdout(["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
+  execute_cmd_and_get_output(["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
                              verbose=args.verbose)
 
   if not args.no_clean:
     # Clear the benchmark directory on the Android device.
-    atexit.register(execute_cmd_and_get_stdout,
+    atexit.register(execute_cmd_and_get_output,
                     ["adb", "shell", "rm", "-rf", ANDROID_TMPDIR],
                     verbose=args.verbose)
     # Also clear temporary directory on the host device.
@@ -415,9 +376,9 @@ def main(args):
   # to capture traces along the way, forward port via adb.
   trace_capture_config = benchmark_config.trace_capture_config
   if trace_capture_config:
-    execute_cmd_and_get_stdout(["adb", "forward", "tcp:8086", "tcp:8086"],
+    execute_cmd_and_get_output(["adb", "forward", "tcp:8086", "tcp:8086"],
                                verbose=args.verbose)
-    atexit.register(execute_cmd_and_get_stdout,
+    atexit.register(execute_cmd_and_get_output,
                     ["adb", "forward", "--remove", "tcp:8086"],
                     verbose=args.verbose)
 
@@ -433,7 +394,7 @@ def main(args):
     print(benchmark_results.benchmarks)
 
   if trace_capture_config:
-    # Put all captures in a tarball and remove the original files.
+    # Put all captures in a tarball and remove the origial files.
     with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
       for capture_filename in benchmark_driver.get_capture_filenames():
         tar.add(capture_filename)

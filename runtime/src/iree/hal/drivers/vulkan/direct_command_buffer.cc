@@ -148,8 +148,17 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
 
 bool iree_hal_vulkan_direct_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_resource_is(&command_buffer->resource,
-                              &iree_hal_vulkan_direct_command_buffer_vtable);
+  return iree_hal_command_buffer_dyn_cast(
+      command_buffer, &iree_hal_vulkan_direct_command_buffer_vtable);
+}
+
+static void* iree_hal_vulkan_direct_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
+  if (vtable == &iree_hal_vulkan_direct_command_buffer_vtable) {
+    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
+    return command_buffer;
+  }
+  return NULL;
 }
 
 static void iree_hal_vulkan_direct_command_buffer_destroy(
@@ -174,11 +183,11 @@ static void iree_hal_vulkan_direct_command_buffer_destroy(
 
 VkCommandBuffer iree_hal_vulkan_direct_command_buffer_handle(
     iree_hal_command_buffer_t* base_command_buffer) {
-  if (!iree_hal_vulkan_direct_command_buffer_isa(base_command_buffer)) {
-    return VK_NULL_HANDLE;
-  }
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
-      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+      (iree_hal_vulkan_direct_command_buffer_t*)
+          iree_hal_command_buffer_dyn_cast(
+              base_command_buffer,
+              &iree_hal_vulkan_direct_command_buffer_vtable);
   return command_buffer->handle;
 }
 
@@ -816,6 +825,7 @@ namespace {
 const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_direct_command_buffer_vtable = {
         /*.destroy=*/iree_hal_vulkan_direct_command_buffer_destroy,
+        /*.dyn_cast=*/iree_hal_vulkan_direct_command_buffer_dyn_cast,
         /*.begin=*/iree_hal_vulkan_direct_command_buffer_begin,
         /*.end=*/iree_hal_vulkan_direct_command_buffer_end,
         /*.begin_debug_group=*/

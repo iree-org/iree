@@ -193,7 +193,6 @@ function(iree_cc_library)
     target_link_libraries(${_NAME}
       PUBLIC
         ${_RULE_DEPS}
-        ${IREE_THREADS_DEPS}
     )
 
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})

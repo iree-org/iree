@@ -11,7 +11,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/hal/utils/allocators.h"
-#include "iree/hal/utils/mpi_channel_provider.h"
 
 //===----------------------------------------------------------------------===//
 // Shared driver registry
@@ -305,29 +304,6 @@ static iree_status_t iree_hal_configure_allocator_from_flags(
 }
 
 //===----------------------------------------------------------------------===//
-// Collectives configuration
-//===----------------------------------------------------------------------===//
-
-// Configures the |device| channel provider based on the current environment.
-// Today this simply checks to see if the process is running under MPI and
-// initializes that unconditionally.
-//
-// WARNING: not thread-safe and must only be called immediately after device
-// creation.
-static iree_status_t iree_hal_configure_collectives_from_flags(
-    iree_hal_device_t* device) {
-  if (!iree_hal_mpi_is_configured()) return iree_ok_status();
-  iree_hal_channel_provider_t* channel_provider = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_mpi_channel_provider_create(
-          iree_hal_device_host_allocator(device), &channel_provider),
-      "creating MPI channel provider as detected in environment");
-  iree_hal_device_replace_channel_provider(device, channel_provider);
-  iree_hal_channel_provider_release(channel_provider);
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
 // Device selection
 //===----------------------------------------------------------------------===//
 
@@ -383,13 +359,6 @@ iree_status_t iree_hal_create_device_from_flags(
   // more easily break the rules.
   iree_status_t status = iree_hal_configure_allocator_from_flags(device);
 
-  // Optionally set a collective channel provider used by devices to initialize
-  // their default channels. Hosting libraries or applications can do the same
-  // to interface with their own implementations.
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_configure_collectives_from_flags(device);
-  }
-
   if (iree_status_is_ok(status)) {
     *out_device = device;
   } else {
@@ -405,15 +374,14 @@ iree_status_t iree_hal_create_device_from_flags(
 
 IREE_FLAG(
     string, device_profiling_mode, "",
-    "HAL device profiling mode (one of ['queue', 'dispatch', 'executable'])\n"
-    "or empty to disable profiling. HAL implementations may require\n"
-    "additional flags in order to configure profiling support on their\n"
-    "devices.");
+    "HAL device profiling mode (one of ['queue', 'dispatch', 'executable']) "
+    "or empty to disable profiling. HAL implementations may require additional "
+    "flags in order to configure profiling support on "
+    "their devices.");
 IREE_FLAG(
     string, device_profiling_file, "",
-    "Optional file path/prefix for profiling file output. Some\n"
-    "implementations may require a file name in order to capture profiling\n"
-    "information.");
+    "Optional file path/prefix for profiling file output. Some implementations "
+    "may require a file name in order to capture profiling information.");
 
 iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
   if (!device) return iree_ok_status();

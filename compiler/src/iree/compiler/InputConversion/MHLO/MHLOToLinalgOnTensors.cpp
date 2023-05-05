@@ -228,14 +228,8 @@ struct OptimizationBarrierOpConversion
   LogicalResult matchAndRewrite(
       mhlo::OptimizationBarrierOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Value> outputs;
-    for (auto operand : adaptor.getOperands()) {
-      outputs.push_back(
-          rewriter
-              .create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), operand)
-              .getResult(0));
-    }
-    rewriter.replaceOp(op, outputs);
+    rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(
+        op, op.getOperands());
     return success();
   }
 };

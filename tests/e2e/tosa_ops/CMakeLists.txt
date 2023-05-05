@@ -199,7 +199,6 @@ iree_check_single_backend_test_suite(
     "maximum.mlir"
     "minimum.mlir"
     "mul.mlir"
-    "mul_shift.mlir"
     "negate.mlir"
     "pad.mlir"
     "reciprocal.mlir"
@@ -253,7 +252,7 @@ iree_check_single_backend_test_suite(
     "maximum.mlir"
     "minimum.mlir"
     "mul.mlir"
-    "mul_shift.mlir"
+    # "mul_shift.mlir"  # TODO(#11571): error: extended arithmetic is not finalized for WGSL
     "negate.mlir"
     "pad.mlir"
     "reciprocal.mlir"

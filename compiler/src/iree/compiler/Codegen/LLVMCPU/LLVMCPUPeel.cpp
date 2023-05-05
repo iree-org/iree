@@ -22,22 +22,19 @@ namespace iree_compiler {
 namespace {
 // Gathers tiled loops that aren't distribution loops from previous tiling
 // stages.
-void collectLoopsToPeel(RewriterBase &rewriter, Operation *op,
+void collectLoopsToPeel(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                         SmallVectorImpl<scf::ForOp> &loopsToPeel) {
-  if (!iree_compiler::getLoweringConfig(op)) return;
+  if (!iree_compiler::getLoweringConfig(linalgOp)) return;
+  if (!linalgOp) return;
 
-  int maxNumLoopsToPeel = TypeSwitch<Operation *, int>(op)
-                              .Case<linalg::LinalgOp>([](auto linalgOp) {
-                                return linalgOp.getNumLoops();
-                              })
-                              .Case<tensor::PackOp>([](auto packOp) {
-                                return packOp.getSourceRank();
-                              })
-                              .Default([](auto) { return 0; });
+  auto maxNumLoopsToPeel = linalgOp.getNumLoops();
+  Operation *currentOp = linalgOp;
   for (int i = 0; i < maxNumLoopsToPeel; ++i) {
-    op = op->getParentOfType<scf::ForOp>();
-    auto loop = llvm::cast_or_null<scf::ForOp>(op);
-    if (!loop || iree_compiler::isTiledAndDistributedLoop(loop)) break;
+    currentOp = currentOp->getParentOfType<scf::ForOp>();
+    auto loop = llvm::cast_or_null<scf::ForOp>(currentOp);
+    if (!loop || iree_compiler::isTiledAndDistributedLoop(loop)) {
+      break;
+    }
     loopsToPeel.push_back(loop);
   }
 
@@ -56,21 +53,17 @@ class LLVMCPUPeelPass : public LLVMCPUPeelBase<LLVMCPUPeelPass> {
 void LLVMCPUPeelPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-  SmallVector<Operation *> candidates;
-  funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp, tensor::PackOp>(op)) {
-      candidates.push_back(op);
-    }
-  });
-  for (auto op : candidates) {
-    LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
+  SmallVector<linalg::LinalgOp> candidates;
+  funcOp.walk([&](linalg::LinalgOp op) { candidates.push_back(op); });
+  for (auto linalgOp : candidates) {
+    LLVM_DEBUG(llvm::dbgs() << "candidate: " << linalgOp << "\n");
 
     IRRewriter rewriter(context);
     IRRewriter::InsertionGuard g(rewriter);
-    rewriter.setInsertionPointAfter(op);
+    rewriter.setInsertionPointAfter(linalgOp);
 
     SmallVector<scf::ForOp> loopsToPeel;
-    collectLoopsToPeel(rewriter, op, loopsToPeel);
+    collectLoopsToPeel(rewriter, linalgOp, loopsToPeel);
     linalg::peelLoops(rewriter, loopsToPeel);
   }
 

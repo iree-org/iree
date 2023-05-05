@@ -4,30 +4,30 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-namespace iree.hal.rocm;
+namespace iree;
 
 // 'ROCM Executable'.
 file_identifier "ROCM";
 file_extension "rocm";
 
 // A struct for the kernel block size along each dimensions.
-struct BlockSizeDef {
+struct ROCMBlockSizeDef {
   x:uint32;
   y:uint32;
   z:uint32;
 }
 
-table ExecutableDef {
+table ROCMExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
   entry_points:[string];
 
   // Block sizes for each entry point.
   //
-  block_sizes:[BlockSizeDef];
+  block_sizes:[ROCMBlockSizeDef];
 
   // HSACO string of the module.
   hsaco_image:string;
 }
 
-root_type ExecutableDef;
+root_type ROCMExecutableDef;

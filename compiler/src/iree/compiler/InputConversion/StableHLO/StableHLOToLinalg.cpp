@@ -8,7 +8,11 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <memory>
+#include <numeric>
+#include <optional>
 #include <string>
+#include <utility>
 
 #include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
@@ -19,6 +23,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -28,6 +33,7 @@
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -39,6 +45,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -50,6 +57,9 @@ namespace mlir::iree_compiler::stablehlo {
 #include "iree/compiler/InputConversion/StableHLO/Passes.h.inc"
 
 namespace {
+
+namespace stablehlo = mlir::stablehlo;
+
 Value getResultValue(Operation* op) { return op->getResult(0); }
 
 ShapedType getHloOpResultType(Operation* op) {
@@ -76,12 +86,11 @@ Value extractIndexFromTensor(OpBuilder& builder, Location loc, Value tensor,
 
 // Pass to lower from rng to stateless pseudo RNG with LCG
 // algorithm
-struct RngUniformConversion
-    : public OpConversionPattern<mlir::stablehlo::RngOp> {
-  using OpConversionPattern<mlir::stablehlo::RngOp>::OpConversionPattern;
+struct RngUniformConversion : public OpConversionPattern<stablehlo::RngOp> {
+  using OpConversionPattern<stablehlo::RngOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::RngOp op, OpAdaptor adaptor,
+      stablehlo::RngOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     // We only handle uniform distributions
     if (op.getRngDistribution() !=
@@ -256,12 +265,12 @@ SmallVector<AffineExpr> getExprFromConfig(
 // {lhs:["a","b","c"], rhs:["c","d"], out:["a","b","d"]} = {lhs:[d0,d1,d2],
 // rhs:[d2,d3], out:[d0,d1,d3]}.
 class EinsumToLinalgConverter
-    : public OpConversionPattern<mlir::stablehlo::EinsumOp> {
+    : public OpConversionPattern<stablehlo::EinsumOp> {
  public:
-  using OpConversionPattern<mlir::stablehlo::EinsumOp>::OpConversionPattern;
+  using OpConversionPattern<stablehlo::EinsumOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::EinsumOp op, OpAdaptor adaptor,
+      stablehlo::EinsumOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     auto getRank = [](Value v) {
       return v.getType().cast<ShapedType>().getRank();
@@ -528,11 +537,11 @@ class BroadcastConverter
 };
 
 class BroadcastOpToBroadcastConverter
-    : public OpConversionPattern<mlir::stablehlo::BroadcastOp> {
-  using OpConversionPattern<mlir::stablehlo::BroadcastOp>::OpConversionPattern;
+    : public OpConversionPattern<stablehlo::BroadcastOp> {
+  using OpConversionPattern<stablehlo::BroadcastOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::BroadcastOp op, OpAdaptor adaptor,
+      stablehlo::BroadcastOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
     auto resultTy = typeConverter->convertType(op.getType()).cast<ShapedType>();
 
@@ -553,14 +562,14 @@ class BroadcastOpToBroadcastConverter
 
 class HloBroadcastInDimConverter
     : public DataMovementOpConverter<HloBroadcastInDimConverter,
-                                     mlir::stablehlo::BroadcastInDimOp> {
+                                     stablehlo::BroadcastInDimOp> {
  public:
   using DataMovementOpConverter<
       HloBroadcastInDimConverter,
-      mlir::stablehlo::BroadcastInDimOp>::DataMovementOpConverter;
+      stablehlo::BroadcastInDimOp>::DataMovementOpConverter;
 
   static SmallVector<AffineMap, 2> getIndexingMaps(
-      mlir::stablehlo::BroadcastInDimOp broadcastOp, Builder* b) {
+      stablehlo::BroadcastInDimOp broadcastOp, Builder* b) {
     auto resultType = getHloOpResultType(broadcastOp);
     auto operandType =
         broadcastOp.getOperand().getType().template cast<ShapedType>();
@@ -656,20 +665,19 @@ Value transposeBroadcastOperand(PatternRewriter& rewriter, Location loc,
   }
   dimensions = transposedDimensions;
 
-  return rewriter.create<mlir::stablehlo::TransposeOp>(
+  return rewriter.create<stablehlo::TransposeOp>(
       loc,
       RankedTensorType::get(transposedOperandShape, operandTy.getElementType()),
       operand, rewriter.getI64VectorAttr(permutation));
 }
 
 class BroadcastInDimOpToBroadcastConverter
-    : public OpConversionPattern<mlir::stablehlo::BroadcastInDimOp> {
+    : public OpConversionPattern<stablehlo::BroadcastInDimOp> {
  public:
-  using OpConversionPattern<
-      mlir::stablehlo::BroadcastInDimOp>::OpConversionPattern;
+  using OpConversionPattern<stablehlo::BroadcastInDimOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::BroadcastInDimOp op, OpAdaptor adaptor,
+      stablehlo::BroadcastInDimOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
     Location loc = op.getLoc();
 
@@ -718,13 +726,13 @@ class BroadcastInDimOpToBroadcastConverter
 // pattern (`mhlo.constant` -> `mhlo.dynamic_broadcast_in_dim`) should be
 // converted to a tensor dialect op similar to TF's `ConstantLikeOp`.
 class HloDynamicBroadcastInDimConverter
-    : public OpConversionPattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+    : public OpConversionPattern<stablehlo::DynamicBroadcastInDimOp> {
  public:
   using OpConversionPattern<
-      mlir::stablehlo::DynamicBroadcastInDimOp>::OpConversionPattern;
+      stablehlo::DynamicBroadcastInDimOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::DynamicBroadcastInDimOp op, OpAdaptor adaptor,
+      stablehlo::DynamicBroadcastInDimOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     Value operand = adaptor.getOperand();
     auto operandType = operand.getType().dyn_cast<RankedTensorType>();
@@ -793,13 +801,13 @@ class HloDynamicBroadcastInDimConverter
 };
 
 class DynamicBroadcastInDimOpToBroadcastConverter
-    : public OpConversionPattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+    : public OpConversionPattern<stablehlo::DynamicBroadcastInDimOp> {
  public:
   using OpConversionPattern<
-      mlir::stablehlo::DynamicBroadcastInDimOp>::OpConversionPattern;
+      stablehlo::DynamicBroadcastInDimOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::DynamicBroadcastInDimOp op, OpAdaptor adaptor,
+      stablehlo::DynamicBroadcastInDimOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     Location loc = op.getLoc();
 
@@ -938,11 +946,11 @@ class TransposeConverter
 };
 
 class TransposeOpToTransposeConverter
-    : public OpConversionPattern<mlir::stablehlo::TransposeOp> {
-  using OpConversionPattern<mlir::stablehlo::TransposeOp>::OpConversionPattern;
+    : public OpConversionPattern<stablehlo::TransposeOp> {
+  using OpConversionPattern<stablehlo::TransposeOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::TransposeOp op, OpAdaptor adaptor,
+      stablehlo::TransposeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
     auto resultTy = typeConverter->convertType(op.getType()).cast<ShapedType>();
 
@@ -961,11 +969,11 @@ class TransposeOpToTransposeConverter
 };
 
 class BitcastConvertConverter
-    : public OpConversionPattern<mlir::stablehlo::BitcastConvertOp> {
+    : public OpConversionPattern<stablehlo::BitcastConvertOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::BitcastConvertOp op, OpAdaptor adaptor,
+      stablehlo::BitcastConvertOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) return failure();
 
@@ -1065,10 +1073,9 @@ class BitcastConvertConverter
 // Lowers mhlo.RealDynamicSliceOp to tensor.extract_slice and other
 // arith/tensor dialect ops.
 class RealDynamicSliceConverter
-    : public OpConversionPattern<mlir::stablehlo::RealDynamicSliceOp> {
+    : public OpConversionPattern<stablehlo::RealDynamicSliceOp> {
  public:
-  using OpConversionPattern<
-      mlir::stablehlo::RealDynamicSliceOp>::OpConversionPattern;
+  using OpConversionPattern<stablehlo::RealDynamicSliceOp>::OpConversionPattern;
 
   // Computes size of a slice as
   //   size = ceil((limit - start)/stride)
@@ -1081,7 +1088,7 @@ class RealDynamicSliceConverter
   }
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::RealDynamicSliceOp realDynamicSliceOp, OpAdaptor adaptor,
+      stablehlo::RealDynamicSliceOp realDynamicSliceOp, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     Location loc = realDynamicSliceOp.getLoc();
     auto argType = adaptor.getOperand().getType().dyn_cast<ShapedType>();
@@ -1164,14 +1171,12 @@ class RealDynamicSliceConverter
 
 // Converts reshape ops that can be proven to be either a collapse of dimensions
 // or expansion of dimensions of the operand.
-class ReshapeOpConverter
-    : public OpConversionPattern<mlir::stablehlo::ReshapeOp> {
+class ReshapeOpConverter : public OpConversionPattern<stablehlo::ReshapeOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::ReshapeOp reshapeOp,
-      mlir::stablehlo::ReshapeOp::Adaptor adaptor,
+      stablehlo::ReshapeOp reshapeOp, stablehlo::ReshapeOp::Adaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(reshapeOp))) return failure();
     auto operand = adaptor.getOperand();
@@ -1322,10 +1327,9 @@ class IotaConverter : public OpConversionPattern<OpTy> {
               nestedBuilder.getIntegerType(
                   unwrappedResultElementType.getIntOrFloatBitWidth()),
               indexOp);
-          castOp = mlir::stablehlo::StableHloOpToStdScalarOp::mapOpOfType<
-              mlir::stablehlo::ConvertOp>(nestedLoc, resultElementType,
-                                          castOp.getType(), {castOp},
-                                          &nestedBuilder);
+          castOp = stablehlo::StableHloOpToStdScalarOp::mapOpOfType<
+              stablehlo::ConvertOp>(nestedLoc, resultElementType,
+                                    castOp.getType(), {castOp}, &nestedBuilder);
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, castOp);
         },
         linalg::getPrunedAttributeList(iotaOp));
@@ -1358,10 +1362,10 @@ class IotaToMapConverter : public OpConversionPattern<OpTy> {
               nestedLoc, iotaOp.getIotaDimension());
           index = nestedBuilder.create<arith::IndexCastOp>(
               nestedLoc, nestedBuilder.getI64Type(), index);
-          Value result = mlir::stablehlo::StableHloOpToStdScalarOp::mapOpOfType<
-              mlir::stablehlo::ConvertOp>(nestedLoc, resultTy.getElementType(),
-                                          index.getType(), {ValueRange{index}},
-                                          &nestedBuilder);
+          Value result = stablehlo::StableHloOpToStdScalarOp::mapOpOfType<
+              stablehlo::ConvertOp>(nestedLoc, resultTy.getElementType(),
+                                    index.getType(), {ValueRange{index}},
+                                    &nestedBuilder);
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, ValueRange{result});
         },
         linalg::getPrunedAttributeList(iotaOp));
@@ -1372,11 +1376,11 @@ class IotaToMapConverter : public OpConversionPattern<OpTy> {
 
 /// Converts stablehlo.concatenate operation to a linalg.generic op.
 struct ConcatenateConverter
-    : public OpConversionPattern<mlir::stablehlo::ConcatenateOp> {
+    : public OpConversionPattern<stablehlo::ConcatenateOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::ConcatenateOp op, OpAdaptor adaptor,
+      stablehlo::ConcatenateOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
     // Shortcut the one-operand case, simplifies code below.
     if (adaptor.getOperands().size() == 1) {
@@ -1460,13 +1464,12 @@ struct ConcatenateConverter
   }
 };
 
-class ConstConverterTensor
-    : public OpConversionPattern<mlir::stablehlo::ConstantOp> {
+class ConstConverterTensor : public OpConversionPattern<stablehlo::ConstantOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::ConstantOp constOp, OpAdaptor /*adaptor*/,
+      stablehlo::ConstantOp constOp, OpAdaptor /*adaptor*/,
       ConversionPatternRewriter& rewriter) const final {
     auto valueAttr = constOp.getValue().cast<DenseElementsAttr>();
     auto type =
@@ -1483,13 +1486,12 @@ class ConstConverterTensor
 
 // TODO(b/156787842): Support the lowering for dynamic shapes.
 class ReverseConverter
-    : public DataMovementOpConverter<ReverseConverter,
-                                     mlir::stablehlo::ReverseOp> {
+    : public DataMovementOpConverter<ReverseConverter, stablehlo::ReverseOp> {
  public:
-  using DataMovementOpConverter<
-      ReverseConverter, mlir::stablehlo::ReverseOp>::DataMovementOpConverter;
-  static SmallVector<AffineMap, 2> getIndexingMaps(
-      mlir::stablehlo::ReverseOp op, Builder* b) {
+  using DataMovementOpConverter<ReverseConverter,
+                                stablehlo::ReverseOp>::DataMovementOpConverter;
+  static SmallVector<AffineMap, 2> getIndexingMaps(stablehlo::ReverseOp op,
+                                                   Builder* b) {
     auto resultType = getHloOpResultType(op).cast<ShapedType>();
     auto nloops = resultType.getRank();
     SmallVector<AffineExpr, 2> inputExprs;
@@ -1508,13 +1510,12 @@ class ReverseConverter
   }
 };
 
-class SliceConverter : public OpConversionPattern<mlir::stablehlo::SliceOp> {
+class SliceConverter : public OpConversionPattern<stablehlo::SliceOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::SliceOp sliceOp,
-      typename mlir::stablehlo::SliceOp::Adaptor adaptor,
+      stablehlo::SliceOp sliceOp, typename stablehlo::SliceOp::Adaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     auto argType = adaptor.getOperands()[0].getType().dyn_cast<ShapedType>();
     if (!argType || !argType.hasRank()) {
@@ -1542,13 +1543,12 @@ class SliceConverter : public OpConversionPattern<mlir::stablehlo::SliceOp> {
 };
 
 class DynamicSliceConverter
-    : public OpConversionPattern<mlir::stablehlo::DynamicSliceOp> {
+    : public OpConversionPattern<stablehlo::DynamicSliceOp> {
  public:
-  using OpConversionPattern<
-      mlir::stablehlo::DynamicSliceOp>::OpConversionPattern;
+  using OpConversionPattern<stablehlo::DynamicSliceOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::DynamicSliceOp dynamicSliceOp, OpAdaptor adaptor,
+      stablehlo::DynamicSliceOp dynamicSliceOp, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     auto loc = dynamicSliceOp.getLoc();
     auto argType = adaptor.getOperand().getType().dyn_cast<ShapedType>();
@@ -1558,8 +1558,8 @@ class DynamicSliceConverter
     }
 
     SmallVector<OpFoldResult, 3> startIndices, sizes;
-    auto originalStartIndexType =
-        dynamicSliceOp.getStartIndices().front().getType().cast<ShapedType>();
+    Type originalStartIndexType =
+        dynamicSliceOp.getStartIndices().front().getType();
     for (const auto& en : llvm::enumerate(
              llvm::zip(adaptor.getStartIndices(),
                        dynamicSliceOp.getSliceSizes().getValues<int64_t>()))) {
@@ -1599,13 +1599,13 @@ class DynamicSliceConverter
 };
 
 class DynamicUpdateSliceConverter
-    : public OpConversionPattern<mlir::stablehlo::DynamicUpdateSliceOp> {
+    : public OpConversionPattern<stablehlo::DynamicUpdateSliceOp> {
  public:
   using OpConversionPattern<
-      mlir::stablehlo::DynamicUpdateSliceOp>::OpConversionPattern;
+      stablehlo::DynamicUpdateSliceOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::DynamicUpdateSliceOp op, OpAdaptor adaptor,
+      stablehlo::DynamicUpdateSliceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     auto loc = op.getLoc();
     auto operandType =
@@ -1636,9 +1636,9 @@ class DynamicUpdateSliceConverter
       // By mhlo.DynamicUpdateSlice definition:
       //   `start_indices[i] = clamp(start_indices[i],
       //       0, operand.dimension_size[i] - update.dimension_size[i])`
-      Value startIndex = extractIndexFromTensor(
-          rewriter, loc, en.value(),
-          cast<ShapedType>(op.getStartIndices()[en.index()].getType()));
+      Value startIndex =
+          extractIndexFromTensor(rewriter, loc, en.value(),
+                                 op.getStartIndices()[en.index()].getType());
       Value ub = rewriter.create<arith::ConstantIndexOp>(
           loc, operandType.getDimSize(en.index()) -
                    updateType.getDimSize(en.index()));
@@ -1657,12 +1657,11 @@ class DynamicUpdateSliceConverter
   }
 };
 
-class MapOpToGenericConverter
-    : public OpConversionPattern<mlir::stablehlo::MapOp> {
+class MapOpToGenericConverter : public OpConversionPattern<stablehlo::MapOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::MapOp op, OpAdaptor adaptor,
+      stablehlo::MapOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) return failure();
 
@@ -1705,11 +1704,11 @@ class MapOpToGenericConverter
   }
 };
 
-class MapOpToMapConverter : public OpConversionPattern<mlir::stablehlo::MapOp> {
+class MapOpToMapConverter : public OpConversionPattern<stablehlo::MapOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::MapOp op, OpAdaptor adaptor,
+      stablehlo::MapOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     if (failed(verifyHloOpBufferOrTensorSemantics(op))) return failure();
 
@@ -1724,7 +1723,7 @@ class MapOpToMapConverter : public OpConversionPattern<mlir::stablehlo::MapOp> {
     for (Value operand : llvm::drop_begin(adaptor.getOperands(), 1)) {
       coercedOperands.push_back(coerceTensorShape(
           rewriter, loc, cast<TypedValue<ShapedType>>(operand),
-          cast<ShapedType>(operand0.getType())));
+          operand0.getType()));
     }
     Value output = rewriter.create<tensor::EmptyOp>(
         loc, tensor::getMixedSizes(rewriter, loc, operand0),
@@ -1760,12 +1759,11 @@ class MapOpToMapConverter : public OpConversionPattern<mlir::stablehlo::MapOp> {
 /// The current version computes the scattered index and populates the correct
 /// value for each tile. It does not currently handle overlapping tiles.
 struct SelectAndScatterNoOverlapConverter
-    : public OpConversionPattern<mlir::stablehlo::SelectAndScatterOp> {
-  using OpConversionPattern<
-      mlir::stablehlo::SelectAndScatterOp>::OpConversionPattern;
+    : public OpConversionPattern<stablehlo::SelectAndScatterOp> {
+  using OpConversionPattern<stablehlo::SelectAndScatterOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::SelectAndScatterOp op, OpAdaptor adaptor,
+      stablehlo::SelectAndScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     Location loc = op.getLoc();
     ImplicitLocOpBuilder b(loc, rewriter);
@@ -2119,11 +2117,11 @@ struct SelectAndScatterNoOverlapConverter
 // Decomposes a pad with negative edge padding into a pad without negative edge
 // padding and a tensor.extract_slice.
 struct PadOpNegativePaddingConversion
-    : public OpConversionPattern<mlir::stablehlo::PadOp> {
+    : public OpConversionPattern<stablehlo::PadOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::PadOp op, OpAdaptor adaptor,
+      stablehlo::PadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
     SmallVector<int64_t, 4> padLow;
     SmallVector<int64_t, 4> padHigh;
@@ -2154,7 +2152,7 @@ struct PadOpNegativePaddingConversion
     if (!hasNegativePadding) return failure();
 
     // Create a new pad op with the positive values.
-    Value pad = rewriter.create<mlir::stablehlo::PadOp>(
+    Value pad = rewriter.create<stablehlo::PadOp>(
         op.getLoc(), adaptor.getOperand(), adaptor.getPaddingValue(),
         rewriter.getI64TensorAttr(padLow), rewriter.getI64TensorAttr(padHigh),
         op.getInteriorPadding());
@@ -2174,11 +2172,11 @@ struct PadOpNegativePaddingConversion
 };
 
 /// Converts mhlo.pad operation to tensor.pad or tensor.insert_slice.
-struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
+struct PadOpConversion : public OpConversionPattern<stablehlo::PadOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::PadOp op, OpAdaptor adaptor,
+      stablehlo::PadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const override {
     auto loc = op.getLoc();
     auto resultType = typeConverter->convertType(op.getResult().getType());
@@ -2208,8 +2206,8 @@ struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
 
     // We have interior padding, which can be lowered to tensor.insert_slice.
     // Start by filling a result-sized tensor with the pad value.
-    auto emptyTensor = getEmptyTensorFor(
-        rewriter, loc, cast<ShapedType>(resultType), op, adaptor.getOperands());
+    auto emptyTensor =
+        getEmptyTensorFor(rewriter, loc, resultType, op, adaptor.getOperands());
     auto fill =
         rewriter.create<linalg::FillOp>(loc, paddingVal, emptyTensor).result();
 
@@ -2239,11 +2237,11 @@ struct PadOpConversion : public OpConversionPattern<mlir::stablehlo::PadOp> {
 
 /// Converts xla-hlo.torch_index_select op to a linalg.generic op.
 struct TorchIndexSelectOpConversion
-    : public OpConversionPattern<mlir::stablehlo::TorchIndexSelectOp> {
+    : public OpConversionPattern<stablehlo::TorchIndexSelectOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::TorchIndexSelectOp op, OpAdaptor adaptor,
+      stablehlo::TorchIndexSelectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     int axis = static_cast<int>(op.getDim());
     int batch = static_cast<int>(op.getBatchDims());
@@ -2361,12 +2359,12 @@ struct TorchIndexSelectOpConversion
 };
 
 class SetDimensionSizeConverter
-    : public OpConversionPattern<mlir::stablehlo::SetDimensionSizeOp> {
+    : public OpConversionPattern<stablehlo::SetDimensionSizeOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::stablehlo::SetDimensionSizeOp setDimensionSizeOp, OpAdaptor adaptor,
+      stablehlo::SetDimensionSizeOp setDimensionSizeOp, OpAdaptor adaptor,
       ConversionPatternRewriter& rewriter) const final {
     // We can lower SetDimensionSize to tensor extract. This turns into a
     // regular dynamic shape. Note that the bounds annotation is still around
@@ -2463,27 +2461,27 @@ void populateStableHloToLinalgConversionPatterns(MLIRContext* context,
       BroadcastInDimOpToBroadcastConverter,
       BroadcastOpToBroadcastConverter,
       DynamicBroadcastInDimOpToBroadcastConverter,
-      IotaToMapConverter<mlir::stablehlo::IotaOp>,
-      IotaToMapConverter<mlir::stablehlo::DynamicIotaOp>,
+      IotaToMapConverter<stablehlo::IotaOp>,
+      IotaToMapConverter<stablehlo::DynamicIotaOp>,
       MapOpToMapConverter,
       TransposeOpToTransposeConverter
     >(typeConverter, context);
   } else {
     patterns->add<
-      BroadcastConverter<mlir::stablehlo::BroadcastOp>,
-      IotaConverter<mlir::stablehlo::IotaOp>,
-      IotaConverter<mlir::stablehlo::DynamicIotaOp>,
+      BroadcastConverter<stablehlo::BroadcastOp>,
+      IotaConverter<stablehlo::IotaOp>,
+      IotaConverter<stablehlo::DynamicIotaOp>,
       HloBroadcastInDimConverter,
       HloDynamicBroadcastInDimConverter,
       MapOpToGenericConverter,
-      TransposeConverter<mlir::stablehlo::TransposeOp>
+      TransposeConverter<stablehlo::TransposeOp>
     >(typeConverter, context);
   }
 
   // clang-format on
 
-  detail::populateStableHloConvolutionToLinalgConversionPatterns(
-      context, typeConverter, patterns);
+  // TODO(#12678): Handle the convolution.
+
   detail::populateStableHloDotProdToLinalgConversionPatterns(
       context, typeConverter, patterns);
   detail::populateStableHloRandomToLinalgConversionPatterns(

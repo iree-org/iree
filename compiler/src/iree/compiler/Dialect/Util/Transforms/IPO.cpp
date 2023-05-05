@@ -363,9 +363,8 @@ static void replaceValueWithConstant(Value value, LocAttr constantValue,
   // themselves.
   if (arith::ConstantOp::isBuildableWith(constantValue.attr,
                                          constantValue.type)) {
-    op = builder.create<arith::ConstantOp>(constantValue.loc.value(),
-                                           constantValue.type,
-                                           cast<TypedAttr>(constantValue.attr));
+    op = builder.create<arith::ConstantOp>(
+        constantValue.loc.value(), constantValue.attr, constantValue.type);
   }
 
   // Try the attr and type dialects to see if they can materialize.

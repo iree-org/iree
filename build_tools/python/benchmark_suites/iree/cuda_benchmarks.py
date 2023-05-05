@@ -56,7 +56,7 @@ class Linux_CUDA_Benchmarks(object):
         for model in models
     ]
     sm80_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-        architecture=common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
+        architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64)
     run_module_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=gen_configs,
@@ -73,21 +73,18 @@ class Linux_CUDA_Benchmarks(object):
     """Generates IREE compile and run configs."""
     gen_configs, run_configs = self._generate_configs(model_groups.CUDA_MODELS,
                                                       self.SM_80_COMPILE_CONFIG)
-    # The `cuda` tag is required to put them into the CUDA benchmark preset.
     ubench_gen_configs, ubench_run_configs = self._generate_configs(
         model_groups.MICRO_MATMUL,
         self.SM_80_UBENCH_MATMUL_COMPILE_CONFIG,
-        execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
-        run_tags=["cuda"])
+        execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG)
     ubench_splitk_gen_configs, ubench_splitk_run_configs = self._generate_configs(
         model_groups.MICRO_MATMUL_SPLITK,
         self.SM_80_UBENCH_MATMUL_SPLITK_COMPILE_CONFIG,
-        execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
-        run_tags=["cuda"])
+        execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG)
     long_running_gen_configs, long_running_module_configs = self._generate_configs(
         model_groups.CUDA_MODELS_LONG,
         self.SM_80_COMPILE_CONFIG,
-        run_tags=["cuda", "long-running"])
+        run_tags=["long-running"])
     return (gen_configs + ubench_gen_configs + ubench_splitk_gen_configs +
             long_running_gen_configs, run_configs + ubench_run_configs +
             ubench_splitk_run_configs + long_running_module_configs)

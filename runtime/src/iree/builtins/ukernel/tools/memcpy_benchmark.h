@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
-void iree_uk_benchmark_register_memcpy(int64_t working_set_size);
+void iree_uk_benchmark_register_memcpy(int64_t working_set_size,
+                                       int64_t batch_min_traversal_size);
 
 #endif  // IREE_BUILTINS_UKERNEL_TOOLS_MEMCPY_BENCHMARK_H_

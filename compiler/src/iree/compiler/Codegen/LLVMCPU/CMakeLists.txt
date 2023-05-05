@@ -106,7 +106,6 @@ iree_cc_library(
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
-    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::TransformDialectStrategies::CPU::TransformDialectStrategies
     iree::compiler::Codegen::Transforms
@@ -117,7 +116,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::Util::IR
-    iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
     iree::schemas::instruments
   PUBLIC

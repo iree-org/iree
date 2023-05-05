@@ -49,8 +49,7 @@ static llvm::cl::opt<bool> clEnableWorkgroupSpecialization(
     "iree-codegen-enable-workgroup-specialization",
     llvm::cl::desc("Enable workgroup specialization."), llvm::cl::init(true));
 
-static std::optional<int64_t> getConstantLowerBound(
-    affine::AffineMinOp affineMinOp) {
+static std::optional<int64_t> getConstantLowerBound(AffineMinOp affineMinOp) {
   for (AffineExpr expr : affineMinOp.getMap().getResults()) {
     if (auto cst = expr.dyn_cast<AffineConstantExpr>()) {
       return cst.getValue();
@@ -75,10 +74,10 @@ static std::optional<int64_t> getConstantLowerBound(
 // 3. Create a condition that ANDs all the affineMin == constant
 // 4. Splice the rest of the block and clone into a specialized if/else
 static void specializeFunction(func::FuncOp funcOp) {
-  SmallVector<affine::AffineMinOp> minSizeOps;
+  SmallVector<AffineMinOp> minSizeOps;
   SmallVector<Operation *> ids;
   funcOp.walk([&minSizeOps, &ids](Operation *op) {
-    if (auto affineMin = dyn_cast<affine::AffineMinOp>(op)) {
+    if (auto affineMin = dyn_cast<AffineMinOp>(op)) {
       for (Value operand : affineMin->getOperands()) {
         if (!operand.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>()) {
           return WalkResult::advance();
@@ -103,7 +102,7 @@ static void specializeFunction(func::FuncOp funcOp) {
   OpBuilder::InsertionGuard guard(builder);
   // Move ops at the top of the function. This is always correct as those only
   // depends on workgroup ids.
-  for (affine::AffineMinOp affineMin : llvm::reverse(minSizeOps)) {
+  for (AffineMinOp affineMin : llvm::reverse(minSizeOps)) {
     affineMin->moveBefore(&block->front());
   }
   for (Operation *id : llvm::reverse(ids)) {
@@ -114,7 +113,7 @@ static void specializeFunction(func::FuncOp funcOp) {
   Value cond;
   SmallVector<Value> constantOps;  // ConstantIndexOps for tile sizes
   for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
-    affine::AffineMinOp minOp = minSizeOps[i];
+    AffineMinOp minOp = minSizeOps[i];
     int64_t lowerBound = *getConstantLowerBound(minOp);
     // Generate a compare op that checks the dynamic size is equal to the
     // constant main tile size.
@@ -154,8 +153,8 @@ namespace {
 struct WorkgroupSpecializationPass
     : public WorkgroupSpecializationBase<WorkgroupSpecializationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<AffineDialect, linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
 
   void runOnOperation() override {

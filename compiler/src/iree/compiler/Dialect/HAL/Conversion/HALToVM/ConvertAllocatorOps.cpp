@@ -36,9 +36,9 @@ class AllocatorAllocateInitializedOpConversion
         ArrayRef<Value>{
             adaptor.getAllocator(),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getMemoryTypesAttr().getInt()),
+                op.getLoc(), op.getMemoryTypesAttr()),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getBufferUsageAttr().getInt()),
+                op.getLoc(), op.getBufferUsageAttr()),
             adaptor.getSource(),
             castToImportType(adaptor.getOffset(), rewriter.getI64Type(),
                              rewriter),
@@ -76,9 +76,9 @@ class AllocatorTryMapOpConversion
             adaptor.getAllocator(),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), /*try=*/1),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getMemoryTypesAttr().getInt()),
+                op.getLoc(), op.getMemoryTypesAttr()),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(
-                op.getLoc(), op.getBufferUsageAttr().getInt()),
+                op.getLoc(), op.getBufferUsageAttr()),
             adaptor.getSource(),
             castToImportType(adaptor.getOffset(), rewriter.getI64Type(),
                              rewriter),

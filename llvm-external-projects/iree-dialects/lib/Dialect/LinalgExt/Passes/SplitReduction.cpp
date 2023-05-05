@@ -149,7 +149,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
-  TypedAttr negInfAttr;
+  Attribute negInfAttr;
   if (auto intType = valueElementType.dyn_cast<IntegerType>()) {
     negInfAttr = rewriter.getIntegerAttr(
         intType, APInt::getSignedMinValue(intType.getWidth()));
@@ -160,7 +160,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
     negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
   }
   Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
-  TypedAttr posInfAttr =
+  Attribute posInfAttr =
       rewriter.getIntegerAttr(indicesElementType, APInt::getSignedMaxValue(32));
   Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
   Value negInfTensor =

@@ -19,8 +19,7 @@ namespace {
 struct SPIRVVectorToGPUSubgroupMMAPass final
     : public SPIRVVectorToGPUSubgroupMMABase<SPIRVVectorToGPUSubgroupMMAPass> {
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<affine::AffineDialect, gpu::GPUDialect,
-                    memref::MemRefDialect>();
+    registry.insert<AffineDialect, gpu::GPUDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {

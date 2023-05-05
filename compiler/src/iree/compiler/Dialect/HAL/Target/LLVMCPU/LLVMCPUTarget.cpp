@@ -320,9 +320,10 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       std::string sourceFile = "";
       int sourceLine = 0;
       if (options.debugLevel >= 1) {
-        if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
-          sourceFile = loc->getFilename().str();
-          sourceLine = loc->getLine();
+        // TODO(scotttodd): Copy findFirstFileLoc() from VulkanSPIRVTarget?
+        if (auto loc = exportOp.getLoc().dyn_cast<FileLineColLoc>()) {
+          sourceFile = loc.getFilename().str();
+          sourceLine = loc.getLine();
         }
       }
       libraryBuilder.addExport(

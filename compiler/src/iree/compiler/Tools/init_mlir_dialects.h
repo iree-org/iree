@@ -47,7 +47,7 @@ namespace mlir {
 // Add all the MLIR dialects to the provided registry.
 inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format off
-  registry.insert<affine::AffineDialect,
+  registry.insert<AffineDialect,
                   bufferization::BufferizationDialect,
                   cf::ControlFlowDialect,
                   complex::ComplexDialect,

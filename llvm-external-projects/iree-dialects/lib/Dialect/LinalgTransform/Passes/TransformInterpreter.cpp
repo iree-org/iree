@@ -56,7 +56,7 @@ public:
     // clang-format off
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
                     arith::ArithDialect,
-                    affine::AffineDialect,
+                    AffineDialect,
                     bufferization::BufferizationDialect,
                     func::FuncDialect,
                     linalg::LinalgDialect,

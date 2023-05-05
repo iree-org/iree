@@ -21,7 +21,6 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 #include "spirv-tools/libspirv.hpp"
 
@@ -109,12 +108,6 @@ class WebGPUTargetBackend : public TargetBackend {
     // Therefore, just let the SPIR-V CodeGen to avoid generating guards w.r.t.
     // NaN and infinity.
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/true);
-
-    // WGSL does not support extended multiplication:
-    // https://github.com/gpuweb/gpuweb/issues/1565. Make sure to lower it to
-    // regular multiplication before we convert SPIR-V to WGSL.
-    passManager.nest<ModuleOp>().nest<spirv::ModuleOp>().addPass(
-        spirv::createSPIRVWebGPUPreparePass());
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
@@ -207,23 +200,23 @@ class WebGPUTargetBackend : public TargetBackend {
 
     // Pack the WGSL and metadata into a FlatBuffer.
     FlatbufferBuilder builder;
-    iree_hal_wgsl_ExecutableDef_start_as_root(builder);
+    iree_WGSLExecutableDef_start_as_root(builder);
 
-    iree_hal_wgsl_ShaderModuleDef_start(builder);
+    iree_WGSLShaderModuleDef_start(builder);
     auto wgslRef = builder.createString(wgsl.value());
-    iree_hal_wgsl_ShaderModuleDef_code_add(builder, wgslRef);
+    iree_WGSLShaderModuleDef_code_add(builder, wgslRef);
     // TODO(scotttodd): populate source map
-    auto shaderModuleRef = iree_hal_wgsl_ShaderModuleDef_end(builder);
+    auto shaderModuleRef = iree_WGSLShaderModuleDef_end(builder);
 
-    auto shaderModulesVec = iree_hal_wgsl_ShaderModuleDef_vec_create(
+    auto shaderModulesVec = iree_WGSLShaderModuleDef_vec_create(
         builder, &shaderModuleRef, /*len=*/1);
-    iree_hal_wgsl_ExecutableDef_shader_modules_add(builder, shaderModulesVec);
+    iree_WGSLExecutableDef_shader_modules_add(builder, shaderModulesVec);
 
     auto entryPointsRef = flatbuffers_uint32_vec_create(
         builder, entryPointOrdinals.data(), entryPointOrdinals.size());
-    iree_hal_wgsl_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_WGSLExecutableDef_entry_points_add(builder, entryPointsRef);
 
-    iree_hal_wgsl_ExecutableDef_end_as_root(builder);
+    iree_WGSLExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
