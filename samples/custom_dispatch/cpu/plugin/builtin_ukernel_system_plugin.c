@@ -40,13 +40,13 @@ static int iree_uk_mmt4d_plugin(void* context, void* params_ptr,
 }
 
 static int iree_uk_pack_plugin(void* context, void* params_ptr,
-                                void* reserved) {
+                               void* reserved) {
   iree_uk_pack((const iree_uk_pack_params_t*)params_ptr);
   return 0;
 }
 
 static int iree_uk_unpack_plugin(void* context, void* params_ptr,
-                                void* reserved) {
+                                 void* reserved) {
   iree_uk_unpack((const iree_uk_unpack_params_t*)params_ptr);
   return 0;
 }

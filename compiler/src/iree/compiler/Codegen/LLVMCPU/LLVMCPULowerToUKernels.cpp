@@ -79,9 +79,11 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 0);
   Value k = rewriter.create<tensor::DimOp>(loc, rhs, 1);
 
-  auto getDimAsI32 = [](RewriterBase& rewriter, Location loc, Value value, int dim) -> Value {
-    return rewriter.create<arith::IndexCastOp>(loc, rewriter.getI32Type(),
-                                                     rewriter.create<tensor::DimOp>(loc, value, dim));
+  auto getDimAsI32 = [](RewriterBase &rewriter, Location loc, Value value,
+                        int dim) -> Value {
+    return rewriter.create<arith::IndexCastOp>(
+        loc, rewriter.getI32Type(),
+        rewriter.create<tensor::DimOp>(loc, value, dim));
   };
   Value m0 = getDimAsI32(rewriter, loc, lhs, 2);
   Value n0 = getDimAsI32(rewriter, loc, rhs, 2);
