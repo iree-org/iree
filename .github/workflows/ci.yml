@@ -83,14 +83,7 @@ jobs:
       BUILD_DIR: build-windows
       IREE_VULKAN_DISABLE: 1
     steps:
-      - id: "gcp-auth"
-        name: "Authenticating to Google Cloud"
-        uses: "google-github-actions/auth@v1"
-        with:
-          token_format: "access_token"
-          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
-          create_credentials_file: false
-      # actions/cache is for some reason unusably slow on the large managed
+      # actions/checkout is for some reason unusably slow on the large managed
       # Windows GitHub runners so we roll our own. See
       # https://github.com/actions/checkout/issues/1186
       # TODO(gcmn): Factor this out into something reusable across jobs. Can't
@@ -105,6 +98,14 @@ jobs:
           git fetch --depth 1 "${REMOTE_URL}" "${GITHUB_SHA}"
           git checkout "${GITHUB_SHA}"
           git submodule update --init --jobs 8 --depth 1
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        if: ${{ needs.setup.outputs.write-caches }} == 1
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
       - name: "Setting up Python"
         uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
         with:
@@ -174,6 +175,14 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        if: ${{ needs.setup.outputs.write-caches }} == 1
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Setting up Python"
@@ -187,17 +196,13 @@ jobs:
         # We need coreutils for `realpath` used in scripts.
         # We need bash because the default one on macOS is fairly old and lacks
         # features we use in scripts.
-        run: brew install ninja coreutils bash
+        run: brew install ninja ccache coreutils bash
       # Finally: build and run tests.
       - name: "Building IREE"
         env:
-          # Note: we would love to use caching here but the GitHub Actions cache
-          # is utterly broken. See https://github.com/actions/cache/issues/1115
-          # and https://github.com/openxla/iree/pull/12905
-          IREE_READ_REMOTE_CCACHE: 0
-          IREE_WRITE_REMOTE_CCACHE: 0
-          IREE_READ_LOCAL_CCACHE: 0
-          IREE_WRITE_LOCAL_CCACHE: 0
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+          IREE_CCACHE_GCP_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
+          CCACHE_NAMESPACE: github-macos-12-xl
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
