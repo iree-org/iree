@@ -144,7 +144,7 @@ steps:
       buildkite-agent artifact download benchmark-results-*.json ./
       python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
         --verbose \
-        --benchmark_files benchmark-results-*.json
+        --benchmark_files="benchmark-results-*.json"
     key: "upload-to-dashboard"
     branches: "main"
     agents:
