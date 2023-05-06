@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/ChloOps.h"
@@ -1275,6 +1276,9 @@ struct StableHLOToStableHLOPreprocessing final
     }
 
     RewritePatternSet patterns(context);
+    // General canonicalization patterns.
+    populateCanonicalizationPatterns(context, &patterns, PatternBenefit{1024});
+
     // TODO: Remove once we have a general contraction to matmul pass.
     populatePreprocessingEinsumToDotGeneralPatterns(context, &patterns);
     populatePreprocessingUnfuseBatchNormPatterns(context, &patterns);

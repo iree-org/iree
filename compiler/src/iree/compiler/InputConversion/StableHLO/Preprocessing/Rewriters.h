@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PREPROCESSING_REWRITERS_H_
 #define IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PREPROCESSING_REWRITERS_H_
 
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler::stablehlo {
@@ -14,6 +15,11 @@ namespace mlir::iree_compiler::stablehlo {
 //===----------------------------------------------------------------------===//
 // General StableHLO/CHLO preprocessing patterns.
 //===----------------------------------------------------------------------===//
+
+/// Collection of canonicalization patterns for StableHLO.
+void populateCanonicalizationPatterns(MLIRContext *context,
+                                      RewritePatternSet *patterns,
+                                      PatternBenefit benefit = 1);
 
 /// Collection of rewrite patterns for lowering of StableHLO dot general
 /// operations.
