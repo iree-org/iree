@@ -1276,7 +1276,11 @@ struct StableHLOToStableHLOPreprocessing final
     }
 
     RewritePatternSet patterns(context);
-    // General canonicalization patterns.
+    // General StableHLO canonicalization patterns. Run these with a high
+    // benefit to enable more rewrites and avoid needless expansions that could
+    // be more difficult to fold away. Note that we need to manually add these
+    // because StableHLO does not provide constant folders or canonicalization
+    // patterns for its ops.
     populateCanonicalizationPatterns(context, &patterns, PatternBenefit{1024});
 
     // TODO: Remove once we have a general contraction to matmul pass.
