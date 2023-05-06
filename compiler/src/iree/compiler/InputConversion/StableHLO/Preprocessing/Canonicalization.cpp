@@ -102,11 +102,10 @@ struct DynamicReshapeOpCanon final
                                 PatternRewriter &rewriter) const override {
     // This is a noop when the output type is already a static shape.
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type || !type.hasStaticShape())
-      return failure();
+    if (!type || !type.hasStaticShape()) return failure();
 
-    rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(
-        op, type, op.getOperand());
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, type,
+                                                            op.getOperand());
     return success();
   }
 };
