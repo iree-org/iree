@@ -15,7 +15,7 @@
 #include "iree/hal/drivers/cuda/status_util.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
-static const char* IREE_HAL_CUDA_ALLOCATOR_ID = "CUDA";
+static const char* IREE_HAL_CUDA_ALLOCATOR_ID = "CUDA unpooled";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 typedef struct iree_hal_cuda_allocator_t {
@@ -24,6 +24,7 @@ typedef struct iree_hal_cuda_allocator_t {
   iree_hal_cuda_context_wrapper_t* context;
   CUdevice device;
   CUstream stream;
+  iree_hal_cuda_memory_pools_t* pools;
   bool supports_concurrent_managed_access;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
@@ -39,9 +40,11 @@ static iree_hal_cuda_allocator_t* iree_hal_cuda_allocator_cast(
 
 iree_status_t iree_hal_cuda_allocator_create(
     iree_hal_device_t* base_device, iree_hal_cuda_context_wrapper_t* context,
-    CUdevice device, CUstream stream, iree_hal_allocator_t** out_allocator) {
+    CUdevice device, CUstream stream, iree_hal_cuda_memory_pools_t* pools,
+    iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(context);
+  IREE_ASSERT_ARGUMENT(pools);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // To support device-local + host-visible memory we need concurrent managed
@@ -75,6 +78,7 @@ iree_status_t iree_hal_cuda_allocator_create(
     allocator->context = context;
     allocator->device = device;
     allocator->stream = stream;
+    allocator->pools = pools;
     allocator->supports_concurrent_managed_access =
         supports_concurrent_managed_access != 0;
     *out_allocator = (iree_hal_allocator_t*)allocator;
@@ -115,6 +119,8 @@ static void iree_hal_cuda_allocator_query_statistics(
     iree_hal_cuda_allocator_t* allocator =
         iree_hal_cuda_allocator_cast(base_allocator);
     memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
+    iree_hal_cuda_memory_pools_merge_statistics(allocator->pools,
+                                                out_statistics);
   });
 }
 
@@ -274,6 +280,10 @@ static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
       CUDA_IGNORE_ERROR(context->syms, cuMemHostUnregister(host_ptr));
       break;
     }
+    case IREE_HAL_CUDA_BUFFER_TYPE_ASYNC: {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "(ignored; async)");
+      break;
+    }
   }
   IREE_TRACE_ZONE_END(z0);
 }
@@ -370,7 +380,8 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
         compat_params.usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, buffer_type, device_ptr, host_ptr,
-        iree_hal_buffer_release_callback_null(), &buffer);
+        iree_hal_buffer_release_callback_null(),
+        iree_hal_allocator_host_allocator(base_allocator), &buffer);
   }
 
   // Copy the initial contents into the buffer. This may require staging.
@@ -541,7 +552,8 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
         compat_params.usage, external_buffer->size,
         /*byte_offset=*/0,
         /*byte_length=*/external_buffer->size, buffer_type, device_ptr,
-        host_ptr, release_callback, &buffer);
+        host_ptr, release_callback,
+        iree_hal_allocator_host_allocator(base_allocator), &buffer);
   }
 
   if (iree_status_is_ok(status)) {

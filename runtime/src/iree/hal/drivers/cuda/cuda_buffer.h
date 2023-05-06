@@ -17,11 +17,13 @@ extern "C" {
 
 typedef enum iree_hal_cuda_buffer_type_e {
   // cuMemAlloc/cuMemAllocManaged + cuMemFree
-  IREE_HAL_CUDA_BUFFER_TYPE_DEVICE = 1u << 0,
+  IREE_HAL_CUDA_BUFFER_TYPE_DEVICE = 0,
   // cuMemHostAlloc + cuMemFreeHost
-  IREE_HAL_CUDA_BUFFER_TYPE_HOST = 1u << 1,
+  IREE_HAL_CUDA_BUFFER_TYPE_HOST,
   // cuMemHostRegister + cuMemHostUnregister
-  IREE_HAL_CUDA_BUFFER_TYPE_HOST_REGISTERED = 1u << 2,
+  IREE_HAL_CUDA_BUFFER_TYPE_HOST_REGISTERED,
+  // cuMemAllocFromPoolAsync + cuMemFree/cuMemFreeAsync
+  IREE_HAL_CUDA_BUFFER_TYPE_ASYNC,
 } iree_hal_cuda_buffer_type_t;
 
 // Wraps a CUDA allocation in an iree_hal_buffer_t.
@@ -32,7 +34,7 @@ iree_status_t iree_hal_cuda_buffer_wrap(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree_hal_cuda_buffer_type_t buffer_type, CUdeviceptr device_ptr,
     void* host_ptr, iree_hal_buffer_release_callback_t release_callback,
-    iree_hal_buffer_t** out_buffer);
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 // Returns the underlying CUDA buffer type.
 iree_hal_cuda_buffer_type_t iree_hal_cuda_buffer_type(
@@ -46,6 +48,12 @@ CUdeviceptr iree_hal_cuda_buffer_device_pointer(
 
 // Returns the CUDA host pointer for the given |buffer|, if available.
 void* iree_hal_cuda_buffer_host_pointer(const iree_hal_buffer_t* buffer);
+
+// Drops the release callback so that when the buffer is destroyed no callback
+// will be made. This is not thread safe but all callers are expected to be
+// holding an allocation and the earliest the buffer could be destroyed is after
+// this call returns and the caller has released its reference.
+void iree_hal_cuda_buffer_drop_release_callback(iree_hal_buffer_t* buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

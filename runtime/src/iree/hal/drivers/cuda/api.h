@@ -33,6 +33,26 @@ typedef struct {
   char data[128];
 } iree_hal_cuda_nccl_id_t;
 
+// Parameters defining a CUmemoryPool.
+typedef struct iree_hal_cuda_memory_pool_params_t {
+  // Minimum number of bytes to keep in the pool when trimming with
+  // iree_hal_device_trim.
+  uint64_t minimum_capacity;
+  // Soft maximum number of bytes to keep in the pool.
+  // When more than this is allocated the extra will be freed at the next
+  // device synchronization in order to remain under the threshold.
+  uint64_t release_threshold;
+  // TODO: per-device access permissions array.
+} iree_hal_cuda_memory_pool_params_t;
+
+// Parameters for each CUmemoryPool used for queue-ordered allocations.
+typedef struct iree_hal_cuda_memory_pooling_params_t {
+  // Used exclusively for DEVICE_LOCAL allocations.
+  iree_hal_cuda_memory_pool_params_t device_local;
+  // Used for any host-visible/host-local memory types.
+  iree_hal_cuda_memory_pool_params_t other;
+} iree_hal_cuda_memory_pooling_params_t;
+
 // Parameters configuring an iree_hal_cuda_device_t.
 // Must be initialized with iree_hal_cuda_device_params_initialize prior to use.
 typedef struct iree_hal_cuda_device_params_t {
@@ -63,6 +83,9 @@ typedef struct iree_hal_cuda_device_params_t {
   // identify slow dispatches and refine from there; be wary of whole-program
   // tracing with this enabled.
   bool stream_tracing;
+
+  // Parameters for each CUmemoryPool used for queue-ordered allocations.
+  iree_hal_cuda_memory_pooling_params_t memory_pools;
 } iree_hal_cuda_device_params_t;
 
 // Initializes |out_params| to default values.
