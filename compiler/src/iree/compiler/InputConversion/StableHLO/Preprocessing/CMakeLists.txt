@@ -53,6 +53,7 @@ iree_cc_library(
     "Passes.h"
     "Rewriters.h"
   SRCS
+    "Canonicalization.cpp"
     "DotGeneralToDot.cpp"
     "EinsumToDotGeneral.cpp"
     "GatherToTorchIndexSelect.cpp"

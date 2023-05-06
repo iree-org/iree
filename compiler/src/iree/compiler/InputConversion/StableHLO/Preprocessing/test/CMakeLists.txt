@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "canonicalization.mlir"
     "complex_lowering.mlir"
     "dot_general_to_dot.mlir"
     "einsum_to_dot_general.mlir"

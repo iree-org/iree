@@ -15,18 +15,6 @@ class ConstantSplat<string value> : NativeCodeCall<
     "::mlir::iree_compiler::stablehlo::getSplat(&$_builder, $0, " # value # ")">;
 
 //===----------------------------------------------------------------------===//
-// Folds
-//===----------------------------------------------------------------------===//
-
-// real(complex x, y) -> x
-def : Pat<(StableHLO_RealOp (StableHLO_ComplexOp $lhs, $rhs)),
-          (replaceWithValue $lhs)>;
-
-// imag(complex x, y) -> y
-def : Pat<(StableHLO_ImagOp (StableHLO_ComplexOp $lhs, $rhs)),
-          (replaceWithValue $rhs)>;
-
-//===----------------------------------------------------------------------===//
 // Binary op patterns.
 //===----------------------------------------------------------------------===//
 
