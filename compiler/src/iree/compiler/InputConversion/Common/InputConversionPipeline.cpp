@@ -4,27 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/Input/InputDialect.h"
-#include "iree-dialects/Dialect/Input/InputOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
+
 #include "iree/compiler/InputConversion/Common/Passes.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/DialectConversion.h"
 
 // Dialect specific
 #ifdef IREE_HAVE_MHLO_INPUT
@@ -149,7 +137,6 @@ void InputConversionPipelinePass::runOnOperation() {
 }
 
 #else
-void InputConversionPipelinePass::initialize();
 void InputConversionPipelinePass::runOnOperation() {}
 #endif
 

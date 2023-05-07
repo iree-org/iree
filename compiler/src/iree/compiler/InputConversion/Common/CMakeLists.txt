@@ -8,7 +8,31 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
+# Enable input dialects based on options.
+set(IREE_INPUT_DEPS "")
+if(IREE_INPUT_MHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
+endif()
+if(IREE_INPUT_TORCH)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
+endif()
+if(IREE_INPUT_TOSA)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
+endif()
+
 iree_add_all_subdirs()
+
+set(IREE_INPUT_DEPS "")
+if(IREE_INPUT_MHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+endif()
+if(IREE_INPUT_TORCH)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
+endif()
+if(IREE_INPUT_TOSA)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
+endif()
 
 iree_tablegen_library(
   NAME
@@ -50,6 +74,7 @@ iree_cc_library(
     "TopLevelSCFToCFG.cpp"
     "Utils.cpp"
   DEPS
+    ${IREE_INPUT_DEPS}
     ::PassHeaders
     ::PassesIncGen
     IREEInputDialect
