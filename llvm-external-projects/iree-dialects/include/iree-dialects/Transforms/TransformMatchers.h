@@ -1131,10 +1131,10 @@ void makeSoftmaxMatcher(MatcherContext &context,
                         StructuredOpMatcher *&softmaxRootCapture);
 
 struct MatchedConvolutionCaptures {
+  Type inputElementType, filterElementType, outputElementType;
   mlir::linalg::detail::ConvolutionDimensions convolutionDims = {};
   SmallVector<int64_t> convolutionOpSizes = {};
   SmallVector<int64_t> trailingOpSizes = {};
-  int64_t convolutionOutputElementalTypeBitWidth = 0;
   int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
   int64_t maybeFillElementalTypeBitWidth = 0;
 };

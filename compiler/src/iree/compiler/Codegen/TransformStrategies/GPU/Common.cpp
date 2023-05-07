@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/ConvolutionImplicitGemmStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -441,9 +442,9 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(1));
 
   // Rewrite aligned pads as destination passing (linalg.copy)
-  if (strategy.alignedLhs())
+  if (strategy.alignedLhs() && strategy.packingDimensions[0])
     lhsH = b.create<RewriteInDestinationPassingStyleOp>(lhsH.getType(), lhsH);
-  if (strategy.alignedRhs())
+  if (strategy.alignedRhs() && strategy.packingDimensions[1])
     rhsH = b.create<RewriteInDestinationPassingStyleOp>(rhsH.getType(), rhsH);
 
   MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();

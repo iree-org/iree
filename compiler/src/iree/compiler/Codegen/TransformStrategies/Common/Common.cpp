@@ -291,7 +291,9 @@ Value mlir::iree_compiler::buildPad(
 // TODO: configure patterns.
 Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
                                           bool applyCleanups) {
-  funcH = b.create<VectorizeOp>(funcH);
+  funcH = b.create<VectorizeOp>(funcH,
+                                /*vectorizePadding=*/false,
+                                /*vectorizeNdExtract=*/true);
   if (applyCleanups) {
     iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   }
