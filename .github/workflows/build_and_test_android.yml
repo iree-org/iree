@@ -110,11 +110,11 @@ jobs:
     needs: cross_compile
     strategy:
       matrix:
-        # TODO(#9855): Add pixel-6-pro and moto-edge-x30.
         target:
           - device-name: pixel-4
             label-exclude: vulkan
-          - device-name: Pixel-6-Pro
+          - device-name: pixel-6-pro
+          - device-name: moto-edge-x30
     name: test_on_${{ matrix.target.device-name }}
     runs-on:
       - self-hosted # must come first
