@@ -114,6 +114,7 @@ jobs:
         target:
           - device-name: pixel-4
             label-exclude: vulkan
+          - device-name: Pixel-6-Pro
     name: test_on_${{ matrix.target.device-name }}
     runs-on:
       - self-hosted # must come first
