@@ -49,7 +49,11 @@ iree_status_t iree_hal_metal_descriptor_set_layout_create(
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
 
-// Returns the information about a given |binding| in //
+// Returns the total number of bindings in the given descriptor set.
+iree_host_size_t iree_hal_metal_descriptor_set_layout_binding_count(
+    iree_hal_descriptor_set_layout_t* base_descriptor_set_layout);
+
+// Returns the information about a given |binding| in
 // |base_descriptor_set_layout|.
 iree_hal_descriptor_set_layout_binding_t*
 iree_hal_metal_descriptor_set_layout_binding(

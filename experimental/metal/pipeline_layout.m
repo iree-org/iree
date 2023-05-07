@@ -82,6 +82,13 @@ iree_hal_descriptor_set_layout_binding_t* iree_hal_metal_descriptor_set_layout_b
   return NULL;
 }
 
+iree_host_size_t iree_hal_metal_descriptor_set_layout_binding_count(
+    iree_hal_descriptor_set_layout_t* base_descriptor_set_layout) {
+  iree_hal_metal_descriptor_set_layout_t* descriptor_set_layout =
+      iree_hal_metal_descriptor_set_layout_cast(base_descriptor_set_layout);
+  return descriptor_set_layout->binding_count;
+}
+
 static const iree_hal_descriptor_set_layout_vtable_t iree_hal_metal_descriptor_set_layout_vtable = {
     .destroy = iree_hal_metal_descriptor_set_layout_destroy,
 };

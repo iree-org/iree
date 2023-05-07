@@ -19,12 +19,151 @@
 #include "iree/hal/api.h"
 #include "iree/hal/utils/resource_set.h"
 
+//===------------------------------------------------------------------------------------------===//
+// Segmented submission management
+//===------------------------------------------------------------------------------------------===//
+
+// Unlike Vulkan, Metal adopts a multi-level command recording model--memory/dispatch commands are
+// not directly recorded into a command buffer; rather, they must go through the additional level of
+// blit/compute encoders. IREE's HAL follows the flat Vulkan command buffer recording model, so we
+// have a mismatch here. Implementing IREE's HAL using Metal would require switching encoders for
+// interleaved memory and dispatch commands. Additionally, certain IREE HAL API features do not have
+// direct mapping in Metal APIs, e.g., various forms of IREE HAL execution/memory barriers.
+// Translating them would require looking at both previous and next commands to decide the proper
+// mapping.
+//
+// Due to these reasons, it's beneficial to have a complete view of the full command buffer and
+// extra flexibility during recording, in order to fixup past commands, or inspect future commands.
+//
+// Therefore, to implement IREE HAL command buffers using Metal, we perform two steps using a linked
+// list of command segments. First we create segments (iree_hal_metal_command_buffer_prepare_* and
+// iree_hal_metal_command_segment_create_*) to keep track of all IREE HAL commands and the
+// associated data, and then, when finalizing the command buffer, we iterate through all the
+// segments and record their contents (iree_hal_metal_command_segment_record_*) into a proper Metal
+// command buffer . A linked list gives us the flexibility to organize command sequence in low
+// overhead; and a deferred recording gives us the complete picture of the command buffer when
+// really started recording.
+
+// Command action kind of a command segment.
+typedef enum iree_hal_metal_command_segment_action_e {
+  IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_BARRIER,      // Execution/memory barrier command
+  IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH,     // Dispatch command
+  IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_FILL_BUFFER,  // Fill buffer command
+  IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_COPY_BUFFER,  // Copy buffer command
+} iree_hal_metal_command_segment_action_t;
+
+// API data for execution/memory barrier command segments.
+typedef struct iree_hal_metal_barrier_segment_t {
+  iree_host_size_t memory_barrier_count;  // Total number of memory barriers
+  iree_host_size_t buffer_barrier_count;  // Total number of buffer barriers
+  // The list of buffer barriers, pointing to the end of the segment allocation.
+  const iree_hal_buffer_barrier_t* buffer_barriers;
+} iree_hal_metal_barrier_segment_t;
+// + Additional inline allocation for holding all buffer barriers.
+
+typedef struct iree_hal_metal_buffer_and_usage_t {
+  id<MTLBuffer> buffer;
+  MTLResourceUsage usage;
+} iree_hal_metal_buffer_and_usage_t;
+
+// API data for dispatch command segments.
+typedef struct iree_hal_metal_dispatch_segment_t {
+  // Compute kernel information--kernel object, pipeline layout, threadgroup size, etc.
+  iree_hal_metal_kernel_params_t kernel_params;
+
+  // Workgroup count information--if |workgroups_buffer| is not nil, then indirect dispatch;
+  // otherwise uses |workgroup_count| for direct dispatch.
+  id<MTLBuffer> workgroups_buffer;
+  iree_device_size_t workgroups_offset;
+  uint32_t workgroup_count[3];
+
+  // The number of argument buffers for descriptor sets.
+  iree_host_size_t argument_buffer_count;
+  // The list of argument buffers, pointing to the end of the segment allocation.
+  id<MTLBuffer>* argument_buffers;
+
+  // The number of buffer usage fields.
+  iree_host_size_t buffer_usage_count;
+  // The list of buffer usage fields, pointing to the end of the segment allocation.
+  iree_hal_metal_buffer_and_usage_t* buffer_usages;
+
+  // The number of push constant values.
+  iree_host_size_t push_constant_count;
+  // The list of push constants, pointing to the end of the segment allocation.
+  int32_t* push_constants;
+} iree_hal_metal_dispatch_segment_t;
+// + Additional inline allocation for holding all argument buffers.
+// + Additional inline allocation for holding all buffer usages.
+// + Additional inline allocation for holding all push constants.
+
+// API data for fill buffer command segments.
+typedef struct iree_hal_metal_fill_buffer_segment_t {
+  id<MTLBuffer> target_buffer;
+  iree_device_size_t target_offset;
+  iree_device_size_t length;
+  // The fill pattern, pointing to the end of the segment allocation.
+  const void* pattern;
+  iree_host_size_t pattern_length;
+} iree_hal_metal_fill_buffer_segment_t;
+// + Additional inline allocation for holding the fill pattern.
+
+// API data for copy buffer command segments.
+typedef struct iree_hal_metal_copy_buffer_segment_t {
+  id<MTLBuffer> source_buffer;
+  iree_device_size_t source_offset;
+  id<MTLBuffer> target_buffer;
+  iree_device_size_t target_offset;
+  iree_device_size_t length;
+} iree_hal_metal_copy_buffer_segment_t;
+
+struct iree_hal_metal_command_segment_t;
+typedef struct iree_hal_metal_command_segment_t {
+  struct iree_hal_metal_command_segment_t* next_segment;
+  iree_hal_metal_command_segment_action_t action;
+  union {
+    iree_hal_metal_barrier_segment_t barrier;
+    iree_hal_metal_dispatch_segment_t dispatch;
+    iree_hal_metal_fill_buffer_segment_t fill_buffer;
+    iree_hal_metal_copy_buffer_segment_t copy_buffer;
+  };
+} iree_hal_metal_command_segment_t;
+
+typedef struct iree_hal_metal_command_segment_list_t {
+  iree_hal_metal_command_segment_t* head;
+  iree_hal_metal_command_segment_t* tail;
+} iree_hal_metal_command_segment_list_t;
+
+static void iree_hal_metal_command_segment_list_reset(iree_hal_metal_command_segment_list_t* list) {
+  memset(list, 0, sizeof(*list));
+}
+
+static void iree_hal_metal_command_segment_list_push_front(
+    iree_hal_metal_command_segment_list_t* list, iree_hal_metal_command_segment_t* segment) {
+  segment->next_segment = list->head;
+  list->head = segment;
+  if (!list->tail) list->tail = segment;
+}
+
+static void iree_hal_metal_command_segment_list_push_back(
+    iree_hal_metal_command_segment_list_t* list, iree_hal_metal_command_segment_t* segment) {
+  segment->next_segment = NULL;
+  if (list->tail) {
+    list->tail->next_segment = segment;
+    list->tail = segment;
+  } else {
+    list->head = list->tail = segment;
+  }
+}
+
+//===------------------------------------------------------------------------------------------===//
+// iree_hal_metal_command_buffer_t
+//===------------------------------------------------------------------------------------------===//
+
 typedef struct iree_hal_metal_descriptor_t {
   uint32_t set;
   uint32_t binding;
   iree_hal_buffer_t* buffer;
   iree_host_size_t offset;
-
 } iree_hal_metal_descriptor_t;
 
 typedef struct iree_hal_metal_command_buffer_t {
@@ -35,6 +174,12 @@ typedef struct iree_hal_metal_command_buffer_t {
 
   // For polyfilling fill/copy/update buffers that are not directly supported by Metal APIs.
   iree_hal_metal_builtin_executable_t* builtin_executable;
+
+  // Arena used for all allocations; references the shared device block pool.
+  iree_arena_allocator_t arena;
+
+  // Linked list of command segments to be recorded into a command buffer.
+  iree_hal_metal_command_segment_list_t segments;
 
   id<MTLCommandBuffer> command_buffer;
 
@@ -80,6 +225,10 @@ typedef struct iree_hal_metal_command_buffer_t {
   iree_hal_resource_set_t* resource_set;
 } iree_hal_metal_command_buffer_t;
 
+//===------------------------------------------------------------------------------------------===//
+// iree_hal_metal_command_buffer_vtable APIs
+//===------------------------------------------------------------------------------------------===//
+
 static const iree_hal_command_buffer_vtable_t iree_hal_metal_command_buffer_vtable;
 
 static iree_hal_metal_command_buffer_t* iree_hal_metal_command_buffer_cast(
@@ -109,6 +258,15 @@ static void iree_hal_metal_end_blit_encoder(iree_hal_metal_command_buffer_t* com
     [command_buffer->blit_encoder release];  // -1
     command_buffer->blit_encoder = nil;
   }
+}
+
+static void iree_hal_metal_command_buffer_reset(iree_hal_metal_command_buffer_t* command_buffer) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_metal_end_blit_encoder(command_buffer);
+  iree_hal_metal_end_compute_encoder(command_buffer);
+  iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
+  iree_arena_reset(&command_buffer->arena);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static id<MTLComputeCommandEncoder> iree_hal_metal_get_or_begin_compute_encoder(
@@ -181,7 +339,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
 
   if (binding_capacity > 0) {
     // TODO(#10144): support indirect command buffers with binding tables.
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplemented indirect command buffers");
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "indirect command buffer not yet supported");
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -195,6 +353,8 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
         &iree_hal_metal_command_buffer_vtable, &command_buffer->base);
     command_buffer->queue = [queue retain];  // +1
     command_buffer->builtin_executable = builtin_executable;
+    iree_arena_initialize(block_pool, &command_buffer->arena);
+    iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
       // We track resource lifetime by ourselves in IREE; so just do unretained references to
       // resources in Metal command buffer, which avoids overhead and gives better performance.
@@ -234,12 +394,15 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_metal_command_buffer_reset(command_buffer);
+
   [command_buffer->encoder_event release];  // -1
   IREE_ASSERT_EQ(command_buffer->compute_encoder, nil);
   IREE_ASSERT_EQ(command_buffer->blit_encoder, nil);
   [command_buffer->command_buffer release];  // -1
   [command_buffer->queue release];           // -1
   iree_hal_resource_set_free(command_buffer->resource_set);
+  iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(command_buffer->host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
@@ -247,21 +410,6 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
 
 bool iree_hal_metal_command_buffer_isa(iree_hal_command_buffer_t* command_buffer) {
   return iree_hal_resource_is(&command_buffer->resource, &iree_hal_metal_command_buffer_vtable);
-}
-
-static iree_status_t iree_hal_metal_command_buffer_begin(
-    iree_hal_command_buffer_t* base_command_buffer) {
-  // Nothing to do.
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_metal_command_buffer_end(
-    iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_metal_command_buffer_t* command_buffer =
-      iree_hal_metal_command_buffer_cast(base_command_buffer);
-  iree_hal_metal_end_blit_encoder(command_buffer);
-  iree_hal_metal_end_compute_encoder(command_buffer);
-  return iree_ok_status();
 }
 
 static void iree_hal_metal_command_buffer_begin_debug_group(
@@ -275,7 +423,7 @@ static void iree_hal_metal_command_buffer_end_debug_group(
   // TODO(antiagainst): implement support for debug group
 }
 
-static iree_status_t iree_hal_metal_command_buffer_execution_barrier(
+static iree_status_t iree_hal_metal_command_buffer_prepare_barrier(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_execution_stage_t source_stage_mask,
     iree_hal_execution_stage_t target_stage_mask, iree_hal_execution_barrier_flags_t flags,
     iree_host_size_t memory_barrier_count, const iree_hal_memory_barrier_t* memory_barriers,
@@ -291,8 +439,39 @@ static iree_status_t iree_hal_metal_command_buffer_execution_barrier(
 
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (memory_barrier_count == 0 && buffer_barrier_count == 0) {
+  // Allocate the command segment and keep track of all necessary API data.
+  uint8_t* storage_base = NULL;
+  iree_hal_metal_command_segment_t* segment = NULL;
+  iree_host_size_t buffer_barrier_length = buffer_barrier_count * sizeof(iree_hal_buffer_barrier_t);
+  iree_status_t status = iree_arena_allocate(
+      &command_buffer->arena, sizeof(*segment) + buffer_barrier_length, (void**)&storage_base);
+
+  if (iree_status_is_ok(status)) {
+    // Copy the buffer barriers to the end of the current segments for later access. We don't copy
+    // memory barriers because in Metal there is only coarse-grained full memory barrier affecting
+    // all buffers, regardless of the fine-grained details from IREE HAL barriers.
+    uint8_t* barrier_ptr = storage_base + sizeof(*segment);
+    memcpy(barrier_ptr, (const uint8_t*)buffer_barriers, buffer_barrier_length);
+
+    // Compose and push the barrier segment.
+    segment = (iree_hal_metal_command_segment_t*)storage_base;
+    segment->action = IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_BARRIER;
+    iree_hal_metal_command_segment_list_push_back(&command_buffer->segments, segment);
+
+    segment->barrier.memory_barrier_count = memory_barrier_count;
+    segment->barrier.buffer_barrier_count = buffer_barrier_count;
+    segment->barrier.buffer_barriers = (const iree_hal_buffer_barrier_t*)barrier_ptr;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_metal_command_segment_record_barrier(
+    iree_hal_metal_command_buffer_t* command_buffer, iree_hal_metal_barrier_segment_t* segment) {
+  if (segment->memory_barrier_count == 0 && segment->buffer_barrier_count == 0) {
     // There is no direct corresponding APIs for execution only barrier in Metal. We just signal and
     // wait on the same value of a MTLEvent here.
     iree_hal_metal_end_blit_encoder(command_buffer);
@@ -307,23 +486,23 @@ static iree_status_t iree_hal_metal_command_buffer_execution_barrier(
   id<MTLComputeCommandEncoder> encoder =
       iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
 
-  if (memory_barrier_count != 0) {
+  if (segment->memory_barrier_count != 0) {
     // If there is a memory barrier specified, we have to place a catch-all barrier for all buffers.
     // Metal does not provide a more fine-grained control here.
     [encoder memoryBarrierWithScope:MTLBarrierScopeBuffers];
     return iree_ok_status();
   }
 
-  if (buffer_barrier_count != 0) {
+  if (segment->buffer_barrier_count != 0) {
     // But we do have the option to specify a list of buffers to synchronize if only buffer barriers
     // are specified.
     id<MTLResource>* resources =
-        (id<MTLResource>*)iree_alloca(sizeof(id<MTLResource>) * buffer_barrier_count);
-    for (unsigned i = 0; i < buffer_barrier_count; ++i) {
-      resources[i] =
-          iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(buffer_barriers[i].buffer));
+        (id<MTLResource>*)iree_alloca(sizeof(id<MTLResource>) * segment->buffer_barrier_count);
+    for (iree_host_size_t i = 0; i < segment->buffer_barrier_count; ++i) {
+      resources[i] = iree_hal_metal_buffer_handle(
+          iree_hal_buffer_allocated_buffer(segment->buffer_barriers[i].buffer));
     }
-    [encoder memoryBarrierWithResources:resources count:buffer_barrier_count];
+    [encoder memoryBarrierWithResources:resources count:segment->buffer_barrier_count];
   }
   return iree_ok_status();
 }
@@ -421,7 +600,7 @@ static iree_status_t iree_hal_metal_duplicate_to_four_byte_value(const void* pat
   return iree_make_status(IREE_STATUS_INTERNAL, "fill pattern should have 1/2/4 bytes");
 }
 
-static iree_status_t iree_hal_metal_command_buffer_fill_buffer(
+static iree_status_t iree_hal_metal_command_buffer_prepare_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length) {
@@ -433,10 +612,46 @@ static iree_status_t iree_hal_metal_command_buffer_fill_buffer(
       iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
+  // Allocate the command segment and keep track of all necessary API data.
+  uint8_t* storage_base = NULL;
+  iree_hal_metal_command_segment_t* segment = NULL;
+  iree_status_t status = iree_arena_allocate(
+      &command_buffer->arena, sizeof(*segment) + pattern_length, (void**)&storage_base);
+
+  if (iree_status_is_ok(status)) {
+    // Copy the patttern to the end of the segment for later access.
+    uint8_t* pattern_ptr = storage_base + sizeof(*segment);
+    memcpy(pattern_ptr, (const uint8_t*)pattern, pattern_length);
+
+    // Compose and push the fill buffer segment.
+    segment = (iree_hal_metal_command_segment_t*)storage_base;
+    segment->action = IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_FILL_BUFFER;
+    iree_hal_metal_command_segment_list_push_back(&command_buffer->segments, segment);
+
+    segment->fill_buffer.target_buffer = target_device_buffer;
+    segment->fill_buffer.target_offset = target_offset;
+    segment->fill_buffer.length = length;
+    segment->fill_buffer.pattern = (const void*)pattern_ptr;
+    segment->fill_buffer.pattern_length = pattern_length;
+  }
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_buffer);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_metal_command_segment_record_fill_buffer(
+    iree_hal_metal_command_buffer_t* command_buffer,
+    iree_hal_metal_fill_buffer_segment_t* segment) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Per the spec for fillBuffer:range:value: "The alignment and length of the range must both be a
   // multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS."
 #if defined(IREE_PLATFORM_MACOS)
-  bool can_use_metal_api = target_offset % 4 == 0 && length % 4 == 0;
+  bool can_use_metal_api = segment->target_offset % 4 == 0 && segment->length % 4 == 0;
 #else
   bool can_use_metal_api = true;
 #endif
@@ -446,28 +661,26 @@ static iree_status_t iree_hal_metal_command_buffer_fill_buffer(
   // fillBuffer:range:value:. Otherwise we need to emulate the support.
   uint8_t single_byte_value = 0u;
   if (can_use_metal_api) {
-    can_use_metal_api &= iree_hal_metal_get_duplicated_single_byte_value(pattern, pattern_length,
-                                                                         &single_byte_value);
+    can_use_metal_api &= iree_hal_metal_get_duplicated_single_byte_value(
+        segment->pattern, segment->pattern_length, &single_byte_value);
   }
-
-  IREE_RETURN_IF_ERROR(
-      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_buffer));
 
   iree_status_t status = iree_ok_status();
   if (can_use_metal_api) {
     id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
-    [encoder fillBuffer:target_device_buffer
-                  range:NSMakeRange(target_offset, length)
+    [encoder fillBuffer:segment->target_buffer
+                  range:NSMakeRange(segment->target_offset, segment->length)
                   value:single_byte_value];
   } else {
     id<MTLComputeCommandEncoder> compute_encoder =
         iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
     uint32_t pattern_4byte = 0;
-    status = iree_hal_metal_duplicate_to_four_byte_value(pattern, pattern_length, &pattern_4byte);
+    status = iree_hal_metal_duplicate_to_four_byte_value(segment->pattern, segment->pattern_length,
+                                                         &pattern_4byte);
     if (iree_status_is_ok(status)) {
-      status = iree_hal_metal_builtin_executable_fill_buffer(command_buffer->builtin_executable,
-                                                             compute_encoder, target_device_buffer,
-                                                             target_offset, length, pattern_4byte);
+      status = iree_hal_metal_builtin_executable_fill_buffer(
+          command_buffer->builtin_executable, compute_encoder, segment->target_buffer,
+          segment->target_offset, segment->length, pattern_4byte);
     }
   }
 
@@ -475,14 +688,45 @@ static iree_status_t iree_hal_metal_command_buffer_fill_buffer(
   return status;
 }
 
-static iree_status_t iree_hal_metal_command_buffer_copy_buffer_internal(
+static iree_status_t iree_hal_metal_command_segment_create_copy_buffer(
     iree_hal_metal_command_buffer_t* command_buffer, id<MTLBuffer> source_device_buffer,
     iree_device_size_t source_offset, id<MTLBuffer> target_device_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Allocate the command segment and keep track of all necessary API data.
+  uint8_t* storage_base = NULL;
+  iree_hal_metal_command_segment_t* segment = NULL;
+  iree_status_t status =
+      iree_arena_allocate(&command_buffer->arena, sizeof(*segment), (void**)&storage_base);
+
+  if (iree_status_is_ok(status)) {
+    // Compose and push the barrier segment.
+    segment = (iree_hal_metal_command_segment_t*)storage_base;
+    segment->action = IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_COPY_BUFFER;
+    iree_hal_metal_command_segment_list_push_back(&command_buffer->segments, segment);
+
+    segment->copy_buffer.source_buffer = source_device_buffer;
+    segment->copy_buffer.source_offset = source_offset;
+    segment->copy_buffer.target_buffer = target_device_buffer;
+    segment->copy_buffer.target_offset = target_offset;
+    segment->copy_buffer.length = length;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_metal_command_segment_record_copy_buffer(
+    iree_hal_metal_command_buffer_t* command_buffer,
+    iree_hal_metal_copy_buffer_segment_t* segment) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Per the spec for copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size, the source/target
   // offset and length must be a multiple of 4 bytes in macOS, and 1 byte in iOS and tvOS.
 #if defined(IREE_PLATFORM_MACOS)
-  bool can_use_metal_api = source_offset % 4 == 0 && target_offset % 4 == 0 && length % 4 == 0;
+  bool can_use_metal_api = segment->source_offset % 4 == 0 && segment->target_offset % 4 == 0 &&
+                           segment->length % 4 == 0;
 #else
   bool can_use_metal_api = true;
 #endif
@@ -490,23 +734,23 @@ static iree_status_t iree_hal_metal_command_buffer_copy_buffer_internal(
   iree_status_t status = iree_ok_status();
   if (can_use_metal_api) {
     id<MTLBlitCommandEncoder> encoder = iree_hal_metal_get_or_begin_blit_encoder(command_buffer);
-    [encoder copyFromBuffer:source_device_buffer
-               sourceOffset:source_offset
-                   toBuffer:target_device_buffer
-          destinationOffset:target_offset
-                       size:length];
+    [encoder copyFromBuffer:segment->source_buffer
+               sourceOffset:segment->source_offset
+                   toBuffer:segment->target_buffer
+          destinationOffset:segment->target_offset
+                       size:segment->length];
   } else {
     id<MTLComputeCommandEncoder> encoder =
         iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
     status = iree_hal_metal_builtin_executable_copy_buffer(
-        command_buffer->builtin_executable, encoder, source_device_buffer, source_offset,
-        target_device_buffer, target_offset, length);
+        command_buffer->builtin_executable, encoder, segment->source_buffer, segment->source_offset,
+        segment->target_buffer, segment->target_offset, segment->length);
   }
 
   return status;
 }
 
-static iree_status_t iree_hal_metal_command_buffer_update_buffer(
+static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
@@ -532,7 +776,7 @@ static iree_status_t iree_hal_metal_command_buffer_update_buffer(
       iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
-  iree_status_t status = iree_hal_metal_command_buffer_copy_buffer_internal(
+  iree_status_t status = iree_hal_metal_command_segment_create_copy_buffer(
       command_buffer, data_buffer, /*source_offset=*/0, target_device_buffer, target_offset,
       length);
 
@@ -540,7 +784,7 @@ static iree_status_t iree_hal_metal_command_buffer_update_buffer(
   return status;
 }
 
-static iree_status_t iree_hal_metal_command_buffer_copy_buffer(
+static iree_status_t iree_hal_metal_command_buffer_prepare_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
@@ -560,7 +804,7 @@ static iree_status_t iree_hal_metal_command_buffer_copy_buffer(
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
-  iree_status_t status = iree_hal_metal_command_buffer_copy_buffer_internal(
+  iree_status_t status = iree_hal_metal_command_segment_create_copy_buffer(
       command_buffer, source_device_buffer, source_offset, target_device_buffer, target_offset,
       length);
 
@@ -737,28 +981,63 @@ static iree_status_t iree_hal_metal_create_argument_encoder(
 }
 
 // Prepares kernels and argument buffers needed for kernel dispatches.
-static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
+static iree_status_t iree_hal_metal_command_segment_create_dispatch(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, iree_hal_metal_kernel_params_t* kernel_params) {
+    int32_t entry_point, iree_hal_metal_dispatch_segment_t** out_segment) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &executable));
+
+  iree_hal_metal_kernel_params_t kernel_params;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_kernel_library_entry_point_kernel_params(
-                                            executable, entry_point, kernel_params));
+                                            executable, entry_point, &kernel_params));
   if (!command_buffer->current_pipeline_layout) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing pipeline layout when dispatch");
   }
 
-  // Set the compute kernel to dispatch.
-  id<MTLComputeCommandEncoder> compute_encoder =
-      iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
-  [compute_encoder setComputePipelineState:kernel_params->pso];
+  // Allocate the command segment and keep track of all necessary API data.
+  uint8_t* storage_base = NULL;
+  iree_hal_metal_command_segment_t* segment = NULL;
+  iree_host_size_t descriptor_set_count = command_buffer->current_max_set_number + 1;
+  iree_host_size_t descriptor_set_length = descriptor_set_count * sizeof(id<MTLBuffer>);
+  iree_host_size_t buffer_usage_length =
+      command_buffer->current_total_binding_count * sizeof(iree_hal_metal_buffer_and_usage_t);
+  iree_host_size_t push_constant_count =
+      iree_hal_metal_pipeline_layout_push_constant_count(command_buffer->current_pipeline_layout);
+  iree_host_size_t push_constant_length = push_constant_count * sizeof(int32_t);
+  iree_host_size_t total_size =
+      sizeof(*segment) + descriptor_set_length + buffer_usage_length + push_constant_length;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(&command_buffer->arena, total_size, (void**)&storage_base));
 
+  // Compose and push the dispatch segment.
+  segment = (iree_hal_metal_command_segment_t*)storage_base;
+  memset(segment, 0, sizeof(*segment));
+  segment->action = IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH;
+  iree_hal_metal_command_segment_list_push_back(&command_buffer->segments, segment);
+
+  segment->dispatch.kernel_params = kernel_params;
+
+  // Get pointers to the argument buffer inline allocation.
+  segment->dispatch.argument_buffer_count = descriptor_set_count;
+  id<MTLBuffer>* descriptor_set_ptr = (id<MTLBuffer>*)(storage_base + sizeof(*segment));
+  memset(descriptor_set_ptr, 0, descriptor_set_length);
+  segment->dispatch.argument_buffers = descriptor_set_ptr;
+
+  // Get pointers to the buffer usage inline allocation.
+  segment->dispatch.buffer_usage_count = command_buffer->current_total_binding_count;
+  iree_hal_metal_buffer_and_usage_t* buffer_usage_ptr =
+      (iree_hal_metal_buffer_and_usage_t*)(storage_base + sizeof(*segment) + descriptor_set_length);
+  memset(buffer_usage_ptr, 0, buffer_usage_length);
+  segment->dispatch.buffer_usages = buffer_usage_ptr;
+
+  // Build argument buffers for all descriptor sets and keep at the end of the current segment for
+  // later access. Also do the same for buffer usage information.
   iree_status_t status = iree_ok_status();
-
-  // Bind all buffers in all descriptor sets.
   iree_hal_metal_descriptor_t* descriptors = command_buffer->current_descriptors;
   int binding_count = command_buffer->current_total_binding_count;
   int i = 0;
@@ -771,7 +1050,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_metal_create_argument_encoder(
                 command_buffer->command_buffer.device, command_buffer->command_buffer,
-                kernel_params->function, current_set, &argument_encoder, &argument_buffer));
+                kernel_params.function, current_set, &argument_encoder, &argument_buffer));
 
     iree_hal_descriptor_set_layout_t* set_layout =
         iree_hal_metal_pipeline_layout_descriptor_set_layout(
@@ -799,76 +1078,105 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
                                   current_binding, current_set);
         break;
       }
-      [compute_encoder useResource:current_buffer
-                             usage:iree_hal_metal_get_metal_resource_usage(binding_params)];
+      buffer_usage_ptr[i].buffer = current_buffer;
+      buffer_usage_ptr[i].usage = iree_hal_metal_get_metal_resource_usage(binding_params);
     }
-    if (!iree_status_is_ok(status)) break;
-
-    [compute_encoder setBuffer:argument_buffer offset:0 atIndex:current_set];
+    descriptor_set_ptr[current_set] = argument_buffer;
   }
 
-  if (iree_hal_metal_pipeline_layout_push_constant_count(command_buffer->current_pipeline_layout)) {
-    [compute_encoder setBytes:(void*)command_buffer->push_constants
-                       length:sizeof(command_buffer->push_constants)
-                      atIndex:IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX];
-  }
+  // Copy push constants to the end of the current segment for later access.
+  segment->dispatch.push_constant_count = push_constant_count;
+  uint8_t* push_constant_ptr =
+      storage_base + sizeof(*segment) + descriptor_set_length + buffer_usage_length;
+  memcpy(push_constant_ptr, (const uint8_t*)command_buffer->push_constants, push_constant_length);
+  segment->dispatch.push_constants = (int32_t*)push_constant_ptr;
 
-  if (iree_status_is_ok(status)) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &executable));
-  }
-
+  *out_segment = &segment->dispatch;
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-static iree_status_t iree_hal_metal_command_buffer_dispatch(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, uint32_t workgroup_count_x, uint32_t workgroup_count_y,
-    uint32_t workgroup_count_z) {
-  iree_hal_metal_command_buffer_t* command_buffer =
-      iree_hal_metal_command_buffer_cast(base_command_buffer);
+static iree_status_t iree_hal_metal_command_segment_record_dispatch(
+    iree_hal_metal_command_buffer_t* command_buffer, iree_hal_metal_dispatch_segment_t* segment) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_metal_kernel_params_t kernel_params;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_command_buffer_prepare_dispatch(base_command_buffer, executable,
-                                                         entry_point, &kernel_params));
-
+  // Set the compute kernel to dispatch.
   id<MTLComputeCommandEncoder> compute_encoder =
       iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
-  uint32_t* workgroup_size = kernel_params.threadgroup_size;
-  [compute_encoder
-       dispatchThreadgroups:MTLSizeMake(workgroup_count_x, workgroup_count_y, workgroup_count_z)
-      threadsPerThreadgroup:MTLSizeMake(workgroup_size[0], workgroup_size[1], workgroup_size[2])];
+  [compute_encoder setComputePipelineState:segment->kernel_params.pso];
+
+  // Record push constants.
+  if (segment->push_constant_count != 0) {
+    [compute_encoder setBytes:(void*)segment->push_constants
+                       length:segment->push_constant_count * sizeof(int32_t)
+                      atIndex:IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX];
+  }
+
+  // Record buffer usages.
+  for (iree_host_size_t i = 0; i < segment->buffer_usage_count; ++i) {
+    [compute_encoder useResource:segment->buffer_usages[i].buffer
+                           usage:segment->buffer_usages[i].usage];
+  }
+
+  // Record all argument buffers.
+  for (iree_host_size_t i = 0; i < segment->argument_buffer_count; ++i) {
+    if (segment->argument_buffers[i] == nil) continue;
+    [compute_encoder setBuffer:segment->argument_buffers[i] offset:0 atIndex:i];
+  }
+
+  // Record the dispatch, either direct or indirect.
+  uint32_t* workgroup_size = segment->kernel_params.threadgroup_size;
+  if (segment->workgroups_buffer == nil) {
+    // Direct dispatch of a fixed workgroup count.
+    uint32_t* workgroup_count = segment->workgroup_count;
+    [compute_encoder
+         dispatchThreadgroups:MTLSizeMake(workgroup_count[0], workgroup_count[1],
+                                          workgroup_count[2])
+        threadsPerThreadgroup:MTLSizeMake(workgroup_size[0], workgroup_size[1], workgroup_size[2])];
+  } else {
+    // Indirect dispatch using a workgroup count from buffers.
+    [compute_encoder
+        dispatchThreadgroupsWithIndirectBuffer:segment->workgroups_buffer
+                          indirectBufferOffset:segment->workgroups_offset
+                         threadsPerThreadgroup:MTLSizeMake(workgroup_size[0], workgroup_size[1],
+                                                           workgroup_size[2])];
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_metal_command_buffer_dispatch_indirect(
+static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
+    iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
+    int32_t entry_point, uint32_t workgroup_count_x, uint32_t workgroup_count_y,
+    uint32_t workgroup_count_z) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_metal_dispatch_segment_t* segment = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_metal_command_segment_create_dispatch(base_command_buffer, executable,
+                                                         entry_point, &segment));
+  segment->workgroup_count[0] = workgroup_count_x;
+  segment->workgroup_count[1] = workgroup_count_y;
+  segment->workgroup_count[2] = workgroup_count_z;
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
     int32_t entry_point, iree_hal_buffer_t* workgroups_buffer,
     iree_device_size_t workgroups_offset) {
-  iree_hal_metal_command_buffer_t* command_buffer =
-      iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_metal_kernel_params_t kernel_params;
+  iree_hal_metal_dispatch_segment_t* segment = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_command_buffer_prepare_dispatch(base_command_buffer, executable,
-                                                         entry_point, &kernel_params));
-
-  id<MTLComputeCommandEncoder> compute_encoder =
-      iree_hal_metal_get_or_begin_compute_encoder(command_buffer);
-  uint32_t* workgroup_size = kernel_params.threadgroup_size;
-  id<MTLBuffer> metal_buffer =
+      z0, iree_hal_metal_command_segment_create_dispatch(base_command_buffer, executable,
+                                                         entry_point, &segment));
+  segment->workgroups_buffer =
       iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(workgroups_buffer));
-  [compute_encoder
-      dispatchThreadgroupsWithIndirectBuffer:metal_buffer
-                        indirectBufferOffset:workgroups_offset
-                       threadsPerThreadgroup:MTLSizeMake(workgroup_size[0], workgroup_size[1],
-                                                         workgroup_size[2])];
+  segment->workgroups_offset = workgroups_offset;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -880,24 +1188,80 @@ static iree_status_t iree_hal_metal_command_buffer_execute_commands(
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "secondary command buffer not yet supported");
 }
 
+static iree_status_t iree_hal_metal_command_segment_record(
+    iree_hal_metal_command_buffer_t* command_buffer) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  for (iree_hal_metal_command_segment_t* segment = command_buffer->segments.head; segment;
+       segment = segment->next_segment) {
+    switch (segment->action) {
+      case IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_BARRIER: {
+        IREE_RETURN_AND_END_ZONE_IF_ERROR(
+            z0, iree_hal_metal_command_segment_record_barrier(command_buffer, &segment->barrier));
+      } break;
+      case IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH: {
+        IREE_RETURN_AND_END_ZONE_IF_ERROR(
+            z0, iree_hal_metal_command_segment_record_dispatch(command_buffer, &segment->dispatch));
+      } break;
+      case IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_FILL_BUFFER: {
+        IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_command_segment_record_fill_buffer(
+                                                  command_buffer, &segment->fill_buffer));
+      } break;
+      case IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_COPY_BUFFER: {
+        IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_command_segment_record_copy_buffer(
+                                                  command_buffer, &segment->copy_buffer));
+      } break;
+      default:
+        IREE_ASSERT(false, "unhandled command segment kind");
+        break;
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_metal_command_buffer_begin(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+  iree_hal_metal_command_buffer_reset(command_buffer);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_metal_command_buffer_end(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_metal_command_buffer_t* command_buffer =
+      iree_hal_metal_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_command_segment_record(command_buffer));
+  iree_hal_metal_end_blit_encoder(command_buffer);
+  iree_hal_metal_end_compute_encoder(command_buffer);
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 static const iree_hal_command_buffer_vtable_t iree_hal_metal_command_buffer_vtable = {
     .destroy = iree_hal_metal_command_buffer_destroy,
     .begin = iree_hal_metal_command_buffer_begin,
     .end = iree_hal_metal_command_buffer_end,
     .begin_debug_group = iree_hal_metal_command_buffer_begin_debug_group,
     .end_debug_group = iree_hal_metal_command_buffer_end_debug_group,
-    .execution_barrier = iree_hal_metal_command_buffer_execution_barrier,
+    .execution_barrier = iree_hal_metal_command_buffer_prepare_barrier,
     .signal_event = iree_hal_metal_command_buffer_signal_event,
     .reset_event = iree_hal_metal_command_buffer_reset_event,
     .wait_events = iree_hal_metal_command_buffer_wait_events,
     .discard_buffer = iree_hal_metal_command_buffer_discard_buffer,
-    .fill_buffer = iree_hal_metal_command_buffer_fill_buffer,
-    .update_buffer = iree_hal_metal_command_buffer_update_buffer,
-    .copy_buffer = iree_hal_metal_command_buffer_copy_buffer,
+    .fill_buffer = iree_hal_metal_command_buffer_prepare_fill_buffer,
+    .update_buffer = iree_hal_metal_command_buffer_prepare_update_buffer,
+    .copy_buffer = iree_hal_metal_command_buffer_prepare_copy_buffer,
     .collective = iree_hal_metal_command_buffer_collective,
     .push_constants = iree_hal_metal_command_buffer_push_constants,
     .push_descriptor_set = iree_hal_metal_command_buffer_push_descriptor_set,
-    .dispatch = iree_hal_metal_command_buffer_dispatch,
-    .dispatch_indirect = iree_hal_metal_command_buffer_dispatch_indirect,
+    .dispatch = iree_hal_metal_command_buffer_prepare_dispatch,
+    .dispatch_indirect = iree_hal_metal_command_buffer_prepare_dispatch_indirect,
     .execute_commands = iree_hal_metal_command_buffer_execute_commands,
 };
