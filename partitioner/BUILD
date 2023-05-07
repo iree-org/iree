@@ -1,0 +1,81 @@
+# Copyright 2023 The OpenXLA Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+cc_library(
+    name = "defs",
+    includes = ["src"],
+)
+
+cc_library(
+    name = "gspmd_pipeline",
+    srcs = [
+        "src/openxla/partitioner/GSPMDPipeline.cpp",
+    ],
+    hdrs = [
+        "src/openxla/partitioner/GSPMDPipeline.h",
+    ],
+    copts = [
+        # TODO: File issue against XLA team: for deprecations in
+        # external/xla/xla/comparison_util.h
+        "-Wno-deprecated-declarations",
+    ],
+    deps = [
+        ":defs",
+        "@xla//xla/hlo/transforms:hlo_constant_splitter",
+        "@xla//xla/mlir_hlo:hlo_legalize_to_stablehlo",
+        "@xla//xla/mlir_hlo:mhlo_passes",
+        "@xla//xla/mlir_hlo:stablehlo_legalize_to_hlo",
+        "@xla//xla/service:algebraic_simplifier",
+        "@xla//xla/service:call_inliner",
+        "@xla//xla/service:conditional_canonicalizer",
+        "@xla//xla/service:conditional_simplifier",
+        "@xla//xla/service:gather_expander",
+        "@xla//xla/service:gather_simplifier",
+        "@xla//xla/service:hlo_constant_folding",
+        "@xla//xla/service:hlo_dce",
+        "@xla//xla/service:hlo_module_config",
+        "@xla//xla/service:hlo_pass_pipeline",
+        "@xla//xla/service:reshape_mover",
+        "@xla//xla/service:scatter_expander",
+        "@xla//xla/service:scatter_simplifier",
+        "@xla//xla/service:sharding_propagation",
+        "@xla//xla/service:sharding_remover",
+        "@xla//xla/service:sort_simplifier",
+        "@xla//xla/service:topk_rewriter",
+        "@xla//xla/service:tuple_simplifier",
+        "@xla//xla/service:while_loop_constant_sinking",
+        "@xla//xla/service:while_loop_simplifier",
+        "@xla//xla/service:zero_sized_hlo_elimination",
+        "@xla//xla/service/gpu:gpu_conv_rewriter",
+        "@xla//xla/service/spmd:collective_permute_motion",
+        "@xla//xla/service/spmd:spmd_partitioner",
+        "@xla//xla/service/spmd:stateful_rng_spmd_partitioner",
+        "@xla//xla/translate/hlo_to_mhlo:hlo_to_mlir_hlo",
+        "@xla//xla/translate/mhlo_to_hlo:mlir_hlo_to_hlo",
+    ],
+)
+
+cc_binary(
+    name = "partitioner_main",
+    srcs = [
+        "src/openxla/partitioner/Main.cpp",
+    ],
+    includes = ["src"],
+    deps = [
+        ":defs",
+        ":gspmd_pipeline",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Support",
+        "@stablehlo//:register",
+
+        # Upstream dialects.
+        "@llvm-project//mlir:ControlFlowDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:MLProgramDialect",
+        "@llvm-project//mlir:ShapeDialect",
+    ],
+)
