@@ -10,6 +10,16 @@ cc_library(
 )
 
 cc_library(
+    name = "c_headers",
+    hdrs = [
+        "bindings/c/openxla/partitioner/embedding_api.h",
+    ],
+    includes = [
+        "bindings/c",
+    ],
+)
+
+cc_library(
     name = "gspmd_pipeline",
     srcs = [
         "src/openxla/partitioner/GSPMDPipeline.cpp",
@@ -58,24 +68,48 @@ cc_library(
     ],
 )
 
-cc_binary(
-    name = "partitioner_main",
+cc_library(
+    name = "_private_lib_impl",
     srcs = [
-        "src/openxla/partitioner/Main.cpp",
+        "src/openxla/partitioner/EmbeddingLib.cpp",
+        "src/openxla/partitioner/MainLib.cpp",
     ],
-    includes = ["src"],
     deps = [
+        ":c_headers",
         ":defs",
         ":gspmd_pipeline",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:Support",
-        "@stablehlo//:register",
-
-        # Upstream dialects.
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:MLProgramDialect",
+        "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:ShapeDialect",
+        "@llvm-project//mlir:Support",
+        "@stablehlo//:register",
+    ],
+    alwayslink = 1,
+)
+
+cc_binary(
+    name = "libOpenXLAPartitioner.so",
+    linkshared = 1,
+    deps = [
+        ":_private_lib_impl",
+    ],
+)
+
+cc_import(
+    name = "impl_shared",
+    shared_library = "libOpenXLAPartitioner.so",
+)
+
+cc_binary(
+    name = "openxla_partitioner",
+    srcs = [
+        "src/openxla/partitioner/Main.c",
+    ],
+    deps = [
+        ":c_headers",
+        ":impl_shared",
     ],
 )

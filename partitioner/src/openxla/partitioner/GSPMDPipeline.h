@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef OPENXLA_PARTITIONER_GSPMD_PIPELINE_H
+#define OPENXLA_PARTITIONER_GSPMD_PIPELINE_H
+
 #include "mlir/Pass/PassManager.h"
 
 namespace openxla::partitioner {
@@ -12,3 +15,5 @@ namespace openxla::partitioner {
 void buildGSPMDPipeline(mlir::PassManager &passManager);
 
 }  // namespace openxla::partitioner
+
+#endif  // OPENXLA_PARTITIONER_GSPMD_PIPELINE_H
