@@ -65,7 +65,6 @@ iree_cc_library(
     MLIRTosaToTensor
     MLIRTransforms
     iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::InputConversion::Common
   DEFINES
     "IREE_HAVE_TOSA_INPUT"
   PUBLIC

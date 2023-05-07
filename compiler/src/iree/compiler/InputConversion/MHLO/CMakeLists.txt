@@ -93,7 +93,6 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
-    iree::compiler::InputConversion::Common
     iree::compiler::Utils
     tensorflow::external_mhlo_includes
   DEFINES

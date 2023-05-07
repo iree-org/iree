@@ -34,6 +34,8 @@ struct InputDialectOptions {
     // Applies no input transformation. Only supported core and extension ops
     // are supported.
     none,
+    // Analyses the input to determine what input dialect pipeline to use.
+    analysis,
 #ifdef IREE_HAVE_MHLO_INPUT
     // Legalizes input defined over MHLO ops.
     mhlo,
@@ -52,7 +54,7 @@ struct InputDialectOptions {
     tosa,
 #endif  // IREE_HAVE_TOSA_INPUT
   };
-  Type type = Type::none;
+  Type type = Type::analysis;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<InputDialectOptions>;

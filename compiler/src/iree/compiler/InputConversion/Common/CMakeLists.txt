@@ -42,6 +42,7 @@ iree_cc_library(
   SRCS
     "IREEImportPublic.cpp"
     "ImportMLProgram.cpp"
+    "InputConversionPipeline.cpp"
     "Passes.cpp"
     "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"

@@ -45,4 +45,14 @@ def TopLevelSCFToCFG :
   let constructor = "mlir::iree_compiler::createTopLevelSCFToCFGPass()";
 }
 
+def InputConversionPipeline :
+    Pass<"iree-input-conversion", "ModuleOp"> {
+  let summary = "Analysis and runs appropriate input pipeline.";
+  let description = [{
+    Analysis the input model to determine which input pipeline, or part of input
+    conversion to run.
+  }];
+  let constructor = "mlir::iree_compiler::createInputConversionPipelinePass()";
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES

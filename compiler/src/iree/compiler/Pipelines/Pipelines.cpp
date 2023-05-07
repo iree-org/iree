@@ -49,6 +49,9 @@ void buildIREEVMTransformPassPipeline(
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;
+    case InputDialectOptions::Type::analysis:
+      passManager.addPass(createInputConversionPipelinePass());
+      break;
 #ifdef IREE_HAVE_MHLO_INPUT
     case InputDialectOptions::Type::mhlo:
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
