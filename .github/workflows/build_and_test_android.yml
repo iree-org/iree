@@ -112,9 +112,11 @@ jobs:
       matrix:
         target:
           - device-name: pixel-4
-            label-exclude: vulkan
+            label-exclude: "vulkan"
           - device-name: pixel-6-pro
+            label-exclude: "^requires-gpu-nvidia$"
           - device-name: moto-edge-x30
+            label-exclude: "^requires-gpu-nvidia$"
     name: test_on_${{ matrix.target.device-name }}
     runs-on:
       - self-hosted # must come first
