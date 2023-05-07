@@ -21,6 +21,8 @@ iree_compiler_cc_library(
         "StagedReductionStrategy.cpp",
     ],
     hdrs = [
+        "AbstractGemmLikeStrategy.h",
+        "AbstractGpuStrategy.h",
         "AbstractReductionStrategy.h",
         "Common.h",
         "MatmulTensorCoreStrategy.h",
