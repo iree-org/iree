@@ -867,20 +867,7 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (set == IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "descriptor set #%d reserved for push constant emulation",
-                            IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX);
-  }
-
-  for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    if (bindings[i].buffer) continue;
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "unimplemented null buffer in push descriptor set");
-  }
-
+  IREE_ASSERT(set != IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX);
   iree_hal_metal_descriptor_t* descriptors = command_buffer->current_descriptors;
   IREE_ASSERT(iree_hal_metal_is_sorted_unique_descriptors(
       descriptors, command_buffer->current_total_binding_count));
@@ -954,10 +941,7 @@ static iree_status_t iree_hal_metal_create_argument_encoder(
     uint32_t buffer_index, id<MTLArgumentEncoder>* out_encoder, id<MTLBuffer>* out_buffer) {
   id<MTLArgumentEncoder> argument_encoder =
       [function newArgumentEncoderWithBufferIndex:buffer_index];  // +1
-  if (!argument_encoder) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "invalid argument buffer index #%u",
-                            buffer_index);
-  }
+  IREE_ASSERT(argument_encoder != nil);
 
   __block id<MTLBuffer> argument_buffer =
       [device newBufferWithLength:argument_encoder.encodedLength
@@ -994,10 +978,7 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
   iree_hal_metal_kernel_params_t kernel_params;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_kernel_library_entry_point_kernel_params(
                                             executable, entry_point, &kernel_params));
-  if (!command_buffer->current_pipeline_layout) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing pipeline layout when dispatch");
-  }
+  IREE_ASSERT(command_buffer->current_pipeline_layout != NULL);
 
   // Allocate the command segment and keep track of all necessary API data.
   uint8_t* storage_base = NULL;
@@ -1037,7 +1018,6 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
 
   // Build argument buffers for all descriptor sets and keep at the end of the current segment for
   // later access. Also do the same for buffer usage information.
-  iree_status_t status = iree_ok_status();
   iree_hal_metal_descriptor_t* descriptors = command_buffer->current_descriptors;
   int binding_count = command_buffer->current_total_binding_count;
   int i = 0;
@@ -1055,11 +1035,7 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
     iree_hal_descriptor_set_layout_t* set_layout =
         iree_hal_metal_pipeline_layout_descriptor_set_layout(
             command_buffer->current_pipeline_layout, current_set);
-    if (!set_layout) {
-      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "cannot find descriptor set layout for set #%u", current_set);
-      break;
-    }
+    IREE_ASSERT(set_layout != NULL);
 
     // Now put all bound buffers belonging to the current descriptor set into the argument buffer.
     for (; i < binding_count && descriptors[i].set == current_set; ++i) {
@@ -1072,12 +1048,7 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
 
       iree_hal_descriptor_set_layout_binding_t* binding_params =
           iree_hal_metal_descriptor_set_layout_binding(set_layout, current_binding);
-      if (!binding_params) {
-        status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                  "cannot find information for binding #%u in set #%u",
-                                  current_binding, current_set);
-        break;
-      }
+      IREE_ASSERT(binding_params != NULL);
       buffer_usage_ptr[i].buffer = current_buffer;
       buffer_usage_ptr[i].usage = iree_hal_metal_get_metal_resource_usage(binding_params);
     }
@@ -1093,7 +1064,7 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
 
   *out_segment = &segment->dispatch;
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_command_segment_record_dispatch(
