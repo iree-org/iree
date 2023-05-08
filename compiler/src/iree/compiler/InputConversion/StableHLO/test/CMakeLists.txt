@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "legalize_control_flow.mlir"
     "legalize_shape_computations.mlir"
+    "stablehlo_to_iree_input_dialects.mlir"
     "stablehlo_to_linalg.mlir"
     "stablehlo_to_linalg_convolution.mlir"
     "stablehlo_to_linalg_dot_prod.mlir"

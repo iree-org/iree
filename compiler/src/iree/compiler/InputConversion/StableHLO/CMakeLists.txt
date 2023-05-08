@@ -44,6 +44,7 @@ iree_cc_library(
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
     "StableHLOToArith.cpp"
+    "StableHLOToIREEInputDialects.cpp"
     "StableHLOToLinalg.cpp"
     "StableHLOToLinalgConvolution.cpp"
     "StableHLOToLinalgDotProd.cpp"
@@ -70,6 +71,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
+    MLIRMLProgramDialect
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRSCFDialect

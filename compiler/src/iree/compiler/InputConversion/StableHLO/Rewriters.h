@@ -34,8 +34,14 @@ void populateLegalizeShapeComputationPatterns(MLIRContext *context,
 // IREE-specific patterns.
 //===----------------------------------------------------------------------===//
 
-/// Populates the patterns that convert from StableHLO to Linalg on tensors.
+/// Populates the patterns that convert from StableHLO to LinalgExt.
 void populateStableHloToLinalgExtConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
+
+/// Populates the patterns that convert from StableHLO to Linalg on tensors.
+/// Extends the general linalg lowering patterns with IREE-specific ones.
+void populateStableHloToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns);
 
