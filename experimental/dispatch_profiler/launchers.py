@@ -165,7 +165,7 @@ class IreeToolsLauncher:
     # Parse the verification output.
     m = re.search(r"\[(?P<verification_result>[a-zA-Z]+)\]", cmd_output)
     if m is None:
-      raise Exception(
+      raise ValueError(
           f"Failed to parse verification output by iree-run-module: {cmd_output}"
       )
     verification_result = m.group('verification_result')
@@ -217,7 +217,7 @@ class IreeToolsLauncher:
     # Parse the profiling output.
     m = re.search(r"real_time_median\s+(?P<runtime>\d+.\d+)\s+ms", cmd_output)
     if m is None:
-      raise Exception(
+      raise ValueError(
           f"Failed to parse runtime from benchmark result: {cmd_output}")
     runtime_in_ms = float(m.group('runtime'))
     return runtime_in_ms
