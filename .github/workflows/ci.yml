@@ -74,7 +74,6 @@ jobs:
 
   build_test_all_windows:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run) && ! fromJson(needs.setup.outputs.is-pr)
     runs-on: windows-2022-64core
     defaults:
       run:
@@ -83,6 +82,14 @@ jobs:
       BUILD_DIR: build-windows
       IREE_VULKAN_DISABLE: 1
     steps:
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        if: false
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
       # actions/checkout is for some reason unusably slow on the large managed
       # Windows GitHub runners so we roll our own. See
       # https://github.com/actions/checkout/issues/1186
@@ -98,14 +105,6 @@ jobs:
           git fetch --depth 1 "${REMOTE_URL}" "${GITHUB_SHA}"
           git checkout "${GITHUB_SHA}"
           git submodule update --init --jobs 8 --depth 1
-      - id: "gcp-auth"
-        name: "Authenticating to Google Cloud"
-        if: ${{ needs.setup.outputs.write-caches }} == 1
-        uses: "google-github-actions/auth@v1"
-        with:
-          token_format: "access_token"
-          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
-          create_credentials_file: false
       - name: "Setting up Python"
         uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
         with:
