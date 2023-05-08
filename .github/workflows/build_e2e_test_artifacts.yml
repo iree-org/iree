@@ -123,7 +123,7 @@ jobs:
           # Not archiving the directory to allow fetching each file as needed
           # separately.
           find "${E2E_TEST_ARTIFACTS_DIR}" -maxdepth 1 \
-            -name "iree_*" -o -name "model_*.mlir" -o -name "*.json" | \
+            -name "iree_*" -o -name "model_*.mlir" -o -name "model_*.mlirbc" -o -name "*.json" | \
             gcloud storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \

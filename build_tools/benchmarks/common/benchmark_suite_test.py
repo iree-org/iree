@@ -138,7 +138,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         id="tf",
         name="model_tf",
         tags=["fp32"],
-        source_type=common_definitions.ModelSourceType.EXPORTED_TF_V2,
+        source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
         source_url="",
         entry_function="predict",
         input_types=["1xf32"])
@@ -204,10 +204,10 @@ class BenchmarkSuiteTest(unittest.TestCase):
 
     suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs,
                                                  root_benchmark_dir=root_dir)
-
-    self.assertEqual(suite.list_categories(),
-                     [("exported_tf_v2", pathlib.Path("exported_tf_v2")),
-                      ("exported_tflite", pathlib.Path("exported_tflite"))])
+    self.assertEqual(
+        suite.list_categories(),
+        [("exported_mhlo_mlir", pathlib.Path("exported_mhlo_mlir")),
+         ("exported_tflite", pathlib.Path("exported_tflite"))])
     run_config_a_case_dir = pathlib.Path(
         iree_artifacts.get_module_dir_path(
             run_config_a.module_generation_config, root_dir))
@@ -238,7 +238,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         ])
     self.assertEqual(
         suite.filter_benchmarks_for_category(
-            category="exported_tf_v2",
+            category="exported_mhlo_mlir",
             target_architectures=["riscv_32-generic"],
             model_name_filter="model_tf.*fp32",
             mode_filter="defaults"),
@@ -254,7 +254,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         ])
     self.assertEqual(
         suite.filter_benchmarks_for_category(
-            category="exported_tf_v2",
+            category="exported_mhlo_mlir",
             target_architectures=["cpu-riscv_32-generic"],
             mode_filter="experimental"), [])
 
