@@ -126,7 +126,9 @@ static void addBufferizePasses(OpPassManager &passManager) {
 }
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
-  pm.addPass(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createTileAndDistributeToWorkgroupsPass(
+      /*maxWorkgroupParallelDims=*/kNumMaxParallelDims,
+      linalg::DistributionMethod::CyclicNumProcsEqNumIters));
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
