@@ -811,15 +811,12 @@ jobs:
               --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-c2-standard-16.json" \
               --benchmark_files="${EXECUTION_BENCHMARK_RESULTS_DIR}/benchmark-results-a2-highgpu-1g.json" \
               --compile_stats_files="${COMPILE_STATS_RESULTS}"
-
-  benchmark_db_import:
-    needs: [setup, compilation_benchmarks, execution_benchmarks]
-    if: fromJson(needs.setup.outputs.should-run) && needs.setup.outputs.benchmark-presets != ''
-    uses: ./.github/workflows/benchmark_db_import.yml
-    with:
-      runner-group: ${{ needs.setup.outputs.runner-group }}
-      runner-env: ${{ needs.setup.outputs.runner-env }}
-
+      - name: Trigger DB import
+        continue-on-error: true
+        env:
+          DB_IMPORTER_TYPE: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+        run: |
+          build_tools/benchmarks/trigger_db_import.sh "$DB_IMPORTER_TYPE" "${{github.run_id}}" "${{github.run_attempt}}"
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
@@ -1052,7 +1049,6 @@ jobs:
       - compilation_benchmarks
       - execution_benchmarks
       - process_benchmark_results
-      - benchmark_db_import
     steps:
       - name: Getting failed jobs
         id: failed_jobs
