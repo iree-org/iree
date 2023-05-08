@@ -450,9 +450,9 @@ static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
     Operation *currOp = worklist.front();
     worklist.pop_front();
     for (OpOperand &operand : currOp->getOpOperands()) {
-      auto tilingInterfaceProducer =
-          operand.get().getDefiningOp<TilingInterface>();
-      if (!tilingInterfaceProducer ||
+      Operation *definingOp = operand.get().getDefiningOp();
+      auto tilingInterfaceProducer = dyn_cast<TilingInterface>(definingOp);
+      if (!tilingInterfaceProducer || isa<tensor::PadOp>(definingOp) ||
           producers.count(tilingInterfaceProducer)) {
         continue;
       }
