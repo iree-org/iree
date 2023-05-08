@@ -124,49 +124,8 @@ struct ConvertAddSubOp : public OpConversionPattern<OpTy> {
   }
 };
 
-template <typename DotOpTy>
-struct ConvertDotOp : public OpConversionPattern<DotOpTy> {
-  using OpConversionPattern<DotOpTy>::OpConversionPattern;
-
-  // Complex Dot operation is same as complex multiplication:
-  //   result.real = lhs.real * rhs.real - lhs.imag * rhs.imag
-  //   result.imag = lhs.imag * rhs.real + lhs.real * rhs.imag
-  LogicalResult matchAndRewrite(
-      DotOpTy op, typename DotOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!(isComplexTensor(adaptor.getLhs()) &&
-          isComplexTensor(adaptor.getRhs()))) {
-      return rewriter.notifyMatchFailure(op, "no complex tensor");
-    }
-
-    Location loc = op.getLoc();
-    Value lhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.getLhs());
-    Value lhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.getLhs());
-    Value rhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.getRhs());
-    Value rhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.getRhs());
-
-    Value lhsRhsRealReal = rewriter.create<chlo::BroadcastMulOp>(
-        loc, lhsReal, rhsReal, /*broadcast_dimensions=*/nullptr);
-    Value lhsRhsImagImag = rewriter.create<chlo::BroadcastMulOp>(
-        loc, lhsImag, rhsImag, /*broadcast_dimensions=*/nullptr);
-    Value lhsRhsImagReal = rewriter.create<chlo::BroadcastMulOp>(
-        loc, lhsImag, rhsReal, /*broadcast_dimensions=*/nullptr);
-    Value lhsRhsRealImag = rewriter.create<chlo::BroadcastMulOp>(
-        loc, lhsReal, rhsImag, /*broadcast_dimensions=*/nullptr);
-
-    Value realPart =
-        rewriter.create<mhlo::SubtractOp>(loc, lhsRhsRealReal, lhsRhsImagImag);
-    Value imagPart =
-        rewriter.create<mhlo::AddOp>(loc, lhsRhsImagReal, lhsRhsRealImag);
-
-    Value cmplxOp = rewriter.create<mhlo::ComplexOp>(loc, realPart, imagPart);
-    rewriter.replaceOp(op, cmplxOp);
-    return success();
-  }
-};
-
-// Complex multiplication results in a cross product multiplication between
-// the real and imaginary components such that:
+// Complex multiplication results in a cross product multiplication between the
+// real and imaginary components such that:
 //   result.real = lhs.real * rhs.real - lhs.imag * rhs.imag
 //   result.imag = lhs.imag * rhs.real + lhs.real * rhs.imag
 template <typename MulOpTy>
@@ -463,9 +422,6 @@ void populateMHLOComplexToRealPatterns(MLIRContext *context,
   // Mul patterns.
   patterns.insert<ConvertMulOp<mhlo::MulOp>>(typeConverter, context);
   patterns.insert<ConvertMulOp<chlo::BroadcastMulOp>>(typeConverter, context);
-
-  // Dot patterns.
-  patterns.insert<ConvertDotOp<mhlo::DotOp>>(typeConverter, context);
 
   // Div patterns.
   patterns.insert<ConvertDivOp<mhlo::DivOp>>(typeConverter, context);
