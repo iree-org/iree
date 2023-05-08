@@ -4,10 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
 #include "iree/compiler/Utils/IndexSet.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -16,6 +18,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-vmvx-resolve-buffer-descriptor"
 
 namespace mlir::iree_compiler::IREE::VMVX {
 
@@ -52,7 +56,7 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForSubview(
   // Apply stride multipliers.
   AffineMap mulMap = getMulMap(rewriter.getContext());
   for (auto [index, stride] : llvm::enumerate(subview.getMixedStrides())) {
-    OpFoldResult currentStride = makeComposedFoldedAffineApply(
+    OpFoldResult currentStride = affine::makeComposedFoldedAffineApply(
         rewriter, loc, mulMap, {sourceStrides[index], stride});
     resultDescriptor.strides.push_back(currentStride);
   }
@@ -61,9 +65,9 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForSubview(
   resultDescriptor.offset = sourceOffset;
   AffineMap addMap = getAddMap(rewriter.getContext());
   for (auto [index, offset] : llvm::enumerate(subview.getMixedOffsets())) {
-    OpFoldResult physicalOffset = makeComposedFoldedAffineApply(
+    OpFoldResult physicalOffset = affine::makeComposedFoldedAffineApply(
         rewriter, loc, mulMap, {offset, resultDescriptor.strides[index]});
-    resultDescriptor.offset = makeComposedFoldedAffineApply(
+    resultDescriptor.offset = affine::makeComposedFoldedAffineApply(
         rewriter, loc, addMap, {resultDescriptor.offset, physicalOffset});
   }
   return resultDescriptor;
@@ -83,8 +87,8 @@ static SmallVector<OpFoldResult> getStridesFromSizes(
   }
   AffineMap mulMap = getMulMap(rewriter.getContext());
   for (int i = sizes.size() - 2; i >= 0; --i) {
-    strides[i] = makeComposedFoldedAffineApply(rewriter, loc, mulMap,
-                                               {strides[i + 1], sizes[i + 1]});
+    strides[i] = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulMap, {strides[i + 1], sizes[i + 1]});
   }
   return strides;
 }
@@ -112,24 +116,8 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
       getStridesFromSizes(rewriter, loc, resultDescriptor.sizes);
 
   // Offset.
-  Type elementType = memRefType.getElementType();
-  OpFoldResult elementWidth =
-      TypeSwitch<Type, OpFoldResult>(elementType)
-          .Case<ComplexType, IntegerType, FloatType>(
-              [&](auto type) -> OpFoldResult {
-                return rewriter.getIndexAttr(
-                    IREE::Util::getRoundedElementByteWidth(
-                        memRefType.getElementType()));
-              })
-          .Default([&](Type t) -> OpFoldResult {
-            return rewriter.create<IREE::Util::SizeOfOp>(loc, elementType)
-                .getResult();
-          });
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  resultDescriptor.offset = makeComposedFoldedAffineApply(
-      rewriter, loc, s0.floorDiv(s1),
-      ArrayRef<OpFoldResult>{binding.getByteOffset(), elementWidth});
+  resultDescriptor.offset = convertByteOffsetToElementOffset(
+      rewriter, loc, binding.getByteOffset(), memRefType.getElementType());
   return resultDescriptor;
 }
 
@@ -199,9 +187,9 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForGetGlobalOp(
 
 /// Replaces the offsets, sizes and strides based on values provided
 /// by `DescriptorInfo` object.
-template <typename OpTy>
 static void replaceOffsetSizesAndStridesWith(
-    RewriterBase &rewriter, OpTy op, const DescriptorInfo &resultDescriptor) {
+    RewriterBase &rewriter, GetBufferDescriptorOp op,
+    const DescriptorInfo &resultDescriptor) {
   int rank = resultDescriptor.sizes.size();
   assert(rank == resultDescriptor.strides.size() &&
          "expected number of sizes and strides to match");
@@ -230,10 +218,9 @@ static void replaceOffsetSizesAndStridesWith(
 
 namespace {
 
-template <typename OpTy>
-struct FromMemRefSubView : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
-  LogicalResult matchAndRewrite(OpTy op,
+struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto subview = op.getSource().template getDefiningOp<memref::SubViewOp>();
     if (!subview) return failure();
@@ -254,9 +241,9 @@ struct FromMemRefSubView : public OpRewritePattern<OpTy> {
     for (int i = 0; i < sourceRank; i++) {
       sizeStrideTypes.push_back(indexType);
     }
-    auto sourceDesc =
-        rewriter.create<OpTy>(loc, op.getBaseBuffer().getType(), indexType,
-                              sizeStrideTypes, sizeStrideTypes, source);
+    auto sourceDesc = rewriter.create<GetBufferDescriptorOp>(
+        loc, op.getBaseBuffer().getType(), indexType, sizeStrideTypes,
+        sizeStrideTypes, source);
 
     FailureOr<DescriptorInfo> resultDescriptor =
         resolveBufferDescriptorForSubview(
@@ -327,62 +314,22 @@ struct FromHalInterfaceBindingSubspan
   }
 };
 
-struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
-    : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
-                                PatternRewriter &rewriter) const override {
-    auto binding =
-        op.getSource()
-            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!binding) return failure();
-    auto memRefType = binding.getResult().getType().template cast<MemRefType>();
-    if (memRefType.getRank() < 1) return failure();
-
-    auto loc = op.getLoc();
-    FailureOr<DescriptorInfo> resultDescriptor =
-        resolveBufferDescriptorForInterfaceBinding(binding, rewriter, loc);
-    if (failed(resultDescriptor)) {
-      return rewriter.notifyMatchFailure(
-          op, "failed to resolve descriptor with source being binding op");
-    }
-
-    replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
-
-    // Base buffer. Use a 1D memref for hal.interface.binding.subspan.
-    AffineMap mulMap = getMulMap(rewriter.getContext());
-    OpFoldResult linearizedMemrefSize = rewriter.getIndexAttr(1);
-    for (auto size : resultDescriptor->sizes) {
-      linearizedMemrefSize = makeComposedFoldedAffineApply(
-          rewriter, loc, mulMap, {linearizedMemrefSize, size});
-    }
-    SmallVector<int64_t> staticLinearShape;
-    SmallVector<Value> dynamicLinearShape;
-    dispatchIndexOpFoldResult(linearizedMemrefSize, dynamicLinearShape,
-                              staticLinearShape);
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(binding);
-
-    Value newOffset = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value linearInterfaceBinding =
-        rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-            loc, op.getBaseBuffer().getType(), binding.getSetAttr(),
-            binding.getBindingAttr(), binding.getDescriptorTypeAttr(),
-            newOffset, /*dynamicDims =*/ValueRange{},
-            binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
-    rewriter.replaceAllUsesWith(op.getBaseBuffer(), linearInterfaceBinding);
-
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
+/// Function to handle replacement of base pointer of buffer
+/// descriptors.
+static Value getBaseBufferReplacementForDescriptor(
+    GetBufferDescriptorOp descriptorOp, RewriterBase &rewriter, Location loc,
+    Value source) {
+  return rewriter
+      .create<UnrealizedConversionCastOp>(
+          loc, descriptorOp.getBaseBuffer().getType(), source)
+      .getResult(0);
+}
 
 // Allocations always return a non-offset memref and are matched by this
 // pattern.
-template <typename OpTy>
-struct FromAllocation : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
-  LogicalResult matchAndRewrite(OpTy op,
+struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto alloca = op.getSource().template getDefiningOp<memref::AllocaOp>();
     if (!alloca) return failure();
@@ -402,12 +349,9 @@ struct FromAllocation : public OpRewritePattern<OpTy> {
     replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
 
     // Base buffer.
-    rewriter.replaceAllUsesWith(
-        op.getBaseBuffer(),
-        rewriter
-            .template create<UnrealizedConversionCastOp>(
-                loc, op.getBaseBuffer().getType(), alloca.getResult())
-            .getResult(0));
+    Value replacement = getBaseBufferReplacementForDescriptor(
+        op, rewriter, loc, alloca.getResult());
+    rewriter.replaceAllUsesWith(op.getBaseBuffer(), replacement);
 
     rewriter.eraseOp(op);
     return success();
@@ -416,10 +360,9 @@ struct FromAllocation : public OpRewritePattern<OpTy> {
 
 // MemRef globals are always static shaped and reference a non-offset
 // buffer.
-template <typename OpTy>
-struct FromGlobal : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
-  LogicalResult matchAndRewrite(OpTy op,
+struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto global = op.getSource().template getDefiningOp<memref::GetGlobalOp>();
     if (!global) return failure();
@@ -439,17 +382,18 @@ struct FromGlobal : public OpRewritePattern<OpTy> {
     replaceOffsetSizesAndStridesWith(rewriter, op, resultDescriptor.value());
 
     // Base buffer.
-    rewriter.replaceAllUsesWith(
-        op.getBaseBuffer(),
-        rewriter
-            .template create<UnrealizedConversionCastOp>(
-                loc, op.getBaseBuffer().getType(), global.getResult())
-            .getResult(0));
+    Value replacement = getBaseBufferReplacementForDescriptor(
+        op, rewriter, loc, global.getResult());
+    rewriter.replaceAllUsesWith(op.getBaseBuffer(), replacement);
 
     rewriter.eraseOp(op);
     return success();
   }
 };
+
+//===---------------------------------------------------------------------===//
+// Pass To resovle descriptors.
+//===---------------------------------------------------------------------===//
 
 class ResolveBufferDescriptorsPass
     : public ResolveBufferDescriptorsBase<ResolveBufferDescriptorsPass> {
@@ -457,20 +401,13 @@ class ResolveBufferDescriptorsPass
   ResolveBufferDescriptorsPass() = default;
   ResolveBufferDescriptorsPass(const ResolveBufferDescriptorsPass &) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::VMVX::VMVXDialect>();
+    registry.insert<affine::AffineDialect, IREE::VMVX::VMVXDialect>();
   }
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.insert<FromAllocation<GetBufferDescriptorOp>,
-                    FromAllocation<memref::ExtractStridedMetadataOp>,
-                    FromGlobal<GetBufferDescriptorOp>,
-                    FromGlobal<memref::ExtractStridedMetadataOp>,
-                    FromHalInterfaceBindingSubspan,
-                    FromMemRefSubView<GetBufferDescriptorOp>,
-                    FromMemRefSubView<memref::ExtractStridedMetadataOp>,
-                    ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
-        &getContext());
+    patterns.insert<FromAllocation, FromGlobal, FromHalInterfaceBindingSubspan,
+                    FromMemRefSubView>(&getContext());
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
@@ -481,7 +418,7 @@ class ResolveBufferDescriptorsPass
     if (!allowUnresolved) {
       SmallVector<Operation *> remaining;
       getOperation()->walk([&](Operation *op) {
-        if (isa<GetBufferDescriptorOp, memref::ExtractStridedMetadataOp>(op)) {
+        if (isa<GetBufferDescriptorOp>(op)) {
           remaining.push_back(op);
         }
       });

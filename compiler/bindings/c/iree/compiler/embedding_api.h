@@ -17,7 +17,9 @@
 #ifndef IREE_COMPILER_EMBEDDING_API_H
 #define IREE_COMPILER_EMBEDDING_API_H
 
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "iree/compiler/api_support.h"
 
@@ -55,22 +57,61 @@ IREE_EMBED_EXPORTED const char *ireeCompilerErrorGetMessage(
 //===----------------------------------------------------------------------===//
 
 // Gets the version of the API that this compiler exports.
+// The version is encoded with the lower 16 bits containing the minor version
+// and upper bits containing the major version.
+// The compiler API is versioned. Within a major version, symbols may be
+// added, but existing symbols must not be removed or changed to alter
+// previously exposed functionality. A major version bump implies an API
+// break and no forward or backward compatibility is assumed across major
+// versions.
 IREE_EMBED_EXPORTED int ireeCompilerGetAPIVersion();
 
 // The compiler must be globally initialized before further use.
 // It is intended to be called as part of the hosting process's startup
 // sequence. Any failures that it can encounter are fatal and will abort
 // the process.
+// It is legal to call this multiple times, and each call must be balanced
+// by a call to |ireeCompilerGlobalShutdown|. The final shutdown call will
+// permanently disable the compiler for the process and subsequent calls
+// to initialize will fail/abort. If this is not desirable, some higher level
+// code must hold initialization open with its own call.
+IREE_EMBED_EXPORTED void ireeCompilerGlobalInitialize();
+
+// Gets the build revision of the IREE compiler. In official releases, this
+// will be a string with the build tag. In development builds, it may be an
+// empty string. The returned is valid for as long as the compiler is
+// initialized.
+// Available since: 1.1
+IREE_EMBED_EXPORTED const char *ireeCompilerGetRevision();
+
+// Processes an argc/argv from main() using platform specific dark magic,
+// possibly updating them in-place to cleaned up values. On most systems,
+// this is a no-op. However, on Windows, this will do various processing
+// to extract the original command line and decode it properly as UTF-8.
+// It is therefore essential that this be passed the actual argc/argv to main
+// and not some permutation of it. Any updated argv will persist until a
+// final call to |ireeCompilerGlobalShutdown|. This must be called after
+// |ireeCompilerGlobalInitialize|.
 //
-// If |initializeCommandLine| is true, then compiler flags will be bound to
-// the process-level command line environment. This can provide convenient
-// mnemonic access to single tenant setups but is risky in a multi-tenant
-// library.
+// We're really sorry about this. Old platforms are annoying.
+// This API is not yet considered version-stable. If using out of tree, please
+// contact the developers.
+IREE_EMBED_EXPORTED void ireeCompilerGetProcessCLArgs(int *argc,
+                                                      const char ***argv);
+
+// Initializes the command line environment from an explicit argc/argv
+// (typically the result of a prior call to ireeCompilerGetProcessCLArgs).
+// This uses dark magic to setup the usual array of expected signal handlers.
+// This API is not yet considered version-stable. If using out of tree, please
+// contact the developers.
 //
-// Note that for internal tools which use InitLLVM to manage access to the CLI,
-// it is legal for that to co-exist with this global initialize/shutdown.
-IREE_EMBED_EXPORTED void ireeCompilerGlobalInitialize(
-    bool initializeCommandLine);
+// Note that there is as yet no facility to register new global command line
+// options from the C API. However, this facility should be sufficient for
+// subordinating builtin command line options to a higher level integration
+// by tunneling global options into the initialization sequence.
+IREE_EMBED_EXPORTED void ireeCompilerSetupGlobalCL(int argc, const char **argv,
+                                                   const char *banner,
+                                                   bool installSignalHandlers);
 
 // Destroys any process level resources that the compiler may have created.
 // This must be called prior to library unloading.
@@ -284,6 +325,20 @@ IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFile(
 // Must be destroyed via ireeCompilerOutputDestroy().
 IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenFD(
     int fd, iree_compiler_output_t **out_output);
+
+// Opens an output to in-memory storage. Use the API
+// |ireeCompilerOutputMapMemory| to access the mapped contents once all
+// output has been written.
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputOpenMembuffer(
+    iree_compiler_output_t **out_output);
+
+// Maps the contents of a compiler output opened via
+// |ireeCompilerOutputOpenMembuffer|. This may be something obtained via
+// mmap or a more ordinary temporary buffer. This may fail in platform
+// specific ways unless if the output was created via
+// |ireeCompilerOutputOpenMembuffer|.
+IREE_EMBED_EXPORTED iree_compiler_error_t *ireeCompilerOutputMapMemory(
+    iree_compiler_output_t *output, void **contents, uint64_t *size);
 
 // For file or other persistent outputs, by default they will be deleted on
 // |ireeCompilerOutputDestroy| (or exit). It is necessary to call

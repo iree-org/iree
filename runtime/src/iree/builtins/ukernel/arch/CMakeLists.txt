@@ -4,37 +4,36 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-option(IREE_UK_FORCE_DISABLE_ARCH_SPECIFIC_CODE "Disable all architecture-specific code in builtin kernels" OFF)
+# Our inline assembly is of the GCC/Clang flavor. Enable it by default when it
+# is expected to compile.
+iree_select_compiler_opts(IREE_UK_ENABLE_INLINE_ASM_DEFAULT
+  CLANG_OR_GCC
+    ON
+)
 
-if(IREE_UK_FORCE_DISABLE_ARCH_SPECIFIC_CODE)
-  set(IREE_UK_ENABLE_ARCH_SPECIFIC_CODE FALSE)
-else()
-  set(IREE_UK_ENABLE_ARCH_SPECIFIC_CODE TRUE)
+option(IREE_UK_ENABLE_INLINE_ASM 
+  "Enable inline assembly in ukernels"
+  ${IREE_UK_ENABLE_INLINE_ASM_DEFAULT}
+)
+
+option(IREE_UK_ENABLE_INTRINSICS_EVEN_WHEN_INLINE_ASM_AVAILABLE
+  "Enable intrinsics code paths even when an inline assembly alternative is available. These may then be selected by a *_PREFER_INTRINSICS ukernel flag."
+  OFF
+)
+
+if (IREE_ARCH STREQUAL "arm_64")
+  set(IREE_UK_ARCH_ARM_64 TRUE)
+  add_subdirectory(arm_64)
+  list(APPEND IREE_UK_ARCH_DEPS
+    "iree::builtins::ukernel::arch::arm_64"
+  )
+elseif (IREE_ARCH STREQUAL "x86_64")
+  set(IREE_UK_ARCH_X86_64 TRUE)
+  add_subdirectory(x86_64)
+  list(APPEND IREE_UK_ARCH_DEPS
+    "iree::builtins::ukernel::arch::x86_64"
+  )
 endif()
-
-# This block is borrowed from boringssl's CMake code here:
-# https://boringssl.googlesource.com/boringssl/+/c5f0e58e653d2d9afa8facc090ce09f8aaa3fa0d/CMakeLists.txt#43
-if(CMAKE_OSX_ARCHITECTURES)
-  list(LENGTH CMAKE_OSX_ARCHITECTURES NUM_ARCHES)
-  if(NOT ${NUM_ARCHES} EQUAL 1)
-    message(WARNING "Performance advisory: architecture-specific code paths disabled because this is a multi-architecture build.")
-    set(IREE_UK_ENABLE_ARCH_SPECIFIC_CODE FALSE)
-  endif()
-  list(GET CMAKE_OSX_ARCHITECTURES 0 CMAKE_SYSTEM_PROCESSOR)
-endif()
-
-if(IREE_UK_ENABLE_ARCH_SPECIFIC_CODE)
-  if((CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64) OR (CMAKE_SYSTEM_PROCESSOR STREQUAL arm64))
-    set(IREE_UK_ARCH_ARM_64 TRUE)
-    add_subdirectory(arm_64)
-    list(APPEND IREE_UK_ARCH_DEPS
-      "iree::builtins::ukernel::arch::arm_64::mmt4d_arm_64"
-      "iree::builtins::ukernel::arch::arm_64::pack_arm_64"
-      "iree::builtins::ukernel::arch::arm_64::query_tile_sizes_arm_64"
-      "iree::builtins::ukernel::arch::arm_64::unpack_arm_64"
-    )
-  endif()
-endif()  # IREE_UK_ENABLE_ARCH_SPECIFIC_CODE
 
 set(IREE_UK_POINTER_SIZE "${CMAKE_SIZEOF_VOID_P}")
 

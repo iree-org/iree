@@ -173,7 +173,7 @@ static void inlineUniformConstants(
   unsigned operandCount = anyDispatchOp.getUniformOperands().size();
 
   // Find uniform constant values for each operand across all usages.
-  SmallVector<Optional<APInt>> operandValues(operandCount);
+  SmallVector<std::optional<APInt>> operandValues(operandCount);
   SmallVector<SmallVector<Location>> operandLocs(operandCount);
   llvm::BitVector uniformOperandMap(operandCount, /*t=*/true);
   for (auto dispatchOp : dispatchOps) {

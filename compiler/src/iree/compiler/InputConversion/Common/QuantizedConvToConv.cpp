@@ -11,8 +11,9 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -28,17 +29,10 @@ namespace {
 
 // Creates an empty copy matching the provided value.
 Value emptyCopy(ImplicitLocOpBuilder &rewriter, Value value) {
-  RankedTensorType ty = value.getType().cast<RankedTensorType>();
-  Type eTy = ty.getElementType();
-
-  SmallVector<Value> dynSizes;
-  for (int i = 0, s = ty.getRank(); i < s; i++) {
-    if (ty.isDynamicDim(i)) {
-      dynSizes.push_back(rewriter.create<tensor::DimOp>(value, i));
-    }
-  }
-
-  return rewriter.create<tensor::EmptyOp>(ty.getShape(), eTy, dynSizes);
+  Type eTy = getElementTypeOrSelf(value.getType());
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::createDimValues(rewriter, rewriter.getLoc(), value);
+  return rewriter.create<tensor::EmptyOp>(mixedSizes, eTy);
 }
 
 // Creates an zero initialized tensor of given shape and type.
@@ -47,7 +41,7 @@ Value emptyZero(ImplicitLocOpBuilder &builder, RankedTensorType ty,
   Value empty =
       builder.create<tensor::EmptyOp>(ty.getShape(), ty.getElementType(), dyn);
 
-  Attribute attr = builder.getZeroAttr(ty.getElementType());
+  TypedAttr attr = builder.getZeroAttr(ty.getElementType());
   Value cnst = builder.create<arith::ConstantOp>(attr);
   return builder.create<linalg::FillOp>(ValueRange{cnst}, ValueRange{empty})
       .result();

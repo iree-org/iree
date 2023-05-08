@@ -5,7 +5,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import os
 import pathlib
 import tempfile
 import unittest
@@ -13,6 +12,7 @@ from typing import Sequence
 from common.benchmark_definition import IREE_DRIVERS_INFOS
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_artifacts import iree_artifacts
 
 
 class BenchmarkSuiteTest(unittest.TestCase):
@@ -57,8 +57,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         category="TFLite",
         available_drivers=["local-task", "vulkan"],
         available_loaders=["embedded-elf"],
-        cpu_target_arch_filter="cpu-armv8",
-        gpu_target_arch_filter="gpu-mali",
+        target_architectures=["cpu-armv8", "gpu-mali"],
         driver_filter=None,
         mode_filter=".*full-inference.*",
         model_name_filter="deepnet.*")
@@ -66,16 +65,14 @@ class BenchmarkSuiteTest(unittest.TestCase):
         category="TFLite",
         available_drivers=["local-task", "vulkan"],
         available_loaders=["embedded-elf"],
-        cpu_target_arch_filter="cpu-unknown",
-        gpu_target_arch_filter="gpu-mali",
+        target_architectures=["gpu-mali"],
         driver_filter="vulkan",
         mode_filter=".*full-inference.*",
-        model_name_filter="deepnet.*/case2")
+        model_name_filter="deepnet.*")
     all_benchmarks = suite.filter_benchmarks_for_category(
         category="TFLite",
         available_drivers=None,
-        cpu_target_arch_filter=None,
-        gpu_target_arch_filter=None,
+        target_architectures=None,
         driver_filter=None,
         mode_filter=None,
         model_name_filter=None)
@@ -93,8 +90,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         category="PyTorch",
         available_drivers=[],
         available_loaders=[],
-        cpu_target_arch_filter="ARMv8",
-        gpu_target_arch_filter="Mali-G78")
+        target_architectures=["ARMv8", "Mali-G78"])
 
     self.assertEqual(benchmarks, [])
 
@@ -127,8 +123,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
               category="PyTorch",
               available_drivers=["vulkan"],
               available_loaders=[],
-              cpu_target_arch_filter="cpu-armv8",
-              gpu_target_arch_filter="gpu-mali"), [case2])
+              target_architectures=["cpu-armv8", "gpu-mali"]), [case2])
 
   def test_load_from_run_configs(self):
     model_tflite = common_definitions.Model(
@@ -147,107 +142,120 @@ class BenchmarkSuiteTest(unittest.TestCase):
         source_url="",
         entry_function="predict",
         input_types=["1xf32"])
-    exec_config_a = iree_definitions.ModuleExecutionConfig(
+    exec_config_a = iree_definitions.ModuleExecutionConfig.build(
         id="exec_a",
         tags=["defaults"],
         loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
         driver=iree_definitions.RuntimeDriver.LOCAL_SYNC)
-    exec_config_b = iree_definitions.ModuleExecutionConfig(
+    exec_config_b = iree_definitions.ModuleExecutionConfig.build(
         id="exec_b",
         tags=["experimental"],
         loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
         driver=iree_definitions.RuntimeDriver.LOCAL_TASK)
-    device_spec_a = common_definitions.DeviceSpec(
+    device_spec_a = common_definitions.DeviceSpec.build(
         id="dev_a",
         device_name="a",
         architecture=common_definitions.DeviceArchitecture.RV32_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
-        device_parameters=[])
-    device_spec_b = common_definitions.DeviceSpec(
+        device_parameters=[],
+        tags=[])
+    device_spec_b = common_definitions.DeviceSpec.build(
         id="dev_b",
         device_name="b",
         architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
         host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
-        device_parameters=[])
+        device_parameters=[],
+        tags=[])
     compile_target = iree_definitions.CompileTarget(
         target_backend=iree_definitions.TargetBackend.LLVM_CPU,
         target_architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
         target_abi=iree_definitions.TargetABI.LINUX_GNU)
-    run_config_a = iree_definitions.E2EModelRunConfig.with_flag_generation(
-        module_generation_config=iree_definitions.ModuleGenerationConfig.
-        with_flag_generation(
+    run_config_a = iree_definitions.E2EModelRunConfig.build(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.build(
             imported_model=iree_definitions.ImportedModel.from_model(
                 model_tflite),
-            compile_config=iree_definitions.CompileConfig(
+            compile_config=iree_definitions.CompileConfig.build(
                 id="1", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_a,
         target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
-    run_config_b = iree_definitions.E2EModelRunConfig.with_flag_generation(
-        module_generation_config=iree_definitions.ModuleGenerationConfig.
-        with_flag_generation(
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
+    run_config_b = iree_definitions.E2EModelRunConfig.build(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.build(
             imported_model=iree_definitions.ImportedModel.from_model(
                 model_tflite),
-            compile_config=iree_definitions.CompileConfig(
+            compile_config=iree_definitions.CompileConfig.build(
                 id="2", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_b,
         target_device_spec=device_spec_b,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
-    run_config_c = iree_definitions.E2EModelRunConfig.with_flag_generation(
-        module_generation_config=iree_definitions.ModuleGenerationConfig.
-        with_flag_generation(
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
+    run_config_c = iree_definitions.E2EModelRunConfig.build(
+        module_generation_config=iree_definitions.ModuleGenerationConfig.build(
             imported_model=iree_definitions.ImportedModel.from_model(model_tf),
-            compile_config=iree_definitions.CompileConfig(
+            compile_config=iree_definitions.CompileConfig.build(
                 id="3", tags=[], compile_targets=[compile_target])),
         module_execution_config=exec_config_a,
         target_device_spec=device_spec_a,
-        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA)
+        input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+        tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE)
     run_configs = [run_config_a, run_config_b, run_config_c]
+    root_dir = pathlib.Path("root")
 
-    suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs)
+    suite = BenchmarkSuite.load_from_run_configs(run_configs=run_configs,
+                                                 root_benchmark_dir=root_dir)
 
     self.assertEqual(suite.list_categories(),
                      [("exported_tf_v2", pathlib.Path("exported_tf_v2")),
                       ("exported_tflite", pathlib.Path("exported_tflite"))])
+    run_config_a_case_dir = pathlib.Path(
+        iree_artifacts.get_module_dir_path(
+            run_config_a.module_generation_config, root_dir))
+    run_config_b_case_dir = pathlib.Path(
+        iree_artifacts.get_module_dir_path(
+            run_config_b.module_generation_config, root_dir))
+    run_config_c_case_dir = pathlib.Path(
+        iree_artifacts.get_module_dir_path(
+            run_config_c.module_generation_config, root_dir))
     self.assertEqual(
         suite.filter_benchmarks_for_category(category="exported_tflite"), [
             BenchmarkCase(model_name=model_tflite.name,
                           model_tags=model_tflite.tags,
                           bench_mode=exec_config_a.tags,
-                          target_arch="cpu-riscv_32-generic",
+                          target_arch="riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=run_config_a_case_dir,
                           run_config=run_config_a),
             BenchmarkCase(model_name=model_tflite.name,
                           model_tags=model_tflite.tags,
                           bench_mode=exec_config_b.tags,
-                          target_arch="cpu-riscv_64-generic",
+                          target_arch="riscv_64-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=run_config_b_case_dir,
                           run_config=run_config_b)
         ])
     self.assertEqual(
         suite.filter_benchmarks_for_category(
             category="exported_tf_v2",
-            cpu_target_arch_filter="cpu-riscv_32-generic",
+            target_architectures=["riscv_32-generic"],
             model_name_filter="model_tf.*fp32",
             mode_filter="defaults"),
         [
             BenchmarkCase(model_name=model_tf.name,
                           model_tags=model_tf.tags,
                           bench_mode=exec_config_a.tags,
-                          target_arch="cpu-riscv_32-generic",
+                          target_arch="riscv_32-generic",
                           driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_tool_name="iree-benchmark-module",
-                          benchmark_case_dir=None,
+                          benchmark_case_dir=run_config_c_case_dir,
                           run_config=run_config_c)
         ])
     self.assertEqual(
         suite.filter_benchmarks_for_category(
             category="exported_tf_v2",
-            cpu_target_arch_filter="cpu-riscv_32-generic",
+            target_architectures=["cpu-riscv_32-generic"],
             mode_filter="experimental"), [])
 
   @staticmethod

@@ -534,22 +534,24 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_trace,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_channel_create,  //
                    iree_hal_module_state_t,         //
-                   rIii, r) {
+                   rIirrii, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_queue_affinity_t queue_affinity =
       (iree_hal_queue_affinity_t)args->i1;
-  int32_t rank = args->i2;
-  int32_t count = args->i3;
+  uint32_t flags = args->i2;
+  iree_vm_buffer_t* id = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref_or_null(args->r3, &id));
+  iree_vm_buffer_t* group = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref_or_null(args->r4, &group));
+  iree_string_view_t group_str = iree_vm_buffer_as_string(group);
+  int32_t rank = args->i5;
+  int32_t count = args->i6;
 
-  // TODO(benvanik): a way to rendezvous with the ID? We could accept a byte
-  // buffer as input and map that directly. We really don't want to encourage
-  // usage where transient addresses are compiled into artifacts, though, so
-  // for now it's fine to rely on either the hosting application creating the
-  // channel and passing it into the program or using the environment.
   iree_hal_channel_params_t params = {
-      .flags = IREE_HAL_CHANNEL_FLAG_NONE,
-      .id = iree_const_byte_span_empty(),
+      .flags = flags,
+      .id = iree_vm_buffer_const_contents(id),  // may be null
+      .group = group_str,                       // may be null
       .rank = rank,
       .count = count,
   };

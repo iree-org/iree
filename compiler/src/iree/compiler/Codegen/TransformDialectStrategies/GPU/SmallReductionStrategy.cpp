@@ -25,7 +25,6 @@ using namespace mlir;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOpPatterns;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
-using iree_compiler::IREE::transform_dialect::MapNestedForallToGpuThreadsOp;
 using iree_compiler::IREE::transform_dialect::VectorToWarpExecuteOnLane0Op;
 using iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
 using transform::FuseIntoContainingOp;

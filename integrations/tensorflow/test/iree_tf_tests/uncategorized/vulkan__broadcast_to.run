@@ -1,3 +1,0 @@
-# REQUIRES: bugfix
-#           TODO(#11277): re-enable after passing
-# RUN: %PYTHON -m iree_tf_tests.uncategorized.broadcast_to_test --target_backends=iree_vulkan --artifacts_dir=%t

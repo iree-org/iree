@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-hal-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion %s | FileCheck %s
 
 // Today all memory control operations are ignored and we're just left with
 // the normal sequential execution barriers.
@@ -245,6 +245,32 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
   return %0 : !stream.timepoint
+}
+
+// -----
+
+// Tests conversion of streamable calls and function declarations.
+// Expect a command buffer and a buffer + offset + length for each resource.
+
+// CHECK: func.func private @cmdFunc(!hal.command_buffer, !hal.buffer, index, index, i32, !hal.buffer, index, index, !custom.type, !hal.buffer, index, index)
+stream.cmd.func private @cmdFunc(%arg0[%arg1 for %arg2]: !stream.resource<*>, %arg3: i32, %arg4[%arg5 for %arg6]: !stream.resource<*>, %arg7: !custom.type, %arg8[%arg9 for %arg10]: !stream.resource<*>)
+
+// CHECK-LABEL: @cmdCall
+func.func @cmdCall(%arg0: !stream.resource<external>, %arg1: i32, %arg2: !stream.resource<external>, %arg3: !custom.type, %arg4: !stream.resource<external>) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  // CHECK-DAG: %[[SIZE0:.+]] = arith.constant 100
+  %size0 = arith.constant 100 : index
+  // CHECK-DAG: %[[SIZE1:.+]] = arith.constant 101
+  %size1 = arith.constant 101 : index
+  // CHECK-DAG: %[[SIZE2:.+]] = arith.constant 102
+  %size2 = arith.constant 102 : index
+  // CHECK: %[[COMMAND_BUFFER:.+]] = hal.command_buffer.create
+  %timepoint = stream.cmd.execute with(%arg0 as %stream0: !stream.resource<external>{%size0}, %arg2 as %stream1: !stream.resource<external>{%size1}, %arg4 as %stream2: !stream.resource<external>{%size2}) {
+    // CHECK: call @cmdFunc(%[[COMMAND_BUFFER]], %arg0, %c0, %[[SIZE0]], %arg1, %arg2, %c0, %[[SIZE1]], %arg3, %arg4, %c0, %[[SIZE2]]) :
+    // CHECK-SAME: (!hal.command_buffer, !hal.buffer, index, index, i32, !hal.buffer, index, index, !custom.type, !hal.buffer, index, index) -> ()
+    stream.cmd.call @cmdFunc(ro %stream0[%c0 for %size0], %arg1, rw %stream1[%c0 for %size1], %arg3, wo %stream2[%c0 for %size2]) : (!stream.resource<external>{%size0}, i32, !stream.resource<external>{%size1}, !custom.type, !stream.resource<external>{%size2}) -> ()
+  } => !stream.timepoint
+  return %timepoint : !stream.timepoint
 }
 
 // -----

@@ -22,6 +22,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/ROCDL/ROCDLToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -76,6 +77,7 @@ class ROCMTargetBackend final : public TargetBackend {
   std::string name() const override { return "rocm"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerROCDLDialectTranslation(registry);
     registry.insert<IREE::Codegen::IREECodegenDialect>();
@@ -151,7 +153,8 @@ class ROCMTargetBackend final : public TargetBackend {
       if (llvmFunc->isDeclaration()) continue;
       std::array<int32_t, 3> workgroupSize;
       auto exportOp = exportOps[func.getName()];
-      if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+      if (std::optional<ArrayAttr> workgroupSizeAttr =
+              exportOp.getWorkgroupSize()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
           workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
           flatWgSize *= it.value().cast<IntegerAttr>().getInt();
@@ -190,7 +193,7 @@ class ROCMTargetBackend final : public TargetBackend {
     llvmModule->setDataLayout(targetMachine->createDataLayout());
 
     iree_compiler::FlatbufferBuilder builder;
-    iree_ROCMExecutableDef_start_as_root(builder);
+    iree_hal_rocm_ExecutableDef_start_as_root(builder);
 
     // Link module to Device Library
     if (clROCMLinkBC) {
@@ -217,19 +220,19 @@ class ROCMTargetBackend final : public TargetBackend {
         [&](auto op) { return op.getName(); }));
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
-    iree_ROCMBlockSizeDef_vec_start(builder);
+    iree_hal_rocm_BlockSizeDef_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
     for (int i = 0, e = entryPointNames.size(); i < e; ++i) {
-      iree_ROCMBlockSizeDef_vec_push_create(builder, (*blockSizes)[0],
-                                            (*blockSizes)[1], (*blockSizes)[2]);
+      iree_hal_rocm_BlockSizeDef_vec_push_create(
+          builder, (*blockSizes)[0], (*blockSizes)[1], (*blockSizes)[2]);
       ++blockSizes;
     }
-    auto blockSizesRef = iree_ROCMBlockSizeDef_vec_end(builder);
+    auto blockSizesRef = iree_hal_rocm_BlockSizeDef_vec_end(builder);
 
-    iree_ROCMExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_ROCMExecutableDef_block_sizes_add(builder, blockSizesRef);
-    iree_ROCMExecutableDef_hsaco_image_add(builder, hsacoRef);
-    iree_ROCMExecutableDef_end_as_root(builder);
+    iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
+    iree_hal_rocm_ExecutableDef_hsaco_image_add(builder, hsacoRef);
+    iree_hal_rocm_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(

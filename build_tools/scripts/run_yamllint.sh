@@ -9,7 +9,7 @@
 # Runs yamllint on files modified vs the specified reference commit
 # (default "main")
 
-set -uo pipefail
+set -euo pipefail
 
 BASE_REF="${1:-main}"
 

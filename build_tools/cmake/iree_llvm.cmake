@@ -42,8 +42,12 @@ macro(iree_llvm_configure_bundled)
   set(LLVM_CMAKE_DIR "${IREE_BINARY_DIR}/llvm-project/lib/cmake/llvm")
   list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
   # TODO: Fix MLIR upstream so it doesn't spew into the containing project
-  # binary dir.
-  set(MLIR_CMAKE_DIR "${IREE_BINARY_DIR}/lib/cmake/mlir")
+  # binary dir. See mlir/cmake/modules/CMakeLists.txt
+  # (and other LLVM sub-projects).
+  set(MLIR_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/mlir")
+  if(NOT EXISTS "${MLIR_CMAKE_DIR}/AddMLIR.cmake")
+    message(SEND_ERROR "Could not find AddMLIR.cmake in ${MLIR_CMAKE_DIR}: LLVM sub-projects may have changed their layout. See the mlir_cmake_builddir variable in mlir/cmake/modules/CMakeLists.txt")
+  endif()
   list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 
   set(LLVM_INCLUDE_DIRS

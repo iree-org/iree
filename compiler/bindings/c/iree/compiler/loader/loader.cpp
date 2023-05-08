@@ -72,8 +72,10 @@ namespace {
 DlHandle libraryHandle = nullptr;
 
 #define HANDLE_SYMBOL(fn_name) decltype(fn_name) *__##fn_name = nullptr;
+#define HANDLE_VERSIONED_SYMBOL(fn_name, major, minor) HANDLE_SYMBOL(fn_name)
 #include "./handle_symbols.inc"
 #undef HANDLE_SYMBOL
+#undef HANDLE_VERSIONED_SYMBOL
 
 void assertLoaded() {
   if (libraryHandle) return;
@@ -94,6 +96,19 @@ bool ireeCompilerLoadLibrary(const char *libraryPath) {
     return false;
   }
 
+  // Resolve the api version separately.
+  int (*apiVersionFn)() = (int (*)())lookupLibrarySymbol(
+      localLibraryHandle, IREE_CDECL_SYMBOL_PREFIX "ireeCompilerGetAPIVersion");
+  if (!apiVersionFn) {
+    fprintf(stderr,
+            "IREE COMPILER ERROR: Could not find symbol "
+            "'ireeCompilerGetAPIVersion'\n");
+    return false;
+  }
+  int packedApiVersion = apiVersionFn();
+  int apiMinor = packedApiVersion & 0xffff;
+  int apiMajor = packedApiVersion >> 16;
+
 #define HANDLE_SYMBOL(fn_name)                                           \
   __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(              \
       localLibraryHandle, IREE_CDECL_SYMBOL_PREFIX #fn_name);            \
@@ -101,6 +116,11 @@ bool ireeCompilerLoadLibrary(const char *libraryPath) {
     fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol '%s'\n", \
             IREE_CDECL_SYMBOL_PREFIX #fn_name);                          \
     return false;                                                        \
+  }
+#define HANDLE_VERSIONED_SYMBOL(fn_name, availApiMajor, availApiMinor) \
+  if (apiMajor > availApiMajor ||                                      \
+      (apiMajor == availApiMajor && apiMinor >= availApiMinor)) {      \
+    HANDLE_SYMBOL(fn_name);                                            \
   }
 #include "./handle_symbols.inc"
 #undef HANDLE_SYMBOL
@@ -127,9 +147,29 @@ int ireeCompilerGetAPIVersion() {
   return __ireeCompilerGetAPIVersion();
 }
 
-void ireeCompilerGlobalInitialize(bool initializeCommandLine) {
+void ireeCompilerGlobalInitialize() {
   assertLoaded();
-  __ireeCompilerGlobalInitialize(initializeCommandLine);
+  __ireeCompilerGlobalInitialize();
+}
+
+const char *ireeCompilerGetRevision() {
+  assertLoaded();
+  if (__ireeCompilerGetRevision) {
+    return __ireeCompilerGetRevision();
+  } else {
+    return "";
+  }
+}
+
+void ireeCompilerGetProcessCLArgs(int *argc, const char ***argv) {
+  assertLoaded();
+  __ireeCompilerGetProcessCLArgs(argc, argv);
+}
+
+void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
+                               bool installSignalHandlers) {
+  assertLoaded();
+  __ireeCompilerSetupGlobalCL(argc, argv, banner, installSignalHandlers);
 }
 
 void ireeCompilerGlobalShutdown() {
@@ -277,8 +317,18 @@ iree_compiler_error_t *ireeCompilerOutputOpenFD(
   return __ireeCompilerOutputOpenFD(fd, out_output);
 }
 
+iree_compiler_error_t *ireeCompilerOutputOpenMembuffer(
+    iree_compiler_output_t **out_output) {
+  return __ireeCompilerOutputOpenMembuffer(out_output);
+}
+
 void ireeCompilerOutputKeep(iree_compiler_output_t *output) {
   __ireeCompilerOutputKeep(output);
+}
+
+iree_compiler_error_t *ireeCompilerOutputMapMemory(
+    iree_compiler_output_t *output, void **contents, uint64_t *size) {
+  return __ireeCompilerOutputMapMemory(output, contents, size);
 }
 
 iree_compiler_error_t *ireeCompilerOutputWrite(iree_compiler_output_t *output,

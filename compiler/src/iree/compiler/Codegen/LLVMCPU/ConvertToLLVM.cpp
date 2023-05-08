@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -37,6 +38,7 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
@@ -44,9 +46,11 @@
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -333,20 +337,20 @@ static InstrumentationEntry acquireInstrumentationEntry(Location loc,
 
   Value offsetIndex =
       builder.create<LLVM::ConstantOp>(loc, i64Type, headOffset);
-  Value offsetPtr =
-      builder.create<LLVM::GEPOp>(loc, basePtr.getType(), basePtr, offsetIndex,
-                                  /*inbounds=*/true);
-  Value offsetPtrI64 = builder.create<LLVM::BitcastOp>(
-      loc, LLVM::LLVMPointerType::get(i64Type), offsetPtr);
+  Value offsetPtr = builder.create<LLVM::GEPOp>(
+      loc, basePtr.getType(), LLVM::LLVMPointerType::get(builder.getContext()),
+      basePtr, offsetIndex,
+      /*inbounds=*/true);
   Value rawOffset = builder.create<LLVM::AtomicRMWOp>(
-      loc, LLVM::AtomicBinOp::add, offsetPtrI64, entrySize,
+      loc, LLVM::AtomicBinOp::add, offsetPtr, entrySize,
       LLVM::AtomicOrdering::monotonic);
   Value offsetMask =
       builder.create<LLVM::ConstantOp>(loc, i64Type, ringSize - 1);
   Value wrappedOffset = builder.create<LLVM::AndOp>(loc, rawOffset, offsetMask);
 
-  Value entryPtr = builder.create<LLVM::GEPOp>(loc, basePtr.getType(), basePtr,
-                                               wrappedOffset);
+  Value entryPtr = builder.create<LLVM::GEPOp>(
+      loc, basePtr.getType(), LLVM::LLVMPointerType::get(builder.getContext()),
+      basePtr, wrappedOffset);
 
   return {basePtr, entryPtr, wrappedOffset};
 }
@@ -370,7 +374,8 @@ static InstrumentationEntry appendInstrumentationEntry(
   builder.create<LLVM::StoreOp>(
       loc, entryStruct,
       builder.create<LLVM::BitcastOp>(
-          loc, LLVM::LLVMPointerType::get(entryType), entry.entryPtr),
+          loc, LLVM::LLVMPointerType::get(builder.getContext()),
+          entry.entryPtr),
       /*alignment=*/16);
 
   return entry;
@@ -447,9 +452,9 @@ struct ConvertHALInstrumentWorkgroupOp
   }
 };
 
-static Optional<uint64_t> mapValueType(Type type) {
-  return TypeSwitch<Type, Optional<uint64_t>>(type)
-      .Case<IntegerType>([&](Type type) -> Optional<uint64_t> {
+static std::optional<uint64_t> mapValueType(Type type) {
+  return TypeSwitch<Type, std::optional<uint64_t>>(type)
+      .Case<IntegerType>([&](Type type) -> std::optional<uint64_t> {
         if (type.isUnsignedInteger()) {
           switch (type.getIntOrFloatBitWidth()) {
             case 8:
@@ -477,7 +482,7 @@ static Optional<uint64_t> mapValueType(Type type) {
             return std::nullopt;
         }
       })
-      .Case<FloatType>([&](Type type) -> Optional<uint64_t> {
+      .Case<FloatType>([&](Type type) -> std::optional<uint64_t> {
         if (type.isBF16()) {
           return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_BFLOAT_16;
         }
@@ -492,10 +497,10 @@ static Optional<uint64_t> mapValueType(Type type) {
             return std::nullopt;
         }
       })
-      .Case<IndexType>([&](Type type) -> Optional<uint64_t> {
+      .Case<IndexType>([&](Type type) -> std::optional<uint64_t> {
         return IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_SINT_64;
       })
-      .Default([&](Type) -> Optional<uint64_t> { return std::nullopt; });
+      .Default([&](Type) -> std::optional<uint64_t> { return std::nullopt; });
 }
 
 struct ConvertHALInstrumentValueOp
@@ -508,7 +513,7 @@ struct ConvertHALInstrumentValueOp
     auto loc = instrumentOp.getLoc();
 
     // Only convert ops we can handle, otherwise warn and discard.
-    Optional<uint64_t> valueType;
+    std::optional<uint64_t> valueType;
     if (operands.getOperand().getType().isa<LLVM::LLVMPointerType>()) {
       valueType = IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_POINTER;
     } else {
@@ -703,13 +708,30 @@ struct RewriteExternCallOpToDynamicImportCallOp
                                          "and does not need an import wrapper");
     }
 
+    // Allow multiple imports to alias by having their name explicitly
+    // specified.
+    StringRef importName = flatSymbol.getValue();
+    if (auto importNameAttr =
+            calleeOp->getAttrOfType<StringAttr>("hal.import.name")) {
+      importName = importNameAttr.getValue();
+    }
+
     // TODO(benvanik): way to determine if weak (maybe via linkage?).
     bool weak = false;
 
+    // The call may need some additional internal fields appended.
+    SmallVector<StringRef> extraFields;
+    if (auto extraFieldsAttr =
+            calleeOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
+      for (auto extraFieldAttr : extraFieldsAttr) {
+        extraFields.push_back(extraFieldAttr.cast<StringAttr>().getValue());
+      }
+    }
+
     // Rewrite the call to a dynamic import call.
     SmallVector<Value> results = abi.wrapAndCallImport(
-        callOp, flatSymbol.getValue(), weak, callOp->getResultTypes(),
-        callOp->getOperands(), rewriter);
+        callOp, importName, weak, callOp->getResultTypes(),
+        callOp->getOperands(), extraFields, rewriter);
 
     rewriter.replaceOp(callOp, results);
     return success();
@@ -738,10 +760,11 @@ class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
 
     Type wideType = rewriter.getIntegerType(64);
     // Shift amount necessary to extract the high bits from widened result.
-    Attribute shiftValAttr = rewriter.getI64IntegerAttr(32);
+    TypedAttr shiftValAttr = rewriter.getI64IntegerAttr(32);
     if (auto vecTy = resultType.dyn_cast<VectorType>()) {
       wideType = VectorType::get(vecTy.getShape(), wideType);
-      shiftValAttr = SplatElementsAttr::get(wideType, shiftValAttr);
+      shiftValAttr =
+          SplatElementsAttr::get(cast<ShapedType>(wideType), shiftValAttr);
     }
     Value shiftVal = rewriter.create<arith::ConstantOp>(loc, shiftValAttr);
 
@@ -819,12 +842,18 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
-    vector::populateVectorContractLoweringPatterns(patterns);
+    // TODO: doubtful that the "default" does what one want here, it is likely
+    // better to use outerproduct.
+    vector::populateVectorContractLoweringPatterns(
+        patterns, vector::VectorTransformsOptions());
     vector::populateVectorMaskMaterializationPatterns(
         patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
-    vector::populateVectorTransposeLoweringPatterns(patterns);
+    // TODO: doubtful that the "default" does what one want here, it is likely
+    // better to use shuffle.
+    vector::populateVectorTransposeLoweringPatterns(
+        patterns, vector::VectorTransformsOptions());
     populateConvertArmNeon2dToIntrPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
@@ -886,6 +915,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
   populateFuncToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
+  arith::populateExpandBFloat16Patterns(patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(

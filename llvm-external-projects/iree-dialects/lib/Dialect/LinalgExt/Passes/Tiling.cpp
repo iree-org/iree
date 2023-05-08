@@ -21,7 +21,6 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Transform/IR/TransformUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -57,7 +56,7 @@ verifySupportedTilingOptions(PatternRewriter &rewriter, Operation *op,
 /// converted to an `IntegerAttr` of that value. So here just return true if
 /// this is an attribute with a zero value.
 static bool isUntiledLoop(OpFoldResult valueOrAttr) {
-  Optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
+  std::optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
   return intVal && *intVal == 0;
 }
 
@@ -90,30 +89,27 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
   // the op by invoking the TiledOpInterface methods.
   if (loopDepth == tileSizes.size()) {
     TiledOp ret;
-    SmallVector<Operation *> tiledOps =
+    FailureOr<TilingResult> tiledOps =
         tilableOp.getTiledImplementation(builder, offsets, tileSizes);
-    if (tiledOps.empty()) {
+    if (failed(tiledOps)) {
       return static_cast<LogicalResult>(
           tilableOp.emitOpError("failed to get tiled implementation"));
     }
-    assert(
-        (tiledOps.size() == 1) &&
-        "expected only a single operation returned from tiling implementation");
-    ret.op.assign(tiledOps);
-    for (auto result : llvm::enumerate(ret.op.back()->getResults())) {
-      if (!result.value().getType().isa<RankedTensorType>()) {
-        ret.results.push_back(result.value());
+    ret.op.append(tiledOps->tiledOps);
+    for (auto [index, result] : llvm::enumerate(tilableOp->getResults())) {
+      if (!result.getType().isa<RankedTensorType>()) {
+        ret.results.push_back(result);
         continue;
       }
       SmallVector<OpFoldResult> resultOffsets, resultSizes;
-      if (succeeded(tilableOp.getResultTilePosition(
-              builder, result.index(), offsets, tileSizes, resultOffsets,
-              resultSizes))) {
+      if (succeeded(tilableOp.getResultTilePosition(builder, index, offsets,
+                                                    tileSizes, resultOffsets,
+                                                    resultSizes))) {
         SmallVector<OpFoldResult> resultStrides(resultOffsets.size(),
                                                 builder.getIndexAttr(1));
         Value insertSlice = builder.create<tensor::InsertSliceOp>(
-            loc, ret.op.back()->getResult(result.index()),
-            outputs[result.index()], resultOffsets, resultSizes, resultStrides);
+            loc, tiledOps->tiledValues[index], outputs[index], resultOffsets,
+            resultSizes, resultStrides);
         ret.results.push_back(insertSlice);
       }
     }
@@ -165,7 +161,7 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
         // Similar to linalg tiling, the tile size is the min(tileSizes, ub -
         // iv) to account for cases where tile size does not divide (ub - lb)
         // exactly.
-        Value inBoundsTileSize = b.create<AffineMinOp>(
+        Value inBoundsTileSize = b.create<affine::AffineMinOp>(
             loc, affineMaps,
             ValueRange{iv,
                        getValueOrCreateConstantIndexOp(builder, loc,
@@ -310,10 +306,10 @@ struct TilingInterfaceTilingPass
     : public TilingInterfaceTilingBase<TilingInterfaceTilingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
-        AffineDialect, IREE::Input::IREEInputDialect, linalg::LinalgDialect,
-        IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-        func::FuncDialect, mlir::arith::ArithDialect, math::MathDialect,
-        tensor::TensorDialect, scf::SCFDialect>();
+        affine::AffineDialect, IREE::Input::IREEInputDialect,
+        linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+        memref::MemRefDialect, func::FuncDialect, mlir::arith::ArithDialect,
+        math::MathDialect, tensor::TensorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override;
 };

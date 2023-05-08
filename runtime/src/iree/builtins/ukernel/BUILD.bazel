@@ -1,0 +1,72 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "static_assert",
+    hdrs = ["static_assert.h"],
+)
+
+iree_runtime_cc_library(
+    name = "exported_bits",
+    hdrs = ["exported_bits.h"],
+    deps = [":static_assert"],
+)
+
+internal_headers = [
+    "common.h",
+    "elementwise.h",
+    "mmt4d.h",
+    "mmt4d_internal.h",
+    "pack.h",
+    "pack_internal.h",
+    "query_tile_sizes.h",
+    "query_tile_sizes_internal.h",
+    "unpack.h",
+    "unpack_internal.h",
+]
+
+iree_runtime_cc_library(
+    name = "internal_headers",
+    hdrs = internal_headers,
+    visibility = [":__subpackages__"],
+    deps = [
+        ":exported_bits",
+        ":static_assert",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/builtins/ukernel/arch:config",
+    ],
+)
+
+# Entry points.
+iree_runtime_cc_library(
+    name = "ukernel",
+    srcs = [
+        "elementwise.c",
+        "mmt4d.c",
+        "mmt4d_tile.c",
+        "pack.c",
+        "pack_tile.c",
+        "query_tile_sizes.c",
+        "unpack.c",
+        "unpack_tile.c",
+    ] + internal_headers,
+    hdrs = ["api.h"],
+    deps = [
+        ":exported_bits",
+        ":static_assert",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/builtins/ukernel/arch:config",
+        "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
+    ],
+)

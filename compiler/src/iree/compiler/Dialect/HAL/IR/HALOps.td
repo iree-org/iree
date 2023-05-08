@@ -80,7 +80,8 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims,
-    Optional<HAL_Fence>:$wait_fence
+    Optional<HAL_Fence>:$wait_fence,
+    OptionalAttr<StrAttr>:$name
   );
   let results = (outs
     AnyTensor:$target
@@ -88,21 +89,24 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 
   let assemblyFormat = [{
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
-    $source `:` type($source)
-    `->`
+    $source
+    ($name^)?
+    `:` type($source) `->`
     custom<TypeAlias>($target_encoding, type($target)) (`{` $target_dims^ `}`)?
-    attr-dict-with-keyword
+    attr-dict
   }];
 
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source
+      "Value":$source,
+      "StringAttr":$name
     )>,
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source,
-      "Value":$waitFence
+      "Value":$waitFence,
+      "StringAttr":$name
     )>,
   ];
 
@@ -146,7 +150,8 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     AnyTensor:$source,
     TypeAttr:$source_encoding,
     HAL_ShapeDynamicDims:$source_dims,
-    Optional<HAL_Buffer>:$target_storage
+    Optional<HAL_Buffer>:$target_storage,
+    OptionalAttr<StrAttr>:$name
   );
   let results = (outs
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
@@ -154,18 +159,20 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
 
   let assemblyFormat = [{
     $source
+    ($name^)?
     (`into` $target_storage^)?
     `:`
     custom<TypeAlias>($source_encoding, type($source)) (`{` $source_dims^ `}`)?
     `->`
     type($target)
-    attr-dict-with-keyword
+    attr-dict
   }];
 
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source
+      "Value":$source,
+      "StringAttr":$name
     )>,
   ];
 
@@ -688,17 +695,17 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
     queue. Collective operations using this channel must only be submitted on
     compatible queues.
 
-    A rank or count of -1 can be used to indicate a default inherited from the
-    environment or device configuration.
+    The group and ID are optional and may be null. A rank or count of -1 can be
+    used to indicate a default inherited from the environment or device
+    configuration.
   }];
 
   let arguments = (ins
     HAL_Device:$device,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    // TODO(benvanik): optional discriminator for groupings.
-    // TODO(benvanik): channel ID as a `Util_BufferType:$id`.
-    // TODO(benvanik): make rank/count optional (but then would need a custom vm
-    // import pattern).
+    I32Attr:$flags,
+    Util_BufferType:$id,
+    Util_BufferType:$group,
     I32:$rank,
     I32:$count
   );
@@ -709,6 +716,9 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
     `affinity` `(` $queue_affinity `)`
+    `flags` `(` $flags `)`
+    `id` `(` $id `)`
+    `group` `(` $group `)`
     `rank` `(` $rank `)`
     `count` `(` $count `)`
     `:` type($result)
@@ -1455,6 +1465,8 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
     `:` custom<SizeAwareType>(type($result), $result_size)
     attr-dict-with-keyword
   }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
@@ -1485,6 +1497,8 @@ def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
     `buffer` `(` $buffer `:` type($buffer) `)`
     attr-dict-with-keyword
   }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
@@ -1514,7 +1528,13 @@ def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute"> {
     attr-dict-with-keyword
   }];
 
+  let extraClassDeclaration = [{
+    // Returns true if the execution represents a barrier.
+    bool isBarrier() { return getCommandBuffers().empty(); }
+  }];
+
   let hasCanonicalizer = 1;
+  let hasVerifier = 1;
 }
 
 def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
@@ -1848,6 +1868,19 @@ def HAL_ExecutableConstantBlockOp :
     // CallableOpInterface:
     ::mlir::Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
+
     // FunctionOpInterface:
     ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
     ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
@@ -2363,7 +2396,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
       "Value":$byte_offset,
       "ValueRange":$dynamic_dims,
       "IntegerAttr":$alignment,
-      CArg<"mlir::Optional<DescriptorFlags>", "llvm::None">:$flags
+      CArg<"std::optional<DescriptorFlags>", "llvm::None">:$flags
     )>,
   ];
 
@@ -2501,6 +2534,7 @@ def HAL_FenceJoinOp : HAL_Op<"fence.join", [
     attr-dict-with-keyword
   }];
 
+  let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -2541,6 +2575,8 @@ def HAL_FenceSignalOp : HAL_Op<"fence.signal"> {
     `<` $fence `:` type($fence) `>`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_FenceFailOp : HAL_Op<"fence.fail"> {

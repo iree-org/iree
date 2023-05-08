@@ -47,7 +47,7 @@ namespace Stream {
 //  stream.async.concurrent ... {
 //    stream.yield
 //  }
-static Optional<IREE::Stream::YieldOp> getYieldIfOnlyOp(Block &block) {
+static std::optional<IREE::Stream::YieldOp> getYieldIfOnlyOp(Block &block) {
   if (block.empty()) return std::nullopt;
   if (&block.front() != &block.back()) return std::nullopt;
   auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.back());
@@ -55,9 +55,18 @@ static Optional<IREE::Stream::YieldOp> getYieldIfOnlyOp(Block &block) {
   return std::nullopt;
 }
 
-// Finds the insertion point before |targetOp| and after |earliestOp| that would
-// not oscillate if an op was moved there. Oscillations can occur if there are
-// multiple ops inserted before a single op as insertion order based on
+// Various patterns try to sink ops, and in case of uses in multiple blocks
+// they might be sunk to the end of a block. When multiple such ops are being
+// sunk, they can "fight" over who is at the end of the block, resulting in
+// infinite pattern recursion. To avoid this, we need to collectively know
+// across patterns which ops are liable to be sunk that way.
+static bool isSinkCandidate(Operation *op) {
+  return isa<AsyncSplatOp, AsyncAllocaOp, TimepointAwaitOp>(op);
+}
+
+// Determine if sinking |toBeSunkOp| before |targetOp| won't result in an
+// unstable oscillation across patterns. Oscillations can occur if there
+// are multiple ops inserted before a single op as insertion order based on
 // canonicalization is undefined.
 //
 // Example:
@@ -66,37 +75,73 @@ static Optional<IREE::Stream::YieldOp> getYieldIfOnlyOp(Block &block) {
 //   %2 = op.c %0, %1
 // If %0 and %1 are sunk to %2 the ordering will depend on which sink pattern
 // runs first and each of the patterns will fight trying to sink lower than the
-// other.
-static Block::iterator findInsertionPointBefore(Operation *earliestOp,
-                                                Operation *targetOp) {
-  // Check if ops between this and the target are all used by the target.
-  // If they are, we skip sinking so that we don't get stuck in an infinite loop
-  // if there are two splats used by the same op (or another pattern sinking).
-  if (earliestOp->getBlock() == targetOp->getBlock()) {
-    SmallPtrSet<Operation *, 4> producerOps;
+// other. As long as sinking only happens when this function returns `true`,
+// then the sinking across patterns will reach a fixed-point.
+static bool canStablySinkTo(Operation *toBeSunkOp, Operation *targetOp) {
+  // Stably sinking implies that other sinking won't "fight" with this
+  // sinking. This is obviously not possible in an open pattern ecosystem,
+  // but for the purpose of this function, we assume that all sinking patterns
+  // that we are concerned with are the other patterns in the `stream` dialect.
+  //
+  // In typical usage, this function will result in various patterns sinking
+  // their relevant ops before `targetOp`. This results in a sequence of
+  // sinkable ops before `targetOp`. This is fine, until we start to sink
+  // them again, which can result in "fighting". We detect that scenario
+  // by seeing if all the ops between `toBeSunkOp` and `targetOp` might be sunk
+  // again.
+  //
+  // To prove that this function results in sinking that reaches a fixed-point,
+  // we can design a potential function `f(the_module) -> int`, and show that it
+  // decreases strictly monotonically with each sinking operation (and cannot go
+  // below 0). In particular, we choose the following function: `f(the_module) =
+  // sum(g(op) for op in the_module)`, where `g(op) -> int` gives the distance
+  // between op's current location and the latest it could appear in the program
+  // (infinite, if that location is in another block).
+  assert(isSinkCandidate(toBeSunkOp) && "asking to sink a non-sinkable op");
+
+  // If `targetOp` is a terminator, then it might be chosen as a sink location
+  // purely for control flow reasons, and not due to use-def chains. This means
+  // that if `targetOp` is not a terminator, then we can prune the set of
+  // sinkable ops that might fight with `toBeSunkOp` more aggressively by using
+  // use-def chains.
+  bool allowUseDefPruning = !targetOp->hasTrait<mlir::OpTrait::IsTerminator>();
+
+  // If the sinking operation would be a no-op, then we need to prevent
+  // the sinking operation, to avoid infinite pattern applications.
+  if (Block::iterator(targetOp) == std::next(Block::iterator(toBeSunkOp)))
+    return false;
+
+  // If the sinking is to a different block, then it okay, since for any later
+  // sinkings, this reduces the problem to stable sinking within a single
+  // block (handled below).
+  if (toBeSunkOp->getBlock() != targetOp->getBlock()) return true;
+
+  SmallPtrSet<Operation *, 4> producerOps;
+  if (allowUseDefPruning) {
     for (auto operand : targetOp->getOperands()) {
       if (operand.getDefiningOp()) {
         producerOps.insert(operand.getDefiningOp());
       }
     }
-    bool allUsed = true;
-    for (auto it = Block::iterator(earliestOp); it != Block::iterator(targetOp);
-         ++it) {
-      if (!producerOps.contains(&*it)) {
-        allUsed = false;
-        break;
-      }
-    }
-    if (allUsed) return Block::iterator(earliestOp);
   }
-  return Block::iterator(targetOp);
+
+  // If any of the ops between `toBeSunkOp` and `targetOp` are known to not
+  // fight with this op, then it is stable to sink.
+  for (Operation &op : llvm::make_range(Block::iterator(toBeSunkOp),
+                                        Block::iterator(targetOp))) {
+    // If the intervening op that is not even a sink candidate itself,
+    // then it cannot fight.
+    if (!isSinkCandidate(&op)) return true;
+    // If the op is pruned by use-def chains, then it won't fight.
+    if (allowUseDefPruning && !producerOps.contains(&op)) return true;
+  }
+  return false;
 }
 
 // Sinks |op| down to |targetOp|, ensuring that we don't oscillate.
 // Returns success if the op was sunk and failure if sinking was not needed.
 static LogicalResult sinkOp(Operation *op, Operation *targetOp) {
-  auto ip = findInsertionPointBefore(op, targetOp);
-  if (ip == Block::iterator(op)) return failure();
+  if (!canStablySinkTo(op, targetOp)) return failure();
   op->moveBefore(targetOp);
   return success();
 }
@@ -851,7 +896,7 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
         constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.getResultEncoding()),
         constantOp.getResultEncodingDims(), constantOp.getAffinityAttr());
-    rewriter.replaceOpWithNewOp<TensorEmptyOp>(
+    rewriter.replaceOpWithNewOp<IREE::Stream::TensorEmptyOp>(
         constantOp, constantOp.getResult().getType(),
         constantOp.getResultEncoding(), constantOp.getResultEncodingDims(),
         resultSize, constantOp.getAffinityAttr());
@@ -992,7 +1037,7 @@ static APInt computeRequiredPatternBits(APInt pattern) {
 // to be emulated - if we can avoid that here that's a big win. Some HAL
 // implementations (such as Metal) only support 8-bit fills and anything larger
 // needs to be implemented as well.
-static Attribute tryNarrowPatternBits(Attribute patternAttr) {
+static TypedAttr tryNarrowPatternBits(TypedAttr patternAttr) {
   // Get the old pattern bitcast to an APInt. Splats are bitwise operations
   // and we don't care what the value originally was.
   APInt oldPattern;
@@ -1021,7 +1066,7 @@ struct NarrowSplatPattern : public OpRewritePattern<TensorSplatOp> {
   LogicalResult matchAndRewrite(TensorSplatOp splatOp,
                                 PatternRewriter &rewriter) const override {
     // Try narrowing the pattern.
-    Attribute oldPatternAttr;
+    TypedAttr oldPatternAttr;
     if (!matchPattern(splatOp.getValue(), m_Constant(&oldPatternAttr))) {
       return failure();
     }
@@ -1114,7 +1159,7 @@ struct NarrowFillPattern : public OpRewritePattern<TensorFillOp> {
   LogicalResult matchAndRewrite(TensorFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
     // Try narrowing the pattern.
-    Attribute oldPatternAttr;
+    TypedAttr oldPatternAttr;
     if (!matchPattern(fillOp.getValue(), m_Constant(&oldPatternAttr))) {
       return failure();
     }
@@ -1692,6 +1737,16 @@ void AsyncDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.call
+//===----------------------------------------------------------------------===//
+
+void AsyncCallOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                              MLIRContext *context) {
+  // TODO(benvanik): elide calls to targets that have nosideeffects.
+  // results.insert<ElideUnusedOp<AsyncCallOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.execute
 //===----------------------------------------------------------------------===//
 
@@ -2030,6 +2085,8 @@ void CmdCopyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
+// TODO(benvanik): make this something on the DispatchOpInterface.
+
 // Folds subview ranges into dispatch ranges.
 //
 // Example:
@@ -2059,21 +2116,20 @@ struct FoldSubviewsIntoDispatchOp : public OpRewritePattern<Op> {
     rewriter.startRootUpdate(op);
 
     setInsertionPointToParentExecutionScope(op, rewriter);
-    for (auto it : llvm::enumerate(resourceSubviewOps)) {
-      unsigned resourceIdx = static_cast<unsigned>(it.index());
-      auto subviewOp = it.value();
+    for (auto [resourceIndex, subviewOp] :
+         llvm::enumerate(resourceSubviewOps)) {
       if (!subviewOp) continue;
       auto fusedLoc = rewriter.getFusedLoc({subviewOp.getLoc(), op.getLoc()});
       auto newOffset = rewriter.createOrFold<arith::AddIOp>(
           fusedLoc, subviewOp.getSourceOffset(),
-          op.getResourceOffsets()[resourceIdx]);
+          op.getResourceOffsets()[resourceIndex]);
       op.getResourcesMutable()
-          .slice(resourceIdx, 1)
+          .slice(resourceIndex, 1)
           .assign(subviewOp.getSource());
       op.getResourceSizesMutable()
-          .slice(resourceIdx, 1)
+          .slice(resourceIndex, 1)
           .assign(subviewOp.getSourceSize());
-      op.getResourceOffsetsMutable().slice(resourceIdx, 1).assign(newOffset);
+      op.getResourceOffsetsMutable().slice(resourceIndex, 1).assign(newOffset);
     }
 
     rewriter.finalizeRootUpdate(op);
@@ -2095,6 +2151,65 @@ void CmdCollectiveOp::getCanonicalizationPatterns(RewritePatternSet &results,
 void CmdDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
   results.insert<FoldSubviewsIntoDispatchOp<CmdDispatchOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.call
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// TODO(benvanik): make this something on the DispatchOpInterface.
+// This duplicates FoldSubviewsIntoDispatchOp to handle the call op until the
+// interface can be written.
+struct FoldSubviewsIntoCmdCallOp : public OpRewritePattern<CmdCallOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(CmdCallOp op,
+                                PatternRewriter &rewriter) const override {
+    // Original operand index + the subview.
+    SmallVector<std::pair<int, ResourceSubviewOp>> resourceSubviewOps;
+    bool anySubviewOps = false;
+    for (auto [operandIndex, operand] :
+         llvm::enumerate(op.getResourceOperands())) {
+      if (operand.getType().isa<IREE::Stream::ResourceType>()) {
+        auto subviewOp = ResourceSubviewOp::findSubviewOp(operand);
+        if (subviewOp) anySubviewOps = true;
+        resourceSubviewOps.push_back({operandIndex, subviewOp});
+      }
+    }
+    if (!anySubviewOps) return failure();
+    rewriter.startRootUpdate(op);
+
+    setInsertionPointToParentExecutionScope(op, rewriter);
+    for (auto [resourceIndex, resourceSubviewOp] :
+         llvm::enumerate(resourceSubviewOps)) {
+      auto [operandIndex, subviewOp] = resourceSubviewOp;
+      if (!subviewOp) continue;
+      auto fusedLoc = rewriter.getFusedLoc({subviewOp.getLoc(), op.getLoc()});
+      auto newOffset = rewriter.createOrFold<arith::AddIOp>(
+          fusedLoc, subviewOp.getSourceOffset(),
+          op.getResourceOperandOffsets()[resourceIndex]);
+      op.getResourceOperandsMutable()
+          .slice(operandIndex, 1)
+          .assign(subviewOp.getSource());
+      op.getResourceOperandSizesMutable()
+          .slice(resourceIndex, 1)
+          .assign(subviewOp.getSourceSize());
+      op.getResourceOperandOffsetsMutable()
+          .slice(resourceIndex, 1)
+          .assign(newOffset);
+    }
+
+    rewriter.finalizeRootUpdate(op);
+    return success();
+  }
+};
+
+}  // namespace
+
+void CmdCallOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                            MLIRContext *context) {
+  results.insert<FoldSubviewsIntoCmdCallOp>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2260,6 +2375,82 @@ LogicalResult TimepointExportOp::fold(FoldAdaptor operands,
 }
 
 //===----------------------------------------------------------------------===//
+// stream.timepoint.chain_external
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Elides a timepoint chaining operation when the chained timepoint is directly
+// usable from imported external values. This covers the common case where an
+// imported fence is chained with a new fence - since fences are single-shot the
+// new fence can be replaced with the imported fence. We rely on MemAlloc to
+// detect when the external fence is one created for chaining vs an argument/etc
+// that we may not be able to elide.
+//
+// Example:
+//  %timepoint = stream.timepoint.import %arg_fence
+//  %chained_fence = hal.fence.create
+//  stream.timepoint.chain_external %timepoint => (%chained_fence : !hal.fence)
+// ->
+//  %chained_fence = %arg_fence
+struct PassThroughChainExternal
+    : public OpRewritePattern<TimepointChainExternalOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TimepointChainExternalOp op,
+                                PatternRewriter &rewriter) const override {
+    // Try to get the original external values that we want to chain.
+    auto importOp = dyn_cast_or_null<IREE::Stream::TimepointImportOp>(
+        op.getAwaitTimepoint().getDefiningOp());
+    if (!importOp) {
+      return rewriter.notifyMatchFailure(
+          op, "timepoint not imported from an external value");
+    }
+
+    // The imported external values must match the types of the chained external
+    // values as we'll be doing a SSA value replacement and can't change types.
+    if (!llvm::all_of_zip(importOp.getOperands(), op.getExternalValues(),
+                          [](Value importValue, Value chainValue) {
+                            return importValue.getType() ==
+                                   chainValue.getType();
+                          })) {
+      return rewriter.notifyMatchFailure(
+          op,
+          "can only chain when external value types match between the import "
+          "and chain op");
+    }
+
+    // We can only replace external values that are locally allocated as this
+    // pattern is effectively just killing the allocation - if it comes from
+    // above/globals/external functions then we can't change things.
+    //
+    // TODO(benvanik): improve this to handle more external value types; for now
+    // only !hal.fence is used in practice and that is MemAlloc.
+    for (auto externalValue : op.getExternalValues()) {
+      auto definingOp = dyn_cast_or_null<MemoryEffectOpInterface>(
+          externalValue.getDefiningOp());
+      if (!definingOp || !definingOp.hasEffect<MemoryEffects::Allocate>()) {
+        return rewriter.notifyMatchFailure(
+            op, "external chained value is not locally allocated");
+      }
+    }
+
+    // Should be safe to now replace the allocated external values with the
+    // original imported ones.
+    rewriter.replaceAllUsesWith(op.getExternalValues(), importOp.getOperands());
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
+
+}  // namespace
+
+void TimepointChainExternalOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<PassThroughChainExternal>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // stream.timepoint.join
 //===----------------------------------------------------------------------===//
 
@@ -2368,6 +2559,45 @@ void TimepointJoinOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
+// Extremely basic check for whether a source |resource| is immediately resolved
+// or may be part of a timeline sequence.
+static bool isSourceImmediatelyResolved(Value resource) {
+  // TODO(benvanik): data flow analysis/at least walk up tied ops. For now we
+  // err on the conservative side and only check for a few common scenarios.
+  auto *definingOp = resource.getDefiningOp();
+  if (!definingOp) return false;
+  return TypeSwitch<Operation *, bool>(definingOp)
+      .Case<IREE::Stream::ResourceAllocOp, IREE::Stream::TensorImportOp>(
+          [](auto op) { return true; })
+      .Default([](auto op) { return false; });
+}
+
+// Elides barriers that source their operands from immediate operations.
+// These barriers are implicitly resolved and need not be modeled.
+//
+// Example:
+//  %r0a = stream.resource.alloc
+//  %r0b, %r0ready = stream.timepoint.barrier %r0a
+// ->
+//  %r0a = stream.resource.alloc
+//  %r0b = %r0a
+//  %r0ready = stream.timepoint.immediate
+struct ElideImmediateBarrier : public OpRewritePattern<TimepointBarrierOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TimepointBarrierOp barrierOp,
+                                PatternRewriter &rewriter) const override {
+    if (!isSourceImmediatelyResolved(barrierOp.getResource())) {
+      // Could not analyze or found to be a timeline op.
+      return failure();
+    }
+    auto immediateTimepoint =
+        rewriter.create<IREE::Stream::TimepointImmediateOp>(barrierOp.getLoc());
+    rewriter.replaceOp(barrierOp,
+                       {barrierOp.getResource(), immediateTimepoint});
+    return success();
+  }
+};
+
 // Walks up the tied op SSA def chain to find a stream.timepoint.await op that
 // produces the resource. Returns nullptr if no await op is found or local
 // analysis cannot determine the source (spans across a branch, etc).
@@ -2428,6 +2658,7 @@ struct ChainTimepoints : public OpRewritePattern<TimepointBarrierOp> {
 
 void TimepointBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                      MLIRContext *context) {
+  results.insert<ElideImmediateBarrier>(context);
   results.insert<ChainTimepoints>(context);
 }
 
@@ -2497,13 +2728,12 @@ struct SinkAwaitToFirstConsumer : public OpRewritePattern<TimepointAwaitOp> {
       }
     }
 
-    // Find the earliest point before |user| that is safe to insert into. If it
-    // ends up being where we already are then no-op.
-    auto ip = findInsertionPointBefore(op, firstUserInDominator);
-    if (ip == Block::iterator(op)) return failure();
+    // If sinking to `firstUserInDominator` could result in patterns
+    // fighting each other, then don't sink.
+    if (!canStablySinkTo(op, firstUserInDominator)) return failure();
 
     rewriter.updateRootInPlace(op,
-                               [&]() { op->moveBefore(ip->getBlock(), ip); });
+                               [&]() { op->moveBefore(firstUserInDominator); });
     return success();
   }
 };

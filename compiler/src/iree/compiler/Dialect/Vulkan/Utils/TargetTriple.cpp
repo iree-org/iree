@@ -38,8 +38,11 @@ spirv::Vendor getVendor(const TargetTriple &triple) {
       return spirv::Vendor::ARM;
     case TargetTripleArch::Apple_M1:
       return spirv::Vendor::Apple;
+    case TargetTripleArch::Intel_Arc:
+      return spirv::Vendor::Intel;
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
+    case TargetTripleArch::NV_Pascal:
       return spirv::Vendor::NVIDIA;
     case TargetTripleArch::QC_Adreno:
       return spirv::Vendor::Qualcomm;
@@ -68,6 +71,8 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
     case TargetTripleArch::AMD_RDNAv3:
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
+    case TargetTripleArch::NV_Pascal:
+    case TargetTripleArch::Intel_Arc:
       return spirv::DeviceType::DiscreteGPU;
     case TargetTripleArch::Apple_M1:
     case TargetTripleArch::ARM_Valhall:
@@ -177,16 +182,16 @@ void getExtensions(const TargetTriple &triple,
   }
 
   // Desktop GPUs typically support all extensions we care.
-  const std::array<Extension, 7> desktop = {
-      Extension::VK_KHR_16bit_storage,
-      Extension::VK_KHR_8bit_storage,
-      Extension::VK_KHR_shader_float16_int8,
-      Extension::VK_KHR_spirv_1_4,
-      Extension::VK_KHR_storage_buffer_storage_class,
-      Extension::VK_KHR_variable_pointers,
-      Extension::VK_EXT_subgroup_size_control};
+  const Extension desktop[] = {Extension::VK_KHR_16bit_storage,
+                               Extension::VK_KHR_8bit_storage,
+                               Extension::VK_KHR_shader_float16_int8,
+                               Extension::VK_KHR_shader_integer_dot_product,
+                               Extension::VK_KHR_spirv_1_4,
+                               Extension::VK_KHR_storage_buffer_storage_class,
+                               Extension::VK_KHR_variable_pointers,
+                               Extension::VK_EXT_subgroup_size_control};
 
-  extensions.append(desktop.begin(), desktop.end());
+  llvm::append_range(extensions, desktop);
   if (getVendor(triple) == spirv::Vendor::NVIDIA ||
       triple.getArch() == TargetTripleArch::AMD_RDNAv3) {
     extensions.push_back(Extension::VK_NV_cooperative_matrix);
@@ -210,7 +215,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
   int subgroupSize = 32;
   SubgroupFeature subgroupFeatures = SubgroupFeature::Basic;
-  Optional<int> minSubgroupSize, maxSubgroupSize;
+  std::optional<int> minSubgroupSize, maxSubgroupSize;
 
   bool shaderFloat16 = false, shaderFloat64 = false;
   bool shaderInt8 = false, shaderInt16 = false, shaderInt64 = false;
@@ -266,6 +271,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       shaderFloat16 = shaderFloat64 = true;
       shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+      shaderIntegerDotProduct = true;
 
       storageBuffer16BitAccess = storagePushConstant16 = true;
       uniformAndStorageBuffer16BitAccess = true;
@@ -355,6 +362,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       shaderFloat16 = shaderFloat64 = true;
       shaderInt8 = shaderInt16 = shaderInt64 = true;
 
+      shaderIntegerDotProduct = true;
+
       storageBuffer16BitAccess = storagePushConstant16 = true;
       uniformAndStorageBuffer16BitAccess = true;
       storageBuffer8BitAccess = true, storagePushConstant8 = true;
@@ -381,6 +390,31 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
           /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
           /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
     } break;
+    case TargetTripleArch::NV_Pascal:
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=17937
+      maxComputeSharedMemorySize = 49152;
+      maxComputeWorkGroupInvocations = 1536;
+      maxComputeWorkGroupSize = {1536, 1024, 64};
+
+      subgroupSize = 32, minSubgroupSize = 32, maxSubgroupSize = 32;
+      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                         SubgroupFeature::Shuffle |
+                         SubgroupFeature::ShuffleRelative |
+                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
+
+      shaderFloat16 = shaderFloat64 = true;
+      shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+      shaderIntegerDotProduct = true;
+
+      storageBuffer16BitAccess = storagePushConstant16 = true;
+      uniformAndStorageBuffer16BitAccess = true;
+      storageBuffer8BitAccess = true, storagePushConstant8 = true;
+      uniformAndStorageBuffer8BitAccess = true;
+
+      variablePointers = variablePointersStorageBuffer = true;
+      break;
     case TargetTripleArch::QC_Adreno:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
@@ -401,6 +435,33 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       if (triple.getOS() == TargetTripleOS::Android31) {
         storageBuffer8BitAccess = true;
       }
+
+      variablePointers = variablePointersStorageBuffer = true;
+      break;
+    case TargetTripleArch::Intel_Arc:
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=19818
+      maxComputeSharedMemorySize = 32768;
+      maxComputeWorkGroupInvocations = 1024;
+      maxComputeWorkGroupSize = {1024, 1024, 64};
+
+      subgroupSize = 32, minSubgroupSize = 8, maxSubgroupSize = 32;
+      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                         SubgroupFeature::Shuffle |
+                         SubgroupFeature::ShuffleRelative |
+                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
+
+      shaderFloat16 = true;
+      shaderFloat64 = false;
+      shaderInt8 = shaderInt16 = true;
+      shaderInt64 = false;
+
+      shaderIntegerDotProduct = true;
+
+      storageBuffer16BitAccess = storagePushConstant16 = true;
+      uniformAndStorageBuffer16BitAccess = true;
+      storageBuffer8BitAccess = true, storagePushConstant8 = true;
+      uniformAndStorageBuffer8BitAccess = true;
 
       variablePointers = variablePointersStorageBuffer = true;
       break;

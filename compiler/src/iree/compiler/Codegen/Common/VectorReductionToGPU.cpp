@@ -14,6 +14,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -153,7 +154,7 @@ class VectorReduceToGPUPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
-                    AffineDialect>();
+                    affine::AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -174,7 +175,7 @@ class VectorReduceToGPUPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs()
           << "\n--- After Step 1: Preprocessing of reduction ops ---\n";
       funcOp.dump();
@@ -204,7 +205,7 @@ class VectorReduceToGPUPass
     builder.setInsertionPointToEnd(&warpOp.getWarpRegion().getBlocks().back());
     builder.create<vector::YieldOp>(loc);
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After Step 2: Adding the distribution op ---\n";
       funcOp.dump();
       llvm::dbgs() << "\n\n";
@@ -213,7 +214,7 @@ class VectorReduceToGPUPass
     // 3. Hoist the scalar code outside of the warp region.
     moveScalarAndBindingUniformCode(warpOp);
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After Step 3: Hoist uniform code ---\n";
       funcOp.dump();
       llvm::dbgs() << "\n\n";
@@ -248,7 +249,7 @@ class VectorReduceToGPUPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After Step 4: Propagate distribution ---\n";
       funcOp.dump();
       llvm::dbgs() << "\n\n";
@@ -267,7 +268,7 @@ class VectorReduceToGPUPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After Step 5: Lower remaining ops ---\n";
       funcOp.dump();
       llvm::dbgs() << "\n\n";

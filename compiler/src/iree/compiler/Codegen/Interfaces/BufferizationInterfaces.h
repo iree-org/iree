@@ -14,6 +14,12 @@
 namespace mlir {
 namespace iree_compiler {
 
+struct IREEOneShotBufferizationOptions
+    : public mlir::bufferization::OneShotBufferizationOptions {
+  // For now this has no extra fields. Keeping this anyway in case this is
+  // needed in future.
+};
+
 // Register all interfaces needed for bufferization.
 void registerBufferizationInterfaces(DialectRegistry &registry);
 

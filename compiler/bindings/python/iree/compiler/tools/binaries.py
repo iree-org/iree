@@ -43,7 +43,6 @@ _TOOL_MODULE_MAP = {
     "iree-compile": "iree.tools.core",
     "iree-lld": "iree.tools.core",
     "iree-import-tflite": "iree.tools.tflite",
-    "iree-import-xla": "iree.tools.xla",
     "iree-import-tf": "iree.tools.tf",
 }
 
@@ -53,7 +52,6 @@ _TOOL_MODULE_PACKAGES = {
     "iree.tools.core": "<none>",
     "iree.tools.tf": "iree-tools-tf",
     "iree.tools.tflite": "iree-tools-tflite",
-    "iree.tools.xla": "iree-tools-xla",
 }
 
 # Environment variable holding directories to be searched for named tools.

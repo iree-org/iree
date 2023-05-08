@@ -18,9 +18,9 @@ DRY_RUN="${DRY_RUN:-0}"
 TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
 GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-01-30-1675109292}"
-GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-100}"
+GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-1000}"
 CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-01-30-1675109033}"
-CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-100}"
+CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-1000}"
 
 PROD_TEMPLATE_CONFIG_REPO="${PROD_TEMPLATE_CONFIG_REPO:-openxla/iree}"
 GITHUB_RUNNER_SCOPE="${GITHUB_RUNNER_SCOPE:-openxla}"
@@ -51,9 +51,9 @@ VERSION="${SHORT_REF}-${SUFFIX}"
 if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
-GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.301.1}"
-GITHUB_RUNNER_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARCHIVE_DIGEST:-3ee9c3b83de642f919912e0594ee2601835518827da785d034c1163f8efdf907}"
-GITHUB_TOKEN_PROXY_URL="${GITHUB_TOKEN_PROXY_URL:-https://ght-proxy-zbhz5clunq-ue.a.run.app}"
+GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.303.0}"
+GITHUB_RUNNER_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARCHIVE_DIGEST:-e4a9fb7269c1a156eb5d5369232d0cd62e06bec2fd2b321600e85ac914a9cc73}"
+GITHUB_TOKEN_PROXY_URL="${GITHUB_TOKEN_PROXY_URL:-https://ght-proxy-openxla-zbhz5clunq-ue.a.run.app}"
 
 if (( TESTING_SELF_DELETER==1 )); then
   INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-testing-zbhz5clunq-uc.a.run.app"
@@ -81,9 +81,7 @@ declare -a common_args=(
   # Matches firewall rule for health check traffic
   --tags="allow-health-checks"
   --provisioning-model=STANDARD
-  # The instance group manager handles this for us and this is necessary to
-  # achieve better local SSD performance:
-  # https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable-automatic-restart
+  # The instance group manager handles this for us
   --no-restart-on-failure
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
@@ -133,21 +131,19 @@ function create_template() {
       --machine-type=a2-highgpu-1g
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
-      # See comment in build_tools/github_actions/runner/config/setup.sh
-      --local-ssd=interface=NVME
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-ssd"
     )
   elif [[ "${type}" == cpu ]]; then
     cmd+=(
       --machine-type=n1-standard-96
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-ssd"
     )
   elif [[ "${type}" == c2s16 ]]; then
     cmd+=(
       --machine-type=c2-standard-16
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-ssd"
     )
   else
     echo "Got unrecognized type '${type}'" >2

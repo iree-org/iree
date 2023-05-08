@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --canonicalize=test-convergence=true %s | iree-opt --split-input-file | FileCheck %s
 
 // Ensures that the splat moves to the first common dominator of bb2/bb3.
 // We likely want to clone instead to reduce lifetime of the splats.
@@ -42,6 +42,45 @@ func.func @SinkSplatsToConsumers(
 
 // -----
 
+// CHECK-LABEL: @SplatAlreadyAtSinkLocation
+func.func @SplatAlreadyAtSinkLocation(
+  %arg0: i1, %arg1: i1,
+  %arg2: !stream.resource<*>,
+  %arg3: !stream.resource<*>,
+  %arg4: !stream.resource<*>
+) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c100 = arith.constant 100 : index
+  %c101 = arith.constant 101 : index
+  %c121_i32 = arith.constant 121 : i32
+  // The splat is already where we would sink it to -- this used to trigger
+  // infinite pattern recursion.
+  // CHECK: %[[SPLAT100:.+]] = stream.async.splat %c121_i32 : i32 -> !stream.resource<*>{%c100}
+  // CHECK-NEXT: %[[SPLAT101:.+]] = stream.async.splat %c121_i32 : i32 -> !stream.resource<*>{%c101}
+  // CHECK-NEXT: cf.cond_br %arg1, ^bb1, ^bb2
+  %0 = stream.async.splat %c121_i32 : i32 -> !stream.resource<*>{%c100}
+  %1 = stream.async.splat %c121_i32 : i32 -> !stream.resource<*>{%c101}
+  cf.cond_br %arg1, ^bb1, ^bb2
+// CHECK: ^bb1:
+^bb1:
+  // CHECK: stream.async.dispatch @executable::@dispatch0[%c1, %c2, %c3](%[[SPLAT100]][%c0 to %c100 for %c100], %[[SPLAT101]][%c0 to %c101 for %c101]) : (!stream.resource<*>{%c100}, !stream.resource<*>{%c101}) -> !stream.resource<*>{%c100}
+  %2 = stream.async.dispatch @executable::@dispatch0[%c1, %c2, %c3](%0[%c0 to %c100 for %c100], %1[%c0 to %c101 for %c101]) : (!stream.resource<*>{%c100}, !stream.resource<*>{%c101}) -> !stream.resource<*>{%c100}
+  cf.br ^bb3(%2 : !stream.resource<*>)
+// CHECK: ^bb2:
+^bb2:
+  // CHECK: stream.async.dispatch @executable::@dispatch1[%c1, %c2, %c3](%[[SPLAT100]][%c0 to %c100 for %c100], %[[SPLAT101]][%c0 to %c101 for %c101]) : (!stream.resource<*>{%c100}, !stream.resource<*>{%c101}) -> !stream.resource<*>{%c100}
+  %3 = stream.async.dispatch @executable::@dispatch1[%c1, %c2, %c3](%0[%c0 to %c100 for %c100], %1[%c0 to %c101 for %c101]) : (!stream.resource<*>{%c100}, !stream.resource<*>{%c101}) -> !stream.resource<*>{%c100}
+  cf.br ^bb3(%3 : !stream.resource<*>)
+// CHECK: ^bb3(
+^bb3(%arg6: !stream.resource<*>):
+  return %arg6 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @PropagateClonableOps
 func.func @PropagateClonableOps(%arg0: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
@@ -59,12 +98,12 @@ func.func @PropagateClonableOps(%arg0: index) -> !stream.resource<*> {
 
 // CHECK-LABEL: @ConvertSplatConstantsIntoSplats
 func.func @ConvertSplatConstantsIntoSplats(%arg0: index) -> (!stream.resource<transient>, !stream.resource<transient>) {
-  // CHECK-NOT: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[3]> : tensor<8xi32>
   // CHECK: %[[CST:.+]] = arith.constant 3 : i32
-  // CHECK: %0 = stream.async.splat %[[CST]] : i32 -> !stream.resource<transient>{%arg0}
-  %0 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<3> : tensor<8xi32>
   // CHECK: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[1, 2, 3, 4, 5, 6, 7, 8]> : tensor<8xi32>
-  %1 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[1, 2, 3, 4, 5, 6, 7, 8]> : tensor<8xi32>
+  %0 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[1, 2, 3, 4, 5, 6, 7, 8]> : tensor<8xi32>
+  // CHECK-NOT: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[3]> : tensor<8xi32>
+  // CHECK: = stream.async.splat %[[CST]] : i32 -> !stream.resource<transient>{%arg0}
+  %1 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<3> : tensor<8xi32>
   return %0, %1 : !stream.resource<transient>, !stream.resource<transient>
 }
 

@@ -13,8 +13,9 @@ transform.sequence failures(propagate) {
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!pdl.operation) -> !pdl.operation
   %not_root = merge_handles %fill, %red : !pdl.operation
   %forall, %tiled_generic =
-    transform.iree.tile_to_forall_and_workgroup_count_region %root tile_sizes [1, 4]
+    transform.structured.tile_to_forall_op %root tile_sizes [1, 4]
     ( mapping = [#gpu.block<x>, #gpu.block<y>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!pdl.operation) -> ()
   transform.structured.fuse_into_containing_op %not_root into %forall
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
@@ -54,8 +55,8 @@ transform.sequence failures(propagate) {
   // Step 3. Rank-reduce and vectorize.
   // ==================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-  %funcx = transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector }
-  transform.structured.vectorize %funcx
+  transform.iree.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
+  transform.structured.vectorize %func
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
@@ -74,8 +75,8 @@ transform.sequence failures(propagate) {
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===================================================================
   %end_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  %end_func_2 = transform.iree.apply_patterns %end_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases }
+  transform.iree.apply_patterns %end_func { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases } : (!pdl.operation) -> ()
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
-  transform.iree.vector.warp_distribute %end_func_2
+  transform.iree.vector.warp_distribute %end_func
 }

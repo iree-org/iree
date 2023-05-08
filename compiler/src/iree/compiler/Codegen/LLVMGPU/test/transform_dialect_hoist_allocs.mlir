@@ -18,8 +18,7 @@ transform.sequence failures(propagate) {
 ^bb1(%module: !pdl.operation):
     %func = transform.structured.match ops{["func.func"]} in %module
       : (!pdl.operation) -> !transform.op<"func.func">
-    %func_2 = transform.iree.hoist_static_alloc %func
-      : (!transform.op<"func.func">) -> !transform.op<"func.func">
+    transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
 }
 
 // -----
@@ -50,8 +49,7 @@ transform.sequence failures(propagate) {
 ^bb1(%module: !pdl.operation):
     %func = transform.structured.match ops{["func.func"]} in %module
       : (!pdl.operation) -> !transform.op<"func.func">
-    %func_2 = transform.iree.hoist_static_alloc %func
-      : (!transform.op<"func.func">) -> !transform.op<"func.func">
+    transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
 }
 
 // -----
@@ -83,6 +81,5 @@ transform.sequence failures(propagate) {
 ^bb1(%module: !pdl.operation):
     %func = transform.structured.match ops{["func.func"]} in %module
       : (!pdl.operation) -> !transform.op<"func.func">
-    %func_2 = transform.iree.hoist_static_alloc %func
-      : (!transform.op<"func.func">) -> !transform.op<"func.func">
+    transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
 }

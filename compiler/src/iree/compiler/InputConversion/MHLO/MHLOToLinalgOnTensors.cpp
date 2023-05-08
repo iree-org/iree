@@ -15,6 +15,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/InputConversion/MHLO/ConvertMHLOToFlow.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -219,6 +221,25 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   }
 };
 
+struct OptimizationBarrierOpConversion
+    : public OpConversionPattern<mhlo::OptimizationBarrierOp> {
+  using OpConversionPattern<mhlo::OptimizationBarrierOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::OptimizationBarrierOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> outputs;
+    for (auto operand : adaptor.getOperands()) {
+      outputs.push_back(
+          rewriter
+              .create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), operand)
+              .getResult(0));
+    }
+    rewriter.replaceOp(op, outputs);
+    return success();
+  }
+};
+
 // We need to convert func ops in order to convert types.
 class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
@@ -323,8 +344,8 @@ class GenericTypeConvert : public ConversionPattern {
   }
 };
 
-llvm::Optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
-                                     ValueRange inputs, Location loc) {
+std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
+                                    ValueRange inputs, Location loc) {
   assert(inputs.size() == 1);
   if (inputs.front().getType().isa<ShapedType>()) {
     return std::nullopt;
@@ -340,8 +361,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
     : public ConvertMHLOToLinalgOnTensorsBase<
           ConvertMHLOToLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    mhlo::MhloDialect, shape::ShapeDialect, math::MathDialect,
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect,
+                    linalg::LinalgDialect, mhlo::MhloDialect,
+                    shape::ShapeDialect, math::MathDialect,
                     memref::MemRefDialect, complex::ComplexDialect>();
   }
 
@@ -462,8 +484,9 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHloToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
-  patterns.insert<ConcatenateOpConversion, FftOpConversion>(
-      typeConverter, context, PatternBenefit(1000));
+  patterns.insert<ConcatenateOpConversion, FftOpConversion,
+                  OptimizationBarrierOpConversion>(typeConverter, context,
+                                                   PatternBenefit(1000));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createMHLOToLinalgOnTensorsPass() {

@@ -83,9 +83,9 @@ static Attribute createAttributeFromRawData(Location loc,
 
 }  // namespace
 
-CompiledBinary::CompiledBinary() {}
+CompiledBinary::CompiledBinary() = default;
 
-CompiledBinary::~CompiledBinary() {}
+CompiledBinary::~CompiledBinary() = default;
 
 void CompiledBinary::deinitialize() {
   hal_module.reset();
@@ -106,10 +106,10 @@ LogicalResult CompiledBinary::invokeNullary(Location loc, StringRef name,
   }
 
   iree::vm::ref<iree_vm_list_t> inputs;
-  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 0,
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 0,
                                     iree_allocator_system(), &inputs));
   iree::vm::ref<iree_vm_list_t> outputs;
-  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
                                     iree_allocator_system(), &outputs));
 
   if (auto status =
@@ -188,7 +188,7 @@ Attribute CompiledBinary::convertVariantToAttribute(
   auto context = loc.getContext();
   Builder builder(context);
   if (iree_vm_variant_is_value(variant)) {
-    switch (variant.type.value_type) {
+    switch (iree_vm_type_def_as_value(variant.type)) {
       case IREE_VM_VALUE_TYPE_I8:
         return builder.getI8IntegerAttr(variant.i8);
       case IREE_VM_VALUE_TYPE_I16:
@@ -203,7 +203,8 @@ Attribute CompiledBinary::convertVariantToAttribute(
         return builder.getF64FloatAttr(variant.f64);
       default:
         emitError(loc) << "unrecognized evaluated value type: "
-                       << static_cast<int>(variant.type.value_type);
+                       << static_cast<int>(
+                              iree_vm_type_def_as_value(variant.type));
         return {};
     }
   }
@@ -248,7 +249,7 @@ Attribute CompiledBinary::convertVariantToAttribute(
       return convertedAttr;
     } else {
       iree_string_view_t typeName =
-          iree_vm_ref_type_name(variant.type.ref_type);
+          iree_vm_ref_type_name(iree_vm_type_def_as_ref(variant.type));
       emitError(loc) << "unrecognized evaluated ref type: "
                      << StringRef(typeName.data, typeName.size);
       return {};
@@ -311,7 +312,8 @@ Runtime::Runtime() {
   IREE_CHECK_OK(
       iree_hal_driver_registry_allocate(iree_allocator_system(), &registry));
   IREE_CHECK_OK(iree_hal_local_task_driver_module_register(registry));
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
   IREE_CHECK_OK(iree_hal_module_register_all_types(instance.get()));
 }
 

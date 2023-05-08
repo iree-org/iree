@@ -30,7 +30,8 @@ class VMBytecodeDispatchAsyncTest : public ::testing::Test {
     IREE_TRACE_SCOPE();
     const iree_file_toc_t* file = async_bytecode_modules_c_create();
 
-    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         instance_,

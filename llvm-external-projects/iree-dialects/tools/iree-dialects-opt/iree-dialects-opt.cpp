@@ -17,10 +17,12 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/TransformOps/DialectExtension.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -60,7 +62,7 @@ int main(int argc, char **argv) {
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithDialect,
-      mlir::AffineDialect,
+      mlir::affine::AffineDialect,
       mlir::cf::ControlFlowDialect,
       mlir::func::FuncDialect,
       mlir::linalg::LinalgDialect,
@@ -97,8 +99,6 @@ int main(int argc, char **argv) {
   mlir::scf::registerTransformDialectExtension(registry);
   mlir::vector::registerTransformDialectExtension(registry);
 
-  return mlir::asMainReturnCode(
-      mlir::MlirOptMain(argc, argv, "MLIR modular optimizer driver\n", registry,
-                        // Note: without preloading, 3 tests fail atm.
-                        /*preloadDialectsInContext=*/true));
+  return mlir::asMainReturnCode(mlir::MlirOptMain(
+      argc, argv, "MLIR modular optimizer driver\n", registry));
 }

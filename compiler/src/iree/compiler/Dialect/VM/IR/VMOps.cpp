@@ -501,7 +501,7 @@ static bool isConstIntegerBuildableWith(TypedAttr value, Type type) {
   } else if (auto intAttr = value.dyn_cast<IntegerAttr>()) {
     return intAttr.getType().isInteger(SZ);
   } else if (auto elementsAttr = value.dyn_cast<ElementsAttr>()) {
-    return elementsAttr.getType().getElementType().isInteger(SZ);
+    return elementsAttr.getShapedType().getElementType().isInteger(SZ);
   }
   return false;
 }
@@ -520,14 +520,14 @@ static bool isConstFloatBuildableWith(TypedAttr value, Type type) {
   if (auto floatAttr = value.dyn_cast<FloatAttr>()) {
     elementType = floatAttr.getType();
   } else if (auto elementsAttr = value.dyn_cast<ElementsAttr>()) {
-    elementType = elementsAttr.getType().getElementType();
+    elementType = elementsAttr.getShapedType().getElementType();
   }
   if (!elementType) return false;
   return elementType.getIntOrFloatBitWidth() == SZ;
 }
 
 template <int SZ>
-static Attribute convertConstIntegerValue(TypedAttr value) {
+static TypedAttr convertConstIntegerValue(TypedAttr value) {
   assert(isConstIntegerBuildableWith<SZ>(value, value.getType()));
   Builder builder(value.getContext());
   auto integerType = builder.getIntegerType(SZ);
@@ -552,7 +552,7 @@ static Attribute convertConstIntegerValue(TypedAttr value) {
     }
   }
   assert(false && "unexpected attribute type");
-  return Attribute();
+  return TypedAttr();
 }
 
 static FloatType getFloatType(int bitwidth, MLIRContext *context) {
@@ -570,7 +570,7 @@ static FloatType getFloatType(int bitwidth, MLIRContext *context) {
 }
 
 template <int SZ>
-static Attribute convertConstFloatValue(TypedAttr value) {
+static TypedAttr convertConstFloatValue(TypedAttr value) {
   assert(isConstFloatBuildableWith<SZ>(value, value.getType()));
   Builder builder(value.getContext());
   auto floatType = getFloatType(SZ, value.getContext());
@@ -589,7 +589,7 @@ static Attribute convertConstFloatValue(TypedAttr value) {
     }
   }
   assert(false && "unexpected attribute type");
-  return Attribute();
+  return TypedAttr();
 }
 
 // static

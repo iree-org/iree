@@ -6,7 +6,8 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import (Any, Callable, Dict, Generic, List, Optional, Sequence,
+                    Tuple, TypeVar, Union)
 import pathlib
 import dataclasses
 import json
@@ -15,10 +16,13 @@ import markdown_strings as md
 import math
 
 from common import benchmark_definition
-from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_ARTIFACT_SIZE_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
+from common.benchmark_thresholds import (BENCHMARK_THRESHOLDS,
+                                         COMPILATION_TIME_THRESHOLDS,
+                                         TOTAL_ARTIFACT_SIZE_THRESHOLDS,
+                                         TOTAL_DISPATCH_SIZE_THRESHOLDS,
+                                         BenchmarkThreshold, ThresholdUnit)
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
-GetMetricsObjNameFunc = Callable[[Any], str]
 
 PERFBOARD_SERIES_PREFIX = "https://perf.iree.dev/serie?IREE?"
 BENCHMARK_RESULTS_HEADERS = [
@@ -48,6 +52,9 @@ class AggregateBenchmarkLatency:
   # The average latency time for the base commit to compare against.
   base_mean_time: Optional[int] = None
 
+  def __str__(self) -> str:
+    return self.name
+
 
 @dataclass(frozen=True)
 class CompilationMetrics:
@@ -60,6 +67,9 @@ class CompilationMetrics:
   base_compilation_time_ms: Optional[int] = None
   base_total_artifact_bytes: Optional[int] = None
   base_total_dispatch_component_bytes: Optional[int] = None
+
+  def __str__(self) -> str:
+    return self.name
 
 
 T = TypeVar("T")
@@ -260,33 +270,28 @@ def aggregate_all_benchmarks(
       raise ValueError("Inconsistent pull request commit")
 
     for benchmark_index in range(len(file_results.benchmarks)):
-      benchmark_case = file_results.benchmarks[benchmark_index]
+      benchmark_run = file_results.benchmarks[benchmark_index]
 
-      series_name = str(benchmark_case.benchmark_info)
+      series_name = str(benchmark_run.info)
       # Make sure each benchmark has a unique name.
       if series_name in benchmark_names:
         raise ValueError(f"Duplicated benchmark name: {series_name}")
       benchmark_names.add(series_name)
 
       # TODO(#11076): Remove legacy path.
-      series_id = benchmark_case.benchmark_info.run_config_id
+      series_id = benchmark_run.info.run_config_id
       if series_id is None:
         series_id = series_name
 
       if series_id in aggregate_results:
         raise ValueError(f"Duplicated benchmark id: {series_id}")
 
-      # Now scan all benchmark iterations and find the aggregate results.
-      mean_time = file_results.get_aggregate_time(benchmark_index, "mean")
-      median_time = file_results.get_aggregate_time(benchmark_index, "median")
-      stddev_time = file_results.get_aggregate_time(benchmark_index, "stddev")
-
       aggregate_results[series_id] = AggregateBenchmarkLatency(
           name=series_name,
-          benchmark_info=benchmark_case.benchmark_info,
-          mean_time=mean_time,
-          median_time=median_time,
-          stddev_time=stddev_time)
+          benchmark_info=benchmark_run.info,
+          mean_time=benchmark_run.metrics.real_time.mean,
+          median_time=benchmark_run.metrics.real_time.median,
+          stddev_time=benchmark_run.metrics.real_time.stddev)
 
   return aggregate_results
 
@@ -394,7 +399,7 @@ def _categorize_on_single_metric(
     raw group (the group with no base to compare to).
 
     Args:
-      metrics_map: map of (name, metrics object).
+      metrics_map: map of (series_id, metrics object).
       metric_func: the function returns current and base value of the metric.
       thresholds: list of threshold settings to match for categorizing.
     Returns:
@@ -405,19 +410,20 @@ def _categorize_on_single_metric(
   improved_map = {}
   similar_map = {}
   raw_map = {}
-  for name, metrics_obj in metrics_map.items():
+  for series_id, metrics_obj in metrics_map.items():
     current, base = metric_func(metrics_obj)
     if base is None:
-      raw_map[name] = metrics_obj
+      raw_map[series_id] = metrics_obj
       continue
 
+    series_name = str(metrics_obj)
     similar_threshold = None
     for threshold in thresholds:
-      if threshold.regex.match(name):
+      if threshold.regex.match(series_name):
         similar_threshold = threshold
         break
     if similar_threshold is None:
-      raise ValueError(f"No matched threshold setting for: {name}")
+      raise ValueError(f"No matched threshold setting for: {series_name}")
 
     if similar_threshold.unit == ThresholdUnit.PERCENTAGE:
       ratio = abs(current - base) / base * 100
@@ -429,11 +435,11 @@ def _categorize_on_single_metric(
       )
 
     if ratio <= similar_threshold.threshold:
-      similar_map[name] = metrics_obj
+      similar_map[series_id] = metrics_obj
     elif current > base:
-      regressed_map[name] = metrics_obj
+      regressed_map[series_id] = metrics_obj
     else:
-      improved_map[name] = metrics_obj
+      improved_map[series_id] = metrics_obj
 
   return (regressed_map, improved_map, similar_map, raw_map)
 
@@ -528,20 +534,16 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
   return "\n\n".join(tables)
 
 
-def _sort_metrics_objects_and_get_table(
-    metrics_objs: Dict[str, T],
-    metrics_obj_name_func: GetMetricsObjNameFunc,
-    mapper: MetricsToTableMapper[T],
-    headers: Sequence[str],
-    size_cut: Optional[int] = None) -> str:
+def _sort_metrics_objects_and_get_table(metrics_objs: Dict[str, T],
+                                        mapper: MetricsToTableMapper[T],
+                                        headers: Sequence[str],
+                                        size_cut: Optional[int] = None) -> str:
   """Sorts all metrics objects according to the improvement/regression ratio and
     returns a markdown table for it.
 
     Args:
       metrics_objs: map of (target_id, CompilationMetrics). All objects must
         contain base value.
-      metrics_obj_name_func: function that returns the display name of a metrics
-        object.
       mapper: MetricsToTableMapper for metrics_objs.
       headers: list of table headers.
       size_cut: If not None, only show the top N results for each table.
@@ -553,8 +555,7 @@ def _sort_metrics_objects_and_get_table(
       raise AssertionError("Base can't be None for sorting.")
     ratio = abs(current - base) / base
     sorted_rows.append((ratio, (
-        _make_series_link(metrics_obj_name_func(metrics_obj),
-                          mapper.get_series_id(target_id)),
+        _make_series_link(str(metrics_obj), mapper.get_series_id(target_id)),
         _get_compare_text(current, base),
     )))
   sorted_rows.sort(key=lambda row: row[0], reverse=True)
@@ -591,7 +592,6 @@ def categorize_compilation_metrics_into_tables(
       tables.append(
           _sort_metrics_objects_and_get_table(
               metrics_objs=regressed,
-              metrics_obj_name_func=lambda obj: obj.name,
               mapper=mapper,
               headers=["Benchmark Name", table_header],
               size_cut=size_cut))
@@ -600,7 +600,6 @@ def categorize_compilation_metrics_into_tables(
       tables.append(
           _sort_metrics_objects_and_get_table(
               metrics_objs=improved,
-              metrics_obj_name_func=lambda obj: obj.name,
               mapper=mapper,
               headers=["Benchmark Name", table_header],
               size_cut=size_cut))

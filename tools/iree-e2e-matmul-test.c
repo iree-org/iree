@@ -302,7 +302,7 @@ static iree_status_t copy_device_buffer_views_to_host(
   iree_vm_type_def_t elem_type = iree_vm_list_element_type(src);
   iree_host_size_t size = iree_vm_list_size(src);
   iree_allocator_t allocator = iree_hal_allocator_host_allocator(hal_allocator);
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(&elem_type, size, allocator, dst));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(elem_type, size, allocator, dst));
   IREE_RETURN_IF_ERROR(iree_vm_list_resize(*dst, size));
   for (iree_host_size_t i = 0; i < size; ++i) {
     iree_hal_buffer_view_t* src_elem = NULL;
@@ -312,7 +312,7 @@ static iree_status_t copy_device_buffer_views_to_host(
                                                          src_elem, &dst_elem));
     iree_vm_ref_t dst_elem_ref = {0};
     IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-        dst_elem, iree_hal_buffer_view_type_id(), &dst_elem_ref));
+        dst_elem, iree_hal_buffer_view_type(), &dst_elem_ref));
     IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_move(*dst, i, &dst_elem_ref));
   }
   return iree_ok_status();
@@ -987,7 +987,7 @@ static iree_status_t mask_and_copy_device_buffer_views_to_device(
   iree_host_size_t size = iree_vm_list_size(src_list);
   iree_allocator_t allocator = iree_hal_allocator_host_allocator(hal_allocator);
   IREE_RETURN_IF_ERROR(
-      iree_vm_list_create(&elem_type, size, allocator, dst_list));
+      iree_vm_list_create(elem_type, size, allocator, dst_list));
   IREE_RETURN_IF_ERROR(iree_vm_list_resize(*dst_list, size));
   for (iree_host_size_t i = 0; i < size; ++i) {
     iree_hal_buffer_view_t* src = NULL;
@@ -997,7 +997,7 @@ static iree_status_t mask_and_copy_device_buffer_views_to_device(
         device, hal_allocator, src, mask[i], &dst));
     iree_vm_ref_t dst_ref = {0};
     IREE_RETURN_IF_ERROR(
-        iree_vm_ref_wrap_assign(dst, iree_hal_buffer_view_type_id(), &dst_ref));
+        iree_vm_ref_wrap_assign(dst, iree_hal_buffer_view_type(), &dst_ref));
     IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_move(*dst_list, i, &dst_ref));
   }
   return iree_ok_status();
@@ -1023,66 +1023,49 @@ static iree_status_t do_matmul_and_check_results(
   // linalg.matmul. We need to preserve the original test inputs to perform
   // reruns on variants in the failure case (see |replay_event_call_matmul|).
   iree_vm_list_t* device_inputs = NULL;
-  iree_status_t status = mask_and_copy_device_buffer_views_to_device(
+  IREE_CHECK_OK(mask_and_copy_device_buffer_views_to_device(
       replay->device, device_allocator, original_device_inputs, mask,
-      &device_inputs);
+      &device_inputs));
 
   // Perform a deep copy of the device-local inputs into host-local buffers.
   // Needed to pass to the reference matmul implementation and to logging
   // in the failure case.
   iree_vm_list_t* host_inputs = NULL;
-  if (iree_status_is_ok(status)) {
-    status = copy_device_buffer_views_to_host(replay->device, device_allocator,
-                                              device_inputs, &host_inputs);
-  }
+  IREE_CHECK_OK(copy_device_buffer_views_to_host(
+      replay->device, device_allocator, device_inputs, &host_inputs));
 
   // Invoke the function to produce the actual result.
   iree_vm_list_t* device_outputs = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_list_create(/*element_type=*/NULL,
-                                 /*initial_capacity=*/8, replay->host_allocator,
-                                 &device_outputs);
-  }
-
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_invoke(
-        replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
-        /*policy=*/NULL, device_inputs, device_outputs, replay->host_allocator);
-  }
-
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                    /*initial_capacity=*/8,
+                                    replay->host_allocator, &device_outputs));
+  IREE_CHECK_OK(iree_vm_invoke(
+      replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
+      /*policy=*/NULL, device_inputs, device_outputs, replay->host_allocator));
   iree_vm_list_release(device_inputs);
 
   // Get the device_actual_result from the device_outputs.
   iree_hal_buffer_view_t* device_actual_result;
-  if (iree_status_is_ok(status)) {
-    status = get_item_as_buffer_view(device_outputs, 0, &device_actual_result);
-  }
+  IREE_CHECK_OK(
+      get_item_as_buffer_view(device_outputs, 0, &device_actual_result));
 
   // Copy the results to a host local buffer to be able to map it.
   iree_hal_buffer_view_t* host_actual_result = NULL;
-  if (iree_status_is_ok(status)) {
-    status = copy_device_buffer_view_to_host(replay->device, device_allocator,
-                                             device_actual_result,
-                                             &host_actual_result);
-  }
+  IREE_CHECK_OK(copy_device_buffer_view_to_host(
+      replay->device, device_allocator, device_actual_result,
+      &host_actual_result));
 
   // Allocate host_expected_result with same shape as host_actual_result.
   iree_hal_buffer_view_t* host_expected_result = NULL;
-  if (iree_status_is_ok(status)) {
-    status = allocate_host_buffer_view_like(
-        device_allocator, host_actual_result, &host_expected_result);
-  }
+  IREE_CHECK_OK(allocate_host_buffer_view_like(
+      device_allocator, host_actual_result, &host_expected_result));
 
   // Use the reference matmul implementation to fill host_expected_result
-  if (iree_status_is_ok(status)) {
-    status = reference_matmul(host_inputs, host_expected_result);
-  }
+  IREE_CHECK_OK(reference_matmul(host_inputs, host_expected_result));
 
   // Check that host_actual_result and host_expected_result agree.
-  if (iree_status_is_ok(status)) {
-    status = check_matmul_results(file, host_inputs, host_actual_result,
-                                  host_expected_result);
-  }
+  iree_status_t status = check_matmul_results(
+      file, host_inputs, host_actual_result, host_expected_result);
 
   iree_vm_list_release(device_outputs);  // releases device_actual_result
   iree_vm_list_release(host_inputs);
@@ -1282,7 +1265,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
                                     iree_vm_instance_t* instance) {
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
-      root_path, instance,
+      root_path, instance, IREE_TRACE_REPLAY_FLAG_NONE,
       FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                            : IREE_VM_CONTEXT_FLAG_NONE,
       iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
@@ -1298,7 +1281,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
-    iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+    iree_trace_replay_deinitialize(&replay);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "yaml_parser_initialize failed");
   }
@@ -1323,7 +1306,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
   }
 
   yaml_parser_delete(&parser);
-  iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+  iree_trace_replay_deinitialize(&replay);
   return status;
 }
 
@@ -1356,8 +1339,8 @@ int main(int argc, char** argv) {
   }
 
   iree_vm_instance_t* instance = NULL;
-  iree_status_t status =
-      iree_vm_instance_create(iree_allocator_system(), &instance);
+  iree_status_t status = iree_vm_instance_create(
+      IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &instance);
   if (iree_status_is_ok(status)) {
     status = run_trace_files(argc - 1, argv + 1, instance);
   }

@@ -8,7 +8,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/IR/Dominance.h"
 
 namespace mlir {
@@ -20,7 +20,7 @@ struct GPUMultiBufferingPass
   GPUMultiBufferingPass(unsigned numBuffers) : numBuffers(numBuffers) {}
 
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<AffineDialect>();
+    registry.insert<affine::AffineDialect>();
   }
 
   void runOnOperation() override {

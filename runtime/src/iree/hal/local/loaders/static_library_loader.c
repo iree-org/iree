@@ -14,6 +14,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_environment.h"
+#include "iree/hal/local/executable_library_util.h"
 #include "iree/hal/local/local_executable.h"
 
 //===----------------------------------------------------------------------===//
@@ -36,6 +37,12 @@ typedef struct iree_hal_static_executable_t {
 
 static const iree_hal_local_executable_vtable_t
     iree_hal_static_executable_vtable;
+
+static int iree_hal_static_executable_import_thunk_v0(
+    iree_hal_executable_import_v0_t fn_ptr, void* context, void* params,
+    void* reserved) {
+  return fn_ptr(context, params, reserved);
+}
 
 static iree_status_t iree_hal_static_executable_create(
     const iree_hal_executable_params_t* executable_params,
@@ -68,27 +75,32 @@ static iree_status_t iree_hal_static_executable_create(
     executable->library.header = library_header;
     executable->identifier = iree_make_cstring_view((*library_header)->name);
     executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
-
-    // Copy executable constants so we own them.
-    if (executable_params->constant_count > 0) {
-      uint32_t* target_constants =
-          (uint32_t*)((uint8_t*)executable + sizeof(*executable) +
-                      executable_params->pipeline_layout_count *
-                          sizeof(*executable->layouts));
-      memcpy(target_constants, executable_params->constants,
-             executable_params->constant_count *
-                 sizeof(*executable_params->constants));
-      executable->base.environment.constants = target_constants;
-    }
   }
 
+  // Copy executable constants so we own them.
+  if (iree_status_is_ok(status) && executable_params->constant_count > 0) {
+    uint32_t* target_constants =
+        (uint32_t*)((uint8_t*)executable + sizeof(*executable) +
+                    executable_params->pipeline_layout_count *
+                        sizeof(*executable->layouts));
+    memcpy(target_constants, executable_params->constants,
+           executable_params->constant_count *
+               sizeof(*executable_params->constants));
+    executable->base.environment.constants = target_constants;
+  }
+
+  // Resolve imports, if any.
   if (iree_status_is_ok(status)) {
-    if (executable->library.v0->imports.count > 0) {
-      status =
-          iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                           "static libraries do not support imports and should "
-                           "directly link against the functions they require");
-    }
+    status = iree_hal_executable_library_initialize_imports(
+        &executable->base.environment, import_provider,
+        &executable->library.v0->imports,
+        iree_hal_static_executable_import_thunk_v0, host_allocator);
+  }
+
+  // Verify that the library matches the executable params.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_executable_library_verify(executable_params,
+                                                executable->library.v0);
   }
 
   if (iree_status_is_ok(status)) {
@@ -106,6 +118,9 @@ static void iree_hal_static_executable_destroy(
       (iree_hal_static_executable_t*)base_executable;
   iree_allocator_t host_allocator = executable->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_executable_library_deinitialize_imports(
+      &executable->base.environment, host_allocator);
 
   iree_hal_local_executable_deinitialize(
       (iree_hal_local_executable_t*)base_executable);
@@ -128,42 +143,10 @@ static iree_status_t iree_hal_static_executable_issue_call(
                             "entry point ordinal out of bounds");
   }
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  iree_string_view_t entry_point_name = iree_string_view_empty();
-  if (library->exports.names != NULL) {
-    entry_point_name = iree_make_cstring_view(library->exports.names[ordinal]);
-  }
-  if (iree_string_view_is_empty(entry_point_name)) {
-    entry_point_name = iree_make_cstring_view("unknown_static_call");
-  }
-  const char* source_file = NULL;
-  size_t source_file_length = 0;
-  uint32_t source_line;
-  if (library->exports.src_locs != NULL) {
-    // We have source location data, so use it.
-    source_file = library->exports.src_locs[ordinal].path;
-    source_file_length = library->exports.src_locs[ordinal].path_length;
-    source_line = library->exports.src_locs[ordinal].line;
-  } else {
-    // No source location data, so make do with what we have.
-    source_file = executable->identifier.data;
-    source_file_length = executable->identifier.size;
-    source_line = ordinal;
-  }
-  IREE_TRACE_ZONE_BEGIN_EXTERNAL(z0, source_file, source_file_length,
-                                 source_line, entry_point_name.data,
-                                 entry_point_name.size, NULL, 0);
-  if (library->exports.tags != NULL) {
-    const char* tag = library->exports.tags[ordinal];
-    if (tag) {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, tag);
-    }
-  }
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
+  IREE_HAL_EXECUTABLE_LIBRARY_CALL_TRACE_ZONE_BEGIN(z0, executable->identifier,
+                                                    library, ordinal);
   int ret = library->exports.ptrs[ordinal](&base_executable->environment,
                                            dispatch_state, workgroup_state);
-
   IREE_TRACE_ZONE_END(z0);
 
   return ret == 0 ? iree_ok_status()

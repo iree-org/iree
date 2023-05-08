@@ -96,6 +96,17 @@
 // or stick to generic code.
 #include "iree/builtins/ukernel/arch/config.h"
 
+// Now that we have IREE_UK_ARCH_ARM_64 et al defined, based on that we can
+// include the architecture-specific configured header. What it defines is
+// architecture-specific details that we don't necessarily need in this header,
+// but having it included here ensures that all files consistently have this
+// defined.
+#if defined(IREE_UK_ARCH_ARM_64)
+#include "iree/builtins/ukernel/arch/arm_64/config.h"
+#elif defined(IREE_UK_ARCH_X86_64)
+#include "iree/builtins/ukernel/arch/x86_64/config.h"
+#endif
+
 // Include common flag values, shared with the compiler.
 #include "iree/builtins/ukernel/exported_bits.h"
 
@@ -196,6 +207,13 @@ extern "C" {
 #define IREE_UK_ASSUME_UNREACHABLE
 #endif
 
+#define IREE_UK_ASSUME(condition) \
+  do {                            \
+    if (!(condition)) {           \
+      IREE_UK_ASSUME_UNREACHABLE; \
+    }                             \
+  } while (false)
+
 #if IREE_UK_HAVE_ATTRIBUTE(noinline) || \
     (defined(__GNUC__) && !defined(__clang__))
 #define IREE_UK_ATTRIBUTE_NOINLINE __attribute__((noinline))
@@ -247,18 +265,31 @@ IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint16_t) == 2);
 IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint32_t) == 4);
 IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint64_t) == 8);
 
-#define IREE_UK_INT8_MIN (-127i8 - 1)
-#define IREE_UK_INT16_MIN (-32767 - 1)
-#define IREE_UK_INT32_MIN (-2147483647 - 1)
-#define IREE_UK_INT64_MIN (-9223372036854775807LL - 1)
-#define IREE_UK_INT8_MAX 127i8
-#define IREE_UK_INT16_MAX 32767
-#define IREE_UK_INT32_MAX 2147483647
-#define IREE_UK_INT64_MAX 9223372036854775807LL
+#define IREE_UK_INT8_MIN -0x80
+#define IREE_UK_INT16_MIN -0x8000
+#define IREE_UK_INT32_MIN -0x80000000
+#define IREE_UK_INT64_MIN -0x8000000000000000LL
+#define IREE_UK_INT8_MAX 0x7f
+#define IREE_UK_INT16_MAX 0x7fff
+#define IREE_UK_INT32_MAX 0x7fffffff
+#define IREE_UK_INT64_MAX 0x7fffffffffffffffLL
 #define IREE_UK_UINT8_MAX 0xff
 #define IREE_UK_UINT16_MAX 0xffff
 #define IREE_UK_UINT32_MAX 0xffffffffU
 #define IREE_UK_UINT64_MAX 0xffffffffffffffffULL
+
+IREE_UK_STATIC_ASSERT(IREE_UK_INT8_MIN == -(1 << 7));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT16_MIN == -(1 << 15));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT32_MIN == -(1U << 31));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT64_MIN == -(1ULL << 63));
+IREE_UK_STATIC_ASSERT(IREE_UK_INT8_MAX == (1 << 7) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT16_MAX == (1 << 15) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT32_MAX == (1U << 31) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_INT64_MAX == (1ULL << 63) - 1);
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT8_MAX == ((iree_uk_uint8_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT16_MAX == ((iree_uk_uint16_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT32_MAX == ((iree_uk_uint32_t)-1));
+IREE_UK_STATIC_ASSERT(IREE_UK_UINT64_MAX == ((iree_uk_uint64_t)-1));
 
 // Helper for microkernel input validation
 #define IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(VALUE, BIT_COUNT) \
@@ -286,12 +317,20 @@ static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
   *b = t;
 }
 
+static inline iree_uk_ssize_t iree_uk_ssize_min(iree_uk_ssize_t a,
+                                                iree_uk_ssize_t b) {
+  return a <= b ? a : b;
+}
+
+static inline iree_uk_ssize_t iree_uk_ssize_max(iree_uk_ssize_t a,
+                                                iree_uk_ssize_t b) {
+  return a >= b ? a : b;
+}
+
 static inline iree_uk_ssize_t iree_uk_ssize_clamp(iree_uk_ssize_t val,
                                                   iree_uk_ssize_t min,
                                                   iree_uk_ssize_t max) {
-  if (val < min) val = min;
-  if (val > max) val = max;
-  return val;
+  return iree_uk_ssize_min(max, iree_uk_ssize_max(min, val));
 }
 
 //===----------------------------------------------------------------------===//
@@ -470,18 +509,30 @@ static inline int iree_uk_type_size(iree_uk_type_t t) {
 typedef iree_uk_uint16_t iree_uk_type_pair_t;
 typedef iree_uk_uint32_t iree_uk_type_triple_t;
 
-#define IREE_UK_TIE_2_TYPES(B0, B1) ((B0) + ((B1) << 8))
-#define IREE_UK_TIE_3_TYPES(B0, B1, B2) ((B0) + ((B1) << 8) + ((B2) << 16))
+// These need to be macros because they are used to define enum values.
+#define IREE_UK_TIE_2_TYPES(T0, T1) ((T0) + ((T1) << 8))
+#define IREE_UK_TIE_3_TYPES(T0, T1, T2) ((T0) + ((T1) << 8) + ((T2) << 16))
+
+// Convenience macros to build tuples of literal types.
 #define IREE_UK_TIE_2_TYPES_LITERAL(T0, T1) \
   IREE_UK_TIE_2_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1)
 #define IREE_UK_TIE_3_TYPES_LITERAL(T0, T1, T2) \
   IREE_UK_TIE_3_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1, IREE_UK_TYPE_##T2)
 
-#define IREE_UK_UNTIE_TYPE(POS, WORD) (((WORD) >> (8 * (POS))) & 0xFF)
+static inline iree_uk_uint32_t iree_uk_tie_2_types(iree_uk_type_t t0,
+                                                   iree_uk_type_t t1) {
+  return IREE_UK_TIE_2_TYPES(t0, t1);
+}
+
+static inline iree_uk_uint32_t iree_uk_tie_3_types(iree_uk_type_t t0,
+                                                   iree_uk_type_t t1,
+                                                   iree_uk_type_t t2) {
+  return IREE_UK_TIE_3_TYPES(t0, t1, t2);
+}
 
 static inline iree_uk_type_t iree_uk_untie_type(int pos,
                                                 iree_uk_uint32_t word) {
-  return IREE_UK_UNTIE_TYPE(pos, word);
+  return (word >> (8 * pos)) & 0xFF;
 }
 
 //===----------------------------------------------------------------------===//
@@ -556,6 +607,59 @@ static inline int iree_uk_po2_log2_u32(const iree_uk_uint32_t n) {
 static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
   return n <= 1 ? 0 : (1 + iree_uk_floor_log2_u32(n - 1));
 }
+
+//===----------------------------------------------------------------------===//
+// Portable explicit prefetch hints
+//
+// Architecture-specific files may use architecture prefetch intrinsics instead.
+//
+// Any explicit prefetch should be justified by measurements on a specific CPU.
+//===----------------------------------------------------------------------===//
+
+#if IREE_UK_HAVE_BUILTIN(__builtin_prefetch) || defined(__GNUC__)
+#define IREE_UK_PREFETCH_RO(ptr, hint) __builtin_prefetch((ptr), /*rw=*/0, hint)
+#define IREE_UK_PREFETCH_RW(ptr, hint) __builtin_prefetch((ptr), /*rw=*/1, hint)
+#else
+#define IREE_UK_PREFETCH_RO(ptr, hint)
+#define IREE_UK_PREFETCH_RW(ptr, hint)
+#endif
+
+// This is how the 0--3 locality hint is interpreted by both Clang and GCC on
+// both arm64 and x86-64.
+#define IREE_UK_PREFETCH_LOCALITY_NONE 0  // No locality. Data accessed once.
+#define IREE_UK_PREFETCH_LOCALITY_L3 1    // Some locality. Try to keep in L3.
+#define IREE_UK_PREFETCH_LOCALITY_L2 2    // More locality. Try to keep in L2.
+#define IREE_UK_PREFETCH_LOCALITY_L1 3    // Most locality. Try to keep in L1.
+
+//===----------------------------------------------------------------------===//
+// Selection between inline asm and intrinsics code paths.
+//
+// Some ukernels have both intrinsics and inline asm code paths. This macro
+// helps select the one to use based on what's enabled in the build. If both
+// intrinsics and inline asm are enabled in the build, by default inline asm is
+// preferred, unless `prefer_intrinsics` is true --- that's useful for testing.
+//
+// This is a macro in order to avoid referencing undefined function symbols.
+//
+// This currently falls back on intrinsics as always enabled -- we can always
+// add an option for that, like IREE_UK_ENABLE_INLINE_ASM, if needed.
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_UK_ENABLE_INLINE_ASM) && \
+    defined(IREE_UK_ENABLE_INTRINSICS_EVEN_WHEN_INLINE_ASM_AVAILABLE)
+#define IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS
+#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
+                                                prefer_intrinsics)      \
+  ((prefer_intrinsics) ? (intrinsics) : (inline_asm))
+#elif defined(IREE_UK_ENABLE_INLINE_ASM)
+#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
+                                                prefer_intrinsics)      \
+  (inline_asm)
+#else  // not defined(IREE_UK_ENABLE_INLINE_ASM)
+#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
+                                                prefer_intrinsics)      \
+  (intrinsics)
+#endif  // not defined(IREE_UK_ENABLE_INLINE_ASM)
 
 #ifdef __cplusplus
 }  // extern "C"

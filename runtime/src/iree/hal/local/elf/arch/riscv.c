@@ -22,8 +22,8 @@
 // ELF machine type/ABI
 //==============================================================================
 
-bool iree_elf_arch_is_valid(const iree_elf_ehdr_t* ehdr) {
-  return ehdr->e_machine == 0xF3;  // EM_RISCV / 243
+bool iree_elf_machine_is_valid(iree_elf_half_t machine) {
+  return machine == 0xF3;  // EM_RISCV / 243
 }
 
 //==============================================================================
@@ -191,6 +191,12 @@ int iree_elf_call_i_p(const void* symbol_ptr, void* a0) {
 
 int iree_elf_call_i_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2) {
   typedef int (*ptr_t)(void*, void*, void*);
+  return ((ptr_t)symbol_ptr)(a0, a1, a2);
+}
+
+void* iree_elf_call_p_ppp(const void* symbol_ptr, void* a0, void* a1,
+                          void* a2) {
+  typedef void* (*ptr_t)(void*, void*, void*);
   return ((ptr_t)symbol_ptr)(a0, a1, a2);
 }
 

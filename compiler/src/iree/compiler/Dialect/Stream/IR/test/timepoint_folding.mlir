@@ -23,6 +23,36 @@ func.func @DontFoldTimepointExportMismatch(%arg0: !hal.semaphore, %arg1: index) 
 
 // -----
 
+// CHECK-LABEL: @PassThroughChainExternal
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[ARG_FENCE:.+]]: !hal.fence)
+func.func @PassThroughChainExternal(%device: !hal.device, %arg_fence: !hal.fence) -> !hal.fence {
+  // CHECK-NOT: stream.timepoint.import
+  %timepoint = stream.timepoint.import %arg_fence : (!hal.fence) => !stream.timepoint
+  // CHECK-NOT: hal.fence.create
+  %chained_fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
+  // CHECK-NOT: stream.timepoint.chain_external
+  stream.timepoint.chain_external %timepoint => (%chained_fence : !hal.fence)
+  // CHECK: return %[[ARG_FENCE]]
+  return %chained_fence : !hal.fence
+}
+
+// -----
+
+// Tests that external chained values we can't analyze aren't replaced.
+
+// CHECK-LABEL: @DontPassThroughChainExternal
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[ARG_FENCE:.+]]: !hal.fence, %[[CHAINED_FENCE:.+]]: !hal.fence)
+func.func @DontPassThroughChainExternal(%device: !hal.device, %arg_fence: !hal.fence, %chained_fence: !hal.fence) -> !hal.fence {
+  // CHECK: %[[TIMEPOINT:.+]] = stream.timepoint.import %[[ARG_FENCE]]
+  %timepoint = stream.timepoint.import %arg_fence : (!hal.fence) => !stream.timepoint
+  // CHECK: stream.timepoint.chain_external %[[TIMEPOINT]] => (%[[CHAINED_FENCE]]
+  stream.timepoint.chain_external %timepoint => (%chained_fence : !hal.fence)
+  // CHECK: return %[[CHAINED_FENCE]]
+  return %chained_fence : !hal.fence
+}
+
+// -----
+
 // CHECK-LABEL: @FoldTimepointJoinOp
 func.func @FoldTimepointJoinOp(%arg0: !stream.timepoint) -> !stream.timepoint {
   // CHECK-NOT: stream.timepoint.join
@@ -73,6 +103,20 @@ func.func @ExpandTimepointJoinOperands(%arg0: !stream.timepoint, %arg1: !stream.
   %join1 = stream.timepoint.join max(%arg2, %join0, %arg3) => !stream.timepoint
   // CHECK: return %[[JOIN]]
   return %join1 : !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @ElideImmediateBarrier
+// CHECK-SAME: (%[[SIZE:.+]]: index)
+func.func @ElideImmediateBarrier(%size: index) -> (!stream.resource<external>, !stream.timepoint) {
+  // CHECK-DAG: %[[RESOURCE:.+]] = stream.resource.alloc
+  %r0 = stream.resource.alloc uninitialized : !stream.resource<external>{%size}
+  // CHECK-DAG: %[[FENCE:.+]] = stream.timepoint.immediate
+  // CHECK-NOT: stream.timepoint.barrier
+  %r1, %r1t = stream.timepoint.barrier %r0 : !stream.resource<external>{%size} => !stream.timepoint
+  // CHECK: return %[[RESOURCE]], %[[FENCE]]
+  return %r1, %r1t : !stream.resource<external>, !stream.timepoint
 }
 
 // -----

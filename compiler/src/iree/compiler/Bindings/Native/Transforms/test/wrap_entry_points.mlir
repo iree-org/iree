@@ -8,14 +8,14 @@
 //  CHECK-SAME:   iree.abi.stub
 //  CHECK-SAME: } {
 //  CHECK-NEXT:   %[[ARG0_DIM0:.+]] = hal.buffer_view.dim<%[[ARG0]] : !hal.buffer_view>[0] : index
-//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG0_DIM0]]}
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG0_DIM0]]}
 //  CHECK-NEXT:   %[[ARG1_DIM0:.+]] = hal.buffer_view.dim<%[[ARG1]] : !hal.buffer_view>[0] : index
-//  CHECK-NEXT:   %[[ARG1_TENSOR:.+]] = hal.tensor.import %[[ARG1]] : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG1_DIM0]]}
+//  CHECK-NEXT:   %[[ARG1_TENSOR:.+]] = hal.tensor.import %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG1_DIM0]]}
 //  CHECK-NEXT:   %[[RET_TENSORS:.+]]:2 = call @_dynamicEntry(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
 //       CHECK:   %[[RET0_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#0, %c0{{.*}} : tensor<?x8x8x3xf32>
-//  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#0 : tensor<?x8x8x3xf32>{%[[RET0_DIM0]]} -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#0 "output 0" : tensor<?x8x8x3xf32>{%[[RET0_DIM0]]} -> !hal.buffer_view
 //       CHECK:   %[[RET1_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#1, %c0{{.*}} : tensor<?x8x8x3xf32>
-//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#1 : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#1 "output 1" : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
 //  CHECK-NEXT:   return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }
 
@@ -38,12 +38,12 @@ func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) 
 //  CHECK-SAME:   iree.abi.stub
 //  CHECK-SAME: } {
 //  CHECK-NEXT:   %[[ARG0_DIM0:.+]] = hal.buffer_view.dim<%[[ARG0]] : !hal.buffer_view>[0] : index
-//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG0_DIM0]]}
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG0_DIM0]]}
 //  CHECK-NEXT:   %[[RET_TENSORS:.+]]:2 = call @_outputStorage(%[[ARG0_TENSOR]], %[[RET1_STORAGE]])
 //       CHECK:   %[[RET0_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#0, %c0{{.*}} : tensor<?x8x8x3xf32>
-//  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#0 : tensor<?x8x8x3xf32>{%[[RET0_DIM0]]} -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#0 "output 0" : tensor<?x8x8x3xf32>{%[[RET0_DIM0]]} -> !hal.buffer_view
 //       CHECK:   %[[RET1_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#1, %c0{{.*}} : tensor<?x8x8x3xf32>
-//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#1 into %[[RET1_STORAGE]] : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#1 "output 1" into %[[RET1_STORAGE]] : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
 //  CHECK-NEXT:   return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }
 

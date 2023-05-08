@@ -68,7 +68,7 @@ def iree_check_test(
         name = name,
         args = [
             "--device=%s" % driver,
-            "$(location :%s)" % bytecode_module_name,
+            "--module=$(location :%s)" % bytecode_module_name,
         ] + runner_args,
         data = [":%s" % bytecode_module_name],
         src = "//tools:iree-check-module",
@@ -118,15 +118,12 @@ def iree_check_single_backend_test_suite(
     # We haven't implemented this so far because we have been using target_cpu_features so far only
     # for aarch64 targets, for which we use the CMake build. To future people implementing this:
     # target_cpu_features should be a list, and here it should be joined into a comma-separated
-    # string to be passed to --iree-llvm-target-cpu-features
+    # string to be passed to --iree-llvmcpu-target-cpu-features
     if target_cpu_features:
         fail("target_cpu_features must currently be empty")
 
     tests = []
     for src in srcs:
-        # CUDA backend/driver not supported by Bazel build.
-        if target_backend == "cuda" or driver == "cuda":
-            continue
         test_name = "_".join([name, src])
         iree_check_test(
             name = test_name,

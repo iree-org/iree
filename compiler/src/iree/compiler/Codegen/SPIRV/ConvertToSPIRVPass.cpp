@@ -27,6 +27,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Conversion/ArithToSPIRV/ArithToSPIRV.h"
+#include "mlir/Conversion/ComplexToSPIRV/ComplexToSPIRV.h"
 #include "mlir/Conversion/ControlFlowToSPIRV/ControlFlowToSPIRVPass.h"
 #include "mlir/Conversion/FuncToSPIRV/FuncToSPIRV.h"
 #include "mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h"
@@ -377,10 +378,10 @@ void ConvertToSPIRVPass::runOnOperation() {
           "expected workgroup_size attribute to be set for SPIR-V lowering");
       return signalPassFailure();
     }
-    Optional<int64_t> subgroupSize = getSubgroupSize(exportOp);
+    std::optional<int64_t> subgroupSize = getSubgroupSize(exportOp);
     auto workgroupSize32 = llvm::to_vector<4>(llvm::map_range(
         workgroupSize, [](int64_t v) { return static_cast<int32_t>(v); }));
-    Optional<int> subgroupSize32;
+    std::optional<int> subgroupSize32;
     if (subgroupSize) subgroupSize32 = *subgroupSize;
     funcOp->setAttr(
         spirv::getEntryPointABIAttrName(),
@@ -442,6 +443,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   arith::populateArithToSPIRVPatterns(typeConverter, patterns);
   populateFuncToSPIRVPatterns(typeConverter, patterns);
   populateMathToSPIRVPatterns(typeConverter, patterns);
+  populateComplexToSPIRVPatterns(typeConverter, patterns);
 
   // Pull in standard patterns to convert tensor operations to SPIR-V. These are
   // primarily used to handle tensor-type constants and contain a

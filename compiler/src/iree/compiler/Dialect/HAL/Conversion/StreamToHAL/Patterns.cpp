@@ -140,8 +140,13 @@ static IREE::HAL::CommandCategoryBitfield deriveCommandCategories(
   auto bits = IREE::HAL::CommandCategoryBitfield::None;
   for (auto &block : region) {
     for (auto &op : block) {
-      if (isa<IREE::Stream::CmdDispatchOp>(op) ||
-          isa<IREE::Stream::CmdCollectiveOp>(op)) {
+      if (isa<IREE::Stream::CmdCollectiveOp>(op) ||
+          isa<IREE::Stream::CmdCallOp>(op)) {
+        // Calls may do anything and collectives may be implemented as either
+        // transfers or dispatches.
+        bits = bits | IREE::HAL::CommandCategoryBitfield::Dispatch |
+               IREE::HAL::CommandCategoryBitfield::Transfer;
+      } else if (isa<IREE::Stream::CmdDispatchOp>(op)) {
         bits = bits | IREE::HAL::CommandCategoryBitfield::Dispatch;
       } else {
         bits = bits | IREE::HAL::CommandCategoryBitfield::Transfer;
@@ -746,8 +751,9 @@ struct CmdCopyOpPattern
 // NOTE: this relies on the enums being the same today. Ew.
 static IREE::HAL::CollectiveAttr convertCollectiveAttr(
     IREE::Stream::CollectiveAttr sourceAttr) {
-  auto convertReductionOp = [](Optional<IREE::Stream::CollectiveReductionOp> op)
-      -> Optional<IREE::HAL::CollectiveReductionOp> {
+  auto convertReductionOp =
+      [](std::optional<IREE::Stream::CollectiveReductionOp> op)
+      -> std::optional<IREE::HAL::CollectiveReductionOp> {
     if (!op.has_value()) return std::nullopt;
     return static_cast<IREE::HAL::CollectiveReductionOp>(op.value());
   };
@@ -928,6 +934,79 @@ struct CmdDispatchOpPattern
   }
 };
 
+struct CmdFuncOpPattern
+    : public StreamConversionPattern<IREE::Stream::CmdFuncOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::CmdFuncOp funcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type> newArgTypes;
+    SmallVector<DictionaryAttr> newArgAttrs;
+    newArgTypes.push_back(rewriter.getType<IREE::HAL::CommandBufferType>());
+    newArgAttrs.push_back(rewriter.getDictionaryAttr({}));  // command buffer
+    funcOp.getAllArgAttrs(newArgAttrs);
+    SmallVector<Type> newResultTypes;
+    if (failed(getTypeConverter()->convertTypes(funcOp.getArgumentTypes(),
+                                                newArgTypes)) ||
+        failed(getTypeConverter()->convertTypes(funcOp.getResultTypes(),
+                                                newResultTypes))) {
+      return rewriter.notifyMatchFailure(funcOp, "failed to convert types");
+    }
+    auto newOp = rewriter.replaceOpWithNewOp<func::FuncOp>(
+        funcOp, funcOp.getName(),
+        rewriter.getFunctionType(newArgTypes, newResultTypes),
+        funcOp.getSymVisibilityAttr(),
+        rewriter.getArrayAttr(
+            ArrayRef<Attribute>(newArgAttrs.data(), newArgAttrs.size())),
+        funcOp.getAllResultAttrs());
+    newOp->setDialectAttrs(funcOp->getDialectAttrs());
+    return success();
+  }
+};
+
+struct CmdCallOpPattern
+    : public StreamConversionPattern<IREE::Stream::CmdCallOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::CmdCallOp callOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto commandBuffer = mapping->lookupCommandBufferFor(callOp);
+
+    // Always pass the command buffer as the first arg.
+    SmallVector<Value> operands;
+    operands.push_back(commandBuffer);
+    size_t resourceIndex = 0;
+    for (auto [originalOperand, convertedOperand] : llvm::zip_equal(
+             callOp.getResourceOperands(), adaptor.getResourceOperands())) {
+      if (originalOperand.getType().isa<IREE::Stream::ResourceType>()) {
+        // Resource type, add offset/length.
+        operands.push_back(convertedOperand);
+        operands.push_back(adaptor.getResourceOperandOffsets()[resourceIndex]);
+        operands.push_back(adaptor.getResourceOperandLengths()[resourceIndex]);
+        ++resourceIndex;
+      } else {
+        // Primitive/custom type.
+        operands.push_back(convertedOperand);
+      }
+    }
+
+    SmallVector<Type> resultTypes;
+    for (auto result : callOp.getResults()) {
+      SmallVector<Type> convertedTypes;
+      if (failed(getTypeConverter()->convertType(result.getType(),
+                                                 convertedTypes))) {
+        return rewriter.notifyMatchFailure(callOp.getLoc(),
+                                           "unconvertable result type");
+      }
+      llvm::append_range(resultTypes, convertedTypes);
+    }
+
+    rewriter.replaceOpWithNewOp<func::CallOp>(callOp, callOp.getCalleeAttr(),
+                                              resultTypes, operands);
+    return success();
+  }
+};
+
 static void insertSerializationBarriers(Location loc, Block &block,
                                         Value commandBuffer,
                                         OpBuilder builder) {
@@ -998,8 +1077,8 @@ struct CmdExecuteOpPattern
     // Begin/end recording and inline the execution region between them.
     auto endOp =
         rewriter.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
-    rewriter.mergeBlockBefore(&executeOp.getBody().front(), endOp,
-                              adaptor.getResourceOperands());
+    rewriter.inlineBlockBefore(&executeOp.getBody().front(), endOp,
+                               adaptor.getResourceOperands());
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -1032,7 +1111,7 @@ struct CmdSerialOpPattern
                                 OpBuilder::atBlockBegin(&bodyBlock));
 
     // Inline the serial execution region.
-    rewriter.mergeBlockBefore(&serialOp.getBody().front(), serialOp);
+    rewriter.inlineBlockBefore(&serialOp.getBody().front(), serialOp);
     rewriter.eraseOp(serialOp);
     return success();
   }
@@ -1046,7 +1125,7 @@ struct CmdConcurrentOpPattern
       ConversionPatternRewriter &rewriter) const override {
     // Inline the concurrent execution region.
     // TODO(benvanik): split barriers (event set/wait) when nesting.
-    rewriter.mergeBlockBefore(&concurrentOp.getBody().front(), concurrentOp);
+    rewriter.inlineBlockBefore(&concurrentOp.getBody().front(), concurrentOp);
     rewriter.eraseOp(concurrentOp);
     return success();
   }
@@ -1190,6 +1269,24 @@ struct ChannelCreateOpPattern
       }
       return neg1I32;
     };
+    Value id = adaptor.getId();
+    if (!id) {
+      id = rewriter.create<IREE::Util::NullOp>(
+          createOp.getLoc(), rewriter.getType<IREE::Util::BufferType>());
+    }
+    Value group =
+        adaptor.getGroupAttr()
+            ? rewriter
+                  .create<IREE::Util::BufferConstantOp>(
+                      createOp.getLoc(),
+                      /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
+                      /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
+                  .getResult()
+            : rewriter
+                  .create<IREE::Util::NullOp>(
+                      createOp.getLoc(),
+                      rewriter.getType<IREE::Util::BufferType>())
+                  .getResult();
     Value rank =
         adaptor.getRank()
             ? rewriter.create<arith::IndexCastOp>(
@@ -1202,7 +1299,8 @@ struct ChannelCreateOpPattern
             : getDefault();
     rewriter.replaceOpWithNewOp<IREE::HAL::ChannelCreateOp>(
         createOp, rewriter.getType<IREE::HAL::ChannelType>(), device,
-        queueAffinity, rank, count);
+        queueAffinity, /*flags=*/rewriter.getI32IntegerAttr(0), id, group, rank,
+        count);
     return success();
   }
 };
@@ -1309,8 +1407,9 @@ void populateStreamToHALPatterns(MLIRContext *context,
   patterns
       .insert<CmdFlushOpPattern, CmdInvalidateOpPattern, CmdDiscardOpPattern,
               CmdFillOpPattern, CmdCopyOpPattern, CmdCollectiveOpPattern,
-              CmdDispatchOpPattern, CmdExecuteOpPattern, CmdSerialOpPattern,
-              CmdConcurrentOpPattern>(mapping, typeConverter, context);
+              CmdDispatchOpPattern, CmdFuncOpPattern, CmdCallOpPattern,
+              CmdExecuteOpPattern, CmdSerialOpPattern, CmdConcurrentOpPattern>(
+          mapping, typeConverter, context);
   patterns.insert<TimepointImmediateOpPattern, TimepointImportOpPattern,
                   TimepointExportOpPattern, TimepointChainExternalOpPattern,
                   TimepointJoinOpPattern, TimepointBarrierOpPattern,

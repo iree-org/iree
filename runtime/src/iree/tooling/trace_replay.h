@@ -18,11 +18,21 @@ extern "C" {
 
 typedef struct iree_trace_replay_t iree_trace_replay_t;
 
-enum iree_trace_replay_shutdown_flag_bits_e {
-  IREE_TRACE_REPLAY_SHUTDOWN_QUIET = 0u,
-  IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS = 1 << 0u,
+enum iree_trace_replay_flag_bits_e {
+  IREE_TRACE_REPLAY_FLAG_NONE = 0u,
+  // Prints statistics on replay shutdown.
+  IREE_TRACE_REPLAY_FLAG_PRINT_STATISTICS = 1u << 0,
+  // Only creates devices once and reuses them for all execution contexts.
+  // When omitted new devices will be created each time the HAL module is
+  // loaded and existing devices will be destroyed when new contexts are loaded.
+  IREE_TRACE_REPLAY_FLAG_REUSE_DEVICES = 1u << 1,
+  // Only loads modules once and reuses them for all execution contexts.
+  // When omitted modules will be created each time a module load is encountered
+  // and destroyed when new contexts are loaded. Context-specific module state
+  // is not preserved.
+  IREE_TRACE_REPLAY_FLAG_REUSE_MODULES = 1u << 2,
 };
-typedef uint32_t iree_trace_replay_shutdown_flags_t;
+typedef uint32_t iree_trace_replay_flags_t;
 
 // Optional set of callbacks around a replay event function call.
 // Functions not required by the caller may be omitted.
@@ -51,17 +61,32 @@ typedef struct iree_trace_replay_t {
   iree_allocator_t host_allocator;
   iree_string_view_t root_path;
 
+  iree_trace_replay_flags_t replay_flags;
+
   iree_vm_instance_t* instance;
   iree_vm_context_flags_t context_flags;
+
+  // Optional copy of stdin owned by the caller. When non-empty this will be
+  // used in place of the real stdin stream and otherwise the real stream will
+  // be read on each event. Must remain valid for the lifetime of the replay.
+  iree_const_byte_span_t stdin_contents;
 
   iree_hal_driver_registry_t* driver_registry;
   iree_host_size_t device_uri_count;
   const iree_string_view_t* device_uris;
 
+  // All loaded modules, reset each context load unless
+  // IREE_TRACE_REPLAY_FLAG_REUSE_MODULES is set to preserve them.
+  // Note that this is only the module itself and not its per-context state.
+  iree_host_size_t module_count;
+  iree_vm_module_t* modules[16];
+
   // Context used within the replay, modules registered on-demand.
   iree_vm_context_t* context;
 
-  // Active HAL device if any. Will be initialized on the first HAL module load.
+  // Active HAL device if any. Will be initialized on the first HAL module load
+  // and reset each context load unless IREE_TRACE_REPLAY_FLAG_REUSE_DEVICES is
+  // set to reuse it.
   iree_hal_device_t* device;
 
   // Optional inputs available via `!input.get`/`!input.take`.
@@ -80,13 +105,13 @@ typedef struct iree_trace_replay_t {
 // path (may be cwd, may be file source, etc).
 iree_status_t iree_trace_replay_initialize(
     iree_string_view_t root_path, iree_vm_instance_t* instance,
+    iree_trace_replay_flags_t replay_flags,
     iree_vm_context_flags_t context_flags,
     iree_hal_driver_registry_t* driver_registry,
     iree_allocator_t host_allocator, iree_trace_replay_t* out_replay);
 
 // Deinitializes a trace replay context and releases all resources.
-void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
-                                    iree_trace_replay_shutdown_flags_t flags);
+void iree_trace_replay_deinitialize(iree_trace_replay_t* replay);
 
 // TODO(#5724): remove this and instead provide a device set on initialize.
 // Overrides the HAL driver used in the trace with the given |driver|.
@@ -94,6 +119,9 @@ void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
 void iree_trace_replay_set_hal_devices_override(
     iree_trace_replay_t* replay, iree_host_size_t device_uri_count,
     const iree_string_view_t* device_uris);
+
+// Resets replay input/output/blackboard state.
+void iree_trace_replay_reset(iree_trace_replay_t* replay);
 
 // Replays the given |event_node| against the replay context.
 // Automatically switches between the default iree_trace_replay_event_* methods.

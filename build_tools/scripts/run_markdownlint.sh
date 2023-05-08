@@ -9,7 +9,7 @@
 # Runs Markdownlint on Markdown (.md) files
 # https://github.com/igorshubovych/markdownlint-cli
 
-set -xuo pipefail
+set -euo pipefail
 
 declare -a included_files_patterns=(
   # All .md files (disabled while we decide how rigorously to apply lint checks)

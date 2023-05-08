@@ -20,6 +20,10 @@ namespace ABI {
 
 void buildTransformPassPipeline(OpPassManager &passManager,
                                 const InvocationOptions &invocationOptions) {
+  // Convert streamable ops prior to wrapping. This lets us use the original
+  // types on function boundaries prior to wrapping.
+  passManager.addPass(createConvertStreamableOpsPass());
+
   // Wraps the entry points in an export function.
   passManager.addPass(
       createWrapEntryPointsPass(invocationOptions.invocationModel));

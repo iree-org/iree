@@ -40,8 +40,12 @@ int64_t adjustNumberOfWarpsForBlockShuffle(int64_t numWarpsToUse,
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
+/// Takes an optional `warpDims` argument to specify the number of warp
+/// dimensions to consider along various dimensions and avoid second-guessing
+/// how the mapping to warps should occur.
 Value buildMapToBlockAndThreads(ImplicitLocOpBuilder& b, Value funcH,
-                                ArrayRef<int64_t> blockSize);
+                                ArrayRef<int64_t> blockSize,
+                                ArrayRef<int64_t> warpDims = {});
 
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
@@ -92,19 +96,13 @@ void build1DSplittingStrategyWithOptionalThreadMapping(
 struct GPUModel {
   static constexpr StringLiteral kDefaultGPU = "DefaultGPU";
   StringRef model = kDefaultGPU;
+  bool hasWarpShuffle = false;
+  bool hasTF32TensorCore = false;
 };
 
-/// Map an N-D parallel, 1-D reduction operation with optional leading and
-/// optional trailing elementwise operations.
-/// The 1-D reduction dimension must be in the most minor dimension.
-/// The innermost dimensions of the leading and trailing operations must be
-/// most minor along all accesses. Return failure if matching fails. On a
-/// successful match, configure a reduction strategy based on a proxy model of
-/// the hardware and construct transform dialect IR that implements the
-/// reduction strategy. The transform dialect IR is added in a top-level
-/// ModuleOp after the `entryPoint` func::FuncOp.
-LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
-                                           linalg::LinalgOp op,
+/// Try to find an exisiting transform dialect strategy for a given entry point.
+LogicalResult matchAndSetTransformStrategy(func::FuncOp entryPoint,
+                                           Operation* op,
                                            const GPUModel& gpuModel);
 
 }  // namespace gpu

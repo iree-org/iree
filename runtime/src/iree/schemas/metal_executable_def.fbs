@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-namespace iree;
+namespace iree.hal.metal;
 
 // 'Metal Executable'.
 file_identifier "MTLE";
 file_extension "mtle";
 
 // A struct for Metal threadgroup size along each dimension.
-struct MetalThreadgroupSize {
+struct ThreadgroupSize {
   x:uint32;
   y:uint32;
   z:uint32;
@@ -20,7 +20,7 @@ struct MetalThreadgroupSize {
 // A Metal shader library and runtime pipeline state description.
 // This information is used to create MTLLibrary, MTLFunction and pipeline
 // state objects.
-table MetalExecutableDef {
+table ExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
   entry_points:[string];
@@ -32,7 +32,7 @@ table MetalExecutableDef {
   // compiling SPIR-V to MSL, we need to persist the information here so that
   // later it can be used for dispatching.
   // TODO(antiagainst): support SPIR-V specialization constant.
-  threadgroup_sizes:[MetalThreadgroupSize];
+  threadgroup_sizes:[ThreadgroupSize];
 
   // Shader content can be provided as either a serialized library or in the
   // form of source code strings.
@@ -43,5 +43,4 @@ table MetalExecutableDef {
   shader_sources:[string];
 }
 
-root_type MetalExecutableDef;
-
+root_type ExecutableDef;

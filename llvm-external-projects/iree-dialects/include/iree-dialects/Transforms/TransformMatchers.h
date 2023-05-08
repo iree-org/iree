@@ -71,6 +71,12 @@ struct CaptureDims : public CaptureStaticValue<SmallVector<int64_t>> {
   using Base::Base;
 };
 
+/// Captures the convolution dimensions of the target operation.
+struct CaptureConvDims
+    : public CaptureStaticValue<mlir::linalg::detail::ConvolutionDimensions> {
+  using Base::Base;
+};
+
 /// Captures the rank of the operation.
 struct CaptureRank : public CaptureStaticValue<int64_t> {
   using Base::Base;
@@ -366,6 +372,7 @@ public:
   StructuredOpMatcher &rank(CaptureRank capture);
   StructuredOpMatcher &dim(int64_t dimension, CaptureDim capture);
   StructuredOpMatcher &dim(AllDims tag, CaptureDims captures);
+  StructuredOpMatcher &convolutionDims(CaptureConvDims convDims);
 
   //===-------------------------------------------------------------------===//
   // Constraints on input operands.
@@ -733,6 +740,11 @@ struct MatchedReductionCaptures {
   int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
 };
 
+struct MatchedMatmulCaptures {
+  Type lhsType, rhsType, outputType;
+  SmallVector<int64_t> matmulOpSizes = {};
+};
+
 /// Creates a group of matchers for:
 ///
 ///     trailing(reduction(leading(), fill()))
@@ -749,6 +761,18 @@ void makeReductionMatcher(transform_ext::MatcherContext &context,
                           StructuredOpMatcher *&reductionCapture,
                           MatchedReductionCaptures &captures);
 
+/// Creates a group of matchers for:
+///
+///     trailing(matmul(*, *, fill()))
+///
+/// where trailing and leading are elementwise operations whose presence is
+/// optional. Each matcher will capture the corresponding operation.
+void makeMatmulMatcher(transform_ext::MatcherContext &matcherContext,
+                       StructuredOpMatcher *&matmulCapture,
+                       StructuredOpMatcher *&fillCapture,
+                       StructuredOpMatcher *&trailingCapture,
+                       MatchedMatmulCaptures &captures);
+
 /// Create a group of matchers for a different code sequence of operations
 /// matching exactly a softmax operation.
 ///
@@ -761,6 +785,30 @@ void makeSoftmaxMatcher(
     transform_ext::MatcherContext &context,
     transform_ext::StructuredOpMatcher *&maxReductionCapture,
     transform_ext::StructuredOpMatcher *&softmaxRootCapture);
+
+struct MatchedConvolutionCaptures {
+  mlir::linalg::detail::ConvolutionDimensions convolutionDims = {};
+  SmallVector<int64_t> convolutionOpSizes = {};
+  SmallVector<int64_t> trailingOpSizes = {};
+  int64_t convolutionOutputElementalTypeBitWidth = 0;
+  int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
+  int64_t maybeFillElementalTypeBitWidth = 0;
+};
+
+/// Creates a group of matchers for:
+///
+///     trailing(convolution(input, filter, fill()))
+///
+/// where fill is a FillOp and trailing is an elementwise operation, both of
+/// which is optional. Each matcher will capture the corresponding operation.
+void makeConvolutionMatcher(transform_ext::MatcherContext &context,
+                            StructuredOpMatcher *&convolutionCapture,
+                            StructuredOpMatcher *&fillCapture,
+                            StructuredOpMatcher *&trailingCapture,
+                            MatchedConvolutionCaptures &captures);
+void makeConvolutionMatcher(transform_ext::MatcherContext &context,
+                            StructuredOpMatcher *&convolutionCapture,
+                            MatchedConvolutionCaptures &captures);
 
 } // namespace transform_ext
 } // namespace mlir

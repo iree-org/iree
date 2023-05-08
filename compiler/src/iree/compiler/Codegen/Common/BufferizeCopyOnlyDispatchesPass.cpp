@@ -35,8 +35,12 @@ namespace {
 /// to use the `linalg.generic` operation generated for lowering the dispatch.
 struct BufferizeCopyOnlyDispatchesPass
     : public BufferizeCopyOnlyDispatchesBase<BufferizeCopyOnlyDispatchesPass> {
+  BufferizeCopyOnlyDispatchesPass() = default;
+  BufferizeCopyOnlyDispatchesPass(const BufferizeCopyOnlyDispatchesPass &pass) {
+  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, bufferization::BufferizationDialect,
+    registry.insert<affine::AffineDialect, bufferization::BufferizationDialect,
                     IREE::Flow::FlowDialect, linalg::LinalgDialect,
                     memref::MemRefDialect, tensor::TensorDialect>();
   }

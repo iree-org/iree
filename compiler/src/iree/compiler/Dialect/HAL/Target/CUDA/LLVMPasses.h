@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,12 +7,21 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_CUDA_PASS_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_CUDA_PASS_H_
 
+#include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/CodeGen.h"
+
 namespace llvm {
 
-class Pass;
+/// Pass to set range metadata attached to block id intrinsics.
+struct SetBlockIdsRangePass : PassInfoMixin<SetBlockIdsRangePass> {
+  SetBlockIdsRangePass(const std::array<int32_t, 3> &maxWorkgroupSize)
+      : maxWorkgroupSize(maxWorkgroupSize) {}
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 
-/// Pass to mark all loops with llvm metadata to disable unrolling.
-Pass *createSetNoUnrollPass();
+ private:
+  std::array<int32_t, 3> maxWorkgroupSize;
+};
 
 }  // namespace llvm
 

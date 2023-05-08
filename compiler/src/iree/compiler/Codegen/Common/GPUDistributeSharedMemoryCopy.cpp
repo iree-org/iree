@@ -74,6 +74,8 @@ static void populateTilingCopyToWorkgroupMemPatterns(
                                        .cast<MemRefType>();
 
         unsigned rank = dstMemRefType.getRank();
+        // Return empty tile size for zero dim tensor.
+        if (rank == 0) return tileSizesVal;
         int copyTileSize =
             copyVectorNumBits / dstMemRefType.getElementTypeBitWidth();
         for (unsigned i = 0; i < rank - 1; i++) {
@@ -110,7 +112,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 
 /// Compute a tile size so that the numer of iteraton is equal to the flat
 /// workgroup size.
-static Optional<SmallVector<int64_t>> getTileToDistributableSize(
+static std::optional<SmallVector<int64_t>> getTileToDistributableSize(
     linalg::GenericOp copyOp, int64_t flatWorkgroupSize) {
   SmallVector<int64_t, 4> shape = copyOp.getStaticLoopRanges();
   unsigned bitWidth = copyOp.getDpsInitOperand(0)
@@ -146,7 +148,7 @@ static void populateTileToUnroll(RewritePatternSet &patterns,
         SmallVector<Value, 4> tileSizesVal;
         auto copyOp = dyn_cast<linalg::GenericOp>(operation);
         if (!copyOp) return tileSizesVal;
-        Optional<SmallVector<int64_t>> staticSize =
+        std::optional<SmallVector<int64_t>> staticSize =
             getTileToDistributableSize(copyOp, flatWorkgroupSize);
         for (int64_t dim : *staticSize) {
           tileSizesVal.push_back(
@@ -185,13 +187,15 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
                             stride.cast<IntegerAttr>().getInt();
     Value dimId = id;
     if (infos.size() != parallelLoopRanges.size() - 1)
-      dimId = makeComposedAffineApply(b, loc, d0 % numThreadsDim, {dimId});
+      dimId =
+          affine::makeComposedAffineApply(b, loc, d0 % numThreadsDim, {dimId});
     info.procId = dimId;
     info.nprocs = b.create<arith::ConstantIndexOp>(loc, numThreadsDim);
     info.distributionMethod =
         linalg::DistributionMethod::CyclicNumProcsEqNumIters;
     infos.push_back(info);
-    id = makeComposedAffineApply(b, loc, d0.floorDiv(numThreadsDim), {id});
+    id = affine::makeComposedAffineApply(b, loc, d0.floorDiv(numThreadsDim),
+                                         {id});
   }
   std::reverse(infos.begin(), infos.end());
   return infos;
@@ -275,7 +279,7 @@ static Value createFlatId(func::FuncOp funcOp,
       b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::y);
   Value threadZ =
       b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::z);
-  Value flatThreadId = makeComposedAffineApply(
+  Value flatThreadId = affine::makeComposedAffineApply(
       b, funcOp.getLoc(),
       d0 + workgroupSize[0] * d1 + (workgroupSize[0] * workgroupSize[1]) * d2,
       {threadX, threadY, threadZ});

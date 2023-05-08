@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-tensor-pad"
@@ -28,11 +29,14 @@ static FailureOr<SmallVector<int64_t>> getPaddedShapeFromTensorLoad(
   SmallVector<int64_t> paddedShape(origShape.begin(), origShape.end());
   for (const auto &[index, size] :
        llvm::enumerate(tensorLoad.getMixedSizes())) {
-    if (Optional<int64_t> cst = getConstantIntValue(size)) {
+    if (std::optional<int64_t> cst = getConstantIntValue(size)) {
       paddedShape[index] = cst.value();
     } else {
       FailureOr<int64_t> upperBound =
-          linalg::getConstantUpperBoundForIndex(size.get<Value>());
+          ValueBoundsConstraintSet::computeConstantBound(
+              presburger::BoundType::UB, size.get<Value>(),
+              /*dim=*/std::nullopt,
+              /*stopCondition=*/nullptr, /*closedUB=*/true);
       if (failed(upperBound)) return failure();
       paddedShape[index] = *upperBound;
     }
@@ -85,7 +89,7 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   // Slice out the original shape from the padded result to pass on to
   // consumers. The original linalg op is used to provide the dims for the reify
   // result shapes.
-  SmallVector<SmallVector<Value>> reifiedResultShapes;
+  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
   if (failed(cast<ReifyRankedShapedTypeOpInterface>(linalgOp.getOperation())
                  .reifyResultShapes(rewriter, reifiedResultShapes))) {
     return failure();
@@ -98,8 +102,7 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
     int64_t rank = paddedResult.getType().cast<RankedTensorType>().getRank();
     SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> sizes;
-    for (Value v : reifiedResultShapes[resultNumber])
-      sizes.push_back(getAsOpFoldResult(v));
+    for (OpFoldResult v : reifiedResultShapes[resultNumber]) sizes.push_back(v);
     SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
     paddedSubviewResults.push_back(rewriter.create<tensor::ExtractSliceOp>(
         loc, paddedResult, offsets, sizes, strides));
@@ -148,7 +151,7 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
 
   // Slice out the original shape from the padded result to pass on to
   // consumers.
-  SmallVector<SmallVector<Value>> reifiedResultShapes;
+  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
   if (failed(op.reifyResultShapes(rewriter, reifiedResultShapes))) {
     return failure();
   }
@@ -156,8 +159,7 @@ static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
   Value paddedSubviewResults;
   int64_t rank = paddedOp.getDestRank();
   SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
-  SmallVector<OpFoldResult> sizes =
-      getAsOpFoldResult(ValueRange(reifiedResultShapes[0]));
+  SmallVector<OpFoldResult> sizes = reifiedResultShapes[0];
   SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
   paddedSubviewResults = rewriter.create<tensor::ExtractSliceOp>(
       loc, paddedOp.getResult(), offsets, sizes, strides);

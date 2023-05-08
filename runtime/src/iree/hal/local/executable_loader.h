@@ -22,6 +22,20 @@ extern "C" {
 // iree_hal_executable_import_provider_t
 //===----------------------------------------------------------------------===//
 
+enum iree_hal_executable_import_resolution_bits_e {
+  // One or more missing optional symbols.
+  IREE_HAL_EXECUTABLE_IMPORT_RESOLUTION_MISSING_OPTIONAL = 1u << 0,
+  // TODO(benvanik): could add JIT feedback here ("may be slow path" etc) to
+  // propagate warnings up.
+};
+typedef uint32_t iree_hal_executable_import_resolution_t;
+
+typedef iree_status_t(
+    IREE_API_PTR* iree_hal_executable_import_provider_resolve_fn_t)(
+    void* self, iree_host_size_t count, const char* const* symbol_names,
+    void** out_fn_ptrs, void** out_fn_contexts,
+    iree_hal_executable_import_resolution_t* out_resolution);
+
 // Interface used to resolve executable imports at load-time.
 // This virtualizes some external provider and does not take ownership of the
 // instance: callers must ensure that the provider remains valid for the
@@ -33,12 +47,9 @@ typedef struct iree_hal_executable_import_provider_t {
   // User-defined pointer passed to all functions.
   void* self;
 
-  // Resolves an import symbol with the given |symbol_name| and stores a pointer
-  // to the function (or its context) in |out_fn_ptr|.
-  iree_status_t(IREE_API_PTR* resolve)(void* self,
-                                       iree_string_view_t symbol_name,
-                                       void** out_fn_ptr,
-                                       void** out_fn_context);
+  // Resolves |count| imports given |symbol_names| and stores pointers to their
+  // implementation in |out_fn_ptrs| and optional contexts in |out_fn_contexts|.
+  iree_hal_executable_import_provider_resolve_fn_t resolve;
 } iree_hal_executable_import_provider_t;
 
 static inline iree_hal_executable_import_provider_t
@@ -47,24 +58,35 @@ iree_hal_executable_import_provider_null(void) {
   return provider;
 }
 
-// Returns the import provider specified by
-// IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN or null.
+// Resolves |count| imports given |symbol_names| and stores pointers to their
+// implementation in |out_fn_ptrs| and optional contexts in |out_fn_contexts|.
 //
-// To use define a function like:
-//   iree_hal_executable_import_provider_t my_provider(void) { ... }
-// And define it:
-//   -DIREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN=my_provider
-iree_hal_executable_import_provider_t
-iree_hal_executable_import_provider_default(void);
-
-// Resolves an import symbol with the given |symbol_name| and stores a pointer
-// to the function (or its context) in |out_fn_ptr|.
+// A symbol name starting with `?` indicates that the symbol is optional and is
+// allowed to be resolved to NULL. Such cases will always return OK but set the
+// IREE_HAL_EXECUTABLE_IMPORT_RESOLUTION_MISSING_OPTIONAL resolution bit.
 //
-// A |symbol_name| ending in `?` indicates that the symbol is weak and is
-// allowed to be resolved to NULL. Such cases will always return OK.
-iree_status_t iree_hal_executable_import_provider_resolve(
+// Any already resolved function pointers will be skipped and left unmodified.
+// When there's only partial availability of required imports any available
+// ones will still be populated and NOT_FOUND will is returned. This allows for
+// looping over multiple providers to populate what they can and only fails out
+// if all providers return NOT_FOUND for a required import.
+//
+// Symbol names must be sorted alphabetically so if we cared we could use this
+// information to more efficiently resolve the symbols from providers (O(n)
+// walk vs potential O(nlogn)/O(n^2)).
+iree_status_t iree_hal_executable_import_provider_try_resolve(
     const iree_hal_executable_import_provider_t import_provider,
-    iree_string_view_t symbol_name, void** out_fn_ptr, void** out_fn_context);
+    iree_host_size_t count, const char* const* symbol_names, void** out_fn_ptrs,
+    void** out_fn_contexts,
+    iree_hal_executable_import_resolution_t* out_resolution);
+
+// Returns true if the import |symbol_name| is optional.
+static bool iree_hal_executable_import_is_optional(const char* symbol_name) {
+  // A `?` prefix indicates the symbol is optional and can be NULL.
+  // Since the strings are NUL terminated we know there's always 1 char and
+  // we can just test that for the prefix.
+  return symbol_name ? (symbol_name[0] == '?') : false;
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_loader_t

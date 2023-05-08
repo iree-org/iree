@@ -101,4 +101,38 @@ def RewriteForallToScfForOp :
   }];
 }
 
+def TileAndDecomposeAttentionOp : Op<Transform_Dialect, "tile_and_decompose_attention",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
+  let description = [{
+    Target iree_linalg_ext.attention ops and tile and decompose them.
+    This transform consumes the target handle and produces a result handle.
+  }];
+
+  let arguments = (
+      ins PDL_Operation:$target
+  );
+  let results = (outs Variadic<PDL_Operation>:$result);
+
+  let assemblyFormat = "attr-dict $target";
+  let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let assemblyFormat = [{
+    $target attr-dict `:` functional-type(operands, results)
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::iree_compiler::IREE::LinalgExt::AttentionOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_DIALECT_LINALGEXT_TRANSFORMOPS

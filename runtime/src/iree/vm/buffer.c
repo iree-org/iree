@@ -123,11 +123,11 @@ static void iree_vm_buffer_destroy(void* ptr) {
 }
 
 IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer) {
-  iree_vm_ref_object_retain(buffer, &iree_vm_buffer_descriptor);
+  iree_vm_ref_object_retain(buffer, iree_vm_buffer_type());
 }
 
 IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer) {
-  iree_vm_ref_object_release(buffer, &iree_vm_buffer_descriptor);
+  iree_vm_ref_object_release(buffer, iree_vm_buffer_type());
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
@@ -184,6 +184,24 @@ iree_vm_buffer_length(const iree_vm_buffer_t* buffer) {
 IREE_API_EXPORT uint8_t* iree_vm_buffer_data(const iree_vm_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
   return buffer->data.data;
+}
+
+IREE_API_EXPORT iree_byte_span_t
+iree_vm_buffer_contents(const iree_vm_buffer_t* buffer) {
+  // Buffer requires mutable access.
+  if (!buffer ||
+      !iree_all_bits_set(buffer->access, IREE_VM_BUFFER_ACCESS_MUTABLE)) {
+    return iree_byte_span_empty();
+  }
+  return iree_make_byte_span(iree_vm_buffer_data(buffer),
+                             iree_vm_buffer_length(buffer));
+}
+
+IREE_API_EXPORT iree_const_byte_span_t
+iree_vm_buffer_const_contents(const iree_vm_buffer_t* buffer) {
+  return buffer ? iree_make_const_byte_span(iree_vm_buffer_data(buffer),
+                                            iree_vm_buffer_length(buffer))
+                : iree_const_byte_span_empty();
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_buffer_copy_bytes(
@@ -297,13 +315,22 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
 }
 
 iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
-  if (iree_vm_buffer_descriptor.type != IREE_VM_REF_TYPE_NULL) {
-    // Already registered.
-    return iree_ok_status();
-  }
-  iree_vm_buffer_descriptor.destroy = iree_vm_buffer_destroy;
-  iree_vm_buffer_descriptor.offsetof_counter =
-      offsetof(iree_vm_buffer_t, ref_object.counter);
-  iree_vm_buffer_descriptor.type_name = iree_make_cstring_view("vm.buffer");
-  return iree_vm_ref_register_type(&iree_vm_buffer_descriptor);
+  static const iree_vm_ref_type_descriptor_t descriptor = {
+      .destroy = iree_vm_buffer_destroy,
+      .type_name = IREE_SVL("vm.buffer"),
+      .offsetof_counter = offsetof(iree_vm_buffer_t, ref_object.counter) /
+                          IREE_VM_REF_COUNTER_ALIGNMENT,
+  };
+  return iree_vm_instance_register_type(instance, &descriptor,
+                                        &iree_vm_buffer_registration);
+}
+
+iree_status_t iree_vm_buffer_resolve_types(iree_vm_instance_t* instance) {
+  iree_vm_buffer_registration =
+      iree_vm_instance_lookup_type(instance, IREE_SV("vm.buffer"));
+  return iree_vm_buffer_registration
+             ? iree_ok_status()
+             : iree_make_status(
+                   IREE_STATUS_INTERNAL,
+                   "VM type `vm.buffer` not registered with the instance");
 }

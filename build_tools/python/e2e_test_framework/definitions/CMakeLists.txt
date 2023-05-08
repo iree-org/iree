@@ -10,3 +10,10 @@ iree_build_tools_py_test(
   SRC
     "iree_definitions_test.py"
 )
+
+iree_build_tools_py_test(
+  NAME
+    utils_test
+  SRC
+    "utils_test.py"
+)

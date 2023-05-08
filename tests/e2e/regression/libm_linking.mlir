@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-transformation-pipeline --iree-hal-target-backends=llvm-cpu %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-transformation-pipeline --iree-hal-target-backends=llvm-cpu --iree-llvm-link-embedded=false %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-transformation-pipeline --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-link-embedded=false %s | FileCheck %s
 
 // When lowering to CPU code through LLVM, certain LLVM intrinsics require
 // linking against libm (the standard C library of math functions, `-lm`).
@@ -39,3 +39,11 @@ func.func @floor(%input : tensor<f32>) -> (tensor<f32>) {
   %result = math.floor %input : tensor<f32>
   return %result : tensor<f32>
 }
+
+// CHECK: vm.func private @exp2
+func.func @exp2(%input : tensor<f32>) -> (tensor<f32>) {
+  // May lower to llvm.intr.exp2 (exp2f)
+  %result = math.exp2 %input : tensor<f32>
+  return %result : tensor<f32>
+}
+

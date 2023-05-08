@@ -34,7 +34,8 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_instance_create(allocator, &model->instance));
+      z0, iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT, allocator,
+                                  &model->instance));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_module_register_all_types(model->instance));
 

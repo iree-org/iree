@@ -92,7 +92,8 @@ class IreeRuleBuilder(object):
       module_generation_config: iree_definitions.ModuleGenerationConfig,
       output_file_path: pathlib.PurePath) -> IreeModuleCompileRule:
 
-    compile_flags = module_generation_config.materialize_compile_flags()
+    compile_flags = module_generation_config.materialize_compile_flags(
+        module_dir_path=output_file_path.parent)
 
     # Module target name: iree-module-<gen_config_id>
     target_name = f"iree-module-{module_generation_config.composite_id}"
@@ -102,7 +103,8 @@ class IreeRuleBuilder(object):
             target_name=target_name,
             src=str(model_import_rule.output_file_path),
             module_name=str(output_file_path),
-            flags=compile_flags)
+            flags=compile_flags,
+            friendly_name=str(module_generation_config))
     ]
 
     # TODO(#10155): Dump the compile flags from iree_bytecode_module into a flagfile.

@@ -8,6 +8,7 @@
 
 #include <inttypes.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
@@ -21,15 +22,42 @@ IREE_FLAG(
     "Use CUDA streams for executing command buffers (instead of graphs).");
 
 IREE_FLAG(bool, cuda_allow_inline_execution, false,
-          "Allow command buffers to execute inline against CUDA streams when "
+          "Allow command buffers to execute inline against CUDA streams when\n"
           "possible.");
 
-IREE_FLAG(bool, cuda_tracing, true,
-          "Enables tracing of stream events when Tracy instrumentation is "
-          "enabled. Severely impacts benchmark timings and should only be used "
-          "when analyzing dispatch timings.");
+IREE_FLAG(
+    bool, cuda_tracing, true,
+    "Enables tracing of stream events when Tracy instrumentation is enabled.\n"
+    "Severely impacts benchmark timings and should only be used when\n"
+    "analyzing dispatch timings.");
 
 IREE_FLAG(int32_t, cuda_default_index, 0, "Index of the default CUDA device.");
+
+IREE_FLAG(bool, cuda_default_index_from_mpi, true,
+          "Sets the default CUDA device index from the PMI_RANK or\n"
+          "OMPI_COMM_WORLD_LOCAL_RANK environment variables if set.");
+
+static bool iree_try_parse_env_i32(const char* var_name, int32_t* out_value) {
+  const char* var_value = getenv(var_name);
+  if (!var_value || strlen(var_value) == 0) return false;
+  return iree_string_view_atoi_int32(iree_make_cstring_view(var_value),
+                                     out_value);
+}
+
+// Attempts to find the local MPI rank from the environment and use that as the
+// device index. This makes it easy to use N devices on a single system when
+// running via mpiexec.
+static int32_t iree_hal_cuda_infer_device_index_from_env(
+    int32_t default_index) {
+  // TODO: try more env vars from other implementations. This covers Intel/MS
+  // and OpenMPI today.
+  int32_t result = 0;
+  if (iree_try_parse_env_i32("PMI_RANK", &result) ||
+      iree_try_parse_env_i32("OMPI_COMM_WORLD_LOCAL_RANK", &result)) {
+    return result;
+  }
+  return default_index;
+}
 
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
@@ -42,43 +70,6 @@ static iree_status_t iree_hal_cuda_driver_factory_enumerate(
   *out_driver_info_count = IREE_ARRAYSIZE(driver_infos);
   *out_driver_infos = driver_infos;
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_cuda_init_nccl_rank_and_count(
-    iree_hal_cuda_device_params_t* params) {
-  params->nccl_default_count = 0;
-  params->nccl_default_rank = 0;
-
-  char* nprocs_str = getenv("IREE_CUDA_NCCL_NPROCS");
-  if (!nprocs_str) {
-    return iree_ok_status();
-  }
-
-  int nprocs = atoi(nprocs_str);
-  if (nprocs <= 0) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_CUDA_NCCL_NPROCS has invalid value '%s'; expected integer >= 0",
-        nprocs_str);
-  }
-  params->nccl_default_count = nprocs;
-
-  char* procid_str = getenv("IREE_CUDA_NCCL_PROCID");
-  if (!procid_str) {
-    // Expected PROCID when NPROCS is set.
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_CUDA_NCCL_PROCID must be set when IREE_CUDA_NCCL_NPROCS is set.");
-  }
-  int procid = atoi(procid_str);
-  if (procid < 0 || procid >= nprocs) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "IREE_CUDA_NCCL_PROCID has invalid value '%s'; expected integer >= 0",
-        procid_str);
-  }
-  params->nccl_default_rank = procid;
-  return iree_status_from_code(IREE_STATUS_OK);
 }
 
 static iree_status_t iree_hal_cuda_driver_factory_try_create(
@@ -102,21 +93,19 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
   default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
   default_params.stream_tracing = FLAG_cuda_tracing;
 
-  iree_status_t status =
-      iree_hal_cuda_init_nccl_rank_and_count(&default_params);
+  iree_hal_cuda_driver_options_t driver_options;
+  iree_hal_cuda_driver_options_initialize(&driver_options);
 
-  if (iree_status_is_ok(status)) {
-    // Note that nccl_default_id can't be initalized until the driver imports
-    // the NCCL symbols from the dynamic library.
-
-    iree_hal_cuda_driver_options_t driver_options;
-    iree_hal_cuda_driver_options_initialize(&driver_options);
-    driver_options.default_device_index = FLAG_cuda_default_index;
-
-    status = iree_hal_cuda_driver_create(driver_name, &default_params,
-                                         &driver_options, host_allocator,
-                                         out_driver);
+  driver_options.default_device_index = FLAG_cuda_default_index;
+  if (FLAG_cuda_default_index_from_mpi) {
+    driver_options.default_device_index =
+        iree_hal_cuda_infer_device_index_from_env(
+            driver_options.default_device_index);
   }
+
+  iree_status_t status =
+      iree_hal_cuda_driver_create(driver_name, &default_params, &driver_options,
+                                  host_allocator, out_driver);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

@@ -174,8 +174,12 @@ constexpr auto splat_literal(const T& v) {
 template <typename T>
 struct cconv_map;
 
-template <typename T>
-struct cconv_map {
+template <>
+struct cconv_map<int32_t> {
+  static constexpr const auto conv_chars = literal("i");
+};
+template <>
+struct cconv_map<uint32_t> {
   static constexpr const auto conv_chars = literal("i");
 };
 
@@ -186,6 +190,15 @@ struct cconv_map<int64_t> {
 template <>
 struct cconv_map<uint64_t> {
   static constexpr const auto conv_chars = literal("I");
+};
+
+template <>
+struct cconv_map<float> {
+  static constexpr const auto conv_chars = literal("f");
+};
+template <>
+struct cconv_map<double> {
+  static constexpr const auto conv_chars = literal("F");
 };
 
 template <>
@@ -382,18 +395,18 @@ struct ParamUnpack<ref<T>> {
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
-    if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
+    if (reg_ptr->type == ref_type_descriptor<T>::type()) {
       out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
-      status =
-          iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                           "parameter contains a reference to the wrong type; "
-                           "have %.*s but expected %.*s",
-                           (int)iree_vm_ref_type_name(reg_ptr->type).size,
-                           iree_vm_ref_type_name(reg_ptr->type).data,
-                           (int)ref_type_descriptor<T>::get()->type_name.size,
-                           ref_type_descriptor<T>::get()->type_name.data);
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "parameter contains a reference to the wrong type; "
+          "have %.*s but expected %.*s",
+          (int)iree_vm_ref_type_name(reg_ptr->type).size,
+          iree_vm_ref_type_name(reg_ptr->type).data,
+          (int)iree_vm_ref_type_name(ref_type_descriptor<T>::type()).size,
+          iree_vm_ref_type_name(ref_type_descriptor<T>::type()).data);
     } else {
       out_param = {};
     }
@@ -407,18 +420,18 @@ struct ParamUnpack<const ref<T>> {
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
-    if (reg_ptr->type == ref_type_descriptor<T>::get()->type) {
+    if (reg_ptr->type == ref_type_descriptor<T>::type()) {
       out_param = vm::retain_ref(reinterpret_cast<T*>(reg_ptr->ptr));
       memset(reg_ptr, 0, sizeof(*reg_ptr));
     } else if (IREE_UNLIKELY(reg_ptr->type != IREE_VM_REF_TYPE_NULL)) {
-      status =
-          iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                           "parameter contains a reference to the wrong type; "
-                           "have %.*s but expected %.*s",
-                           (int)iree_vm_ref_type_name(reg_ptr->type).size,
-                           iree_vm_ref_type_name(reg_ptr->type).data,
-                           (int)ref_type_descriptor<T>::get()->type_name.size,
-                           ref_type_descriptor<T>::get()->type_name.data);
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "parameter contains a reference to the wrong type; "
+          "have %.*s but expected %.*s",
+          (int)iree_vm_ref_type_name(reg_ptr->type).size,
+          iree_vm_ref_type_name(reg_ptr->type).data,
+          (int)iree_vm_ref_type_name(ref_type_descriptor<T>::type()).size,
+          iree_vm_ref_type_name(ref_type_descriptor<T>::type()).data);
     } else {
       out_param = {};
     }
@@ -433,7 +446,7 @@ struct ParamUnpack<iree_string_view_t> {
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
-    if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::get()->type) {
+    if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::type()) {
       auto byte_span = reinterpret_cast<iree_vm_buffer_t*>(reg_ptr->ptr)->data;
       out_param = iree_make_string_view(
           reinterpret_cast<const char*>(byte_span.data), byte_span.data_length);
@@ -444,8 +457,11 @@ struct ParamUnpack<iree_string_view_t> {
           "have %.*s but expected %.*s",
           (int)iree_vm_ref_type_name(reg_ptr->type).size,
           iree_vm_ref_type_name(reg_ptr->type).data,
-          (int)ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.size,
-          ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.data);
+          (int)iree_vm_ref_type_name(
+              ref_type_descriptor<iree_vm_buffer_t>::type())
+              .size,
+          iree_vm_ref_type_name(ref_type_descriptor<iree_vm_buffer_t>::type())
+              .data);
     } else {
       // NOTE: empty string is allowed here!
       out_param = iree_string_view_empty();
@@ -459,7 +475,7 @@ struct ParamUnpack<std::string_view> {
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     auto* reg_ptr = reinterpret_cast<iree_vm_ref_t*>(ptr);
     ptr += sizeof(iree_vm_ref_t);
-    if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::get()->type) {
+    if (reg_ptr->type == ref_type_descriptor<iree_vm_buffer_t>::type()) {
       auto byte_span = reinterpret_cast<iree_vm_buffer_t*>(reg_ptr->ptr)->data;
       out_param = std::string_view{
           reinterpret_cast<const char*>(byte_span.data), byte_span.data_length};
@@ -470,8 +486,11 @@ struct ParamUnpack<std::string_view> {
           "have %.*s but expected %.*s",
           (int)iree_vm_ref_type_name(reg_ptr->type).size,
           iree_vm_ref_type_name(reg_ptr->type).data,
-          (int)ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.size,
-          ref_type_descriptor<iree_vm_buffer_t>::get()->type_name.data);
+          (int)iree_vm_ref_type_name(
+              ref_type_descriptor<iree_vm_buffer_t>::type())
+              .size,
+          iree_vm_ref_type_name(ref_type_descriptor<iree_vm_buffer_t>::type())
+              .data);
     } else {
       // NOTE: empty string is allowed here!
       out_param = {};
@@ -487,7 +506,7 @@ struct ParamUnpack<std::array<U, S>> {
   using storage_type = std::array<element_type, S>;
   static void Load(Status& status, params_ptr_t& ptr, storage_type& out_param) {
     for (size_t i = 0; i < S; ++i) {
-      ParamUnpack::Load(status, ptr, out_param[i]);
+      ParamUnpack<element_type>::Load(status, ptr, out_param[i]);
     }
   }
 };
@@ -572,8 +591,9 @@ struct ResultPack<opaque_ref> {
 template <typename T>
 struct ResultPack<ref<T>> {
   static void Store(result_ptr_t& ptr, ref<T> value) {
-    iree_vm_ref_wrap_assign(value.release(), value.type(),
+    iree_vm_ref_wrap_assign(value.get(), value.type(),
                             reinterpret_cast<iree_vm_ref_t*>(ptr));
+    value.release();
     ptr += sizeof(iree_vm_ref_t);
   }
 };

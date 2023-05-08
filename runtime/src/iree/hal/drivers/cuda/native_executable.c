@@ -51,17 +51,18 @@ iree_status_t iree_hal_cuda_native_executable_create(
   // TODO: verify the flatbuffer.
   // WARNING: THIS IS CURRENTLY INSECURE. This code is not checking any of the
   // data from the flatbuffer.
-  iree_CUDAExecutableDef_table_t executable_def =
-      iree_CUDAExecutableDef_as_root(executable_params->executable_data.data);
+  iree_hal_cuda_ExecutableDef_table_t executable_def =
+      iree_hal_cuda_ExecutableDef_as_root(
+          executable_params->executable_data.data);
 
   flatbuffers_string_t ptx_image =
-      iree_CUDAExecutableDef_ptx_image_get(executable_def);
+      iree_hal_cuda_ExecutableDef_ptx_image_get(executable_def);
   flatbuffers_uint32_vec_t shared_memory_sizes =
-      iree_CUDAExecutableDef_shared_memory_size_get(executable_def);
+      iree_hal_cuda_ExecutableDef_shared_memory_size_get(executable_def);
   flatbuffers_string_vec_t entry_points_vec =
-      iree_CUDAExecutableDef_entry_points_get(executable_def);
-  iree_CUDABlockSizeDef_vec_t block_sizes_vec =
-      iree_CUDAExecutableDef_block_sizes_get(executable_def);
+      iree_hal_cuda_ExecutableDef_entry_points_get(executable_def);
+  iree_hal_cuda_BlockSizeDef_vec_t block_sizes_vec =
+      iree_hal_cuda_ExecutableDef_block_sizes_get(executable_def);
   iree_host_size_t entry_point_count =
       flatbuffers_string_vec_len(entry_points_vec);
 
@@ -120,12 +121,28 @@ iree_status_t iree_hal_cuda_native_executable_create(
         break;
       }
 
+      int32_t max_shared_mem = 0;
       status = CU_RESULT_TO_STATUS(
           context->syms,
-          cuFuncSetAttribute(function,
-                             CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
-                             shared_memory_sizes[i]),
-          "cuFuncSetAttribute");
+          cuDeviceGetAttribute(
+              &max_shared_mem,
+              CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN,
+              context->cu_device),
+          "cuDeviceGetAttribute");
+      if (!iree_status_is_ok(status)) break;
+      if (shared_memory_sizes[i] > max_shared_mem) {
+        status = iree_make_status(IREE_STATUS_INTERNAL,
+                                  "CUDA driver error: Requested shared memory "
+                                  "size of %d larger than allowed size of %d",
+                                  shared_memory_sizes[i], max_shared_mem);
+      } else {
+        status = CU_RESULT_TO_STATUS(
+            context->syms,
+            cuFuncSetAttribute(function,
+                               CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                               shared_memory_sizes[i]),
+            "cuFuncSetAttribute");
+      }
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.
@@ -145,6 +162,22 @@ iree_status_t iree_hal_cuda_native_executable_create(
         params->function_name =
             iree_make_string_view(string_table_buffer, entry_name_length);
         string_table_buffer += entry_name_length;
+      });
+
+      IREE_TRACE({
+        if (iree_hal_cuda_ExecutableDef_source_locations_is_present(
+                executable_def)) {
+          iree_hal_cuda_FileLineLocDef_vec_t source_locs_vec =
+              iree_hal_cuda_ExecutableDef_source_locations_get(executable_def);
+          iree_hal_cuda_FileLineLocDef_table_t source_loc =
+              iree_hal_cuda_FileLineLocDef_vec_at(source_locs_vec, i);
+          flatbuffers_string_t filename =
+              iree_hal_cuda_FileLineLocDef_filename_get(source_loc);
+          uint32_t line = iree_hal_cuda_FileLineLocDef_line_get(source_loc);
+          params->source_filename =
+              iree_make_string_view(filename, flatbuffers_string_len(filename));
+          params->source_line = line;
+        }
       });
     }
   }

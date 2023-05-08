@@ -68,6 +68,8 @@ export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
 # We test on SwiftShader as a baseline, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
+# Respect the user setting, but default to skipping tests that require Nvidia GPU.
+export IREE_NVIDIA_GPU_TESTS_DISABLE=${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with its directory.
@@ -95,9 +97,11 @@ declare -a label_exclude_args=(
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
 fi
-
 if [[ "${IREE_VULKAN_F16_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
+fi
+if [[ "${IREE_NVIDIA_GPU_TESTS_DISABLE}" == 1 ]]; then
+  label_exclude_args+=("^requires-gpu-nvidia$")
 fi
 
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"

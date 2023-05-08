@@ -178,6 +178,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
     # warnings turned off above.
+    "-Wc++20-extensions"  # Enable until we use C++20 across all compilers
     "-Wctad-maybe-unsupported"
     "-Wfloat-overflow-conversion"
     "-Wfloat-zero-conversion"
@@ -284,6 +285,24 @@ if(IREE_DEV_MODE)
   )
 endif()
 
+#-------------------------------------------------------------------------------
+# Enable frame pointers in IREE_DEV_MODE and in RelWithDebInfo build type ---
+# these are conditions under which the instrumentation/debugging/profiling
+# benefits of frame pointers outweigh the cost.
+#
+# `perf record -g` defaults to relying on frame pointers. There is a non-default
+# option `perf record --call-graph=dwarf`, to rely on debug info instead. It
+# produces inferior results and has a discoverability issue anyway.
+#-------------------------------------------------------------------------------
+
+string(TOUPPER "${CMAKE_BUILD_TYPE}" _UPPERCASE_CMAKE_BUILD_TYPE)
+if (IREE_DEV_MODE OR (_UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "RELWITHDEBINFO"))
+  iree_select_compiler_opts(IREE_DEFAULT_COPTS
+    CLANG_OR_GCC
+      "-fno-omit-frame-pointer"
+  )
+endif()
+
 # Debug information and __FILE__ macros get expanded with full paths by default.
 # This results in binaries that differ based on what directories they are built
 # from and that's annoying.
@@ -316,14 +335,16 @@ if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
+# Find and add threads as dependency.
 if(NOT ANDROID AND IREE_ENABLE_THREADING)
-  iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
-    CLANG_OR_GCC
-      "-lpthread"
-  )
+  set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+  set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+  find_package(Threads)
+  set(IREE_THREADS_DEPS Threads::Threads)
 else()
   # Android provides its own pthreads support with no linking required.
 endif()
+
 
 # Emscripten needs -pthread specified in link _and_ compile options when using
 # atomics, shared memory, or pthreads. If we bring our own threading impl and
@@ -352,7 +373,6 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
     # Required by all modern software, effectively:
     "-lm"
-    ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"

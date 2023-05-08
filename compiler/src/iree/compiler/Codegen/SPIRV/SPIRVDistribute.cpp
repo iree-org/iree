@@ -51,10 +51,10 @@ struct DistributeLoop final : public OpRewritePattern<scf::ForOp> {
     auto mulAddMap = AffineMap::get(0, 3, {sym0 * sym1 + sym2}, context);
     auto mulMap = AffineMap::get(0, 2, {sym0 * sym1}, context);
 
-    auto newLb = rewriter.create<AffineApplyOp>(
+    auto newLb = rewriter.create<affine::AffineApplyOp>(
         loc, mulAddMap,
         ValueRange{idOp, forOp.getStep(), forOp.getLowerBound()});
-    auto newStep = rewriter.create<AffineApplyOp>(
+    auto newStep = rewriter.create<affine::AffineApplyOp>(
         loc, mulMap, ValueRange{countOp, forOp.getStep()});
 
     forOp.getLowerBoundMutable().assign(newLb);

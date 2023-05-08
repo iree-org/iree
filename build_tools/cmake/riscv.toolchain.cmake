@@ -49,10 +49,10 @@ if(RISCV_CPU STREQUAL "linux-riscv_64")
       -march=rv64i2p0ma2p0f2p0d2p0c2p0 -mabi=lp64d")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lstdc++ -lpthread -lm -ldl")
   set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
-    "--iree-llvm-target-triple=riscv64"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c,+zvl512b,+v"
+    "--iree-llvmcpu-target-triple=riscv64"
+    "--iree-llvmcpu-target-cpu=generic-rv64"
+    "--iree-llvmcpu-target-abi=lp64d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+c,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     CACHE INTERNAL "Default llvm codegen flags for testing purposes")
 elseif(RISCV_CPU STREQUAL "linux-riscv_32")
@@ -67,10 +67,10 @@ elseif(RISCV_CPU STREQUAL "linux-riscv_32")
       -Wno-atomic-alignment")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lstdc++ -lpthread -lm -ldl -latomic")
   set(RISCV32_TEST_DEFAULT_LLVM_FLAGS
-    "--iree-llvm-target-triple=riscv32"
-    "--iree-llvm-target-cpu=generic-rv32"
-    "--iree-llvm-target-abi=ilp32d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+zvl512b,+zve32f"
+    "--iree-llvmcpu-target-triple=riscv32"
+    "--iree-llvmcpu-target-cpu=generic-rv32"
+    "--iree-llvmcpu-target-abi=ilp32d"
+    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
     CACHE INTERNAL "Default llvm codegen flags for testing purposes")
 elseif(RISCV_CPU STREQUAL "generic-riscv_32")
@@ -86,6 +86,8 @@ elseif(RISCV_CPU STREQUAL "generic-riscv_32")
   set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF CACHE BOOL "" FORCE)
   set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON CACHE BOOL "" FORCE)
   set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON CACHE BOOL "" FORCE)
+  set(IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS OFF CACHE BOOL "" FORCE)
+  set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF ON CACHE BOOL "" FORCE)
   set(CMAKE_SYSTEM_LIBRARY_PATH "${RISCV_TOOLCHAIN_ROOT}/riscv32-unknown-elf/lib")
   set(IREE_ENABLE_THREADING OFF CACHE BOOL "" FORCE)
   # Specify ISP spec for march=rv64gc. This is to resolve the mismatch between

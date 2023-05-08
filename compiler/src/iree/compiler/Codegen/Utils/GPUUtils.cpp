@@ -16,6 +16,8 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define DBGSNL() (llvm::dbgs() << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
 
@@ -57,7 +59,7 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
         builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]);
     if (i == 0) {
       mlir::AffineExpr d0 = builder.getAffineDimExpr(0);
-      subgroupId = mlir::makeComposedAffineApply(
+      subgroupId = mlir::affine::makeComposedAffineApply(
           builder, loc, d0.floorDiv(builder.getAffineConstantExpr(warpSize)),
           {subgroupId});
     }
@@ -74,7 +76,7 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
   std::array<int64_t, 3> workgroupSize;
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       mlir::iree_compiler::getEntryPoint(funcOp);
-  llvm::Optional<mlir::ArrayAttr> workgroupSizeAttr =
+  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
       exportOp->getWorkgroupSize();
   assert(workgroupSizeAttr.has_value());
   for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
@@ -93,8 +95,10 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
                                            int64_t vectorSize) {
   // Verify that each dimension of the shape can be distributed on the
   // threads
+  // For zero dim tensor, consider it's too small to access using all threads.
+  if (shape.size() == 0) return false;
   int64_t threadsAvailable = threadCount;
-  for (auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
+  for (const auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
     int64_t numElementPerThread = index == 0 ? vectorSize : 1;
     int64_t numThreads = dim / numElementPerThread;
     if (numThreads == 0) return false;
@@ -114,7 +118,7 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
 
 /// Pick an unrolling order that will allow tensorcore operation to reuse LHS
 /// register. This is needed to get good performance on sm_80 target.
-Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
+std::optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
     vector::ContractionOp contract) {
   SmallVector<int64_t> order;
   // First make reduction the outer dimensions.
@@ -147,10 +151,10 @@ Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(
 // GPU workgroup memory
 //===----------------------------------------------------------------------===//
 
-Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
-                                        memref::SubViewOp subview,
-                                        ArrayRef<Value> sizeBounds,
-                                        DataLayout &) {
+std::optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
+                                             memref::SubViewOp subview,
+                                             ArrayRef<Value> sizeBounds,
+                                             DataLayout &) {
   OpBuilder::InsertionGuard guard(builder);
 
   func::FuncOp funcOp = subview->getParentOfType<func::FuncOp>();
@@ -305,10 +309,8 @@ static Value promoteElementToVector(Location loc, OpBuilder &builder,
   return vectorInput;
 }
 
-/// Packs vector of lower precision into a single 32-bit width element.
-/// (i.e <2xf16> -> i32 and <4xi8> -> i32)
-static Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
-                                        Value input) {
+Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
+                                 Value input) {
   LLVM_DEBUG({
     auto vecType = input.getType().cast<VectorType>();
     Type elementType = vecType.getElementType();
@@ -325,10 +327,8 @@ static Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
   return packedInput;
 }
 
-/// Unpack single scalar element into a target vector type.
-/// (i.e i32 -> vector<4xi8> or f32 -> vector<2xf16>)
-static Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
-                            VectorType targetVecType) {
+Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
+                     VectorType targetVecType) {
   LLVM_DEBUG({
     Type packedType = packedInput.getType();
     assert(packedType.isIntOrFloat() && "Only ints and floats are unpackable.");
@@ -385,7 +385,7 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
 
 // List of identity elements by operation.
 // https://en.wikipedia.org/wiki/Identity_element
-static Attribute getCombiningKindIdentity(OpBuilder &builder,
+static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
                                           vector::CombiningKind combiningKind,
                                           Type type) {
   switch (combiningKind) {
@@ -419,7 +419,7 @@ static Attribute getCombiningKindIdentity(OpBuilder &builder,
       return builder.getFloatAttr(type, negInfApFloat);
     }
   }
-  return Attribute();
+  return TypedAttr();
 }
 
 /// Compute the value on a single thread to get per lane reduction value.
@@ -463,11 +463,11 @@ static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
   } else {
     // In cases where vecSize < unrollCount, we would pad the vector
     // with identity elements until it's total bit size is 32.
-    Attribute identityAttr =
+    TypedAttr identityAttr =
         getCombiningKindIdentity(builder, kind, elementType);
     identityAttr = DenseElementsAttr::get(unrolledLaneValType, identityAttr);
-    Value identity = builder.create<arith::ConstantOp>(loc, identityAttr,
-                                                       unrolledLaneValType);
+    Value identity = builder.create<arith::ConstantOp>(loc, unrolledLaneValType,
+                                                       identityAttr);
     perLaneReduction = builder.create<vector::InsertStridedSliceOp>(
         loc, input, identity, /*offsets=*/ArrayRef<int64_t>{0},
         /*strides=*/ArrayRef<int64_t>{1});
@@ -484,13 +484,13 @@ static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
   if (vectorType) {
     elementType = vectorType.getElementType();
   }
-  Attribute identityAttr = getCombiningKindIdentity(builder, kind, elementType);
+  TypedAttr identityAttr = getCombiningKindIdentity(builder, kind, elementType);
   if (vectorType) {
     identityAttr = DenseElementsAttr::get(vectorType, identityAttr);
   }
   assert(identityAttr && "Unknown identity value for the reduction");
   Value identity =
-      builder.create<arith::ConstantOp>(loc, identityAttr, identityType);
+      builder.create<arith::ConstantOp>(loc, identityType, identityAttr);
   return identity;
 }
 
@@ -556,7 +556,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
   return laneVal;
 }
 
-Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
+std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
   // Currently hardcode the size of wmma operation. When more cases are
   // supported this should be picked based on what the backend supports.
   int64_t m = 16;
@@ -583,7 +583,7 @@ Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
       if (sliceType && sliceType != vecType) return std::nullopt;
       sliceType = vecType;
     }
-    return llvm::to_vector<>(sliceType.getShape());
+    return llvm::to_vector(sliceType.getShape());
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
@@ -600,7 +600,7 @@ Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
 // getMmaNativeVectorSize
 //===----------------------------------------------------------------------===//
 /// Returns vector::ContractionOp operand's index where the result is used.
-static Optional<int> getVectorContractOpOperandId(
+static std::optional<int> getVectorContractOpOperandId(
     vector::ContractionOp contractOp, OpResult result) {
   if (contractOp.getLhs() == result) return 0;
   if (contractOp.getRhs() == result) return 1;
@@ -611,14 +611,23 @@ static Optional<int> getVectorContractOpOperandId(
 /// Returns vector::ContractionOp operand's index  where the
 /// vector::TransferReadOp is consumed either consumed directly or via
 /// vector::ExtractStridedSliceOp.
-static Optional<int> getVectorContractOpOperandIdForVectorReadOp(
+static std::optional<int> getVectorContractOpOperandIdForVectorReadOp(
     Operation *op) {
   vector::ContractionOp contractOp;
 
+  // Check if the vector::TransferReadOp is consumed directly by
+  // vector::ContractionOp.
+  if (op->use_empty()) return std::nullopt;
   Operation *firstLevelUser = *((op->getUsers()).begin());
+  if (!firstLevelUser) return std::nullopt;
   if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser))
     return getVectorContractOpOperandId(contractOp, op->getResult(0));
+
+  // Check if the vector::TransferReadOp is consumed indirectly by
+  // vector::ContractionOp. Only check until the second level of use-def chain.
+  if (firstLevelUser->use_empty()) return std::nullopt;
   Operation *secondLevelUser = *((firstLevelUser->getUsers()).begin());
+  if (!secondLevelUser) return std::nullopt;
   if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser))
     return getVectorContractOpOperandId(contractOp,
                                         firstLevelUser->getResult(0));
@@ -626,7 +635,7 @@ static Optional<int> getVectorContractOpOperandIdForVectorReadOp(
 }
 
 /// Helper function to return native size for MMA.SYNC-based operations.
-Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
+std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
   // Shape of native Tensor Core GPU mma.sync operations.
   int64_t mmaShapeM = 16;
   int64_t mmaShapeN = 8;
@@ -667,11 +676,13 @@ Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     auto resultVectorType = readOp.getVector().getType().cast<VectorType>();
     Type resultElementType = resultVectorType.getElementType();
 
-    Optional<int> operandId = getVectorContractOpOperandIdForVectorReadOp(op);
+    std::optional<int> operandId =
+        getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
-      op->emitError() << "Cannot determine operandId this "
-                         "vector::TransferReadOp is used as in the "
-                         "vector::TransferContractOp";
+      LLVM_DEBUG({
+        DBGS() << "Failed to get operandId for vector::TransferReadOp: " << *op
+               << "\n";
+      });
       return std::nullopt;
     }
 
@@ -736,11 +747,18 @@ Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
           if (sliceType && sliceType != vecType) return std::nullopt;
           sliceType = vecType;
         }
-        return llvm::to_vector<>(sliceType.getShape());
+        return llvm::to_vector(sliceType.getShape());
       }
     }
   }
   return std::nullopt;
+}
+
+bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
+  auto addrSpace =
+      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
+  return addrSpace &&
+         addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
 }
 
 }  // namespace iree_compiler

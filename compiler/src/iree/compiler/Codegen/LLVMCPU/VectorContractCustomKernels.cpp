@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
@@ -941,7 +941,7 @@ class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
     VectorType flatAccVectorType =
         VectorType::get({accType.getNumElements()}, accType.getElementType());
     ;
-    Attribute resultInitializer;
+    TypedAttr resultInitializer;
     if (accElemType.isSignlessInteger()) {
       resultInitializer = DenseIntElementsAttr::get(flatAccVectorType, 0);
     } else if (accElemType.isF32()) {

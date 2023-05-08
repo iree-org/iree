@@ -11,7 +11,7 @@ vm.module @my_module {
     // CHECK-DAG: %[[BUFFER_ACCESS:.+]] = "emitc.constant"() {value = #emitc.opaque<"IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST">} : () -> !emitc.opaque<"iree_vm_buffer_access_t">
     // CHECK-NEXT: %[[STATUS:.+]] = emitc.call "iree_vm_buffer_create"(%[[BUFFER_ACCESS]], %[[SIZE]], %[[ALIGNMENT]], %[[ALLOCTOR]], %[[BUFFER_PTR]]) : (!emitc.opaque<"iree_vm_buffer_access_t">, i64, i32, !emitc.opaque<"iree_allocator_t">, !emitc.ptr<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>) -> !emitc.opaque<"iree_status_t">
 
-    // CHECK: %[[BUFFER_TYPE_ID:.+]] = emitc.call "iree_vm_buffer_type_id"() : () -> !emitc.opaque<"iree_vm_ref_type_t">
+    // CHECK: %[[BUFFER_TYPE_ID:.+]] = emitc.call "iree_vm_buffer_type"() : () -> !emitc.opaque<"iree_vm_ref_type_t">
     // CHECK-NEXT: %[[STATUS2:.+]] = emitc.call "iree_vm_ref_wrap_assign"(%[[BUFFER]], %[[BUFFER_TYPE_ID]], %1) : (!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, !emitc.opaque<"iree_vm_ref_type_t">, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
 
     %c128 = vm.const.i64 128

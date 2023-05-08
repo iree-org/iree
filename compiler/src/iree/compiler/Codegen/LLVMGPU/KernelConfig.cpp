@@ -53,6 +53,19 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
     llvm::cl::desc(
         "tag attribute value for the transform dialect transform op container"),
     llvm::cl::init(""));
+
+/// Flag to force using WMMA tensorcore operations.
+llvm::cl::opt<bool> clGPUUseWMMA(
+    "iree-codegen-llvmgpu-use-wmma",
+    llvm::cl::desc("force use of wmma operations for tensorcore"),
+    llvm::cl::init(false));
+
+/// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
+llvm::cl::opt<bool> clGPUUseMMASync(
+    "iree-codegen-llvmgpu-use-mma-sync",
+    llvm::cl::desc("force use mma sync instead of wmma ops"),
+    llvm::cl::init(false));
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
@@ -72,8 +85,6 @@ struct TileWorkgroupSizePair {
   int64_t pipelineDepth;
 };
 
-// Software pipeline depths
-constexpr unsigned softwarePipelineDepthTensorCore = 4;
 // Simt codegen does not do software pipelining.
 constexpr unsigned softwarePipelineDepthSimt = 0;
 }  // namespace
@@ -100,22 +111,24 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
 static void getTensorCoreConfig(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, bool isFp16, int64_t M,
     int64_t N, int64_t K) {
-  // Tile sizes are skewed towards small matmul for now. Long term the plan is
-  // to not rely on hardcoded configurations.
+  // Based on early analysis we found that 128x256x32_3 gives acceptable
+  // performance across many of the large matrix sizes for f16 and fp32. This
+  // needs to be refined into a better startegy based on empircal data but this
+  // gives us a quick solution to achieve performance in the right order of
+  // magnitude for large square like cases.
+  int64_t parallelDim = M * N;
+  static constexpr int64_t kLargDimThreashold = 1536;
   if (isFp16) {
-    int64_t parallelDim = M * N;
-    static constexpr int64_t kLargDimThreashold = 1536;
-    // Based on early analysis we found that 128x256x32_3 gives acceptable
-    // performance across many of the large matrix sizes for f16. This needs to
-    // be refined into a better startegy based on empircal data but this gives
-    // us a quick solution to achieve performance in the right order of
-    // magnitude for large square like cases.
     if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
       tileSizes.push_back(
           TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
     }
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
   } else {
+    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
+      tileSizes.push_back(
+          TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
+    }
     tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
     tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
@@ -194,6 +207,29 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
     }
   }
   return true;
+}
+
+/// Decides which tensorcore operations to use.
+static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
+    bool isF16) {
+  // Currently mma.sync is on by default for fp16 only.
+  IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
+      isF16 ? IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCoreMmaSync
+            : IREE::Codegen::DispatchLoweringPassPipeline::
+                  LLVMGPUMatmulTensorCore;
+
+  // Override the decision based on cl flags.
+  assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
+  if (clGPUUseMMASync) {
+    codegenPipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUMatmulTensorCoreMmaSync;
+  }
+  if (clGPUUseWMMA) {
+    codegenPipeline =
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
+  };
+  return codegenPipeline;
 }
 
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
@@ -290,12 +326,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
         if (sizeK % config.tileSize[2] == 0 &&
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
+          IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
+              getTensorCorePipeline(isFp16);
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,
               sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
-              IREE::Codegen::DispatchLoweringPassPipeline::
-                  LLVMGPUMatmulTensorCore);
+              codegenPipeline);
         }
       }
     }
@@ -523,6 +560,8 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
         vectorSize = 1;
         int64_t id = 0;
         for (int64_t dim : llvm::reverse(shape)) {
+          // Unit loops are already skipped.
+          if (dim == 1) continue;
           if (dim < flatWG) {
             skipInnerTiling++;
             workgroupSize[id] = dim;
@@ -586,7 +625,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 // TODO: this should be part of LinalgOp interface, the equivalent member
 // function currently only support the case where all the dimensions are static
 // while we want to support dynamic shapes.
-static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
+static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   for (auto [mapIdx, map] : llvm::enumerate(op.getIndexingMapsArray())) {
     for (auto [dimIdx, dim] : llvm::enumerate(map.getResults())) {
       auto expr = dim.dyn_cast<AffineDimExpr>();
@@ -601,9 +640,9 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 }
 
 /// Set configuration for reduction transform dialect based strategy.
-static LogicalResult setReductionTransformDialectConfig(
-    func::FuncOp entryPoint, linalg::LinalgOp op,
-    const TargetInfo &targetInfo) {
+static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
+                                               Operation *op,
+                                               const TargetInfo &targetInfo) {
   if (!clGPUCodegenTransformDialectFileName.empty() &&
       clGPUEnableTransformDialectJit) {
     return entryPoint.emitError()
@@ -615,7 +654,6 @@ static LogicalResult setReductionTransformDialectConfig(
       clGPUCodegenTransformDialectFileName.empty()) {
     return failure();
   }
-  if (!targetInfo.hasWarpShuffle) return failure();
 
   // Transform script file provided, use it.
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
@@ -625,11 +663,13 @@ static LogicalResult setReductionTransformDialectConfig(
     return setTranslationInfo(entryPoint, translationInfo);
   }
 
+  // TODO: unify the target informations into one structure.
   iree_compiler::gpu::GPUModel gpuModel;
-  if (failed(iree_compiler::gpu::matchAndSetReductionStrategy(entryPoint, op,
+  gpuModel.hasWarpShuffle = targetInfo.hasWarpShuffle;
+  gpuModel.hasTF32TensorCore = targetInfo.hasTF32TensorCore;
+  if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
                                                               gpuModel)))
     return failure();
-
   return setTranslationInfo(entryPoint, translationInfo);
 }
 
@@ -673,7 +713,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   }
   if (!foundSingleReductionOutput) return failure();
 
-  Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
+  std::optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
 
   const Type elementType = op.getDpsInitOperand(0)
@@ -877,7 +917,7 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
   int64_t residualTilingFactor = bestTilingFactor;
 
   SmallVector<int64_t, 3> workgroupSize(3, 1);  // (X, Y, Z)
-  SmallVector<int64_t> workgroupTileSizes(4, 0);
+  SmallVector<int64_t> workgroupTileSizes(4, 1);
 
   if (isNCHW) {
     // OW -> x, OH -> y, OC -> z
@@ -947,11 +987,12 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     // bypass the heuristic.
     return setUserConfig(entryPointFn, computeOp, compilationInfo);
   }
+  // First try to see if there is a transform dialect configuration existing.
+  if (succeeded(
+          setTransformDialectConfig(entryPointFn, computeOp, targetInfo))) {
+    return success();
+  }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (succeeded(setReductionTransformDialectConfig(entryPointFn, linalgOp,
-                                                     targetInfo))) {
-      return success();
-    }
     if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
       return success();
     }
@@ -1002,11 +1043,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
-    SmallVector<Operation *> computeOps;
-    if (failed(getComputeOps(funcOp, computeOps))) {
-      return funcOp.emitOpError("failed to get compute ops");
-    }
-
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     Operation *rootOperation = nullptr;
     // Find the root operation. linalg.generic and linalg.fill are not root
     // operations if there are other compute operations present.

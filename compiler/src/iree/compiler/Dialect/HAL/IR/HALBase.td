@@ -236,15 +236,17 @@ def HAL_AccessScopeBitfieldAttr :
 
 def HAL_CollectiveKind_AllGather : I32EnumAttrCase<"AllGather", 0, "all_gather">;
 def HAL_CollectiveKind_AllReduce : I32EnumAttrCase<"AllReduce", 1, "all_reduce">;
-def HAL_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 2, "broadcast">;
-def HAL_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 3, "reduce">;
-def HAL_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 4, "reduce_scatter">;
-def HAL_CollectiveKind_Send : I32EnumAttrCase<"Send", 5, "send">;
-def HAL_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 6, "recv">;
+def HAL_CollectiveKind_AllToAll : I32EnumAttrCase<"AllToAll", 2, "all_to_all">;
+def HAL_CollectiveKind_Broadcast : I32EnumAttrCase<"Broadcast", 3, "broadcast">;
+def HAL_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 4, "reduce">;
+def HAL_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 5, "reduce_scatter">;
+def HAL_CollectiveKind_Send : I32EnumAttrCase<"Send", 6, "send">;
+def HAL_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 7, "recv">;
 def HAL_CollectiveKindAttr :
     I32EnumAttr<"CollectiveKind", "valid CollectiveKind", [
       HAL_CollectiveKind_AllGather,
       HAL_CollectiveKind_AllReduce,
+      HAL_CollectiveKind_AllToAll,
       HAL_CollectiveKind_Broadcast,
       HAL_CollectiveKind_Reduce,
       HAL_CollectiveKind_ReduceScatter,
@@ -522,7 +524,7 @@ def HAL_CollectiveAttr :
   }];
   let parameters = (ins
     AttrParameter<"CollectiveKind", "">:$kind,
-    OptionalParameter<"mlir::Optional<CollectiveReductionOp>">:$reduction,
+    OptionalParameter<"std::optional<CollectiveReductionOp>">:$reduction,
     AttrParameter<"CollectiveElementType", "">:$element_type
   );
   let assemblyFormat = [{
@@ -544,7 +546,7 @@ def HAL_DescriptorSetBindingAttr :
   let parameters = (ins
     AttrParameter<"int64_t", "">:$ordinal,
     AttrParameter<"DescriptorType", "">:$type,
-    OptionalParameter<"mlir::Optional<DescriptorFlags>">:$flags
+    OptionalParameter<"std::optional<DescriptorFlags>">:$flags
   );
   let assemblyFormat = [{
     `<` $ordinal `,` $type (`,` $flags^)? `>`
@@ -799,7 +801,7 @@ def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
 
     // Returns the contents of the object file or None if loading failed.
     // TODO(benvanik): better return type to support mapping/etc? eh
-    Optional<std::string> loadData();
+    std::optional<std::string> loadData();
   }];
 }
 
@@ -845,7 +847,7 @@ def HAL_ExecutableObjectsAttr : AttrDef<HAL_Dialect, "ExecutableObjects"> {
 
   let extraClassDeclaration = [{
     // Returns the objects specified for the given generic target.
-    Optional<ArrayAttr> getApplicableObjects(
+    std::optional<ArrayAttr> getApplicableObjects(
         IREE::HAL::ExecutableTargetAttr specificTargetAttr);
   }];
 }

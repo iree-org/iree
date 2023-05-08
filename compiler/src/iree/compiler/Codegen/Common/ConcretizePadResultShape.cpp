@@ -84,8 +84,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
       // SSA values that would need invoking other patterns to simplify. We
       // cannot invoke patterns in patterns.
       AffineMap map = addMap;
-      fullyComposeAffineMapAndOperands(&map, &valueSizes);
-      canonicalizeMapAndOperands(&map, &valueSizes);
+      affine::fullyComposeAffineMapAndOperands(&map, &valueSizes);
+      affine::canonicalizeMapAndOperands(&map, &valueSizes);
 
       auto cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
       // Specially handle the case where we have both dimensions and symbols and
@@ -104,7 +104,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
         map = map.replace(dimToSymMap, /*numResultDims=*/0,
                           /*numResultSyms=*/numDims + numSyms);
 
-        canonicalizeMapAndOperands(&map, &valueSizes);
+        affine::canonicalizeMapAndOperands(&map, &valueSizes);
         cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
       }
       if (!cstExpr) return failure();
@@ -135,7 +135,7 @@ class ConcretizePadResultShapePass final
 
     {
       RewritePatternSet patterns(context);
-      populateConcretizePadResultShapePatterns(context, patterns);
+      populateConcretizePadResultShapePatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -157,15 +157,16 @@ createConcretizePadResultShapePass() {
   return std::make_unique<ConcretizePadResultShapePass>();
 }
 
-void populateConcretizePadResultShapePatterns(MLIRContext *context,
-                                              RewritePatternSet &patterns) {
+void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
+                                              ArrayRef<int64_t> numWorkgroups) {
+  MLIRContext *context = patterns.getContext();
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   // Pulling in upstream scf.for and affine.min canonicalization patterns.
   // They work on tiled (but not distributed) loops.
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
   // Pulling in IREE scf.for and affine.min canonicalization patterns.
   // They work on tiled and distributed loops.
-  populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+  populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
   // Pulling in flow.dispatch.tensor.load op canonicalization patterns.
   // Tiling can generate dim ops taking them as operands.
   IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,

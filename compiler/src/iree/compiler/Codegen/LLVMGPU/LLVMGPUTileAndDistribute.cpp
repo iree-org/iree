@@ -184,7 +184,7 @@ struct LLVMGPUTileAndDistributePass
   LLVMGPUTileAndDistributePass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect>();
+    registry.insert<affine::AffineDialect, gpu::GPUDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();

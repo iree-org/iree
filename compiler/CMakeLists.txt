@@ -10,6 +10,9 @@ add_subdirectory(bindings/c)
 
 # The compiler implementation is gated on the global setting.
 if(IREE_BUILD_COMPILER)
+  # Must configure plugins before processing the compiler sources so that
+  # the static link list can be set.
+  iree_compiler_configure_plugins()
   add_subdirectory(src)
 
   # Copy Python packaging files to the build dir so that we can install from

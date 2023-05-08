@@ -49,7 +49,7 @@ struct DispatchParams {
   // Analyzed minimum binding sizes.
   SmallVector<Binding> bindings;
   // Push constant operands that are known constant. May be null if dynamic.
-  SmallVector<Attribute> uniformOperands;
+  SmallVector<TypedAttr> uniformOperands;
 };
 
 using DispatchParamsMap =
@@ -97,9 +97,9 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
                             resourceLengthInt.getSExtValue()});
       }
 
-      SmallVector<Attribute> uniformOperands;
+      SmallVector<TypedAttr> uniformOperands;
       for (auto operand : dispatchOp.getUniformOperands()) {
-        Attribute uniformOperand;
+        TypedAttr uniformOperand;
         if (!matchPattern(operand, m_Constant(&uniformOperand))) {
           // Non-constant uniform operand; skip the dispatch.
           // TODO(benvanik): extract information from the executable annotations

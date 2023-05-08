@@ -11,8 +11,10 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/MatmulTensorCoreStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/SmallReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/StagedReductionStrategy.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -24,11 +26,18 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/TypeUtilities.h"
 
 using namespace mlir;
 
 #define DEBUG_TYPE "iree-transform-builder"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << '[' << DEBUG_TYPE << "] " << X)
+
+llvm::cl::opt<bool> clGPUEnableTransformDialectMatmulTensorCoreStrategy(
+    "iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy",
+    llvm::cl::desc("activate the matmul tensorcore strategy"),
+    llvm::cl::init(false));
 
 // TODO: significantly better namespacing.
 using iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
@@ -51,6 +60,7 @@ using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
+using iree_compiler::gpu::buildMatmulTensorCoreStrategy;
 using iree_compiler::gpu::buildSmallReductionStrategy;
 using iree_compiler::gpu::buildStagedReductionStrategy;
 using iree_compiler::gpu::GPUModel;
@@ -137,9 +147,11 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 Value mlir::iree_compiler::gpu::buildMapToBlockAndThreads(
-    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize) {
-  funcH = b.create<ForallToWorkgroupOp>(funcH);
-  return b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize);
+    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize,
+    ArrayRef<int64_t> warpDims) {
+  b.create<ForallToWorkgroupOp>(funcH);
+  b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize, warpDims);
+  return funcH;
 }
 
 /// Post-bufferization vector distribution with rank-reduction.
@@ -152,7 +164,7 @@ Value mlir::iree_compiler::gpu::buildDistributeVectors(ImplicitLocOpBuilder &b,
   ApplyPatternsOpPatterns patterns;
   patterns.foldMemrefAliases = true;
   patterns.rankReducingVector = true;
-  funcH = b.create<ApplyPatternsOp>(funcH, patterns);
+  b.create<ApplyPatternsOp>(funcH, patterns);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   // Locally suppress failures for this op only because it doesn't cover the
   // `threadIdx.x == 0 && threadIdx.y == 0` case at the moment.
@@ -277,7 +289,7 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
   // as well as hoisting subset operations such as vector.transfer_read/write.
   funcH = mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
       b, configuration, funcH);
-  funcH = iree_compiler::buildHoisting(b, funcH);
+  iree_compiler::buildHoisting(b, funcH);
 
   // Step N-2. Bufferize and drop HAL descriptor from memref ops.
   variantH = iree_compiler::buildBufferize(b, variantH, /*targetGpu=*/true);
@@ -399,14 +411,32 @@ static ReductionConfig getReductionConfig(
   return ReductionConfig{maxNumThreads, vectorSize, ReductionStrategy::Staged};
 }
 
-LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
-    func::FuncOp entryPoint, linalg::LinalgOp op, const GPUModel &gpuModel) {
+/// Map an N-D parallel, 1-D reduction operation with optional leading and
+/// optional trailing elementwise operations.
+/// The 1-D reduction dimension must be in the most minor dimension.
+/// The innermost dimensions of the leading and trailing operations must be
+/// most minor along all accesses. Return failure if matching fails. On a
+/// successful match, configure a reduction strategy based on a proxy model of
+/// the hardware and construct transform dialect IR that implements the
+/// reduction strategy. The transform dialect IR is added in a top-level
+/// ModuleOp after the `entryPoint` func::FuncOp.
+static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
+                                                  linalg::LinalgOp op,
+                                                  const GPUModel &gpuModel) {
+  if (!gpuModel.hasWarpShuffle) {
+    LDBG("--Reduction strategy no warp shuffle\n");
+    return failure();
+  }
+
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;
   transform_ext::MatcherContext matcherContext;
   makeReductionMatcher(matcherContext, reduction, captures);
-  if (!matchPattern(op, *reduction)) return failure();
+  if (!matchPattern(op, *reduction)) {
+    LDBG("--Reduction strategy failed to match\n");
+    return failure();
+  }
 
   // 2. Construct the configuration and the strategy builder.
   // TODO: Generalize along the HW axis.
@@ -427,7 +457,113 @@ LogicalResult mlir::iree_compiler::gpu::matchAndSetReductionStrategy(
   };
 
   // 3. Build strategy embedded into the IR.
-  createTransformRegion(entryPoint, strategyBuilder);
+  mlir::iree_compiler::createTransformRegion(entryPoint, strategyBuilder);
 
   return success();
+}
+
+static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
+                                               linalg::LinalgOp op,
+                                               const GPUModel &gpuModel) {
+  if (!clGPUEnableTransformDialectMatmulTensorCoreStrategy) {
+    LDBG("--Matmul strategy flag turned off\n");
+    return failure();
+  }
+  if (!gpuModel.hasTF32TensorCore) {
+    LDBG("--Matmul strategy no TF32 tensor core\n");
+    return failure();
+  }
+
+  // 1. Match a reduction and surrounding ops.
+  StructuredOpMatcher *fill;
+  StructuredOpMatcher *matmul;
+  StructuredOpMatcher *trailing;
+  transform_ext::MatchedMatmulCaptures captures;
+  transform_ext::MatcherContext matcherContext;
+  makeMatmulMatcher(matcherContext, matmul, fill, trailing, captures);
+  if (!matchPattern(op, *matmul)) {
+    LDBG("--Matmul strategy fail to match\n");
+    return failure();
+  }
+
+  // We are very peculiar about the dispatches we want to match for now:
+  //   - f32 only atm.
+  //   - Mandatory fill op.
+  //   - No trailing op.
+  //   - If the matmul is "too aligned" then use the default IREE strategy.
+  //   - Otherwise, we take it.
+  if (!fill->getCaptured() || trailing->getCaptured()) {
+    LDBG("--Matmul strategy fill / trailing preconditions failed\n");
+    return failure();
+  }
+
+  // TODO: Capture in the matcher.
+  captures.lhsType =
+      getElementTypeOrSelf(op.getDpsInputOperand(0)->get().getType());
+  captures.rhsType =
+      getElementTypeOrSelf(op.getDpsInputOperand(1)->get().getType());
+  captures.outputType =
+      getElementTypeOrSelf(op.getDpsInitOperand(0)->get().getType());
+  if (!captures.lhsType.isF32() || !captures.rhsType.isF32() ||
+      !captures.outputType.isF32()) {
+    LDBG("--Matmul strategy elemental type check failed\n");
+    return failure();
+  }
+
+  // TODO: Generalize to a good mix of sizes, alignments and element types.
+  const auto &matmulSize = captures.matmulOpSizes;
+  if (matmulSize.size() != 3) {
+    LDBG("--Matmul strategy size capture failed\n");
+    return failure();
+  }
+
+  // Currently the unaligned transform strategy does not properly handle
+  // optionality when padding operations get folded away. So we only use it when
+  // all operands require a padding that does not fold. This is the case when
+  // either:
+  //   - m and k are not aligned to the tile sizes (conservatively, take 64, 16)
+  //   - n and k are not aligned to the tile sizes (conservatively, take 64, 16)
+  // Other cases currently result in folding and fall back to the default
+  // unaligned IREE strategy.
+  bool unsupportedAlignedCases =
+      (matmulSize[0] % 64 == 0 && matmulSize[2] % 16 == 0) ||
+      (matmulSize[1] % 64 == 0 && matmulSize[2] % 16 == 0);
+  if (unsupportedAlignedCases) {
+    LDBG("--Matmul strategy alignment check failed\n");
+    return failure();
+  }
+
+  // 2. Construct the configuration and the strategy builder.
+  // TODO: Generalize along the HW axis.
+  auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
+    iree_compiler::gpu::MatmulStrategy strategy(op->getContext(), captures);
+    return buildMatmulTensorCoreStrategy(b, variant, strategy);
+  };
+
+  // 3. Build strategy embedded into the IR.
+  mlir::iree_compiler::createTransformRegion(entryPoint, strategyBuilder);
+
+  return success();
+}
+
+LogicalResult mlir::iree_compiler::gpu::matchAndSetTransformStrategy(
+    func::FuncOp entryPoint, Operation *op, const GPUModel &gpuModel) {
+  LDBG("Look up a TD strategy for entryPoint:\n" << entryPoint << "\n");
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) {
+    LDBG("Not a Linalg op: " << *op << " -> Fail\n");
+    return failure();
+  }
+  if (succeeded(matchAndSetReductionStrategy(entryPoint, linalgOp, gpuModel))) {
+    LDBG("Activate reduction strategy\n");
+    return success();
+  }
+  if (succeeded(matchAndSetMatmulStrategy(entryPoint, linalgOp, gpuModel))) {
+    LDBG("Activate matmul\n");
+    return success();
+  }
+  // TODO: Add more transform dialect strategy for other kind of dispatch
+  // regions.
+  LDBG("No suitable strategy found\n");
+  return failure();
 }

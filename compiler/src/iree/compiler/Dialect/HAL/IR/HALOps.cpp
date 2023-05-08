@@ -39,7 +39,8 @@ static ParseResult parseDescriptorType(OpAsmParser &parser,
                                        DescriptorTypeAttr &dtAttr) {
   StringRef enumKeyword;
   if (failed(parser.parseKeyword(&enumKeyword))) return failure();
-  Optional<DescriptorType> maybeEnum = symbolizeDescriptorType(enumKeyword);
+  std::optional<DescriptorType> maybeEnum =
+      symbolizeDescriptorType(enumKeyword);
   if (!maybeEnum) return failure();
   dtAttr = DescriptorTypeAttr::get(parser.getContext(), *maybeEnum);
   return success();
@@ -159,12 +160,13 @@ LogicalResult ReturnOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source) {
-  build(builder, result, resultType, source, /*waitFence=*/Value{});
+                           Type resultType, Value source, StringAttr name) {
+  build(builder, result, resultType, source, /*waitFence=*/Value{}, name);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source, Value waitFence) {
+                           Type resultType, Value source, Value waitFence,
+                           StringAttr name) {
   auto shapedType = resultType.cast<ShapedType>();
   assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
           shapedType.hasStaticShape()) &&
@@ -178,14 +180,14 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         builder.getIndexAttr(i)));
   }
   build(builder, result, resultType, source, TypeAttr::get(shapedType),
-        dynamicDims, waitFence);
+        dynamicDims, waitFence, name);
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::llvm::Optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
@@ -251,18 +253,18 @@ LogicalResult TensorImportOp::verify() {
 }
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source) {
+                           Type resultType, Value source, StringAttr name) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
   build(builder, result, resultType, source, TypeAttr::get(source.getType()),
-        dynamicDims, /*target_storage=*/nullptr);
+        dynamicDims, /*target_storage=*/nullptr, name);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
 }
 
-::llvm::Optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
@@ -298,7 +300,7 @@ Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
       getSources()[resultIndex]);
 }
 
-::llvm::Optional<unsigned> TensorBarrierOp::getTiedResultOperandIndex(
+::std::optional<unsigned> TensorBarrierOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {resultIndex};  // sources[i]
 }
@@ -638,6 +640,28 @@ Value DeviceQueueAllocaOp::getResultSize(unsigned idx) {
   return getResultSize();
 }
 
+static LogicalResult verifyDeviceQueueFences(Operation *queueOp,
+                                             Value waitFence,
+                                             Value signalFence) {
+  if (waitFence == signalFence) {
+    return queueOp->emitOpError() << "device queue operations cannot wait and "
+                                     "signal on the same fence";
+  }
+  return success();
+}
+
+LogicalResult DeviceQueueAllocaOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueDeallocaOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueExecuteOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
 //===----------------------------------------------------------------------===//
 // hal.executable
 //===----------------------------------------------------------------------===//
@@ -972,7 +996,8 @@ void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
   ArrayRef<Type> argTypes = getArgumentTypes();
   ArrayRef<Type> resultTypes = getResultTypes();
   mlir::function_interface_impl::printFunctionSignature(
-      p, op, argTypes, /*isVariadic=*/false, resultTypes);
+      p, cast<FunctionOpInterface>(op), argTypes, /*isVariadic=*/false,
+      resultTypes);
   p << " as ";
   if (resultTypes.size() != 1) p << '(';
   llvm::interleaveComma(getKeys().getValue(), p,
@@ -1064,7 +1089,7 @@ void InterfaceBindingSubspanOp::build(
     OpBuilder &builder, OperationState &result, Type resultType, APInt set,
     APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
     ValueRange dynamic_dims, IntegerAttr alignment,
-    Optional<DescriptorFlags> flags) {
+    std::optional<DescriptorFlags> flags) {
   IREE::HAL::DescriptorFlagsAttr descriptorAttr;
   if (flags.has_value()) {
     descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),

@@ -673,7 +673,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         Note that the index returned is into the full range of all operands of
         the current op.
       }],
-      /*retTy=*/"::llvm::Optional<unsigned>",
+      /*retTy=*/"::std::optional<unsigned>",
       /*methodName=*/"getTiedResultOperandIndex",
       /*args=*/(ins "unsigned":$resultIndex),
       /*methodBody=*/[{}],
@@ -691,7 +691,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*retTy=*/"void",
       /*methodName=*/"setTiedResultOperandIndex",
       /*args=*/(ins "unsigned":$resultIndex,
-                    "::llvm::Optional<unsigned>":$operandIndex),
+                    "::std::optional<unsigned>":$operandIndex),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         return IREE::Util::detail::setTiedResultOperandIndex($_op, resultIndex, operandIndex);
@@ -756,7 +756,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   }];
 
   let verify = [{
-    return IREE::Util::detail::verifyTiedOp($_op);
+    return IREE::Util::detail::verifyTiedOp(cast<TiedOpInterface>($_op));
   }];
 }
 

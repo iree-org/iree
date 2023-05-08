@@ -156,9 +156,8 @@ iree_status_t iree_tooling_parse_to_variant_list(
   iree_vm_list_t* list = NULL;
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_vm_list_create(
-          /*element_type=*/NULL, input_strings_count, host_allocator, &list));
+      z0, iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                              input_strings_count, host_allocator, &list));
 
   iree_status_t status = iree_tooling_parse_into_variant_list(
       device_allocator, input_strings, input_strings_count, host_allocator,
@@ -340,7 +339,7 @@ static iree_status_t iree_variant_format(iree_vm_variant_t variant,
   if (iree_vm_variant_is_empty(variant)) {
     return iree_string_builder_append_string(builder, IREE_SV("(null)\n"));
   } else if (iree_vm_variant_is_value(variant)) {
-    switch (variant.type.value_type) {
+    switch (iree_vm_type_def_as_value(variant.type)) {
       IREE_PRINTVARIANT_CASE_I(8, builder, variant)
       IREE_PRINTVARIANT_CASE_I(16, builder, variant)
       IREE_PRINTVARIANT_CASE_I(32, builder, variant)
@@ -351,7 +350,8 @@ static iree_status_t iree_variant_format(iree_vm_variant_t variant,
         return iree_string_builder_append_string(builder, IREE_SV("?\n"));
     }
   } else if (iree_vm_variant_is_ref(variant)) {
-    iree_string_view_t type_name = iree_vm_ref_type_name(variant.type.ref_type);
+    iree_string_view_t type_name =
+        iree_vm_ref_type_name(iree_vm_type_def_as_ref(variant.type));
     IREE_RETURN_IF_ERROR(iree_string_builder_append_string(builder, type_name));
     IREE_RETURN_IF_ERROR(
         iree_string_builder_append_string(builder, IREE_SV("\n")));

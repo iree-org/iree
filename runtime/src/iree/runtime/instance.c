@@ -75,8 +75,8 @@ IREE_API_EXPORT iree_status_t iree_runtime_instance_create(
   instance->driver_registry = options->driver_registry;
   // TODO(benvanik): driver registry ref counting.
 
-  iree_status_t status =
-      iree_vm_instance_create(host_allocator, &instance->vm_instance);
+  iree_status_t status = iree_vm_instance_create(
+      IREE_VM_TYPE_CAPACITY_DEFAULT, host_allocator, &instance->vm_instance);
   if (iree_status_is_ok(status)) {
     status = iree_hal_module_register_all_types(instance->vm_instance);
   }

@@ -24,10 +24,10 @@ namespace mlir {
 namespace iree_compiler {
 
 // NOTE: HALDispatchABI and the associated conversion patterns should live under
-// iree/compiler/Dialect/HAL/Target/LLVM/ instead of here as they have nothing
-// to do with linalg. If we need to use the patterns in this conversion we can
-// expose a populate*Patterns() function to access them without needing them
-// defined here.
+// iree/compiler/Dialect/HAL/Target/LLVMCPU/ instead of here as they have
+// nothing to do with linalg. If we need to use the patterns in this conversion
+// we can expose a populate*Patterns() function to access them without needing
+// them defined here.
 
 //------------------------------------------------------------------------------
 // ExecutableLibraryDI
@@ -269,6 +269,9 @@ class HALDispatchABI {
   //   uint32_t processor_id = state->processor_id;
   Value loadProcessorID(Operation *forOp, OpBuilder &builder);
 
+  // Loads a pointer to the processor information data fields.
+  Value loadProcessorData(Operation *forOp, OpBuilder &builder);
+
   // Loads a processor information data field at the given index.
   // May be 0 if the field is not available.
   Value loadProcessorData(Operation *forOp, int64_t index, OpBuilder &builder);
@@ -306,12 +309,18 @@ class HALDispatchABI {
 
   // Emits a call to a dynamically linked import using the given |importName|
   // as a template.
+  //
   // The provided |resultTypes| and |args| are packed in a struct and transit
-  // through memory so that we can expose a single void* argument.
+  // through memory so that we can expose a single void* argument. Optionally
+  // |extraFields| can be specified with an ordered list of field names to be
+  // appended to the end of the struct.
+  //
   // Returns 0 on success and non-zero otherwise.
   SmallVector<Value> wrapAndCallImport(Operation *forOp, StringRef importName,
                                        bool weak, TypeRange resultTypes,
-                                       ValueRange args, OpBuilder &builder);
+                                       ValueRange args,
+                                       ArrayRef<StringRef> extraFields,
+                                       OpBuilder &builder);
 
  private:
   Value getIndexValue(Location loc, int64_t value, OpBuilder &builder);
@@ -327,6 +336,9 @@ class HALDispatchABI {
                        OpBuilder &builder);
   Value loadFieldValue(Operation *forOp, WorkgroupStateField field,
                        OpBuilder &builder);
+
+  Value getExtraField(Operation *forOp, StringRef extraField,
+                      OpBuilder &builder);
 
   mlir::MLIRContext *context;
   LLVMTypeConverter *typeConverter;

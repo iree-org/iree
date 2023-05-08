@@ -1,0 +1,46 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        [
+            "block_patterns.mlir",
+            "combine_initializers.mlir",
+            "demote_f32_to_f16.mlir",
+            "demote_f64_to_f32.mlir",
+            "demote_i64_to_i32.mlir",
+            "drop_compiler_hints.mlir",
+            "fold_globals.mlir",
+            "fuse_globals.mlir",
+            "hoist_into_globals.mlir",
+            "hoist_into_globals_linalg.mlir",
+            "ipo.mlir",
+            "promote_bf16_to_f32.mlir",
+            "promote_arith_bf16_to_f32.mlir",
+            "promote_f16_to_f32.mlir",
+            "propagate_subranges.mlir",
+            "simplify_global_accesses.mlir",
+            "strip_debug_ops.mlir",
+            "test_float_range_analysis.mlir",
+            "test_float_range_analysis_linalg.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+    cfg = "//compiler:lit.cfg.py",
+    tools = [
+        "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

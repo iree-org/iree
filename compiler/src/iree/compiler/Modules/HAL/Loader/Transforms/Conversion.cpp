@@ -41,7 +41,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::HAL::Inline::HALInlineDialect,
                     IREE::HAL::Loader::HALLoaderDialect,
-                    mlir::arith::ArithDialect, mlir::AffineDialect>();
+                    mlir::arith::ArithDialect, mlir::affine::AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -49,14 +49,15 @@ class ConversionPass : public ConversionBase<ConversionPass> {
 
     // Ensure all input dialects go away.
     ConversionTarget conversionTarget(*context);
-    conversionTarget
-        .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
-                         mlir::arith::ArithDialect, mlir::AffineDialect>();
+    conversionTarget.addLegalDialect<
+        mlir::func::FuncDialect, mlir::scf::SCFDialect,
+        mlir::arith::ArithDialect, mlir::affine::AffineDialect>();
 
     TypeConverter typeConverter;
     RewritePatternSet patterns(context);
 
     // Pass-through.
+    typeConverter.addConversion([](Type type) { return type; });
     typeConverter.addConversion([](IndexType type) { return type; });
     typeConverter.addConversion([](IntegerType type) { return type; });
     typeConverter.addConversion([](FloatType type) { return type; });

@@ -117,8 +117,8 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       loc, valuesExpandedType, valuesOrig, reassociationIndices);
 
   // Expand input indices shape for parallel processing if they exist
-  Optional<Value> indicesExpanded;
-  if (Optional<Value> inputIndices = topkOp.indices()) {
+  std::optional<Value> indicesExpanded;
+  if (std::optional<Value> inputIndices = topkOp.indices()) {
     // Type inputElementType = inputIndices->getType().cast<ShapedType>();
     Type indicesExpandedType =
         RankedTensorType::get(expandedShape, indicesElementType);
@@ -149,7 +149,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
-  Attribute negInfAttr;
+  TypedAttr negInfAttr;
   if (auto intType = valueElementType.dyn_cast<IntegerType>()) {
     negInfAttr = rewriter.getIntegerAttr(
         intType, APInt::getSignedMinValue(intType.getWidth()));
@@ -160,7 +160,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
     negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
   }
   Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
-  Attribute posInfAttr =
+  TypedAttr posInfAttr =
       rewriter.getIntegerAttr(indicesElementType, APInt::getSignedMaxValue(32));
   Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
   Value negInfTensor =

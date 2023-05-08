@@ -34,7 +34,7 @@ namespace Util {
 namespace {
 
 struct LocAttr {
-  Optional<Location> loc;
+  std::optional<Location> loc;
   Type type;
   Attribute attr;
   operator bool() const { return attr != nullptr; }
@@ -363,8 +363,9 @@ static void replaceValueWithConstant(Value value, LocAttr constantValue,
   // themselves.
   if (arith::ConstantOp::isBuildableWith(constantValue.attr,
                                          constantValue.type)) {
-    op = builder.create<arith::ConstantOp>(
-        constantValue.loc.value(), constantValue.attr, constantValue.type);
+    op = builder.create<arith::ConstantOp>(constantValue.loc.value(),
+                                           constantValue.type,
+                                           cast<TypedAttr>(constantValue.attr));
   }
 
   // Try the attr and type dialects to see if they can materialize.

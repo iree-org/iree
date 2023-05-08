@@ -130,6 +130,15 @@ iree_vm_buffer_length(const iree_vm_buffer_t* buffer);
 // prefer the utility methods instead.
 IREE_API_EXPORT uint8_t* iree_vm_buffer_data(const iree_vm_buffer_t* buffer);
 
+// Returns the contents of the buffer in mutable form.
+// Returns an empty span if the buffer is immutable.
+IREE_API_EXPORT iree_byte_span_t
+iree_vm_buffer_contents(const iree_vm_buffer_t* buffer);
+
+// Returns the contents of the buffer.
+IREE_API_EXPORT iree_const_byte_span_t
+iree_vm_buffer_const_contents(const iree_vm_buffer_t* buffer);
+
 // Copies a byte range from |source_buffer| to |target_buffer|.
 IREE_API_EXPORT iree_status_t iree_vm_buffer_copy_bytes(
     const iree_vm_buffer_t* source_buffer, iree_host_size_t source_offset,

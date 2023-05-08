@@ -14,7 +14,6 @@
 #include "iree/hal/drivers/cuda/cuda_device.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/status_util.h"
-#include "third_party/nccl/nccl.h"
 
 // Maximum device name length we support.
 #define IREE_HAL_CUDA_MAX_DEVICE_NAME_LENGTH 128
@@ -49,28 +48,6 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
   out_options->default_device_index = 0;
 }
 
-static iree_status_t iree_hal_nccl_get_unique_id_from_env(
-    iree_hal_cuda_driver_t* driver) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  char* nccl_comm_id_str = getenv("NCCL_COMM_ID");
-  if (!nccl_comm_id_str) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "expected NCCL_COMM_ID environment variable to be "
-                            "set when using the default NCCL configuration");
-  }
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, NCCL_RESULT_TO_STATUS(
-              &driver->syms,
-              ncclGetUniqueId(
-                  (ncclUniqueId*)&driver->default_params.nccl_default_id),
-              "ncclGetUniqueId"));
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_cuda_driver_create_internal(
     iree_string_view_t identifier,
     const iree_hal_cuda_device_params_t* default_params,
@@ -92,15 +69,15 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
 
   iree_status_t status =
       iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
+
   if (iree_status_is_ok(status)) {
-    // Initialize NCCL if NPROCS is set.
-    if (driver->default_params.nccl_default_count > 0) {
-      status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
-                                                             &driver->syms);
-      if (iree_status_is_ok(status)) {
-        // Get a unique ID from the environmental variable.
-        status = iree_hal_nccl_get_unique_id_from_env(driver);
-      }
+    // Try to load NCCL. This will fail if NCCL is unavailable or incompatible.
+    // We only fail on unavailability when the user tries to create a channel
+    // and otherwise defer reporting.
+    status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
+                                                           &driver->syms);
+    if (iree_status_is_unavailable(status)) {
+      status = iree_status_ignore(status);
     }
   }
 
@@ -384,6 +361,16 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
 
   // Ensure CUDA is initialized before querying it.
   IREE_RETURN_IF_ERROR(iree_hal_cuda_init(driver));
+
+  // Query the number of available CUDA devices.
+  int device_count = 0;
+  CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetCount(&device_count),
+                       "cuDeviceGetCount");
+  if (device_index >= device_count) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "device %d not found (of %d enumerated)",
+                            device_index, device_count);
+  }
 
   CUdevice device = 0;
   CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGet(&device, device_index),

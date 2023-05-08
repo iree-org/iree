@@ -21,13 +21,20 @@ transform.sequence failures(propagate) {
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
   transform.structured.vectorize %2 { vectorize_padding }
-  transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
-    {bufferize_function_boundaries = true}
-  %3 = transform.structured.match ops{["func.func"]} in %module_op 
+  %module_op1 = transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
+    {bufferize_function_boundaries = true} : (!pdl.operation) -> !pdl.operation
+  %3 = transform.structured.match ops{["func.func"]} in %module_op1
     : (!pdl.operation) -> !pdl.operation
-  transform.vector.lower_vectors %3 multireduction_lowering = "innerreduction"
 
-  // lower_to_llvm is the only remaining op not upstreamed, at the same time we
-  // upstreamed --test-lower-to-llvm.
-  lower_to_llvm
+
+  %func = transform.structured.match ops{["func.func"]} in %module_op1
+    : (!pdl.operation) -> !pdl.operation
+  %func_e_2 = transform.vector.lower_contraction %func
+    lowering_strategy = "outerproduct"
+      : (!pdl.operation) -> !pdl.operation
+  %func_e_3 = transform.vector.lower_transpose %func_e_2
+    lowering_strategy = "shuffle_1d"
+      : (!pdl.operation) -> !pdl.operation
+
+  lower_to_llvm %module_op1 : (!pdl.operation) -> !pdl.operation
 }

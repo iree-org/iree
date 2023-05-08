@@ -26,3 +26,14 @@ func.func @global_types() -> tensor<2xui32> {
   // CHECK: return %[[VALUE]] : tensor<2xi32>
   return %0 : tensor<2xui32>
 }
+
+// -----
+
+// CHECK: func.func @optimization_barrier
+// CHECK: %[[RESULT1:.+]] = util.optimization_barrier %arg0 : tensor<3x4xf32
+// CHECK: %[[RESULT2:.+]] = util.optimization_barrier %arg1 : tensor<4xi32>
+// CHECK: return %[[RESULT1]], %[[RESULT2]]
+func.func @optimization_barrier(%arg0: tensor<3x4xf32>, %arg1: tensor<4xi32>) -> (tensor<3x4xf32>, tensor<4xi32>) {
+  %0, %1 = "mhlo.optimization_barrier"(%arg0, %arg1) : (tensor<3x4xf32>, tensor<4xi32>) -> (tensor<3x4xf32>, tensor<4xi32>)
+  return %0, %1 : tensor<3x4xf32>, tensor<4xi32>
+}

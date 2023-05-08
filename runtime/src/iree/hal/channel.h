@@ -44,6 +44,9 @@ typedef struct {
   // Equivalent to:
   //   ncclUniqueId
   iree_const_byte_span_t id;
+  // User-defined group key for differentiating multiple channel groups.
+  // Can be treated as opaque.
+  iree_string_view_t group;
   // Rank of the participant within the collective group.
   // May be IREE_HAL_CHANNEL_RANK_DEFAULT to indicate that the environment
   // should be used to populate the rank.

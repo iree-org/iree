@@ -6,6 +6,8 @@
 
 """Common Bazel definitions for IREE."""
 
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
+
 def defaulting_select(selector):
     """Pass through to select() with special semantics when converting to CMake.
 
@@ -71,6 +73,13 @@ def iree_compiler_cc_library(deps = [], **kwargs):
         **kwargs
     )
 
+def iree_compiler_register_plugin(plugin_id, target):
+    """Mirror of the CMake iree_compiler_register_plugin function.
+
+    Does nothing in bazel currently.
+    """
+    pass
+
 def iree_compiler_cc_test(deps = [], **kwargs):
     """Used for cc_test targets within the //compiler tree.
 
@@ -78,6 +87,19 @@ def iree_compiler_cc_test(deps = [], **kwargs):
     runtime specific options and deps.
     """
     native.cc_test(
+        deps = deps + [
+            "//compiler/src:defs",
+        ],
+        **kwargs
+    )
+
+def iree_compiler_cc_binary(deps = [], **kwargs):
+    """Used for cc_binary targets within the //compiler tree.
+
+    This is a pass-through to the native cc_binary which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_binary(
         deps = deps + [
             "//compiler/src:defs",
         ],
@@ -111,3 +133,42 @@ def iree_runtime_cc_test(deps = [], **kwargs):
         ],
         **kwargs
     )
+
+def iree_runtime_cc_binary(deps = [], **kwargs):
+    """Used for cc_binary targets within the //runtime tree.
+
+    This is a pass-through to the native cc_binary which adds specific
+    runtime specific options and deps.
+    """
+    native.cc_binary(
+        deps = deps + [
+            # TODO: Rename to //runtime/src:defs to match compiler.
+            "//runtime/src:runtime_defines",
+        ],
+        **kwargs
+    )
+
+def iree_tablegen_doc(includes = [], **kwargs):
+    """iree_tablegen_doc() generates documentation from a table definition file.
+
+    This is a simple wrapper over gentbl() so we can differentiate between
+    documentation and others. See gentbl() for details regarding arguments.
+    """
+
+    gentbl_filegroup(includes = includes + [
+        "/compiler/src",
+    ], **kwargs)
+
+def iree_gentbl_cc_library(includes = [], **kwargs):
+    """IREE version of gentbl_cc_library which sets up includes properly."""
+
+    gentbl_cc_library(includes = includes + [
+        "/compiler/src",
+    ], **kwargs)
+
+def iree_td_library(includes = [], **kwargs):
+    """IREE version of td_library."""
+
+    td_library(includes = includes + [
+        "/compiler/src",
+    ], **kwargs)

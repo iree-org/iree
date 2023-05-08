@@ -13,25 +13,12 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef enum iree_uk_pack_type_t {
-  iree_uk_pack_type_f32f32 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
-  iree_uk_pack_type_i8i8 = IREE_UK_TIE_2_TYPES_LITERAL(INT_8, INT_8),
-  iree_uk_pack_type_i32i32 = IREE_UK_TIE_2_TYPES_LITERAL(INT_32, INT_32),
-} iree_uk_pack_type_t;
-
-static inline iree_uk_type_t iree_uk_pack_in_type(iree_uk_pack_type_t type) {
-  return iree_uk_untie_type(0, type);
-}
-
-static inline iree_uk_type_t iree_uk_pack_out_type(iree_uk_pack_type_t type) {
-  return iree_uk_untie_type(1, type);
-}
-
-// Parameters for a pack operation.
 typedef struct iree_uk_pack_params_t {
-  iree_uk_pack_type_t type;
-  iree_uk_uint32_t flags;
+  const void* in_buffer;
+  iree_uk_ssize_t in_offset;
   iree_uk_ssize_t in_stride0;
+  void* out_buffer;
+  iree_uk_ssize_t out_offset;
   iree_uk_ssize_t out_stride0;
   iree_uk_ssize_t in_size0;
   iree_uk_ssize_t in_size1;
@@ -39,20 +26,21 @@ typedef struct iree_uk_pack_params_t {
   iree_uk_ssize_t out_size1;
   iree_uk_ssize_t out_size2;
   iree_uk_ssize_t out_size3;
-  const void* in_buffer;
-  void* out_buffer;
-  const void* padding_value;
+  // The least significant bits of `padding_value`, up to element size, are used
+  // for padding. As this is based solely on bit-significance and not on byte
+  // addresses, this is independent of endianness.
+  //
+  // If the element size is less than 64 bits then the most significant bits
+  // (above element size) are unused.
+  //
+  // If the element size is more than 64 bits then only repeating 64-bit
+  // patterns are supported for padding. This covers most cases as floating
+  // point types encode zero as zero bits.
+  iree_uk_uint64_t padding_value;
+  iree_uk_uint32_t flags;
   const iree_uk_uint64_t* cpu_data;
 } iree_uk_pack_params_t;
 
-typedef void (*iree_uk_pack_tile_func_t)(
-    void* IREE_UK_RESTRICT /*out_tile_ptr*/,
-    const void* IREE_UK_RESTRICT /*in_tile_ptr*/,
-    iree_uk_ssize_t /*outer_size1*/, iree_uk_ssize_t /*out_stride1*/,
-    iree_uk_ssize_t /*in_stride0*/, iree_uk_ssize_t /*elem_size*/,
-    iree_uk_ssize_t /*tile_size0*/, iree_uk_ssize_t /*tile_size1*/);
-
-// Main entry point.
 IREE_UK_EXPORT void iree_uk_pack(const iree_uk_pack_params_t* params);
 
 #ifdef __cplusplus

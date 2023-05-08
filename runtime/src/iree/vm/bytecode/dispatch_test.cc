@@ -37,7 +37,8 @@ std::vector<TestParams> GetModuleTestParams() {
   std::vector<TestParams> test_params;
 
   iree_vm_instance_t* instance = NULL;
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                        iree_allocator_system(), &instance));
 
   const struct iree_file_toc_t* module_file_toc =
       all_bytecode_modules_c_create();
@@ -75,7 +76,8 @@ class VMBytecodeDispatchTest
   virtual void SetUp() {
     const auto& test_params = GetParam();
 
-    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         instance_,

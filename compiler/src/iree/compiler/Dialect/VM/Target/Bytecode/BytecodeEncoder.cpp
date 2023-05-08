@@ -153,7 +153,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
         failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";
     }
-    for (auto el : value.getValues<Attribute>()) {
+    for (auto el : value.getValues<TypedAttr>()) {
       if (failed(encodePrimitiveAttr(el))) {
         return currentOp_->emitOpError() << "failed to encode element " << el;
       }
@@ -258,7 +258,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return success();
   }
 
-  Optional<std::vector<uint8_t>> finish() {
+  std::optional<std::vector<uint8_t>> finish() {
     if (failed(fixupOffsets())) {
       return std::nullopt;
     }
@@ -343,7 +343,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 }  // namespace
 
 // static
-Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
+std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
     SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase) {
   EncodedBytecodeFunction result;

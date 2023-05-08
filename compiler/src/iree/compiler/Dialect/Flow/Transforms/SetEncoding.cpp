@@ -18,7 +18,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
@@ -47,25 +47,25 @@ static Type getElementTypeOrType(Type t) {
 /// Returns a constant 0 of type `elementType`.
 static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
                                 Type elementType) {
-  Attribute zeroVal =
-      TypeSwitch<Type, Attribute>(elementType)
+  TypedAttr zeroVal =
+      TypeSwitch<Type, TypedAttr>(elementType)
           .Case<FloatType>([&](FloatType floatType) -> Attribute {
-            return builder.getFloatAttr(floatType, 0);
+            return cast<TypedAttr>(builder.getFloatAttr(floatType, 0));
           })
           .Case<IntegerType>([&](IntegerType intType) -> Attribute {
-            return builder.getIntegerAttr(intType, 0);
+            return cast<TypedAttr>(builder.getIntegerAttr(intType, 0));
           })
           .Default([](Type type) { return nullptr; });
   if (!zeroVal) return failure();
-  return builder.create<arith::ConstantOp>(loc, zeroVal, elementType)
+  return builder.create<arith::ConstantOp>(loc, elementType, zeroVal)
       .getResult();
 }
 
 /// Pads `value` to `padding` if needed. If no padding is specified,
 /// return `value` itself.
-static FailureOr<Value> padIfNeeded(OpBuilder &builder, Location loc,
-                                    Value value,
-                                    Optional<int64_t> padding = std::nullopt) {
+static FailureOr<Value> padIfNeeded(
+    OpBuilder &builder, Location loc, Value value,
+    std::optional<int64_t> padding = std::nullopt) {
   if (!padding) return value;
 
   OpFoldResult paddingOfr = builder.getIndexAttr(padding.value());
@@ -86,7 +86,7 @@ static FailureOr<Value> padIfNeeded(OpBuilder &builder, Location loc,
   AffineExpr highPadExpr =
       shapeExpr.ceilDiv(paddingExpr) * paddingExpr - shapeExpr;
   for (auto shape : llvm::enumerate(shape.value())) {
-    highPad[shape.index()] = makeComposedFoldedAffineApply(
+    highPad[shape.index()] = affine::makeComposedFoldedAffineApply(
         builder, loc, highPadExpr, {paddingOfr, shape.value()});
   }
 

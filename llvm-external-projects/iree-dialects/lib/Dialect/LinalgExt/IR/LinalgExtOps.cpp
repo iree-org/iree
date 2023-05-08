@@ -49,6 +49,12 @@ namespace IREE = mlir::iree_compiler::IREE;
 // Utils.
 //===----------------------------------------------------------------------===//
 
+static Type getComplexElementTypeOrSelf(Type ty) {
+  if (auto complex = dyn_cast_or_null<ComplexType>(ty))
+    return complex.getElementType();
+  return ty;
+}
+
 static void getEffectsImpl(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects,
@@ -186,8 +192,9 @@ LogicalResult ScatterOp::verify() {
                                      updateType.getRank()))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) >
-        originalType.getDimSize(originalDim)) {
+    if (!originalType.isDynamicDim(originalDim) &&
+        updateType.getDimSize(updateDim) >
+            originalType.getDimSize(originalDim)) {
       return op->emitOpError("shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim;
     }
@@ -200,8 +207,9 @@ LogicalResult ScatterOp::verify() {
            llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) >
-        originalType.getDimSize(originalDim)) {
+    if (!originalType.isDynamicDim(originalDim) &&
+        updateType.getDimSize(updateDim) >
+            originalType.getDimSize(originalDim)) {
       return op->emitOpError("indexed shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim
              << " " << updateType.getDimSize(updateDim) << " "
@@ -216,7 +224,8 @@ LogicalResult ScatterOp::verify() {
   }
   Type arg0Type = body->getArgument(0).getType();
   Type arg1Type = body->getArgument(1).getType();
-  if (!arg0Type.isIntOrFloat() || !arg1Type.isIntOrFloat()) {
+  if (!getComplexElementTypeOrSelf(arg0Type).isIntOrFloat() ||
+      !getComplexElementTypeOrSelf(arg1Type).isIntOrFloat()) {
     return op->emitOpError(
         "expected region to have scalar argument of integer or float types");
   }
@@ -267,7 +276,7 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   return ranges;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 ScatterOp::getTiledImplementation(OpBuilder &builder,
                                   ArrayRef<OpFoldResult> offsets,
                                   ArrayRef<OpFoldResult> sizes) {
@@ -316,7 +325,8 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledScatterOp =
       mlir::clone(builder, getOperation(), resultTypes,
                   ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
-  return {tiledScatterOp};
+  return TilingResult{{tiledScatterOp},
+                      SmallVector<Value>(tiledScatterOp->getResults())};
 }
 
 LogicalResult ScatterOp::getResultTilePosition(
@@ -484,7 +494,7 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 SortOp::getTiledImplementation(OpBuilder &builder,
                                ArrayRef<OpFoldResult> offsets,
                                ArrayRef<OpFoldResult> sizes) {
@@ -506,7 +516,8 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   }
   Operation *tiledSortOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return {tiledSortOp};
+  return TilingResult{{tiledSortOp},
+                      SmallVector<Value>{tiledSortOp->getResults()}};
 }
 
 LogicalResult SortOp::getResultTilePosition(
@@ -807,7 +818,7 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 FftOp::getTiledImplementation(OpBuilder &builder,
                               ArrayRef<OpFoldResult> offsets,
                               ArrayRef<OpFoldResult> sizes) {
@@ -828,7 +839,8 @@ FftOp::getTiledImplementation(OpBuilder &builder,
   }
   Operation *tiledFftOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return {tiledFftOp};
+  return TilingResult{{tiledFftOp},
+                      SmallVector<Value>(tiledFftOp->getResults())};
 }
 
 LogicalResult FftOp::getResultTilePosition(
@@ -1006,7 +1018,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 ScanOp::getTiledImplementation(OpBuilder &builder,
                                ArrayRef<OpFoldResult> offsets,
                                ArrayRef<OpFoldResult> sizes) {
@@ -1042,7 +1054,8 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledScanOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return {tiledScanOp};
+  return TilingResult{{tiledScanOp},
+                      SmallVector<Value>(tiledScanOp->getResults())};
 }
 
 LogicalResult ScanOp::getResultTilePosition(
@@ -1161,7 +1174,7 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 ReverseOp::getTiledImplementation(OpBuilder &builder,
                                   ArrayRef<OpFoldResult> offsets,
                                   ArrayRef<OpFoldResult> sizes) {
@@ -1191,7 +1204,8 @@ ReverseOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledRevOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledRevOp};
+  return TilingResult{{tiledRevOp},
+                      SmallVector<Value>(tiledRevOp->getResults())};
 }
 
 LogicalResult ReverseOp::getResultTilePosition(
@@ -1209,10 +1223,10 @@ LogicalResult ReverseOp::getResultTilePosition(
     Value offset =
         getValueOrCreateConstantIndexOp(builder, loc, resultOffsets[dim]);
     Value tileSize = getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]);
-    resultOffsets[dim] =
-        builder
-            .create<AffineApplyOp>(loc, map, ValueRange{size, offset, tileSize})
-            .getResult();
+    resultOffsets[dim] = builder
+                             .create<affine::AffineApplyOp>(
+                                 loc, map, ValueRange{size, offset, tileSize})
+                             .getResult();
   }
   resultSizes.assign(sizes.begin(), sizes.end());
   return success();
@@ -1424,7 +1438,7 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 TopkOp::getTiledImplementation(OpBuilder &builder,
                                ArrayRef<OpFoldResult> offsets,
                                ArrayRef<OpFoldResult> sizes) {
@@ -1465,7 +1479,8 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledTopkOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-  return {tiledTopkOp};
+  return TilingResult{{tiledTopkOp},
+                      SmallVector<Value>(tiledTopkOp->getResults())};
 }
 
 LogicalResult TopkOp::getResultTilePosition(
@@ -1508,7 +1523,7 @@ areNotFullTiles(ArrayRef<int64_t> inputShape,
       continue;
     auto it = dimAndTileMapping.find(dim);
     if (it != dimAndTileMapping.end()) {
-      Optional<int64_t> constantTile = getConstantIntValue(it->second);
+      std::optional<int64_t> constantTile = getConstantIntValue(it->second);
       if (!constantTile)
         continue;
       if (inputShape[dim] % (*constantTile) != 0)
@@ -1645,7 +1660,7 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
           llvm::zip(packedType.getShape().take_back(mixedTiles.size()),
                     mixedTiles),
           [](std::tuple<int64_t, OpFoldResult> it) {
-            Optional<int64_t> constTileSize =
+            std::optional<int64_t> constTileSize =
                 getConstantIntValue(std::get<1>(it));
             int64_t shape = std::get<0>(it);
             if (!constTileSize) {
@@ -1677,7 +1692,7 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
 void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
                    Value output, ArrayRef<int64_t> innerDimsPos,
                    ArrayRef<OpFoldResult> innerTiles,
-                   Optional<Value> paddingValue,
+                   std::optional<Value> paddingValue,
                    ArrayRef<int64_t> outerDimsPerm) {
   assert(innerDimsPos.size() == innerTiles.size() &&
          "number of tile sizes specified must match the specified number of "
@@ -1766,7 +1781,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   bindSymbols(builder.getContext(), s0, s1);
   AffineExpr ceilDivExpr = s0.ceilDiv(s1);
   for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    resultDims[tiledDim.value()] = makeComposedFoldedAffineApply(
+    resultDims[tiledDim.value()] = affine::makeComposedFoldedAffineApply(
         builder, loc, ceilDivExpr,
         {resultDims[tiledDim.value()], innerTileSizes[tiledDim.index()]});
   }
@@ -1866,7 +1881,7 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
       AffineExpr i, j, tile;
       bindDims(builder.getContext(), i, j);
       bindSymbols(builder.getContext(), tile);
-      OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
+      OpFoldResult sourceIndex = affine::makeComposedFoldedAffineApply(
           builder, loc, i * tile + j,
           ArrayRef<OpFoldResult>{
               interchangedIvs[dim],
@@ -1937,14 +1952,17 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   // over the tile dimensions.
   for (auto dataTileDim :
        llvm::seq<unsigned>(getInputRank(), getOutputRank() - 1)) {
-    Value ub = outputShape[0][dataTileDim];
+    Value ub = getValueOrCreateConstantIndexOp(builder, loc,
+                                               outputShape[0][dataTileDim]);
     scf::ForOp loop = builder.create<scf::ForOp>(loc, zero, ub, one);
     builder.setInsertionPointToStart(loop.getBody());
     ivVec.push_back(loop.getInductionVar());
   }
   // The body of the innermost loops does the actual data movement.
-  builder.create<scf::ForOp>(loc, zero, outputShape[0].back(), one,
-                             ValueRange{},
+  builder.create<scf::ForOp>(loc, zero,
+                             getValueOrCreateConstantIndexOp(
+                                 builder, loc, outputShape[0].back()),
+                             one, ValueRange{},
                              [&](OpBuilder &bodyBuilder, Location bodyLoc,
                                  Value iv, ValueRange regionIterArgs) {
                                ivVec.push_back(iv);
@@ -2021,9 +2039,10 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   inputIvsPointLoops.reserve(dimAndTileMapping.size());
   for (auto dim : llvm::seq<int64_t>(0, getOutputRank())) {
     if (dimAndTileMapping.count(dim)) {
-      DivModValue divMod = getDivMod(builder, loc, ivs[dim],
-                                     getValueOrCreateConstantIndexOp(
-                                         builder, loc, dimAndTileMapping[dim]));
+      affine::DivModValue divMod =
+          affine::getDivMod(builder, loc, ivs[dim],
+                            getValueOrCreateConstantIndexOp(
+                                builder, loc, dimAndTileMapping[dim]));
       inputIvsPointLoops.push_back(divMod.remainder);
       inputIvs.push_back(divMod.quotient);
     } else {
@@ -2167,7 +2186,7 @@ WinogradInputTransformOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
                                                  ArrayRef<OpFoldResult> offsets,
                                                  ArrayRef<OpFoldResult> sizes) {
@@ -2210,7 +2229,7 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledOp};
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
 LogicalResult WinogradInputTransformOp::getResultTilePosition(
@@ -2329,7 +2348,7 @@ WinogradOutputTransformOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Operation *> WinogradOutputTransformOp::getTiledImplementation(
+FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes) {
 
@@ -2371,7 +2390,7 @@ SmallVector<Operation *> WinogradOutputTransformOp::getTiledImplementation(
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledOp};
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
 LogicalResult WinogradOutputTransformOp::getResultTilePosition(
@@ -2447,7 +2466,7 @@ SmallVector<utils::IteratorType> SoftmaxOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 SoftmaxOp::getTiledImplementation(OpBuilder &builder,
                                   ArrayRef<OpFoldResult> offsets,
                                   ArrayRef<OpFoldResult> sizes) {
@@ -2467,7 +2486,7 @@ SoftmaxOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledOp};
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
 LogicalResult SoftmaxOp::getResultTilePosition(
@@ -2543,7 +2562,7 @@ SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Operation *>
+FailureOr<TilingResult>
 AttentionOp::getTiledImplementation(OpBuilder &builder,
                                     ArrayRef<OpFoldResult> offsets,
                                     ArrayRef<OpFoldResult> sizes) {
@@ -2591,7 +2610,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return {tiledOp};
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
 }
 
 LogicalResult AttentionOp::getResultTilePosition(
@@ -2681,8 +2700,7 @@ LogicalResult SetEncodingOp::reifyResultShapes(
   OpBuilder::InsertionGuard g(builder);
   builder.setInsertionPoint(getOperation());
   reifiedReturnShapes.resize(1);
-  reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
-      builder, getLoc(), getDims(builder, getLoc(), getSource()));
+  reifiedReturnShapes[0] = getDims(builder, getLoc(), getSource());
   return success();
 }
 
@@ -2720,8 +2738,7 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
   OpBuilder::InsertionGuard g(builder);
   builder.setInsertionPoint(getOperation());
   reifiedReturnShapes.resize(1);
-  reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
-      builder, getLoc(), getDims(builder, getLoc(), getSource()));
+  reifiedReturnShapes[0] = getDims(builder, getLoc(), getSource());
   return success();
 }
 

@@ -210,7 +210,7 @@ class StridedBufferAnalysis {
 
  private:
   Value buffer;
-  Optional<StridedBufferDescriptor> desc;
+  std::optional<StridedBufferDescriptor> desc;
 };
 
 /// Emits a vmvx binary op.
@@ -558,7 +558,8 @@ struct LinalgBinaryGenericConversion
     // Returns an emitter for a generic binary compatible operation where
     // |binaryOp| has a 1:1 correspondance with |opcode|.
     auto configureGenericBinary =
-        [&](Operation *binaryOp, StringRef opcode) -> Optional<BinaryEmitter> {
+        [&](Operation *binaryOp,
+            StringRef opcode) -> std::optional<BinaryEmitter> {
       SmallVector<BinaryEmitter::Descriptor, 2> operands;
       // Make sure that the binary op has operands that map to the
       // ins and detect the order.
@@ -594,87 +595,87 @@ struct LinalgBinaryGenericConversion
     // Emit from the iree_ukernel_x32b_opcode_t table.
     Type resultType = binaryOp->getResult(0).getType();
     if (!resultType.isIntOrFloat()) return failure();
-    Optional<BinaryEmitter> emitter =
-        TypeSwitch<Operation *, Optional<BinaryEmitter>>(binaryOp)
-            .Case([&](arith::AddFOp op) -> Optional<BinaryEmitter> {
+    std::optional<BinaryEmitter> emitter =
+        TypeSwitch<Operation *, std::optional<BinaryEmitter>>(binaryOp)
+            .Case([&](arith::AddFOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "add");
               }
               return std::nullopt;
             })
-            .Case([&](arith::AddIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::AddIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "add");
               }
               return std::nullopt;
             })
-            .Case([&](arith::AndIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::AndIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "and");
               }
               return std::nullopt;
             })
-            .Case([&](arith::DivFOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::DivFOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "div");
               }
               return std::nullopt;
             })
-            .Case([&](arith::DivSIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::DivSIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "divs");
               }
               return std::nullopt;
             })
-            .Case([&](arith::DivUIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::DivUIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "divu");
               }
               return std::nullopt;
             })
-            .Case([&](arith::MulFOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::MulFOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "mul");
               }
               return std::nullopt;
             })
-            .Case([&](arith::MulIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::MulIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "mul");
               }
               return std::nullopt;
             })
-            .Case([&](arith::OrIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::OrIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "or");
               }
               return std::nullopt;
             })
-            .Case([&](arith::ShLIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::ShLIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "shl");
               }
               return std::nullopt;
             })
-            .Case([&](arith::ShRSIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::ShRSIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "shrs");
               }
               return std::nullopt;
             })
-            .Case([&](arith::XOrIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::XOrIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "xor");
               }
               return std::nullopt;
             })
-            .Case([&](arith::SubFOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::SubFOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "sub");
               }
               return std::nullopt;
             })
-            .Case([&](arith::SubIOp op) -> Optional<BinaryEmitter> {
+            .Case([&](arith::SubIOp op) -> std::optional<BinaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "sub");
               }
@@ -729,7 +730,8 @@ struct LinalgUnaryGenericConversion
     // Returns an emitter for a generic binary compatible operation where
     // |binaryOp| has a 1:1 correspondance with |opcode|.
     auto configureGenericUnary =
-        [&](Operation *unaryOp, StringRef opcode) -> Optional<UnaryEmitter> {
+        [&](Operation *unaryOp,
+            StringRef opcode) -> std::optional<UnaryEmitter> {
       SmallVector<UnaryEmitter::Descriptor, 2> operands;
       // Make sure that the binary op has operands that map to the
       // ins and detect the order.
@@ -746,51 +748,52 @@ struct LinalgUnaryGenericConversion
     // Emit from the iree_ukernel_x32b_opcode_t table.
     Type resultType = unaryOp->getResult(0).getType();
     if (!resultType.isIntOrFloat()) return failure();
-    Optional<UnaryEmitter> emitter =
-        TypeSwitch<Operation *, Optional<UnaryEmitter>>(unaryOp)
-            .Case([&](math::AbsFOp op) -> Optional<UnaryEmitter> {
+    std::optional<UnaryEmitter> emitter =
+        TypeSwitch<Operation *, std::optional<UnaryEmitter>>(unaryOp)
+            .Case([&](math::AbsFOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "abs");
               }
               return std::nullopt;
             })
-            .Case([&](math::CeilOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::CeilOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "ceil");
               }
               return std::nullopt;
             })
-            .Case([&](math::CountLeadingZerosOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::CountLeadingZerosOp op)
+                      -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "ctlz");
               }
               return std::nullopt;
             })
-            .Case([&](math::ExpOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::ExpOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "exp");
               }
               return std::nullopt;
             })
-            .Case([&](math::FloorOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::FloorOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "floor");
               }
               return std::nullopt;
             })
-            .Case([&](math::LogOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::LogOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "log");
               }
               return std::nullopt;
             })
-            .Case([&](arith::NegFOp op) -> Optional<UnaryEmitter> {
+            .Case([&](arith::NegFOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "neg");
               }
               return std::nullopt;
             })
-            .Case([&](math::RsqrtOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::RsqrtOp op) -> std::optional<UnaryEmitter> {
               if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "rsqrt");
               }
@@ -894,512 +897,6 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
   }
 };
 
-struct LinalgExtPackConversion
-    : public OpRewritePattern<IREE::LinalgExt::PackOp> {
-  using OpRewritePattern::OpRewritePattern;
-  static bool isSupportedElementTypes(Type inElType, Type outElType) {
-    if (inElType.isF32() && outElType.isF32()) {
-      return true;
-    }
-    if (inElType.isSignlessInteger(8) && inElType.isSignlessInteger(8)) {
-      return true;
-    }
-    if (inElType.isSignlessInteger(32) && inElType.isSignlessInteger(32)) {
-      return true;
-    }
-    return false;
-  }
-
-  LogicalResult matchAndRewrite(IREE::LinalgExt::PackOp op,
-                                PatternRewriter &rewriter) const override {
-    MemRefType inType = op.getInputType().cast<MemRefType>();
-    MemRefType outType = op.getOutputType().cast<MemRefType>();
-
-    if (!isSupportedElementTypes(inType.getElementType(),
-                                 outType.getElementType())) {
-      return rewriter.notifyMatchFailure(
-          op, "unsupported combination of in/out element types");
-    }
-
-    if (inType.getRank() != 2) {
-      return rewriter.notifyMatchFailure(op, "expected input to be 2D");
-    }
-
-    if (outType.getRank() != 4) {
-      return rewriter.notifyMatchFailure(op, "expected output to be 4D");
-    }
-
-    int64_t innerDimsPos[2] = {0, 1};
-    ArrayRef<int64_t> innerDimsPosArr = op.getInnerDimsPos();
-    if (!innerDimsPosArr.empty()) {
-      innerDimsPos[0] = innerDimsPosArr[0];
-      innerDimsPos[1] = innerDimsPosArr[1];
-    }
-
-    int64_t outerDimsPerm[2] = {0, 1};
-    ArrayRef<int64_t> outerDimsPosArr = op.getOuterDimsPerm();
-    if (!outerDimsPosArr.empty()) {
-      outerDimsPerm[0] = outerDimsPosArr[0];
-      outerDimsPerm[1] = outerDimsPosArr[1];
-    }
-
-    int flags = 0;
-
-    if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
-      // nothing to do
-    } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
-      flags |= IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
-    } else {
-      return rewriter.notifyMatchFailure(op, "unsupported inner_dims_pos");
-    }
-
-    if (outerDimsPerm[0] == 0 && outerDimsPerm[1] == 1) {
-      // nothing to do
-    } else if (outerDimsPerm[0] == 1 && outerDimsPerm[1] == 0) {
-      flags |= IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
-    } else {
-      return rewriter.notifyMatchFailure(op, "unsupported outer_dims_perm");
-    }
-
-    SmallVector<int64_t> inStrides;
-    int64_t inOffset;
-    if (failed(mlir::getStridesAndOffset(inType, inStrides, inOffset))) {
-      return rewriter.notifyMatchFailure(
-          op, "failed to getStridesAndOffset for input");
-    }
-
-    if (inStrides[1] != 1) {
-      return rewriter.notifyMatchFailure(
-          op, "unsupported input layout with non-contiguous inner dimension");
-    }
-
-    if (!verifyMemRefInnerDimsContiguousRowMajor(outType)) {
-      return rewriter.notifyMatchFailure(
-          op,
-          "expected the output's inner dimensions to be contiguous row-major");
-    }
-
-    StridedBufferAnalysis inAnalysis(op.getInput());
-    StridedBufferAnalysis outAnalysis(op.getOutput());
-
-    if (!inAnalysis.isValid()) {
-      return rewriter.notifyMatchFailure(
-          op, "could not compute buffer descriptor for input");
-    }
-
-    if (!outAnalysis.isValid()) {
-      return rewriter.notifyMatchFailure(
-          op, "could not compute buffer descriptor for output");
-    }
-
-    Location loc = op.getLoc();
-
-    Value paddingValue = op.getPaddingValue();
-    if (!paddingValue) {
-      paddingValue = rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getZeroAttr(inType.getElementType()),
-          inType.getElementType());
-    }
-
-    StridedBufferDescriptor &inDesc = inAnalysis.getDesc(rewriter);
-    StridedBufferDescriptor &outDesc = outAnalysis.getDesc(rewriter);
-
-    Value inBuffer = inDesc.castToLinear(loc, rewriter);
-    Value outBuffer = outDesc.castToLinear(loc, rewriter);
-    Value inSize0 = inDesc.sizes[0];
-    Value inSize1 = inDesc.sizes[1];
-    Value inStride0 = inDesc.strides[0];
-    Value outSize0 = outDesc.sizes[0];
-    Value outSize1 = outDesc.sizes[1];
-    Value outSize2 = outDesc.sizes[2];
-    Value outSize3 = outDesc.sizes[3];
-    Value outStride0 = outDesc.strides[0];
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::PackOp>(
-        op,
-        // input
-        inBuffer, inDesc.offset, inStride0,
-        // output
-        outBuffer, outDesc.offset, outStride0,
-        // input shape
-        inSize0, inSize1,
-        // output shape
-        outSize0, outSize1, outSize2, outSize3, paddingValue,
-        // flags
-        inDesc.getElementTypeAttr(), outDesc.getElementTypeAttr(),
-        rewriter.getI32IntegerAttr(flags));
-    return success();
-  }
-};
-
-struct LinalgExtUnpackConversion
-    : public OpRewritePattern<IREE::LinalgExt::UnPackOp> {
-  using OpRewritePattern::OpRewritePattern;
-  static bool isSupportedElementTypes(Type inElType, Type outElType) {
-    if (inElType.isF32() && outElType.isF32()) {
-      return true;
-    }
-    if (inElType.isSignlessInteger(8) && inElType.isSignlessInteger(8)) {
-      return true;
-    }
-    if (inElType.isSignlessInteger(32) && inElType.isSignlessInteger(32)) {
-      return true;
-    }
-    return false;
-  }
-
-  LogicalResult matchAndRewrite(IREE::LinalgExt::UnPackOp op,
-                                PatternRewriter &rewriter) const override {
-    MemRefType inType = op.getInputType().cast<MemRefType>();
-    MemRefType outType = op.getOutputType().cast<MemRefType>();
-
-    if (!isSupportedElementTypes(inType.getElementType(),
-                                 outType.getElementType())) {
-      return rewriter.notifyMatchFailure(
-          op, "unsupported combination of in/out element types");
-    }
-
-    if (inType.getRank() != 4) {
-      return rewriter.notifyMatchFailure(op, "expected input to be 4D");
-    }
-
-    if (outType.getRank() != 2) {
-      return rewriter.notifyMatchFailure(op, "expected output to be 2D");
-    }
-
-    int64_t innerDimsPos[2] = {0, 1};
-    ArrayRef<int64_t> innerDimsPosArr = op.getInnerDimsPos();
-    if (!innerDimsPosArr.empty()) {
-      innerDimsPos[0] = innerDimsPosArr[0];
-      innerDimsPos[1] = innerDimsPosArr[1];
-    }
-
-    int64_t outerDimsPerm[2] = {0, 1};
-    ArrayRef<int64_t> outerDimsPosArr = op.getOuterDimsPerm();
-    if (!outerDimsPosArr.empty()) {
-      outerDimsPerm[0] = outerDimsPosArr[0];
-      outerDimsPerm[1] = outerDimsPosArr[1];
-    }
-
-    int flags = 0;
-
-    if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
-      // nothing to do
-    } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
-      flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER;
-    } else {
-      return rewriter.notifyMatchFailure(op, "unsupported inner_dims_pos");
-    }
-
-    if (outerDimsPerm[0] == 0 && outerDimsPerm[1] == 1) {
-      // nothing to do
-    } else if (outerDimsPerm[0] == 1 && outerDimsPerm[1] == 0) {
-      flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
-    } else {
-      return rewriter.notifyMatchFailure(op, "unsupported outer_dims_perm");
-    }
-
-    SmallVector<int64_t> outStrides;
-    int64_t outOffset;
-    if (failed(mlir::getStridesAndOffset(outType, outStrides, outOffset))) {
-      return rewriter.notifyMatchFailure(
-          op, "failed to getStridesAndOffset for output");
-    }
-
-    if (outStrides[1] != 1) {
-      return rewriter.notifyMatchFailure(
-          op, "unsupported output layout with non-contiguous inner dimension");
-    }
-
-    if (!verifyMemRefInnerDimsContiguousRowMajor(inType)) {
-      return rewriter.notifyMatchFailure(
-          op,
-          "expected the input's inner dimensions to be contiguous row-major");
-    }
-
-    StridedBufferAnalysis inAnalysis(op.getInput());
-    StridedBufferAnalysis outAnalysis(op.getOutput());
-
-    if (!inAnalysis.isValid()) {
-      return rewriter.notifyMatchFailure(
-          op, "could not compute buffer descriptor for input");
-    }
-
-    if (!outAnalysis.isValid()) {
-      return rewriter.notifyMatchFailure(
-          op, "could not compute buffer descriptor for output");
-    }
-
-    Location loc = op.getLoc();
-
-    StridedBufferDescriptor &inDesc = inAnalysis.getDesc(rewriter);
-    StridedBufferDescriptor &outDesc = outAnalysis.getDesc(rewriter);
-
-    Value inBuffer = inDesc.castToLinear(loc, rewriter);
-    Value outBuffer = outDesc.castToLinear(loc, rewriter);
-    Value inSize0 = inDesc.sizes[0];
-    Value inSize1 = inDesc.sizes[1];
-    Value inSize2 = inDesc.sizes[2];
-    Value inSize3 = inDesc.sizes[3];
-    Value inStride0 = inDesc.strides[0];
-    Value outSize0 = outDesc.sizes[0];
-    Value outSize1 = outDesc.sizes[1];
-    Value outStride0 = outDesc.strides[0];
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::UnpackOp>(
-        op,
-        // input
-        inBuffer, inDesc.offset, inStride0,
-        // output
-        outBuffer, outDesc.offset, outStride0,
-        // input shape
-        inSize0, inSize1, inSize2, inSize3,
-        // output shape
-        outSize0, outSize1,
-        // flags
-        inDesc.getElementTypeAttr(), outDesc.getElementTypeAttr(),
-        rewriter.getI32IntegerAttr(flags));
-    return success();
-  }
-};
-
-bool isMmt4d(ArrayAttr indexingMaps) {
-  if (indexingMaps.size() != 3) return false;
-
-  auto map0 = indexingMaps[0].cast<AffineMapAttr>().getValue();
-  auto map1 = indexingMaps[1].cast<AffineMapAttr>().getValue();
-  auto map2 = indexingMaps[2].cast<AffineMapAttr>().getValue();
-
-  if (map0.getNumResults() != 4 || map1.getNumResults() != 4 ||
-      map2.getNumResults() != 4 || map0.getNumInputs() != 6 ||
-      map1.getNumInputs() != 6 || map2.getNumInputs() != 6) {
-    return false;
-  }
-
-  // Extract dimensions for MxK * KxN -> MxN
-  AffineExpr m = map2.getResult(0);
-  AffineExpr n = map2.getResult(1);
-  AffineExpr k = map0.getResult(1);
-  AffineExpr m0 = map2.getResult(2);
-  AffineExpr n0 = map2.getResult(3);
-  AffineExpr k0 = map0.getResult(3);
-
-  auto *context = indexingMaps.getContext();
-  auto mapA = AffineMapAttr::get(AffineMap::get(6, 0, {m, k, m0, k0}, context));
-  auto mapB = AffineMapAttr::get(AffineMap::get(6, 0, {n, k, n0, k0}, context));
-  auto mapC = AffineMapAttr::get(AffineMap::get(6, 0, {m, n, m0, n0}, context));
-  auto maps = ArrayAttr::get(context, {mapA, mapB, mapC});
-  return indexingMaps == maps;
-}
-
-int getNumberOfUses(Value v) {
-  auto uses = v.getUses();
-  return std::distance(uses.begin(), uses.end());
-}
-
-template <typename OpType>
-OpType getUserOfType(Value v) {
-  auto uses = v.getUses();
-  for (const auto &u : uses) {
-    if (OpType user = llvm::dyn_cast<OpType>(u.getOwner())) {
-      return user;
-    }
-  }
-  return nullptr;
-}
-
-linalg::FillOp findFillOpSolelyZeroingOutputOf(linalg::LinalgOp op) {
-  Value out = op.getDpsInitOperand(0)->get();
-  if (getNumberOfUses(out) != 2) {
-    return nullptr;
-  }
-  linalg::FillOp fillOp = getUserOfType<linalg::FillOp>(out);
-  if (!fillOp) {
-    return nullptr;
-  }
-  if (!fillOp->isBeforeInBlock(op)) {
-    return nullptr;
-  }
-  Value fillValue = fillOp.value();
-  if (auto constIntOp = fillValue.getDefiningOp<arith::ConstantIntOp>()) {
-    if (constIntOp.value() == 0) {
-      return fillOp;
-    }
-  }
-  if (auto constFloatOp = fillValue.getDefiningOp<arith::ConstantFloatOp>()) {
-    if (constFloatOp.value().isZero()) {
-      return fillOp;
-    }
-  }
-  return nullptr;
-}
-
-/// Convert supported linalg contraction ops like matmul and mmt4d.
-struct LinalgContractionConversion
-    : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
-  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  struct OpInfo {
-    linalg::ContractionOpInterface contract;
-    linalg::LinalgOp op;
-
-    Value lhs;
-    Value rhs;
-    Value out;
-
-    StridedBufferAnalysis lhsAnal;
-    StridedBufferAnalysis rhsAnal;
-    StridedBufferAnalysis outAnal;
-
-    OpInfo(linalg::ContractionOpInterface contract)
-        : contract(contract),
-          op(llvm::cast<linalg::LinalgOp>(contract.getOperation())),
-          lhsAnal(contract.lhs()),
-          rhsAnal(contract.rhs()),
-          outAnal(op.getDpsInitOperands().front()->get()) {
-      lhs = contract.lhs();
-      rhs = contract.rhs();
-      out = op.getDpsInitOperands().front()->get();
-    }
-  };
-
-  static bool isSupportedElementTypes(const OpInfo &info) {
-    Type lhsElType = info.lhs.getType().cast<ShapedType>().getElementType();
-    Type rhsElType = info.rhs.getType().cast<ShapedType>().getElementType();
-    Type outElType = info.out.getType().cast<ShapedType>().getElementType();
-    if (lhsElType.isF32() && rhsElType.isF32() && outElType.isF32()) {
-      return true;
-    }
-    if (lhsElType.isSignlessInteger(8) && rhsElType.isSignlessInteger(8) &&
-        outElType.isSignlessInteger(32)) {
-      return true;
-    }
-    return false;
-  }
-
-  LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
-                                PatternRewriter &rewriter) const override {
-    OpInfo info(op);
-
-    if (!isSupportedElementTypes(info)) {
-      return rewriter.notifyMatchFailure(
-          op, "unsupported combination of lhs/rhs/out element types");
-    }
-
-    // Check that buffer descriptors could be computed.
-    if (!info.lhsAnal.isValid() || !info.rhsAnal.isValid() ||
-        !info.outAnal.isValid()) {
-      return rewriter.notifyMatchFailure(
-          op, "could not compute buffer descriptor for operands");
-    }
-
-    // Check for unit inner strides.
-    if (!info.lhsAnal.areInnerDimsContiguousRowMajor()) {
-      return rewriter.notifyMatchFailure(op, "lhs has non-unit inner stride");
-    }
-    if (!info.rhsAnal.areInnerDimsContiguousRowMajor()) {
-      return rewriter.notifyMatchFailure(op, "rhs has non-unit inner stride");
-    }
-    if (!info.outAnal.areInnerDimsContiguousRowMajor()) {
-      return rewriter.notifyMatchFailure(op, "out has non-unit inner stride");
-    }
-
-    // Switch on contraction type.
-    if (info.contract.isRowMajorMatmul()) {
-      if (succeeded(handleConformingMatmul2D(info, rewriter))) {
-        return success();
-      }
-    } else if (isMmt4d(info.op.getIndexingMaps())) {
-      if (succeeded(handleConformingMmt4d(info, rewriter))) {
-        return success();
-      }
-    }
-
-    // Match failure.
-    return rewriter.notifyMatchFailure(op, "unsupported contraction variant");
-  }
-
-  LogicalResult handleConformingMatmul2D(OpInfo &info,
-                                         PatternRewriter &rewriter) const {
-    int flags = 0;
-    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
-      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
-    } else {
-      flags |= IREE_UK_FLAG_ACCUMULATE;  // accumulate into existing.
-    }
-
-    auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
-    auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
-    auto &outDesc = info.outAnal.getDesc(rewriter);
-
-    Value m = lhsDesc.sizes[0];
-    Value k = rhsDesc.sizes[0];
-    Value n = rhsDesc.sizes[1];
-
-    auto loc = info.op.getLoc();
-    auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
-    auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
-    auto outBuffer = outDesc.castToLinear(loc, rewriter);
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::MatmulOp>(
-        info.op,
-        // LHS
-        lhsBuffer, lhsDesc.offset, lhsDesc.strides[0],
-        // RHS
-        rhsBuffer, rhsDesc.offset, rhsDesc.strides[0],
-        // Out
-        outBuffer, outDesc.offset, outDesc.strides[0],
-        // m,n,k
-        m, n, k,
-        // flags
-        lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
-        outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
-    return success();
-  }
-
-  LogicalResult handleConformingMmt4d(OpInfo &info,
-                                      PatternRewriter &rewriter) const {
-    int flags = 0;
-    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
-      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
-    } else {
-      flags |= IREE_UK_FLAG_ACCUMULATE;  // accumulate into existing.
-    }
-
-    auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
-    auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
-    auto &outDesc = info.outAnal.getDesc(rewriter);
-
-    Value m = lhsDesc.sizes[0];
-    Value n = rhsDesc.sizes[0];
-    Value k = rhsDesc.sizes[1];
-    Value m0 = lhsDesc.sizes[2];
-    Value n0 = rhsDesc.sizes[2];
-    Value k0 = rhsDesc.sizes[3];
-
-    auto loc = info.op.getLoc();
-    auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
-    auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
-    auto outBuffer = outDesc.castToLinear(loc, rewriter);
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::Mmt4dOp>(
-        info.op,
-        // LHS
-        lhsBuffer, lhsDesc.offset, lhsDesc.strides[0],
-        // RHS
-        rhsBuffer, rhsDesc.offset, rhsDesc.strides[0],
-        // Out
-        outBuffer, outDesc.offset, outDesc.strides[0],
-        // m,n,k
-        m, n, k,
-        // m0,n0,k0
-        m0, n0, k0,
-        // flags
-        lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
-        outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
-    return success();
-  }
-};
-
 }  // namespace
 
 class VMVXLowerLinalgMicrokernelsPass
@@ -1410,33 +907,15 @@ class VMVXLowerLinalgMicrokernelsPass
   }
 
   void runOnOperation() override {
-    // Patterns that need to be applied first to match multiple linalg ops
-    // before they have been lowered.
-    {
-      RewritePatternSet patterns(&getContext());
-      // LinalgContractionConversion needs to match linalg::FillOp to determine
-      // whether to set the 'accumulate' flag or just erase the FillOp.
-      patterns.insert<LinalgContractionConversion>(&getContext());
+    RewritePatternSet patterns(&getContext());
+    patterns
+        .insert<LinalgBinaryGenericConversion, LinalgFillConversion,
+                LinalgTrivialGenericConversion, LinalgUnaryGenericConversion>(
+            &getContext());
 
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    // Other lowering patterns
-    {
-      RewritePatternSet patterns(&getContext());
-      patterns
-          .insert<LinalgBinaryGenericConversion, LinalgFillConversion,
-                  LinalgTrivialGenericConversion, LinalgUnaryGenericConversion,
-                  LinalgExtPackConversion, LinalgExtUnpackConversion>(
-              &getContext());
-
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
     }
 
     if (warnOnUnconverted) {

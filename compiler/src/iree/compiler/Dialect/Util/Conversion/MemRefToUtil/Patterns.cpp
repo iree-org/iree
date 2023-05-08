@@ -283,6 +283,19 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
   }
 };
 
+// Make `reinterpret_cast` a no-op.
+struct ConvertMemRefReinterpretCastOp
+    : public OpConversionPattern<memref::ReinterpretCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      memref::ReinterpretCastOp castOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(castOp, adaptor.getSource());
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateMemRefToUtilPatterns(MLIRContext *context,
@@ -293,7 +306,7 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
   conversionTarget.addIllegalDialect<memref::MemRefDialect>();
 
   typeConverter.addConversion(
-      [convertedBufferType](MemRefType type) -> llvm::Optional<Type> {
+      [convertedBufferType](MemRefType type) -> std::optional<Type> {
         if (isRankZeroOrOneMemRef(type)) {
           if (convertedBufferType) {
             return convertedBufferType;
@@ -308,10 +321,11 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
       .insert<FoldAsNoOp<bufferization::ToMemrefOp>,
               ElideNoOp<memref::AssumeAlignmentOp>, FoldAsNoOp<memref::CastOp>>(
           typeConverter, context);
-  patterns.insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
-                  ConvertMemRefAllocaOp, ConvertMemRefDimOp,
-                  ConvertMemRefLoadOp, ConvertMemRefStoreOp>(typeConverter,
-                                                             context);
+  patterns
+      .insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
+              ConvertMemRefAllocaOp, ConvertMemRefDimOp, ConvertMemRefLoadOp,
+              ConvertMemRefStoreOp, ConvertMemRefReinterpretCastOp>(
+          typeConverter, context);
 }
 
 }  // namespace iree_compiler

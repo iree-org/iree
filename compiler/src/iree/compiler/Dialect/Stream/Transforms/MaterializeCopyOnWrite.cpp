@@ -128,7 +128,8 @@ static bool materializeRegionCOW(Region &region) {
                     // TODO(#11249): special case collectives for in-place.
                     // We don't want to clone the send buffer.
                     IREE::Stream::AsyncCollectiveOp,
-                    IREE::Stream::AsyncDispatchOp, IREE::Stream::AsyncExecuteOp,
+                    IREE::Stream::AsyncDispatchOp, IREE::Stream::AsyncCallOp,
+                    IREE::Stream::AsyncExecuteOp,
                     IREE::Stream::AsyncConcurrentOp>(
                   [&](auto op) { return materializeTiedOpCOW(op); })
               .Default(false) ||

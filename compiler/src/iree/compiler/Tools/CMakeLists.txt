@@ -10,7 +10,7 @@
 set(IREE_COMPILER_TARGETS "")
 set(IREE_COMPILER_TARGET_COPTS "")
 if(IREE_TARGET_BACKEND_LLVM_CPU)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM)
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVMCPU)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVM_CPU_TARGET")
 endif()
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
@@ -48,9 +48,11 @@ endif()
 set(IREE_INPUT_DEPS "")
 if(IREE_INPUT_MHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
   list(APPEND IREE_INPUT_DEPS tensorflow::external_mhlo_includes)
   list(APPEND IREE_INPUT_DEPS ChloOps)
   list(APPEND IREE_INPUT_DEPS MhloDialect)
+  list(APPEND IREE_INPUT_DEPS StablehloOps)
 endif()
 if(IREE_INPUT_TORCH)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
@@ -74,19 +76,6 @@ iree_cc_library(
   DEPS
     ${IREE_INPUT_DEPS}
     iree::compiler::InputConversion::Common
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    init_iree
-  HDRS
-    "init_iree.h"
-  SRCS
-    "init_iree.cc"
-  DEPS
-    ::version
-    LLVMSupport
   PUBLIC
 )
 
@@ -230,7 +219,6 @@ iree_cc_library(
   SRCS
     "iree_compile_lib.cc"
   DEPS
-    ::init_iree
     LLVMSupport
     iree::compiler::API::Internal::Embed
     iree::compiler::Pipelines

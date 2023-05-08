@@ -34,12 +34,12 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 /// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
-// RUN: iree-run-module --function=reduce --device=cuda --input="8x64xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 /// Note: the current --iree-codegen-llvmgpu-enable-transform-dialect-jit only works for exactly this reduction atm.
 // RUN: iree-compile %s --iree-hal-target-backends=cuda | \
-// RUN: iree-run-module --function=reduce --device=cuda --input="8x64xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index

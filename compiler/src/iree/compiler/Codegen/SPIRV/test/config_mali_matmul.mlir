@@ -358,7 +358,7 @@ hal.executable @matmul_1024x2048x512xi8 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 4]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @matmul_1024x2048x512xi8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]

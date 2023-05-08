@@ -19,7 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -32,8 +32,8 @@ namespace IREE {
 namespace Flow {
 
 /// Check if any of the use dominates all other uses of the operation.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo &dominanceInfo) {
+static std::optional<OpOperand *> getFusableUse(Operation *op,
+                                                DominanceInfo &dominanceInfo) {
   auto uses = op->getUses();
   for (OpOperand &source : uses) {
     Operation *sourceOp = source.getOwner();
@@ -71,6 +71,15 @@ static bool areFusableOps(MLIRContext *context, Operation *producerOp,
         return false;
       })) {
     return true;
+  }
+
+  // Don't fuse if all of the consumer maps aren't projected permutations.
+  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+    if (!llvm::all_of(
+            linalgConsumerOp.getIndexingMapsArray(),
+            [](AffineMap map) { return map.isProjectedPermutation(); })) {
+      return false;
+    }
   }
 
   // If producer has a single user, always fuse
@@ -158,7 +167,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
       return;
     }
 
-    Optional<OpOperand *> fusableUse = getFusableUse(genericOp, dominanceInfo);
+    std::optional<OpOperand *> fusableUse =
+        getFusableUse(genericOp, dominanceInfo);
     if (!fusableUse) return;
     if (!linalg::areElementwiseOpsFusable(fusableUse.value())) return;
 
@@ -199,7 +209,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 struct FusionOfTensorOpsPass
     : public FusionOfTensorOpsBase<FusionOfTensorOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, linalg::LinalgDialect, math::MathDialect>();
+    registry.insert<affine::AffineDialect, linalg::LinalgDialect,
+                    math::MathDialect>();
   }
   FusionOfTensorOpsPass(bool fuseMultiUse, unsigned multiUseFusionIteration) {
     this->fuseMultiUse = fuseMultiUse;
@@ -269,7 +280,8 @@ struct FusionOfTensorOpsPass
       linalg::populateConstantFoldLinalgOperations(fusionPatterns,
                                                    constantFoldControlFn);
 
-      AffineApplyOp::getCanonicalizationPatterns(fusionPatterns, context);
+      affine::AffineApplyOp::getCanonicalizationPatterns(fusionPatterns,
+                                                         context);
       linalg::GenericOp::getCanonicalizationPatterns(fusionPatterns, context);
       tensor::ExpandShapeOp::getCanonicalizationPatterns(fusionPatterns,
                                                          context);

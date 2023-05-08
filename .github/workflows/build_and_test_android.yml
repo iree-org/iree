@@ -1,0 +1,144 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Workflow for android cross-compilation and tests jobs. It is designed to be
+# called from the main workflow ci.yml. The concurrency of this workflow is
+# controlled by the caller's job.
+
+name: Build and test android
+
+on:
+  workflow_call:
+    inputs:
+      runner-group:
+        required: true
+        type: string
+      runner-env:
+        required: true
+        type: string
+      write-caches:
+        required: true
+        type: string
+      is-pr:
+        required: true
+        type: boolean
+      build-dir:
+        required: true
+        type: string
+      build-dir-archive:
+        required: true
+        type: string
+      build-dir-gcs-artifact:
+        required: true
+        type: string
+
+env:
+  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # instead of the outputs of setup because it contains the run attempt and we
+  # want that to be the current attempt, not whatever attempt the setup step
+  # last ran in. It therefore can't be passed in via inputs because the env
+  # context isn't available there.
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+
+jobs:
+  cross_compile:
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ inputs.runner-group }}
+      - environment=${{ inputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      HOST_BUILD_DIR: ${{ inputs.build-dir }}
+      HOST_BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
+      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
+      IREE_WRITE_REMOTE_CCACHE: ${{ inputs.write-caches }}
+    outputs:
+      target-build-dir: ${{ steps.build.outputs.target-build-dir }}
+      target-build-dir-archive: ${{ steps.archive.outputs.target-build-dir-archive }}
+      target-build-dir-gcs-artifact: ${{ steps.upload.outputs.target-build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      - name: "Build cross-compiling target"
+        id: build
+        env:
+          TARGET_BUILD_DIR: build-android-arm_64
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
+            --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
+            --env "BUILD_PRESET=test" \
+            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            gcr.io/iree-oss/android@sha256:3f641d25786b1e5e430ee4cacb8bfe57540fda5ecaa7ca2802c179c26e77ce09 \
+            build_tools/cmake/build_android.sh
+          echo "target-build-dir=${TARGET_BUILD_DIR}" >> "${GITHUB_OUTPUT}"
+      - name: "Creating archive of target build dir"
+        id: archive
+        env:
+          TARGET_BUILD_DIR: ${{ steps.build.outputs.target-build-dir }}
+          TARGET_BUILD_DIR_ARCHIVE: build-android-arm_64.tar
+        run: |
+          tar -cf "${TARGET_BUILD_DIR_ARCHIVE}" \
+            --exclude="*.o" \
+            --exclude="*.a" \
+            "${TARGET_BUILD_DIR}"
+          echo "target-build-dir-archive=${TARGET_BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading target build dir archive"
+        id: upload
+        env:
+          TARGET_BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.target-build-dir-archive }}
+          TARGET_BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.target-build-dir-archive }}
+        run: |
+          gcloud storage cp "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR_GCS_ARTIFACT}"
+          echo "target-build-dir-gcs-artifact=${TARGET_BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+
+  test:
+    # These physical devices are not scalable. Only run on postsubmit for now.
+    if: (! inputs.is-pr)
+    needs: cross_compile
+    strategy:
+      matrix:
+        # TODO(#9855): Add Pixel-6-Pro and XT2201-2
+        target:
+          - device-name: Pixel-4
+            label-exclude: vulkan
+    name: test_on_${{ matrix.target.device-name }}
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ inputs.runner-group }}
+      - environment=${{ inputs.runner-env }}
+      - machine-type=${{ matrix.target.device-name }}
+    env:
+      TARGET_BUILD_DIR: ${{ needs.cross_compile.outputs.target-build-dir }}
+      TARGET_BUILD_DIR_ARCHIVE: ${{ needs.cross_compile.outputs.target-build-dir-archive }}
+      TARGET_BUILD_DIR_GCS_ARTIFACT: ${{ needs.cross_compile.outputs.target-build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Downloading target build archive"
+        run: |
+          gcloud storage cp "${TARGET_BUILD_DIR_GCS_ARTIFACT}" "${TARGET_BUILD_DIR_ARCHIVE}"
+      - name: "Extracting target build dir archive"
+        run: tar -xf "${TARGET_BUILD_DIR_ARCHIVE}" "${TARGET_BUILD_DIR}"
+      - name: "Running tests"
+        env:
+          LABEL_EXCLUDE: ${{ matrix.target.label-exclude }}
+        run: |
+          ctest -j 4 \
+            --test-dir "${TARGET_BUILD_DIR}" \
+            --timeout=900 \
+            --output-on-failure \
+            --no-tests=error \
+            --label-exclude "${LABEL_EXCLUDE}"

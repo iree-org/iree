@@ -174,7 +174,7 @@ static IREE::HAL::PipelineLayoutAttr makePipelineLayoutAttr(
           builder.getContext(), binding.ordinal, binding.type,
           binding.flags != IREE::HAL::DescriptorFlags::None
               ? binding.flags
-              : Optional<IREE::HAL::DescriptorFlags>{}));
+              : std::optional<IREE::HAL::DescriptorFlags>{}));
     }
     setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
         builder.getContext(), setLayout.ordinal, bindingAttrs));
@@ -434,8 +434,8 @@ struct InlineConstantWorkgroupSizePattern
 
     uint64_t dimIdx = sizeOp.getDimension().getZExtValue();
     auto dimAttr = workgroupSizeAttr[dimIdx];
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(sizeOp, dimAttr,
-                                                   rewriter.getIndexType());
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+        sizeOp, rewriter.getIndexType(), cast<TypedAttr>(dimAttr));
     return success();
   }
 };

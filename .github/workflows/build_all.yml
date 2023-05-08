@@ -1,0 +1,108 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# Workflow for building IREE. It is designed to be called from a parent workflow.
+# The concurrency of this workflow is controlled by the caller's job.
+
+name: Build All
+
+on:
+  workflow_call:
+    inputs:
+      runner-group:
+        required: true
+        type: string
+      runner-env:
+        required: true
+        type: string
+      write-caches:
+        required: true
+        type: string
+    outputs:
+      build-dir:
+        description: |
+          Local path that stores compiled artifacts.
+        value: ${{ jobs.build_all.outputs.build-dir }}
+      build-dir-archive:
+        description: |
+          Local path to the zipped build directory.
+        value: ${{ jobs.build_all.outputs.build-dir-archive }}
+      build-dir-gcs-artifact:
+        description: |
+          GCS path to the uploaded build archive.
+        value: ${{ jobs.build_all.outputs.build-dir-gcs-artifact }}
+
+env:
+  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # instead of the outputs of setup because it contains the run attempt and we
+  # want that to be the current attempt, not whatever attempt the setup step
+  # last ran in. It therefore can't be passed in via inputs because the env
+  # context isn't available there.
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+
+jobs:
+  build_all:
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ inputs.runner-group }}
+      - environment=${{ inputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: full-build-dir
+    outputs:
+      # Pass through the build directory as output so it's available to
+      # dependent jobs.
+      build-dir: ${{ env.BUILD_DIR }}
+      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building IREE"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ inputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb" \
+            gcr.io/iree-oss/base@sha256:24fb5467da30c7b4c0f4c191cdf6124bda63b172d3ae98906e53b3d55ed6ddcb \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
+      # The archive step below doesn't include these files. Remove them first to
+      # save disk space.
+      # TODO(#10739): This step can be removed once we enlarge the disk sapce.
+      - name: "Removing unused files"
+        run: |
+          find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
+            -print \
+            -delete
+      # Things get more complicated here than when we're just building the
+      # runtime. The build directory is way bigger. We're also using on our own
+      # runners on GCE. So uploading to GitHub actions artifact storage hosted
+      # on Azure is dirt slow. We drop static libraries and object files, which
+      # aren't needed for testing. Then we do some minimal compression locally
+      # *in parallel* and upload to GCS. This can be further optimized.
+      # Especially decompression is still pretty slow. See #9881.
+      - name: "Creating build dir archive"
+        id: archive
+        env:
+          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
+        run: |
+          tar -I 'zstd -T0' \
+            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+          echo "build-dir-archive=${BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading build dir archive"
+        id: upload
+        env:
+          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
+        run: |
+          gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
+          echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"

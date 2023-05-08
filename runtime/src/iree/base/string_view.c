@@ -210,14 +210,14 @@ IREE_API_EXPORT intptr_t iree_string_view_split(iree_string_view_t value,
                                                 char split_char,
                                                 iree_string_view_t* out_lhs,
                                                 iree_string_view_t* out_rhs) {
-  *out_lhs = iree_string_view_empty();
-  *out_rhs = iree_string_view_empty();
+  if (out_lhs) *out_lhs = iree_string_view_empty();
+  if (out_rhs) *out_rhs = iree_string_view_empty();
   if (!value.data || !value.size) {
     return -1;
   }
   const void* first_ptr = memchr(value.data, split_char, value.size);
   if (!first_ptr) {
-    *out_lhs = value;
+    if (out_lhs) *out_lhs = value;
     return -1;
   }
   intptr_t offset = (intptr_t)((const char*)(first_ptr)-value.data);
@@ -287,6 +287,17 @@ static bool iree_string_view_match_pattern_impl(iree_string_view_t value,
 IREE_API_EXPORT bool iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern) {
   return iree_string_view_match_pattern_impl(value, pattern);
+}
+
+IREE_API_EXPORT void iree_string_view_to_cstring(
+    iree_string_view_t value, char* buffer, iree_host_size_t buffer_length) {
+  if (!buffer_length) return;
+  // Truncate and ensure there's space for the NUL terminator.
+  iree_host_size_t length = iree_min(value.size, buffer_length - 1);
+  // Copy string contents up to the truncated length.
+  memcpy(buffer, value.data, length);
+  // Add NUL terminator.
+  buffer[length] = 0;
 }
 
 IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(

@@ -21,12 +21,15 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -204,7 +207,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       exportOp->getWorkgroupSize().value(),
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  Optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
+  std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize) {
     funcOp->emitError("failed to query subgroup size");
     return signalPassFailure();
@@ -275,7 +278,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
     RewritePatternSet patterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
-    populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+    SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
+    populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       // TODO(#4759): This does not converge after the max number of iterations.
       // It indicates that some pattern upstream is generating ops even when the
@@ -297,10 +301,7 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   MLIRContext *context = funcOp.getContext();
   if (!promoteCMatrix) return success();
 
-  SmallVector<Operation *> computeOps;
-  if (failed(getComputeOps(funcOp, computeOps)))
-    return funcOp.emitError("failed to get compute ops");
-
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   SmallVector<Operation *> linalgOps;
   for (Operation *op : computeOps) {
     if (isa<linalg::FillOp>(op)) continue;  // Don't care
@@ -318,12 +319,12 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   // If there are no fused elementwise ops, we can avoid promoting C matrix.
   if (linalgOps.size() <= 1) return success();
 
-  linalg::LinalgOp matmulOp = linalgOps.front();
+  auto matmulOp = cast<linalg::LinalgOp>(linalgOps.front());
   auto genericOp = cast<linalg::GenericOp>(*linalgOps.back());
 
   auto matmulType =
       matmulOp.getDpsInitOperand(0)->get().getType().cast<MemRefType>();
-  if (isInWorkgroupMemory(matmulType)) {
+  if (hasSharedMemoryAddressSpace(matmulType)) {
     // The matmul output is already in shared memory. This can happen when
     // bufferization decides an allocation is needed, e.g., matmul + arith.extf,
     // where the output have different element types. For such cases, don't need
@@ -361,11 +362,9 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
 bool SPIRVTileAndPromotePass::isCooperativeMatrixFusable(
     linalg::GenericOp genericOp) const {
   if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) return false;
-  // Limit to outer dimension broadcasted cases for now.
-  for (AffineMap map : genericOp.getIndexingMapsArray()) {
-    if (!map.isMinorIdentity()) return false;
-  }
 
+  // Look at fused elementwise ops to make sure they are allowed by the
+  // cooperative matrix spec.
   for (Operation &op : genericOp.getBlock()->without_terminator()) {
     if (!isa<
             // These ops are directly allowed to use cooperative matrix types.
@@ -379,6 +378,19 @@ bool SPIRVTileAndPromotePass::isCooperativeMatrixFusable(
             arith::MulFOp>(op))
       return false;
   }
+
+  // Look at operands to make sure we don't have inlined constants. Cooperative
+  // matrix loads can only happen from StorageBuffer or Workgroup storage
+  // classes.
+  for (Value input : genericOp.getInputs()) {
+    while (auto subviewOp = input.getDefiningOp<memref::SubViewOp>()) {
+      input = subviewOp.getViewSource();
+    }
+    if (auto toMemrefOp = input.getDefiningOp<bufferization::ToMemrefOp>()) {
+      if (matchPattern(toMemrefOp.getTensor(), m_Constant())) return false;
+    }
+  }
+
   return true;
 }
 

@@ -16,11 +16,14 @@ hal.executable private @pad_matmul_static_dispatch_0  {
 
       //      CHECK: memref.alloc() {alignment = 64 : i64} : memref<250x1020xf32, #gpu.address_space<workgroup>>
       // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>)
-      // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>)
+      // CHECK: gpu.barrier
+      // CHECK: linalg.generic
+      // CHECK: gpu.barrier
+      // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32, #gpu.address_space<workgroup>>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>)
       // CHECK-NEXT: bufferization.to_tensor %{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>
       // CHECK-NEXT: memref.dealloc %{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>
-
-      %6 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
+      %p = bufferization.alloc_tensor() copy(%3) : tensor<250x500xf32>
+      %6 = linalg.matmul ins(%p, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
       // Returning a tensor force the allocation that we want to test here: and alloca with memory space "3" for GPU shared memory.
       return %6: tensor<250x1020xf32>
@@ -29,9 +32,9 @@ hal.executable private @pad_matmul_static_dispatch_0  {
 
   transform.sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
-    %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
-    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
+    transform.iree.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
+    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op: (!pdl.operation) -> !pdl.operation
     %func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-    transform.iree.erase_hal_descriptor_type_from_memref %func
+    transform.iree.erase_hal_descriptor_type_from_memref %func : (!pdl.operation) -> ()
   }
 }

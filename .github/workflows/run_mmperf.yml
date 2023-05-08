@@ -38,7 +38,7 @@ jobs:
       runner-group: ${{ steps.configure.outputs.runner-group }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
@@ -74,17 +74,17 @@ jobs:
       GCS_UPLOAD_DIR_NAME: ${{ needs.setup.outputs.artifact-upload-dir }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: "Building mmperf for CPU"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
+            gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75 \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cpu" "${IREE_SHA}"
       - name: "Running mmperf on CPU"
         run: |
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
+            gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75 \
           ./build_tools/benchmarks/mmperf/run_mmperf.sh "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |
@@ -109,11 +109,11 @@ jobs:
       build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: "Building mmperf for CUDA"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
+            gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75 \
           ./build_tools/benchmarks/mmperf/build_mmperf.sh "${BUILD_DIR}" "cuda" "${IREE_SHA}"
       - name: "Removing unused files"
         run: |
@@ -155,7 +155,7 @@ jobs:
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_cuda.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -165,7 +165,7 @@ jobs:
           mkdir ${RESULTS_DIR}
           ./build_tools/github_actions/docker_run.sh \
           --gpus all \
-            gcr.io/iree-oss/mmperf@sha256:f32657e5b9e9bf54614209517f9c895f4fb2280d1a7c1a3a9b7fb702327db8c6 \
+            gcr.io/iree-oss/mmperf@sha256:fa4c29028413081636965bbaead40287e4a3dd403d8992b6b9269bd9d999de75 \
           ./build_tools/benchmarks/mmperf/run_mmperf.sh "${BUILD_DIR}" "${RESULTS_DIR}"
       - name: "Uploading results"
         run: |

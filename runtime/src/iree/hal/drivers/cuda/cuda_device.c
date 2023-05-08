@@ -53,7 +53,11 @@ typedef struct iree_hal_cuda_device_t {
   CUstream stream;
   iree_hal_cuda_context_wrapper_t context_wrapper;
   iree_hal_cuda_tracing_context_t* tracing_context;
+
   iree_hal_allocator_t* device_allocator;
+
+  // Optional provider used for creating/configuring collective channels.
+  iree_hal_channel_provider_t* channel_provider;
 
   // Cache of the direct stream command buffer initialized when in stream mode.
   // TODO: have one cached per stream once there are multiple streams.
@@ -68,7 +72,12 @@ static iree_hal_cuda_device_t* iree_hal_cuda_device_cast(
   return (iree_hal_cuda_device_t*)base_value;
 }
 
-void iree_hal_cuda_device_params_initialize(
+static iree_hal_cuda_device_t* iree_hal_cuda_device_cast_unsafe(
+    iree_hal_device_t* base_value) {
+  return (iree_hal_cuda_device_t*)base_value;
+}
+
+IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
     iree_hal_cuda_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
@@ -110,6 +119,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->params = *params;
   device->device = cu_device;
   device->stream = stream;
+  device->context_wrapper.cu_device = cu_device;
   device->context_wrapper.cu_context = context;
   device->context_wrapper.host_allocator = host_allocator;
   iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
@@ -183,6 +193,19 @@ iree_status_t iree_hal_cuda_device_create(
   return status;
 }
 
+CUcontext iree_hal_cuda_device_context(iree_hal_device_t* base_device) {
+  iree_hal_cuda_device_t* device =
+      iree_hal_cuda_device_cast_unsafe(base_device);
+  return device->context_wrapper.cu_context;
+}
+
+iree_hal_cuda_dynamic_symbols_t* iree_hal_cuda_device_dynamic_symbols(
+    iree_hal_device_t* base_device) {
+  iree_hal_cuda_device_t* device =
+      iree_hal_cuda_device_cast_unsafe(base_device);
+  return device->context_wrapper.syms;
+}
+
 static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
@@ -192,6 +215,9 @@ static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
+
+  // Buffers may have been retaining collective resources.
+  iree_hal_channel_provider_release(device->channel_provider);
 
   // TODO: support multiple streams.
   iree_hal_cuda_tracing_context_free(device->tracing_context);
@@ -237,6 +263,14 @@ static void iree_hal_cuda_replace_device_allocator(
   device->device_allocator = new_allocator;
 }
 
+static void iree_hal_cuda_replace_channel_provider(
+    iree_hal_device_t* base_device, iree_hal_channel_provider_t* new_provider) {
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_hal_channel_provider_retain(new_provider);
+  iree_hal_channel_provider_release(device->channel_provider);
+  device->channel_provider = new_provider;
+}
+
 static iree_status_t iree_hal_cuda_device_trim(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   iree_arena_block_pool_trim(&device->block_pool);
@@ -264,38 +298,17 @@ static iree_status_t iree_hal_cuda_device_query_i64(
       (int)category.size, category.data, (int)key.size, key.data);
 }
 
-// Returns true if |id| is all zeros indicating an empty ID.
-static bool iree_hal_cuda_nccl_id_is_empty(const iree_hal_cuda_nccl_id_t* id) {
-  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(id->data); ++i) {
-    if (id->data[i] != 0) return false;
-  }
-  return true;
-}
-
 static iree_status_t iree_hal_cuda_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-
-  // Try to use the ID specified in the parameters and fall back to the default.
-  iree_hal_cuda_nccl_id_t id;
-  if (iree_const_byte_span_is_empty(params.id)) {
-    // User wants the default.
-    id = device->params.nccl_default_id;
-  } else if (params.id.data_length != IREE_ARRAYSIZE(id.data)) {
-    // User provided something but it's not what we expect.
+  if (!device->context_wrapper.syms->nccl_library) {
     return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "NCCL ID must be %d bytes matching the ncclUniqueId struct",
-        (int)IREE_ARRAYSIZE(id.data));
-  } else {
-    // User provided the ID - we treat it as opaque here and let NCCL validate.
-    memcpy(id.data, params.id.data, IREE_ARRAYSIZE(id.data));
-  }
-  if (iree_hal_cuda_nccl_id_is_empty(&id)) {
-    // TODO: maybe this is ok? a localhost alias or something?
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "no default NCCL ID specified (all zeros)");
+        IREE_STATUS_UNAVAILABLE,
+        "NCCL runtime library (%d.%d.%d) not available; ensure installed and "
+        "the shared library is on your PATH/LD_LIBRARY_PATH "
+        "(nccl.dll/libnccl.so)",
+        NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
   }
 
   // Today we only allow a single logical device per channel.
@@ -310,23 +323,64 @@ static iree_status_t iree_hal_cuda_device_create_channel(
                             requested_count);
   }
 
-  // Users can either specify a specific rank or allow this device
-  // implementation to decide. This allows us to run the same programs acting as
-  // different ranks by setting flags/environment variables/API options/etc.
-  int rank = params.rank;
-  if (rank == IREE_HAL_CHANNEL_RANK_DEFAULT) {
-    rank = device->params.nccl_default_rank;
+  // Ask the channel provider (if configured) for the default rank and count
+  // if the user did not set them.
+  if (device->channel_provider &&
+      (params.rank == IREE_HAL_CHANNEL_RANK_DEFAULT ||
+       params.count == IREE_HAL_CHANNEL_COUNT_DEFAULT)) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_channel_provider_query_default_rank_and_count(
+            device->channel_provider, &params.rank, &params.count),
+        "querying default collective group rank and count");
   }
-  int count = params.count;
-  if (count == IREE_HAL_CHANNEL_COUNT_DEFAULT) {
-    count = device->params.nccl_default_count;
+
+  // An ID is required to initialize NCCL. On the root it'll be the local ID and
+  // on all other participants it'll be the root ID.
+  iree_hal_cuda_nccl_id_t id;
+  memset(&id, 0, sizeof(id));
+  if (iree_const_byte_span_is_empty(params.id)) {
+    // User wants the default ID.
+    if (!device->channel_provider) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "default collective channel ID requested but no channel provider has "
+          "been set on the device to provide it");
+    }
+    if (params.rank == 0) {
+      // Bootstrap NCCL to get the root ID.
+      IREE_RETURN_IF_ERROR(iree_hal_cuda_nccl_get_unique_id_from_context(
+                               &device->context_wrapper, &id),
+                           "bootstrapping NCCL root");
+    }
+    // Exchange NCCL ID with all participants.
+    IREE_RETURN_IF_ERROR(iree_hal_channel_provider_exchange_default_id(
+                             device->channel_provider,
+                             iree_make_byte_span((void*)&id, sizeof(id))),
+                         "exchanging NCCL ID with other participants");
+  } else if (params.id.data_length != IREE_ARRAYSIZE(id.data)) {
+    // User provided something but it's not what we expect.
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "NCCL ID must be %" PRIhsz
+        " bytes matching the ncclUniqueId struct but caller provided %" PRIhsz
+        " bytes",
+        IREE_ARRAYSIZE(id.data), sizeof(id));
+  } else {
+    // User provided the ID - we treat it as opaque here and let NCCL validate.
+    memcpy(id.data, params.id.data, IREE_ARRAYSIZE(id.data));
+  }
+
+  if (iree_hal_cuda_nccl_id_is_empty(&id)) {
+    // TODO: maybe this is ok? a localhost alias or something?
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "no default NCCL ID specified (all zeros)");
   }
 
   // TODO: when we support multiple logical devices we'll want to pass in the
   // context of the device mapped to the queue_affinity. For now since this
   // implementation only supports one device we pass in the only one we have.
-  return iree_hal_cuda_nccl_channel_create(&device->context_wrapper, &id, rank,
-                                           count, out_channel);
+  return iree_hal_cuda_nccl_channel_create(
+      &device->context_wrapper, &id, params.rank, params.count, out_channel);
 }
 
 static iree_status_t iree_hal_cuda_device_create_command_buffer(
@@ -521,6 +575,7 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .host_allocator = iree_hal_cuda_device_host_allocator,
     .device_allocator = iree_hal_cuda_device_allocator,
     .replace_device_allocator = iree_hal_cuda_replace_device_allocator,
+    .replace_channel_provider = iree_hal_cuda_replace_channel_provider,
     .trim = iree_hal_cuda_device_trim,
     .query_i64 = iree_hal_cuda_device_query_i64,
     .create_channel = iree_hal_cuda_device_create_channel,

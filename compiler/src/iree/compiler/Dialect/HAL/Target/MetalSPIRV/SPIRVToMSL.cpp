@@ -98,7 +98,7 @@ class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
 };
 }  // namespace
 
-llvm::Optional<MetalShader> crossCompileSPIRVToMSL(
+std::optional<MetalShader> crossCompileSPIRVToMSL(
     llvm::ArrayRef<uint32_t> spvBinary, StringRef entryPoint) {
   SPIRVToMSLCompiler spvCrossCompiler(spvBinary.data(), spvBinary.size());
 

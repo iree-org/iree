@@ -4,6 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Special case package namespace for tools/ -> "" (empty string)
+# For example, tools/iree-compile -> iree-compile (no namespace)
+set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
 # Tools IREE provides for compiling, executing, and benchmarking programs, as
 # well as other utilities.
 #
@@ -21,7 +25,12 @@
 # Write some important CMake options to a file for convenient use from scripts.
 configure_file(build_config_template.txt.in build_config.txt)
 
+# For sub-directories, we want targets fully qualified relative to the
+# root. But after, we want those in *this* directory to be unqualified
+# (i.e. 'iree-compile').
+set(IREE_PACKAGE_ROOT_PREFIX "iree/tools")
 iree_add_all_subdirs()
+set(IREE_PACKAGE_ROOT_PREFIX "")
 
 # TODO(scotttodd): Should this be checking IREE_BUILD_COMPILER?
 #   Maybe we should disallow setting both at the same time, since it's
@@ -65,6 +74,7 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::internal::atomic_slist
+    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::path
     iree::base::tracing
@@ -73,6 +83,7 @@ iree_cc_binary(
     iree::testing::benchmark
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
@@ -98,6 +109,17 @@ iree_cc_binary(
     iree::vm
     iree::vm::bytecode::module
   TESTONLY
+)
+
+iree_cc_binary(
+  NAME
+    iree-cpuinfo
+  SRCS
+    "iree-cpuinfo.c"
+  DEPS
+    iree::base
+    iree::base::internal::cpu
+    iree::schemas::cpu_data
 )
 
 iree_cc_binary(
@@ -128,22 +150,36 @@ iree_cc_binary(
     iree::vm::bytecode::module
 )
 
+# Only enable fatelf tool when we're compiling it in.
+# Currently it requires that the host and target both support embedded ELFs as
+# the ELF implementation is only compiled when the target supports it.
+if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF OR
+   IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF)
+iree_cc_binary(
+  NAME
+    iree-fatelf
+  SRCS
+    "iree-fatelf.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::path
+    iree::hal::local::elf::elf_module
+)
+endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
+
 iree_cc_binary(
   NAME
     iree-run-module
   SRCS
-    "iree-run-module-main.cc"
+    "iree-run-module-main.c"
   DEPS
     iree::base
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
-    iree::modules::hal::types
-    iree::tooling::comparison
     iree::tooling::context_util
-    iree::tooling::device_util
-    iree::tooling::instrument_util
-    iree::tooling::vm_util
+    iree::tooling::run_module
     iree::vm
 )
 
@@ -185,17 +221,6 @@ iree_cc_binary(
     iree::tooling::yaml_util
     iree::vm
     yaml
-)
-
-iree_cc_binary(
-  NAME
-    iree-cpuinfo
-  SRCS
-    "iree-cpuinfo.c"
-  DEPS
-    iree::base
-    iree::base::internal::cpu
-    iree::schemas::cpu_data
 )
 
 if(IREE_BUILD_COMPILER)
@@ -271,32 +296,20 @@ if(IREE_BUILD_COMPILER)
     SRCS
       "iree-run-mlir-main.cc"
     DEPS
-      LLVMSupport
-      MLIRIR
-      MLIRParser
-      MLIRPass
-      MLIRSupport
-      MLIRTargetLLVMIRExport
       iree::base
       iree::base::internal::flags
       iree::base::tracing
-      iree::compiler::ConstEval
-      iree::compiler::Dialect::HAL::Target
-      iree::compiler::Dialect::VM::Target::Bytecode
-      iree::compiler::Dialect::VM::Target::init_targets
-      iree::compiler::Pipelines
-      iree::compiler::Tools::init_passes_and_dialects
-      iree::compiler::Tools::init_targets
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
       iree::hal
-      iree::modules::hal::types
       iree::tooling::context_util
       iree::tooling::device_util
-      iree::tooling::vm_util
+      iree::tooling::run_module
       iree::vm
-      iree::vm::bytecode::module
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
+    SETUP_INSTALL_RPATH
   )
 
   # Ensure FileCheck and associated binaries get built. Tests don't have

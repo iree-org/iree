@@ -13,9 +13,9 @@ func.func @test(%arg0 : tensor<10x20xf32>, %arg1 : tensor<20x30xf32>, %arg2 : te
 //       CHECK: PadLinalgOps (iree-preprocessing-pad-linalg-ops)
 // CHECK-LABEL: module
 //  CHECK-NEXT:   func.func @test(
-//   CHECK-DAG:     %[[ARG0:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} : !hal.buffer_view -> tensor<10x20xf32>
-//   CHECK-DAG:     %[[ARG1:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} : !hal.buffer_view -> tensor<20x30xf32>
-//   CHECK-DAG:     %[[ARG2:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} : !hal.buffer_view -> tensor<10x30xf32>
+//   CHECK-DAG:     %[[ARG0:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input 0" : !hal.buffer_view -> tensor<10x20xf32>
+//   CHECK-DAG:     %[[ARG1:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input 1" : !hal.buffer_view -> tensor<20x30xf32>
+//   CHECK-DAG:     %[[ARG2:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input 2" : !hal.buffer_view -> tensor<10x30xf32>
 //   CHECK-DAG:     %[[PAD0:.+]] = tensor.pad %[[ARG0]] low[0, 0] high[6, 12]
 //   CHECK-DAG:     %[[PAD1:.+]] = tensor.pad %[[ARG1]] low[0, 0] high[12, 2]
 //   CHECK-DAG:     %[[PAD2:.+]] = tensor.pad %[[ARG2]] low[0, 0] high[6, 2]

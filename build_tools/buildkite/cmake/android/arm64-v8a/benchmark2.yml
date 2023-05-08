@@ -16,7 +16,7 @@ steps:
         --volume="$$PWD:$$IREE_DOCKER_WORKDIR" \
         --workdir="$$IREE_DOCKER_WORKDIR" \
         --rm \
-        gcr.io/iree-oss/frontends@sha256:8f9c268fd4b57a1818695cba9e794dc5dff32b432c36af8345dc1c8f12f0a1e9 \
+        gcr.io/iree-oss/frontends@sha256:c123d9e54e5179ef49345271e5535bcd618ce8d5f20c1353741b81715c3bee33 \
         build_tools/cmake/build_android_benchmark.sh
       tar --exclude='*.tar.gz' \
         --exclude='*.tgz' \
@@ -144,7 +144,7 @@ steps:
       buildkite-agent artifact download benchmark-results-*.json ./
       python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py \
         --verbose \
-        --benchmark_files benchmark-results-*.json
+        --benchmark_files="benchmark-results-*.json"
     key: "upload-to-dashboard"
     branches: "main"
     agents:

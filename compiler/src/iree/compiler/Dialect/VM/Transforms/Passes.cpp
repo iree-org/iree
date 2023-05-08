@@ -76,7 +76,8 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   // rem/div ops that we can never safely remove inside of the hot inner loop
   // and that sucks. We still have this here for now as the cost of the rem/div
   // are less than the cost of an additional loop that this could remove.
-  passManager.addNestedPass<mlir::func::FuncOp>(createLoopCoalescingPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      affine::createLoopCoalescingPass());
 
   FunctionLikeNest(passManager)
       .addPass(mlir::createLoopInvariantCodeMotionPass)

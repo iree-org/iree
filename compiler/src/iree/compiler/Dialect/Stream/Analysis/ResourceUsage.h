@@ -82,7 +82,7 @@ class ResourceUsageAnalysis {
   }
 
   // Returns the analyzed resource usage of the |value| resource, if analyzed.
-  llvm::Optional<ResourceUsageBitfield> tryLookupResourceUsage(Value value);
+  std::optional<ResourceUsageBitfield> tryLookupResourceUsage(Value value);
 
  private:
   Explorer explorer;
