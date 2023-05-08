@@ -49,7 +49,7 @@ void buildIREEVMTransformPassPipeline(
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;
-    case InputDialectOptions::Type::analysis:
+    case InputDialectOptions::Type::auto_detect:
       passManager.addPass(createInputConversionPipelinePass());
       break;
 #ifdef IREE_HAVE_MHLO_INPUT

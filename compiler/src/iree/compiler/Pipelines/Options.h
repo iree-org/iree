@@ -35,7 +35,7 @@ struct InputDialectOptions {
     // are supported.
     none,
     // Analyses the input to determine what input dialect pipeline to use.
-    analysis,
+    auto_detect,
 #ifdef IREE_HAVE_MHLO_INPUT
     // Legalizes input defined over MHLO ops.
     mhlo,
@@ -54,7 +54,7 @@ struct InputDialectOptions {
     tosa,
 #endif  // IREE_HAVE_TOSA_INPUT
   };
-  Type type = Type::analysis;
+  Type type = Type::auto_detect;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<InputDialectOptions>;

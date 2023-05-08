@@ -51,7 +51,6 @@ iree_cc_library(
   SRCS
     "IREEImportPublic.cpp"
     "ImportMLProgram.cpp"
-    "InputConversionPipeline.cpp"
     "Passes.cpp"
     "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"
@@ -59,7 +58,6 @@ iree_cc_library(
     "TopLevelSCFToCFG.cpp"
     "Utils.cpp"
   DEPS
-    ${IREE_INPUT_DEPS}
     ::PassHeaders
     ::PassesIncGen
     IREEInputDialect
@@ -82,6 +80,27 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    InputConversionPipeline
+  HDRS
+    "Passes.h"
+    "Utils.h"
+  SRCS
+    "InputConversionPipeline.cpp"
+  DEPS
+    ${IREE_INPUT_DEPS}
+    ::PassHeaders
+    ::PassesIncGen
+    LLVMSupport
+    MLIRFuncDialect
+    MLIRIR
+    MLIRLinalgUtils
+    MLIRPass
+    MLIRTransforms
   PUBLIC
 )
 
