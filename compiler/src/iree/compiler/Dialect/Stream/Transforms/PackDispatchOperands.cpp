@@ -29,6 +29,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 // Bitwidth utilities
 //===----------------------------------------------------------------------===//
+
 static int64_t getTypeBitwidth(Type type) {
   if (isa<ComplexType>(type)) {
     return 2 *
