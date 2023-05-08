@@ -104,6 +104,9 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:Transforms",
+        "@mlir-hlo//:mlir_hlo",
+        "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
 )
