@@ -9,6 +9,8 @@
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractGemmLikeStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 namespace llvm {
@@ -20,8 +22,6 @@ namespace iree_compiler {
 namespace gpu {
 
 struct GPUModel;
-
-using iree_compiler::gpu::AbstractGemmLikeStrategy;
 
 class MatmulStrategy : public AbstractGemmLikeStrategy {
  public:
@@ -35,6 +35,7 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   MatmulStrategy &operator=(const MatmulStrategy &) = default;
 
   /// Constructor quantities.
+  MLIRContext *ctx;
   transform_ext::MatchedMatmulCaptures captures;
 
   void initDefaultValues();
@@ -59,7 +60,7 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
   MappingInfo getBlockMapping() const override {
     return MappingInfo{/*numThreads=*/{},
                        /*tileSizes=*/{blockTileSizes[0], blockTileSizes[1]},
-                       /*threadMapping=*/{blockY(), blockX()}};
+                       /*threadMapping=*/{blockY(ctx), blockX(ctx)}};
   }
 
   // LHS copy is of size mxk.
@@ -78,7 +79,7 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
         /*numThreads=*/{numThreadsM, numThreadsK},
         /*tileSizes=*/
         {blockTileSizes[0] / numThreadsM, reductionTileSize / numThreadsK},
-        /*threadMapping=*/{linearIdX(), linearIdY()}};
+        /*threadMapping=*/{linearIdX(ctx), linearIdY(ctx)}};
   }
   // RHS copy is of size kxn.
   MappingInfo rhsCopyMapping() const override {
@@ -96,7 +97,7 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
         /*numThreads=*/{numThreadsK, numThreadsN},
         /*tileSizes=*/
         {reductionTileSize / numThreadsK, blockTileSizes[1] / numThreadsN},
-        /*threadMapping=*/{linearIdY(), linearIdX()}};
+        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
   // RES copy is of size mxn.
   MappingInfo resCopyMapping() const override {
@@ -114,13 +115,13 @@ class MatmulStrategy : public AbstractGemmLikeStrategy {
         /*numThreads=*/{numThreadsM, numThreadsN},
         /*tileSizes=*/
         {blockTileSizes[0] / numThreadsM, blockTileSizes[1] / numThreadsN},
-        /*threadMapping=*/{linearIdY(), linearIdX()}};
+        /*threadMapping=*/{linearIdY(ctx), linearIdX(ctx)}};
   }
   // COMPUTE is of size mxn.
   MappingInfo computeMapping() const override {
     return MappingInfo{/*numThreads=*/{numWarps[0], numWarps[1]},
                        /*tileSizes=*/{},
-                       /*threadMapping=*/{warpY(), warpX()}};
+                       /*threadMapping=*/{warpY(ctx), warpX(ctx)}};
   }
 
   void print(llvm::raw_ostream &os) const;

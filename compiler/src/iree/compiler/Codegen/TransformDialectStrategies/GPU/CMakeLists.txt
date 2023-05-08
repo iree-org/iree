@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "AbstractGemmLikeStrategy.h"
     "AbstractGpuStrategy.h"
-    "AbstractReductionStrategy.h"
     "Common.h"
     "MatmulTensorCoreStrategy.h"
     "SmallReductionStrategy.h"
