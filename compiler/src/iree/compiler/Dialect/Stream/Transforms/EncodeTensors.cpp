@@ -347,7 +347,7 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
 
   // Get floats into integer form.
   auto patternType = pattern.getType();
-  unsigned elemBitWidth = getTypeBitwidth(patternType);
+  unsigned elementBitWidth = getTypeBitwidth(patternType);
   elemBitWidth =
       (isa<ComplexType>(patternType) ? elemBitWidth / 2 : elemBitWidth);
   if (patternType.isa<FloatType>()) {
