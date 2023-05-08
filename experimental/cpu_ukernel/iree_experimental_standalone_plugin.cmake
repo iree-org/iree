@@ -49,7 +49,7 @@ function(iree_experimental_standalone_plugin_arch)
       set(_SRC_FILE "${_SRC_ENTRY_LIST}")
     else()  # NOT _SRC_ENTRY_LIST_LENGTH EQUAL 1
       list(GET _SRC_ENTRY_LIST 0 _SRC_ARCH)
-      if (NOT _SRC_ARCH STREQUAL _RULE_ARCH)
+      if(NOT _SRC_ARCH STREQUAL _RULE_ARCH)
         continue()
       endif()
       list(GET _SRC_ENTRY_LIST 1 _SRC_FILE)
@@ -103,7 +103,7 @@ function(iree_experimental_standalone_plugin_arch)
       VERBATIM
     )
   endforeach()
-  set (_OUTPUT_SO_FILE "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.${_RULE_ARCH}.so")
+  set(_OUTPUT_SO_FILE "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.${_RULE_ARCH}.so")
   add_custom_command(
     OUTPUT
       ${_OUTPUT_SO_FILE}
@@ -185,7 +185,7 @@ function(iree_experimental_standalone_plugin)
     list(LENGTH _ARCH_ENTRY_LIST _ARCH_ENTRY_LIST_LENGTH)
     # Get optional architecture-wide copts into _COPTS.
     set(_COPTS_VAR_NAME "")
-    if (_ARCH_ENTRY_LIST_LENGTH EQUAL 2)
+    if(_ARCH_ENTRY_LIST_LENGTH EQUAL 2)
       list(GET _ARCH_ENTRY_LIST 1 _COPTS_VAR_NAME)
     endif()
     set(_COPTS "${${_COPTS_VAR_NAME}}")

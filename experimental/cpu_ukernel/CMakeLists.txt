@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if (NOT IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS)
+if(NOT IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS)
   return()
 endif()
 
