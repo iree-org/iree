@@ -20,6 +20,21 @@ cc_library(
 )
 
 cc_library(
+    name = "support",
+    srcs = [
+        "src/openxla/partitioner/Support/OptionUtils.cpp",
+    ],
+    hdrs = [
+        "src/openxla/partitioner/Support/OptionUtils.h",
+    ],
+    deps = [
+        ":defs",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+cc_library(
     name = "gspmd_pipeline",
     srcs = [
         "src/openxla/partitioner/GSPMDPipeline.cpp",
@@ -34,6 +49,7 @@ cc_library(
     ],
     deps = [
         ":defs",
+        ":support",
         "@xla//xla/hlo/transforms:hlo_constant_splitter",
         "@xla//xla/mlir_hlo:hlo_legalize_to_stablehlo",
         "@xla//xla/mlir_hlo:mhlo_passes",
@@ -78,6 +94,7 @@ cc_library(
         ":c_headers",
         ":defs",
         ":gspmd_pipeline",
+        ":support",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",

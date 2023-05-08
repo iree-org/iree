@@ -129,10 +129,21 @@ Status RunSPMDOptimizer(HloModule *hlo_module, int64_t num_partitions) {
 
 namespace openxla::partitioner {
 
+void GSPMDOptions::bindOptions(support::OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category("GSPMD pipeline options");
+  binder.opt<int>("openxla-partitioner-gspmd-num-partitions", numPartitions,
+                  llvm::cl::desc("Number of partitions to shard"),
+                  llvm::cl::cat(category));
+}
+
 namespace {
 
 class RunGSPMDPartitionerPass
     : public PassWrapper<RunGSPMDPartitionerPass, OperationPass<ModuleOp>> {
+ public:
+  RunGSPMDPartitionerPass(GSPMDOptions options) : options(options) {}
+
+ private:
   StringRef getArgument() const override { return "openxla-partitioner-gspmd"; }
   void runOnOperation() override {
     // Convert to HLO.
@@ -157,9 +168,8 @@ class RunGSPMDPartitionerPass
 
     // When converting back, the HLO is inlined into the MLIR module. So
     // first, we remove all children from the MLIR module first.
-    for (auto &childOp : llvm::make_early_inc_range(
-             getOperation().getBody()->without_terminator())) {
-      childOp.erase();
+    while (!getOperation().getBody()->empty()) {
+      getOperation().getBody()->front().erase();
     }
     status = xla::ConvertHloToMlirHlo(getOperation(), hloModule.get());
     if (!status.ok()) {
@@ -179,24 +189,30 @@ class RunGSPMDPartitionerPass
                         xla::HloModule::CreateFromProto(hlo_proto.hlo_module(),
                                                         hlo_module_config));
     // TODO: Get the number of partitions from somewhere intelligible.
-    TF_RETURN_IF_ERROR(
-        RunSPMDOptimizer(hlo_module.get(), /*num_partitions=*/2));
+    TF_RETURN_IF_ERROR(RunSPMDOptimizer(
+        hlo_module.get(), /*num_partitions=*/options.numPartitions));
 
     return hlo_module;
   }
+
+  GSPMDOptions options;
 };
 
 }  // namespace
 
 // Builds a pipeline which runs the GSPMD partitioner.
-void buildGSPMDPipeline(mlir::PassManager &passManager) {
+void buildGSPMDPipeline(mlir::PassManager &passManager,
+                        const GSPMDOptions &options) {
   // To MHLO.
   passManager.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
 
-  passManager.addPass(std::make_unique<RunGSPMDPartitionerPass>());
+  passManager.addPass(std::make_unique<RunGSPMDPartitionerPass>(options));
 
   // And back to stablehlo.
   passManager.addPass(mlir::mhlo::createHloLegalizeToStablehloPass());
 }
 
 }  // namespace openxla::partitioner
+
+OPENXLA_PARTITIONER_DEFINE_COMPILER_OPTION_FLAGS(
+    openxla::partitioner::GSPMDOptions);

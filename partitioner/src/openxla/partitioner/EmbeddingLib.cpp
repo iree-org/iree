@@ -107,6 +107,11 @@ struct GlobalInit {
   // Stash the revision for the life of the instance.
   // TODO: Get release revision stamp.
   std::string revision;
+
+  // Our session options can optionally be bound to the global command-line
+  // environment. If that is not the case, then these will be nullptr, and
+  // they should be default initialized at the session level.
+  GSPMDOptions *clGSPMDOptions = nullptr;
 };
 
 GlobalInit::GlobalInit() {
@@ -156,18 +161,60 @@ void GlobalInit::registerCommandLineOptions() {
   // Register pass manager command-line options like -mlir-print-ir-*.
   mlir::registerPassManagerCLOptions();
   mlir::registerDefaultTimingManagerCLOptions();
+
+  // Bind session options to the command line environment.
+  clGSPMDOptions = &GSPMDOptions::FromFlags::get();
 }
 
 // Sessions bring together an initialized context and set of flags.
 struct Session {
   Session(GlobalInit &globalInit);
 
+  Error *setFlags(int argc, const char *const *argv) {
+    std::string errorMessage;
+    auto callback = [&](llvm::StringRef message) {
+      if (errorMessage.empty()) {
+        errorMessage = "Error parsing flags:";
+      }
+      errorMessage.append("\n  ");
+      errorMessage.append(message.data(), message.size());
+    };
+
+    if (failed(binder.parseArguments(argc, argv, callback))) {
+      return new Error(std::move(errorMessage));
+    }
+    return nullptr;
+  }
+
+  void getFlags(bool nonDefaultOnly,
+                void (*onFlag)(const char *flag, size_t length, void *),
+                void *userData) {
+    auto flagVector = binder.printArguments(nonDefaultOnly);
+    for (std::string &value : flagVector) {
+      onFlag(value.c_str(), value.size(), userData);
+    }
+  }
+
   GlobalInit &globalInit;
+  support::OptionsBinder binder;
   MLIRContext context;
+
+  // Options structs.
+  GSPMDOptions gspmdOptions;
 };
 
-Session::Session(GlobalInit &globalInit) : globalInit(globalInit) {
+Session::Session(GlobalInit &globalInit)
+    : globalInit(globalInit), binder(support::OptionsBinder::local()) {
   context.appendDialectRegistry(globalInit.getRegistry());
+
+  // Bootstrap session options from the cl environment, if enabled.
+  if (globalInit.usesCommandLine) {
+    gspmdOptions = *globalInit.clGSPMDOptions;
+  }
+
+  // Register each options struct with the binder so we can manipulate
+  // mnemonically via the API.
+  gspmdOptions.bindOptions(binder);
 }
 
 // A source is instantiated against a session and is used to access an llvm
@@ -413,7 +460,7 @@ bool Invocation::runPipeline(llvm::StringRef pipeline) {
 }
 
 bool Invocation::runGSPMDPipeline() {
-  buildGSPMDPipeline(passManager);
+  buildGSPMDPipeline(passManager, session.gspmdOptions);
   passManager.enableVerifier(enableVerifier);
   if (failed(passManager.run(parsedModule.get()))) {
     return false;
@@ -583,20 +630,16 @@ void openxlaPartitionerSessionDestroy(openxla_partitioner_session_t *session) {
   delete unwrap(session);
 }
 
-// TODO: Finish implementing
-// openxla_partitioner_error_t *openxlaPartitionerSessionSetFlags(
-//     openxla_partitioner_session_t *session, int argc, const char *const
-//     *argv) {
-//   return wrap(unwrap(session)->setFlags(argc, argv));
-// }
+openxla_partitioner_error_t *openxlaPartitionerSessionSetFlags(
+    openxla_partitioner_session_t *session, int argc, const char *const *argv) {
+  return wrap(unwrap(session)->setFlags(argc, argv));
+}
 
-// TODO: Finish implementing
-// void openxlaPartitionerSessionGetFlags(
-//     openxla_partitioner_session_t *session, bool nonDefaultOnly,
-//     void (*onFlag)(const char *flag, size_t length, void *), void *userData)
-//     {
-//   unwrap(session)->getFlags(nonDefaultOnly, onFlag, userData);
-// }
+void openxlaPartitionerSessionGetFlags(
+    openxla_partitioner_session_t *session, bool nonDefaultOnly,
+    void (*onFlag)(const char *flag, size_t length, void *), void *userData) {
+  unwrap(session)->getFlags(nonDefaultOnly, onFlag, userData);
+}
 
 openxla_partitioner_invocation_t *openxlaPartitionerInvocationCreate(
     openxla_partitioner_session_t *session) {
