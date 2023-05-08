@@ -199,6 +199,9 @@ typedef struct iree_hal_metal_command_buffer_t {
   // binding buffers. So we need to cache the descriptor information by ourselves and apply them in
   // a delayed manner.
 
+  // TODO(antiagainst): Switch to use separate lists for different descriptor sets to avoid the
+  // overhead of sorting and iterating through the whole list.
+
   // A sorted flat list of descriptors from all pushed descriptor sets.
   iree_hal_metal_descriptor_t current_descriptors[IREE_HAL_METAL_MAX_BINDING_COUNT];
   // The total used slot count / next unused slot index in |current_descriptors|.
@@ -468,6 +471,9 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_barrier(
 
 static iree_status_t iree_hal_metal_command_segment_record_barrier(
     iree_hal_metal_command_buffer_t* command_buffer, iree_hal_metal_barrier_segment_t* segment) {
+  // TODO(antiagainst): Analyze segments before and after to optimize barriers, e.g., switching
+  // encoders would require its own synchronization; so we don't need extract barriers in the
+  // middle.
   if (segment->memory_barrier_count == 0 && segment->buffer_barrier_count == 0) {
     // There is no direct corresponding APIs for execution only barrier in Metal. We just signal and
     // wait on the same value of a MTLEvent here.
@@ -1013,6 +1019,8 @@ static iree_status_t iree_hal_metal_command_segment_record_dispatch(
     uint32_t current_set = descriptors[i].set;
 
     // Build argument encoder and argument buffer for the current descriptor set.
+    // TODO(antiagainst): Use a cache layer to cache and reuse argument buffers with the same
+    // content, to avoid duplicating overhead.
     id<MTLBuffer> argument_buffer = command_buffer->staging_buffer->metal_buffer;
     id<MTLArgumentEncoder> argument_encoder =
         [segment->kernel_params.function newArgumentEncoderWithBufferIndex:current_set];  // +1
