@@ -15,17 +15,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-//===----------------------------------------------------------------------===//
-// Bitwidth utilities
-//===----------------------------------------------------------------------===//
-static int64_t getTypeBitwidth(Type type) {
-  if (isa<ComplexType>(type)) {
-    return 2 *
-           dyn_cast<ComplexType>(type).getElementType().getIntOrFloatBitWidth();
-  }
-  return type.getIntOrFloatBitWidth();
-}
-
 // TODO(benvanik): import op handling of optional values.
 // It'd be nice if the std::optional<Index>:$binding_capacity could be emitted
 // as 0 when not present; today it'll be omitted entirely (as it's not in the
@@ -106,7 +95,7 @@ class CommandBufferFillBufferOpConversion
 
     // Record the original pattern length then extend it to a 32 bit integer.
     auto originalPatternType = op.getPattern().getType();
-    unsigned patternBitWidth = getTypeBitwidth(originalPatternType);
+    unsigned patternBitWidth = IREE::Util::getTypeBitWidth(originalPatternType);
     // The pattern length (in bytes) will be used at runtime to issue the fill
     // command. While the pattern itself will be stored in a 32 bit integer,
     // the fill operation will use this length to slice a potentially smaller

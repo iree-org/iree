@@ -35,16 +35,6 @@ namespace Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// Bitwidth utilities
-//===----------------------------------------------------------------------===//
-static int64_t getTypeBitwidth(Type type) {
-  if (auto complexType = type.dyn_cast<ComplexType>()) {
-    return 2 * complexType.getElementType().getIntOrFloatBitWidth();
-  }
-  return type.getIntOrFloatBitWidth();
-}
-
-//===----------------------------------------------------------------------===//
 // Encoding utilities
 //===----------------------------------------------------------------------===//
 
@@ -77,7 +67,7 @@ static Type alignElementType(Type originalType) {
   // Align the element type to a power of two byte size.
   auto alignedBitWidth =
       IREE::Util::getRoundedElementByteWidth(elementType) * 8;
-  if (getTypeBitwidth(elementType) == alignedBitWidth) {
+  if (IREE::Util::getTypeBitWidth(elementType) == alignedBitWidth) {
     // Already aligned.
     return originalType;
   }
@@ -346,18 +336,18 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
 
   // Get floats into integer form.
   auto patternType = pattern.getType();
-  unsigned elementBitWidth = getTypeBitwidth(patternType);
-  elemBitWidth =
-      (isa<ComplexType>(patternType) ? elemBitWidth / 2 : elemBitWidth);
+  unsigned elementBitWidth = IREE::Util::getTypeBitWidth(patternType);
+  elementBitWidth =
+      (isa<ComplexType>(patternType) ? elementBitWidth / 2 : elementBitWidth);
   if (patternType.isa<FloatType>()) {
     pattern = rewriter.createOrFold<arith::BitcastOp>(
-        loc, rewriter.getIntegerType(elemBitWidth), pattern);
+        loc, rewriter.getIntegerType(elementBitWidth), pattern);
   }
 
   if (isa<ComplexType>(patternType)) {
-    int64_t complexBitWidth = elemBitWidth;
-    Type bwElemType = rewriter.getIntegerType(elemBitWidth);
-    Type bwType = rewriter.getIntegerType(elemBitWidth * 2);
+    int64_t complexBitWidth = elementBitWidth;
+    Type bwElemType = rewriter.getIntegerType(elementBitWidth);
+    Type bwType = rewriter.getIntegerType(elementBitWidth * 2);
     Value shiftAmount = rewriter.create<arith::ConstantOp>(
         loc, bwType, rewriter.getIntegerAttr(bwType, complexBitWidth));
 
@@ -378,7 +368,7 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
   if (patternType.isInteger(1)) {
     return rewriter.createOrFold<arith::ExtUIOp>(loc, rewriter.getI8Type(),
                                                  pattern);
-  } else if ((elemBitWidth % 8) != 0) {
+  } else if ((elementBitWidth % 8) != 0) {
     // We'd need some policy to determine how to handle non-byte-aligned widths.
     return {};
   }
@@ -406,7 +396,7 @@ struct EncodeTensorSplatOp
       return rewriter.notifyMatchFailure(
           op, "unsupported pattern width; encoding policy required");
     }
-    unsigned bitWidth = getTypeBitwidth(pattern.getType());
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
     if (bitWidth > 32) {
       // We emulate 64-bit support with a stream.builtin.splat.i64.
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinSplatI64Op>(
@@ -513,7 +503,7 @@ struct EncodeTensorFillOp
       return rewriter.notifyMatchFailure(
           op, "unsupported pattern width; encoding policy required");
     }
-    unsigned bitWidth = getTypeBitwidth(pattern.getType());
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
     if (bitWidth > 64) {
       // This happens mostly when complex<f64> is used as a input type for
       // splat. complex<type> is broken down into a 2xtype value with the real
