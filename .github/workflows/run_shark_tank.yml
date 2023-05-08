@@ -153,6 +153,6 @@ jobs:
         run: |
           gcloud storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_UPLOAD_DIR}/"
       - name: "Updating latest"
-        if: ${{ github.event_name != 'pull_request' }}
+        if: github.event_name != 'pull_request'
         run: |
           gcloud storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_LATEST_DIR}/"

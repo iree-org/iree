@@ -25,6 +25,7 @@ struct LowerComplex final : impl::LowerComplexBase<LowerComplex> {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
     populatePreprocessingComplexPatterns(ctx, &patterns);
+    populateCanonicalizationPatterns(ctx, &patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       signalPassFailure();

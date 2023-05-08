@@ -57,6 +57,10 @@ static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
     llvm::cl::init("sm_35"));
 
+static llvm::cl::opt<std::string> clTargetFeature(
+    "iree-hal-cuda-llvm-target-feature",
+    llvm::cl::desc("Use to set PTX version."), llvm::cl::init("+ptx76"));
+
 static llvm::cl::opt<bool> clUsePtxas(
     "iree-hal-cuda-use-ptxas", llvm::cl::init(false),
     llvm::cl::desc(
@@ -506,7 +510,7 @@ class CUDATargetBackend final : public TargetBackend {
       {
         llvm::Triple triple("nvptx64-nvidia-cuda");
         std::string targetChip = clTargetChip;
-        std::string features = "+ptx60";
+        std::string features = clTargetFeature;
         std::string error;
         const llvm::Target *target =
             llvm::TargetRegistry::lookupTarget("", triple, error);

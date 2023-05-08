@@ -175,6 +175,19 @@ LogicalResult eliminateEmptyTensors(
 
 void EliminateEmptyTensorsPass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
+  MLIRContext *context = &getContext();
+
+  // Run the convert to destination style patterns.
+  {
+    RewritePatternSet patterns(context);
+    linalg::populateConvertToDestinationStylePatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
+      moduleOp->emitOpError(
+          "Failed in conversion to destination style patterns");
+      return signalPassFailure();
+    }
+  }
+
   OneShotBufferizationOptions options = getBufferizationOptions();
 
   IRRewriter rewriter(moduleOp->getContext());
