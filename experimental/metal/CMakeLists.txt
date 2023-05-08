@@ -35,6 +35,8 @@ iree_cc_library(
     "nop_executable_cache.m"
     "pipeline_layout.h"
     "pipeline_layout.m"
+    "staging_buffer.h"
+    "staging_buffer.m"
   DEPS
     iree::base
     iree::base::core_headers

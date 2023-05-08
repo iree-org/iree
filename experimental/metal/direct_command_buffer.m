@@ -13,6 +13,7 @@
 #include "experimental/metal/metal_device.h"
 #include "experimental/metal/metal_kernel_library.h"
 #include "experimental/metal/pipeline_layout.h"
+#include "experimental/metal/staging_buffer.h"
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
@@ -168,6 +169,10 @@ typedef struct iree_hal_metal_command_buffer_t {
   // Arena used for all allocations; references the shared device block pool.
   iree_arena_allocator_t arena;
 
+  // Per-queue shared uniform staging buffer for uploading parameters to the GPU, including argument
+  // buffers and buffer update source buffers.
+  iree_hal_metal_staging_buffer_t* staging_buffer;
+
   // Linked list of command segments to be recorded into a command buffer.
   iree_hal_metal_command_segment_list_t segments;
 
@@ -319,6 +324,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     iree_hal_command_category_t command_categories, iree_host_size_t binding_capacity,
     iree_hal_metal_command_buffer_resource_reference_mode_t resource_reference_mode,
     id<MTLCommandQueue> queue, iree_allocator_t host_allocator, iree_arena_block_pool_t* block_pool,
+    iree_hal_metal_staging_buffer_t* staging_buffer,
     iree_hal_metal_builtin_executable_t* builtin_executable,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device);
@@ -344,6 +350,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     command_buffer->queue = [queue retain];  // +1
     command_buffer->builtin_executable = builtin_executable;
     iree_arena_initialize(block_pool, &command_buffer->arena);
+    command_buffer->staging_buffer = staging_buffer;
     iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
       // We track resource lifetime by ourselves in IREE; so just do unretained references to
@@ -737,6 +744,7 @@ static iree_status_t iree_hal_metal_command_segment_record_copy_buffer(
         segment->target_buffer, segment->target_offset, segment->length);
   }
 
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -744,20 +752,19 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  // There are no direct corresponding APIs in Metal. We emulate it by creating a buffer with the
-  // content and then copy it over.
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  id<MTLDevice> device = command_buffer->command_buffer.device;
-  MTLResourceOptions options = MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined;
-  id<MTLBuffer> data_buffer = [device newBufferWithBytes:((uint8_t*)source_buffer + source_offset)
-                                                  length:length
-                                                 options:options];  // +1
-  [command_buffer->command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cmdbuf) {
-    [data_buffer release];  // -1
-  }];
+  // There are no direct corresponding APIs in Metal. We update the source buffer data to the
+  // staging buffer and then copy over.
+
+  iree_const_byte_span_t source_data_span =
+      iree_make_const_byte_span((uint8_t*)source_buffer + source_offset, length);
+  uint32_t offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_metal_staging_buffer_append(command_buffer->staging_buffer, source_data_span,
+                                               /*alignment=*/4, &offset));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_buffer));
@@ -767,8 +774,8 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
   iree_status_t status = iree_hal_metal_command_segment_create_copy_buffer(
-      command_buffer, data_buffer, /*source_offset=*/0, target_device_buffer, target_offset,
-      length);
+      command_buffer, command_buffer->staging_buffer->metal_buffer, offset, target_device_buffer,
+      target_offset, length);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -931,37 +938,6 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
   return iree_ok_status();
 }
 
-// Creates an argument encoder and its backing argument buffer for the given kernel |function|'s
-// |buffer_index|. The argument encoder will be set to encode into the newly created argument
-// buffer. Callers are expected to release both the argument encoder and buffer.
-static iree_status_t iree_hal_metal_create_argument_encoder(
-    id<MTLDevice> device, id<MTLCommandBuffer> command_buffer, id<MTLFunction> function,
-    uint32_t buffer_index, id<MTLArgumentEncoder>* out_encoder, id<MTLBuffer>* out_buffer) {
-  id<MTLArgumentEncoder> argument_encoder =
-      [function newArgumentEncoderWithBufferIndex:buffer_index];  // +1
-  IREE_ASSERT(argument_encoder != nil);
-
-  __block id<MTLBuffer> argument_buffer =
-      [device newBufferWithLength:argument_encoder.encodedLength
-                          options:MTLResourceStorageModeShared];  // +1
-  if (!argument_buffer) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "failed to create argument buffer with size = %ld bytes",
-                            argument_encoder.encodedLength);
-  }
-
-  // The arugment encoder and buffer can be deleted once the command buffer completes.
-  [command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cmdbuf) {
-    [argument_buffer release];   // -1
-    [argument_encoder release];  // -1
-  }];
-
-  [argument_encoder setArgumentBuffer:argument_buffer offset:0];
-  *out_encoder = argument_encoder;
-  *out_buffer = argument_buffer;
-  return iree_ok_status();
-}
-
 // Prepares kernels and argument buffers needed for kernel dispatches.
 static iree_status_t iree_hal_metal_command_segment_create_dispatch(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
@@ -1033,17 +1009,23 @@ static iree_status_t iree_hal_metal_command_segment_record_dispatch(
 
   // Record argument buffers for all descriptors and record buffer usages.
   iree_hal_metal_descriptor_t* descriptors = segment->descriptors;
-  iree_host_size_t i = 0;
-  while (i < segment->descriptor_count) {
+  for (iree_host_size_t i = 0; i < segment->descriptor_count;) {
     uint32_t current_set = descriptors[i].set;
 
     // Build argument encoder and argument buffer for the current descriptor set.
-    id<MTLArgumentEncoder> argument_encoder;
-    id<MTLBuffer> argument_buffer;
+    id<MTLBuffer> argument_buffer = command_buffer->staging_buffer->metal_buffer;
+    id<MTLArgumentEncoder> argument_encoder =
+        [segment->kernel_params.function newArgumentEncoderWithBufferIndex:current_set];  // +1
+    IREE_ASSERT(argument_encoder != nil);
+
+    // Reserve space for the argument buffer from shared staging buffer.
+    iree_byte_span_t reservation;
+    uint32_t argument_buffer_offset;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_metal_create_argument_encoder(
-                command_buffer->command_buffer.device, command_buffer->command_buffer,
-                segment->kernel_params.function, current_set, &argument_encoder, &argument_buffer));
+        z0, iree_hal_metal_staging_buffer_reserve(
+                command_buffer->staging_buffer, argument_encoder.encodedLength,
+                argument_encoder.alignment, &reservation, &argument_buffer_offset));
+    [argument_encoder setArgumentBuffer:argument_buffer offset:argument_buffer_offset];
 
     // Now record all bound buffers belonging to the current set into the argument buffer.
     for (; i < segment->descriptor_count && descriptors[i].set == current_set; ++i) {
@@ -1058,7 +1040,9 @@ static iree_status_t iree_hal_metal_command_segment_record_dispatch(
       [compute_encoder useResource:current_buffer usage:descriptors[i].usage];
     }
     // Record the argument buffer.
-    [compute_encoder setBuffer:argument_buffer offset:0 atIndex:current_set];
+    [compute_encoder setBuffer:argument_buffer offset:argument_buffer_offset atIndex:current_set];
+
+    [argument_encoder release];  // -1
   }
 
   // Record the dispatch, either direct or indirect.

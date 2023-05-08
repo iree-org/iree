@@ -46,10 +46,15 @@ typedef enum iree_hal_metal_resource_hazard_tracking_mode_e {
 // Must be initialized with iree_hal_metal_device_params_initialize prior to
 // use.
 typedef struct iree_hal_metal_device_params_t {
-  // Total size of each block in the device shared block pool.
+  // Total size in bytes of each block in the device shared block pool.
   // Larger sizes will lower overhead and ensure the heap isn't hit for
   // transient allocations while also increasing memory consumption.
   iree_host_size_t arena_block_size;
+
+  // Total size in bytes of per-queue uniform buffers for uploading parameters
+  // to the GPU (including argument buffers and update source buffers).
+  // Larger sizes better support more concurrent/complex command buffers.
+  iree_host_size_t queue_uniform_buffer_size;
 
   // Command dispatch type in command buffers.
   // Normally we want to dispatch commands in command buffers in parallel, given

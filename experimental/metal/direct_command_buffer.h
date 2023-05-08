@@ -11,6 +11,7 @@
 
 #include "experimental/metal/api.h"
 #include "experimental/metal/builtin_executables.h"
+#include "experimental/metal/staging_buffer.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
 
@@ -43,6 +44,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
         resource_reference_mode,
     id<MTLCommandQueue> queue, iree_allocator_t host_allocator,
     iree_arena_block_pool_t* block_pool,
+    iree_hal_metal_staging_buffer_t* staging_buffer,
     iree_hal_metal_builtin_executable_t* builtin_executable,
     iree_hal_command_buffer_t** out_command_buffer);
 

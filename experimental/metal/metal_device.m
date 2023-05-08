@@ -13,6 +13,7 @@
 #include "experimental/metal/metal_shared_event.h"
 #include "experimental/metal/nop_executable_cache.h"
 #include "experimental/metal/pipeline_layout.h"
+#include "experimental/metal/staging_buffer.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -29,8 +30,10 @@ typedef struct iree_hal_metal_device_t {
   // contain inlined data uploads).
   iree_arena_block_pool_t block_pool;
 
-  // Original driver that owns this device.
-  iree_hal_driver_t* driver;
+  // Per-queue staging buffer for parameter uploads.
+  iree_hal_metal_staging_buffer_t staging_buffer;
+
+  iree_hal_metal_device_params_t params;
 
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
@@ -69,6 +72,7 @@ static const iree_hal_metal_device_t* iree_hal_metal_device_const_cast(
 void iree_hal_metal_device_params_initialize(iree_hal_metal_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
+  out_params->queue_uniform_buffer_size = IREE_HAL_METAL_STAGING_BUFFER_DEFAULT_CAPACITY;
   out_params->command_dispatch_type = IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_CONCURRENT;
   out_params->command_buffer_resource_reference_mode =
       IREE_HAL_METAL_COMMAND_BUFFER_RESOURCE_REFERENCE_MODE_UNRETAINED;
@@ -98,6 +102,7 @@ static iree_status_t iree_hal_metal_device_create_internal(
   iree_status_t status = iree_hal_metal_allocator_create((iree_hal_device_t*)device, metal_device,
                                                          params->resource_hazard_tracking_mode,
                                                          host_allocator, &device->device_allocator);
+
   iree_hal_metal_builtin_executable_t* builtin_executable = NULL;
   if (iree_status_is_ok(status)) {
     status =
@@ -105,13 +110,20 @@ static iree_status_t iree_hal_metal_device_create_internal(
   } else {
     iree_hal_device_release((iree_hal_device_t*)device);
   }
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_metal_staging_buffer_initialize(
+        metal_device, params->queue_uniform_buffer_size, &device->staging_buffer);
+  } else {
+    iree_hal_device_release((iree_hal_device_t*)device);
+  }
+
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_metal_device_vtable, &device->resource);
     iree_string_view_append_to_buffer(identifier, &device->identifier,
                                       (char*)device + iree_sizeof_struct(*device));
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator, &device->block_pool);
-    device->driver = driver;
-    iree_hal_driver_retain(device->driver);
+    device->params = *params;
     device->host_allocator = host_allocator;
     device->device = [metal_device retain];          // +1
     device->queue = [metal_device newCommandQueue];  // +1
@@ -124,7 +136,6 @@ static iree_status_t iree_hal_metal_device_create_internal(
     device->event_listener = [[MTLSharedEventListener alloc]
         initWithDispatchQueue:device->semaphore_notification_queue];  // +1
     device->capture_manager = NULL;
-
     *out_device = (iree_hal_device_t*)device;
   }
   return status;
@@ -158,6 +169,7 @@ static void iree_hal_metal_device_destroy(iree_hal_device_t* base_device) {
   [device->queue release];   // -1
   [device->device release];  // -1
 
+  iree_hal_metal_staging_buffer_deinitialize(&device->staging_buffer);
   iree_arena_block_pool_deinitialize(&device->block_pool);
 
   iree_allocator_free(host_allocator, device);
@@ -221,14 +233,21 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
     iree_hal_command_category_t command_categories, iree_hal_queue_affinity_t queue_affinity,
     iree_host_size_t binding_capacity, iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+
   if (iree_any_bit_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED))
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "nested command buffer not yet supported");
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT))
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unimplmented multi-shot command buffer");
-  return iree_hal_metal_direct_command_buffer_create(
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "multi-shot command buffer not yet supported");
+
+  iree_status_t status = iree_hal_metal_direct_command_buffer_create(
       base_device, mode, command_categories, binding_capacity,
       device->command_buffer_resource_reference_mode, device->queue, device->host_allocator,
-      &device->block_pool, device->builtin_executable, out_command_buffer);
+      &device->block_pool, &device->staging_buffer, device->builtin_executable, out_command_buffer);
+  if (iree_status_is_ok(status)) {
+    iree_hal_metal_staging_buffer_increase_refcount(&device->staging_buffer);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_metal_device_create_descriptor_set_layout(
@@ -354,6 +373,9 @@ static iree_status_t iree_hal_metal_device_queue_execute(
       id<MTLCommandBuffer> handle = iree_hal_metal_direct_command_buffer_handle(command_buffer);
       [handle addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         iree_hal_command_buffer_release(command_buffer);  // -1
+        // Decrease command buffer refcount in the shared staging buffer, and potentially reclaim
+        // resources. This is fine right now given we only support one-shot command buffers.
+        iree_hal_metal_staging_buffer_decrease_refcount(&device->staging_buffer);
       }];
       [handle commit];
     }
