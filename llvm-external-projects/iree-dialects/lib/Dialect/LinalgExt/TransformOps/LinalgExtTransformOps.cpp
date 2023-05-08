@@ -8,6 +8,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -20,6 +21,10 @@ LinalgExt::LinalgExtTransformOpsExtension::LinalgExtTransformOpsExtension() {
 #define GET_OP_LIST
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.cpp.inc"
       >();
+}
+
+void LinalgExt::LinalgExtTransformOpsExtension::init() {
+  declareGeneratedDialect<async::AsyncDialect>();
 }
 
 //===---------------------------------------------------------------------===//
