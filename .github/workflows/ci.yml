@@ -84,7 +84,7 @@ jobs:
     steps:
       - id: "gcp-auth"
         name: "Authenticating to Google Cloud"
-        if: false
+        if: ${{ needs.setup.outputs.write-caches }} == 1
         uses: "google-github-actions/auth@v1"
         with:
           token_format: "access_token"
