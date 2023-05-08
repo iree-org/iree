@@ -38,8 +38,9 @@ All steps here assume starting from the IREE root directory.
     # Add IREE built-from-source Python packages to PYTHONPATH
     source .env
 
-    # Install IREE TF Python packages (TFLite requires a Bazel build)
+    # Install IREE TF/TFLite Python packages
     python -m pip install integrations/tensorflow/python_projects/iree_tf
+    python -m pip install integrations/tensorflow/python_projects/iree_tflite
     ```
 
 3. Run the python test command line
