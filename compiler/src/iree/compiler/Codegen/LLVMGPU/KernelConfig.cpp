@@ -262,7 +262,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
                                    partitionedLoops.end());
         for (auto loopID : llvm::seq<unsigned>(0, numParallelLoops)) {
           if (!partitionedLoopsSet.count(loopID)) {
-            workgroupTileSizes[loopID] = 1;
+            workgroupTileSizes[loopID] = 0;
           }
         }
 
