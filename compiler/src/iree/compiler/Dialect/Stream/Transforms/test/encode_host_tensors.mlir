@@ -110,7 +110,7 @@ func.func @denseTensorSplatI64(%arg0: i64, %arg1: index, %arg2: index) -> !strea
 // -----
 
 // CHECK-LABEL: @denseTensorSplatComplexF32
-func.func private @denseTensorSplatComplexF32(%arg0: !stream.resource<*>) -> (!stream.resource<*>) {
+func.func @denseTensorSplatComplexF32(%arg0: !stream.resource<*>) -> (!stream.resource<*>) {
     %cst = complex.constant [3.000000e+00 : f32, 1.000000e+01 : f32] : complex<f32>
     %0 = stream.tensor.sizeof tensor<6xcomplex<f32>> : index
     // CHECK: %[[I64NUMBER:.+]] = arith.constant 4629700418029486080
