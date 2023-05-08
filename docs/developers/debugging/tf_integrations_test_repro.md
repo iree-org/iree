@@ -3,7 +3,7 @@
 These are steps to reproduce/address failures in TF/TFLite integration tests. All steps here
 assume starting from the IREE root directory.
 
-1. First setup the python environment as described [here](https://openxla.github.io/iree/building-from-source/python-bindings-and-importers/#environment-setup).
+1. First setup the python environment as described [here](https://openxla.github.io/iree/building-from-source/getting-started/#python-bindings).
 
 ```
 python -m venv iree.venv
