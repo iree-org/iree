@@ -85,7 +85,6 @@ static llvm::cl::opt<std::string> clUsePtxasParams(
     "iree-hal-cuda-use-ptxas-params", llvm::cl::init(""),
     llvm::cl::desc("Passes the given additional parameters to ptxas."));
 
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
