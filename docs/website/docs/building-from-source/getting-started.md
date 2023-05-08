@@ -1,6 +1,6 @@
 # Getting started
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
 IREE can be built from source using [CMake](https://cmake.org/). We also
 recommend the [Ninja](https://ninja-build.org/) CMake generator and the
@@ -56,7 +56,7 @@ recommend the [Ninja](https://ninja-build.org/) CMake generator and the
 
 <!-- TODO(#12921): add notes about Docker and/or dev containers  -->
 
-## Quickstart: clone and build
+## :octicons-rocket-16: Quickstart: clone and build
 
 Use [Git](https://git-scm.com/) to clone the IREE repository and initialize its
 submodules:
@@ -85,7 +85,7 @@ cmake --build ../iree-build/
     Use case permitting, disabling the compiler build with
     `-DIREE_BUILD_COMPILER=OFF` will drastically simplify the build.
 
-## Configuration settings
+## :octicons-sliders-16: Configuration settings
 
 The configure step should be customized for your build environment. These
 settings can improve compile and link times substantially.
@@ -148,7 +148,7 @@ settings can improve compile and link times substantially.
 
     See also our [developer documentation for ccache](https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/ccache.md).
 
-### Optional components
+### :octicons-gear-16: Optional components
 
 By default, the CMake build includes:
 
@@ -174,7 +174,7 @@ tools. See the root
 [`CMakeLists.txt`](https://github.com/openxla/iree/blob/main/CMakeLists.txt)
 for details.
 
-## Tests and samples
+## :octicons-code-16: Tests and samples
 
 ### Running tests
 
