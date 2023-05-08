@@ -1805,12 +1805,20 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                 : std::min(typeVectorSize, ubs.back()));
   minTileSizes.back() = vectorTileSizes.back();
 
+  auto partitionableLoopsOp =
+      cast<PartitionableLoopsInterface>(padOp.getOperation());
   SmallVector<unsigned> partitionableLoops =
-      cast<PartitionableLoopsInterface>(padOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+      partitionableLoopsOp.getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t> distributedTileSizes =
       getDefaultDistributedLevelTileSizes(partitionableLoops, lbs, ubs,
                                           minTileSizes, maxTileSizes);
+  // Tile other partitionable loops with one to avoid unbounded stack
+  // allocations.
+  if (!clDisableDistribution) {
+    for (auto dim : partitionableLoopsOp.getPartitionableLoops(std::nullopt)) {
+      if (distributedTileSizes[dim] == 0) distributedTileSizes[dim] = 1;
+    }
+  }
   TileSizesListType tileSizes;
   // Distribution tiling
   tileSizes.emplace_back(std::move(distributedTileSizes));
