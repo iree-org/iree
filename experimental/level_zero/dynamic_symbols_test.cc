@@ -65,8 +65,8 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   }
 
   // Print basic properties of the device
-  ze_device_properties_t deviceProperties = {
-      .stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES};
+  ze_device_properties_t deviceProperties;
+  deviceProperties.stype = ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES;
   LEVEL_ZERO_CHECK_ERRORS(
       symbols.zeDeviceGetProperties(device, &deviceProperties));
   std::cout << "Device   : " << deviceProperties.name << "\n"
