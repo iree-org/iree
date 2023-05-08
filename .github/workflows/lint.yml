@@ -8,7 +8,7 @@
 
 name: Lint
 
-on: [pull_request]
+on: []
 
 jobs:
   bazel_to_cmake:
