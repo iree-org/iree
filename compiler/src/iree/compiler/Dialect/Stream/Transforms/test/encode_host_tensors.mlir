@@ -252,4 +252,3 @@ func.func @denseTensorStoreRank0(%arg0: !stream.resource<staging>, %arg1: index,
   return %0 : !stream.resource<staging>
 }
 
-
