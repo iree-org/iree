@@ -173,6 +173,11 @@ typedef struct iree_hal_metal_command_buffer_t {
   // buffers and buffer update source buffers.
   iree_hal_metal_staging_buffer_t* staging_buffer;
 
+  iree_allocator_t host_allocator;
+
+  // Maintains a reference to all resources used within the command buffer. Resets on each begin.
+  iree_hal_resource_set_t* resource_set;
+
   // Linked list of command segments to be recorded into a command buffer.
   iree_hal_metal_command_segment_list_t segments;
 
@@ -180,47 +185,44 @@ typedef struct iree_hal_metal_command_buffer_t {
 
   MTLDispatchType dispatch_type;
 
-  // The current active compute/blit encoders for encoding compute for memory operations.
-  // Metal commands are encoded into the command buffer with such encoders, and each encoder can
-  // only encode the specific type of operations it supports.
-  id<MTLComputeCommandEncoder> compute_encoder;
-  id<MTLBlitCommandEncoder> blit_encoder;
+  struct {
+    // The current active compute/blit encoders for encoding compute for memory operations.
+    // Metal commands are encoded into the command buffer with such encoders, and each encoder can
+    // only encode the specific type of operations it supports.
+    id<MTLComputeCommandEncoder> compute_encoder;
+    id<MTLBlitCommandEncoder> blit_encoder;
 
-  // MTLEven used for synchronization when we switch between blit and compute encoders.
-  // Normally we would use MTLFence objects, but the difference between IREE HAL and Metal API means
-  // we may see many encoder switches. It would require creating a lot GPU objects. In order to
-  // avoid the cost, we just use one MTLEvent with different values for different switches.
-  id<MTLEvent> encoder_event;
-  // The next available encoder event value to signal/wait to/on.
-  uint64_t next_encoder_event_value;
+    // MTLEven used for synchronization when we switch between blit and compute encoders.
+    // Normally we would use MTLFence objects, but the difference between IREE HAL and Metal API
+    // means we may see many encoder switches. It would require creating a lot GPU objects. In order
+    // to avoid the cost, we just use one MTLEvent with different values for different switches.
+    id<MTLEvent> encoder_event;
+    // The next available encoder event value to signal/wait to/on.
+    uint64_t next_encoder_event_value;
 
-  // Metal APIs mandate we create argument bufffers (for descriptor sets) from compiled kernel
-  // function. That means we need to bind the compute kernel first before setting descriptors and
-  // binding buffers. So we need to cache the descriptor information by ourselves and apply them in
-  // a delayed manner.
+    // Metal APIs mandate we create argument bufffers (for descriptor sets) from compiled kernel
+    // function. That means we need to bind the compute kernel first before setting descriptors and
+    // binding buffers. So we need to cache the descriptor information by ourselves and apply them
+    // in a delayed manner.
 
-  // TODO(antiagainst): Switch to use separate lists for different descriptor sets to avoid the
-  // overhead of sorting and iterating through the whole list.
+    // TODO(antiagainst): Switch to use separate lists for different descriptor sets to avoid the
+    // overhead of sorting and iterating through the whole list.
 
-  // A sorted flat list of descriptors from all pushed descriptor sets.
-  iree_hal_metal_descriptor_t current_descriptors[IREE_HAL_METAL_MAX_BINDING_COUNT];
-  // The total used slot count / next unused slot index in |current_descriptors|.
-  int current_total_binding_count;
-  // The max descriptor set number we have seen thus far.
-  int current_max_set_number;
+    // A sorted flat list of descriptors from all pushed descriptor sets.
+    iree_hal_metal_descriptor_t current_descriptors[IREE_HAL_METAL_MAX_BINDING_COUNT];
+    // The total used slot count / next unused slot index in |current_descriptors|.
+    int current_total_binding_count;
+    // The max descriptor set number we have seen thus far.
+    int current_max_set_number;
 
-  // All available push constants updated each time push_constants is called. Reset only with the
-  // command buffer and otherwise will maintain its values during recording to allow for partial
-  // push_constants updates.
-  int32_t push_constants[IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT];
+    // All available push constants updated each time push_constants is called. Reset only with the
+    // command buffer and otherwise will maintain its values during recording to allow for partial
+    // push_constants updates.
+    int32_t push_constants[IREE_HAL_METAL_MAX_PUSH_CONSTANT_COUNT];
 
-  // The current pipeline layout used for push descriptors.
-  iree_hal_pipeline_layout_t* current_pipeline_layout;
-
-  iree_allocator_t host_allocator;
-
-  // Maintains a reference to all resources used within the command buffer. Resets on each begin.
-  iree_hal_resource_set_t* resource_set;
+    // The current pipeline layout used for push descriptors.
+    iree_hal_pipeline_layout_t* current_pipeline_layout;
+  } state;
 } iree_hal_metal_command_buffer_t;
 
 //===------------------------------------------------------------------------------------------===//
@@ -243,18 +245,18 @@ id<MTLCommandBuffer> iree_hal_metal_direct_command_buffer_handle(
 }
 
 static void iree_hal_metal_end_compute_encoder(iree_hal_metal_command_buffer_t* command_buffer) {
-  if (command_buffer->compute_encoder) {
-    [command_buffer->compute_encoder endEncoding];
-    [command_buffer->compute_encoder release];  // -1
-    command_buffer->compute_encoder = nil;
+  if (command_buffer->state.compute_encoder) {
+    [command_buffer->state.compute_encoder endEncoding];
+    [command_buffer->state.compute_encoder release];  // -1
+    command_buffer->state.compute_encoder = nil;
   }
 }
 
 static void iree_hal_metal_end_blit_encoder(iree_hal_metal_command_buffer_t* command_buffer) {
-  if (command_buffer->blit_encoder) {
-    [command_buffer->blit_encoder endEncoding];
-    [command_buffer->blit_encoder release];  // -1
-    command_buffer->blit_encoder = nil;
+  if (command_buffer->state.blit_encoder) {
+    [command_buffer->state.blit_encoder endEncoding];
+    [command_buffer->state.blit_encoder release];  // -1
+    command_buffer->state.blit_encoder = nil;
   }
 }
 
@@ -275,25 +277,26 @@ static id<MTLComputeCommandEncoder> iree_hal_metal_get_or_begin_compute_encoder(
   // resources across different passes within a command buffer."
   // https://developer.apple.com/documentation/metal/resource_synchronization
   uint64_t encoder_event_value = 0;
-  if (command_buffer->blit_encoder) {
+  if (command_buffer->state.blit_encoder) {
     iree_hal_metal_end_blit_encoder(command_buffer);
-    encoder_event_value = command_buffer->next_encoder_event_value++;
-    [metal_handle encodeSignalEvent:command_buffer->encoder_event value:encoder_event_value];
+    encoder_event_value = command_buffer->state.next_encoder_event_value++;
+    [metal_handle encodeSignalEvent:command_buffer->state.encoder_event value:encoder_event_value];
   }
 
-  if (!command_buffer->compute_encoder) {
+  if (!command_buffer->state.compute_encoder) {
     if (encoder_event_value != 0) {
-      [metal_handle encodeWaitForEvent:command_buffer->encoder_event value:encoder_event_value];
+      [metal_handle encodeWaitForEvent:command_buffer->state.encoder_event
+                                 value:encoder_event_value];
     }
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
       // We manage commands dependencies and insert barriers explicitly in IREE; so use the
       // concurrent dispatch type for compute encoders.
-      command_buffer->compute_encoder = [[metal_handle
+      command_buffer->state.compute_encoder = [[metal_handle
           computeCommandEncoderWithDispatchType:command_buffer->dispatch_type] retain];  // +1
     }
   }
 
-  return command_buffer->compute_encoder;
+  return command_buffer->state.compute_encoder;
 }
 
 static id<MTLBlitCommandEncoder> iree_hal_metal_get_or_begin_blit_encoder(
@@ -304,22 +307,23 @@ static id<MTLBlitCommandEncoder> iree_hal_metal_get_or_begin_blit_encoder(
   // resources across different passes within a command buffer."
   // https://developer.apple.com/documentation/metal/resource_synchronization
   uint64_t encoder_event_value = 0;
-  if (command_buffer->compute_encoder) {
+  if (command_buffer->state.compute_encoder) {
     iree_hal_metal_end_compute_encoder(command_buffer);
-    encoder_event_value = command_buffer->next_encoder_event_value++;
-    [metal_handle encodeSignalEvent:command_buffer->encoder_event value:encoder_event_value];
+    encoder_event_value = command_buffer->state.next_encoder_event_value++;
+    [metal_handle encodeSignalEvent:command_buffer->state.encoder_event value:encoder_event_value];
   }
 
-  if (!command_buffer->blit_encoder) {
+  if (!command_buffer->state.blit_encoder) {
     if (encoder_event_value != 0) {
-      [metal_handle encodeWaitForEvent:command_buffer->encoder_event value:encoder_event_value];
+      [metal_handle encodeWaitForEvent:command_buffer->state.encoder_event
+                                 value:encoder_event_value];
     }
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
-      command_buffer->blit_encoder = [[metal_handle blitCommandEncoder] retain];  // +1
+      command_buffer->state.blit_encoder = [[metal_handle blitCommandEncoder] retain];  // +1
     }
   }
 
-  return command_buffer->blit_encoder;
+  return command_buffer->state.blit_encoder;
 }
 
 iree_status_t iree_hal_metal_direct_command_buffer_create(
@@ -354,6 +358,8 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     command_buffer->builtin_executable = builtin_executable;
     iree_arena_initialize(block_pool, &command_buffer->arena);
     command_buffer->staging_buffer = staging_buffer;
+    command_buffer->host_allocator = host_allocator;
+    status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
     iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
       // We track resource lifetime by ourselves in IREE; so just do unretained references to
@@ -371,18 +377,18 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
         params->command_dispatch_type == IREE_HAL_METAL_COMMAND_DISPATCH_TYPE_CONCURRENT
             ? MTLDispatchTypeConcurrent
             : MTLDispatchTypeSerial;
-    command_buffer->compute_encoder = nil;
-    command_buffer->blit_encoder = nil;
-    command_buffer->encoder_event = [queue.device newEvent];  // +1
-    command_buffer->next_encoder_event_value = 1;
-    memset(command_buffer->current_descriptors, 0,
-           IREE_HAL_METAL_MAX_BINDING_COUNT * sizeof(command_buffer->current_descriptors[0]));
-    command_buffer->current_total_binding_count = 0;
-    command_buffer->current_max_set_number = -1;
-    memset(command_buffer->push_constants, 0, sizeof(command_buffer->push_constants));
-    command_buffer->current_pipeline_layout = NULL;
-    command_buffer->host_allocator = host_allocator;
-    status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+    command_buffer->state.compute_encoder = nil;
+    command_buffer->state.blit_encoder = nil;
+    command_buffer->state.encoder_event = [queue.device newEvent];  // +1
+    command_buffer->state.next_encoder_event_value = 1;
+    memset(command_buffer->state.current_descriptors, 0,
+           IREE_HAL_METAL_MAX_BINDING_COUNT * sizeof(command_buffer->state.current_descriptors[0]));
+    command_buffer->state.current_total_binding_count = 0;
+    command_buffer->state.current_max_set_number = -1;
+    memset(command_buffer->state.push_constants, 0, sizeof(command_buffer->state.push_constants));
+    command_buffer->state.current_pipeline_layout = NULL;
+
+    *out_command_buffer = &command_buffer->base;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -396,9 +402,9 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
 
   iree_hal_metal_command_buffer_reset(command_buffer);
 
-  [command_buffer->encoder_event release];  // -1
-  IREE_ASSERT_EQ(command_buffer->compute_encoder, nil);
-  IREE_ASSERT_EQ(command_buffer->blit_encoder, nil);
+  [command_buffer->state.encoder_event release];  // -1
+  IREE_ASSERT_EQ(command_buffer->state.compute_encoder, nil);
+  IREE_ASSERT_EQ(command_buffer->state.blit_encoder, nil);
   [command_buffer->command_buffer release];  // -1
   [command_buffer->queue release];           // -1
   iree_hal_resource_set_free(command_buffer->resource_set);
@@ -480,9 +486,9 @@ static iree_status_t iree_hal_metal_command_segment_record_barrier(
     iree_hal_metal_end_blit_encoder(command_buffer);
     iree_hal_metal_end_compute_encoder(command_buffer);
     id<MTLCommandBuffer> metal_handle = command_buffer->command_buffer;
-    uint64_t event_value = command_buffer->next_encoder_event_value++;
-    [metal_handle encodeSignalEvent:command_buffer->encoder_event value:event_value];
-    [metal_handle encodeWaitForEvent:command_buffer->encoder_event value:event_value];
+    uint64_t event_value = command_buffer->state.next_encoder_event_value++;
+    [metal_handle encodeSignalEvent:command_buffer->state.encoder_event value:event_value];
+    [metal_handle encodeWaitForEvent:command_buffer->state.encoder_event value:event_value];
     return iree_ok_status();
   }
 
@@ -833,14 +839,14 @@ static iree_status_t iree_hal_metal_command_buffer_push_constants(
   // compatibility and invalidate existing values.
   // See https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html
 
-  if (IREE_UNLIKELY(offset + values_length >= sizeof(command_buffer->push_constants))) {
+  if (IREE_UNLIKELY(offset + values_length >= sizeof(command_buffer->state.push_constants))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "push constant range [%zu, %zu) out of range", offset,
                             offset + values_length);
   }
 
-  memcpy((uint8_t*)&command_buffer->push_constants + offset, values, values_length);
-  command_buffer->current_pipeline_layout = pipeline_layout;
+  memcpy((uint8_t*)&command_buffer->state.push_constants + offset, values, values_length);
+  command_buffer->state.current_pipeline_layout = pipeline_layout;
 
   return iree_ok_status();
 }
@@ -878,26 +884,26 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_ASSERT(set != IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX);
-  iree_hal_metal_descriptor_t* descriptors = command_buffer->current_descriptors;
+  iree_hal_metal_descriptor_t* descriptors = command_buffer->state.current_descriptors;
   IREE_ASSERT(iree_hal_metal_is_sorted_unique_descriptors(
-      descriptors, command_buffer->current_total_binding_count));
+      descriptors, command_buffer->state.current_total_binding_count));
 
-  if (command_buffer->current_max_set_number >= (int)set) {
+  if (command_buffer->state.current_max_set_number >= (int)set) {
     // We are pushing an already seen set. This would invalidate all sets with the given number and
     // larger ones. So clear all affected bindings.
     // TODO(antiagainst): We should actually check current pipeline's layout compatibility with
     // previous one and decide whether we should invalidate lower numbered sets too. For now we
     // assume the compiler side is doing proper job of guaranteeing that.
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/html/chap14.html#descriptorsets-compatibility
-    int* count = &command_buffer->current_total_binding_count;
+    int* count = &command_buffer->state.current_total_binding_count;
     while (*count > 0 && descriptors[*count - 1].set >= (int)set) --(*count);
-    command_buffer->current_max_set_number = (*count == 0) ? -1 : descriptors[*count - 1].set;
+    command_buffer->state.current_max_set_number = (*count == 0) ? -1 : descriptors[*count - 1].set;
   }
 
   // Pushing a new set with a larger number. All sets with smaller number remain active. Just sort
   // the current one and copy over the data. This is the expected usage pattern in IREE, where the
   // compiler sorts/deduplicates descriptor sets, and pushes them in ascending order.
-  if (binding_count + command_buffer->current_total_binding_count >
+  if (binding_count + command_buffer->state.current_total_binding_count >
       IREE_HAL_METAL_MAX_BINDING_COUNT) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -907,7 +913,7 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
   iree_hal_descriptor_set_layout_t* set_layout =
       iree_hal_metal_pipeline_layout_descriptor_set_layout(pipeline_layout, set);
 
-  int start_index = command_buffer->current_total_binding_count;
+  int start_index = command_buffer->state.current_total_binding_count;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     iree_hal_metal_descriptor_t* descriptor = &descriptors[start_index + i];
 
@@ -922,11 +928,11 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
   }
   qsort(&descriptors[start_index], binding_count, sizeof(descriptors[0]), compare_descriptor);
 
-  command_buffer->current_max_set_number = set;
-  command_buffer->current_total_binding_count += binding_count;
+  command_buffer->state.current_max_set_number = set;
+  command_buffer->state.current_total_binding_count += binding_count;
 
   IREE_ASSERT(iree_hal_metal_is_sorted_unique_descriptors(
-      descriptors, command_buffer->current_total_binding_count));
+      descriptors, command_buffer->state.current_total_binding_count));
 
   // Retain all buffers bound in this descriptor set.
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
@@ -936,7 +942,7 @@ static iree_status_t iree_hal_metal_command_buffer_push_descriptor_set(
     }
   }
 
-  command_buffer->current_pipeline_layout = pipeline_layout;
+  command_buffer->state.current_pipeline_layout = pipeline_layout;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &pipeline_layout));
 
@@ -958,15 +964,15 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
   iree_hal_metal_kernel_params_t kernel_params;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_kernel_library_entry_point_kernel_params(
                                             executable, entry_point, &kernel_params));
-  IREE_ASSERT(command_buffer->current_pipeline_layout != NULL);
+  IREE_ASSERT(command_buffer->state.current_pipeline_layout != NULL);
 
   // Allocate the command segment and keep track of all necessary API data.
   uint8_t* storage_base = NULL;
   iree_hal_metal_command_segment_t* segment = NULL;
-  iree_host_size_t descriptor_count = command_buffer->current_total_binding_count;
+  iree_host_size_t descriptor_count = command_buffer->state.current_total_binding_count;
   iree_host_size_t descriptor_length = descriptor_count * sizeof(iree_hal_metal_descriptor_t);
-  iree_host_size_t push_constant_count =
-      iree_hal_metal_pipeline_layout_push_constant_count(command_buffer->current_pipeline_layout);
+  iree_host_size_t push_constant_count = iree_hal_metal_pipeline_layout_push_constant_count(
+      command_buffer->state.current_pipeline_layout);
   iree_host_size_t push_constant_length = push_constant_count * sizeof(int32_t);
   iree_host_size_t total_size = sizeof(*segment) + descriptor_length + push_constant_length;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -983,13 +989,14 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
   // Copy descriptors to the end of the current segment for later access.
   segment->dispatch.descriptor_count = descriptor_count;
   uint8_t* descriptor_ptr = storage_base + sizeof(*segment);
-  memcpy(descriptor_ptr, command_buffer->current_descriptors, descriptor_length);
+  memcpy(descriptor_ptr, command_buffer->state.current_descriptors, descriptor_length);
   segment->dispatch.descriptors = (iree_hal_metal_descriptor_t*)descriptor_ptr;
 
   // Copy push constants to the end of the current segment for later access.
   segment->dispatch.push_constant_count = push_constant_count;
   uint8_t* push_constant_ptr = storage_base + sizeof(*segment) + descriptor_length;
-  memcpy(push_constant_ptr, (const uint8_t*)command_buffer->push_constants, push_constant_length);
+  memcpy(push_constant_ptr, (const uint8_t*)command_buffer->state.push_constants,
+         push_constant_length);
   segment->dispatch.push_constants = (int32_t*)push_constant_ptr;
 
   *out_segment = &segment->dispatch;
