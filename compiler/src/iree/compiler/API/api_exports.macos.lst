@@ -166,6 +166,9 @@ _mlirBlockInsertOwnedOperationBefore
 _mlirBlockPrint
 _mlirBoolAttrGet
 _mlirBoolAttrGetValue
+_mlirBytecodeWriterConfigCreate
+_mlirBytecodeWriterConfigDesiredEmitVersion
+_mlirBytecodeWriterConfigDestroy
 _mlirComplexTypeGet
 _mlirComplexTypeGetElementType
 _mlirContextAppendDialectRegistry
@@ -437,6 +440,7 @@ _mlirOperationStateEnableResultTypeInference
 _mlirOperationStateGet
 _mlirOperationVerify
 _mlirOperationWriteBytecode
+_mlirOperationWriteBytecodeWithConfig
 _mlirPDLAttributeTypeGet
 _mlirPDLOperationTypeGet
 _mlirPDLRangeTypeGet
