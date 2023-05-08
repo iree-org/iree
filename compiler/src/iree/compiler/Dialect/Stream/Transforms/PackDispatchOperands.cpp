@@ -30,7 +30,7 @@ namespace {
 // Bitwidth utilities
 //===----------------------------------------------------------------------===//
 
-static int64_t getTypeBitwidth(Type type) {
+static int64_t getTypeBitWidth(Type type) {
   if (isa<ComplexType>(type)) {
     return 2 *
            dyn_cast<ComplexType>(type).getElementType().getIntOrFloatBitWidth();
