@@ -17,7 +17,7 @@
 #ifdef IREE_HAVE_MHLO_INPUT
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "mhlo/IR/hlo_ops.h"
-#endif
+#endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #endif  // IREE_HAVE_TOSA_INPUT
@@ -32,8 +32,6 @@ struct InputConversionPipelinePass
     : public InputConversionPipelineBase<InputConversionPipelinePass> {
   void runOnOperation() override;
 };
-
-#if defined(IREE_HAVE_MHLO_INPUT) || defined(IREE_HAVE_TOSA_INPUT)
 
 // All the features seen that should be handled during input conversion.
 struct InputFeatures {
@@ -86,19 +84,10 @@ void InputConversionPipelinePass::runOnOperation() {
   MLIRContext* ctxt = &getContext();
 
   InputFeatures features;
-
-  const Dialect* mhloDialect = nullptr;
-  const Dialect* tosaDialect = nullptr;
-  const Dialect* tmTensorDialect = nullptr;
-#ifdef IREE_HAVE_MHLO_INPUT
-  mhloDialect = ctxt->getLoadedDialect<mhlo::MhloDialect>();
-#endif
-#ifdef IREE_HAVE_TORCH_INPUT
-  tmTensorDialect = ctxt->getLoadedDialect<torch::TMTensor::TMTensorDialect>();
-#endif
-#ifdef IREE_HAVE_TOSA_INPUT
-  tosaDialect = ctxt->getLoadedDialect<tosa::TosaDialect>();
-#endif
+  const Dialect* mhloDialect = ctxt->getLoadedDialect("mhlo");
+  const Dialect* tosaDialect = ctxt->getLoadedDialect("tosa");
+  const Dialect* tmTensorDialect = ctxt->getLoadedDialect("tm_tensor");
+  if (!mhloDialect && !tosaDialect && !tmTensorDialect) return;
 
   auto res = module.walk([&](Operation* op) {
     populateFeatures(op, mhloDialect, tmTensorDialect, tosaDialect, features);
@@ -117,6 +106,7 @@ void InputConversionPipelinePass::runOnOperation() {
     return WalkResult::advance();
   });
   if (res.wasInterrupted()) return signalPassFailure();
+  if (!features.hasMHLO && !features.hasTOSA && !features.hasTmTensor) return;
 
   OpPassManager pm(ModuleOp::getOperationName(),
                    OpPassManager::Nesting::Explicit);
@@ -134,10 +124,6 @@ void InputConversionPipelinePass::runOnOperation() {
 
   if (failed(runPipeline(pm, module))) signalPassFailure();
 }
-
-#else
-void InputConversionPipelinePass::runOnOperation() {}
-#endif
 
 std::unique_ptr<OperationPass<ModuleOp>> createInputConversionPipelinePass() {
   return std::make_unique<InputConversionPipelinePass>();
