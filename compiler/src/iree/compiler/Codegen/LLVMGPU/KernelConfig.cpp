@@ -256,13 +256,13 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
         SmallVector<unsigned> partitionedLoops =
             cast<PartitionableLoopsInterface>(op.getOperation())
-                .getPartitionableLoops(kNumMaxParallelDims);
+                .getPartitionableLoops(/*maxNumPartitionedLoops=*/5);
         llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
         partitionedLoopsSet.insert(partitionedLoops.begin(),
                                    partitionedLoops.end());
         for (auto loopID : llvm::seq<unsigned>(0, numParallelLoops)) {
           if (!partitionedLoopsSet.count(loopID)) {
-            workgroupTileSizes[loopID] = 0;
+            workgroupTileSizes[loopID] = 1;
           }
         }
 
