@@ -23,6 +23,12 @@ typedef struct iree_hal_cuda_buffer_t {
 
 static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable;
 
+static iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_cast(
+    iree_hal_buffer_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_buffer_vtable);
+  return (iree_hal_cuda_buffer_t*)base_value;
+}
+
 static iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_cast_unsafe(
     iree_hal_buffer_t* base_value) {
   return (iree_hal_cuda_buffer_t*)base_value;
@@ -67,8 +73,7 @@ iree_status_t iree_hal_cuda_buffer_wrap(
 }
 
 static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
-  iree_hal_cuda_buffer_t* buffer =
-      iree_hal_cuda_buffer_cast_unsafe(base_buffer);
+  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
   if (buffer->release_callback.fn) {
@@ -84,8 +89,7 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
-  iree_hal_cuda_buffer_t* buffer =
-      iree_hal_cuda_buffer_cast_unsafe(base_buffer);
+  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
 
   // TODO(benvanik): add upload/download for unmapped buffers.
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
