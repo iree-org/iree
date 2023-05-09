@@ -319,11 +319,11 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_c8949024e2472bec7b18c4e3757412715c248273005ca6f8d5769656ed425a84/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
   FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+    "EfficientNetV2STF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -336,11 +336,11 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_a30b64a3d7850881ee9db94e8f75c661af3f76f48d10b3342a6912e1c8879252/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
   FRIENDLY_NAME
-    "MiniLML12H384Uncased(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+    "MiniLML12H384Uncased(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -353,11 +353,11 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_10a9a8a00ac0f36f45b5e35a032ca177b68621e3137dc57b9d6e08225301441b/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
   FRIENDLY_NAME
-    "Resnet50TFBatch1(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+    "Resnet50TFBatch1(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -387,11 +387,11 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_module_1c7402f88ba881ec6abb39204faa4b5fedb2ffff4a6066555fcff0c7c4b74732/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
   FRIENDLY_NAME
-    "BertForMaskedLMTF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+    "BertForMaskedLMTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -404,11 +404,11 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_9c849d0ccfc89c0bca0740949572db8735832012a43c4c9f15c3a8ef0d9cca04/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
   FRIENDLY_NAME
-    "BertLargeTF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+    "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -628,13 +628,13 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_aed1ca2855056bcd5b7e51063741685b4a387d9d0574b343e8ddc383b49afc76/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
+    "EfficientNetV2STF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
 )
 
@@ -647,13 +647,13 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_80a2368e148d9605d98060027b9198dea46efbf050a383784ec5df5e85904757/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   FRIENDLY_NAME
-    "MiniLML12H384Uncased(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
+    "MiniLML12H384Uncased(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
 )
 
@@ -666,13 +666,13 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_f146632eb124afeb899eeae8aaf5ab6cd9efae22ee9ffb26d34fe1da10049fbe/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-llvmcpu-enable-pad-consumer-fusion"
   FRIENDLY_NAME
-    "BertLargeTF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
+    "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
   PUBLIC
 )
 
@@ -685,10 +685,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_04ca0a5077b7dd5ace66d803c9b822dff3428b24e7620a61995aff0907af9533/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "EfficientNetV2STF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -701,10 +701,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_deafafd0926321a4b8e4dc73ed4a30b2ed9317d26488246461415be2ee857eb1/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "MiniLML12H384Uncased(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "MiniLML12H384Uncased(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -717,10 +717,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_module_bdd904cc5614ebf77609c7802a2dfc09f139aee2a247a247d10d320de72b0e28/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertForMaskedLMTF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertForMaskedLMTF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -733,10 +733,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_45565cae821666fd34bca97be2e4cce3bd61e71308785728737d89acbb9bc9d2/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -903,10 +903,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_58f67edb580a13aa98d3fd05ad31f207d62462c9de990825656b19d2fbacda3c/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "Resnet50TFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "Resnet50TFBatch1(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -919,10 +919,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_module_1655ee92ee23748886eef280d7d6f96c8a227fae7d6d78abd3466ce8614f16ba/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "Resnet50TFBatch8(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "Resnet50TFBatch8(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -935,10 +935,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_module_496bdea78d06c9c32d8deae84b088b0eb34f6d1982ac790e2580a50dec4281ae/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "Resnet50TFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "Resnet50TFBatch64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -951,10 +951,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_module_5aa3c57b33d354d5ebfe51626e2dac78485a548aa9bf2fba7a3e7a248f8b909e/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "Resnet50TFBatch128(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "Resnet50TFBatch128(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -967,10 +967,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_module_a52ef9f5a8c064a4cbf52ea82b694d2c0bb9a0dd43d3576131335ab5453b62a4/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "Resnet50TFBatch256(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "Resnet50TFBatch256(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -983,10 +983,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch2048_module_a6f73626c6b41d410da11809d66d613293a0e3c298d491d6fb25e3729cf6685e/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "Resnet50TFBatch2048(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "Resnet50TFBatch2048(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -999,10 +999,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1_module_369f2b1edbd94d2c19cf18be7ee8bb7aa937fe0669fbe6e5fb9a5c06185ebb42/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch1(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1015,10 +1015,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch16_module_52f3e54f0a7479eecdae97afb32b90e3952c8be195a861722fd8e8ece857ff40/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch16(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch16(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1031,10 +1031,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch24_module_30baf74b5974ab7269c57015554a0fb0447cbde5fb77ab44ed9cf9cd2bc0e351/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch24(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch24(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1047,10 +1047,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch32_module_09dd0099b9a0924cc1bcadfb355bccbeea9cb3c29fc48c5181fbb87d80af28a9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch32(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch32(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1063,10 +1063,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch48_module_3385106a53075a52f4ae60523e09ad42cdad60475d97e84695a9c68584d9182a/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch48(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch48(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1079,10 +1079,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch64_module_2021b32a685c21ba21823416591c14fd79075595c101665abe565ff92335c3ef/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1095,10 +1095,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch512_module_57080e57e3ba061d70d35d8579824a8eab7ee05ef3e0eea02cc251bab87cfd10/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch512(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch512(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1111,10 +1111,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1024_module_88f03be31249d371d00c63d44d44732ad4c348bf2354bd2b3b042465d86f7183/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch1024(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch1024(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1127,10 +1127,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1280_module_b3f2a0c268a0a8752ccbb56f013455197c466635637b535778a494dab316cf9e/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "BertLargeTFBatch1280(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "BertLargeTFBatch1280(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1143,10 +1143,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch1_module_bf4bda91fb17ec7f3402e7b301cb3ab0b7a9b0b00d8cee29fd4cfa46262a5ea1/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "T5LargeTFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "T5LargeTFBatch1(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1159,10 +1159,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch16_module_9900b1a0c52b31fc38f1d82ff088102f7131ecbb3fc1b8274929481337d031c5/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "T5LargeTFBatch16(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "T5LargeTFBatch16(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1175,10 +1175,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch24_module_25f1a116fad68b01401dfbd8462c7b2729ef2d504df0954509cd488cd5da17a1/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "T5LargeTFBatch24(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "T5LargeTFBatch24(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1191,10 +1191,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch32_module_89643b9db9da0c7b822ba8e2ead4ec12fc3093dbde9b7a8570de1be3d46bd54b/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "T5LargeTFBatch32(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "T5LargeTFBatch32(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1207,10 +1207,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch48_module_c16715c83936394998fe81f8d33f6e7901f17ff662dfd2941a3982f85c3a9e17/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "T5LargeTFBatch48(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "T5LargeTFBatch48(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1223,10 +1223,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch64_module_7ba873f0f155e857b45f991cbb4e8776f8b137d59ddc5f81a7a23ed2a48eecc9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "T5LargeTFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "T5LargeTFBatch64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -1239,10 +1239,10 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch512_module_374d3219ba3a0064fc5eccb0857f9ae7c37ad2c8183c930b59b33a6a6248d109/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME
-    "T5LargeTFBatch512(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
+    "T5LargeTFBatch512(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -3102,7 +3102,7 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_01d35de2a55b9800e05151455eace0bf4493337ac1210fcc4904d630b075599a/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
@@ -3110,7 +3110,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_01d35de2a55b9800e05151455eace0bf4493337ac1210fcc4904d630b075599a/scheduling_stats.json"
   FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+    "EfficientNetV2STF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3123,7 +3123,7 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_2957930127e9b01e90ccddb7290e1c4b4abf6373cc36929809040e2c144d3fd7/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
@@ -3131,7 +3131,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_2957930127e9b01e90ccddb7290e1c4b4abf6373cc36929809040e2c144d3fd7/scheduling_stats.json"
   FRIENDLY_NAME
-    "MiniLML12H384Uncased(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+    "MiniLML12H384Uncased(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3144,7 +3144,7 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_ee88f7648c08cb775827b3afa89a2aaccd34eff697306c2b35598ba7e4c78df8/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
@@ -3152,7 +3152,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_ee88f7648c08cb775827b3afa89a2aaccd34eff697306c2b35598ba7e4c78df8/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50TFBatch1(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+    "Resnet50TFBatch1(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3186,7 +3186,7 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_module_ddd1657bc5433ccca5c8ce562f581626457a793670958cd8b4016c426191a9c4/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
@@ -3194,7 +3194,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_module_ddd1657bc5433ccca5c8ce562f581626457a793670958cd8b4016c426191a9c4/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertForMaskedLMTF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+    "BertForMaskedLMTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3207,7 +3207,7 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_8ee3c7b136703472b53bc8a19d8d28945aca93953612ccc65e55cd1b3dfda6c8/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-vm-emit-polyglot-zip=true"
@@ -3215,7 +3215,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_8ee3c7b136703472b53bc8a19d8d28945aca93953612ccc65e55cd1b3dfda6c8/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+    "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3479,7 +3479,7 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_c9a7c5b08db10ed782045b6810cb4ee157da9e95590456d3839c06163ee30fa7/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
@@ -3489,7 +3489,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_c9a7c5b08db10ed782045b6810cb4ee157da9e95590456d3839c06163ee30fa7/scheduling_stats.json"
   FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
+    "EfficientNetV2STF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
 )
 
@@ -3502,7 +3502,7 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_838cc09b422958a332fd76cf12a6a2a95b8346c8e8d2fe7b15cb5ace4c20581e/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
@@ -3512,7 +3512,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_838cc09b422958a332fd76cf12a6a2a95b8346c8e8d2fe7b15cb5ace4c20581e/scheduling_stats.json"
   FRIENDLY_NAME
-    "MiniLML12H384Uncased(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
+    "MiniLML12H384Uncased(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
 )
 
@@ -3525,7 +3525,7 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_8231a286cdc63a48f3f70a12ab5a182142c00cbebaccdc79e35ca552f02422e7/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
@@ -3535,7 +3535,7 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_8231a286cdc63a48f3f70a12ab5a182142c00cbebaccdc79e35ca552f02422e7/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
+    "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
   PUBLIC
 )
 
@@ -3548,14 +3548,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509/scheduling_stats.json"
   FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "EfficientNetV2STF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3568,14 +3568,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_MiniLML12H384Uncased_module_65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b/scheduling_stats.json"
   FRIENDLY_NAME
-    "MiniLML12H384Uncased(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "MiniLML12H384Uncased(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3588,14 +3588,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_module_8b19868be1c797cb585551c871c4171e78817e0efc49d30d91b9d722be283de9/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertForMaskedLMTF_module_8b19868be1c797cb585551c871c4171e78817e0efc49d30d91b9d722be283de9/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertForMaskedLMTF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertForMaskedLMTF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3608,14 +3608,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_c2085883b1f5c767f37508ab998a4bcd17d169fe6a5197d28e4dca8772c90253/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_c2085883b1f5c767f37508ab998a4bcd17d169fe6a5197d28e4dca8772c90253/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTF(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3818,14 +3818,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_2fe6a4ac93d74732ebabbd87e84e6ec56d2aeb9f6a94f5b595f74f947498c579/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch1_module_2fe6a4ac93d74732ebabbd87e84e6ec56d2aeb9f6a94f5b595f74f947498c579/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50TFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "Resnet50TFBatch1(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3838,14 +3838,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_module_32dfb79e574ef282dd352a156620d44d545dda0f49ea1ac27394028d2ced46a8/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch8_module_32dfb79e574ef282dd352a156620d44d545dda0f49ea1ac27394028d2ced46a8/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50TFBatch8(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "Resnet50TFBatch8(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3858,14 +3858,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_module_3421bd5d457a3ed62e7aa74559afb7199105c1f60b65090a247ee3e6d9aec69c/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch64_module_3421bd5d457a3ed62e7aa74559afb7199105c1f60b65090a247ee3e6d9aec69c/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50TFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "Resnet50TFBatch64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3878,14 +3878,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_module_5663bccd89aa0616691d5b804b337c8989a2ca94c1bf2673d41dbbab9e511f20/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch128_module_5663bccd89aa0616691d5b804b337c8989a2ca94c1bf2673d41dbbab9e511f20/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50TFBatch128(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "Resnet50TFBatch128(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3898,14 +3898,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_module_353a915204b8eb401d0caac543588920cfab76f826463394cc1e99546cab13bb/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch256_module_353a915204b8eb401d0caac543588920cfab76f826463394cc1e99546cab13bb/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50TFBatch256(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "Resnet50TFBatch256(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3918,14 +3918,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch2048_module_c5f0532455c22436b0fce487797b957939acb0d1f235644187d63bca29a70654/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Resnet50TFBatch2048_module_c5f0532455c22436b0fce487797b957939acb0d1f235644187d63bca29a70654/scheduling_stats.json"
   FRIENDLY_NAME
-    "Resnet50TFBatch2048(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "Resnet50TFBatch2048(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3938,14 +3938,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1_module_1bac11dad2160652ffcfb201d96418f4c044fcd79771cf6a783f311998850a2e/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1_module_1bac11dad2160652ffcfb201d96418f4c044fcd79771cf6a783f311998850a2e/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch1(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3958,14 +3958,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch16_module_3edb70502ef7a26db736a64e24a677ff085fb800a8475e750dd2a9d119baf407/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch16_module_3edb70502ef7a26db736a64e24a677ff085fb800a8475e750dd2a9d119baf407/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch16(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch16(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3978,14 +3978,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch24_module_7f45c4f644d293bb984007aa1a91c919c5a75d01bf38f70ba7257c0b21c654f3/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch24_module_7f45c4f644d293bb984007aa1a91c919c5a75d01bf38f70ba7257c0b21c654f3/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch24(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch24(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3998,14 +3998,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch32_module_bb96ff5237b0ad603b1ee7c59601a1c957a2ed5c95cbfd94f7ec6d707aad3660/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch32_module_bb96ff5237b0ad603b1ee7c59601a1c957a2ed5c95cbfd94f7ec6d707aad3660/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch32(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch32(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4018,14 +4018,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch48_module_5b499a05fc60f78b5b11b1e9ba89ba797450e5b49b0613b3c23d996c6f767c64/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch48_module_5b499a05fc60f78b5b11b1e9ba89ba797450e5b49b0613b3c23d996c6f767c64/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch48(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch48(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4038,14 +4038,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch64_module_40b0bd95d986d079ae0fc8cd57b473a150289a5f3ee6029b388ebc86edd4a60c/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch64_module_40b0bd95d986d079ae0fc8cd57b473a150289a5f3ee6029b388ebc86edd4a60c/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4058,14 +4058,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch512_module_03736c12afe2b27f77101146eddaa80c8911cdbc2120ab574225c08b088e14f3/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch512_module_03736c12afe2b27f77101146eddaa80c8911cdbc2120ab574225c08b088e14f3/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch512(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch512(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4078,14 +4078,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1024_module_b180d82d1a87fe29e414ecd55bf8a82ff92b80d7c644d31769729160b27aa467/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1024_module_b180d82d1a87fe29e414ecd55bf8a82ff92b80d7c644d31769729160b27aa467/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch1024(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch1024(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4098,14 +4098,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1280_module_6265e9506389bb29c551ad62f4ea05f54bd0e549c2d29bf425bac9d56aa55ef6/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTFBatch1280_module_6265e9506389bb29c551ad62f4ea05f54bd0e549c2d29bf425bac9d56aa55ef6/scheduling_stats.json"
   FRIENDLY_NAME
-    "BertLargeTFBatch1280(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "BertLargeTFBatch1280(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4118,14 +4118,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch1_module_1ee530ad72c5711ee3abf11b27eed04e11d261fb6c0d23a6cb68c80c1a42580b/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch1_module_1ee530ad72c5711ee3abf11b27eed04e11d261fb6c0d23a6cb68c80c1a42580b/scheduling_stats.json"
   FRIENDLY_NAME
-    "T5LargeTFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "T5LargeTFBatch1(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4138,14 +4138,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch16_module_38e99a06cd01399fe48cd9d860f65474e4fd7df1b3aca491766ff5f825315a79/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch16_module_38e99a06cd01399fe48cd9d860f65474e4fd7df1b3aca491766ff5f825315a79/scheduling_stats.json"
   FRIENDLY_NAME
-    "T5LargeTFBatch16(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "T5LargeTFBatch16(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4158,14 +4158,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch24_module_db86dfb7ef5e59b31bf513df65fffd397f49e3fe3b5c03149140ccf3b6b2f821/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch24_module_db86dfb7ef5e59b31bf513df65fffd397f49e3fe3b5c03149140ccf3b6b2f821/scheduling_stats.json"
   FRIENDLY_NAME
-    "T5LargeTFBatch24(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "T5LargeTFBatch24(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4178,14 +4178,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch32_module_89966a2ac764b543e721d822acdbe015526866e0a8d56a6782f240eeb3cddea1/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch32_module_89966a2ac764b543e721d822acdbe015526866e0a8d56a6782f240eeb3cddea1/scheduling_stats.json"
   FRIENDLY_NAME
-    "T5LargeTFBatch32(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "T5LargeTFBatch32(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4198,14 +4198,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch48_module_6da0542e65f9e5eff1bc142506866aec435b931b36eb8e86139f79b4945863fd/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch48_module_6da0542e65f9e5eff1bc142506866aec435b931b36eb8e86139f79b4945863fd/scheduling_stats.json"
   FRIENDLY_NAME
-    "T5LargeTFBatch48(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "T5LargeTFBatch48(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4218,14 +4218,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch64_module_f55259e9c9778885d48b20cfb18242984fa9dde9840fa0f92c7de379c88c8230/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch64_module_f55259e9c9778885d48b20cfb18242984fa9dde9840fa0f92c7de379c88c8230/scheduling_stats.json"
   FRIENDLY_NAME
-    "T5LargeTFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "T5LargeTFBatch64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -4238,14 +4238,14 @@ iree_bytecode_module(
     "${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch512_module_d931d256d015f057a71fb67c6c7d7d4099910286d5bbcd6c1c71b43b2b3756e8/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
+    "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_T5LargeTFBatch512_module_d931d256d015f057a71fb67c6c7d7d4099910286d5bbcd6c1c71b43b2b3756e8/scheduling_stats.json"
   FRIENDLY_NAME
-    "T5LargeTFBatch512(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
+    "T5LargeTFBatch512(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 

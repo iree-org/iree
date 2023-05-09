@@ -96,8 +96,8 @@ class ModelSourceType(Enum):
   """Type of model source."""
   # Exported Linalg MLIR file.
   EXPORTED_LINALG_MLIR = "exported_linalg_mlir"
-  # Exported MHLO file.
-  EXPORTED_MHLO_MLIR = "exported_mhlo_mlir"
+  # Exported Stable HLO file.
+  EXPORTED_STABLEHLO_MLIR = "exported_stablehlo_mlir"
   # Exported TFLite model file.
   EXPORTED_TFLITE = "exported_tflite"
 
