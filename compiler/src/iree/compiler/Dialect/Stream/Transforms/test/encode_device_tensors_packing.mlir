@@ -1,6 +1,7 @@
 // RUN: iree-opt --split-input-file --iree-stream-encode-device-tensors --verify-diagnostics %s | FileCheck %s
 
-// Check that i3 load is expanded right now.
+// Ensures that loading a non-power-of-two type (i3) is expanded to a full byte
+// because we don't currently do unaligned sub-byte packing.
 
 // CHECK-LABEL: @subspanLoadI3
 stream.executable private @subspanLoadI3 {
@@ -22,7 +23,8 @@ stream.executable private @subspanLoadI3 {
 
 // -----
 
-// Check that i3 store is expanded right now.
+// Ensures that storing a non-power-of-two type (i3) is expanded to a full byte
+// because we don't currently do unaligned sub-byte packing.
 
 // CHECK-LABEL: @subspanStoreI3
 stream.executable private @subspanStoreI3 {
@@ -62,18 +64,17 @@ stream.executable private @subspanLoadI4 {
 
 // -----
 
-// Check that sub-byte store is not supported for packing right now.
-
 // CHECK-LABEL: @subspanStoreI4
 stream.executable private @subspanStoreI4 {
   stream.executable.export public @dispatch
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding) {
       %c0 = arith.constant 0 : index
-      // expected-error @+1 {{unsupported sub-byte dispatch tensor write}}
-      %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
+      // CHECK: %[[TILE_I4:.+]] = arith.constant dense<[5, -1, 0, 3, 1, 7, -8, 4]> : tensor<8xi4>
       %cst = arith.constant dense<[5, 15, 0, 3, 1, 7, 8, 4]> : tensor<8xi4>
-      // expected-error @+1 {{unsupported sub-byte tensor store}}
+      // CHECK: %[[BINDING:.+]] = stream.binding.subspan {{.+}} : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
+      %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
+      // CHECK: flow.dispatch.tensor.store %[[TILE_I4]], %[[BINDING]], offsets = [0], sizes = [4], strides = [1] : tensor<8xi4> -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
       flow.dispatch.tensor.store %cst, %binding, offsets = [0], sizes = [4], strides = [1] : tensor<8xi4> -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
       return
     }

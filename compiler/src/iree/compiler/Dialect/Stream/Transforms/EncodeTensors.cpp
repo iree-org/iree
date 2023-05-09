@@ -682,11 +682,6 @@ struct EncodeBindingSubspanOp
     // Align the element type, if needed.
     IREE::Flow::DispatchTensorType alignedType =
         alignDispatchTensorType(originalType);
-    if (originalType.getAccess() != Flow::TensorAccess::ReadOnly &&
-        needToPackSubByteInterfaceElements(
-            cast<RankedTensorType>(alignedType.getBoundType()))) {
-      return op.emitOpError("unsupported sub-byte dispatch tensor write");
-    }
     if (originalType == alignedType) return failure();  // already aligned.
 
     // Directly swap the type with the one, changing all uses in the IR.
@@ -744,10 +739,6 @@ struct EncodeDispatchTensorStoreOp
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(sourceType);
-    if (needToPackSubByteInterfaceElements(
-            cast<RankedTensorType>(alignedType))) {
-      return op.emitOpError("unsupported sub-byte tensor store");
-    }
     if (sourceType == alignedType) return failure();  // already aligned.
 
     // Stores always extend from a sub-byte aligned type to a byte aligned one.

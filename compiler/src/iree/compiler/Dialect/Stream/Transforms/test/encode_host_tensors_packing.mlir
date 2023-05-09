@@ -14,7 +14,8 @@ func.func @denseTensorConstantI2() -> !stream.resource<constant> {
 
 // -----
 
-// Check that i3 constant is expanded right now.
+// Ensures that a non-power-of-two type (i3) constant is expanded to a full byte
+// because we don't currently do unaligned sub-byte packing.
 
 // CHECK: func.func @denseTensorConstantI3()
 func.func @denseTensorConstantI3() -> !stream.resource<constant> {
@@ -38,7 +39,7 @@ func.func @denseTensorConstantI4() -> !stream.resource<constant> {
 
 // -----
 
-// Check that non-byte-aligned total size is not supported for constant.
+// Checks that non-byte-aligned total size is not supported for constant.
 
 func.func @denseTensorConstantI4() -> !stream.resource<constant> {
   // expected-error @+1 {{failed to calculate total byte count: 'tensor<5xi4>' does not have integral number of total bytes}}
@@ -69,7 +70,7 @@ func.func @denseTensorSizeOfStatic() -> index {
 
 // -----
 
-// Check that non-byte-aligned total size is not supported for sizeof.
+// Checks that non-byte-aligned total size is not supported for sizeof.
 
 func.func @denseTensorSizeOfStatic() -> index {
   // expected-error @+1 {{failed to calculate total byte count: 'tensor<11xi4>' does not have integral number of total bytes}}
@@ -92,7 +93,7 @@ func.func @denseTensorSizeOfDynamic(%arg0: index) -> index {
 
 // -----
 
-// Check that stream.tensor.load with sub-byte packing is not supported right now.
+// Checks that stream.tensor.load with sub-byte packing is not supported right now.
 
 // CHECK-LABEL: @denseTensorLoad
 func.func @denseTensorLoad(%arg0: !stream.resource<staging>, %arg1: index, %arg2: index, %arg3: index) -> i4 {
@@ -104,7 +105,7 @@ func.func @denseTensorLoad(%arg0: !stream.resource<staging>, %arg1: index, %arg2
 
 // -----
 
-// Check that stream.tensor.store with sub-byte packing is not supported right now.
+// Checks that stream.tensor.store with sub-byte packing is not supported right now.
 
 // CHECK-LABEL: @denseTensorStore
 func.func @denseTensorStore(%arg0: !stream.resource<staging>, %arg1: index, %arg2: index, %arg3: i4) -> !stream.resource<staging> {
@@ -174,7 +175,8 @@ func.func @denseTensorSliceI2(%arg0: !stream.resource<*>, %arg1: index, %arg2: i
 
 // -----
 
-// Check that i3 slice is expanded right now.
+// Ensures that a non-power-of-two type (i3) slice is expanded to a full byte
+// because we don't currently do unaligned sub-byte packing.
 
 // CHECK-LABEL: @denseTensorSliceI3
 func.func @denseTensorSliceI3(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index) -> !stream.resource<*> {
@@ -191,7 +193,8 @@ func.func @denseTensorSliceI3(%arg0: !stream.resource<*>, %arg1: index, %arg2: i
 
 // -----
 
-// Check that i3 update is expanded right now.
+// Ensures that a non-power-of-two type (i3) update is expanded to a full byte
+// because we don't currently do unaligned sub-byte packing.
 
 // CHECK-LABEL: @denseTensorUpdateI3
 func.func @denseTensorUpdateI3(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index, %arg4: index, %arg5: index, %arg6: index) -> !stream.resource<*> {
