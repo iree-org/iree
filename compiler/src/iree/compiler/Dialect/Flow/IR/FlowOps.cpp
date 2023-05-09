@@ -1838,6 +1838,34 @@ void CollectiveReduceScatterOp::build(OpBuilder &builder, OperationState &state,
         channel, builder.getIndexArrayAttr({0}));
 }
 
+//===----------------------------------------------------------------------===//
+// flow.collective.send_recv
+//===----------------------------------------------------------------------===//
+
+Value CollectiveSendRecvOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::llvm::Optional<unsigned> CollectiveSendRecvOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // target
+}
+
+SmallVector<int64_t, 4> CollectiveSendRecvOp::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
+void CollectiveSendRecvOp::build(OpBuilder &builder, OperationState &state,
+                                 CollectiveElementTypeAttr elementType,
+                                 Value target, Value source, Value channel,
+                                 Value send, Value recv) {
+  auto targetDims =
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
+
+  build(builder, state, elementType, target, targetDims, source, channel, send,
+        recv, builder.getIndexArrayAttr({0}));
+}
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

@@ -86,3 +86,23 @@ func.func @reduce_scatter(%channel: !flow.channel, %arg0: !hal.buffer_view) -> !
   %3 = hal.tensor.export %2 : tensor<2x2xf32> -> !hal.buffer_view
   return %3 : !hal.buffer_view
 }
+
+//-----
+
+// CHECK-LABEL: @send_recv
+// CHECK-SAME: %arg1: !hal.buffer_view, [[SEND:%.+]]: i32, [[RECV:%.+]]: i32)
+func.func @send_recv(%channel: !flow.channel, %arg0: !hal.buffer_view, %send: i32, %recv: i32) -> !hal.buffer_view attributes {iree.abi.stub} {
+  // CHECK: stream.tensor.empty : tensor<1024xf32>
+  // CHECK-DAG: [[CST_LO_MASK:%.+]] = arith.constant 65535 : i32
+  // CHECK-DAG: [[CST_SHIFT16:%.+]] = arith.constant 16 : i32
+  // CHECK-DAG: [[LO:%.+]] = arith.andi [[SEND]], [[CST_LO_MASK]] : i32
+  // CHECK-DAG: [[HI:%.+]] = arith.shli [[RECV]], [[CST_SHIFT16]] : i32
+  // CHECK-DAG: [[PARAM:%.+]] = arith.ori [[HI]], [[LO]] : i32
+  // CHECK: stream.async.collective<send_recv : f32>
+  // CHECK-SAME: source_target_pair([[PARAM]])
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<1024xf32>
+  %1 = flow.tensor.empty : tensor<1024xf32>
+  %2 = flow.collective.send_recv f32, %1, %0, %channel, %send, %recv : (tensor<1024xf32>, tensor<1024xf32>, !flow.channel, i32, i32) -> tensor<1024xf32>
+  %3 = hal.tensor.export %2 : tensor<1024xf32> -> !hal.buffer_view
+  return %3 : !hal.buffer_view
+}

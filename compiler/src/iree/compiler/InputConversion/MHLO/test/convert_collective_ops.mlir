@@ -470,3 +470,27 @@ module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 
     return %out : tensor<2304xf32>
   }
 }
+
+// -----
+
+// CHECK-LABEL: @collective_permute
+// CHECK-SAME: ([[ARG0:%.+]]: tensor<8xf32>) -> tensor<8xf32>
+func.func @collective_permute(%input : tensor<8xf32>) -> tensor<8xf32> {
+  // CHECK: [[CST_BUFFER_SIZE:%.+]] = arith.constant 20 : index
+  // CHECK: [[CST_4:%.+]] = arith.constant 4 : index
+  // CHECK: [[CHANNEL:%.+]] = flow.channel.default : !flow.channel
+  // CHECK: [[RANK:%.+]] = flow.channel.rank [[CHANNEL]] : index
+  // CHECK: [[INDEX:%.+]] = arith.minsi [[RANK]], [[CST_4]] : index
+  // CHECK: [[CST_SEND_BUFFER:%.+]] = util.buffer.constant : !util.buffer = dense<[1, 2, 3, 0, -1]> : tensor<5xi32>
+  // CHECK: [[INDEX_MUL4:%.+]] = arith.muli [[INDEX]], [[CST_4]] : index
+  // CHECK: [[SEND:%.+]] = util.buffer.load [[CST_SEND_BUFFER]]{{\[}}[[INDEX_MUL4]] for [[CST_4]]] : !util.buffer{[[CST_BUFFER_SIZE]]} -> i32
+  // CHECK: [[CST_RECV_BUFFER:%.+]] = util.buffer.constant : !util.buffer = dense<[3, 0, 1, 2, -1]> : tensor<5xi32>
+  // CHECK: [[RECV:%.+]] = util.buffer.load [[CST_RECV_BUFFER]]{{\[}}[[INDEX_MUL4]] for [[CST_4]]] : !util.buffer{[[CST_BUFFER_SIZE]]} -> i32
+  // CHECK: [[EMPTY:%.+]] = tensor.empty() : tensor<8xf32>
+  // CHECK: [[OP:%.+]] = flow.collective.send_recv f32, [[EMPTY]], [[ARG0]], [[CHANNEL]], [[SEND]], [[RECV]] : (tensor<8xf32>, tensor<8xf32>, !flow.channel, i32, i32) -> [[EMPTY]] as tensor<8xf32>
+  // CHECK: return [[OP]] : tensor<8xf32>
+  %out = "mhlo.collective_permute"(%input) {
+        source_target_pairs = dense<[[0, 1], [1, 2], [2, 3], [3, 0]]> : tensor<4x2xi64>,
+        channel_handle = #mhlo.channel_handle<handle = 1, type = 1>} : (tensor<8xf32>) -> tensor<8xf32>
+  return %out : tensor<8xf32>
+}

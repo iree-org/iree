@@ -459,6 +459,44 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
                            "ncclRecv");
       break;
     }
+    case IREE_HAL_COLLECTIVE_KIND_SEND_RECV: {
+      CUdeviceptr sendbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
+          entry->send_binding.offset;
+      CUdeviceptr recvbuff =
+          iree_hal_cuda_buffer_device_pointer(
+              iree_hal_buffer_allocated_buffer(entry->recv_binding.buffer)) +
+          iree_hal_buffer_byte_offset(entry->recv_binding.buffer) +
+          entry->recv_binding.offset;
+      int16_t sendid;
+      int16_t recvid;
+      memcpy(&sendid, &entry->param, 2);
+      memcpy(&recvid, (char*)&entry->param + 2, 2);
+      if (sendid != -1) {
+        NCCL_RETURN_IF_ERROR(
+            syms,
+            ncclSend((const void*)sendbuff, entry->element_count, datatype,
+                     sendid, comm, stream),
+            "ncclSend");
+      }
+      if (recvid != -1) {
+        NCCL_RETURN_IF_ERROR(syms,
+                             ncclRecv((void*)recvbuff, entry->element_count,
+                                      datatype, recvid, comm, stream),
+                             "ncclRecv");
+      } else {
+        // Zero out recvbuff if this rank is not receiving any data.
+        iree_device_size_t num_bytes =
+            entry->element_count *
+            iree_hal_collective_element_byte_count(entry->op.element_type);
+        CUDA_RETURN_IF_ERROR(syms,
+                             cuMemsetD8Async(recvbuff, 0, num_bytes, stream),
+                             "cuMemsetD8Async");
+      }
+      break;
+    }
   }  // switch
   return iree_ok_status();
 }

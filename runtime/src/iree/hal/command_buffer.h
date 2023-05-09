@@ -298,8 +298,19 @@ enum iree_hal_collective_kind_e {
   //   ncclRecv
   IREE_HAL_COLLECTIVE_KIND_RECV,
 
+  // |param| is used to store the target rank in the low 16 bits, and the source
+  // rank in the high 16 bits. Sends |element_count| elements of the specified
+  // type in |send_binding| the target rank, unless it is -1. Receives
+  // |element_count| elements of the specified type in |recv_binding| from
+  // source rank, unless it is -1, then the result will be all zeros.
+  //
+  // |param|: first 16 bits are the target, last 16 bits are the source
+  // |send_binding|: used on source
+  // |recv_binding|: used on target
+  IREE_HAL_COLLECTIVE_KIND_SEND_RECV,
+
   // Maximum enumeration value for collective operations.
-  IREE_HAL_COLLECTIVE_KIND_MAX_VALUE = IREE_HAL_COLLECTIVE_KIND_RECV,
+  IREE_HAL_COLLECTIVE_KIND_MAX_VALUE = IREE_HAL_COLLECTIVE_KIND_SEND_RECV,
 };
 typedef uint8_t iree_hal_collective_kind_t;
 

@@ -158,6 +158,7 @@ def Stream_CollectiveKind_Reduce : I32EnumAttrCase<"Reduce", 4, "reduce">;
 def Stream_CollectiveKind_ReduceScatter : I32EnumAttrCase<"ReduceScatter", 5, "reduce_scatter">;
 def Stream_CollectiveKind_Send : I32EnumAttrCase<"Send", 6, "send">;
 def Stream_CollectiveKind_Recv : I32EnumAttrCase<"Recv", 7, "recv">;
+def Stream_CollectiveKind_SendRecv : I32EnumAttrCase<"SendRecv", 8, "send_recv">;
 def Stream_CollectiveKindAttr :
     I32EnumAttr<"CollectiveKind", "valid CollectiveKind", [
       Stream_CollectiveKind_AllGather,
@@ -168,6 +169,7 @@ def Stream_CollectiveKindAttr :
       Stream_CollectiveKind_ReduceScatter,
       Stream_CollectiveKind_Send,
       Stream_CollectiveKind_Recv,
+      Stream_CollectiveKind_SendRecv,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
 }
