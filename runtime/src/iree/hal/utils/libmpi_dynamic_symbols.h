@@ -18,3 +18,7 @@ MPI_PFN_DECL(MPI_Comm_split, IREE_MPI_Comm comm, int color, int key,
 MPI_PFN_DECL(ompi_mpi_byte)
 MPI_PFN_DECL(ompi_mpi_comm_world)
 #endif  // IREE_MPI_TYPES_ARE_POINTERS
+
+// MPI error handling
+MPI_PFN_DECL(MPI_Error_class, int err_code, int* err_class)
+MPI_PFN_DECL(MPI_Error_string, int err_code, char* string, int* resultlen)
