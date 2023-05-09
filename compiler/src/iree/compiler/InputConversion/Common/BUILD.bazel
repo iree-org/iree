@@ -84,9 +84,9 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
-    name = "InputConversionPipeline",
+    name = "AutoInputConversionPipeline",
     srcs = [
-        "InputConversionPipeline.cpp",
+        "AutoInputConversionPipeline.cpp",
     ],
     hdrs = [
         "Passes.h",

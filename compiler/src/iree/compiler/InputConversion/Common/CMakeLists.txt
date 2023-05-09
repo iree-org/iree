@@ -85,12 +85,12 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    InputConversionPipeline
+    AutoInputConversionPipeline
   HDRS
     "Passes.h"
     "Utils.h"
   SRCS
-    "InputConversionPipeline.cpp"
+    "AutoInputConversionPipeline.cpp"
   DEPS
     ${IREE_INPUT_DEPS}
     ::PassHeaders

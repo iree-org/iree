@@ -28,8 +28,8 @@
 
 namespace mlir::iree_compiler {
 
-struct InputConversionPipelinePass
-    : public InputConversionPipelineBase<InputConversionPipelinePass> {
+struct AutoInputConversionPipelinePass
+    : public AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
   void runOnOperation() override;
 };
 
@@ -50,23 +50,39 @@ struct InputFeatures {
 
 static void populateHloFeatures(Operation* op, InputFeatures& features) {
   features.hasMHLO = true;
-  if (features.hasTuples) return;
+  if (features.hasTuples) {
+    return;
+  }
 
   if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
     FunctionType type = dyn_cast<FunctionType>(funcOp.getFunctionType());
     for (auto t : type.getResults()) {
-      if (isa<TupleType>(t)) return (void)(features.hasTuples = true);
+      if (isa<TupleType>(t)) {
+        features.hasTuples = true;
+        return;
+      }
     }
     for (auto t : type.getInputs()) {
-      if (isa<TupleType>(t)) return (void)(features.hasTuples = true);
+      if (isa<TupleType>(t)) {
+        features.hasTuples = true;
+        return;
+      }
     }
   }
 
   // Check for tuple operands or results.
-  for (auto t : op->getOperandTypes())
-    if (isa<TupleType>(t)) return (void)(features.hasTuples = true);
-  for (auto t : op->getResultTypes())
-    if (isa<TupleType>(t)) return (void)(features.hasTuples = true);
+  for (auto t : op->getOperandTypes()) {
+    if (isa<TupleType>(t)) {
+      features.hasTuples = true;
+      return;
+    }
+  }
+  for (auto t : op->getResultTypes()) {
+    if (isa<TupleType>(t)) {
+      features.hasTuples = true;
+      return;
+    }
+  }
 }
 
 static void populateFeatures(Operation* op, const Dialect* mhloDialect,
@@ -74,12 +90,20 @@ static void populateFeatures(Operation* op, const Dialect* mhloDialect,
                              const Dialect* tosaDialect,
                              InputFeatures& features) {
   Dialect* d = op->getDialect();
-  if (d == mhloDialect) return populateHloFeatures(op, features);
-  if (d == tosaDialect) return (void)(features.hasTOSA = true);
-  if (d == tmTensorDialect) return (void)(features.hasTmTensor = true);
+  if (d == mhloDialect) {
+    return populateHloFeatures(op, features);
+  }
+  if (d == tosaDialect) {
+    features.hasTOSA = true;
+    return;
+  }
+  if (d == tmTensorDialect) {
+    features.hasTmTensor = true;
+    return;
+  }
 }
 
-void InputConversionPipelinePass::runOnOperation() {
+void AutoInputConversionPipelinePass::runOnOperation() {
   ModuleOp module = getOperation();
   MLIRContext* ctxt = &getContext();
 
@@ -87,7 +111,9 @@ void InputConversionPipelinePass::runOnOperation() {
   const Dialect* mhloDialect = ctxt->getLoadedDialect("mhlo");
   const Dialect* tosaDialect = ctxt->getLoadedDialect("tosa");
   const Dialect* tmTensorDialect = ctxt->getLoadedDialect("tm_tensor");
-  if (!mhloDialect && !tosaDialect && !tmTensorDialect) return;
+  if (!mhloDialect && !tosaDialect && !tmTensorDialect) {
+    return;
+  }
 
   auto res = module.walk([&](Operation* op) {
     populateFeatures(op, mhloDialect, tmTensorDialect, tosaDialect, features);
@@ -105,28 +131,38 @@ void InputConversionPipelinePass::runOnOperation() {
     }
     return WalkResult::advance();
   });
-  if (res.wasInterrupted()) return signalPassFailure();
-  if (!features.hasMHLO && !features.hasTOSA && !features.hasTmTensor) return;
+  if (res.wasInterrupted()) {
+    return signalPassFailure();
+  }
+  if (!features.hasMHLO && !features.hasTOSA && !features.hasTmTensor) {
+    return;
+  }
 
   OpPassManager pm(ModuleOp::getOperationName(),
                    OpPassManager::Nesting::Explicit);
   if (features.hasMHLO) {
-    if (features.hasTuples)
+    if (features.hasTuples) {
       MHLO::buildXLAInputConversionPassPipeline(pm);
-    else
+    } else {
       MHLO::buildMHLOInputConversionPassPipeline(pm);
+    }
   }
-  if (features.hasTOSA) buildTOSAInputConversionPassPipeline(pm);
+  if (features.hasTOSA) {
+    buildTOSAInputConversionPassPipeline(pm);
+  }
   if (features.hasTmTensor) {
     pm.addNestedPass<func::FuncOp>(
         TMTensor::createConvertTMTensorToLinalgExtPass());
   }
 
-  if (failed(runPipeline(pm, module))) signalPassFailure();
+  if (failed(runPipeline(pm, module))) {
+    signalPassFailure();
+  }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createInputConversionPipelinePass() {
-  return std::make_unique<InputConversionPipelinePass>();
+std::unique_ptr<OperationPass<ModuleOp>>
+createAutoInputConversionPipelinePass() {
+  return std::make_unique<AutoInputConversionPipelinePass>();
 }
 
 }  // namespace mlir::iree_compiler
