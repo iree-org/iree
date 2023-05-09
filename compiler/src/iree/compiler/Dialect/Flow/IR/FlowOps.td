@@ -947,6 +947,11 @@ def FLOW_CallOp : FLOW_Op<"call", [
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
     }
 
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
     // StreamableOpInterface:
     bool isTransfer() { return false; }
 

@@ -39,7 +39,7 @@ using transform::MatchOp;
 using transform::MergeHandlesOp;
 using transform::PrintOp;
 using transform::SequenceOp;
-using transform::SplitHandlesOp;
+using transform::SplitHandleOp;
 using transform::SplitReductionOp;
 using transform::TileToForallOp;
 using transform::VectorizeOp;
@@ -53,8 +53,8 @@ template <int N, typename... MatchingArgs>
 auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
                     MatchingArgs... args) {
   Value matchedH = b.create<MatchOp>(targetH, args...);
-  auto matchOp = b.create<SplitHandlesOp>(matchedH,
-                                          /*numHandles=*/N);
+  auto matchOp = b.create<SplitHandleOp>(matchedH,
+                                         /*numHandles=*/N);
   assert(matchOp->getNumResults() == N && "Unexpected number of results");
   std::array<Value, N> a;
   for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
