@@ -23,9 +23,9 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")"
 readonly REPO_ROOT="${SCRIPT_DIR}/../../"
-readonly WORKFLOW="$1"
-readonly GITHUB_RUN_ID="$2"
-readonly GITHUB_RUN_ATTEMPT="$3"
+readonly WORKFLOW="${1}"
+readonly GITHUB_RUN_ID="${2}"
+readonly GITHUB_RUN_ATTEMPT="${3}"
 readonly CLOUD_FUNCTION_URL="https://oobi-${WORKFLOW}-importer-zbhz5clunq-uc.a.run.app"
 
 source "${REPO_ROOT}/build_tools/github_actions/runner/config/functions.sh"
