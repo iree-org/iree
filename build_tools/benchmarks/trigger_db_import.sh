@@ -21,8 +21,12 @@
 
 set -euo pipefail
 
-readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+readonly SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")"
 readonly REPO_ROOT="${SCRIPT_DIR}/../../"
+readonly WORKFLOW="$1"
+readonly GITHUB_RUN_ID="$2"
+readonly GITHUB_RUN_ATTEMPT="$3"
+readonly CLOUD_FUNCTION_URL="https://oobi-${WORKFLOW}-importer-zbhz5clunq-uc.a.run.app"
 
 source "${REPO_ROOT}/build_tools/github_actions/runner/config/functions.sh"
 
@@ -40,27 +44,22 @@ if [[ $# -ne 3 ]]; then
   usage
 fi
 
-if [[ "$1" != "presubmit" && "$1" != "postsubmit" ]]; then
+if [[ "${WORKFLOW}" != "presubmit" && "${WORKFLOW}" != "postsubmit" ]]; then
   echo -e "<importer> can be either 'presubmit' or 'postsubmit'.\n" >&2
   usage
 fi
 
-if ! [[ "$2" -gt 0 ]] 2>/dev/null; then
+if ! [[ "${GITHUB_RUN_ID}" -gt 0 ]] 2>/dev/null; then
   echo -e "<github_run_id> must be a positive integer!\n" >&2
   usage
 fi
 
-if ! [[ "$3" -gt 0 ]] 2>/dev/null; then
+if ! [[ "${GITHUB_RUN_ATTEMPT}" -gt 0 ]] 2>/dev/null; then
   echo -e "<github_run_attempt> must be a positive integer!\n" >&2
   usage
 fi
 
-readonly WORKFLOW="$1"
-readonly GITHUB_RUN_ID="$2"
-readonly GITHUB_RUN_ATTEMPT="$3"
-readonly CLOUD_FUNCTION_URL="https://oobi-$WORKFLOW-importer-zbhz5clunq-uc.a.run.app"
-
-if [[ -v GITHUB_ACTION ]]; then
+if [[ -v GITHUB_ACTIONS ]]; then
   # This means we run as part of a GitHub Actions workflow and will get our ID token through the runner's service account
   readonly ID_TOKEN="$(get_metadata "instance/service-accounts/default/identity?audience=${CLOUD_FUNCTION_URL}&format=full")"
 else
