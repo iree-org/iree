@@ -18,14 +18,32 @@ namespace mlir {
 namespace iree_compiler {
 
 std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
+  if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
+    return loc;
+  }
+
   if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
+    // Recurse through fused locations.
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
       if (childResult) return childResult;
     }
-  } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
-    return loc;
+  } else if (auto loc = baseLoc.dyn_cast<CallSiteLoc>()) {
+    // First check caller...
+    auto callerResult = findFirstFileLoc(loc.getCaller());
+    if (callerResult) return callerResult;
+    // Then check callee...
+    auto calleeResult = findFirstFileLoc(loc.getCallee());
+    if (calleeResult) return calleeResult;
+  } else if (auto loc = baseLoc.dyn_cast<NameLoc>()) {
+    auto childResult = findFirstFileLoc(loc.getChildLoc());
+    if (childResult) return childResult;
+  } else if (auto loc = baseLoc.dyn_cast<OpaqueLoc>()) {
+    // TODO(scotttodd): Use loc.fallbackLocation()?
+  } else if (auto loc = baseLoc.dyn_cast<UnknownLoc>()) {
+    // ¯\_(ツ)_/¯
   }
+
   return std::nullopt;
 }
 
