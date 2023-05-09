@@ -13,6 +13,7 @@ on:
     # Scheduled to run at 09:00 UTC and 21:00 UTC.
     - cron: '0 09,21 * * *'
   workflow_dispatch:
+  pull_request:
 
 env:
   # This needs to be in env instead of the outputs of setup because it contains
