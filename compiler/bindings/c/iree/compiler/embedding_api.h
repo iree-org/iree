@@ -17,7 +17,6 @@
 #ifndef IREE_COMPILER_EMBEDDING_API_H
 #define IREE_COMPILER_EMBEDDING_API_H
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
