@@ -13,6 +13,7 @@
 // summaries of HAL objects in lists. We should have a better way of doing this
 // dynamically vs hard depending on a type switch here.
 #include "iree/modules/hal/module.h"
+#include "iree/tooling/modules/resolver.h"
 #include "iree/vm/api.h"
 #include "pybind11/numpy.h"
 
@@ -129,6 +130,26 @@ void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
 //------------------------------------------------------------------------------
 // VmModule
 //------------------------------------------------------------------------------
+
+VmModule VmModule::ResolveModuleDependency(VmInstance* instance,
+                                           const std::string& name,
+                                           uint32_t minimum_version) {
+  IREE_TRACE_SCOPE0("VmModule::ResolveModuleDependency");
+  iree_vm_module_t* module = nullptr;
+
+  iree_vm_module_dependency_t dependency = {
+      iree_make_cstring_view(name.c_str()), minimum_version,
+      IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED};
+
+  auto status = iree_tooling_resolve_module_dependency(
+      instance->raw_ptr(), &dependency, iree_allocator_system(), &module);
+
+  assert(module != nullptr);
+
+  CheckApiStatus(status, "Error resolving module dependency");
+  auto py_module = VmModule::StealFromRawPtr(module);
+  return py_module;
+}
 
 VmModule VmModule::FromFlatbufferBlob(VmInstance* instance,
                                       py::object flatbuffer_blob_object) {
@@ -638,6 +659,8 @@ void SetupVmBindings(pybind11::module m) {
       .def("invoke", &VmContext::Invoke);
 
   py::class_<VmModule>(m, "VmModule")
+      .def_static("resolve_module_dependency",
+                  &VmModule::ResolveModuleDependency)
       .def_static("from_flatbuffer", &VmModule::FromFlatbufferBlob)
       .def_property_readonly("name", &VmModule::name)
       .def_property_readonly("version",
