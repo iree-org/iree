@@ -177,3 +177,20 @@ func.func @ukernel_generic_test_fndef_attrs(%arg0 : memref<?xf32, strided<[1], o
 //      CHECK: func.func private @test1d(memref<f32>, index, index)
 // CHECK-SAME:     hal.import.fields = ["processor_id", "processor_data"]
 
+// -----
+
+func.func @ukernel_address_cast() {
+  %0 = memref.alloc() : memref<4x256xf32, #gpu.address_space<workgroup>>
+  %1 = memref.alloc() : memref<4x128xf32, #gpu.address_space<workgroup>>
+  iree_codegen.ukernel.generic "testme" ins(%0 : memref<4x256xf32, #gpu.address_space<workgroup>>) outs(%1 : memref<4x128xf32, #gpu.address_space<workgroup>>)
+  return
+}
+
+
+// CHECK:     %[[IN:.+]] = memref.alloc() : memref<4x256xf32, #gpu.address_space<workgroup>>
+// CHECK:     %[[OUT:.+]] = memref.alloc() : memref<4x128xf32, #gpu.address_space<workgroup>>
+// CHECK:     %[[CIN:.+]] = memref.memory_space_cast %[[IN]] : memref<4x256xf32, #gpu.address_space<workgroup>> to memref<4x256xf32>
+// CHECK:     %[[COUT:.+]] = memref.memory_space_cast %[[OUT]] : memref<4x128xf32, #gpu.address_space<workgroup>> to memref<4x128xf32>
+// CHECK:     %[[BASE:.+]], %{{.*}}, %{{.*}}:2, %{{.*}}:2 = memref.extract_strided_metadata %[[CIN]] : memref<4x256xf32> -> memref<f32>, index, index, index, index, index
+// CHECK:     %[[BASE2:.+]], %{{.*}}, %{{.*}}:2, %{{.*}}:2 = memref.extract_strided_metadata %[[COUT]] : memref<4x128xf32> -> memref<f32>, index, index, index, index, index
+// CHECK:     call @testme(%[[BASE]], %offset, %strides#0, %strides#1, %[[BASE2]], %offset_3, %strides_5#0, %strides_5#1) : (memref<f32>, index, index, index, memref<f32>, index, index, index) -> ()
