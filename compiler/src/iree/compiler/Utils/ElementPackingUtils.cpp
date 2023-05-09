@@ -24,7 +24,7 @@ bool needToPackSubByteElementBitWidth(unsigned bitwidth) {
 }
 
 bool needToPackSubByteElements(RankedTensorType shapedType) {
-  unsigned bitwidth = shapedType.getElementType().getIntOrFloatBitWidth();
+  unsigned bitwidth = IREE::Util::getTypeBitWidth(shapedType.getElementType());
   return needToPackSubByteElementBitWidth(bitwidth);
 }
 
@@ -51,7 +51,7 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           OpBuilder &builder) {
   Type alignedElementType =
       legalizeStorageElementType(shapedType.getElementType());
-  unsigned elementBits = alignedElementType.getIntOrFloatBitWidth();
+  unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
 
   // Calculate all static dims first, if any.
   int64_t staticCount = 1;
@@ -92,7 +92,7 @@ Value calculateStorageElementOffsetInBytes(Location loc,
                                            OpBuilder &builder) {
   Type alignedElementType =
       legalizeStorageElementType(originalType.getElementType());
-  unsigned elementBits = alignedElementType.getIntOrFloatBitWidth();
+  unsigned elementBits = IREE::Util::getTypeBitWidth(alignedElementType);
 
   // Sub-byte packing requires putting multiple elements in the same byte.
   if (needToPackSubByteElementBitWidth(elementBits)) {
