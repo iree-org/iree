@@ -367,9 +367,10 @@ struct ConvertStableHloToIreeInputDialects final
 
     populateStableHloToLinalgOnTensorsConversionPatterns(
         context, *typeConverter, &patterns);
+    populateStableHloCollectivesConversionPatterns(context, *typeConverter,
+                                                   &patterns);
 
     // TODO(#12678): Handle remaining complex ops.
-    // TODO(#12678): Handle collective ops.
 
     // TODO(*): expose patterns that do this much better from
     // iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp

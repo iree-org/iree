@@ -45,6 +45,12 @@ void populateStableHloToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns);
 
+/// Populates the patterns that convert from StableHLO collective ops to Flow
+/// ops.
+void populateStableHloCollectivesConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
+
 //===----------------------------------------------------------------------===//
 // Fine-grained patterns used by the implementation.
 //===----------------------------------------------------------------------===//
