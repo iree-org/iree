@@ -465,6 +465,16 @@ static bool isProjectedMap(AffineMap map, int64_t projectedDim) {
   return true;
 }
 
+/// Helper to turn a potentially negative index to positive within the range [0,
+/// ub] and indicate whether the transformed index is in bounds.
+static bool makeValidPositiveIndex(int64_t &index, int64_t ub) {
+  int64_t positiveIndex = index >= 0 ? index : ub + index;
+  if (positiveIndex < 0 || ub < positiveIndex)
+    return false;
+  index = positiveIndex;
+  return true;
+}
+
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
                                           IsProjected dim) {
@@ -473,10 +483,14 @@ transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
                llvm::interleaveComma(positions, llvm::dbgs());
                llvm::dbgs() << " have a permutation maps with " << dim.value
                             << " projected");
-    int64_t updatedDim =
-        dim.value >= 0 ? dim.value : linalgOp.getNumLoops() + dim.value;
+    int64_t updatedDim = dim.value;
+    if (!makeValidPositiveIndex(updatedDim, linalgOp.getNumLoops()))
+      return false;
     for (int64_t position : positions) {
-      OpOperand *operand = linalgOp.getDpsInputOperand(position);
+      int64_t updatedPosition = position;
+      if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+        return false;
+      OpOperand *operand = linalgOp.getDpsInputOperand(updatedPosition);
       if (!isProjectedMap(linalgOp.getMatchingIndexingMap(operand), updatedDim))
         return false;
     }
@@ -508,8 +522,9 @@ transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
                llvm::dbgs() << " have identity maps");
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (int64_t position : positions) {
-      int64_t updatedPosition =
-          position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
+      int64_t updatedPosition = position;
+      if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+        return false;
       OpOperand *operand = linalgOp.getDpsInputOperand(updatedPosition);
       if (!linalgOp.getMatchingIndexingMap(operand).isIdentity())
         return false;
@@ -525,9 +540,8 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "input operand #" << position
                       << " has elemental type with bit width " << width.value);
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInputs())
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
       return false;
     auto shapedType = linalgOp.getDpsInputOperand(updatedPosition)
                           ->get()
@@ -544,9 +558,8 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
                                           CaptureElementTypeBitWidth width) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "input operand #" << position << " capture bitwidth");
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInputs())
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
       return false;
     auto shapedType = linalgOp.getDpsInputOperand(updatedPosition)
                           ->get()
@@ -555,6 +568,27 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
     if (!shapedType || !shapedType.getElementType().isIntOrFloat())
       return false;
     width.value = shapedType.getElementType().getIntOrFloatBitWidth();
+    return true;
+  });
+  return *this;
+}
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::input(int64_t position,
+                                          CaptureElementType elem) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "input operand #" << position
+                      << " capture element type");
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+      return false;
+    auto shapedType = linalgOp.getDpsInputOperand(updatedPosition)
+                          ->get()
+                          .getType()
+                          .dyn_cast<ShapedType>();
+    if (!shapedType)
+      return false;
+    elem.value = shapedType.getElementType();
     return true;
   });
   return *this;
@@ -587,9 +621,8 @@ transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::input(
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "input operands " << position
                       << " is a special floating point constant");
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInputs() + position;
-    if (0 > updatedPosition || updatedPosition >= linalgOp.getNumDpsInputs())
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
       return false;
     auto cstOp = linalgOp.getDpsInputOperand(updatedPosition)
                      ->get()
@@ -614,13 +647,11 @@ void transform_ext::StructuredOpMatcher::addOutputMatcher(
                       << (optional.value ? " (optional match) "
                                          : " (mandatory match) ")
                       << "is produced by\n");
-    int64_t transformedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (transformedPosition >= linalgOp.getNumDpsInits())
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
       return false;
-
     Operation *definingOp =
-        linalgOp.getDpsInitOperand(transformedPosition)->get().getDefiningOp();
+        linalgOp.getDpsInitOperand(updatedPosition)->get().getDefiningOp();
     if (!definingOp)
       return optional.value;
     // We MUST run the matcher at this point, even if the match is optional,
@@ -665,8 +696,9 @@ transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(AllOperands tag, IsProjected dim) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have a maps with projected");
-    int64_t updatedDim =
-        dim.value >= 0 ? dim.value : linalgOp.getNumLoops() + dim.value;
+    int64_t updatedDim = dim.value;
+    if (!makeValidPositiveIndex(updatedDim, linalgOp.getNumLoops()))
+      return false;
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
       if (!isProjectedMap(linalgOp.getMatchingIndexingMap(operand), updatedDim))
@@ -715,9 +747,8 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
                                            CaptureElementTypeBitWidth width) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position << " capture bitwidth");
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInits())
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
       return false;
     auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
                           ->get()
@@ -733,13 +764,33 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
 
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(int64_t position,
+                                           CaptureElementType elem) {
+  predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
+    LLVM_DEBUG(DBGS() << "output operand #" << position
+                      << " capture element type");
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
+      return false;
+    auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
+                          ->get()
+                          .getType()
+                          .dyn_cast<ShapedType>();
+    if (!shapedType)
+      return false;
+    elem.value = shapedType.getElementType();
+    return true;
+  });
+  return *this;
+}
+
+transform_ext::StructuredOpMatcher &
+transform_ext::StructuredOpMatcher::output(int64_t position,
                                            SingleCombinerReduction tag) {
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << " is populated by a single-combiner reduction");
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInits())
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
       return false;
     SmallVector<Operation *> combinerOps;
     return matchReduction(linalgOp.getRegionOutputArgs(), updatedPosition,
@@ -771,9 +822,8 @@ void transform_ext::StructuredOpMatcher::addResultMatcher(
                       << (optional.value ? " (optional match) "
                                          : " (mandatory match) ")
                       << "has a use\n");
-    int64_t transformedPosition =
-        position >= 0 ? position : linalgOp->getNumResults() + position;
-    if (transformedPosition >= linalgOp->getNumResults())
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp->getNumResults()))
       return false;
 
     // We MUST run the matcher at this point, even if the match is optional,
@@ -781,7 +831,7 @@ void transform_ext::StructuredOpMatcher::addResultMatcher(
     LLVM_DEBUG(DBGS() << "start recursive match {\n");
     auto debugRAII = llvm::make_scope_exit(
         [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
-    if (llvm::any_of(linalgOp->getResult(transformedPosition).getUsers(),
+    if (llvm::any_of(linalgOp->getResult(updatedPosition).getUsers(),
                      [&matcher](Operation *op) { return matcher(op); })) {
       return true;
     }
@@ -1036,7 +1086,11 @@ void transform_ext::makeMatmulMatcher(
     transform_ext::MatchedMatmulCaptures &captures) {
   auto &matmul = transform_ext::m_StructuredOp<linalg::MatmulOp>(matcherContext)
                      // Capture op sizes.
-                     .dim(AllDims(), CaptureDims(captures.matmulOpSizes));
+                     .dim(AllDims(), CaptureDims(captures.matmulOpSizes))
+                     // Capture input/output element types.
+                     .input(0, CaptureElementType(captures.lhsElementType))
+                     .input(1, CaptureElementType(captures.rhsElementType))
+                     .output(0, CaptureElementType(captures.outputElementType));
   matmulCapture = &matmul;
   // Mandatory FillOp must create the unique output of the reduction.
   auto &fill = transform_ext::m_StructuredOp<linalg::FillOp>(matcherContext);

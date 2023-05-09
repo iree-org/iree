@@ -87,6 +87,11 @@ struct CaptureElementTypeBitWidth : public CaptureStaticValue<int64_t> {
   using Base::Base;
 };
 
+/// Captures element element type.
+struct CaptureElementType : public CaptureStaticValue<Type> {
+  using Base::Base;
+};
+
 /// A tag indicating to look for any user of the operation's result that would
 /// satisfy the predicate.
 struct HasAnyUse {};
@@ -447,6 +452,9 @@ public:
   StructuredOpMatcher &input(int64_t position,
                              CaptureElementTypeBitWidth width);
 
+  /// Capture the elemental type of input operand `position`.
+  StructuredOpMatcher &input(int64_t position, CaptureElementType elem);
+
   /// Check if input is equal to a known constant.
   // TODO: Support matching for constant ops.
   StructuredOpMatcher &input(int64_t position, ConstantFloatMinOrMinusInf);
@@ -504,6 +512,9 @@ public:
   /// Capture the elemental type bitwidth of output operand `position`.
   StructuredOpMatcher &output(int64_t position,
                               CaptureElementTypeBitWidth width);
+
+  /// Capture the elemental type of output operand `position`.
+  StructuredOpMatcher &output(int64_t position, CaptureElementType elem);
 
   /// Adds a predicate checking that the output of the structured op is produced
   /// by a reduction with a single-operation combinator (such as addf or mulf,
@@ -741,7 +752,7 @@ struct MatchedReductionCaptures {
 };
 
 struct MatchedMatmulCaptures {
-  Type lhsType, rhsType, outputType;
+  Type lhsElementType, rhsElementType, outputElementType;
   SmallVector<int64_t> matmulOpSizes = {};
 };
 
