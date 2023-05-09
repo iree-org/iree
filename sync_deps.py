@@ -7,9 +7,9 @@
 ### Update with: openxla-workspace pin
 
 PINNED_VERSIONS = {
-  "iree": "3679e9cfd77edcd96f0174ded28993a6bafa9128",
-  "xla": "edf740d2dcf4d05ce28fa8ffb739c55b9cad1247",
-  "jax": "47df8628a0fa83900e38431c88a7a0e27660b7aa"
+  "iree": "f3e70439739249dd8f24c6930e8b04666f8a95d6",
+  "xla": "dad64948516e3672b3e2518945831a70b5e90b81",
+  "jax": "68ba54241c3fe6a192c26e8cd8f49690111bbaa3"
 }
 
 ORIGINS = {
@@ -102,8 +102,7 @@ def main():
         update_args.extend(["--depth", "1"])
       update_args.extend(["--"])
       update_args.extend(submodules)
-      if (len(submodules) > 0):
-        run(update_args, repo_dir)
+      run(update_args, repo_dir)
 
 
 def run(args,
