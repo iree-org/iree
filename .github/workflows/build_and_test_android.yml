@@ -106,11 +106,13 @@ jobs:
 
   test:
     # These physical devices are not scalable. Only run on postsubmit for now.
-    # if: (! inputs.is-pr)
+    if: (! inputs.is-pr)
     needs: cross_compile
     strategy:
       matrix:
         target:
+          # Pixel 4 ships an old Adreno GPU driver. There are quite a few bugs
+          # triggered by our tests. Disable running tests entirely on Pixel 4.
           - device-name: pixel-4
             label-exclude: "vulkan"
           - device-name: pixel-6-pro
