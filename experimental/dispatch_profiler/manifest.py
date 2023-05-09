@@ -1,14 +1,15 @@
-# Copyright 2023 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import enum, os, shutil, pickle
+import enum, shutil, pickle
 from library import *
 from matmul import *
 from batch_matmul import *
 from split_k_matmul import *
+from pathlib import Path
 
 
 ###############################################################################
@@ -21,8 +22,8 @@ class EmitSourceMLIR:
     self.operation = dispatch_collection.operation
     self.operation_kind = self.operation.operation_kind
     self.configuration_list = dispatch_collection.configuration_list
-    self.operation_filepath = os.path.join(self.operation_path,
-                                           self.operation.name() + ".mlir")
+    self.operation_filepath = self.operation_path.joinpath(
+        self.operation.name()).with_suffix(".mlir")
 
     mlir_configuration_emitter = {
         OperationKind.Matmul: EmitMatmulCompilationInfo,
@@ -41,7 +42,7 @@ class EmitSourceMLIR:
 
   def __enter__(self):
     self.operation_file = open(self.operation_filepath, "w")
-    self.operation_file.write('// Finename: ' + self.operation_filepath)
+    self.operation_file.write(f'// Finename: {self.operation_filepath}')
 
     # Emit all the configuration attribute tags.
     for configuration in self.configuration_list:
@@ -117,16 +118,16 @@ class Manifest:
       self.dispatch_names = [x for x in args.dispatches.split(',') if x != '']
 
     # Paths to the generated directory (e.g. `./generated/linalg`).
-    self.generated_path = os.path.join(self.args.build_dir, 'generated',
-                                       self.args.mlir_dialect)
+    self.generated_path = Path(self.args.build_dir, 'generated',
+                               self.args.mlir_dialect)
 
     # Create the directories in self.generated_path, if it does not exist.
-    if not os.path.exists(self.generated_path):
-      os.makedirs(self.generated_path)
+    if not self.generated_path.exists():
+      self.generated_path.mkdir(parents=True, exist_ok=True)
 
     # Path to the serialized file.
-    self.serialized_file_path = os.path.join(self.generated_path,
-                                             'serialized_file.pkl')
+    self.serialized_file_path = self.generated_path.joinpath(
+        'serialized_file.pkl')
 
   def _filter_string_matches(self, filter_string, haystack):
     """Returns true if all substrings appear in the haystack in order"""
@@ -212,7 +213,7 @@ class Manifest:
 
   def load(self):
     """Deserialize (load) the self.dispatch_collection_map from a pickle file."""
-    if not os.path.exists(self.serialized_file_path):
+    if not self.serialized_file_path.exists():
       raise ValueError(f"Could not find : {self.serialized_file_path}")
 
     with open(self.serialized_file_path, 'rb') as load_file:
@@ -228,28 +229,26 @@ class Manifest:
     for operation_kind, dispatch_collection_list\
       in self.dispatch_collection_map.items():
 
-      operation_kind_path = os.path.join(self.generated_path,
-                                         OperationKindNames[operation_kind])
+      operation_kind_path = self.generated_path.joinpath(
+          OperationKindNames[operation_kind])
 
       # If the operation_kind_path does not exists, create it.
-      if not os.path.exists(operation_kind_path):
-        os.makedirs(operation_kind_path)
+      if not operation_kind_path.exists():
+        operation_kind_path.mkdir(parents=True, exist_ok=True)
 
       for dispatch_collection in dispatch_collection_list:
 
-        operation_path = os.path.join(operation_kind_path,
-                                      dispatch_collection.operation.name())
+        operation_path = operation_kind_path.joinpath(
+            dispatch_collection.operation.name())
 
         # If the operation_path does not exists, create it.
-        if not os.path.exists(operation_path):
-          os.makedirs(operation_path)
+        if not operation_path.exists():
+          operation_path.mkdir()
 
         with EmitSourceMLIR(operation_path,
                             dispatch_collection) as emit_mlir_source:
-          mlir_file_path = os.path.join(
-              operation_path,
-              ".".join([dispatch_collection.operation.name(), 'mlir']))
-
+          mlir_file_path = operation_path.joinpath(
+              dispatch_collection.operation.name()).with_suffix('.mlir')
           print(f"[Generating]: {mlir_file_path}")
 
           # Emit mlir source file for the dispatch_collection.operation with all the configurations

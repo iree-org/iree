@@ -7,7 +7,7 @@
 from library import *
 from matmul import ReferenceMatmulOp
 from batch_matmul import ReferenceBatchMatmulOp
-import os.path
+from pathlib import Path
 import subprocess
 
 
@@ -17,54 +17,48 @@ class IreeToolsLauncher:
   def __init__(self, args, operation):
     self.operation = operation
 
-    self.generated_path = os.path.join(args.build_dir, 'generated',
-                                       args.mlir_dialect)
+    self.generated_path = Path(args.build_dir, 'generated', args.mlir_dialect)
+
     self.args = args
     self.benchmark_dispatch_repeat_count = args.batch_size
     self.batch_size = args.batch_size
 
     # paths to source dispatch mlir, compiled vmfb, and logs.
-    self.operation_path = os.path.join(
-        self.generated_path, OperationKindNames[operation.operation_kind],
-        operation.name())
-    self.source_mlir_file = os.path.join(self.operation_path,
-                                         operation.name() + '.mlir')
+    self.operation_path = self.generated_path.joinpath(
+        OperationKindNames[operation.operation_kind], operation.name())
+
+    self.source_mlir_file = self.operation_path.joinpath(
+        operation.name()).with_suffix(".mlir")
 
     # path to cached numpy refernece input and expected output files.
-    self.op_reference_cache_path = os.path.join(args.build_dir, 'generated',\
-                                             'reference_cache', operation.name())
+    self.op_reference_cache_path = Path(args.build_dir, 'generated',
+                                        'reference_cache', operation.name())
 
-    if not os.path.exists(self.op_reference_cache_path):
-      os.makedirs(self.op_reference_cache_path)
+    if not self.op_reference_cache_path.exists():
+      self.op_reference_cache_path.mkdir(parents=True, exist_ok=True)
 
     # path to iree-compile tool. (for compiling the input mlir file to vmfb)
-    self.iree_compile_path = os.path.join(args.build_dir, 'tools',
-                                          'iree-compile')
+    self.iree_compile_path = Path(args.build_dir, 'tools', 'iree-compile')
 
     # path to iree-benchmark-module tool. (for performance benchmarking and profiling)
-    self.iree_benchmark_module_path = os.path.join(args.build_dir, 'tools',
-                                                   'iree-benchmark-module')
+    self.iree_benchmark_module_path = Path(args.build_dir, 'tools',
+                                           'iree-benchmark-module')
 
     # path to iree-run-module tool. (for verification)
-    self.iree_run_module_path = os.path.join(args.build_dir, 'tools',
-                                             'iree-run-module')
+    self.iree_run_module_path = Path(args.build_dir, 'tools', 'iree-run-module')
 
     # output vmfb files for verification and profiling.
-    split_k_suffix = "_".join(["split_k_slice", str(operation.split_k_slices)])
+    vmfb_filename = f"{operation.name()}"
 
-    # vmfb files for verification and profiling.
-    vmfb_verify_list = [self.operation.name(), "verify.vmfb"]
-    vmfb_profile_list = [self.operation.name(), "profile.vmfb"]
     if operation.operation_kind == OperationKind.SplitkMatmul:
-      vmfb_verify_list = [self.operation.name(), split_k_suffix, "verify.vmfb"]
-      vmfb_profile_list = [
-          self.operation.name(), split_k_suffix, "profile.vmfb"
-      ]
+      split_k_suffix = "_".join(
+          ['split_k_slice', str(operation.split_k_slices)])
+      vmfb_filename = f"{vmfb_filename}_{split_k_suffix}"
 
-    self.vmfb_verify_filepath = os.path.join(self.operation_path,
-                                             "_".join(vmfb_verify_list))
-    self.vmfb_benchmark_filepath = os.path.join(self.operation_path,
-                                                "_".join(vmfb_profile_list))
+    self.vmfb_verify_filepath = self.operation_path.joinpath(
+        self.operation.name()).with_name(f"{vmfb_filename}_verify.vmfb")
+    self.vmfb_profile_filepath = self.operation_path.joinpath(
+        self.operation.name()).with_name(f"{vmfb_filename}_profile.vmfb")
 
     # reference implementation for the operation_kind.
     self.reference_impl_map = {
@@ -77,10 +71,15 @@ class IreeToolsLauncher:
     """Compiles the input mlir file to vmfb file."""
 
     benchmark_dispatch_repeat_count = self.benchmark_dispatch_repeat_count if compilation_mode == CompilationMode.Profile else 1
-    vmfb_file = self.vmfb_benchmark_filepath if compilation_mode == CompilationMode.Profile else self.vmfb_verify_filepath
+    vmfb_filepath = self.vmfb_profile_filepath if compilation_mode == CompilationMode.Profile else self.vmfb_verify_filepath
 
     # Base iree-compile commandline
-    cmd = [self.iree_compile_path, self.source_mlir_file, "-o", f"{vmfb_file}"]
+    cmd = [
+        f'{self.iree_compile_path}',
+        f'{self.source_mlir_file}',
+        "-o",
+        f'{vmfb_filepath}',
+    ]
 
     # General compilation options
     cmd += [f"--iree-hal-target-backends={self.args.device}"]
@@ -105,20 +104,20 @@ class IreeToolsLauncher:
     if self.args.mlir_print_ir_after_all:
       cmd += [f"--mlir-print-ir-after-all"]
 
-    if not os.path.exists(vmfb_file) or self.args.force_compile:
+    if not vmfb_filepath.exists() or self.args.force_compile:
       complie_mode_str = CompilationModeNames[compilation_mode]
 
       print(f"[Compiling ({complie_mode_str})] {' '.join(cmd)}")
 
-      iree_compile_stdout_filepath = os.path.join(
-          self.operation_path, "iree_compile_cmd_stdout.mlir")
+      iree_compile_stdout_filepath = self.operation_path.joinpath(
+          'iree_compile_cmd_stdout.mlir')
 
       with open(iree_compile_stdout_filepath, "w") as fp:
         subprocess.run(cmd, stderr=fp)
 
     elif self.args.verbose:
       print(
-          f"Skipping compilation of operation: {vmfb_file} since it already exists."
+          f"Skipping compilation of operation: {vmfb_filepath} since it already exists."
       )
 
   def verify(self, configuration):
@@ -136,7 +135,7 @@ class IreeToolsLauncher:
 
     # Commandline `iree-run-module` for verification.
     cmd = [
-        self.iree_run_module_path, f'--module={self.vmfb_verify_filepath}',
+        f'{self.iree_run_module_path}', f'--module={self.vmfb_verify_filepath}',
         f'--device={self.args.device}'
     ]
 
@@ -157,7 +156,7 @@ class IreeToolsLauncher:
     # Save the verification command and the output, only if requested
     # (file writing could slow down the verification).
     if self.args.save_cmds:
-      filepath = os.path.join(self.operation_path, "iree_run_module.stdout")
+      filepath = self.operation_path.joinpath("iree_run_module.stdout")
       with open(filepath, "w") as fp:
         fp.write(f"[Command] $ {' '.join(cmd)}\n")
         fp.write(cmd_output)
@@ -182,9 +181,8 @@ class IreeToolsLauncher:
 
     # Commandline `iree-benchmark-module` for profiling.
     cmd = [
-        self.iree_benchmark_module_path,
-        f'--module={self.vmfb_benchmark_filepath}',
-        f'--device={self.args.device}'
+        f'{self.iree_benchmark_module_path}',
+        f'--module={self.vmfb_profile_filepath}', f'--device={self.args.device}'
     ]
 
     # Profiling specific flags.
@@ -208,8 +206,7 @@ class IreeToolsLauncher:
     # Save the profiling command and the output, only if requested
     # (file writing could slow down the profiling).
     if self.args.save_cmds:
-      filepath = os.path.join(self.operation_path,
-                              "iree_benchmark_module.stdout")
+      filepath = self.operation_path.joinpath("iree_benchmark_module.stdout")
       with open(filepath, "w") as fp:
         fp.write(f"[Command] $ {' '.join(cmd)}\n")
         fp.write(cmd_output)

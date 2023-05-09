@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import csv, textwrap
-import os
 import numpy as np
 from collections import namedtuple
+from pathlib import Path
 
 
 class PerformanceResult:
@@ -76,7 +76,9 @@ class PerformanceReport:
     self.args = args
 
     # Data members extracted from the args.
-    self.output_file_path = args.output
+    self.output_file_path = None
+    if args.output != '':
+      self.output_file_path = Path(args.output)
 
     # List of PerformanceResult.
     self.perf_result_vector = []
@@ -92,12 +94,12 @@ class PerformanceReport:
 
     # If the args.output set, open the file and write the header.
     self.open_mode = 'a' if self.args.append else 'w'
-    if self.output_file_path != '':
+    if self.output_file_path:
       self.csv_file = open(self.output_file_path, self.open_mode)
 
   def __del__(self):
     """If the args.output set, close the file."""
-    if self.output_file_path != '':
+    if self.output_file_path:
       print('Writing performance report to %s' % self.output_file_path)
       self.csv_file.close()
 
@@ -128,7 +130,7 @@ class PerformanceReport:
     Additionaly, if args.output set, write the csv_row entry."""
     self.perf_result_vector.append(performance_result)
 
-    if self.output_file_path != '':
+    if self.output_file_path:
       # Write the header if not written.
       if not self.is_header_written:
         self.write_csv_header(performance_result.operation,

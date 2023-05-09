@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import enum, os, re
+import enum, re
 from enum import auto
 import numpy as np
 from abc import ABC, abstractmethod
@@ -338,13 +338,13 @@ class ReferenceOpInterface(ABC):
     """Returns whether the reference run is cached."""
 
     # Returns False if any of the reference input are missing.
-    for input_file in self.get_input_filepaths():
-      if not os.path.exists(input_file):
+    for input_filepath in self.get_input_filepaths():
+      if not input_filepath.exists():
         return False
 
     # Returns False if any of the reference output are missing.
-    for output_file in self.get_output_filepaths():
-      if not os.path.exists(output_file):
+    for output_filepath in self.get_output_filepaths():
+      if not output_filepath.exists():
         return False
 
     # Returns True if all the reference inputs and outputs are cached.

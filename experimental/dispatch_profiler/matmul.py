@@ -4,13 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import enum
-import os.path
-import shutil
-import functools
-import operator
-import collections
-import subprocess
+import enum, shutil, functools, operator, collections, subprocess
 from library import *
 from dispatch import *
 from options import get_cmd_line_argument_list
@@ -347,12 +341,10 @@ class ReferenceMatmulOp(ReferenceOpInterface):
       tensor_description=self.matmul_operation.result.name())
 
     # Filepath for input and output files.
-    self.filepath_lhs = os.path.join(self.op_reference_cache_path,
-                                     self.filename_lhs)
-    self.filepath_rhs = os.path.join(self.op_reference_cache_path,
-                                     self.filename_rhs)
-    self.filepath_reference_result = os.path.join(
-        self.op_reference_cache_path, self.filename_reference_result)
+    self.filepath_lhs = self.op_reference_cache_path.joinpath(self.filename_lhs)
+    self.filepath_rhs = self.op_reference_cache_path.joinpath(self.filename_rhs)
+    self.filepath_reference_result = self.op_reference_cache_path.joinpath(
+        self.filename_reference_result)
 
   def get_input_filepaths(self):
     """Returns the list of input file paths."""

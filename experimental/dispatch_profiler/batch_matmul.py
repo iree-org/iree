@@ -1,4 +1,4 @@
-# Copyright 2023 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -6,7 +6,6 @@
 from library import *
 from dispatch import *
 from matmul import MatmulOperation, MatmulCompilationInfo, CudaMatmulGenerator
-import os.path
 
 
 class BatchMatmulOperation(MatmulOperation):
@@ -89,8 +88,8 @@ class ReferenceBatchMatmulOp(ReferenceOpInterface):
     self.bmm_operation = bmm_operation
     self.op_reference_cache_path = op_reference_cache_path
 
-    if not os.path.exists(self.op_reference_cache_path):
-      os.makedirs(op_reference_cache_path)
+    if not self.op_reference_cache_path.exists():
+      self.op_reference_cache_path.mkdir()
 
     # Problem shape.
     self.batch_count = bmm_operation.batch_count
@@ -134,12 +133,10 @@ class ReferenceBatchMatmulOp(ReferenceOpInterface):
       tensor_description=self.bmm_operation.result.name())
 
     # Filepath for input and output files.
-    self.filepath_lhs = os.path.join(self.op_reference_cache_path,
-                                     self.filename_lhs)
-    self.filepath_rhs = os.path.join(self.op_reference_cache_path,
-                                     self.filename_rhs)
-    self.filepath_reference_result = os.path.join(
-        self.op_reference_cache_path, self.filename_reference_result)
+    self.filepath_lhs = self.op_reference_cache_path.joinpath(self.filename_lhs)
+    self.filepath_rhs = self.op_reference_cache_path.joinpath(self.filename_rhs)
+    self.filepath_reference_result = self.op_reference_cache_path.joinpath(
+        self.filename_reference_result)
 
   def get_input_filepaths(self):
     """Returns the list of input file paths."""
