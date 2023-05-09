@@ -36,15 +36,18 @@ class LLVMCPUTensorPadPass : public LLVMCPUTensorPadBase<LLVMCPUTensorPadPass> {
 void LLVMCPUTensorPadPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
+  bool nofold;
   utils::IteratorType targetIterType;
   switch (option) {
     case LLVMCPUTensorPadOption::ParallelDims:
       LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
       targetIterType = utils::IteratorType::parallel;
+      nofold = false;
       break;
     case LLVMCPUTensorPadOption::ReductionDims:
       LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
       targetIterType = utils::IteratorType::reduction;
+      nofold = true;
       break;
   };
   SmallVector<linalg::LinalgOp> candidates;
@@ -52,6 +55,14 @@ void LLVMCPUTensorPadPass::runOnOperation() {
   for (auto linalgOp : candidates) {
     IRRewriter rewriter(context);
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << linalgOp);
+
+    if (option == LLVMCPUTensorPadOption::ParallelDims &&
+        linalgOp.getNumParallelLoops() == 0)
+      continue;
+    if (option == LLVMCPUTensorPadOption::ReductionDims &&
+        linalgOp.getNumReductionLoops() == 0)
+      continue;
+
     IRRewriter::InsertionGuard g(rewriter);
     rewriter.setInsertionPointAfter(linalgOp);
 
@@ -70,9 +81,13 @@ void LLVMCPUTensorPadPass::runOnOperation() {
       paddingValueAttributes.push_back(builder.getZeroAttr(elemType));
     }
 
+    SmallVector<bool> noFold(linalgOp.getNumDpsInputs(), nofold);
+    noFold.append(linalgOp.getNumDpsInits(), false);
+
     auto options = linalg::LinalgPaddingOptions()
                        .setPaddingDimensions(paddingDims)
-                       .setPaddingValues(paddingValueAttributes);
+                       .setPaddingValues(paddingValueAttributes)
+                       .setPackPaddings(noFold);
     FailureOr<linalg::LinalgOp> maybePaddedLinalgOp =
         linalg::padAndHoistLinalgOp(rewriter, linalgOp, options);
     if (failed(maybePaddedLinalgOp)) {
