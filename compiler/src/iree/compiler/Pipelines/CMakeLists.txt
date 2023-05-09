@@ -58,6 +58,7 @@ iree_cc_library(
     iree::compiler::Modules::HAL::Inline::Transforms
     iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::InputConversion::Common
+    iree::compiler::InputConversion::Common::AutoInputConversionPipeline
     iree::compiler::Preprocessing::Passes
     iree::compiler::Utils
   PUBLIC

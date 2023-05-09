@@ -40,7 +40,9 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Specifies the input program representation."),
       llvm::cl::values(
           clEnumValN(InputDialectOptions::Type::none, "none",
-                     "No input dialect transformation.")
+                     "No input dialect transformation."),
+          clEnumValN(InputDialectOptions::Type::auto_detect, "auto",
+                     "Analyze the input program to choose conversion.")
   // clang-format off
 #ifdef IREE_HAVE_MHLO_INPUT
         , clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
