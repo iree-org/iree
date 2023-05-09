@@ -8,6 +8,7 @@
 #define IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES_H_
 
 #include "iree/compiler/InputConversion/StableHLO/PassDetail.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

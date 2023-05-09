@@ -10,6 +10,7 @@
 #include <optional>
 #include <string_view>
 
+#include "iree/compiler/Pipelines/Options.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/StringMap.h"
 
@@ -38,6 +39,11 @@ struct EmptyPluginOptions {
 class PipelineExtensions {
  public:
   virtual ~PipelineExtensions();
+
+  // Add passes to the input preprocessing pipeline, which allows to process the
+  // raw input to IREE.
+  virtual void extendInputConversionPreprocessingPassPipeline(
+      OpPassManager &passManager, InputDialectOptions::Type inputType) {}
 
   // Adds passes to the |buildPreprocessingPassPipeline| pipeline at the end.
   virtual void extendPreprocessingPassPipeline(OpPassManager &passManager) {}
