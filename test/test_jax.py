@@ -28,13 +28,14 @@ PYTEST_CMD = [
 
 
 def get_tests(tests):
-  testlist = []
+  fulltestlist = []
   for test in sorted(tests):
+    print("Fetching from:", test)
     stdout = subprocess.run(PYTEST_CMD + ["--setup-only", test],
                             capture_output=True)
-    testlist += re.findall('::[^ ]*::[^ ]*', str(stdout))
-    testlist = [test + func for func in testlist]
-  return testlist
+    testlist = re.findall('::[^ ]*::[^ ]*', str(stdout))
+    fulltestlist += [test + func for func in testlist]
+  return fulltestlist
 
 
 def generate_test_commands(tests, timeout=False):
@@ -49,10 +50,11 @@ def generate_test_commands(tests, timeout=False):
 
 
 def exec_test(command):
-  result = subprocess.run(command,
-                          stdout=subprocess.DEVNULL,
-                          stderr=subprocess.DEVNULL)
-  sys.stdout.write(".")
+  result = subprocess.run(command, capture_output=True)
+  if result.returncode == 0:
+    sys.stdout.write(".")
+  else:
+    sys.stdout.write("f")
   sys.stdout.flush()
   return result.returncode
 

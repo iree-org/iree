@@ -18,7 +18,7 @@ concurrency:
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-20.04-64core
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
@@ -75,15 +75,22 @@ jobs:
           export PJRT_NAMES_AND_LIBRARY_PATHS="iree_cpu:/home/runner/work/openxla-pjrt-plugin/openxla-pjrt-plugin/pjrt_plugins/pjrt_plugin_iree_cpu.so"
           JAX_PLATFORMS=iree_cpu python test/test_simple.py
 
-          JAX_PLATFORMS=iree_cpu python test/test_jax.py /home/runner/work/openxla-pjrt-plugin/jax/tests/nn_test.py \
+          JAX_PLATFORMS=iree_cpu python test/test_jax.py \
+            /home/runner/work/openxla-pjrt-plugin/jax/tests/lax_numpy_*_test.py \
+            /home/runner/work/openxla-pjrt-plugin/jax/tests/nn_test.py \
             --passing ${PASSING_ARTIFACT} \
             --failing ${FAILING_ARTIFACT} \
-            --expected ${GOLDEN_ARTIFACT}
+            --expected ${GOLDEN_ARTIFACT} \
+            --logdir jax_testsuite
 
           # If we passed we can update the golden.
           if [ $? -eq 0 ]; then
             cp ${PASSING_ARTIFACT} ${GOLDEN_ARTIFACT}
           fi
+
+      - name: "Run JAX Testsuite Triage"
+        run: |
+          python test/triage_jaxtest.py --logdir jax_testsuite
 
       - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         if: always()
