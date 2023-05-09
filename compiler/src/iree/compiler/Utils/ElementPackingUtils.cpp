@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Utils/InterfaceUtils.h"
+#include "iree/compiler/Utils/ElementPackingUtils.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/CommandLine.h"
@@ -15,7 +15,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-bool needToPackSubByteInterfaceBitWidth(unsigned bitwidth) {
+bool needToPackSubByteElementBitWidth(unsigned bitwidth) {
   // Require the original bitwidth to be some power of two for now to avoid
   // trickiness and weirdness of packing and cross-byte access.
   // Also disallow boolean values for now--they may require separate interface
@@ -23,19 +23,19 @@ bool needToPackSubByteInterfaceBitWidth(unsigned bitwidth) {
   return bitwidth < 8 && llvm::isPowerOf2_32(bitwidth) && bitwidth != 1;
 }
 
-bool needToPackSubByteInterfaceElements(RankedTensorType shapedType) {
+bool needToPackSubByteElements(RankedTensorType shapedType) {
   unsigned bitwidth = shapedType.getElementType().getIntOrFloatBitWidth();
-  return needToPackSubByteInterfaceBitWidth(bitwidth);
+  return needToPackSubByteElementBitWidth(bitwidth);
 }
 
-Type legalizeInterfaceElementType(Type elementType) {
+Type legalizeStorageElementType(Type elementType) {
   // Only handle integers; floats in MLIR all have aligned widths (today).
   auto intType = dyn_cast<IntegerType>(elementType);
   if (!intType) return elementType;
 
   // For sub-byte elements, default to pack them into bytes.
   unsigned bitWidth = intType.getWidth();
-  if (needToPackSubByteInterfaceBitWidth(bitWidth)) return elementType;
+  if (needToPackSubByteElementBitWidth(bitWidth)) return elementType;
 
   // Otherwise, extend them to the next power-of-two bitwidth.
   unsigned alignedBitWidth =
@@ -45,17 +45,17 @@ Type legalizeInterfaceElementType(Type elementType) {
                           intType.getSignedness());
 }
 
-Value calculateInterfaceElementCountInBytes(Location loc,
-                                            RankedTensorType shapedType,
-                                            ValueRange dynamicDims,
-                                            OpBuilder &builder) {
+Value calculateStorageElementCountInBytes(Location loc,
+                                          RankedTensorType shapedType,
+                                          ValueRange dynamicDims,
+                                          OpBuilder &builder) {
   Type alignedElementType =
-      legalizeInterfaceElementType(shapedType.getElementType());
+      legalizeStorageElementType(shapedType.getElementType());
   unsigned elementBits = alignedElementType.getIntOrFloatBitWidth();
 
   // Calculate all static dims first, if any.
   int64_t staticCount = 1;
-  if (!needToPackSubByteInterfaceBitWidth(elementBits)) {
+  if (!needToPackSubByteElementBitWidth(elementBits)) {
     staticCount *= IREE::Util::getRoundedElementByteWidth(alignedElementType);
   }
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {
@@ -69,7 +69,7 @@ Value calculateInterfaceElementCountInBytes(Location loc,
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
   // Sub-byte packing requires putting multiple elements in the same byte.
-  if (needToPackSubByteInterfaceBitWidth(elementBits)) {
+  if (needToPackSubByteElementBitWidth(elementBits)) {
     assert(8 % elementBits == 0);
     unsigned byteElements = 8 / elementBits;
     // Perform some basic sanity check to make sure the total count is byte
@@ -86,16 +86,16 @@ Value calculateInterfaceElementCountInBytes(Location loc,
   return value;
 }
 
-Value calculateInterfaceElementOffsetInBytes(Location loc,
-                                             RankedTensorType originalType,
-                                             Value linearizedIndex,
-                                             OpBuilder &builder) {
+Value calculateStorageElementOffsetInBytes(Location loc,
+                                           RankedTensorType originalType,
+                                           Value linearizedIndex,
+                                           OpBuilder &builder) {
   Type alignedElementType =
-      legalizeInterfaceElementType(originalType.getElementType());
+      legalizeStorageElementType(originalType.getElementType());
   unsigned elementBits = alignedElementType.getIntOrFloatBitWidth();
 
   // Sub-byte packing requires putting multiple elements in the same byte.
-  if (needToPackSubByteInterfaceBitWidth(elementBits)) {
+  if (needToPackSubByteElementBitWidth(elementBits)) {
     Value byteElements =
         builder.create<arith::ConstantIndexOp>(loc, 8 / elementBits);
     // TODO(antiagainst): We may want to emit runtime check to make sure this is

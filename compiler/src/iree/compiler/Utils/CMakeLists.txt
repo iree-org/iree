@@ -15,9 +15,9 @@ iree_cc_library(
     Utils
   HDRS
     "ConversionUtils.h"
+    "ElementPackingUtils.h"
     "FlatbufferUtils.h"
     "IndexSet.h"
-    "InterfaceUtils.h"
     "ModuleUtils.h"
     "OptionUtils.h"
     "PassUtils.h"
@@ -27,8 +27,8 @@ iree_cc_library(
     "TracingUtils.h"
   SRCS
     "ConversionUtils.cpp"
+    "ElementPackingUtils.cpp"
     "FlatbufferUtils.cpp"
-    "InterfaceUtils.cpp"
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
     "PassUtils.cpp"

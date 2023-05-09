@@ -16,7 +16,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/InterfaceUtils.h"
+#include "iree/compiler/Utils/ElementPackingUtils.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -57,7 +57,7 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
 // Aligns the element type of a tensor<> to a byte-aligned power of 2 bit width.
 static RankedTensorType alignTensorType(RankedTensorType originalType) {
   Type elementType = originalType.getElementType();
-  Type alignedType = legalizeInterfaceElementType(elementType);
+  Type alignedType = legalizeStorageElementType(elementType);
   if (alignedType == elementType) return originalType;
   return RankedTensorType::get(originalType.getShape(), alignedType,
                                originalType.getEncoding());
@@ -108,8 +108,8 @@ static Value calculateElementByteOffset(Location loc,
                                         PatternRewriter &rewriter) {
   Value linearizedIndex =
       calculateElementOffset(loc, tensorType, dynamicDims, indices, rewriter);
-  return calculateInterfaceElementOffsetInBytes(loc, tensorType,
-                                                linearizedIndex, rewriter);
+  return calculateStorageElementOffsetInBytes(loc, tensorType, linearizedIndex,
+                                              rewriter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -174,7 +174,7 @@ struct EncodeTensorSizeOfOp
     }
 
     // Dense: element count * element size.
-    Value totalSize = calculateInterfaceElementCountInBytes(
+    Value totalSize = calculateStorageElementCountInBytes(
         op.getLoc(), encodingType, encodingDims, rewriter);
     if (!totalSize) {
       return op.emitOpError("failed to calculate total byte count: ")
@@ -256,7 +256,7 @@ struct EncodeTensorConstantOp
     }
 
     // Dense:
-    Value resultSize = calculateInterfaceElementCountInBytes(
+    Value resultSize = calculateStorageElementCountInBytes(
         op.getLoc(), alignedType, resultDims, rewriter);
     if (!resultSize) {
       return op.emitOpError("failed to calculate total byte count: ")
@@ -337,7 +337,7 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
   //   %i8_val = (%i8_val << 2) | %i2_val
   //   %i8_val = (%i8_val << 2) | %i2_val
   //   %i8_val = (%i8_val << 2) | %i2_val
-  if (needToPackSubByteInterfaceBitWidth(elementBitWidth)) {
+  if (needToPackSubByteElementBitWidth(elementBitWidth)) {
     Type i8Type = rewriter.getI8Type();
     Value bitwidth = rewriter.createOrFold<arith::ConstantOp>(
         loc, i8Type, rewriter.getIntegerAttr(i8Type, elementBitWidth));
@@ -571,7 +571,7 @@ struct EncodeTensorLoadOp
       return failure();
     }
 
-    if (needToPackSubByteInterfaceElements(sourceType)) {
+    if (needToPackSubByteElements(sourceType)) {
       return rewriter.notifyMatchFailure(
           op, "unsupported load with sub-byte elements");
     }
@@ -602,7 +602,7 @@ struct EncodeTensorStoreOp
       return failure();
     }
 
-    if (needToPackSubByteInterfaceElements(targetType)) {
+    if (needToPackSubByteElements(targetType)) {
       return rewriter.notifyMatchFailure(
           op, "unsupported store with sub-byte elements");
     }
@@ -655,7 +655,7 @@ class EncodeHostTensorsPass
 static IREE::Flow::DispatchTensorType alignDispatchTensorType(
     IREE::Flow::DispatchTensorType originalType) {
   Type elementType = originalType.getBoundElementType();
-  Type alignedType = legalizeInterfaceElementType(elementType);
+  Type alignedType = legalizeStorageElementType(elementType);
   if (alignedType == elementType) return originalType;
   return IREE::Flow::DispatchTensorType::get(
       originalType.getAccess(), originalType.getShape(), alignedType);

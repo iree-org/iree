@@ -27,7 +27,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/InterfaceUtils.h"
+#include "iree/compiler/Utils/ElementPackingUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -61,7 +61,7 @@ static std::optional<Type> getLegalizedType(Type t) {
   if (auto shapedType = t.dyn_cast<RankedTensorType>()) {
     Type elementType = shapedType.getElementType();
     std::optional<Type> legalizedElementType =
-        legalizeInterfaceElementType(elementType);
+        legalizeStorageElementType(elementType);
     if (!legalizedElementType) return std::nullopt;
     return RankedTensorType::get(shapedType.getShape(),
                                  legalizedElementType.value(),
@@ -106,7 +106,7 @@ struct ConstantOpTypeConversion
           constantOp, "expected attribute type to be shaped type");
     }
     std::optional<Type> legalizedElementType =
-        legalizeInterfaceElementType(attrType.getElementType());
+        legalizeStorageElementType(attrType.getElementType());
     if (!legalizedElementType) {
       return rewriter.notifyMatchFailure(constantOp,
                                          "cannot legalize elementType");
@@ -213,7 +213,7 @@ struct GenericOpTypePropagation
         continue;
       }
       std::optional<Type> legalizedArgType =
-          legalizeInterfaceElementType(argType);
+          legalizeStorageElementType(argType);
       if (!legalizedArgType) {
         return genericOp.emitOpError("failed to get legalized type for arg ")
                << index;
@@ -259,7 +259,7 @@ struct GenericOpTypePropagation
           OpOperand *yieldOperand =
               modifiedOp.getMatchingYieldValue(modifiedOpOperand);
           std::optional<Type> legalizedType =
-              legalizeInterfaceElementType(yieldOperand->get().getType());
+              legalizeStorageElementType(yieldOperand->get().getType());
           if (!legalizedType) {
             return genericOp.emitOpError(
                 "failed to get legalized type for yield value");
@@ -289,7 +289,7 @@ struct LinalgFillTypePropagation
       ConversionPatternRewriter &rewriter) const final {
     Value value = adaptor.getInputs().front();
     std::optional<Type> legalizedElementType =
-        legalizeInterfaceElementType(value.getType());
+        legalizeStorageElementType(value.getType());
     if (!legalizedElementType) {
       return fillOp.emitOpError("failed to get legalized type for value");
     }
