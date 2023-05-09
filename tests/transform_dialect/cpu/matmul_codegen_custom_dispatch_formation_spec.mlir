@@ -8,6 +8,8 @@ transform.sequence failures(propagate) {
     transform.structured.tile_to_forall_op %0 num_threads [2] 
     // TODO: IREE needs own workgroup mapping attribute.
     ( mapping = [#gpu.block<x>] )
+    transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall
+      : (!pdl.operation) -> ()
 
   // Canonicalization/CSE is needed before bufferization otherwise unnecessary
   // allocs will be created.

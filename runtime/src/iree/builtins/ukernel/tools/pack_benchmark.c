@@ -9,12 +9,10 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/builtins/ukernel/api.h"
+#include "iree/builtins/ukernel/pack_internal.h"
 #include "iree/builtins/ukernel/tools/benchmark.h"
 #include "iree/builtins/ukernel/tools/memcpy_benchmark.h"
 #include "iree/builtins/ukernel/tools/util.h"
-
-IREE_FLAG(int64_t, batch_min_traversal_size, 10000000,
-          "Minimum number of bytes to be traversed in each batch.");
 
 IREE_FLAG(
     int64_t, working_set_size, 10000,
@@ -32,8 +30,9 @@ static iree_status_t iree_uk_benchmark_pack(
   iree_uk_pack_params_t params;
   memcpy(&params, src_params, sizeof params);
   params.cpu_data = iree_uk_benchmark_cpu_data(user_data);
-  iree_uk_type_t in_type = iree_uk_pack_in_type(params.type);
-  iree_uk_type_t out_type = iree_uk_pack_out_type(params.type);
+  iree_uk_pack_type_t pack_type = iree_uk_pack_type(params.flags);
+  iree_uk_type_t in_type = iree_uk_pack_in_type(pack_type);
+  iree_uk_type_t out_type = iree_uk_pack_out_type(pack_type);
   iree_uk_ssize_t in_type_size = iree_uk_type_size(in_type);
   iree_uk_ssize_t out_type_size = iree_uk_type_size(out_type);
 
@@ -71,7 +70,6 @@ static iree_status_t iree_uk_benchmark_pack(
       iree_uk_2d_buffer_length(out_type, params.out_size0, params.out_stride0);
   void* in_buffer = malloc(in_buffer_size);
   void* out_buffer = malloc(out_buffer_size);
-  void* padding_value_buffer = malloc(out_type_size);
   iree_uk_random_engine_t* engine = iree_uk_benchmark_random_engine(user_data);
   // It's just about plausible that on some platform, for some number type,
   // performance might be different on zero buffers vs random buffers. But it
@@ -80,39 +78,36 @@ static iree_status_t iree_uk_benchmark_pack(
   iree_uk_write_random_buffer(in_buffer, in_buffer_size, in_type, engine);
   iree_uk_write_random_buffer(out_buffer, out_buffer_size, out_type, engine);
   // Test single-byte padding pattern, most common use case as 0.0f is 0 bytes.
-  memset(padding_value_buffer, 0, out_type_size);
   params.in_buffer = in_buffer;
   params.out_buffer = out_buffer;
-  params.padding_value = padding_value_buffer;
+  params.padding_value = 0;
   int64_t total_iterations = 0;
-  int64_t batch_count =
-      (FLAG_batch_min_traversal_size + FLAG_working_set_size - 1) /
-      FLAG_working_set_size;
-  while (iree_benchmark_keep_running(benchmark_state,
-                                     /*batch_count=*/batch_count)) {
+  int64_t batch_count = 1;
+  while (iree_benchmark_keep_running(benchmark_state, batch_count)) {
     for (int i = 0; i < batch_count; ++i) {
       iree_uk_pack(&params);
     }
     total_iterations += batch_count;
+    batch_count *= 2;
   }
   // Report bytes per second, so that can be easily compared to known memory
   // system performance metrics (e.g. RAM bandwidth, to tell whether this is
   // memory-bound).
-  iree_benchmark_set_items_processed(benchmark_state,
+  iree_benchmark_set_bytes_processed(benchmark_state,
                                      total_iterations * out_buffer_size);
   free(in_buffer);
   free(out_buffer);
-  free(padding_value_buffer);
   return iree_ok_status();
 }
 
-static void iree_uk_benchmark_register_pack(iree_uk_pack_type_t type,
+static void iree_uk_benchmark_register_pack(iree_uk_uint32_t flags,
                                             int tile_size0, int tile_size1,
                                             const char* cpu_features) {
+  iree_uk_pack_type_t type = iree_uk_pack_type(flags);
   char type_str[32];
   iree_uk_type_pair_str(type_str, sizeof type_str, type);
-  iree_uk_pack_params_t params = {
-      .type = type, .out_size2 = tile_size0, .out_size3 = tile_size1};
+  iree_uk_pack_params_t params = {.out_size2 = tile_size0,
+                                  .out_size3 = tile_size1};
   typedef struct pack_variant_t {
     const char* label;
     iree_uk_uint32_t flags;
@@ -129,7 +124,7 @@ static void iree_uk_benchmark_register_pack(iree_uk_pack_type_t type,
     char name[128];
     snprintf(name, sizeof name, "pack_%s_tile_%dx%d_%s_wss_%" PRIi64, type_str,
              tile_size0, tile_size1, variant.label, FLAG_working_set_size);
-    params.flags = variant.flags;
+    params.flags = flags | variant.flags;
     iree_uk_benchmark_register(name, iree_uk_benchmark_pack, &params,
                                sizeof params, cpu_features);
   }
@@ -143,33 +138,37 @@ int main(int argc, char** argv) {
 
   // The memcpy benchmark provides a useful comparison point, as pack is fairly
   // close to memory-bound.
-  iree_uk_benchmark_register_memcpy(FLAG_working_set_size,
-                                    FLAG_batch_min_traversal_size);
+  iree_uk_benchmark_register_memcpy(FLAG_working_set_size);
 
 #if defined(IREE_UK_ARCH_ARM_64)
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_f32f32, 8, 1, NULL);
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_i8i8, 8, 1, NULL);
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 1, "");
   // Tile size selected with cpu feature "dotprod".
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_i8i8, 8, 4, NULL);
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 4, "");
   // Tile size selected with cpu feature "i8mm".
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_i8i8, 8, 8, NULL);
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 8, "");
 #elif defined(IREE_UK_ARCH_X86_64)
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_f32f32, 8, 1, "avx2_fma");
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_f32f32, 16, 1,
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1,
+                                  "avx2_fma");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 1,
                                   "avx512_base");
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_f32f32, 8, 8, "avx2_fma");
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_f32f32, 16, 16,
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8,
+                                  "avx2_fma");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 16,
                                   "avx512_base");
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_i8i8, 8, 2, "avx2_fma");
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_i8i8, 16, 2, "avx512_base");
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_i32i32, 8, 8, "avx2_fma");
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_i32i32, 16, 16,
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 2,
+                                  "avx2_fma");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 16, 2,
+                                  "avx512_base");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 8, 8,
+                                  "avx2_fma");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 16, 16,
                                   "avx512_base");
 #else   // defined(IREE_UK_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_f32f32, 8, 1, NULL);
-  iree_uk_benchmark_register_pack(iree_uk_pack_type_i8i8, 8, 1, NULL);
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1, "");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 8, 1, "");
 #endif  // defined(IREE_UK_ARCH_ARM_64)
 
   iree_uk_benchmark_run_and_cleanup();

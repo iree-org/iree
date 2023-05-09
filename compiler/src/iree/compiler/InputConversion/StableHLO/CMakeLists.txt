@@ -27,7 +27,6 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
     "Rewriters.h"
-    "TypeConversion.h"
   DEPS
     ::PassesIncGen
     MLIRPass
@@ -37,8 +36,10 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    StableHLOToLinalg
+    StableHLOLegalization
   SRCS
+    "LegalizeControlFlow.cpp"
+    "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
@@ -46,19 +47,25 @@ iree_cc_library(
     "StableHLOToLinalg.cpp"
     "StableHLOToLinalgConvolution.cpp"
     "StableHLOToLinalgDotProd.cpp"
+    "StableHLOToLinalgExt.cpp"
     "StableHLOToLinalgPointwise.cpp"
     "StableHLOToLinalgRandom.cpp"
     "StableHLOToLinalgReduce.cpp"
     "TypeConversion.cpp"
+    "TypeConversion.h"
+    "VerifyCompilerInputLegality.cpp"
   DEPS
     ::PassHeaders
     ChloOps
+    IREELinalgExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRComplexDialect
+    MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
@@ -71,9 +78,15 @@ iree_cc_library(
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorUtils
     MLIRTransforms
     MLIRVectorDialect
     StablehloOps
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::InputConversion::Common
+    iree::compiler::Utils
   PUBLIC
 )
 
@@ -86,7 +99,7 @@ iree_cc_library(
     "Passes.cpp"
   DEPS
     ::PassHeaders
-    ::StableHLOToLinalg
+    ::StableHLOLegalization
     LLVMSupport
     MLIRLinalgTransforms
     MLIRMLProgramDialect
@@ -101,6 +114,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::InputConversion::Common
+    iree::compiler::InputConversion::StableHLO::Preprocessing
   PUBLIC
 )
 

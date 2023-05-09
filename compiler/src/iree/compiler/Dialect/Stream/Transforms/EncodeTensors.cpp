@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/InterfaceUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -295,10 +296,31 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
 
   // Get floats into integer form.
   auto patternType = pattern.getType();
-  unsigned bitWidth = patternType.getIntOrFloatBitWidth();
+  unsigned elementBitWidth = IREE::Util::getTypeBitWidth(patternType);
+  elementBitWidth =
+      (isa<ComplexType>(patternType) ? elementBitWidth / 2 : elementBitWidth);
   if (patternType.isa<FloatType>()) {
     pattern = rewriter.createOrFold<arith::BitcastOp>(
-        loc, rewriter.getIntegerType(bitWidth), pattern);
+        loc, rewriter.getIntegerType(elementBitWidth), pattern);
+  }
+
+  if (isa<ComplexType>(patternType)) {
+    int64_t complexBitWidth = elementBitWidth;
+    Type bwElemType = rewriter.getIntegerType(elementBitWidth);
+    Type bwType = rewriter.getIntegerType(elementBitWidth * 2);
+    Value shiftAmount = rewriter.create<arith::ConstantOp>(
+        loc, bwType, rewriter.getIntegerAttr(bwType, complexBitWidth));
+
+    Value real = rewriter.create<mlir::complex::ReOp>(loc, pattern);
+    Value realInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, real);
+    Value imag = rewriter.create<mlir::complex::ImOp>(loc, pattern);
+    Value imagInt = rewriter.create<arith::BitcastOp>(loc, bwElemType, imag);
+    realInt = rewriter.create<arith::IndexCastOp>(loc, bwType, realInt);
+    imagInt = rewriter.create<arith::IndexCastOp>(loc, bwType, imagInt);
+    Value shiftReal =
+        rewriter.create<arith::ShLIOp>(loc, bwType, realInt, shiftAmount);
+    Value orImag = rewriter.create<arith::OrIOp>(loc, shiftReal, imagInt);
+    return orImag;
   }
 
   // HACK: extend i1 to i8. This is really not something we should be doing here
@@ -309,19 +331,19 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
   }
   // For packed sub-byte patterns, duplicate the sub-byte parts into a full
   // byte.
-  if (needToPackSubByteInterfaceBitWidth(bitWidth)) {
+  if (needToPackSubByteInterfaceBitWidth(elementBitWidth)) {
     Type i8Type = rewriter.getI8Type();
     Value bw = rewriter.createOrFold<arith::ConstantOp>(
-        loc, i8Type, rewriter.getIntegerAttr(i8Type, bitWidth));
+        loc, i8Type, rewriter.getIntegerAttr(i8Type, elementBitWidth));
     Value part = rewriter.createOrFold<arith::ExtUIOp>(loc, i8Type, pattern);
     Value full = part;
-    for (unsigned i = 1, e = 8 / bitWidth; i < e; ++i) {
+    for (unsigned i = 1, e = 8 / elementBitWidth; i < e; ++i) {
       Value shifted = rewriter.createOrFold<arith::ShLIOp>(loc, full, bw);
       full = rewriter.createOrFold<arith::OrIOp>(loc, shifted, part);
     }
     return full;
   }
-  if ((bitWidth % 8) != 0) {
+  if ((elementBitWidth % 8) != 0) {
     // We'd need some policy to determine how to handle non-byte-aligned widths.
     return {};
   }
@@ -350,7 +372,8 @@ struct EncodeTensorSplatOp
           op, "unsupported pattern width; encoding policy required");
     }
 
-    if (pattern.getType().getIntOrFloatBitWidth() > 32) {
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
+    if (bitWidth > 32) {
       // We emulate 64-bit support with a stream.builtin.splat.i64.
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinSplatI64Op>(
           op, op.getResult().getType(), pattern, op.getResultSize(),
@@ -460,7 +483,17 @@ struct EncodeTensorFillOp
         op.getLoc(), targetOffset, targetLength);
 
     // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
-    if (pattern.getType().getIntOrFloatBitWidth() > 32) {
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
+    if (bitWidth > 64) {
+      // This happens mostly when complex<f64> is used as a input type for
+      // splat. complex<type> is broken down into a 2xtype value with the real
+      // field occupying the sizeof(type) MSB bits and the imaginary field
+      // occupying the rest. At this moment, splats with size > 64 is not
+      // implemented so we error out here.
+      return rewriter.notifyMatchFailure(
+          op, "unsupported bitWidth greater than 64; encoding policy required");
+    }
+    if (bitWidth > 32) {
       rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinFillI64Op>(
           op, op.getResult().getType(), op.getTarget(), op.getTargetSize(),
           targetOffset, targetEnd, targetLength, pattern, op.getAffinityAttr());

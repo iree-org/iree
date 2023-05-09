@@ -33,6 +33,7 @@ class TargetABI(Enum):
   # compiler/src/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
   VULKAN_ANDROID30 = "android30"
   VULKAN_ANDROID31 = "android31"
+  VULKAN_LINUX = "linux"
 
 
 class RuntimeLoader(Enum):
@@ -190,8 +191,7 @@ DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TFLITE_DEFAULT,
     name="tflite",
     tool=ImportTool.TFLITE_IMPORTER,
-    dialect_type=MLIRDialectType.TOSA,
-    import_flags=["--output-format=mlir-bytecode"])
+    dialect_type=MLIRDialectType.TOSA)
 
 DEFAULT_LINALG_MLIR_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_LINALG_MLIR_DEFAULT,

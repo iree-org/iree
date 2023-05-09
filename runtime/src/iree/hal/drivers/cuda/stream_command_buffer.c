@@ -123,17 +123,8 @@ static void iree_hal_cuda_stream_command_buffer_destroy(
 
 bool iree_hal_cuda_stream_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(
-      command_buffer, &iree_hal_cuda_stream_command_buffer_vtable);
-}
-
-static void* iree_hal_cuda_stream_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_cuda_stream_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_cuda_stream_command_buffer_vtable);
 }
 
 // Flushes any pending batched collective operations.
@@ -492,9 +483,9 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
 
   IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->stream,
-      kernel_params.function_name.data, kernel_params.function_name.size,
-      /*line=*/0, /*func_name=*/NULL, 0, kernel_params.function_name.data,
-      kernel_params.function_name.size);
+      kernel_params.source_filename.data, kernel_params.source_filename.size,
+      kernel_params.source_line, /*func_name=*/NULL, 0,
+      kernel_params.function_name.data, kernel_params.function_name.size);
 
   // Patch the push constants in the kernel arguments.
   iree_host_size_t num_constants =
@@ -543,7 +534,6 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_execute_commands(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_stream_command_buffer_vtable = {
         .destroy = iree_hal_cuda_stream_command_buffer_destroy,
-        .dyn_cast = iree_hal_cuda_stream_command_buffer_dyn_cast,
         .begin = iree_hal_cuda_stream_command_buffer_begin,
         .end = iree_hal_cuda_stream_command_buffer_end,
         .begin_debug_group =

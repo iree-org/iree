@@ -19,7 +19,6 @@ iree_compiler_cc_test(
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API:Impl",
         "//compiler/src/iree/compiler/API:MLIRInteropHeaders",
-        "//runtime/src/iree/base",
         "@llvm-project//mlir:CAPIIRHeaders",
     ],
 )

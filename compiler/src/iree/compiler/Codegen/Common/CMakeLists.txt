@@ -84,6 +84,7 @@ iree_cc_library(
     "EncodingInfo.h"
     "Transforms.h"
   SRCS
+    "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"

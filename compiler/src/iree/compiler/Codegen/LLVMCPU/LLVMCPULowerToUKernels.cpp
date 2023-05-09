@@ -51,30 +51,28 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Type lhsElemType = lhsType.getElementType();
   Type rhsElemType = rhsType.getElementType();
   Type outElemType = outType.getElementType();
-  std::string fnName;
+  uint32_t flags = 0;
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.mmt4d.i8i8i32";
+    flags = IREE_UK_FLAG_MMT4D_TYPE_I8I8I32;
   } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
              outElemType.isF32()) {
-    fnName = "vmvx.mmt4d.f32f32f32";
-  }
-  if (fnName.empty()) {
+    flags = IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
+  } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
   }
 
   // Check if the accumulator is zero-filled.
-  int flags = 0;
   if (isInitializedToZero(out)) {
-    // Not setting flags |= IREE_UK_FLAG_ACCUMULATE, so the mmt4d op won't read
-    // the existing accumulator, so its defining op can be discarded.
+    // Not setting flags |= IREE_UK_FLAG_MMT4D_ACCUMULATE, so the mmt4d op won't
+    // read the existing accumulator, so its defining op can be discarded.
     if (auto fillOp = out.getDefiningOp<linalg::FillOp>()) {
       out = fillOp.getDpsInitOperand(0)->get();
     }
   } else {
     // Tell the mmt4d op to read the existing accumulator.
-    flags |= IREE_UK_FLAG_ACCUMULATE;
+    flags |= IREE_UK_FLAG_MMT4D_ACCUMULATE;
   }
   Location loc = op.getLoc();
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
@@ -83,12 +81,12 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value m0 = rewriter.create<tensor::DimOp>(loc, lhs, 2);
   Value n0 = rewriter.create<tensor::DimOp>(loc, rhs, 2);
   Value k0 = rewriter.create<tensor::DimOp>(loc, rhs, 3);
-
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fnName, ValueRange{lhs, rhs}, out,
+      loc, outType, "vmvx.mmt4d", ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
+      /*fn_def_attrs=*/nullptr,
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -102,14 +100,14 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   auto outType = out.getType().cast<ShapedType>();
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
-  std::string fnName;
+  uint32_t flags = 0;
   if (inElemType.isSignlessInteger(8) && outElemType.isSignlessInteger(8)) {
-    fnName = "vmvx.pack.i8i8";
+    flags = IREE_UK_FLAG_PACK_TYPE_I8I8;
   } else if (inElemType.isSignlessInteger(32) &&
              outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.pack.i32i32";
+    flags = IREE_UK_FLAG_PACK_TYPE_I32I32;
   } else if (inElemType.isF32() && outElemType.isF32()) {
-    fnName = "vmvx.pack.f32f32";
+    flags = IREE_UK_FLAG_PACK_TYPE_F32F32;
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
@@ -137,8 +135,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     outerDimsPerm[1] = outerDimsPosArr[1];
   }
 
-  int flags = 0;
-
   if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
     // nothing to do
   } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
@@ -156,12 +152,38 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   }
 
   Location loc = op.getLoc();
-  Value paddingVal = op.getPaddingValue();
-  if (!paddingVal) {
-    paddingVal = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(inElemType), inElemType);
-  }
+  Type i64 = rewriter.getI64Type();
 
+  // The ukernel requires a padding value of type i64. When the element type is
+  // a narrower N-bit type, only the least significant N bits of the i64 padding
+  // value are used.
+  Value paddingVal = op.getPaddingValue();
+  // If the pack op didn't have a padding_value attribute, default to 0.
+  if (!paddingVal) {
+    paddingVal =
+        rewriter.create<arith::ConstantOp>(loc, i64, rewriter.getZeroAttr(i64));
+  }
+  int paddingValBitWidth = paddingVal.getType().getIntOrFloatBitWidth();
+  // Non-integer element types get bitcast to integer of same bit width.
+  if (!paddingVal.getType().isSignlessInteger()) {
+    Type sameWidthIntType = rewriter.getIntegerType(paddingValBitWidth);
+    if (!sameWidthIntType) {
+      return rewriter.notifyMatchFailure(op, "no integer type with this width");
+    }
+    paddingVal =
+        rewriter.create<arith::BitcastOp>(loc, sameWidthIntType, paddingVal);
+  }
+  // Element types > 64bits could be supported, when the padding value is a
+  // repeating 64-bit pattern. For now, we leave this as not-yet-implemented.
+  if (paddingValBitWidth > 64) {
+    return rewriter.notifyMatchFailure(op,
+                                       "unsupported padding_value bit width");
+  }
+  // Integers narrower than 64 bit get extended to 64 bits, it doesn't matter
+  // how, as the high bits are unused.
+  if (paddingValBitWidth < 64) {
+    paddingVal = rewriter.create<arith::ExtUIOp>(loc, i64, paddingVal);
+  }
   Value in_size0 = rewriter.create<tensor::DimOp>(loc, in, 0);
   Value in_size1 = rewriter.create<tensor::DimOp>(loc, in, 1);
   Value out_size0 = rewriter.create<tensor::DimOp>(loc, out, 0);
@@ -171,9 +193,10 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fnName, in, out,
+      loc, outType, "vmvx.pack", in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
+      /*fn_def_attrs=*/nullptr,
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -187,11 +210,11 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   auto outType = out.getType().cast<ShapedType>();
   Type inElemType = inType.getElementType();
   Type outElemType = outType.getElementType();
-  std::string fnName;
+  uint32_t flags = 0;
   if (inElemType.isSignlessInteger(32) && outElemType.isSignlessInteger(32)) {
-    fnName = "vmvx.unpack.i32i32";
+    flags = IREE_UK_FLAG_UNPACK_TYPE_I32I32;
   } else if (inElemType.isF32() && outElemType.isF32()) {
-    fnName = "vmvx.unpack.f32f32";
+    flags = IREE_UK_FLAG_UNPACK_TYPE_F32F32;
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
@@ -219,8 +242,6 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
     outerDimsPerm[1] = outerDimsPosArr[1];
   }
 
-  int flags = 0;
-
   if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
     // nothing to do
   } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
@@ -247,9 +268,10 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fnName, in, out,
+      loc, outType, "vmvx.unpack", in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
+      /*fn_def_attrs=*/nullptr,
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());

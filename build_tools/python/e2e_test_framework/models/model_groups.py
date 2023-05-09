@@ -106,8 +106,9 @@ BERT_LARGE_TF_BATCHES = [
     tf_models.BERT_LARGE_48X384_FP32_TF,
     tf_models.BERT_LARGE_64X384_FP32_TF,
     tf_models.BERT_LARGE_512X384_FP32_TF,
-    tf_models.BERT_LARGE_1024X384_FP32_TF,
-    tf_models.BERT_LARGE_1280X384_FP32_TF,
+    # Disabled due to https://github.com/openxla/iree/issues/13211.
+    #tf_models.BERT_LARGE_1024X384_FP32_TF,
+    #tf_models.BERT_LARGE_1280X384_FP32_TF,
 ]
 
 RESNET50_TF_BATCHES = [
@@ -125,7 +126,7 @@ T5_LARGE_TF_BATCHES = [
     tf_models.T5_LARGE_24x512_FP32_TF,
     tf_models.T5_LARGE_32x512_FP32_TF,
     tf_models.T5_LARGE_48x512_FP32_TF,
-    # Disabled due to # Disabled due to https://github.com/openxla/iree/issues/13189.
+    # Disabled due to https://github.com/openxla/iree/issues/13189.
     #tf_models.T5_LARGE_64x512_FP32_TF,
     #tf_models.T5_LARGE_512x512_FP32_TF,
 ]
@@ -141,3 +142,8 @@ CUDA_MODELS = [
 ]
 
 CUDA_MODELS_LONG = RESNET50_TF_BATCHES + BERT_LARGE_TF_BATCHES + T5_LARGE_TF_BATCHES
+
+VULKAN_MODELS = [
+    torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
+    torch_models.MODEL_UNET_2D_FP32_TORCH,
+]

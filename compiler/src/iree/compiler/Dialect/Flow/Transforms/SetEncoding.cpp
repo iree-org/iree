@@ -47,17 +47,17 @@ static Type getElementTypeOrType(Type t) {
 /// Returns a constant 0 of type `elementType`.
 static FailureOr<Value> getZero(OpBuilder &builder, Location loc,
                                 Type elementType) {
-  Attribute zeroVal =
-      TypeSwitch<Type, Attribute>(elementType)
+  TypedAttr zeroVal =
+      TypeSwitch<Type, TypedAttr>(elementType)
           .Case<FloatType>([&](FloatType floatType) -> Attribute {
-            return builder.getFloatAttr(floatType, 0);
+            return cast<TypedAttr>(builder.getFloatAttr(floatType, 0));
           })
           .Case<IntegerType>([&](IntegerType intType) -> Attribute {
-            return builder.getIntegerAttr(intType, 0);
+            return cast<TypedAttr>(builder.getIntegerAttr(intType, 0));
           })
           .Default([](Type type) { return nullptr; });
   if (!zeroVal) return failure();
-  return builder.create<arith::ConstantOp>(loc, zeroVal, elementType)
+  return builder.create<arith::ConstantOp>(loc, elementType, zeroVal)
       .getResult();
 }
 

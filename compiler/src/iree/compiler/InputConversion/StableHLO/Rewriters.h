@@ -11,11 +11,33 @@
 
 namespace mlir::iree_compiler::stablehlo {
 
+//===----------------------------------------------------------------------===//
+// General StableHLO/CHLO lowering patterns.
+//===----------------------------------------------------------------------===//
+
 /// Populates the patterns that convert from StableHLO to Linalg on tensors.
 void populateStableHloToLinalgConversionPatterns(MLIRContext *context,
                                                  TypeConverter &typeConverter,
                                                  RewritePatternSet *patterns,
                                                  bool enablePrimitiveOps);
+
+/// Collection of rewrite patterns for lowering of StableHLO ops to SCF control
+/// flow ops.
+void populateLegalizeControlFlowPatterns(MLIRContext *context,
+                                         RewritePatternSet *patterns);
+
+/// Collection of rewrite patterns for lowering of StableHLO dim operations.
+void populateLegalizeShapeComputationPatterns(MLIRContext *context,
+                                              RewritePatternSet *patterns);
+
+//===----------------------------------------------------------------------===//
+// IREE-specific patterns.
+//===----------------------------------------------------------------------===//
+
+/// Populates the patterns that convert from StableHLO to Linalg on tensors.
+void populateStableHloToLinalgExtConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns);
 
 //===----------------------------------------------------------------------===//
 // Fine-grained patterns used by the implementation.

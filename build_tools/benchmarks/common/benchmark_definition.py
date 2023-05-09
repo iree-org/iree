@@ -3,11 +3,11 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Utilities for describing Android benchmarks.
+"""Utilities for describing benchmarks.
 
-This file provides common and structured representation of Android devices,
-benchmark definitions, and benchmark result collections, so that they can be
-shared between different stages of the same benchmark pipeline.
+This file provides common and structured representation of devices, benchmark
+definitions, and benchmark result collections, so that they can be shared
+between different stages of the same benchmark pipeline.
 """
 
 import json
@@ -15,18 +15,20 @@ import pathlib
 import re
 import subprocess
 
-from dataclasses import dataclass
+import dataclasses
 from enum import Enum
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-# A map from CPU ABI to IREE's benchmark target architecture.
-CPU_ABI_TO_TARGET_ARCH_MAP = {
+from e2e_test_framework.definitions import common_definitions
+
+# A map from CPU ABI to IREE's legacy benchmark target architecture.
+CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP = {
     "arm64-v8a": "cpu-arm64-v8a",
-    "x86_64": "cpu-x86_64",
+    "x86_64-cascadeLake": "cpu-x86_64-cascadelake",
 }
 
-# A map from GPU name to IREE's benchmark target architecture.
-GPU_NAME_TO_TARGET_ARCH_MAP = {
+# A map from GPU name to IREE's legacy benchmark target architecture.
+GPU_NAME_TO_LEGACY_TARGET_ARCH_MAP = {
     "adreno-640": "gpu-adreno",
     "adreno-650": "gpu-adreno",
     "adreno-660": "gpu-adreno",
@@ -36,14 +38,40 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "tesla-v100-sxm2-16gb": "gpu-cuda-sm_70",
     "nvidia-a100-sxm4-40gb": "gpu-cuda-sm_80",
     "nvidia-geforce-rtx-3090": "gpu-cuda-sm_80",
-    "unknown": "gpu-unknown",
 }
 
-# A map of canonical microarchitecture names.
-CANONICAL_MICROARCHITECTURE_NAMES = {"CascadeLake", "Zen2"}
+# A map from CPU ABI to IREE's benchmark target architecture.
+CPU_ABI_TO_TARGET_ARCH_MAP = {
+    "arm64-v8a":
+        common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
+    "x86_64-cascadelake":
+        common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
+}
+
+# A map from GPU name to IREE's benchmark target architecture.
+GPU_NAME_TO_TARGET_ARCH_MAP = {
+    "adreno-640":
+        common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
+    "adreno-650":
+        common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
+    "adreno-660":
+        common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
+    "adreno-730":
+        common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
+    "mali-g77":
+        common_definitions.DeviceArchitecture.ARM_VALHALL,
+    "mali-g78":
+        common_definitions.DeviceArchitecture.ARM_VALHALL,
+    "tesla-v100-sxm2-16gb":
+        common_definitions.DeviceArchitecture.NVIDIA_PASCAL,
+    "nvidia-a100-sxm4-40gb":
+        common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
+    "nvidia-geforce-rtx-3090":
+        common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
+}
 
 
-@dataclass
+@dataclasses.dataclass
 class DriverInfo:
   """An object describing a IREE HAL driver.
 
@@ -110,17 +138,32 @@ def execute_cmd(args: Sequence[Any],
 
 def execute_cmd_and_get_output(args: Sequence[Any],
                                verbose: bool = False,
+                               **kwargs) -> Tuple[str, str]:
+  """Executes a command and returns its stdout and stderr
+
+  Same as execute_cmd except captures stdout and stderr.
+  """
+  exc = execute_cmd(args,
+                    verbose=verbose,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    **kwargs)
+  return exc.stdout.strip(), exc.stderr.strip()
+
+
+def execute_cmd_and_get_stdout(args: Sequence[Any],
+                               verbose: bool = False,
                                **kwargs) -> str:
   """Executes a command and returns its stdout.
 
   Same as execute_cmd except captures stdout (and not stderr).
   """
-  return execute_cmd(args, verbose=verbose, stdout=subprocess.PIPE,
-                     **kwargs).stdout.strip()
+  stdout, _ = execute_cmd_and_get_output(args, verbose=verbose, **kwargs)
+  return stdout
 
 
 def get_git_commit_hash(commit: str) -> str:
-  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+  return execute_cmd_and_get_stdout(['git', 'rev-parse', commit],
                                     cwd=pathlib.Path(__file__).resolve().parent)
 
 
@@ -142,6 +185,7 @@ def get_iree_benchmark_module_arguments(
       "--benchmark_format=json",
       "--benchmark_out_format=json",
       f"--benchmark_out={results_filename}",
+      "--print_statistics=true",
   ]
   if benchmark_min_time:
     cmd.extend([
@@ -176,7 +220,7 @@ class PlatformType(Enum):
   LINUX = "Linux"
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class DeviceInfo:
   """An object describing a device.
 
@@ -208,28 +252,29 @@ class DeviceInfo:
     params = ", ".join(params)
     return f"{self.platform_type.value} device <{params}>"
 
-  def get_iree_cpu_arch_name(self) -> str:
-    arch = CPU_ABI_TO_TARGET_ARCH_MAP.get(self.cpu_abi.lower())
-    if not arch:
-      raise ValueError(f"Unrecognized CPU ABI: '{self.cpu_abi}'; "
-                       "need to update the map")
-
+  def get_iree_cpu_arch_name(self,
+                             use_legacy_name: bool = False) -> Optional[str]:
+    name = self.cpu_abi.lower()
     if self.cpu_uarch:
-      if self.cpu_uarch not in CANONICAL_MICROARCHITECTURE_NAMES:
-        raise ValueError(
-            f"Unrecognized CPU microarchitecture: '{self.cpu_uarch}'; "
-            "need to update the map")
+      name += f"-{self.cpu_uarch.lower()}"
 
-      arch = f'{arch}-{self.cpu_uarch.lower()}'
+    if use_legacy_name:
+      return CPU_ABI_TO_LEGACY_TARGET_ARCH_MAP.get(name)
 
-    return arch
+    arch = CPU_ABI_TO_TARGET_ARCH_MAP.get(name)
+    # TODO(#11076): Return common_definitions.DeviceArchitecture instead after
+    # removing the legacy path.
+    return None if arch is None else str(arch)
 
-  def get_iree_gpu_arch_name(self) -> str:
-    arch = GPU_NAME_TO_TARGET_ARCH_MAP.get(self.gpu_name.lower())
-    if not arch:
-      raise ValueError(f"Unrecognized GPU name: '{self.gpu_name}'; "
-                       "need to update the map")
-    return arch
+  def get_iree_gpu_arch_name(self,
+                             use_legacy_name: bool = False) -> Optional[str]:
+    name = self.gpu_name.lower()
+
+    if use_legacy_name:
+      return GPU_NAME_TO_LEGACY_TARGET_ARCH_MAP.get(name)
+
+    arch = GPU_NAME_TO_TARGET_ARCH_MAP.get(name)
+    return None if arch is None else str(arch)
 
   def get_detailed_cpu_arch_name(self) -> str:
     """Returns the detailed architecture name."""
@@ -284,7 +329,7 @@ class DeviceInfo:
     return rev
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class BenchmarkInfo:
   """An object describing the current benchmark.
 
@@ -335,9 +380,8 @@ class BenchmarkInfo:
     elif driver_info.device_type == 'CPU':
       target_arch = "CPU-" + device_info.get_detailed_cpu_arch_name()
     else:
-      raise ValueError(
-          f"Unrecognized device type '{driver_info.device_type}' of the driver '{driver_info.pretty_name}'"
-      )
+      raise ValueError(f"Unrecognized device type '{driver_info.device_type}' "
+                       f"of the driver '{driver_info.pretty_name}'")
 
     if model_tags:
       tags = ",".join(model_tags)
@@ -347,7 +391,8 @@ class BenchmarkInfo:
     device_part = f"{device_info.model} ({target_arch})"
 
     mode_tags = ",".join(bench_mode)
-    name = f"{model_part} {mode_tags} with {driver_info.pretty_name} @ {device_part}"
+    name = (f"{model_part} {mode_tags} with {driver_info.pretty_name} "
+            f"@ {device_part}")
 
     return cls(name=name,
                model_name=model_name,
@@ -389,33 +434,176 @@ class BenchmarkInfo:
                          run_config_id=json_object.get("run_config_id"))
 
 
-@dataclass
-class BenchmarkRun(object):
-  """An object describing a single run of the benchmark binary.
+@dataclasses.dataclass(frozen=True)
+class BenchmarkLatency:
+  """Stores latency statistics for a benchmark run."""
+  mean: int
+  median: int
+  stddev: int
+  unit: str
 
-  - benchmark_info: a BenchmarkInfo object describing the benchmark setup.
-  - context: the benchmark context returned by the benchmarking framework.
-  - results: the benchmark results returned by the benchmarking framework.
+  def to_json_object(self) -> Dict[str, Any]:
+    return dataclasses.asdict(self)
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return BenchmarkLatency(**json_object)
+
+
+def _get_google_benchmark_latencies(
+    benchmark_json: Dict[str,
+                         Any]) -> Tuple[BenchmarkLatency, BenchmarkLatency]:
+  """Returns the Google Benchmark aggregate latencies.
+
+    Args:
+      benchmark_json: The JSON string or object returned by Google Benchmark.
+
+    Returns:
+      Real time and CPU time BenchmarkLatency.
+    """
+  real_time_object = dict(unit="ns")
+  cpu_time_object = dict(unit="ns")
+  metrics = ["mean", "median", "stddev"]
+  for case in benchmark_json["benchmarks"]:
+    if any(case["name"].endswith(f"real_time_{m}") for m in metrics):
+      if case["time_unit"] != "ns":
+        raise ValueError(f"Expected ns as time unit")
+      metric = case["name"].split("_")[-1]
+      real_time_object[metric] = int(round(case["real_time"]))
+      cpu_time_object[metric] = int(round(case["cpu_time"]))
+
+  # from_json_object implicitly validates that all metrics were found.
+  real_time = BenchmarkLatency.from_json_object(real_time_object)
+  cpu_time = BenchmarkLatency.from_json_object(cpu_time_object)
+  return real_time, cpu_time
+
+
+@dataclasses.dataclass(frozen=True)
+class BenchmarkMemory:
+  """Stores memory statistics for a benchmark run."""
+  peak: int
+  allocated: int
+  freed: int
+  live: int
+  unit: str
+
+  def to_json_object(self) -> Dict[str, int]:
+    return dataclasses.asdict(self)
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, int]):
+    return BenchmarkMemory(**json_object)
+
+
+def _get_iree_memory_statistics(benchmark_stderr: str,
+                                device: str) -> BenchmarkMemory:
+  """Extracts IREE's memory statistics for a given device."""
+  # The memory statistics for each device are listed on their own line.
+  pattern = (rf"{device}:"
+             r"\s*(?P<peak>\d+)B peak /"
+             r"\s*(?P<allocated>\d+)B allocated /"
+             r"\s*(?P<freed>\d+)B freed /"
+             r"\s*(?P<live>\d+)B live")
+  match_ = re.search(pattern, benchmark_stderr)
+  return BenchmarkMemory(
+      peak=int(match_["peak"]),
+      allocated=int(match_["allocated"]),
+      freed=int(match_["freed"]),
+      live=int(match_["live"]),
+      unit="bytes",
+  )
+
+
+@dataclasses.dataclass(frozen=True)
+class BenchmarkMetrics(object):
+  """An object describing the results from a single benchmark.
+
+  - real_time: the real time latency statistics returned by the benchmarking
+      framework.
+  - cpu_time: the cpu time latency statistics returned by the benchmarking
+      framework.
+  - host_memory: the host memory statistics returned by the benchmarking
+      framework.
+  - device_memory: the device memory statistics returned by the benchmarking
+      framework.
+  - raw_data: additional JSON-compatible raw results returned by the
+      benchmarking framework.
   """
-  benchmark_info: BenchmarkInfo
-  context: Dict[str, Any]
-  results: Sequence[Dict[str, Any]]
+  real_time: BenchmarkLatency
+  cpu_time: BenchmarkLatency
+  host_memory: BenchmarkMemory
+  device_memory: BenchmarkMemory
+  raw_data: Dict[str, Any]
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
-        "benchmark_info": self.benchmark_info.to_json_object(),
-        "context": self.context,
-        "results": self.results,
+        "real_time": self.real_time.to_json_object(),
+        "cpu_time": self.cpu_time.to_json_object(),
+        "host_memory": self.host_memory.to_json_object(),
+        "device_memory": self.device_memory.to_json_object(),
+        "raw_data": self.raw_data,
     }
 
-  def to_json_str(self) -> str:
-    return json.dumps(self.to_json_object())
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return BenchmarkMetrics(
+        real_time=BenchmarkLatency.from_json_object(json_object["real_time"]),
+        cpu_time=BenchmarkLatency.from_json_object(json_object["cpu_time"]),
+        host_memory=BenchmarkMemory.from_json_object(
+            json_object["host_memory"]),
+        device_memory=BenchmarkMemory.from_json_object(
+            json_object["device_memory"]),
+        raw_data=json_object["raw_data"],
+    )
+
+
+def parse_iree_benchmark_metrics(benchmark_stdout: str,
+                                 benchmark_stderr: str) -> BenchmarkMetrics:
+  """Extract benchmark metrics from the output of iree-benchmark-module.
+
+  Args:
+    benchmark_stdout: The stdout of iree-benchmark-module with
+      --benchmark_format=json.
+    benchmark_stdout: The stderr of iree-benchmark-module with
+      --print_statistics=true.
+
+  Returns:
+    A populated BenchmarkMetrics dataclass.
+  """
+  benchmark_json = json.loads(benchmark_stdout)
+  real_time, cpu_time = _get_google_benchmark_latencies(benchmark_json)
+  return BenchmarkMetrics(
+      real_time=real_time,
+      cpu_time=cpu_time,
+      host_memory=_get_iree_memory_statistics(benchmark_stderr, "HOST_LOCAL"),
+      device_memory=_get_iree_memory_statistics(benchmark_stderr,
+                                                "DEVICE_LOCAL"),
+      raw_data=benchmark_json,
+  )
+
+
+@dataclasses.dataclass(frozen=True)
+class BenchmarkRun(object):
+  """An object describing a single run of the benchmark binary.
+
+  - info: a BenchmarkInfo object describing the benchmark setup.
+  - metrics: a BenchmarkMetrics object containing the results of the benchmark.
+  """
+  info: BenchmarkInfo
+  metrics: BenchmarkMetrics
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "info": self.info.to_json_object(),
+        "metrics": self.metrics.to_json_object(),
+    }
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkRun(
-        BenchmarkInfo.from_json_object(json_object["benchmark_info"]),
-        json_object["context"], json_object["results"])
+        BenchmarkInfo.from_json_object(json_object["info"]),
+        BenchmarkMetrics.from_json_object(json_object["metrics"]),
+    )
 
 
 class BenchmarkResults(object):
@@ -427,8 +615,8 @@ class BenchmarkResults(object):
     """
 
   def __init__(self):
-    self.commit = "<unknown>"
-    self.benchmarks = []
+    self.commit: str = "<unknown>"
+    self.benchmarks: List[BenchmarkRun] = []
 
   def set_commit(self, commit: str):
     self.commit = commit
@@ -438,31 +626,10 @@ class BenchmarkResults(object):
       raise ValueError("Inconsistent pull request commit")
     self.benchmarks.extend(other.benchmarks)
 
-  def get_aggregate_time(self, benchmark_index: int, kind: str) -> int:
-    """Returns the Google Benchmark aggreate time for the given kind.
-
-      Args:
-      - benchmark_index: the benchmark's index.
-      - kind: what kind of aggregate time to get; choices:
-        'mean', 'median', 'stddev'.
-      Returns:
-        Time in nanoseconds.
-      """
-    time = None
-    for bench_case in self.benchmarks[benchmark_index].results:
-      if bench_case["name"].endswith(f"real_time_{kind}"):
-        if bench_case["time_unit"] != "ns":
-          raise ValueError(f"Expected ns as time unit")
-        time = int(round(bench_case["real_time"]))
-        break
-    if time is None:
-      raise ValueError(f"Cannot found real_time_{kind} in benchmark results")
-    return time
-
   def to_json_str(self) -> str:
     json_object = {"commit": self.commit, "benchmarks": []}
     json_object["benchmarks"] = [b.to_json_object() for b in self.benchmarks]
-    return json.dumps(json_object)
+    return json.dumps(json_object, indent=2)
 
   @staticmethod
   def from_json_str(json_str: str):
@@ -475,7 +642,7 @@ class BenchmarkResults(object):
     return results
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationInfo(object):
   name: str
   model_name: str
@@ -525,7 +692,7 @@ class CompilationInfo(object):
                            gen_config_id=json_object.get("gen_config_id"))
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class ModuleComponentSizes(object):
   file_bytes: int
   vm_component_bytes: int
@@ -537,7 +704,7 @@ class ModuleComponentSizes(object):
     return ModuleComponentSizes(**json_object)
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationStatistics(object):
   compilation_info: CompilationInfo
   # Module file and component sizes.
@@ -555,7 +722,7 @@ class CompilationStatistics(object):
         compilation_time_ms=json_object["compilation_time_ms"])
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompilationResults(object):
   commit: str
   compilation_statistics: Sequence[CompilationStatistics]

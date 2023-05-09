@@ -233,6 +233,15 @@ enum iree_hal_collective_kind_e {
   //   ncclAllReduce
   IREE_HAL_COLLECTIVE_KIND_ALL_REDUCE,
 
+  // Gathers |element_count| elements of the specified type in |recv_binding| by
+  // sourcing N parts of |element_count|/N elements, one from the |send_binding|
+  // of each rank, and concatenating them.
+  //
+  // |param|: unused
+  // |send_binding|: local elements to split and send to all ranks
+  // |recv_binding|: concatenated results from all ranks
+  IREE_HAL_COLLECTIVE_KIND_ALL_TO_ALL,
+
   // Copies |element_count| elements of the specified type from |send_binding|
   // on the specified rank |param| to all other ranks |recv_binding|s.
   //
@@ -358,6 +367,10 @@ static_assert(sizeof(iree_hal_collective_op_t) == sizeof(uint32_t),
 // a string view into the storage of the resulting value.
 IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
     const iree_hal_collective_op_t* op, iree_bitfield_string_temp_t* out_temp);
+
+// Returns the number of bytes each |element_type| consumes in memory.
+IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
+    iree_hal_collective_element_type_t element_type);
 
 // Describes a subrange of a buffer that can be bound to a binding slot.
 typedef struct iree_hal_buffer_binding_t {
@@ -492,9 +505,6 @@ IREE_API_EXPORT void iree_hal_command_buffer_retain(
 // Releases the given |command_buffer| from the caller.
 IREE_API_EXPORT void iree_hal_command_buffer_release(
     iree_hal_command_buffer_t* command_buffer);
-
-IREE_API_EXPORT void* iree_hal_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable);
 
 // Returns a bitmask indicating the behavior of the command buffer.
 IREE_API_EXPORT iree_hal_command_buffer_mode_t
@@ -783,9 +793,6 @@ IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
 
 typedef struct iree_hal_command_buffer_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_command_buffer_t* command_buffer);
-
-  void*(IREE_API_PTR* dyn_cast)(iree_hal_command_buffer_t* command_buffer,
-                                const void* vtable);
 
   iree_status_t(IREE_API_PTR* begin)(iree_hal_command_buffer_t* command_buffer);
   iree_status_t(IREE_API_PTR* end)(iree_hal_command_buffer_t* command_buffer);

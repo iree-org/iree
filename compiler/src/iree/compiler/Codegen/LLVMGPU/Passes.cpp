@@ -77,12 +77,8 @@ static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  // TODO(#12933): Because of regressions in CUDA backend, there is an
-  // option to keep a legacy mode of not representing the offset in the
-  // type. Remove once the bug is fixed.
-  addIREEComprehensiveBufferizePasses(
-      passManager, allocationFn, deallocationFn, memcpyFn,
-      /*embedSubspanOffsetIntoMemRefType=*/false);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
@@ -518,7 +514,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
-  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
+  pm.addNestedPass<func::FuncOp>(
+      arith::createArithExpandOpsPass({/*include-bf16=*/true}));
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createLowerAffinePass());
@@ -554,17 +551,7 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
-  pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
-  // TODO(#12933): Because of regressions in CUDA backend, there is an
-  // option to keep a legacy mode of not representing the offset in the
-  // type. Remove once the bug is fixed.
-  pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass(
-      /*embedSubspanOffsetIntoMemRefType=*/false));
-  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createDecomposeSoftmaxPass());
-  // Temporary solution to avoid large allocations due to softmax lowering.
-  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createRematerializeParallelOpsPass());
+  addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(

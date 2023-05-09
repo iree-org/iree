@@ -14,8 +14,9 @@ transform.sequence failures(propagate) {
   // Step 2. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
   %forall_grid, %grid_combiner_op =
-    transform.iree.tile_to_forall_and_workgroup_count_region %combiner_op tile_sizes [1]
+    transform.structured.tile_to_forall_op %combiner_op tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!pdl.operation) -> ()
   %not_combiner = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op : !pdl.operation
   transform.structured.fuse_into_containing_op %not_combiner into %forall_grid
 

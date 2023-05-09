@@ -10,7 +10,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/schemas/cpu_data.h"
 
 #ifdef __cplusplus
 extern "C" {

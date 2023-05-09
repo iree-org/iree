@@ -10,7 +10,7 @@
 # reference commit (default "main")
 # See https://github.com/bazelbuild/buildtools/tree/master/buildifier
 
-set -o pipefail
+set -euo pipefail
 
 BASE_REF="${1:-main}"
 

@@ -37,23 +37,27 @@ LogicalResult verifyLoweringConfiguration(
 // Misc/common conversions
 //------------------------------------------------------------------------------
 
+/// Passes that are done on all backends before target-specific code-generation
+/// kicks in.
+void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager);
+
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
 /// CleanupBufferAllocView).
 void addIREEPostBufferizationPasses(OpPassManager &passManager);
 
 using bufferization::BufferizationOptions;
-// TODO(#12933): Because of regressions in CUDA backend, there is an
-// option to keep a legacy mode of not representing the offset in the
-// type. Remove once the bug is fixed.
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
-    bool embedSubspanOffsetIntoMemRefType = true);
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+
+/// Pass to bubble up ordinal operations to allow workgroup count computation
+/// based on slices to correlate back to workload computation.
+std::unique_ptr<Pass> createBubbleUpOrdinalOpsPass();
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -62,11 +66,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 /// Pass to bufferize dispatches that are copying from one interface to
 /// another. This will create a `linalg.generic` op which is a copy that can
 /// then be used by backends to handle appropriately.
-// TODO(#12933): Because of regressions in CUDA backend, there is an
-// option to keep a legacy mode of not representing the offset in the
-// type. Remove once the bug is fixed.
-std::unique_ptr<OperationPass<ModuleOp>> createBufferizeCopyOnlyDispatchesPass(
-    bool embedSubspanOffsetIntoMemRefType = true);
+std::unique_ptr<OperationPass<ModuleOp>>
+createBufferizeCopyOnlyDispatchesPass();
 
 // Decomposes linalg generics on tensors into generics containing no more than
 // one op in the body.
@@ -120,16 +121,12 @@ std::unique_ptr<Pass> createIREEExpandStridedMetadataPass();
 /// is specified, the default allocator generates an `std.alloc` instruction
 /// with the allocated MemRefType having no stride map (i.e. default row-major
 /// striding) and default memory space.
-// TODO(#12933): Because of regressions in CUDA backend, there is an
-// option to keep a legacy mode of not representing the offset in the
-// type. Remove once the bug is fixed.
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
     std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
-    bool embedSubspanOffsetIntoMemRefType = true);
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();
@@ -717,6 +714,9 @@ createSPIRVCreateFastSlowPathPass();
 
 /// Emulates 64-bit integer ops with 32-bit integer ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
+
+/// Emulates bfloat 16 ops with 32-bit float ops.
+std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateBf16Pass();
 
 /// Turns static shaped storage buffer subspan ops into dynamic shaped ones.
 std::unique_ptr<OperationPass<func::FuncOp>>

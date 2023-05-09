@@ -19,7 +19,7 @@
 // as they don't disturb the existing values exposed to the plugin.
 
 #define STATIC_ASSERT_EQ(a, b) \
-  static_assert((a) == (b), "plugin/runtime API mismatch")
+  static_assert((int)(a) == (int)(b), "plugin/runtime API mismatch")
 
 STATIC_ASSERT_EQ(IREE_HAL_EXECUTABLE_PLUGIN_STATUS_OK, IREE_STATUS_OK);
 STATIC_ASSERT_EQ(IREE_HAL_EXECUTABLE_PLUGIN_STATUS_CANCELLED,

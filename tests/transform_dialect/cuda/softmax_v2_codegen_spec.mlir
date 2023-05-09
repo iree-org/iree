@@ -16,8 +16,10 @@ transform.sequence failures(propagate) {
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ==============================================================
   %forall, %_ =
-  transform.iree.tile_to_forall_and_workgroup_count_region %div tile_sizes [1, 4]  
+  transform.structured.tile_to_forall_op %div tile_sizes [1, 4]  
     ( mapping = [#gpu.block<x>, #gpu.block<y>] )
+  transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!pdl.operation) -> ()
+
   // TODO: Merging and fusing merged handles does not work properly atm.
   transform.structured.fuse_into_containing_op %exp_and_exps_sum into %forall
   transform.structured.fuse_into_containing_op %exps_sum_fill into %forall

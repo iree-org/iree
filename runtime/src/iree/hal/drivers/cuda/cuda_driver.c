@@ -46,27 +46,6 @@ IREE_API_EXPORT void iree_hal_cuda_driver_options_initialize(
     iree_hal_cuda_driver_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->default_device_index = 0;
-  out_options->default_rank = 0;
-  out_options->default_count = 0;
-}
-
-// Gets the MPI world size from the environmental variable.
-// Returns 0 if the variable is not set.
-static iree_status_t iree_hal_cuda_get_mpi_comm_world_size_from_env(
-    int32_t* size) {
-  *size = 0;
-
-  const char* comm_world_size_str = getenv("OMPI_COMM_WORLD_SIZE");
-  if (!comm_world_size_str) {
-    return iree_ok_status();
-  }
-
-  if (!iree_string_view_atoi_uint32(iree_make_cstring_view(comm_world_size_str),
-                                    size)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "OMPI_COMM_WORLD_SIZE=%s", comm_world_size_str);
-  }
-  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_driver_create_internal(
@@ -91,30 +70,14 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
   iree_status_t status =
       iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
 
-  int comm_world_size = 0;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_cuda_get_mpi_comm_world_size_from_env(&comm_world_size);
-  }
-
-  // Initialize NCCL too if MPI is used or default_count is set.
-  if (iree_status_is_ok(status) &&
-      (comm_world_size > 0 || options->default_count > 0)) {
+    // Try to load NCCL. This will fail if NCCL is unavailable or incompatible.
+    // We only fail on unavailability when the user tries to create a channel
+    // and otherwise defer reporting.
     status = iree_hal_cuda_nccl_dynamic_symbols_initialize(host_allocator,
                                                            &driver->syms);
-    if (iree_status_is_ok(status) && comm_world_size > 0) {
-      status = iree_hal_mpi_dynamic_symbols_initialize(host_allocator,
-                                                       &driver->syms);
-      if (iree_status_is_ok(status)) {
-        MPI_RETURN_IF_ERROR(&driver->syms, MPI_Init(NULL, NULL), "MPI_Init");
-
-        // Override the device index with the MPI rank.
-        int rank = 0;
-        MPI_RETURN_IF_ERROR(
-            &driver->syms,
-            MPI_Comm_rank(driver->syms.ompi_mpi_comm_world, &rank),
-            "MPI_Comm_rank");
-        driver->default_device_index = rank;
-      }
+    if (iree_status_is_unavailable(status)) {
+      status = iree_status_ignore(status);
     }
   }
 
@@ -130,9 +93,7 @@ static void iree_hal_cuda_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_hal_cuda_driver_t* driver = iree_hal_cuda_driver_cast(base_driver);
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
-  if (driver->syms.mpi_library) {
-    MPI_IGNORE_ERROR(&driver->syms, MPI_Finalize());
-  }
+
   iree_hal_cuda_dynamic_symbols_deinitialize(&driver->syms);
   iree_allocator_free(host_allocator, driver);
 
@@ -400,6 +361,16 @@ static iree_status_t iree_hal_cuda_driver_create_device_by_index(
 
   // Ensure CUDA is initialized before querying it.
   IREE_RETURN_IF_ERROR(iree_hal_cuda_init(driver));
+
+  // Query the number of available CUDA devices.
+  int device_count = 0;
+  CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGetCount(&device_count),
+                       "cuDeviceGetCount");
+  if (device_index >= device_count) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "device %d not found (of %d enumerated)",
+                            device_index, device_count);
+  }
 
   CUdevice device = 0;
   CUDA_RETURN_IF_ERROR(&driver->syms, cuDeviceGet(&device, device_index),

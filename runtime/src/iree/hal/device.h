@@ -14,6 +14,7 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/channel.h"
+#include "iree/hal/channel_provider.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable_cache.h"
@@ -249,9 +250,9 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
     iree_hal_device_t* device);
 
 // Replaces the default device memory allocator.
-// The |new_allocator| will be retained for the lifetime of the device or the
-// allocator is replaced again. The common usage pattern is to shim the default
-// allocator with a wrapper:
+// The |new_allocator| will be retained for the lifetime of the device or until
+// the allocator is replaced again. The common usage pattern is to shim the
+// default allocator with a wrapper:
 //   // Retain the existing allocator in the new wrapper.
 //   wrap_allocator(iree_hal_device_allocator(device), &new_allocator);
 //   // Update the device to use the wrapper for allocations.
@@ -260,8 +261,8 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
 // WARNING: this is not thread-safe and must only be performed when the device
 // is idle and all buffers that may have been allocated from the existing
 // allocator have been released. In general the only safe time to call this is
-// immediately after device creation upon startup and before any buffers have
-// been allocated. Beware: there are no internal checks for this condition!
+// immediately after device creation and before any buffers have been allocated.
+// Beware: there are no internal checks for this condition!
 //
 // TODO(benvanik): remove this method and instead allow allocators to be
 // composed without the safety caveats. This may take the form of unbound
@@ -271,6 +272,18 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
 // they desire.
 IREE_API_EXPORT void iree_hal_device_replace_allocator(
     iree_hal_device_t* device, iree_hal_allocator_t* new_allocator);
+
+// Replaces the current collective channel provider.
+// The |new_provider| will be retained for the lifetime of the device or until
+// the provider is replaced again.
+//
+// WARNING: this is not thread-safe and must only be performed when the device
+// is idle and all channels that may have been created from the existing
+// provider have been released. In general the only safe time to call this is
+// immediately after device creation and before any channels have been created.
+// Beware: there are no internal checks for this condition!
+IREE_API_EXPORT void iree_hal_device_replace_channel_provider(
+    iree_hal_device_t* device, iree_hal_channel_provider_t* new_provider);
 
 // Trims pools and caches used by the HAL to the minimum required for live
 // allocations. This can be used on low-memory conditions or when
@@ -486,6 +499,8 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device);
   void(IREE_API_PTR* replace_device_allocator)(
       iree_hal_device_t* device, iree_hal_allocator_t* new_allocator);
+  void(IREE_API_PTR* replace_channel_provider)(
+      iree_hal_device_t* device, iree_hal_channel_provider_t* new_provider);
 
   iree_status_t(IREE_API_PTR* trim)(iree_hal_device_t* device);
 

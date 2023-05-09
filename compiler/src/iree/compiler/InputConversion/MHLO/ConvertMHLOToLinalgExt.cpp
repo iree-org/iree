@@ -455,7 +455,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
         loc, mixedSizes, indicesElementType);
     // Initialize indices to 0 and values to negative infinity
-    Attribute negInfAttr;
+    TypedAttr negInfAttr;
     if (auto intType = valueElementType.dyn_cast<IntegerType>()) {
       negInfAttr = rewriter.getIntegerAttr(
           intType, APInt::getSignedMinValue(intType.getWidth()));
@@ -466,7 +466,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
       negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
     }
     Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
-    Attribute posInfAttr = rewriter.getIntegerAttr(
+    TypedAttr posInfAttr = rewriter.getIntegerAttr(
         indicesElementType, APInt::getSignedMaxValue(32));
     Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
     Value negInfTensor =

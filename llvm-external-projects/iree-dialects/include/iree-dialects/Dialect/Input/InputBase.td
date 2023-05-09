@@ -59,7 +59,7 @@ class IREEInput_AnyPtrOf<list<Type> types> :
   string builderCall = "";
 }
 
-def IREEInput_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
+def IREEInput_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat, AnyComplex]>;
 def IREEInput_Tensor : TypeAlias<AnyRankedTensor>;
 
 def IREEInput_AnyList : DialectType<

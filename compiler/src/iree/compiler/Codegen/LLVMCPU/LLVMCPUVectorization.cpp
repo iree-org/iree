@@ -16,14 +16,17 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-vectorization"
+#define VEC_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
 /// Returns the op that contains lowering config. Checks whether the provided op
 /// contains the lowering config and returns it. Otherwise, tries to find the
 /// lowering config across the function. If there are multiple ops with the same
@@ -107,10 +110,75 @@ static SmallVector<int64_t> getCanonicalVectorShape(func::FuncOp funcOp) {
   return canonicalVectorShape;
 }
 
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis.
+/// Returns failure if vector sizes can't be inferred.
+static FailureOr<SmallVector<int64_t>> inferVectorSizesFromIR(
+    linalg::LinalgOp linalgOp) {
+  LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << linalgOp << "\n");
+
+  SmallVector<int64_t> vectorSizes;
+  unsigned numDims = linalgOp.getNumLoops();
+
+  for (int dim = 0; dim < numDims; ++dim) {
+    // Map dimension `dim` to an operand dimension that we will use to
+    // traverse the U-D chain to get `dim` vector size information.
+    SmallVector<std::pair<Value, unsigned>> operandDimPairs;
+    linalgOp.mapIterationSpaceDimToAllOperandDims(dim, operandDimPairs);
+    if (operandDimPairs.empty()) {
+      return failure();
+    }
+
+    Value firstOperand = operandDimPairs[0].first;
+    unsigned firstOperandDim = operandDimPairs[0].second;
+
+    // Trivial case: `dim` size is available in the operand type.
+    int64_t dimSize =
+        firstOperand.getType().cast<ShapedType>().getShape()[firstOperandDim];
+    if (!ShapedType::isDynamic(dimSize)) {
+      vectorSizes.push_back(dimSize);
+      LLVM_DEBUG(VEC_DBGS() << "Inferred vector size '" << dimSize
+                            << "' for dimension '" << dim << "'\n");
+      continue;
+    }
+
+    // Use ValueBounds analysis to infer `dim` size upper bound.
+    FailureOr<int64_t> maybeDimBound;
+    for (auto operandDimPair : operandDimPairs) {
+      Value operand = operandDimPair.first;
+      unsigned operandDim = operandDimPair.second;
+      maybeDimBound = ValueBoundsConstraintSet::computeConstantBound(
+          presburger::BoundType::UB, operand, operandDim,
+          /*stopCondition=*/nullptr, /*closedUB=*/true);
+
+      if (succeeded(maybeDimBound)) {
+        break;
+      }
+    }
+
+    if (failed(maybeDimBound)) {
+      return failure();
+    }
+
+    dimSize = maybeDimBound.value();
+    vectorSizes.push_back(dimSize);
+    LLVM_DEBUG(VEC_DBGS() << "Inferred vector size '" << dimSize
+                          << "' for dimension '" << dim << "'\n");
+  }
+
+  return vectorSizes;
+}
+
 // Give the canonical vector shape of a dispatch, returns the vector sizes for a
 // particular linalg op within that dispatch.
 static SmallVector<int64_t> getVectorSizes(
     linalg::LinalgOp linalgOp, ArrayRef<int64_t> canonicalVectorShape) {
+  // Try to infer the vector sizes from the IR. If it fails, try to get them
+  // from the lowering config.
+  auto inferredVectorSizes = inferVectorSizesFromIR(linalgOp);
+  if (succeeded(inferredVectorSizes)) {
+    return *inferredVectorSizes;
+  }
+
   FailureOr<Operation *> rootOp = getRootOp(linalgOp);
   if (failed(rootOp)) {
     return {};

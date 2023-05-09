@@ -472,8 +472,9 @@ struct SerializableDenseElementsAttrModel
           SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
     auto attr = baseAttr.cast<ElementsAttr>();
-    return attr.getNumElements() * IREE::Util::getRoundedElementByteWidth(
-                                       attr.getType().getElementType());
+    return attr.getNumElements() *
+           IREE::Util::getRoundedElementByteWidth(
+               cast<ShapedType>(attr.getType()).getElementType());
   }
 
   LogicalResult serializeToVector(Attribute baseAttr,

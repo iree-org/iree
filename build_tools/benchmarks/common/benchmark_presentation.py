@@ -6,7 +6,8 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import (Any, Callable, Dict, Generic, List, Optional, Sequence,
+                    Tuple, TypeVar, Union)
 import pathlib
 import dataclasses
 import json
@@ -15,7 +16,11 @@ import markdown_strings as md
 import math
 
 from common import benchmark_definition
-from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, COMPILATION_TIME_THRESHOLDS, TOTAL_ARTIFACT_SIZE_THRESHOLDS, TOTAL_DISPATCH_SIZE_THRESHOLDS, BenchmarkThreshold, ThresholdUnit
+from common.benchmark_thresholds import (BENCHMARK_THRESHOLDS,
+                                         COMPILATION_TIME_THRESHOLDS,
+                                         TOTAL_ARTIFACT_SIZE_THRESHOLDS,
+                                         TOTAL_DISPATCH_SIZE_THRESHOLDS,
+                                         BenchmarkThreshold, ThresholdUnit)
 
 GetMetricFunc = Callable[[Any], Tuple[int, Optional[int]]]
 
@@ -265,33 +270,28 @@ def aggregate_all_benchmarks(
       raise ValueError("Inconsistent pull request commit")
 
     for benchmark_index in range(len(file_results.benchmarks)):
-      benchmark_case = file_results.benchmarks[benchmark_index]
+      benchmark_run = file_results.benchmarks[benchmark_index]
 
-      series_name = str(benchmark_case.benchmark_info)
+      series_name = str(benchmark_run.info)
       # Make sure each benchmark has a unique name.
       if series_name in benchmark_names:
         raise ValueError(f"Duplicated benchmark name: {series_name}")
       benchmark_names.add(series_name)
 
       # TODO(#11076): Remove legacy path.
-      series_id = benchmark_case.benchmark_info.run_config_id
+      series_id = benchmark_run.info.run_config_id
       if series_id is None:
         series_id = series_name
 
       if series_id in aggregate_results:
         raise ValueError(f"Duplicated benchmark id: {series_id}")
 
-      # Now scan all benchmark iterations and find the aggregate results.
-      mean_time = file_results.get_aggregate_time(benchmark_index, "mean")
-      median_time = file_results.get_aggregate_time(benchmark_index, "median")
-      stddev_time = file_results.get_aggregate_time(benchmark_index, "stddev")
-
       aggregate_results[series_id] = AggregateBenchmarkLatency(
           name=series_name,
-          benchmark_info=benchmark_case.benchmark_info,
-          mean_time=mean_time,
-          median_time=median_time,
-          stddev_time=stddev_time)
+          benchmark_info=benchmark_run.info,
+          mean_time=benchmark_run.metrics.real_time.mean,
+          median_time=benchmark_run.metrics.real_time.median,
+          stddev_time=benchmark_run.metrics.real_time.stddev)
 
   return aggregate_results
 

@@ -525,10 +525,11 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   //   - n and k are not aligned to the tile sizes (conservatively, take 64, 16)
   // Other cases currently result in folding and fall back to the default
   // unaligned IREE strategy.
-  bool unsupportedAlignedCases =
-      (matmulSize[0] % 64 == 0 && matmulSize[2] % 16 == 0) ||
-      (matmulSize[1] % 64 == 0 && matmulSize[2] % 16 == 0);
-  if (unsupportedAlignedCases) {
+  bool supportedUnalignedCases =
+      (matmulSize[0] % 64 != 0 && matmulSize[2] % 16 != 0) ||
+      (matmulSize[1] % 64 != 0 && matmulSize[2] % 16 != 0);
+
+  if (!supportedUnalignedCases) {
     LDBG("--Matmul strategy alignment check failed\n");
     return failure();
   }

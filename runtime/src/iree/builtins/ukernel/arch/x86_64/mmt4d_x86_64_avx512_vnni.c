@@ -34,7 +34,7 @@ void iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni(
   __m512i acc_3_89AB_7_CDEF_B_0123_F_4567;
   __m512i acc_3_CDEF_7_89AB_B_4567_F_0123;
 
-  if (flags & IREE_UK_FLAG_ACCUMULATE) {
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     acc_0_0123_4_4567_8_89AB_C_CDEF = iree_uk_avx512_loadu_4x128_from_16x16xi32(
         out_ptr, 0, 0, 4, 4, 8, 8, 12, 12);
     acc_0_4567_4_0123_8_CDEF_C_89AB = iree_uk_avx512_loadu_4x128_from_16x16xi32(

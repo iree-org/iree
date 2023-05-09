@@ -467,6 +467,9 @@ typedef struct iree_hal_vulkan_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  // Optional provider used for creating/configuring collective channels.
+  iree_hal_channel_provider_t* channel_provider;
+
   // All queues available on the device; the device owns these.
   iree_host_size_t queue_count;
   CommandQueue** queues;
@@ -776,6 +779,9 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
 
+  // Buffers may have been retaining collective resources.
+  iree_hal_channel_provider_release(device->channel_provider);
+
   // All arena blocks should have been returned.
   iree_arena_block_pool_deinitialize(&device->block_pool);
 
@@ -1055,6 +1061,14 @@ static void iree_hal_vulkan_replace_device_allocator(
   iree_hal_allocator_retain(new_allocator);
   iree_hal_allocator_release(device->device_allocator);
   device->device_allocator = new_allocator;
+}
+
+static void iree_hal_vulkan_replace_channel_provider(
+    iree_hal_device_t* base_device, iree_hal_channel_provider_t* new_provider) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  iree_hal_channel_provider_retain(new_provider);
+  iree_hal_channel_provider_release(device->channel_provider);
+  device->channel_provider = new_provider;
 }
 
 static iree_status_t iree_hal_vulkan_device_trim(
@@ -1351,6 +1365,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.host_allocator=*/iree_hal_vulkan_device_host_allocator,
     /*.device_allocator=*/iree_hal_vulkan_device_allocator,
     /*.replace_device_allocator=*/iree_hal_vulkan_replace_device_allocator,
+    /*.replace_channel_provider=*/iree_hal_vulkan_replace_channel_provider,
     /*.trim=*/iree_hal_vulkan_device_trim,
     /*.query_i64=*/iree_hal_vulkan_device_query_i64,
     /*.create_channel=*/iree_hal_vulkan_device_create_channel,

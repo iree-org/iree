@@ -21,9 +21,11 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRBuiltinToLLVMIRTranslation
+    MLIRCAPIIR
     MLIRIR
     MLIRParser
     MLIRSupport
+    iree::compiler::API::MLIRInteropHeaders
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C
@@ -81,28 +83,6 @@ iree_cc_library(
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
     iree::compiler::bindings::c::headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    MLIRInterop
-  SRCS
-    "MLIRInterop.cpp"
-  DEPS
-    MLIRBuiltinToLLVMIRTranslation
-    MLIRCAPIIR
-    MLIRIR
-    iree::compiler::API::MLIRInteropHeaders
-    iree::compiler::ConstEval
-    iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Dialect::VM::Target::init_targets
-    iree::compiler::Pipelines
-    iree::compiler::Tools::init_llvmir_translations
-    iree::compiler::Tools::init_passes_and_dialects
-    iree::compiler::Tools::init_targets
-    iree::compiler::Utils
   PUBLIC
 )
 

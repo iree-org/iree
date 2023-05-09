@@ -39,11 +39,17 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   auto funcOp = getOperation();
 
   // Per-function lowering pipeline.
-  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle;
+  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle1D;
   auto vectorMultiReductionLowering =
       vector::VectorMultiReductionLowering::InnerReduction;
   auto vectorContractLowering = vector::VectorContractLowering::OuterProduct;
-  auto vectorTransferSplit = vector::VectorTransferSplit::None;
+  auto vectorTransferSplit =
+      llvm::StringSwitch<vector::VectorTransferSplit>(
+          splitVectorTransfersTo.getValue())
+          .Case("none", vector::VectorTransferSplit::None)
+          .Case("linalg-copy", vector::VectorTransferSplit::LinalgCopy)
+          .Case("vector-transfers", vector::VectorTransferSplit::VectorTransfer)
+          .Default(vector::VectorTransferSplit::None);
   auto vectorTransformOptions =
       vector::VectorTransformsOptions()
           .setVectorTransposeLowering(vectorTransposeLowering)

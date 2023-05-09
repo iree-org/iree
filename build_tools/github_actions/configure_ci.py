@@ -14,6 +14,7 @@ The following environment variables are required:
 
 When GITHUB_EVENT_NAME is "pull_request", there are additional environment
 variables to be set:
+- PR_BRANCH (required): PR source branch.
 - PR_TITLE (required): PR title.
 - PR_BODY (optional): PR description.
 - PR_LABELS (optional): JSON list of PR label names.
@@ -34,6 +35,7 @@ import difflib
 import fnmatch
 import json
 import os
+import re
 import subprocess
 import textwrap
 from typing import Iterable, List, Mapping, Sequence, Tuple
@@ -41,6 +43,8 @@ from typing import Iterable, List, Mapping, Sequence, Tuple
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
 BENCHMARK_PRESET_KEY = "benchmarks"
+# Trailer to prevent benchmarks from always running on LLVM integration PRs.
+SKIP_LLVM_INTEGRATE_BENCHMARK_KEY = "skip-llvm-integrate-benchmark"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
 # patterns because they don't treat '/' specially. The standard library doesn't
@@ -73,9 +77,22 @@ SKIP_PATH_PATTERNS = [
 RUNNER_ENV_DEFAULT = "prod"
 RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
-BENCHMARK_PRESET_OPTIONS = ["all", "cuda", "x86_64", "comp-stats"]
+DEFAULT_BENCHMARK_PRESETS = ["cuda", "x86_64", "vulkan-nvidia", "comp-stats"]
+BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESETS + [
+    "experimental-android-cpu"
+]
 
 PR_DESCRIPTION_TEMPLATE = "{title}" "\n\n" "{body}"
+
+# Patterns to detect "LLVM integration" PRs, i.e. changes that update the
+# third_party/llvm-project submodule. This should only include PRs
+# intended to be merged and should exclude test/draft PRs as well as
+# PRs that include temporary patches to the submodule during review.
+# See also: https://github.com/openxla/iree/issues/12268
+LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm-project",
+                                          re.IGNORECASE)
+LLVM_INTEGRATE_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump", re.IGNORECASE)
+LLVM_INTEGRATE_LABEL = "llvm-integrate"
 
 
 def skip_path(path: str) -> bool:
@@ -239,21 +256,35 @@ def get_runner_env(trailers: Mapping[str, str]) -> str:
   return runner_env
 
 
-def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
-                          labels: Sequence[str]) -> str:
+def get_benchmark_presets(trailers: Mapping[str, str], labels: Sequence[str],
+                          is_pr: bool, is_llvm_integrate_pr: bool) -> str:
   """Parses and validates the benchmark presets from trailers.
 
   Args:
-    is_pr: is pull request event.
     trailers: trailers from PR description.
     labels: list of PR labels.
+    is_pr: is pull request event.
+    is_llvm_integrate_pr: is LLVM integration PR.
 
   Returns:
     A comma separated preset string, which later will be parsed by
     build_tools/benchmarks/export_benchmark_config.py.
   """
+
+  skip_llvm_integrate_benchmark = SKIP_LLVM_INTEGRATE_BENCHMARK_KEY in trailers
+  if skip_llvm_integrate_benchmark:
+    print("Skipping default benchmarking on LLVM integration because PR "
+          f"description has '{SKIP_LLVM_INTEGRATE_BENCHMARK_KEY}' trailer.")
+
   if not is_pr:
-    preset_options = ["all"]
+    # TODO(#9855): Only enable android benchmarks in postsubmit before the
+    # migration is finished.
+    preset_options = {"all", "experimental-android-cpu"}
+    print(f"Using benchmark presets '{preset_options}' for non-PR run")
+  elif is_llvm_integrate_pr and not skip_llvm_integrate_benchmark:
+    # Run all benchmark presets for LLVM integration PRs.
+    preset_options = {"all"}
+    print(f"Using benchmark preset '{preset_options}' for LLVM integration PR")
   else:
     preset_options = set(
         label.split(":", maxsplit=1)[1]
@@ -263,17 +294,19 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
     if trailer is not None:
       preset_options = preset_options.union(
           option.strip() for option in trailer.split(","))
-    preset_options = sorted(preset_options)
     print(f"Using benchmark preset '{preset_options}' from trailers and labels")
 
+  # TODO(#13392): "all" should be called as "defaults". Keep it as it is and we
+  # will drop it when removing "benchmarks" trailer (with announcement).
+  if "all" in preset_options:
+    preset_options.remove("all")
+    preset_options.update(DEFAULT_BENCHMARK_PRESETS)
+
+  preset_options = sorted(preset_options)
   for preset_option in preset_options:
     if preset_option not in BENCHMARK_PRESET_OPTIONS:
       raise ValueError(f"Unknown benchmark preset option: '{preset_option}'.\n"
                        f"Available options: '{BENCHMARK_PRESET_OPTIONS}'.")
-
-  if "all" in preset_options:
-    preset_options = list(
-        option for option in BENCHMARK_PRESET_OPTIONS if option != "all")
 
   return ",".join(preset_options)
 
@@ -281,13 +314,23 @@ def get_benchmark_presets(is_pr: bool, trailers: Mapping[str, str],
 def main():
   is_pr = os.environ["GITHUB_EVENT_NAME"] == "pull_request"
   trailers, labels = get_trailers_and_labels(is_pr)
+  is_llvm_integrate_pr = bool(
+      LLVM_INTEGRATE_TITLE_PATTERN.search(os.environ.get("PR_TITLE", "")) or
+      LLVM_INTEGRATE_BRANCH_PATTERN.search(os.environ.get("PR_BRANCH", "")) or
+      LLVM_INTEGRATE_LABEL in labels)
   output = {
-      "should-run": json.dumps(should_run_ci(is_pr, trailers)),
-      "is-pr": json.dumps(is_pr),
-      "runner-env": get_runner_env(trailers),
-      "runner-group": "presubmit" if is_pr else "postsubmit",
-      "write-caches": "0" if is_pr else "1",
-      "benchmark-presets": get_benchmark_presets(is_pr, trailers, labels),
+      "should-run":
+          json.dumps(should_run_ci(is_pr, trailers)),
+      "is-pr":
+          json.dumps(is_pr),
+      "runner-env":
+          get_runner_env(trailers),
+      "runner-group":
+          "presubmit" if is_pr else "postsubmit",
+      "write-caches":
+          "0" if is_pr else "1",
+      "benchmark-presets":
+          get_benchmark_presets(trailers, labels, is_pr, is_llvm_integrate_pr),
   }
 
   set_output(output)

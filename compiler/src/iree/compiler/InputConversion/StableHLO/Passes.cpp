@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/InputConversion/StableHLO/Preprocessing/Passes.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
@@ -54,9 +55,9 @@ void registerStableHLOConversionPassPipeline() {
 
 // Prepare HLO for use as an input to the Flow dialect.
 void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
-  // TODO(#12678): Port StableHLO-StableHLO legalization.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
-  // TODO(#12678): Port StableHLO control flow legalization.
+  passManager.addNestedPass<func::FuncOp>(
+      stablehlo::createLegalizeControlFlow());
 
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf
@@ -64,7 +65,8 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
   // TODO(#12678): Port StableHLO detuple pass.
 
-  // TODO(#12678): Port StableHLO-StableHLO preprocessing.
+  passManager.addNestedPass<func::FuncOp>(
+      createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   // Various shape functions may have been materialized in the `shape.shape_of`
@@ -99,9 +101,11 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
 
   // Convert to Linalg. After this point, StableHLO will be eliminated.
-  // TODO(#12678): Port StableHLO shape computation legalization.
-  // TODO(#12678): Port StableHLO to LinalgExt lowering.
-  passManager.addPass(createConvertStableHloToLinalg());
+  passManager.addNestedPass<func::FuncOp>(
+      stablehlo::createLegalizeShapeComputations());
+  passManager.addNestedPass<func::FuncOp>(
+      stablehlo::createConvertStableHloToLinalgExt());
+  passManager.addPass(stablehlo::createConvertStableHloToLinalg());
   // Ensure conversion completed.
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
@@ -109,7 +113,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
   // canonicalization. See comments in the above pass and find a better way.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
-  // TODO(#12678): Port StableHLO input legality verification pass.
+  passManager.addPass(stablehlo::createVerifyCompilerStableHloInputLegality());
 }
 }  // namespace
 
@@ -121,6 +125,7 @@ void registerStableHLOConversionPasses() {
   // Generated.
   registerPasses();
 
+  registerStableHLOPreprocessingPasses();
   registerStableHLOConversionPassPipeline();
 }
 

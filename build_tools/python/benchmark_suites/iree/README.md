@@ -15,6 +15,15 @@ configrations. To run the benchmark suites, see
 To add a new source model, see
 [Adding a new model](/build_tools/python/e2e_test_framework/models/README.md#adding-a-new-model)
 
+## Updating TF/TFLite Importer in Benchmark CI
+
+For TF and TFLite source models, benchmark CI installs `iree-import-tf/tflite`
+from
+[integrations/tensorflow/python_projects](/integrations/tensorflow/python_projects)
+to import models. See
+[Updating Tensorflow Importers in CI](/integrations/tensorflow/README.md#updating-tensorflow-importers-in-ci)
+to learn about the update procedure.
+
 ## Benchmark Suites Design
 
 > TODO(#12215): Explain the design and the end-to-end flow.

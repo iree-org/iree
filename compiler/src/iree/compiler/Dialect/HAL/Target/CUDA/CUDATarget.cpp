@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
@@ -55,6 +56,10 @@ static llvm::cl::opt<bool> dumpPtx(
 static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
     llvm::cl::init("sm_35"));
+
+static llvm::cl::opt<std::string> clTargetFeature(
+    "iree-hal-cuda-llvm-target-feature",
+    llvm::cl::desc("Use to set PTX version."), llvm::cl::init("+ptx76"));
 
 static llvm::cl::opt<bool> clUsePtxas(
     "iree-hal-cuda-use-ptxas", llvm::cl::init(false),
@@ -409,8 +414,12 @@ class CUDATargetBackend final : public TargetBackend {
       workgroupLocalMemories.push_back(workgroupLocalMemory);
     }
 
+    FlatbufferBuilder builder;
+    iree_hal_cuda_ExecutableDef_start_as_root(builder);
+
     SmallVector<std::string> entryPointNames;
     std::string ptxImage;
+    SmallVector<iree_hal_cuda_FileLineLocDef_ref_t> sourceLocationRefs;
     if (variantOp.isExternal()) {
       if (!variantOp.getObjects().has_value()) {
         return variantOp.emitOpError()
@@ -486,13 +495,22 @@ class CUDATargetBackend final : public TargetBackend {
         setMetadataValueI32("maxntidx", workgroupSize[0]);
         setMetadataValueI32("maxntidy", workgroupSize[1]);
         setMetadataValueI32("maxntidz", workgroupSize[2]);
+
+        // Optional source location information for debugging/profiling.
+        if (options.debugLevel >= 1) {
+          if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
+            auto filenameRef = builder.createString(loc->getFilename());
+            sourceLocationRefs.push_back(iree_hal_cuda_FileLineLocDef_create(
+                builder, filenameRef, loc->getLine()));
+          }
+        }
       }
 
       std::unique_ptr<llvm::TargetMachine> targetMachine;
       {
         llvm::Triple triple("nvptx64-nvidia-cuda");
         std::string targetChip = clTargetChip;
-        std::string features = "+ptx60";
+        std::string features = clTargetFeature;
         std::string error;
         const llvm::Target *target =
             llvm::TargetRegistry::lookupTarget("", triple, error);
@@ -554,29 +572,31 @@ class CUDATargetBackend final : public TargetBackend {
     }
 
     std::string gpuImage = produceGpuImage(ptxImage);
-
-    FlatbufferBuilder builder;
-    iree_CUDAExecutableDef_start_as_root(builder);
-
     auto gpuImageRef = flatbuffers_uint8_vec_create(
         builder, reinterpret_cast<const uint8_t *>(gpuImage.c_str()),
         gpuImage.size());
-    iree_CUDABlockSizeDef_vec_start(builder);
+    iree_hal_cuda_BlockSizeDef_vec_start(builder);
     for (const auto &workgroupSize : workgroupSizes) {
-      iree_CUDABlockSizeDef_vec_push_create(builder, workgroupSize[0],
-                                            workgroupSize[1], workgroupSize[2]);
+      iree_hal_cuda_BlockSizeDef_vec_push_create(
+          builder, workgroupSize[0], workgroupSize[1], workgroupSize[2]);
     }
-    auto blockSizesRef = iree_CUDABlockSizeDef_vec_end(builder);
+    auto blockSizesRef = iree_hal_cuda_BlockSizeDef_vec_end(builder);
     auto workgroupLocalMemoriesRef =
         builder.createInt32Vec(workgroupLocalMemories);
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 
-    iree_CUDAExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_CUDAExecutableDef_block_sizes_add(builder, blockSizesRef);
-    iree_CUDAExecutableDef_shared_memory_size_add(builder,
-                                                  workgroupLocalMemoriesRef);
-    iree_CUDAExecutableDef_ptx_image_add(builder, gpuImageRef);
-    iree_CUDAExecutableDef_end_as_root(builder);
+    iree_hal_cuda_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_cuda_ExecutableDef_block_sizes_add(builder, blockSizesRef);
+    iree_hal_cuda_ExecutableDef_shared_memory_size_add(
+        builder, workgroupLocalMemoriesRef);
+    iree_hal_cuda_ExecutableDef_ptx_image_add(builder, gpuImageRef);
+    if (!sourceLocationRefs.empty()) {
+      auto sourceLocationsRef =
+          builder.createOffsetVecDestructive(sourceLocationRefs);
+      iree_hal_cuda_ExecutableDef_source_locations_add(builder,
+                                                       sourceLocationsRef);
+    }
+    iree_hal_cuda_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(

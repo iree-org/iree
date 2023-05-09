@@ -12,9 +12,7 @@ programs:
   [iree-org/iree-jax repository](https://github.com/iree-org/iree-jax).
 * A PJRT plugin that adapts IREE as a native JAX backend for online / just in
   time (JIT) use. This plugin is being developed in the
-  [pjrt-plugin/](https://github.com/iree-org/iree-samples/tree/main/pjrt-plugin)
-  folder within the iree-samples repository for now, though it will likely move
-  elsewhere as it matures.
+  [openxla/openxla-pjrt-plugin repository](https://github.com/openxla/openxla-pjrt-plugin).
 
 <!-- TODO: Expand on interface differences -->
 <!-- TODO: Add quickstart instructions -->

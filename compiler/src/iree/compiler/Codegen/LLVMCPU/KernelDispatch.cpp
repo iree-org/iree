@@ -171,6 +171,22 @@ static llvm::raw_ostream &operator<<(
   return os;
 }
 
+/// Splits the given `Range` vector and returns the `lbs` and the `ubs` as
+/// separate lists.
+static void getBoundsFromRange(ArrayRef<Range> loopRange,
+                               SmallVector<int64_t> &lb,
+                               SmallVector<int64_t> &ub) {
+  auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
+    Optional<int64_t> intVal = getConstantIntValue(ofr);
+    if (!intVal) return ShapedType::kDynamic;
+    return intVal.value();
+  };
+  lb = llvm::to_vector(llvm::map_range(
+      loopRange, [&](Range r) { return getStaticValue(r.offset); }));
+  ub = llvm::to_vector(llvm::map_range(
+      loopRange, [&](Range r) { return getStaticValue(r.size); }));
+}
+
 /// Returns true if all the input and output tensor operands of 'op' are fully
 /// dynamic.
 static bool isFullyDynamicOp(linalg::LinalgOp op) {
@@ -839,11 +855,12 @@ static LogicalResult setMatmulNoPadRootConfig(
     parallelTileSizes.push_back(sz);
   }
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
-                                 reductionTileSizes);
-
-  setVectorSizesForDynamicShapes(op.getOperation(), vecPreProcStrategy,
+  splitParallelAndReductionTiles(cast<linalg::LinalgOp>(op.getOperation()),
                                  parallelTileSizes, reductionTileSizes);
+
+  setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
+                                 vecPreProcStrategy, parallelTileSizes,
+                                 reductionTileSizes);
 
   TileSizesListType newTileSizes;
   // Copy all the tile size levels except the workgroup one which will be split
@@ -880,8 +897,8 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
 
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
-                                 reductionTileSizes);
+  splitParallelAndReductionTiles(cast<linalg::LinalgOp>(op.getOperation()),
+                                 parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -1092,8 +1109,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
   SmallVector<int64_t> parallelTileSizes = getL1TileSizes();
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(mmt4dOp.getOperation(), parallelTileSizes,
-                                 reductionTileSizes);
+  splitParallelAndReductionTiles(cast<linalg::LinalgOp>(mmt4dOp.getOperation()),
+                                 parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes = {getWorkgroupTileSizes(), parallelTileSizes,
                                  reductionTileSizes};
@@ -1129,7 +1146,7 @@ static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
-  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
+  SmallVector<int64_t> distTileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()));
 
   // The default function aims to returns the number of workload per workgroup,
@@ -1138,12 +1155,15 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
-    tileSizes[pos] = tileSizes[pos] / size;
-    tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
+    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    distTileSizes[pos] = distTileSizes[pos] / size;
+    distTileSizes[pos] = std::max<int64_t>(distTileSizes[pos], 1);
   }
 
-  TileSizesListType tileSizesList = {tileSizes};
+  SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
+  TileSizesListType tileSizesList = {distTileSizes};
+  tileSizesList.push_back(tileSizes);
+
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
       DispatchLoweringPassPipeline::CPUDataTiling);
@@ -1153,18 +1173,25 @@ static LogicalResult setUnPackOpRootConfig(
     func::FuncOp entryPointFn, tensor::UnPackOp op,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDataTiling) {
-  SmallVector<int64_t> tileSizes = getLinalgExtDefaultWorkgroupTileSizes(
+  SmallVector<int64_t> distTileSizes = getLinalgExtDefaultWorkgroupTileSizes(
       cast<TilingInterface>(op.getOperation()));
 
-  // Fixup for making tileSizes be multiple of inner_tile_sizes.
+  // Fixup for making distTileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
-    tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
+    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
+    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
   }
 
-  TileSizesListType tileSizesList = {tileSizes};
+  SmallVector<int64_t> tileSizes(op.getDestRank(), 1);
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    tileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
+  }
+
+  TileSizesListType tileSizesList = {distTileSizes};
+  tileSizesList.push_back(tileSizes);
+
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizesList,
                                                pipeline);
 }
@@ -1665,8 +1692,9 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
 
 static LogicalResult setConvNhwcRootConfigImpl(func::FuncOp entryPointFn,
                                                linalg::LinalgOp convOp) {
-  int64_t vectorSize =
-      getVectorSize(entryPointFn, convOp.getDpsInitOperand(0)->get().getType());
+  int64_t vectorSize = getVectorSize(
+      entryPointFn,
+      cast<ShapedType>(convOp.getDpsInitOperand(0)->get().getType()));
   SmallVector<int64_t> targetTileSizes =
       getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
   return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
@@ -1706,8 +1734,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 /// operations.
 static LogicalResult setConvNchwRootConfigImpl(func::FuncOp entryPointFn,
                                                linalg::LinalgOp convOp) {
-  int64_t vectorSize =
-      getVectorSize(entryPointFn, convOp.getDpsInitOperand(0)->get().getType());
+  int64_t vectorSize = getVectorSize(
+      entryPointFn,
+      cast<ShapedType>(convOp.getDpsInitOperand(0)->get().getType()));
   SmallVector<int64_t> targetTileSizes = {1, vectorSize * 2, 1, 8, 8, 1, 1};
   return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
 }
@@ -1731,11 +1760,51 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 /// operations.
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::DepthwiseConv2DNhwcHwcOp convOp) {
-  int64_t vectorSize =
-      getVectorSize(entryPointFn, convOp.getResult(0).getType());
+  int64_t vectorSize = getVectorSize(
+      entryPointFn, cast<ShapedType>(convOp.getResult(0).getType()));
   SmallVector<int64_t> targetTileSizes =
       getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
   return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   tensor::PadOp padOp) {
+  OpBuilder builder(padOp.getContext());
+  builder.setInsertionPoint(padOp);
+  SmallVector<Range> iterationDomain =
+      cast<TilingInterface>(padOp.getOperation()).getIterationDomain(builder);
+  SmallVector<int64_t> lbs, ubs;
+  getBoundsFromRange(iterationDomain, lbs, ubs);
+
+  SmallVector<int64_t> minTileSizes(lbs.size(), 1);
+  SmallVector<int64_t> maxTileSizes(ubs.size(), defaultWorkgroupTileSize);
+  SmallVector<int64_t> vectorTileSizes(lbs.size(), 1);
+
+  unsigned typeWidthInBytes = IREE::Util::getRoundedElementByteWidth(
+      padOp.getResultType().getElementType());
+  int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
+  vectorTileSizes.back() = (ubs.back() == ShapedType::kDynamic
+                                ? 1
+                                : std::min(typeVectorSize, ubs.back()));
+  minTileSizes.back() = vectorTileSizes.back();
+
+  SmallVector<unsigned> partitionableLoops =
+      cast<PartitionableLoopsInterface>(padOp.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  SmallVector<int64_t> distributedTileSizes =
+      getDefaultDistributedLevelTileSizes(partitionableLoops, lbs, ubs,
+                                          minTileSizes, maxTileSizes);
+  TileSizesListType tileSizes;
+  // Distribution tiling
+  tileSizes.emplace_back(std::move(distributedTileSizes));
+  // Tiling for vectorization.
+  tileSizes.emplace_back(std::move(vectorTileSizes));
+  // No further tiling.
+  tileSizes.push_back({});
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, padOp, tileSizes,
+      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
 /// Set default configuration for Linalg ops.
@@ -1799,12 +1868,13 @@ static LogicalResult setRootConfigImpl(
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
-        .Case<IREE::LinalgExt::FftOp, tensor::PackOp, linalg::Mmt4DOp,
-              linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+        .Case<IREE::LinalgExt::FftOp, tensor::PackOp, tensor::PadOp,
+              linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
+              linalg::Conv2DNchwFchwOp, linalg::PoolingNhwcSumOp,
+              linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
+              linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
+              linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp,
+              linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<tensor::UnPackOp>(
             [&](auto op) { return setUnPackOpRootConfig(entryPointFn, op); })
@@ -1854,21 +1924,47 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 /// to the end of the function is the root op.
 static FailureOr<Operation *> getRootOperation(
     ArrayRef<Operation *> computeOps) {
+  Operation *rootOperation = nullptr;
   for (auto op : llvm::reverse(computeOps)) {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (!linalgOp) continue;
-    if (linalgOp.getNumReductionLoops()) return op;
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      // Do not treat linalg ops that are all parallel as root operations in
+      // this sweep.
+      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops()) continue;
+
+      // All other linalg ops are root ops.
+      rootOperation = op;
+      break;
+    }
+
+    if (isa<TilingInterface>(op) &&
+        !isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
+      // All other operations that implement this interface are root ops.
+      rootOperation = op;
+      break;
+    }
   }
 
-  for (auto op : llvm::reverse(computeOps)) {
-    if (isa<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>(op)) return op;
+  if (!rootOperation) {
+    // Check for elementwise operations.
+    for (auto op : llvm::reverse(computeOps)) {
+      if (isa<linalg::LinalgOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
   }
 
-  for (auto op : llvm::reverse(computeOps)) {
-    if (isa<TilingInterface>(op)) return op;
+  if (!rootOperation) {
+    // Check for pad/pack/unpack ops by themselves.
+    for (auto op : llvm::reverse(computeOps)) {
+      if (isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
   }
 
-  return nullptr;
+  return rootOperation;
 }
 
 static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
@@ -2012,36 +2108,39 @@ static LogicalResult setTranslationInfoAndRootConfig(
   if (failed(rootOp)) return failure();
   Operation *rootOperation = rootOp.value();
 
-  if (rootOperation) {
-    auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-    if (isVMVXBackend(targetAttr)) {
-      if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation))) {
-        return failure();
-      }
-    } else {
-      auto targetMLTransInfo =
-          TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
-      if (failed(setRootConfigImpl(entryPointFn, rootOperation,
-                                   targetMLTransInfo))) {
+  // Handle the case with no known root operation.
+  if (!rootOperation) {
+    // If there is no translation info set, just set it to default.
+    if (!getTranslationInfo(entryPointFn)) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
+      // Fall back, just set the translation to CPUDefault.
+      if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
         return failure();
       }
     }
+    return success();
   }
 
-  if (!getTranslationInfo(entryPointFn)) {
-    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
-    // Fall back, just set the translation to CPUDefault.
-    if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (isVMVXBackend(targetAttr)) {
+    if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation))) {
+      return failure();
+    }
+  } else {
+    auto targetMLTransInfo =
+        TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
+    if (failed(setRootConfigImpl(entryPointFn, rootOperation,
+                                 targetMLTransInfo))) {
       return failure();
     }
   }
 
-  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
+  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
     return failure();
   }
 
-  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
+  if (failed(adjustTileSizesForPackOp(entryPointFn, rootOperation))) {
     return failure();
   }
 

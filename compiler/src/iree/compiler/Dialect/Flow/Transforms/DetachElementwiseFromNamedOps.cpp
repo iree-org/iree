@@ -154,7 +154,7 @@ struct DetachSplatConstantOutsOperands
       Type elementType = resultType.getElementType();
       Value emptyTensorOp = rewriter.create<tensor::EmptyOp>(
           loc, resultType.getShape(), elementType);
-      Attribute constValue;
+      TypedAttr constValue;
       if (elementType.isa<IntegerType>()) {
         constValue = rewriter.getIntegerAttr(
             elementType, attr.template getSplatValue<APInt>());

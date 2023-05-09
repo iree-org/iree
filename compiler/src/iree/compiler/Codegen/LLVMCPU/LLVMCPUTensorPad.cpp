@@ -86,6 +86,7 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
     context->getLoadedDialect<tensor::TensorDialect>()
         ->getCanonicalizationPatterns(patterns);
+    tensor::PadOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
       return signalPassFailure();

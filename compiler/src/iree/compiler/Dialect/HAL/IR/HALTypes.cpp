@@ -769,10 +769,10 @@ Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
     // Empty returns false (no conditions match).
     return builder.create<arith::ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
   }
-  auto conditionValues =
-      llvm::map_range(getConditions(), [&](MatchAttrInterface attr) {
-        return attr.buildConditionExpression(loc, value, builder);
-      });
+  auto conditionValues = llvm::map_range(getConditions(), [&](Attribute attr) {
+    return attr.cast<MatchAttrInterface>().buildConditionExpression(loc, value,
+                                                                    builder);
+  });
   Value resultValue;
   for (auto conditionValue : conditionValues) {
     resultValue = resultValue ? builder.createOrFold<arith::OrIOp>(
@@ -798,10 +798,10 @@ Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
     // Empty returns true (all 0 conditions match).
     return builder.create<arith::ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
   }
-  auto conditionValues =
-      llvm::map_range(getConditions(), [&](MatchAttrInterface attr) {
-        return attr.buildConditionExpression(loc, value, builder);
-      });
+  auto conditionValues = llvm::map_range(getConditions(), [&](Attribute attr) {
+    return attr.cast<MatchAttrInterface>().buildConditionExpression(loc, value,
+                                                                    builder);
+  });
   Value resultValue;
   for (auto conditionValue : conditionValues) {
     resultValue = resultValue ? builder.createOrFold<arith::AndIOp>(

@@ -18,4 +18,25 @@ def ConvertStableHloToLinalg :
                         "transpose) when possible, instead of linalg.generic">];
 }
 
+def ConvertStableHloToLinalgExt :
+    Pass<"iree-stablehlo-to-linalg-ext", "func::FuncOp"> {
+  let summary =
+      "Convert from StableHLO ops to LinalgExt ops and distribute to Flow ops";
+}
+
+def LegalizeControlFlow :
+    Pass<"iree-stablehlo-legalize-control-flow", "func::FuncOp"> {
+  let summary = "Legalize from StableHLO control flow to SCF control flow";
+}
+
+def LegalizeShapeComputations :
+    Pass<"iree-stablehlo-legalize-shape-computations", "func::FuncOp"> {
+  let summary = "Legalize StableHLO shape operations to core-mlir operations";
+}
+
+def VerifyCompilerStableHloInputLegality :
+    Pass<"iree-stablehlo-verify-compiler-input-legality", "ModuleOp"> {
+  let summary = "Verifies that only supported IR constructs are passed to the compiler";
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_STABLEHLO_PASSES

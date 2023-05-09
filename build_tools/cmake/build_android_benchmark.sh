@@ -33,17 +33,7 @@ git submodule update --init --jobs 8 --depth 1
 ROOT_DIR=$(git rev-parse --show-toplevel)
 cd "${ROOT_DIR}"
 
-# BUILD the iree-import-tflite binary for importing models to benchmark from
-# TFLite FlatBuffers.
-cd "${ROOT_DIR}/integrations/tensorflow"
-BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
-BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
-"${BAZEL_CMD[@]}" build \
-      //iree_tf_compiler:iree-import-tflite \
-      --config=generic_clang \
-      --config=remote_cache_bazel_tf_ci
-# So the benchmark build below can find the importer binaries that were built.
-export PATH="$PWD/bazel-bin/iree_tf_compiler:$PATH"
+source build_tools/cmake/setup_tf_python.sh
 
 # --------------------------------------------------------------------------- #
 # Build for the host.

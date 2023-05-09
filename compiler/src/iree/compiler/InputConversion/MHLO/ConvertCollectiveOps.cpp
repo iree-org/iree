@@ -160,6 +160,24 @@ static LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
   return success();
 }
 
+Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
+                    Value input, int64_t srcDim, int64_t dstDim) {
+  // Creates a transpose op that swaps dimensions srcDim and dstDim in the
+  // input.
+  auto inputType = cast<RankedTensorType>(input.getType());
+  SmallVector<int64_t> inputShape(inputType.getShape());
+  SmallVector<int64_t> permutation =
+      llvm::to_vector(llvm::seq<int64_t>(0, inputShape.size()));
+  std::swap(permutation[srcDim], permutation[dstDim]);
+  std::swap(inputShape[srcDim], inputShape[dstDim]);
+  DenseIntElementsAttr permutationAttr = rewriter.getI64VectorAttr(permutation);
+  return rewriter
+      .create<mhlo::TransposeOp>(
+          loc, RankedTensorType::get(inputShape, inputType.getElementType()),
+          input, permutationAttr)
+      .getResult();
+}
+
 }  // namespace
 
 /// Converts mhlo.replica_id to flow.channel.default + flow.channel.rank.
@@ -213,31 +231,16 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
       return rewriter.notifyMatchFailure(
           op, "unsupported element type for collective op");
     }
+    uint64_t allGatherDim = op.getAllGatherDim();
+    Value gatherInput = op.getOperand();
+    SmallVector<int64_t> gatherResultShape(resultType.getShape());
 
     // When all_gather_dim != 0, we need to transpose between 0 and
     // all_gather_dim before and after the flow allgather op.
-    uint64_t allGatherDim = op.getAllGatherDim();
-    auto inputType = op.getOperand().getType().cast<RankedTensorType>();
-    SmallVector<int64_t> gatherInputShape(inputType.getShape());
-    Value gatherInput = op.getOperand();
-    DenseIntElementsAttr permutationAttr;
-    SmallVector<int64_t> gatherResultShape(resultType.getShape());
-
-    if (allGatherDim != 0) {
-      SmallVector<int64_t> permutation =
-          llvm::to_vector(llvm::seq<int64_t>(0, gatherResultShape.size()));
-      std::swap(permutation[0], permutation[allGatherDim]);
-      permutationAttr = rewriter.getI64VectorAttr(permutation);
-      std::swap(gatherInputShape[0], gatherInputShape[allGatherDim]);
+    const bool requiresTranspose = allGatherDim != 0;
+    if (requiresTranspose) {
       std::swap(gatherResultShape[0], gatherResultShape[allGatherDim]);
-      // Transpose the input.
-      gatherInput = rewriter
-                        .create<mhlo::TransposeOp>(
-                            loc,
-                            RankedTensorType::get(gatherInputShape,
-                                                  resultType.getElementType()),
-                            gatherInput, permutationAttr)
-                        .getResult();
+      gatherInput = emitTranspose(rewriter, loc, gatherInput, 0, allGatherDim);
     }
 
     // Create an empty tensor for the result.
@@ -249,11 +252,9 @@ struct AllGatherOpConversion : public OpConversionPattern<mhlo::AllGatherOp> {
                 op.getLoc(), elementTypeAttr, target, gatherInput, channel)
             .getResult();
 
-    if (allGatherDim != 0) {
-      gatherResult = rewriter
-                         .create<mhlo::TransposeOp>(
-                             loc, resultType, gatherResult, permutationAttr)
-                         .getResult();
+    if (requiresTranspose) {
+      gatherResult =
+          emitTranspose(rewriter, loc, gatherResult, allGatherDim, 0);
     }
 
     rewriter.replaceOp(op, gatherResult);
@@ -331,6 +332,136 @@ struct AllReduceOpConversion : public OpConversionPattern<mhlo::AllReduceOp> {
         op.getLoc(), reductionOpAttr, elementTypeAttr, target, op.getOperand(),
         channel);
     rewriter.replaceOp(op, allReduceOp.getResult());
+    return success();
+  }
+};
+
+Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
+                                Location loc, Value input, uint64_t splitDim,
+                                uint64_t concatDim, uint64_t splitCount) {
+  // Helper function to rearrange data after all-to-all.
+  auto inputType = input.getType().cast<RankedTensorType>();
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+
+  // Reshape
+  const int64_t rank = inputShape.size();
+  llvm::SmallVector<int64_t> newShape;
+  for (int64_t i = 0; i < rank; ++i) {
+    if (i != splitDim) {
+      newShape.push_back(inputShape[i]);
+      continue;
+    }
+    newShape.push_back(splitCount);
+    newShape.push_back(inputShape[i] / splitCount);
+  }
+  Value result =
+      rewriter
+          .create<mhlo::ReshapeOp>(
+              loc, RankedTensorType::get(newShape, inputType.getElementType()),
+              input)
+          .getResult();
+
+  // Transpose
+  SmallVector<int64_t> permutation;
+  permutation.reserve(rank + 1);
+  for (int64_t i = 0; i < rank; ++i) {
+    int64_t dimAfterReshape = i >= splitDim ? i + 1 : i;
+    if (i == concatDim) {
+      permutation.push_back(splitDim);
+    }
+    permutation.push_back(dimAfterReshape);
+  }
+  SmallVector<int64_t> transposeResultShape;
+  transposeResultShape.reserve(rank + 1);
+  for (int64_t i = 0; i < rank + 1; ++i)
+    transposeResultShape.push_back(newShape[permutation[i]]);
+  result = rewriter
+               .create<mhlo::TransposeOp>(
+                   loc,
+                   RankedTensorType::get(transposeResultShape,
+                                         inputType.getElementType()),
+                   result, rewriter.getI64VectorAttr(permutation))
+               .getResult();
+
+  // Reshape
+  llvm::SmallVector<int64_t> finalShape(inputShape);
+  finalShape[concatDim] *= splitCount;
+  finalShape[splitDim] /= splitCount;
+  return rewriter
+      .create<mhlo::ReshapeOp>(
+          loc, RankedTensorType::get(finalShape, inputType.getElementType()),
+          result)
+      .getResult();
+}
+
+struct AllToAllOpConversion : public OpConversionPattern<mhlo::AllToAllOp> {
+  using OpConversionPattern<mhlo::AllToAllOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::AllToAllOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+
+    // Create a channel.
+    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+        loc, /*group=*/StringAttr{});
+
+    // Get the collective element type attribute.
+    auto resultType = op.getResult(0).getType().cast<RankedTensorType>();
+    IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
+        getCollectiveElementTypeAttr(op.getContext(), resultType);
+    if (!elementTypeAttr) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported element type for collective op");
+    }
+    if (op.getNumOperands() != 1) {
+      return rewriter.notifyMatchFailure(op,
+                                         "tuple all-to-all is not supported");
+    }
+    if (!op.getSplitDimension() || !op.getConcatDimension() ||
+        !op.getSplitCount()) {
+      return rewriter.notifyMatchFailure(
+          op,
+          "split_dimension, concat_dimension, and split_count must be present "
+          "for array all-to-all");
+    }
+
+    uint64_t splitDim = *op.getSplitDimension();
+    uint64_t concatDim = *op.getConcatDimension();
+    uint64_t splitCount = *op.getSplitCount();
+    Value allToAllInput = op.getOperand().front();
+
+    // When splitDim != 0, we need to transpose splitDim to 0 before and after
+    // the all-to-all.
+    const bool requiresTranspose = splitDim != 0;
+    // When the concatDim != splitDim, we need to rearrange the data after the
+    // all-to-all.
+    const bool requiresSplitAndConcat = concatDim != splitDim;
+    if (requiresTranspose) {
+      allToAllInput = emitTranspose(rewriter, loc, allToAllInput, 0, splitDim);
+    }
+
+    // Create an empty tensor for the result.
+    Value target = rewriter.create<tensor::EmptyOp>(
+        loc, cast<RankedTensorType>(allToAllInput.getType()).getShape(),
+        resultType.getElementType());
+    // Create all-to-all.
+    Value allToAllResult = rewriter
+                               .create<IREE::Flow::CollectiveAllToAllOp>(
+                                   op.getLoc(), elementTypeAttr, target,
+                                   allToAllInput, channel->getResults()[0])
+                               .getResult();
+
+    if (requiresTranspose) {
+      allToAllResult =
+          emitTranspose(rewriter, loc, allToAllResult, splitDim, 0);
+    }
+    if (requiresSplitAndConcat) {
+      allToAllResult = splitAndConcatForAllToAll(
+          rewriter, loc, allToAllResult, splitDim, concatDim, splitCount);
+    }
+
+    rewriter.replaceOp(op, allToAllResult);
     return success();
   }
 };
@@ -451,6 +582,7 @@ void populateMHLOCollectiveOpsConversionPatterns(MLIRContext *context,
                                                  RewritePatternSet &patterns) {
   patterns.insert<AllGatherOpConversion>(typeConverter, context);
   patterns.insert<AllReduceOpConversion>(typeConverter, context);
+  patterns.insert<AllToAllOpConversion>(typeConverter, context);
   patterns.insert<ReduceScatterOpConversion>(typeConverter, context);
   patterns.insert<ReplicaIdOpConversion>(typeConverter, context);
 }

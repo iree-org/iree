@@ -182,6 +182,34 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def InsertDebugTargetAtSymbol :
+    Pass<"iree-flow-insert-debug-target-at-symbol", "mlir::ModuleOp"> {
+  let summary = "Crops and/or traces the program at the specified symbol";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInsertDebugTargetAtSymbolPass()";
+  let options = [
+    Option<"breakDebugTarget", "break-debug-target", "std::string",
+           /*default=*/"",
+           "Symbol at which to insert a break in the program.">,
+    Option<"traceDebugTarget", "trace-debug-target", "std::string",
+           /*default=*/"",
+           "Symbol to insert iree.flow.trace ops around.">
+  ];
+}
+
+def InsertDebugTargetAtOrdinal :
+    Pass<"iree-flow-insert-debug-target-at-ordinal", "mlir::ModuleOp"> {
+  let summary = "Crops and/or traces the program at the specified ordinal";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInsertDebugTargetAtOrdinalPass()";
+  let options = [
+    Option<"breakDebugTarget", "break-debug-target", "std::string",
+           /*default=*/"",
+           "Ordinal at which to insert a break in the program.">,
+    Option<"traceDebugTarget", "trace-debug-target", "std::string",
+           /*default=*/"",
+           "Ordinal to insert iree.flow.trace ops around.">
+  ];
+}
+
 def InterchangeGenericOps :
     Pass<"iree-flow-interchange-generic-ops", ""> {
   let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
