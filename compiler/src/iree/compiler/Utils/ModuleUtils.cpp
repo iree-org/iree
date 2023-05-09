@@ -88,20 +88,19 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
 
       // Resolve symbol name conflicts.
       if (auto targetOp = targetSymbolTable.lookup(symbolName)) {
+        if (OperationEquivalence::isEquivalentTo(
+                targetOp, sourceOp, OperationEquivalence::exactValueMatch,
+                /*markEquivalent=*/nullptr,
+                OperationEquivalence::Flags::IgnoreLocations)) {
+          // If the two ops are identical then we can ignore the source op and
+          // use the existing target op.
+          continue;
+        }
         if (symbolOp.getVisibility() == SymbolTable::Visibility::Private) {
-          // Private symbols can be safely folded into duplicates or renamed.
-          if (OperationEquivalence::isEquivalentTo(
-                  targetOp, sourceOp, OperationEquivalence::exactValueMatch,
-                  /*markEquivalent=*/nullptr,
-                  OperationEquivalence::Flags::IgnoreLocations)) {
-            // Optimization: skip over duplicate private symbols.
-            // We could let CSE do this later, but we may as well check here.
-            continue;
-          } else {
-            // Preserve the op but give it a unique name.
-            renameWithDisambiguatedName(sourceOp, sourceModuleOp,
-                                        sourceSymbolTable, targetSymbolTable);
-          }
+          // Since the source symbol is private we can rename it as all uses
+          // are known to be local to the source module.
+          renameWithDisambiguatedName(sourceOp, sourceModuleOp,
+                                      sourceSymbolTable, targetSymbolTable);
         } else {
           // The source symbol has 'nested' or 'public' visibility.
           if (SymbolTable::getSymbolVisibility(targetOp) !=
