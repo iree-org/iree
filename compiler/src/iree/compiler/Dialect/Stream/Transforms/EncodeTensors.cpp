@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/InterfaceUtils.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -54,13 +55,11 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
 }
 
 // Aligns the element type of a tensor<> to a byte-aligned power of 2 bit width.
-// Returns null type if failed to align.
 static RankedTensorType alignTensorType(RankedTensorType originalType) {
   Type elementType = originalType.getElementType();
-  std::optional<Type> alignedType = legalizeInterfaceElementType(elementType);
-  if (!alignedType) return nullptr;
-  if (*alignedType == elementType) return originalType;
-  return RankedTensorType::get(originalType.getShape(), *alignedType,
+  Type alignedType = legalizeInterfaceElementType(elementType);
+  if (alignedType == elementType) return originalType;
+  return RankedTensorType::get(originalType.getShape(), alignedType,
                                originalType.getEncoding());
 }
 
@@ -178,7 +177,8 @@ struct EncodeTensorSizeOfOp
     Value totalSize = calculateInterfaceElementCountInBytes(
         op.getLoc(), encodingType, encodingDims, rewriter);
     if (!totalSize) {
-      return op.emitOpError("failed to calculate total byte count");
+      return op.emitOpError("failed to calculate total byte count: ")
+             << encodingType << " does not have integral number of total bytes";
     }
     rewriter.replaceOp(op, totalSize);
 
@@ -241,7 +241,6 @@ struct EncodeTensorConstantOp
     // expanded to a power of 2 byte-aligned width. This is unfortunate: it's
     // wasted bits in the final binary that we could otherwise use productively.
     RankedTensorType alignedType = alignTensorType(resultType);
-    if (!alignedType) return op.emitOpError("failed to legalize element type");
     ElementsAttr encodedAttr = op.getValue();
     if (alignedType != resultType) {
       if (auto sourceAttr = encodedAttr.dyn_cast<DenseIntElementsAttr>()) {
@@ -260,7 +259,8 @@ struct EncodeTensorConstantOp
     Value resultSize = calculateInterfaceElementCountInBytes(
         op.getLoc(), alignedType, resultDims, rewriter);
     if (!resultSize) {
-      return op.emitOpError("failed to calculate total byte count");
+      return op.emitOpError("failed to calculate total byte count: ")
+             << alignedType << " does not have integral number of total bytes";
     }
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncConstantOp>(
         op, op.getResult().getType(), encodedAttr, resultSize,
@@ -330,18 +330,26 @@ static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
                                                  pattern);
   }
   // For packed sub-byte patterns, duplicate the sub-byte parts into a full
-  // byte.
+  // byte. We first extend the sub-byte parts into full bytes, and then keep
+  // shifting left and bitwise or the sub-byte parts. For example, to create an
+  // i8 pattern from i2 parts, we generate the following sequence:
+  //   %i8_val = arith.extui %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
+  //   %i8_val = (%i8_val << 2) | %i2_val
   if (needToPackSubByteInterfaceBitWidth(elementBitWidth)) {
     Type i8Type = rewriter.getI8Type();
-    Value bw = rewriter.createOrFold<arith::ConstantOp>(
+    Value bitwidth = rewriter.createOrFold<arith::ConstantOp>(
         loc, i8Type, rewriter.getIntegerAttr(i8Type, elementBitWidth));
-    Value part = rewriter.createOrFold<arith::ExtUIOp>(loc, i8Type, pattern);
-    Value full = part;
+    Value subByteVal =
+        rewriter.createOrFold<arith::ExtUIOp>(loc, i8Type, pattern);
+    Value i8Val = subByteVal;
     for (unsigned i = 1, e = 8 / elementBitWidth; i < e; ++i) {
-      Value shifted = rewriter.createOrFold<arith::ShLIOp>(loc, full, bw);
-      full = rewriter.createOrFold<arith::OrIOp>(loc, shifted, part);
+      Value shifted =
+          rewriter.createOrFold<arith::ShLIOp>(loc, i8Val, bitwidth);
+      i8Val = rewriter.createOrFold<arith::OrIOp>(loc, shifted, subByteVal);
     }
-    return full;
+    return i8Val;
   }
   if ((elementBitWidth % 8) != 0) {
     // We'd need some policy to determine how to handle non-byte-aligned widths.
@@ -368,8 +376,13 @@ struct EncodeTensorSplatOp
     // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
     auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
     if (!pattern) {
+      Type patternType = op.getValue().getType();
+      unsigned bitwdith = IREE::Util::getTypeBitWidth(patternType);
       return rewriter.notifyMatchFailure(
-          op, "unsupported pattern width; encoding policy required");
+          op, llvm::formatv(
+                  "unsupported pattern type {} with non-byte-aligned bitwidth "
+                  "{}; need to update encoding policy for such case",
+                  patternType, bitwdith));
     }
 
     unsigned bitWidth = IREE::Util::getTypeBitWidth(pattern.getType());
@@ -440,9 +453,6 @@ struct EncodeTensorSliceOp
     // Dense:
     auto sourceOffset = calculateElementByteOffset(
         op.getLoc(), sourceType, sourceDims, op.getStartIndices(), rewriter);
-    if (!sourceOffset) {
-      return op.emitOpError("failed to calculate element byte offset");
-    }
     auto sourceEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), sourceOffset, op.getResultSize());
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSliceOp>(
@@ -470,8 +480,13 @@ struct EncodeTensorFillOp
 
     auto pattern = canonicalizeFillPattern(op.getValue(), rewriter);
     if (!pattern) {
+      Type patternType = op.getValue().getType();
+      unsigned bitwdith = IREE::Util::getTypeBitWidth(patternType);
       return rewriter.notifyMatchFailure(
-          op, "unsupported pattern width; encoding policy required");
+          op, llvm::formatv(
+                  "unsupported pattern type {} with non-byte-aligned bitwidth "
+                  "{}; need to update encoding policy for such case",
+                  patternType, bitwdith));
     }
 
     // Dense:
@@ -530,9 +545,6 @@ struct EncodeTensorUpdateOp
     // Dense:
     auto targetOffset = calculateElementByteOffset(
         op.getLoc(), targetType, targetDims, op.getStartIndices(), rewriter);
-    if (!targetOffset) {
-      return op.emitOpError("failed to calculate element byte offset");
-    }
     auto targetEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), targetOffset, op.getUpdateSize());
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncUpdateOp>(
@@ -639,15 +651,14 @@ class EncodeHostTensorsPass
 //===----------------------------------------------------------------------===//
 
 // Aligns the element type of a !flow.dispatch.tensor<> to a byte-aligned power
-// of 2 bit width. Returns null type if failed to align.
+// of 2 bit width.
 static IREE::Flow::DispatchTensorType alignDispatchTensorType(
     IREE::Flow::DispatchTensorType originalType) {
   Type elementType = originalType.getBoundElementType();
-  std::optional<Type> alignedType = legalizeInterfaceElementType(elementType);
-  if (!alignedType) return nullptr;
-  if (*alignedType == elementType) return originalType;
+  Type alignedType = legalizeInterfaceElementType(elementType);
+  if (alignedType == elementType) return originalType;
   return IREE::Flow::DispatchTensorType::get(
-      originalType.getAccess(), originalType.getShape(), *alignedType);
+      originalType.getAccess(), originalType.getShape(), alignedType);
 }
 
 // Aligns binding element types to power-of-two byte boundaries.
@@ -671,7 +682,6 @@ struct EncodeBindingSubspanOp
     // Align the element type, if needed.
     IREE::Flow::DispatchTensorType alignedType =
         alignDispatchTensorType(originalType);
-    if (!alignedType) return op.emitOpError("failed to legalize element type");
     if (originalType.getAccess() != Flow::TensorAccess::ReadOnly &&
         needToPackSubByteInterfaceElements(
             cast<RankedTensorType>(alignedType.getBoundType()))) {
@@ -701,7 +711,6 @@ struct EncodeDispatchTensorLoadOp
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(targetType);
-    if (!alignedType) return op.emitOpError("failed to legalize element type");
     if (targetType == alignedType) return failure();  // already aligned.
 
     // Loads always truncate from an byte aligned type to a sub-byte one.
@@ -735,7 +744,6 @@ struct EncodeDispatchTensorStoreOp
 
     // Align the element type, if needed.
     RankedTensorType alignedType = alignTensorType(sourceType);
-    if (!alignedType) return op.emitOpError("failed to legalize element type");
     if (needToPackSubByteInterfaceElements(
             cast<RankedTensorType>(alignedType))) {
       return op.emitOpError("unsupported sub-byte tensor store");

@@ -28,7 +28,7 @@ bool needToPackSubByteInterfaceElements(RankedTensorType shapedType) {
   return needToPackSubByteInterfaceBitWidth(bitwidth);
 }
 
-std::optional<Type> legalizeInterfaceElementType(Type elementType) {
+Type legalizeInterfaceElementType(Type elementType) {
   // Only handle integers; floats in MLIR all have aligned widths (today).
   auto intType = dyn_cast<IntegerType>(elementType);
   if (!intType) return elementType;
@@ -49,15 +49,14 @@ Value calculateInterfaceElementCountInBytes(Location loc,
                                             RankedTensorType shapedType,
                                             ValueRange dynamicDims,
                                             OpBuilder &builder) {
-  std::optional<Type> alignedElementType =
+  Type alignedElementType =
       legalizeInterfaceElementType(shapedType.getElementType());
-  if (!alignedElementType) return nullptr;
-  unsigned elementBits = alignedElementType->getIntOrFloatBitWidth();
+  unsigned elementBits = alignedElementType.getIntOrFloatBitWidth();
 
   // Calculate all static dims first, if any.
   int64_t staticCount = 1;
   if (!needToPackSubByteInterfaceBitWidth(elementBits)) {
-    staticCount *= IREE::Util::getRoundedElementByteWidth(*alignedElementType);
+    staticCount *= IREE::Util::getRoundedElementByteWidth(alignedElementType);
   }
   for (unsigned i = 0; i < shapedType.getRank(); ++i) {
     if (!shapedType.isDynamicDim(i)) staticCount *= shapedType.getDimSize(i);
@@ -73,7 +72,7 @@ Value calculateInterfaceElementCountInBytes(Location loc,
   if (needToPackSubByteInterfaceBitWidth(elementBits)) {
     assert(8 % elementBits == 0);
     unsigned byteElements = 8 / elementBits;
-    // Perform some basic sanity check to make sure the total account is byte
+    // Perform some basic sanity check to make sure the total count is byte
     // aligned for fully static shapes.
     if (dynamicDims.empty() && staticCount * byteElements % 8 != 0) {
       return nullptr;
@@ -91,10 +90,9 @@ Value calculateInterfaceElementOffsetInBytes(Location loc,
                                              RankedTensorType originalType,
                                              Value linearizedIndex,
                                              OpBuilder &builder) {
-  std::optional<Type> alignedElementType =
+  Type alignedElementType =
       legalizeInterfaceElementType(originalType.getElementType());
-  if (!alignedElementType) return nullptr;
-  unsigned elementBits = alignedElementType->getIntOrFloatBitWidth();
+  unsigned elementBits = alignedElementType.getIntOrFloatBitWidth();
 
   // Sub-byte packing requires putting multiple elements in the same byte.
   if (needToPackSubByteInterfaceBitWidth(elementBits)) {
@@ -107,7 +105,7 @@ Value calculateInterfaceElementOffsetInBytes(Location loc,
   }
 
   Value elementBytes = builder.create<arith::ConstantIndexOp>(
-      loc, IREE::Util::getRoundedElementByteWidth(*alignedElementType));
+      loc, IREE::Util::getRoundedElementByteWidth(alignedElementType));
   return builder.createOrFold<arith::MulIOp>(loc, linearizedIndex,
                                              elementBytes);
 }

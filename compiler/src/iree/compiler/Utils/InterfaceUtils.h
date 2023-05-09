@@ -22,8 +22,7 @@ bool needToPackSubByteInterfaceBitWidth(unsigned bitwidth);
 /// together.
 bool needToPackSubByteInterfaceElements(RankedTensorType shapedType);
 
-/// Legalizes the given |elementType| for runtime-kernel interfaces. Returns
-/// std::nullopt if failed to legalize.
+/// Legalizes the given |elementType| for runtime-kernel interfaces.
 ///
 /// Element types used in runtime-kernel interfaces need to match to make sure
 /// data are handled consistently between the runtime, which prepares the data,
@@ -34,7 +33,7 @@ bool needToPackSubByteInterfaceElements(RankedTensorType shapedType);
 /// In IREE, if compiling from the same source model, we control both the
 /// runtime and kernel. For such cases, we perform tight packing for sub-byte
 /// elements, and expand to the next power-of-two bitwidth for other cases.
-std::optional<Type> legalizeInterfaceElementType(Type elementType);
+Type legalizeInterfaceElementType(Type elementType);
 
 /// Emits IR with the given |builder| to calculate the total number of bytes
 /// required for the given |shapedType| appearing at runtime-kernel interfaces.
@@ -47,7 +46,7 @@ Value calculateInterfaceElementCountInBytes(Location loc,
                                             OpBuilder &builder);
 
 /// Emits IR with the given |builder| to calculate the byte offset for the
-/// element at the given |linearizedIndex|. Returns nullptr on failure.
+/// element at the given |linearizedIndex|.
 Value calculateInterfaceElementOffsetInBytes(Location loc,
                                              RankedTensorType originalType,
                                              Value linearizedIndex,

@@ -41,7 +41,7 @@ func.func @denseTensorConstantI4() -> !stream.resource<constant> {
 // Check that non-byte-aligned total size is not supported for constant.
 
 func.func @denseTensorConstantI4() -> !stream.resource<constant> {
-  // expected-error @+1 {{failed to calculate total byte count}}
+  // expected-error @+1 {{failed to calculate total byte count: 'tensor<5xi4>' does not have integral number of total bytes}}
   %0 = stream.tensor.constant : tensor<5xi4> in !stream.resource<constant> = dense<[5, 15, 0, 3, 1]> : tensor<5xi4>
   return %0 : !stream.resource<constant>
 }
@@ -72,7 +72,7 @@ func.func @denseTensorSizeOfStatic() -> index {
 // Check that non-byte-aligned total size is not supported for sizeof.
 
 func.func @denseTensorSizeOfStatic() -> index {
-  // expected-error @+1 {{failed to calculate total byte count}}
+  // expected-error @+1 {{failed to calculate total byte count: 'tensor<11xi4>' does not have integral number of total bytes}}
   %0 = stream.tensor.sizeof tensor<11xi4> : index
   return %0 : index
 }
