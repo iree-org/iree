@@ -45,6 +45,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "StableHLOLegalization",
     srcs = [
+        "ConvertCollectives.cpp",
         "LegalizeControlFlow.cpp",
         "LegalizeShapeComputations.cpp",
         "LegalizeToLinalgUtils.cpp",
