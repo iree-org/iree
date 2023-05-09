@@ -42,7 +42,7 @@ using transform::LowerShapeCastOp;
 using transform::LowerTransferOp;
 using transform::LowerTransposeOp;
 using transform::MatchOp;
-using transform::SplitHandlesOp;
+using transform::SplitHandleOp;
 using transform::SplitTransferFullPartialOp;
 using transform::TransferToScfOp;
 using transform_ext::AllDims;
