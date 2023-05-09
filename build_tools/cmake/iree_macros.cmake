@@ -52,33 +52,33 @@ endif()
 string(TOLOWER "${_IREE_UNNORMALIZED_ARCH}" _IREE_UNNORMALIZED_ARCH_LOWERCASE)
 
 # Normalize _IREE_UNNORMALIZED_ARCH into IREE_ARCH.
-if (EMSCRIPTEN)
+if(EMSCRIPTEN)
   # TODO: figure what to do about the wasm target, which masquerades as x86.
   # This is the one case where the IREE_ARCH CMake variable is currently
   # inconsistent with the IREE_ARCH C preprocessor token.
-  set (IREE_ARCH "")
-elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "aarch64") OR
+  set(IREE_ARCH "")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "aarch64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64e") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64ec"))
-  set (IREE_ARCH "arm_64")
-elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm") OR
+  set(IREE_ARCH "arm_64")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^armv[5-8]"))
-  set (IREE_ARCH "arm_32")
-elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86_64") OR
+  set(IREE_ARCH "arm_32")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86_64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "amd64") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x64"))
-  set (IREE_ARCH "x86_64")
-elseif ((_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^i[3-7]86$") OR
+  set(IREE_ARCH "x86_64")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^i[3-7]86$") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86") OR
         (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "win32"))
-  set (IREE_ARCH "x86_32")
-elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv64")
-  set (IREE_ARCH "riscv_64")
-elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv32")
-  set (IREE_ARCH "riscv_32")
-elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "")
-  set (IREE_ARCH "")
+  set(IREE_ARCH "x86_32")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv64")
+  set(IREE_ARCH "riscv_64")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv32")
+  set(IREE_ARCH "riscv_32")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "")
+  set(IREE_ARCH "")
   message(WARNING "Performance advisory: architecture-specific code paths "
     "disabled because no target architecture was specified or we didn't know "
     "which CMake variable to read. Some relevant CMake variables:\n"
@@ -88,9 +88,32 @@ elseif (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "")
     "CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}\n"
     )
 else()
-  set (IREE_ARCH "")
+  set(IREE_ARCH "")
   message(SEND_ERROR "Unrecognized target architecture ${_IREE_UNNORMALIZED_ARCH_LOWERCASE}")
 endif()
+
+# iree_arch_to_llvm_arch()
+#
+# Helper mapping an architecture in IREE's naming scheme (as in IREE_ARCH)
+# to an architecture in LLVM's naming scheme (as in LLVM target triples).
+function(iree_arch_to_llvm_arch DST_LLVM_ARCH_VARIABLE SRC_ARCH)
+  if("${SRC_ARCH}" STREQUAL "arm_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "aarch64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "arm_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "arm" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "x86_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "x86_64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "x86_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "i386" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "riscv_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "riscv64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "riscv_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "riscv32" PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "What is the LLVM name of the architecture that we call ${SRC_ARCH} ?")
+    set(${DST_LLVM_ARCH_VARIABLE} "unknown" PARENT_SCOPE)
+  endif()
+endfunction()
 
 #-------------------------------------------------------------------------------
 # General utilities
@@ -141,7 +164,7 @@ function(iree_package_ns PACKAGE_NS)
       set(_PACKAGE "")
     endif()
     if(IREE_PACKAGE_ROOT_PREFIX)
-      if ("${_PACKAGE}" STREQUAL "")
+      if("${_PACKAGE}" STREQUAL "")
         set(_PACKAGE "${IREE_PACKAGE_ROOT_PREFIX}")
       else()
         set(_PACKAGE "${IREE_PACKAGE_ROOT_PREFIX}/${_PACKAGE}")
