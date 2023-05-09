@@ -8,7 +8,7 @@
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 
-DEVICE_NAME = "XT2201-2"
+DEVICE_NAME = "moto-edge-x30"
 
 GPU = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_MOBILE_MOTO_EDGE_X30 + "-gpu",

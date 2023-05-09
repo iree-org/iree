@@ -106,13 +106,14 @@ jobs:
 
   test:
     # These physical devices are not scalable. Only run on postsubmit for now.
-    if: (! inputs.is-pr)
+    # TODO: Remove before submit
+    # if: (! inputs.is-pr)
     needs: cross_compile
     strategy:
       matrix:
-        # TODO(#9855): Add Pixel-6-Pro and XT2201-2
+        # TODO(#9855): Add pixel-6-pro and moto-edge-x30.
         target:
-          - device-name: Pixel-4
+          - device-name: pixel-4
             label-exclude: vulkan
     name: test_on_${{ matrix.target.device-name }}
     runs-on:
