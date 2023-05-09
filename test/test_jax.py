@@ -4,6 +4,7 @@
 
 import argparse
 import multiprocessing
+import os
 import re
 import subprocess
 import sys
@@ -11,11 +12,12 @@ import sys
 parser = argparse.ArgumentParser(prog='test_jax.py',
                                  description='Run jax testsuite hermetically')
 parser.add_argument('testfiles', nargs="*")
-parser.add_argument('-t', '--timeout', default=20)
+parser.add_argument('-t', '--timeout', default=60)
 parser.add_argument('-l', '--logdir', default="/tmp/jaxtest")
 parser.add_argument('-p', '--passing', default=None)
 parser.add_argument('-f', '--failing', default=None)
 parser.add_argument('-e', '--expected', default=None)
+parser.add_argument('-j', '--jobs', default=None)
 
 args = parser.parse_args()
 
@@ -57,7 +59,7 @@ def exec_test(command):
 
 def exec_testsuite(commands):
   returncodes = []
-  with multiprocessing.Pool() as p:
+  with multiprocessing.Pool(int(args.jobs) if args.jobs else args.jobs) as p:
     returncodes = p.map(exec_test, commands)
     print("")
   passing = []
@@ -81,7 +83,7 @@ def write_results(filename, results):
 
 
 def load_results(filename):
-  if not filename:
+  if not filename or not os.path.isfile(filename):
     return []
   expected = []
   with open(filename, 'r') as f:

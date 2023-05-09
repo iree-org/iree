@@ -50,13 +50,10 @@ jobs:
           # TODO: https://github.com/openxla/openxla-pjrt-plugin/issues/30
           sudo apt install -y lld
           # Since only building the runtime, exclude compiler deps (expensive).
-          python ./sync_deps.py --depth 1 --submodules-depth 1 --exclude-submodule "iree:third_party/(llvm|mlir-hlo)"
+          python ./sync_deps.py --depth 1 --submodules-depth 1 --exclude-dep xla --exclude-submodule "iree:third_party/(.*)"
           pip install -r requirements.txt
           python -m pip install absl-py pytest
           python -m pip install -e ctstools
-
-      - name: Setup Bazelisk
-        uses: bazelbuild/setup-bazelisk@v2
 
       - name: "Configure"
         run: |
@@ -73,9 +70,6 @@ jobs:
           echo "testsuite-passing-artifact=${PASSING_ARTIFACT}" >> "${GITHUB_OUTPUT}"
           echo "testsuite-failing-artifact=${FAILING_ARTIFACT}" >> "${GITHUB_OUTPUT}"
           echo "testsuite-golden-artifact=${GOLDEN_ARTIFACT}" >> "${GITHUB_OUTPUT}"
-
-          # Ensure the golden file exists.
-          touch ${GOLDEN_ARTIFACT}
 
           # Point to the downloaded PJRT library.
           export PJRT_NAMES_AND_LIBRARY_PATHS="iree_cpu:/home/runner/work/openxla-pjrt-plugin/openxla-pjrt-plugin/pjrt_plugins/pjrt_plugin_iree_cpu.so"

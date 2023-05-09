@@ -102,7 +102,8 @@ def main():
         update_args.extend(["--depth", "1"])
       update_args.extend(["--"])
       update_args.extend(submodules)
-      run(update_args, repo_dir)
+      if (len(submodules) > 0):
+        run(update_args, repo_dir)
 
 
 def run(args,
