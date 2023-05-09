@@ -242,7 +242,7 @@ class SystemContext:
 
   def add_module_dependency(self, name, minimum_version=0):
     resolved_module = _binding.VmModule.resolve_module_dependency(
-      self._config.vm_instance, name, minimum_version)
+        self._config.vm_instance, name, minimum_version)
     self._vm_context.register_modules([resolved_module])
 
   def add_vm_modules(self, vm_modules):
