@@ -248,13 +248,6 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     }
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs()
-        << "--- After generalizing tensor.pack and tensor.unpack ops ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
   // Fold trailing unit dims away for linalg.transpose ops.
   {
     RewritePatternSet patterns(ctx);
@@ -263,12 +256,6 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       return signalPassFailure();
     }
   }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "--- After unit dims away ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

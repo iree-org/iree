@@ -16,6 +16,24 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static bool has16x16Transpose(func::FuncOp funcOp) {
+  bool res = false;
+  funcOp.walk([&](vector::TransposeOp op) {
+    auto srcGtOneDims = isTranspose2DSlice(op);
+    if (failed(srcGtOneDims)) return WalkResult::advance();
+    VectorType srcType = op.getSourceVectorType();
+    int64_t m = srcType.getDimSize(std::get<0>(srcGtOneDims.value()));
+    int64_t n = srcType.getDimSize(std::get<1>(srcGtOneDims.value()));
+    if (m == 16 && n == 16) {
+      res = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return res;
+}
+
 namespace {
 /// Pass to lower Vector ops before conversion to LLVM.
 class LLVMCPUVectorLoweringPass
@@ -25,7 +43,6 @@ class LLVMCPUVectorLoweringPass
   LLVMCPUVectorLoweringPass(const LLVMCPUVectorLoweringPassOptions &options) {
     this->splitVectorTransfersTo = options.splitVectorTransfersTo;
     this->lowerVectorTransposeToAVX2 = options.lowerVectorTransposeToAVX2;
-    this->lowerVectorTransposeTo = options.lowerVectorTransposeTo;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -40,14 +57,7 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   auto funcOp = getOperation();
 
   // Per-function lowering pipeline.
-  auto vectorTransposeLowering =
-      llvm::StringSwitch<vector::VectorTransposeLowering>(
-          lowerVectorTransposeTo.getValue())
-          .Case("eltwise", vector::VectorTransposeLowering::EltWise)
-          .Case("flat_transpose", vector::VectorTransposeLowering::Flat)
-          .Case("shuffle_1d", vector::VectorTransposeLowering::Shuffle1D)
-          .Case("shuffle_16x16", vector::VectorTransposeLowering::Shuffle16x16)
-          .Default(vector::VectorTransposeLowering::Shuffle1D);
+  auto vectorTransposeLowering = vector::VectorTransposeLowering::Shuffle1D;
   auto vectorMultiReductionLowering =
       vector::VectorMultiReductionLowering::InnerReduction;
   auto vectorContractLowering = vector::VectorContractLowering::OuterProduct;
@@ -64,6 +74,7 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
           .setVectorTransformsOptions(vectorContractLowering)
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
+  // Lower high level vector operations like contract or multidim reduce ops
   // to lower level vector ops.
   {
     RewritePatternSet patterns(ctx);
@@ -118,6 +129,10 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
 
   // Lowering for vector.transpose ops.
   {
+    if (has16x16Transpose(funcOp)) {
+      vectorTransformOptions.setVectorTransposeLowering(
+          vector::VectorTransposeLowering::Shuffle16x16);
+    }
     RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorTransposeLoweringPatterns(patterns,

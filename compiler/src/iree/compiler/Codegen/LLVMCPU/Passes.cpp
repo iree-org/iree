@@ -425,8 +425,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
 void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
                                       int64_t numLevels, bool enablePeeling,
                                       bool enableVectorMasking,
-                                      bool lowerToAVX2,
-                                      bool lowerTransposeToShuffle16x16) {
+                                      bool lowerToAVX2) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -487,9 +486,6 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
-    if (lowerTransposeToShuffle16x16) {
-      options.lowerVectorTransposeTo = "shuffle_16x16";
-    }
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
   }
@@ -583,8 +579,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   }
 }
 
-void addCPUDataTilingPipeline(OpPassManager &passManager,
-                              bool lowerTransposeToShuffle16x16) {
+void addCPUDataTilingPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -606,9 +601,6 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   {
     LLVMCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
-    if (lowerTransposeToShuffle16x16) {
-      options.lowerVectorTransposeTo = "shuffle_16x16";
-    }
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorLoweringPass(options));
   }
