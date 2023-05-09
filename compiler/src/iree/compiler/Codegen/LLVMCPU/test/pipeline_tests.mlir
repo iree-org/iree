@@ -440,7 +440,7 @@ hal.executable private @quant_matmul_fusion {
 //          CHECK:     scf.for
 //          CHECK:       scf.for
 //          CHECK:         vector.outerproduct
-//          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) {double_round = true} : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
+//          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) <{double_round = true}> : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
 
 // -----
 
