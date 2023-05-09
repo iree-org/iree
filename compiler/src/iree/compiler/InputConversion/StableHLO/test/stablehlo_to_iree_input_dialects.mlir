@@ -1,5 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stablehlo-to-iree-input \
-// RUN:   %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stablehlo-to-iree-input %s | FileCheck %s
 
 // CHECK:       func.func @concatenate
 // CHECK-SAME:    %[[ARG0:[^:]+]]
