@@ -6,7 +6,6 @@ imported into an IREE-compatible format then compiled to a series of backends.
 
 ## Prerequisites
 
-
 Install TensorFlow by following the
 [official documentation](https://www.tensorflow.org/install):
 
