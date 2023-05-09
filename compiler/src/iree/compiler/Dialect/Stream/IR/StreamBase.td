@@ -122,7 +122,7 @@ class Stream_Op<string mnemonic, list<Trait> traits = []> :
 // Stream dialect types
 //===----------------------------------------------------------------------===//
 
-def Stream_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
+def Stream_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat, AnyComplex]>;
 def Stream_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
 
 def Stream_Offset : TypeAlias<Index>;

@@ -56,13 +56,13 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
         lambda config: "cuda" in config.tags and "long-running" in config.tags,
     "vulkan-nvidia":
         lambda config: "vulkan-nvidia" in config.tags,
-    # TODO(#9855): Enable benchmarks on Pixel-6-Pro and XT2201-2.
+    # TODO(#9855): Enable benchmarks on pixel-6-pro and moto-edge-x30.
     "experimental-android-cpu":
         lambda config:
         (config.target_device_spec.architecture.type == common_definitions.
          ArchitectureType.CPU and config.target_device_spec.host_environment.
          platform == "android" and config.target_device_spec.device_name in
-         ["Pixel-4"]),
+         ["pixel-4"]),
     "experimental-android-gpu":
         lambda config:
         (config.target_device_spec.architecture.type == common_definitions.

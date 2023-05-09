@@ -45,6 +45,35 @@ static void collectTiledAndFusedOps(Operation *rootOp,
   }
 }
 
+/// Tiling of `tensor.pad` operation generates
+///
+/// ```mlir
+/// scf.if {
+///   ...
+/// } else {
+///    tensor.pad
+/// }
+/// ```
+///
+/// For IREEs use case we dont need this. So this folds away the `if` condition.
+/// Note this is a fairly hacky workaround, but the current pad operation
+/// semantics force us down this path.
+static FailureOr<tensor::PadOp> foldIfGeneratedFromPadding(
+    RewriterBase &rewriter, tensor::PadOp untiledPadOp,
+    tensor::PadOp tiledPadOp) {
+  auto ifOp = dyn_cast<scf::IfOp>(tiledPadOp->getParentOp());
+  if (!ifOp) {
+    return failure();
+  };
+  Block *block = tiledPadOp->getBlock();
+  Operation *terminator = block->getTerminator();
+  ValueRange results = terminator->getOperands();
+  rewriter.inlineBlockBefore(block, ifOp, /*blockArgs=*/{});
+  rewriter.replaceOp(ifOp, results);
+  rewriter.eraseOp(terminator);
+  return tiledPadOp;
+}
+
 /// This pass starts with the last TilingInterface operation, tiles the op and
 /// fuses its producers recursively. The `tilingLevel` must be specified. It
 /// picks the `tilingLevel`-th list as tiling sizes from lowering_config.
@@ -83,6 +112,17 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   }
   yieldedValuesToOrigValues.append(rootOp->result_begin(),
                                    rootOp->result_end());
+
+  // WAR for `if` ops generating `scf.if` operations.
+  if (auto rootPadOp = dyn_cast<tensor::PadOp>(rootOp)) {
+    assert(tilingResult->tiledOps.size() == 1 &&
+           "expected tiling of `pad` op to return only one operation");
+    FailureOr<Operation *> replacementTiledOp = foldIfGeneratedFromPadding(
+        rewriter, rootPadOp, cast<tensor::PadOp>(tilingResult->tiledOps[0]));
+    if (!failed(replacementTiledOp)) {
+      tilingResult->tiledOps[0] = replacementTiledOp.value();
+    }
+  }
   tiledOps.append(tilingResult->tiledOps);
 
   // 2. Tiling each operation results in generation of slices. The source of

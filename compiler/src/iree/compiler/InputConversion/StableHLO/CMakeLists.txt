@@ -38,12 +38,14 @@ iree_cc_library(
   NAME
     StableHLOLegalization
   SRCS
+    "ConvertCollectives.cpp"
     "LegalizeControlFlow.cpp"
     "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
     "StableHLOToArith.cpp"
+    "StableHLOToIREEInputDialects.cpp"
     "StableHLOToLinalg.cpp"
     "StableHLOToLinalgConvolution.cpp"
     "StableHLOToLinalgDotProd.cpp"
@@ -70,6 +72,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
+    MLIRMLProgramDialect
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRSCFDialect
@@ -85,7 +88,6 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
-    iree::compiler::InputConversion::Common
     iree::compiler::Utils
   PUBLIC
 )

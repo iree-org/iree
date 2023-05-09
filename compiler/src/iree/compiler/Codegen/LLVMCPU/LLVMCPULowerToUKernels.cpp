@@ -37,6 +37,36 @@ static bool isInitializedToZero(Value outsOperand) {
          matchPattern(fillVal, m_AnyZeroFloat());
 }
 
+/// Holds a function name and attributes.
+struct FnNameAndDefAttrs {
+  std::string name;
+  SmallVector<NamedAttribute> defAttrs;
+};
+
+/// Returns the function name and attributes to use for a ukernel with given
+/// `ukernelName` on the target described by `targetAttr`.
+static FnNameAndDefAttrs getFnNameAndDefAttrs(
+    const char *ukernelName, RewriterBase &rewriter,
+    IREE::HAL::ExecutableTargetAttr targetAttr) {
+  FnNameAndDefAttrs result;
+  if (isVMVXBackend(targetAttr)) {
+    result.name = std::string("vmvx.") + ukernelName;
+    // TODO(#12327): Based on description in the issue, add an attribute
+    // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
+    // backend (obviously), but is enough to unblock while the proper fix
+    // lands. For now there are a bunch of attributes set on the function, but
+    // this should be made more controllable based on the backend.
+    result.defAttrs.emplace_back(rewriter.getStringAttr("vm.import.module"),
+                                 rewriter.getStringAttr("vmvx"));
+  } else {
+    result.name = std::string("ukernel.") + ukernelName;
+    result.defAttrs.emplace_back(
+        rewriter.getStringAttr("hal.import.fields"),
+        rewriter.getArrayAttr({rewriter.getStringAttr("processor_data")}));
+  }
+  return result;
+}
+
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
@@ -78,15 +108,24 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 0);
   Value k = rewriter.create<tensor::DimOp>(loc, rhs, 1);
-  Value m0 = rewriter.create<tensor::DimOp>(loc, lhs, 2);
-  Value n0 = rewriter.create<tensor::DimOp>(loc, rhs, 2);
-  Value k0 = rewriter.create<tensor::DimOp>(loc, rhs, 3);
+
+  auto getDimAsI32 = [](RewriterBase &rewriter, Location loc, Value value,
+                        int dim) -> Value {
+    return rewriter.create<arith::IndexCastOp>(
+        loc, rewriter.getI32Type(),
+        rewriter.create<tensor::DimOp>(loc, value, dim));
+  };
+  Value m0 = getDimAsI32(rewriter, loc, lhs, 2);
+  Value n0 = getDimAsI32(rewriter, loc, rhs, 2);
+  Value k0 = getDimAsI32(rewriter, loc, rhs, 3);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  auto fn = getFnNameAndDefAttrs("mmt4d", rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, "vmvx.mmt4d", ValueRange{lhs, rhs}, out,
+      loc, outType, fn.name, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
-      /*fn_def_attrs=*/nullptr,
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -192,11 +231,13 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value out_size3 = rewriter.create<tensor::DimOp>(loc, out, 3);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  auto fn = getFnNameAndDefAttrs("pack", rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, "vmvx.pack", in, out,
+      loc, outType, fn.name, in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
-      /*fn_def_attrs=*/nullptr,
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -267,11 +308,13 @@ static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
   Value out_size1 = rewriter.create<tensor::DimOp>(loc, out, 1);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  auto fn = getFnNameAndDefAttrs("unpack", rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, "vmvx.unpack", in, out,
+      loc, outType, fn.name, in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
-      /*fn_def_attrs=*/nullptr,
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());

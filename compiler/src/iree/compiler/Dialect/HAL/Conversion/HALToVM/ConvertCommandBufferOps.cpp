@@ -95,7 +95,7 @@ class CommandBufferFillBufferOpConversion
 
     // Record the original pattern length then extend it to a 32 bit integer.
     auto originalPatternType = op.getPattern().getType();
-    auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
+    unsigned patternBitWidth = IREE::Util::getTypeBitWidth(originalPatternType);
     // The pattern length (in bytes) will be used at runtime to issue the fill
     // command. While the pattern itself will be stored in a 32 bit integer,
     // the fill operation will use this length to slice a potentially smaller

@@ -175,7 +175,7 @@ endif()
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
-option(IREE_BUILD_EXPERIMENTAL_VMVX_MMT4D "Enables MMT4D methods in the VMVX module." OFF)
+option(IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS "Build experimental plugins making builtin ukernels available to llvm-cpu modules compiled with --iree-llvmcpu-enable-microkernels" OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 
 #-------------------------------------------------------------------------------
@@ -965,6 +965,10 @@ endif()
 
 if(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES)
   add_subdirectory(experimental/web)
+endif()
+
+if(IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS)
+  add_subdirectory(experimental/cpu_ukernel)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

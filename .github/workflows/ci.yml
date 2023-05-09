@@ -100,7 +100,7 @@ jobs:
           git submodule update --init --jobs 8 --depth 1
       - id: "gcp-auth"
         name: "Authenticating to Google Cloud"
-        if: ${{ needs.setup.outputs.write-caches }} == 1
+        if: needs.setup.outputs.write-caches == 1
         uses: "google-github-actions/auth@v1"
         with:
           token_format: "access_token"
@@ -177,7 +177,7 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - id: "gcp-auth"
         name: "Authenticating to Google Cloud"
-        if: ${{ needs.setup.outputs.write-caches }} == 1
+        if: needs.setup.outputs.write-caches == 1
         uses: "google-github-actions/auth@v1"
         with:
           token_format: "access_token"
@@ -894,7 +894,7 @@ jobs:
             "${DOCKER_IMAGE}" \
             "${BUILD_SCRIPT}"
       - name: "Test cross-compiling target"
-        if: ${{ matrix.target.test_script }}
+        if: matrix.target.test_script
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \

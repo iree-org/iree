@@ -59,7 +59,7 @@ elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
         --device_model=GCP-c2-standard-16 \
         --cpu_uarch=CascadeLake \
         --verbose
-elif [[ "${TARGET_DEVICE_NAME}" == "Pixel-4" ]]; then
+elif [[ "${TARGET_DEVICE_NAME}" == "pixel-4" ]]; then
   ./build_tools/benchmarks/run_benchmarks_on_android.py \
     --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
     --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \

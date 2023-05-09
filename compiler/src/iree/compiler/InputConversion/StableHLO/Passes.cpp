@@ -65,7 +65,8 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
   // TODO(#12678): Port StableHLO detuple pass.
 
-  // TODO(#12678): Port StableHLO-StableHLO preprocessing.
+  passManager.addNestedPass<func::FuncOp>(
+      createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   // Various shape functions may have been materialized in the `shape.shape_of`
@@ -104,7 +105,7 @@ void buildStableHLOInputConversionPassPipelineImpl(OpPassManager &passManager) {
       stablehlo::createLegalizeShapeComputations());
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createConvertStableHloToLinalgExt());
-  passManager.addPass(stablehlo::createConvertStableHloToLinalg());
+  passManager.addPass(createConvertStableHloToIreeInputDialects());
   // Ensure conversion completed.
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
