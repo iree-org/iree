@@ -70,9 +70,8 @@ static std::optional<Value> materializeCast(OpBuilder &builder, Type toType,
       castType = shapedType.clone(castType);
 
     if (castType != fromType)
-      fromValue =
-          builder.create<tensor::BitcastOp>(loc, castType, fromValue)
-              ->getResult(0);
+      fromValue = builder.create<tensor::BitcastOp>(loc, castType, fromValue)
+                      ->getResult(0);
   }
 
   if (fromType.getRank() != 0) return fromValue;

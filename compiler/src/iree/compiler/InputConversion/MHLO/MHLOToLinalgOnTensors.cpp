@@ -357,7 +357,7 @@ std::optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
       .getResult();
 }
 
-std::optional<Value> materializeCastFromIllegal(OpBuilder& builder, Type type,
+std::optional<Value> materializeCastFromIllegal(OpBuilder &builder, Type type,
                                                 ValueRange inputs,
                                                 Location loc) {
   Type fromType = getElementTypeOrSelf(inputs[0].getType());
@@ -366,11 +366,10 @@ std::optional<Value> materializeCastFromIllegal(OpBuilder& builder, Type type,
       !toType.isSignlessInteger())
     return std::nullopt;
   // Use bitcast to do signless->signful conversions.
-  return builder.create<tensor::BitcastOp>(loc, type, inputs[0])
-      ->getResult(0);
+  return builder.create<tensor::BitcastOp>(loc, type, inputs[0])->getResult(0);
 }
 
-std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
+std::optional<Value> materializeCastToIllegal(OpBuilder &builder, Type type,
                                               ValueRange inputs, Location loc) {
   Type fromType = getElementTypeOrSelf(inputs[0].getType());
   Type toType = getElementTypeOrSelf(type);
@@ -378,8 +377,7 @@ std::optional<Value> materializeCastToIllegal(OpBuilder& builder, Type type,
       (!toType.isSignedInteger() && !toType.isUnsignedInteger()))
     return std::nullopt;
   // Use bitcast to do signless->signful conversions.
-  return builder.create<tensor::BitcastOp>(loc, type, inputs[0])
-      ->getResult(0);
+  return builder.create<tensor::BitcastOp>(loc, type, inputs[0])->getResult(0);
 }
 
 struct ConvertMHLOToLinalgOnTensorsPass
@@ -481,9 +479,8 @@ struct ConvertMHLOToLinalgOnTensorsPass
       return true;
     });
     target.addDynamicallyLegalOp<func::ReturnOp>([&](func::ReturnOp op) {
-      return llvm::all_of(op.getOperandTypes(), [&](Type type) {
-          return !isIllegalFuncType(type);
-        });
+      return llvm::all_of(op.getOperandTypes(),
+                          [&](Type type) { return !isIllegalFuncType(type); });
     });
     target.addDynamicallyLegalOp<ml_program::GlobalOp>(
         [&](ml_program::GlobalOp op) {
