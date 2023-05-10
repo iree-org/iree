@@ -148,8 +148,15 @@ def PromoteArithBF16ToF32 : Pass<"iree-util-promote-arith-bf16-to-f32", "mlir::M
 }
 
 //===----------------------------------------------------------------------===//
-// Test passes
+// Debug/test passes
 //===----------------------------------------------------------------------===//
+
+def AnnotateOpOrdinals : Pass<"iree-util-annotate-op-ordinals", "mlir::ModuleOp"> {
+  let summary = "Annotates ops with globally unique IDs for debugging.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createAnnotateOpOrdinalsPass()
+  }];
+}
 
 def TestConversion : Pass<"iree-util-test-conversion", "mlir::ModuleOp"> {
   let summary = "Tests util dialect conversion patterns.";
