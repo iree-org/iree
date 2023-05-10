@@ -389,9 +389,9 @@ class TransposeReshapeGenericDotGeneral
     int64_t numRhsContractionDims =
         rhsContractionBase + rhsContractingDims.size();
 
-    lhs = ReshapeIfMorethan3D(rewriter, op.getLoc(), lhs,
+    lhs = ReshapeIfNonStandard(rewriter, op.getLoc(), lhs,
                               lhsBatchingDims.size(), lhsContractionBase);
-    rhs = ReshapeIfMorethan3D(rewriter, op.getLoc(), rhs,
+    rhs = ReshapeIfNonStandard(rewriter, op.getLoc(), rhs,
                               rhsBatchingDims.size(), numRhsContractionDims);
 
     if (lhs == op.getLhs() && rhs == op.getRhs())
