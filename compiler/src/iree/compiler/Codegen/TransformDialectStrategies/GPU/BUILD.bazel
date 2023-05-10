@@ -22,8 +22,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "AbstractGemmLikeStrategy.h",
-        "AbstractGpuStrategy.h",
-        "AbstractReductionStrategy.h",
         "Common.h",
         "MatmulTensorCoreStrategy.h",
         "SmallReductionStrategy.h",

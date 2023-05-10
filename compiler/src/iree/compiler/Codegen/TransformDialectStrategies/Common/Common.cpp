@@ -368,7 +368,7 @@ mlir::iree_compiler::buildTileReductionUsingScfForeach(
 std::tuple<Value, Value, Value, Value, Value>
 mlir::iree_compiler::buildReductionStrategyBlockDistribution(
     ImplicitLocOpBuilder &b, Value variantH,
-    const AbstractReductionStrategy &strategy) {
+    ArrayRef<int64_t> workgroupTileSizes) {
   // Step 1. Call the matcher. Note that this is the same matcher as used to
   // trigger this compilation path, so it must always apply.
   b.create<RegisterMatchCallbacksOp>();
@@ -379,7 +379,9 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
   // Step 2. Create the block/mapping tiling level and fusee.
   auto [fusionTargetH, fusionGroupH] =
       buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
-  ArrayRef<Attribute> allBlocksRef(strategy.allBlockAttrs);
+  MLIRContext *ctx = b.getContext();
+  SmallVector<Attribute> blockDimMapping{blockX(ctx), blockY(ctx), blockZ(ctx)};
+  blockDimMapping.resize(workgroupTileSizes.size());
   TileToForallAndFuseAndDistributeResult tileResult =
       buildTileFuseDistToForallWithTileSizes(
           /*builder=*/b,
@@ -387,10 +389,8 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
           /*rootH=*/fusionTargetH,
           /*opsToFuseH=*/fusionGroupH,
           /*tileSizes=*/
-          getAsOpFoldResult(b.getI64ArrayAttr(strategy.workgroupTileSizes)),
-          /*threadDimMapping=*/
-          b.getArrayAttr(
-              allBlocksRef.take_front(strategy.captures.reductionRank - 1)));
+          getAsOpFoldResult(b.getI64ArrayAttr(workgroupTileSizes)),
+          /*threadDimMapping=*/b.getArrayAttr(blockDimMapping));
 
   // Handle the workgroup count region.
   b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(

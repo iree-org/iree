@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/Common/Common.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/MatmulTensorCoreStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/SmallReductionStrategy.h"
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/StagedReductionStrategy.h"
@@ -59,7 +58,6 @@ using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::maxDivisorOfValueBelowLimit;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
 using iree_compiler::gpu::AbstractGemmLikeStrategy;
-using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
@@ -290,7 +288,7 @@ void mlir::iree_compiler::gpu::
 /// the variant op.
 std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
-    const AbstractReductionStrategy &strategy) {
+    ArrayRef<int64_t> numThreadsInBlock) {
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
 
   // Step N-5. Fold tensor.empty to avoid large allocations.
@@ -315,7 +313,7 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildMapToBlockAndThreads(b, funcH, strategy.getNumThreadsInBlock());
+  funcH = buildMapToBlockAndThreads(b, funcH, numThreadsInBlock);
 
   // Step N. Perform a final pass of canonicalization + enabling before
   // returning.
@@ -776,13 +774,11 @@ static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
   auto strategyBuilder = [&](ImplicitLocOpBuilder &b, Value variant) {
     ReductionConfig reductionConfig = getReductionConfig(captures, gpuModel);
     if (reductionConfig.strategy == ReductionStrategy::Small) {
-      auto strategy = SmallReductionStrategy::create(op->getContext(), captures,
-                                                     reductionConfig);
+      SmallReductionStrategy strategy(captures, reductionConfig);
       return buildSmallReductionStrategy(b, variant, strategy);
     } else if (reductionConfig.strategy == ReductionStrategy::Staged) {
       // Otherwise, always fallback to the staged strategy.
-      auto strategy = StagedReductionStrategy::create(
-          op->getContext(), captures, reductionConfig);
+      StagedReductionStrategy strategy(captures, reductionConfig);
       return buildStagedReductionStrategy(b, variant, strategy);
     } else {
       return llvm_unreachable("Unknown strategy");

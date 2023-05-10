@@ -8,9 +8,9 @@
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
 
 #include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractGemmLikeStrategy.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -18,7 +18,36 @@ namespace mlir {
 namespace iree_compiler {
 namespace gpu {
 
-struct AbstractReductionStrategy;
+//===----------------------------------------------------------------------===//
+// Base quantities generally useful for all GPU strategies.
+//===----------------------------------------------------------------------===//
+inline Attribute threadX(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimX);
+}
+inline Attribute threadY(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimY);
+}
+inline Attribute threadZ(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimZ);
+}
+inline Attribute warpX(MLIRContext *ctx) {
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimX);
+}
+inline Attribute warpY(MLIRContext *ctx) {
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimY);
+}
+inline Attribute warpZ(MLIRContext *ctx) {
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimZ);
+}
+inline Attribute linearIdX(MLIRContext *ctx) {
+  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimX);
+}
+inline Attribute linearIdY(MLIRContext *ctx) {
+  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimY);
+}
+inline Attribute linearIdZ(MLIRContext *ctx) {
+  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimZ);
+}
 
 //===----------------------------------------------------------------------===//
 // General helpers.
@@ -61,8 +90,8 @@ Value buildDistributeVectors(ImplicitLocOpBuilder& b, Value variantH,
 // TODO: abstract away AbstractReductionStrategy, this is supposed to be
 // retargetable.
 std::pair<Value, Value> buildCommonTrailingStrategy(
-    ImplicitLocOpBuilder& b, Value variantH,
-    const AbstractReductionStrategy& strategy);
+    ImplicitLocOpBuilder &b, Value variantH,
+    ArrayRef<int64_t> numThreadsInBlock);
 
 //===----------------------------------------------------------------------===//
 // Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
@@ -152,6 +181,20 @@ Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH);
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
+/// Structure to hold a summary of HW-derived properties to configure the
+/// reduction strategy.
+/// The objective of this struct is to act as a minimal summary of key
+/// properties derived from the hardware (e.g. by an oracle) and that are
+/// sufficient to steer the strategy to produce a good version.
+/// These can be thought of as latent variables or embeddings that directly
+/// control the strategy and can be derived from the hardware by some procedure.
+enum class ReductionStrategy { Small, Staged };
+struct ReductionConfig {
+  int64_t maxNumThreads;
+  int64_t vectorSize;
+  ReductionStrategy strategy;
+};
+
 /// Placeholder for some hardware model proxy that contains relevant information
 /// to configure the reduction strategy. In the future, this will need to be
 /// driven by some contract with the runtime.

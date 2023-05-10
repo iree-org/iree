@@ -8,7 +8,6 @@
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_ABSTRACT_GEMM_LIKE_STRATEGY_H_
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractGpuStrategy.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 namespace llvm {
@@ -21,10 +20,8 @@ namespace gpu {
 
 struct GPUModel;
 
-using iree_compiler::gpu::StrategyBase;
-
-struct AbstractGemmLikeStrategy : StrategyBase {
-  AbstractGemmLikeStrategy(MLIRContext *context) : StrategyBase(context) {}
+struct AbstractGemmLikeStrategy {
+  AbstractGemmLikeStrategy() {}
 
   virtual ~AbstractGemmLikeStrategy();
 
