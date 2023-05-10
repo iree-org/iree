@@ -68,9 +68,25 @@ struct ConvertTensorExtractPattern
     if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
-
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
         op, op.getResult().getType(), op.getTensor(), op.getIndices());
+    return success();
+  }
+};
+
+struct ConvertTensorBitcastPattern
+    : public OpRewritePattern<tensor::BitcastOp> {
+  using OpRewritePattern<tensor::BitcastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::BitcastOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
+        op.getLoc(), op.getOperand(), rewriter);
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, op.getResult().getType(), op.getOperand(), dynamicDims,
+        dynamicDims);
     return success();
   }
 };
@@ -226,12 +242,13 @@ struct ConvertLinalgFillPattern final
 
 void populateTensorToFlowConversionPatterns(MLIRContext *context,
                                             RewritePatternSet &patterns) {
-  patterns.insert<ConvertLinalgFillPattern, ConvertTensorCastPattern,
-                  ConvertTensorExtractPattern, ConvertTensorExtractSlicePattern,
-                  ConvertTensorInsertSlicePattern, ConvertTensorInsertPattern,
-                  ConvertTensorFromElementsPattern,
-                  ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
-                  ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
+  patterns
+      .insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
+              ConvertTensorCastPattern, ConvertTensorExtractPattern,
+              ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
+              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern,
+              ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
+              ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
 
 }  // namespace Flow

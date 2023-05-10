@@ -1435,12 +1435,21 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 
 LogicalResult TensorReshapeOp::verify() {
+  // The element types don't need to match but the bit widths need to.
+  auto sourceType = getSource().getType().cast<ShapedType>();
+  auto resultType = getResult().getType().cast<ShapedType>();
+  if (sourceType.getElementTypeBitWidth() !=
+      resultType.getElementTypeBitWidth()) {
+    return emitOpError() << "element bit widths must match";
+  }
+
   if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
                                  getSourceDims())) ||
       failed(verifyOpDynamicDims(getOperation(), {getResult()},
                                  {getResultDims()}))) {
     return failure();
   }
+
   return success();
 }
 
