@@ -17,21 +17,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-namespace {
-
-struct RemoveBitcastOptimization : public OpRewritePattern<tensor::BitcastOp> {
-  using OpRewritePattern<tensor::BitcastOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::BitcastOp op,
-                                PatternRewriter &rewriter) const override {
-    Value input = op.getSource();
-    rewriter.replaceOp(op, input);
-    return success();
-  }
-};
-
-}  // namespace
-
 void populateStandardConstantToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
     TypeConverter &typeConverter, RewritePatternSet &patterns);
@@ -56,7 +41,6 @@ void populateStandardToStreamConversionPatterns(
                                            typeConverter, patterns);
   populateStandardStructuralToStreamPatterns(context, conversionTarget,
                                              typeConverter, patterns);
-  patterns.insert<RemoveBitcastOptimization>(context);
 }
 
 }  // namespace iree_compiler
