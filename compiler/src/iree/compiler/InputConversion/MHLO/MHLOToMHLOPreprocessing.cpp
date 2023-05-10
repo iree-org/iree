@@ -390,9 +390,9 @@ class TransposeReshapeGenericDotGeneral
         rhsContractionBase + rhsContractingDims.size();
 
     lhs = ReshapeIfNonStandard(rewriter, op.getLoc(), lhs,
-                              lhsBatchingDims.size(), lhsContractionBase);
+                               lhsBatchingDims.size(), lhsContractionBase);
     rhs = ReshapeIfNonStandard(rewriter, op.getLoc(), rhs,
-                              rhsBatchingDims.size(), numRhsContractionDims);
+                               rhsBatchingDims.size(), numRhsContractionDims);
 
     if (lhs == op.getLhs() && rhs == op.getRhs())
       return rewriter.notifyMatchFailure(op, "already in canonical form");
