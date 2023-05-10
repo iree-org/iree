@@ -108,6 +108,9 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     context->getLoadedDialect<tensor::TensorDialect>()
         ->getCanonicalizationPatterns(patterns);
     tensor::PadOp::getCanonicalizationPatterns(patterns, context);
+    // Fold multiple tensor.extract_slice ops into a single one. They will be
+    // unfolded back later in the pipeline.
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
       return signalPassFailure();
