@@ -70,7 +70,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo_experimental"
+    "--iree-input-type=stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -134,7 +134,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo_experimental"
+    "--iree-input-type=stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -196,7 +196,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "vulkan"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo_experimental"
+    "--iree-input-type=stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -260,7 +260,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo_experimental"
+    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-cpu-features=host"
   LABELS
     "hostonly"

@@ -59,7 +59,7 @@ void buildIREEVMTransformPassPipeline(
     case InputDialectOptions::Type::xla:
       MHLO::buildXLAInputConversionPassPipeline(passManager);
       break;
-    case InputDialectOptions::Type::stablehlo_experimental:
+    case InputDialectOptions::Type::stablehlo:
       stablehlo::buildStableHLOInputConversionPassPipeline(passManager);
       break;
 #endif  // IREE_HAVE_MHLO_INPUT
