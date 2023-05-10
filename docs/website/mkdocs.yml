@@ -117,7 +117,6 @@ nav:
   - "Building from source":
       - "building-from-source/index.md"
       - "building-from-source/getting-started.md"
-      - "building-from-source/python-bindings-and-importers.md"
       - "building-from-source/android.md"
       - "building-from-source/ios.md"
       - "building-from-source/riscv.md"

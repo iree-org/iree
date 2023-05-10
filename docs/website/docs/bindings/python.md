@@ -22,9 +22,9 @@ components:
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-!!! Caution
-    The TensorFlow, TensorFlow Lite, and XLA packages are currently only
-    available on Linux and macOS. They are not available on Windows yet (see
+!!! Caution "Caution - Operating system support"
+    Packages are currently only available on Linux and macOS. They are not
+    available on Windows yet (see
     [this issue](https://github.com/openxla/iree/issues/6417)).
 
 ## Prerequisites
@@ -33,7 +33,7 @@ To use IREE's Python bindings, you will first need to install
 [Python 3](https://www.python.org/downloads/) and
 [pip](https://pip.pypa.io/en/stable/installing/), as needed.
 
-???+ tip
+???+ Tip "Tip - Virtual environments"
     We recommend using virtual environments to manage python packages, such as
     through `venv`
     ([about](https://docs.python.org/3/library/venv.html),
@@ -61,15 +61,6 @@ To use IREE's Python bindings, you will first need to install
         ```
 
     When done, run `deactivate`.
-
-<!-- TODO(??): use setup.py install_requires for any dependencies IREE needs -->
-
-Next, install packages:
-
-``` shell
-python -m pip install --upgrade pip
-python -m pip install numpy absl-py
-```
 
 ## Installing IREE packages
 
@@ -101,11 +92,11 @@ Stable release packages are published to
       iree-tools-xla
     ```
 
-!!! Tip
+!!! Tip "Tip - Nightly releases"
 
-    Nightly packages are also published on
+    Unstable packages are also published nightly on
     [GitHub releases](https://github.com/openxla/iree/releases). To use these,
-    run `pip install` with this extra option:
+    run `pip install` with this option:
 
     ```
     --find-links https://openxla.github.io/iree/pip-release-links.html
@@ -113,7 +104,7 @@ Stable release packages are published to
 
 ### Building from source
 
-See [Building Python bindings](../../building-from-source/python-bindings-and-importers/#building-python-bindings)
+See [Building Python bindings](../../building-from-source/getting-started/#python-bindings)
 page for instructions for building from source.
 
 ## Using the Python bindings
