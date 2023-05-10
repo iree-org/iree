@@ -119,7 +119,8 @@ struct TileToScfForAndFuseResult {
 /// Note: fusion is currently unsupported.
 TileToScfForAndFuseResult buildTileFuseToScfFor(
     ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value rootH,
-    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes);
+    ValueRange opsHToFuse, ArrayRef<OpFoldResult> tileSizes,
+    bool canonicalize = true);
 
 /// Result of the combined transform performing tiling, fusion and
 /// distribution to parallel constructs.

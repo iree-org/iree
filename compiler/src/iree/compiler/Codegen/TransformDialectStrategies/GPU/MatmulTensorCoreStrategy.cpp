@@ -221,9 +221,9 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
       buildMatmulStrategyBlockDistribution(b, variantH, strategy);
   // Tile reduction loop.
   SmallVector<int64_t> tileSizes{0, 0, strategy.reductionTileSize};
-  auto tileReductionResult =
-      buildTileFuseToScfFor(b, variantH, matmulH, {},
-                            getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
+  auto tileReductionResult = buildTileFuseToScfFor(
+      b, variantH, matmulH, {}, getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)),
+      /*canonicalize=*/!strategy.alignedRes());
 
   // Step 2. Pad the matmul op.
   // TODO: use captured type information to configure the padding values.
@@ -235,7 +235,16 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
   // Step 3. Hoist the padding of the output operand above the reduction loop.
   // The resulting fillOp will be mapped with the contraction using an SIMD
   // programming model.
-  Value fillOpH = buildHoistOutputPaddingOp(b, variantH, paddedMatmulOpH);
+  Value fillOpH;
+  if (!strategy.alignedRes()) {
+    fillOpH = buildHoistOutputPaddingOp(b, variantH, paddedMatmulOpH);
+  } else {
+    fillOpH = b.create<transform::MatchOp>(variantH,
+                                           linalg::FillOp::getOperationName());
+    ApplyPatternsOpPatterns config;
+    iree_compiler::buildCanonicalizationAndEnablingTransforms(b, config,
+                                                              variantH);
+  }
 
   // Step 4. Distribute pad and copies: SIMT programming model.
   auto [lhsCopyOpH, rhsCopyOpH, copyBackOpH] =

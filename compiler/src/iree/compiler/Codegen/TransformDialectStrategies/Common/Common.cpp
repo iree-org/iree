@@ -157,7 +157,8 @@ mlir::iree_compiler::TileToScfForAndFuseResult
 mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
                                            Value isolatedParentOpH, Value rootH,
                                            ValueRange opsHToFuse,
-                                           ArrayRef<OpFoldResult> tileSizes) {
+                                           ArrayRef<OpFoldResult> tileSizes,
+                                           bool canonicalize) {
   assert(opsHToFuse.empty() && "No fusion supported yet");
   iree_compiler::TileToScfForAndFuseResult result;
   // TODO: Replace by transform::TileToScfForOp and deprecate transform::TileOp.
@@ -165,11 +166,16 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
   result.forLoops = tiletoScfForOp.getLoops();
   result.tiledOpH = tiletoScfForOp.getTiledLinalgOp();
 
-  // Perform a pass of canonicalization + enabling after tiling.
-  ApplyPatternsOpPatterns configuration;
-  isolatedParentOpH =
-      mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
-          b, configuration, isolatedParentOpH);
+  // Perform a pass of canonicalization + enabling after tiling. Currently this
+  // folds away the extract slice on the iterator, breaking padding on aligned
+  // matmuls.
+  // TODO: Make padding less brittle so that this toggle is unnecessary.
+  if (canonicalize) {
+    ApplyPatternsOpPatterns configuration;
+    isolatedParentOpH =
+        mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
+            b, configuration, isolatedParentOpH);
+  }
   return result;
 }
 
