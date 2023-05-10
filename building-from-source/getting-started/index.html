@@ -14,7 +14,7 @@
         <link rel="prev" href="../">
       
       
-        <link rel="next" href="../python-bindings-and-importers/">
+        <link rel="next" href="../android/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.11">
@@ -644,8 +644,6 @@
         
           
         
-          
-        
       
       
         
@@ -709,36 +707,36 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#quickstart-clone-and-build" class="md-nav__link">
-    Quickstart: clone and build
+     Quickstart: clone and build
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#configuration-settings" class="md-nav__link">
-    Configuration settings
+     Configuration settings
   </a>
   
-    <nav class="md-nav" aria-label="Configuration settings">
+    <nav class="md-nav" aria-label=" Configuration settings">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#optional-components" class="md-nav__link">
-    Optional components
+     Optional components
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#extensions-and-project-integrations" class="md-nav__link">
-    Extensions and project integrations
+  <a href="#extensions-and-integrations" class="md-nav__link">
+    Extensions and integrations
   </a>
   
 </li>
@@ -750,10 +748,10 @@
       
         <li class="md-nav__item">
   <a href="#tests-and-samples" class="md-nav__link">
-    Tests and samples
+     Tests and samples
   </a>
   
-    <nav class="md-nav" aria-label="Tests and samples">
+    <nav class="md-nav" aria-label=" Tests and samples">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -775,24 +773,44 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#python-bindings" class="md-nav__link">
+     Python bindings
+  </a>
+  
+    <nav class="md-nav" aria-label=" Python bindings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    Dependencies
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-with-cmake" class="md-nav__link">
+    Building with CMake
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-python-bindings" class="md-nav__link">
+    Using the Python bindings
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
       
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../python-bindings-and-importers/" class="md-nav__link">
-        Python bindings and importers
-      </a>
     </li>
   
 
@@ -1237,36 +1255,36 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#quickstart-clone-and-build" class="md-nav__link">
-    Quickstart: clone and build
+     Quickstart: clone and build
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#configuration-settings" class="md-nav__link">
-    Configuration settings
+     Configuration settings
   </a>
   
-    <nav class="md-nav" aria-label="Configuration settings">
+    <nav class="md-nav" aria-label=" Configuration settings">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#optional-components" class="md-nav__link">
-    Optional components
+     Optional components
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#extensions-and-project-integrations" class="md-nav__link">
-    Extensions and project integrations
+  <a href="#extensions-and-integrations" class="md-nav__link">
+    Extensions and integrations
   </a>
   
 </li>
@@ -1278,10 +1296,10 @@
       
         <li class="md-nav__item">
   <a href="#tests-and-samples" class="md-nav__link">
-    Tests and samples
+     Tests and samples
   </a>
   
-    <nav class="md-nav" aria-label="Tests and samples">
+    <nav class="md-nav" aria-label=" Tests and samples">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1294,6 +1312,40 @@
           <li class="md-nav__item">
   <a href="#running-samples" class="md-nav__link">
     Running samples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#python-bindings" class="md-nav__link">
+     Python bindings
+  </a>
+  
+    <nav class="md-nav" aria-label=" Python bindings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    Dependencies
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-with-cmake" class="md-nav__link">
+    Building with CMake
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-the-python-bindings" class="md-nav__link">
+    Using the Python bindings
   </a>
   
 </li>
@@ -1322,7 +1374,7 @@
 
 
 <h1 id="getting-started">Getting started<a class="headerlink" href="#getting-started" title="Permanent link">link</a></h1>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
+<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>IREE can be built from source using <a href="https://cmake.org/">CMake</a>. We also
 recommend the <a href="https://ninja-build.org/">Ninja</a> CMake generator and the
 <a href="https://clang.llvm.org/">clang</a> or MSVC C/C++ compilers.</p>
@@ -1390,7 +1442,7 @@ for details.</p>
 </div>
 <!-- TODO(#12921): add notes about Docker and/or dev containers  -->
 
-<h2 id="quickstart-clone-and-build">Quickstart: clone and build<a class="headerlink" href="#quickstart-clone-and-build" title="Permanent link">link</a></h2>
+<h2 id="quickstart-clone-and-build"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.752 8.752 0 0 1-2.564 6.186l-.458.459c-.314.314-.641.616-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.749.749 0 0 1-1.11-.418l-.954-3.102a1.214 1.214 0 0 1-.145-.125L3.754 9.816a1.218 1.218 0 0 1-.124-.145L.528 8.717a.749.749 0 0 1-.418-1.11l1.71-2.774A1.748 1.748 0 0 1 3.31 4h3.204c.288-.338.59-.665.904-.979l.459-.458A8.749 8.749 0 0 1 14.064 0ZM8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.249 7.249 0 0 0-5.125 2.123ZM3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.234.234 0 0 1-.201-.064.234.234 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12Zm6.94-3.935c-.088.06-.177.118-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766c.058-.09.117-.178.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg></span> Quickstart: clone and build<a class="headerlink" href="#quickstart-clone-and-build" title="Permanent link">link</a></h2>
 <p>Use <a href="https://git-scm.com/">Git</a> to clone the IREE repository and initialize its
 submodules:</p>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/openxla/iree.git
@@ -1412,7 +1464,7 @@ around 5-10 minutes on 64-core Linux machines.</p>
 <p>Use case permitting, disabling the compiler build with
 <code>-DIREE_BUILD_COMPILER=OFF</code> will drastically simplify the build.</p>
 </div>
-<h2 id="configuration-settings">Configuration settings<a class="headerlink" href="#configuration-settings" title="Permanent link">link</a></h2>
+<h2 id="configuration-settings"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75Zm-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5H6.5Zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5h6ZM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8Zm-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0v-2Zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75Z"/></svg></span> Configuration settings<a class="headerlink" href="#configuration-settings" title="Permanent link">link</a></h2>
 <p>The configure step should be customized for your build environment. These
 settings can improve compile and link times substantially.</p>
 <!-- TODO(#5804): add notes about CMake presets?  -->
@@ -1470,7 +1522,7 @@ when rebuilding the compiler. To use it, configure CMake with:</p>
 </code></pre></div>
 <p>See also our <a href="https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/ccache.md">developer documentation for ccache</a>.</p>
 </details>
-<h3 id="optional-components">Optional components<a class="headerlink" href="#optional-components" title="Permanent link">link</a></h3>
+<h3 id="optional-components"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8.2 8.2 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63.27.385.506.792.704 1.218.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294.016.257.016.515 0 .772-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a7.977 7.977 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a5.909 5.909 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8.006 8.006 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a5.738 5.738 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8.12 8.12 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6.214 6.214 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a7.92 7.92 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071.214-.143.437-.272.668-.386.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03 7.53.01 7.764 0 8 0Zm-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189-.173.086-.34.183-.5.29-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045-.22.312-.412.644-.573.99-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a4.709 4.709 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19.162.346.353.677.573.989.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27.161.107.328.204.501.29.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189.173-.086.34-.183.5-.29.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045.22-.313.411-.644.573-.99.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a4.709 4.709 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.464 6.464 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.44 4.44 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8Z"/></svg></span> Optional components<a class="headerlink" href="#optional-components" title="Permanent link">link</a></h3>
 <p>By default, the CMake build includes:</p>
 <ul>
 <li>All compiler targets (<code>llvm-cpu</code>, <code>cuda</code>, <code>vulkan-spirv</code>, etc.)</li>
@@ -1486,13 +1538,13 @@ when rebuilding the compiler. To use it, configure CMake with:</p>
 </ul>
 <p>These can be changed via the <code>IREE_</code> CMake options listed in the root
 <a href="https://github.com/openxla/iree/blob/main/CMakeLists.txt"><code>CMakeLists.txt</code></a>.</p>
-<h3 id="extensions-and-project-integrations">Extensions and project integrations<a class="headerlink" href="#extensions-and-project-integrations" title="Permanent link">link</a></h3>
+<h3 id="extensions-and-integrations">Extensions and integrations<a class="headerlink" href="#extensions-and-integrations" title="Permanent link">link</a></h3>
 <p>When using IREE within other projects, you can register compiler plugins and
 runtime HAL drivers. You can also bring your own copy of LLVM and some other
 tools. See the root
 <a href="https://github.com/openxla/iree/blob/main/CMakeLists.txt"><code>CMakeLists.txt</code></a>
 for details.</p>
-<h2 id="tests-and-samples">Tests and samples<a class="headerlink" href="#tests-and-samples" title="Permanent link">link</a></h2>
+<h2 id="tests-and-samples"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Tests and samples<a class="headerlink" href="#tests-and-samples" title="Permanent link">link</a></h2>
 <h3 id="running-tests">Running tests<a class="headerlink" href="#running-tests" title="Permanent link">link</a></h3>
 <p>Tests are run via <a href="https://cmake.org/cmake/help/latest/manual/ctest.1.html">ctest</a>.
 To build and run the core project tests:</p>
@@ -1551,6 +1603,126 @@ cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
 ls<span class="w"> </span>../iree-build/tools/
 ../iree-build/tools/iree-compile<span class="w"> </span>--help
 ../iree-build/tools/iree-run-module<span class="w"> </span>--help
+</code></pre></div>
+<h2 id="python-bindings"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg></span> Python bindings<a class="headerlink" href="#python-bindings" title="Permanent link">link</a></h2>
+<p>Python packages can either be built from source or installed from our releases.
+See the <a href="../../bindings/python/">Python bindings</a> page for details about the
+bindings themselves.</p>
+<h3 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">link</a></h3>
+<p>You will need a recent Python installation &gt;=3.8 (we aim to support
+<a href="https://endoflife.date/python">non-eol Python versions</a>).</p>
+<details class="tip" open="open">
+<summary>Tip - Managing Python versions</summary>
+<p>Make sure your 'python' is what you expect:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:3"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Linux</label><label for="__tabbed_3_2">macOS</label><label for="__tabbed_3_3">Windows</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Note that on multi-python systems, this may have a version suffix, and on
+many Linuxes where python2 and python3 can co-exist, you may also want to
+use <code>python3</code>.</p>
+<div class="highlight"><pre><span></span><code>which<span class="w"> </span>python
+python<span class="w"> </span>--version
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Note that on multi-python systems, this may have a version suffix, and on
+macOS where python2 and python3 can co-exist, you may also want to use <code>python3</code>.</p>
+<div class="highlight"><pre><span></span><code>which<span class="w"> </span>python
+python<span class="w"> </span>--version
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>The
+<a href="https://docs.python.org/3/using/windows.html#python-launcher-for-windows">Python launcher for Windows</a> (<code>py</code>) can help manage versions.</p>
+<div class="highlight"><pre><span></span><code><span class="n">which</span> <span class="n">python</span>
+<span class="n">python</span> <span class="p">-</span><span class="n">-version</span>
+<span class="n">py</span> <span class="p">-</span><span class="n">-list-paths</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+</details>
+<details class="tip" open="open">
+<summary>Tip - Virtual environments</summary>
+<p>We recommend using virtual environments to manage python packages, such as
+through <code>venv</code>
+(<a href="https://docs.python.org/3/library/venv.html">about</a>,
+<a href="https://docs.python.org/3/tutorial/venv.html">tutorial</a>):</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="4:3"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><input id="__tabbed_4_3" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Linux</label><label for="__tabbed_4_2">macOS</label><label for="__tabbed_4_3">Windows</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="n">python</span> <span class="n">-m</span> <span class="n">venv</span> <span class="p">.</span><span class="n">venv</span>
+<span class="p">.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">activate</span><span class="p">.</span><span class="n">bat</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<p>When done, run <code>deactivate</code>.</p>
+</details>
+<div class="highlight"><pre><span></span><code><span class="c1"># Upgrade PIP before installing other requirements</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
+
+<span class="c1"># Install IREE build requirements</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>runtime/bindings/python/iree/runtime/build_requirements.txt
+</code></pre></div>
+<h3 id="building-with-cmake">Building with CMake<a class="headerlink" href="#building-with-cmake" title="Permanent link">link</a></h3>
+<p>To build the Python bindings, configure CMake with the
+<code>IREE_BUILD_PYTHON_BINDINGS</code> option. We also recommend explicitly setting which
+Python executable to use with <code>Python3_EXECUTABLE</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Configure (including other options as discussed above)</span>
+cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_BUILD_PYTHON_BINDINGS<span class="o">=</span>ON<span class="w">  </span><span class="se">\</span>
+<span class="w">  </span>-DPython3_EXECUTABLE<span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>which<span class="w"> </span>python<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>.
+
+<span class="c1"># Build</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
+</code></pre></div>
+<h3 id="using-the-python-bindings">Using the Python bindings<a class="headerlink" href="#using-the-python-bindings" title="Permanent link">link</a></h3>
+<p>Extend your <code>PYTHONPATH</code> with IREE's <code>bindings/python</code> paths and try importing:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="5:3"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><input id="__tabbed_5_3" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Linux</label><label for="__tabbed_5_2">macOS</label><label for="__tabbed_5_3">Windows</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>../iree-build/.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">export</span><span class="w"> </span>PYTHONPATH
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler&quot;</span>
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.runtime&quot;</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>../iree-build/.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">export</span><span class="w"> </span>PYTHONPATH
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler&quot;</span>
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.runtime&quot;</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="p">../</span><span class="n">iree-build</span><span class="p">/.</span><span class="n">env</span><span class="p">.</span><span class="n">bat</span>
+<span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import iree.compiler&quot;</span>
+<span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import iree.runtime&quot;</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<p>Using IREE's ML framework importers requires a few extra steps:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Install test requirements</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>integrations/tensorflow/test/requirements.txt
+
+<span class="c1"># Install pure Python packages (no build required)</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>integrations/tensorflow/python_projects/iree_tf
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>integrations/tensorflow/python_projects/iree_tflite
+
+<span class="c1"># Then test the tools:</span>
+iree-import-tf<span class="w"> </span>--help
+iree-import-tflite<span class="w"> </span>--help
 </code></pre></div>
 
 

@@ -66,11 +66,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://openxla.github.io/iree/building-from-source/python-bindings-and-importers/</loc>
-         <lastmod>2023-05-10</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://openxla.github.io/iree/building-from-source/riscv/</loc>
          <lastmod>2023-05-10</lastmod>
          <changefreq>daily</changefreq>
