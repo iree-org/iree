@@ -292,10 +292,12 @@ class TransposeReshapeGenericDotGeneral
         b.getI64TensorAttr(targetOrder));
   }
 
-  Value ReshapeIfMorethan3D(OpBuilder &b, Location loc, Value src,
-                            size_t dimsBorder0, size_t dimsBorder1) const {
+  Value ReshapeIfNonStandard(OpBuilder &b, Location loc, Value src,
+                             size_t dimsBorder0, size_t dimsBorder1, int64_t parallel_dim) const {
+    if (dimsBorder0 <= 1 && dimsBorder1 - dimsBorder0 <= 1 &&
+        shape.size() - dimsBorder1 <= 1)
+      return src;
     auto type = src.getType().cast<RankedTensorType>();
-    if (type.getRank() <= 3) return src;
     auto shape = type.getShape();
     SmallVector<int64_t, 4> result_shape = {
         std::accumulate(shape.begin(), shape.begin() + dimsBorder0, 1,
