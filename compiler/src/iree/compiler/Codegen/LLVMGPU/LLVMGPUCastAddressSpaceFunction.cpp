@@ -1,16 +1,15 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
-#include <iree/compiler/Codegen/Utils/GPUUtils.h>
 
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/None.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
