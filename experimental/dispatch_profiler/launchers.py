@@ -17,7 +17,8 @@ class IreeToolsLauncher:
   def __init__(self, args, operation):
     self.operation = operation
 
-    self.generated_path = Path(args.build_dir, 'generated', args.mlir_dialect)
+    self.generated_path = Path(args.generated_dir, 'generated',
+                               args.mlir_dialect)
 
     self.args = args
     self.benchmark_dispatch_repeat_count = args.batch_size
@@ -31,7 +32,7 @@ class IreeToolsLauncher:
         operation.name()).with_suffix(".mlir")
 
     # path to cached numpy refernece input and expected output files.
-    self.op_reference_cache_path = Path(args.build_dir, 'generated',
+    self.op_reference_cache_path = Path(args.generated_dir, 'generated',
                                         'reference_cache', operation.name())
 
     if not self.op_reference_cache_path.exists():
