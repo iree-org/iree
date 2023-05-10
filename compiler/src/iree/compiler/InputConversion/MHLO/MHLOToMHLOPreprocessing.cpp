@@ -293,7 +293,7 @@ class TransposeReshapeGenericDotGeneral
   }
 
   Value ReshapeIfNonStandard(OpBuilder &b, Location loc, Value src,
-                             size_t dimsBorder0, size_t dimsBorder1, int64_t parallel_dim) const {
+                             size_t dimsBorder0, size_t dimsBorder1) const {
     if (dimsBorder0 <= 1 && dimsBorder1 - dimsBorder0 <= 1 &&
         shape.size() - dimsBorder1 <= 1)
       return src;
