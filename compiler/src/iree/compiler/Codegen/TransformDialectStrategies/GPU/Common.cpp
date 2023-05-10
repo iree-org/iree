@@ -826,15 +826,8 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
-  // TODO: Capture in the matcher.
-  captures.lhsType =
-      getElementTypeOrSelf(op.getDpsInputOperand(0)->get().getType());
-  captures.rhsType =
-      getElementTypeOrSelf(op.getDpsInputOperand(1)->get().getType());
-  captures.outputType =
-      getElementTypeOrSelf(op.getDpsInitOperand(0)->get().getType());
-  if (!captures.lhsType.isF32() || !captures.rhsType.isF32() ||
-      !captures.outputType.isF32()) {
+  if (!captures.lhsElementType.isF32() || !captures.rhsElementType.isF32() ||
+      !captures.outputElementType.isF32()) {
     LDBG("--Matmul strategy elemental type check failed\n");
     return failure();
   }

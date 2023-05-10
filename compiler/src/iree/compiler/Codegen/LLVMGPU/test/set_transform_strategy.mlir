@@ -261,15 +261,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK-NOT: transform.sequence
 
 // -----
-hal.executable @matmul_parially_unaligned {
+hal.executable @matmul_partially_unaligned {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
-  hal.executable.export public @matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  hal.executable.export public @matmul_partially_unaligned ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
-    func.func @matmul_parially_unaligned() {
+    func.func @matmul_partially_unaligned() {
       %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x2044xf32>>
@@ -287,11 +287,44 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 }
 
-// CHECK-LABEL: func @matmul_parially_unaligned
+// CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
+// CHECK-LABEL: func @matmul_partially_unaligned
 
 // "Enough" of this matmul's dimensions are divisible by 64/64/16.
 // We currently bail on such cases because at least one of the paddings involved
 // in the strategy fold away and result in the strategy failing to apply.
 // In the future we should also support this case but for now we are missing the
 // generalization along this axis.
+// CHECK-NOT: transform.sequence
+
+// -----
+
+hal.executable @f16_matmul {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.export public @f16_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @f16_matmul() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f16
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2052x2556xf16>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2556x2052xf16>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2052x2052xf16>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2052, 2556], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2052x2556xf16>> -> tensor<2052x2556xf16>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2556, 2052], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2556x2052xf16>> -> tensor<2556x2052xf16>
+      %5 = tensor.empty() : tensor<2052x2052xf16>
+      %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2052x2052xf16>) -> tensor<2052x2052xf16>
+      %7 = linalg.matmul ins(%3, %4 : tensor<2052x2556xf16>, tensor<2556x2052xf16>) outs(%6 : tensor<2052x2052xf16>) -> tensor<2052x2052xf16>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2052, 2052], strides = [1, 1] : tensor<2052x2052xf16> -> !flow.dispatch.tensor<writeonly:tensor<2052x2052xf16>>
+      return
+    }
+  }
+}
+}
+
+// CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
+// CHECK-LABEL: func @f16_matmul
 // CHECK-NOT: transform.sequence
