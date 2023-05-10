@@ -77,21 +77,40 @@ iree_status_t iree_hal_mpi_library_load(
 //===----------------------------------------------------------------------===//
 
 // We convert MPI_SUCCESS to IREE_STATUS_SUCCESS, and MPI errors to
-// IREE_STATUS_INTERNAL and print the MPI error code.
-//
-// TODO(cascaval): use MPI_Error to print the actual error or consider
-// mapping to other error codes.
+// IREE_STATUS_INTERNAL and retrieve the error string from the MPI library.
 iree_status_t iree_hal_mpi_result_to_status(
     iree_hal_mpi_dynamic_symbols_t* syms, int result, const char* file,
     uint32_t line) {
-  iree_status_code_t code;
-  switch (result) {
-    case 0:  // MPI_SUCCESS
-      return iree_ok_status();
-    default:
-      code = IREE_STATUS_INTERNAL;
-      break;
+  // The MPI spec mandates MPI_SUCCESS == 0, all the other errors are
+  // implementation dependent. However, since we already depend on OpenMPI
+  // for implementation dependent handles, we can hardcode the error classes
+  // as well.
+  const int MPI_SUCCESS = 0;
+  const int MPI_ERR_UNKNOWN = 14;
+#define MPI_MAX_ERROR_STRING 256
+
+  if (IREE_LIKELY(result == MPI_SUCCESS)) {
+    return iree_ok_status();
   }
-  return iree_make_status_with_location(file, line, code, "MPI error %d",
-                                        result);
+
+  if (!syms) {
+    return iree_make_status_with_location(file, line, IREE_STATUS_INTERNAL,
+                                          "MPI library symbols not loaded");
+  }
+
+  char error_string[MPI_MAX_ERROR_STRING];
+  int error_len = 0;
+  if (syms->MPI_Error_string(result, error_string, &error_len) != MPI_SUCCESS) {
+    // if you can't say something nice, say nothing at all
+    error_string[0] = '\0';
+  }
+
+  int error_class = 0;
+  if (syms->MPI_Error_class(result, &error_class) != MPI_SUCCESS) {
+    error_class = MPI_ERR_UNKNOWN;
+  }
+
+  return iree_make_status_with_location(
+      file, line, IREE_STATUS_INTERNAL, "MPI error '%d' (class %d): %.*s",
+      result, error_class, error_len, error_string);
 }

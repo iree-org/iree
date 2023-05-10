@@ -38,9 +38,10 @@ namespace IREE {
 namespace LinalgExt {
 class LinalgExtTransformOpsExtension
     : public transform::TransformDialectExtension<
-          LinalgExtTransformOpsExtension, IREELinalgExtDialect> {
+          LinalgExtTransformOpsExtension> {
 public:
   LinalgExtTransformOpsExtension();
+  void init();
 };
 } // namespace LinalgExt
 } // namespace IREE

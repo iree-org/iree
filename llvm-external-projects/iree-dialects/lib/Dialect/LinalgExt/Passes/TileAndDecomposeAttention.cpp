@@ -157,11 +157,10 @@ static Value computeQKTranspose(Value query, Value key, Value output,
 static std::tuple<Value, Value, Value, Value>
 extractSlices(Value key, Value value, Value query, Value output,
               ArrayRef<int64_t> queryShape, ArrayRef<Value> ivs,
-              OpFoldResult sequenceTileLength, Type elementType, Location loc,
-              OpBuilder &builder) {
+              OpFoldResult sequenceTileLength, OpFoldResult headDimension,
+              Type elementType, Location loc, OpBuilder &builder) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
-  auto headDimension = builder.getIndexAttr(queryShape.back());
   SmallVector<OpFoldResult> strides(queryShape.size(), one);
   SmallVector<OpFoldResult> sizes(queryShape.size(), one);
   SmallVector<OpFoldResult> offsets(queryShape.size(), zero);
@@ -188,11 +187,10 @@ extractSlices(Value key, Value value, Value query, Value output,
 static std::tuple<Value, Value, Value>
 insertSlices(Value newResult, Value result, Value newMax, Value max,
              Value newSum, Value sum, ArrayRef<int64_t> queryShape,
-             ArrayRef<Value> ivs, OpFoldResult sequenceTileLength, Location loc,
-             OpBuilder &builder) {
+             ArrayRef<Value> ivs, OpFoldResult sequenceTileLength,
+             OpFoldResult headDimension, Location loc, OpBuilder &builder) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
-  auto headDimension = builder.getIndexAttr(queryShape.back());
   SmallVector<OpFoldResult> strides(queryShape.size(), one);
   SmallVector<OpFoldResult> sizes(queryShape.size(), one);
   SmallVector<OpFoldResult> offsets(queryShape.size(), zero);
@@ -338,9 +336,9 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   rewriter.setInsertionPointToStart(secondLoopNest.loops.back().getBody());
 
   // Extract slices
-  auto [keySlice, valueSlice, querySlice, outputSlice] =
-      extractSlices(key, value, query, iterArgResult, queryShape, ivs,
-                    sequenceTileLength, elementType, loc, rewriter);
+  auto [keySlice, valueSlice, querySlice, outputSlice] = extractSlices(
+      key, value, query, iterArgResult, queryShape, ivs, sequenceTileLength,
+      headDimension, elementType, loc, rewriter);
 
   // Create body of innermost loop
   auto [result, newMax, newSum] = createAttentionBody(
@@ -350,7 +348,7 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   // Insert slices
   auto [updatedAcc, updatedMax, updatedSum] = insertSlices(
       result, iterArgResult, newMax, iterArgMax, newSum, iterArgSum, queryShape,
-      ivs, sequenceTileLength, loc, rewriter);
+      ivs, sequenceTileLength, headDimension, loc, rewriter);
 
   if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
           secondLoopNest.loops.back().getBody()->getTerminator())) {

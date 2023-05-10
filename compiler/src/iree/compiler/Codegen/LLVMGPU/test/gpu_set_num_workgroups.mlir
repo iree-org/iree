@@ -831,3 +831,57 @@ hal.executable @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 {
 //      CHECK: func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+
+hal.executable public @_main_dispatch_15 {
+  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+    hal.executable.export public @_main_dispatch_15_generic_512x4x42x42x64_f32 ordinal(0) layout(#hal.pipeline.layout<push_constants = 3, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @_main_dispatch_15_generic_512x4x42x42x64_f32() {
+        %cst = arith.constant 1.250000e-01 : f32
+        %cst_0 = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = arith.index_castui %0 {stream.alignment = 64 : index, stream.values = [35524672 : index, 240930880 : index, 446337088 : index, 651743296 : index]} : i32 to index
+        %4 = arith.index_castui %1 {stream.alignment = 64 : index, stream.values = [57544768 : index, 262950976 : index, 468357184 : index, 673763392 : index]} : i32 to index
+        %5 = arith.index_castui %2 {stream.alignment = 64 : index, stream.values = [1728 : index, 36472832 : index, 72943744 : index, 109415936 : index]} : i32 to index
+        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>>
+        %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%4) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>>
+        %8 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<512x4x42x42xf32>>
+        %9 = flow.dispatch.tensor.load %6, offsets = [0, 0, 0, 0], sizes = [512, 42, 4, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>> -> tensor<512x42x4x64xf32>
+        %10 = flow.dispatch.tensor.load %7, offsets = [0, 0, 0, 0], sizes = [512, 42, 4, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<512x42x4x64xf32>> -> tensor<512x42x4x64xf32>
+        %11 = tensor.empty() : tensor<512x4x42x42xf32>
+        %12 = linalg.fill ins(%cst_0 : f32) outs(%11 : tensor<512x4x42x42xf32>) -> tensor<512x4x42x42xf32>
+        %13 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%9, %10 : tensor<512x42x4x64xf32>, tensor<512x42x4x64xf32>) outs(%12 : tensor<512x4x42x42xf32>) {
+        ^bb0(%in: f32, %in_1: f32, %out: f32):
+          %15 = arith.mulf %in, %in_1 : f32
+          %16 = arith.addf %out, %15 : f32
+          linalg.yield %16 : f32
+        } -> tensor<512x4x42x42xf32>
+        %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%13 : tensor<512x4x42x42xf32>) outs(%11 : tensor<512x4x42x42xf32>) {
+        ^bb0(%in: f32, %out: f32):
+          %15 = arith.mulf %in, %cst : f32
+          linalg.yield %15 : f32
+        } -> tensor<512x4x42x42xf32>
+        flow.dispatch.tensor.store %14, %8, offsets = [0, 0, 0, 0], sizes = [512, 4, 42, 42], strides = [1, 1, 1, 1] : tensor<512x4x42x42xf32> -> !flow.dispatch.tensor<writeonly:tensor<512x4x42x42xf32>>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-DAG:  #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 32, 128, 32]{{\]}}
+//   CHECK-DAG:  #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
+//       CHECK:  hal.executable.export public @_main_dispatch_15_generic_512x4x42x42x64_f32
+//  CHECK-SAME:    translation_info = #[[TRANSLATION]]
+//       CHECK:  linalg.fill
+//  CHECK-SAME:      lowering_config = #[[CONFIG]]
+//       CHECK:  linalg.generic
+//  CHECK-SAME:      lowering_config = #[[CONFIG]]

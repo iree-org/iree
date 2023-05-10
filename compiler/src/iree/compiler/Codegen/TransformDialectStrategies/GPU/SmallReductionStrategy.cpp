@@ -35,7 +35,7 @@ using transform_ext::MatchCallbackOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::StructuredOpMatcher;
 
-using iree_compiler::gpu::AbstractReductionStrategy;
+using iree_compiler::AbstractReductionStrategy;
 using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
@@ -46,15 +46,19 @@ using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::ReductionConfig;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::gpu::SmallReductionStrategy;
+using iree_compiler::gpu::threadX;
+using iree_compiler::gpu::threadY;
+using iree_compiler::gpu::threadZ;
 
-SmallReductionStrategy mlir::iree_compiler::gpu::SmallReductionStrategy::create(
-    MLIRContext *context,
+mlir::iree_compiler::gpu::SmallReductionStrategy::SmallReductionStrategy(
     const transform_ext::MatchedReductionCaptures &captures,
-    const ReductionConfig &reductionConfig) {
-  SmallReductionStrategy strategy(context, captures);
-  strategy.configure(reductionConfig);
+    const ReductionConfig &reductionConfig)
+    : AbstractReductionStrategy(captures, {}) {
+  configure(reductionConfig);
   LLVM_DEBUG(DBGS() << "use GPU small reduction strategy\n");
-  return strategy;
+  LLVM_DEBUG(llvm::interleaveComma(workgroupTileSizes,
+                                   DBGS() << "--workgroupTileSizes:  ");
+             llvm::dbgs() << "\n");
 }
 
 void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
@@ -97,10 +101,13 @@ void mlir::iree_compiler::gpu::SmallReductionStrategy::configure(
 static void buildSmallReductionStrategyThreadDistribution(
     ImplicitLocOpBuilder &b, Value variantH, Value maybeLeadingH, Value fillH,
     Value reductionH, Value maybeTrailingH,
-    const AbstractReductionStrategy &strategy) {
+    const SmallReductionStrategy &strategy) {
   auto [fusionTargetH, fusionGroupH] =
       iree_compiler::buildSelectFirstNonEmpty(b, maybeTrailingH, reductionH);
-  ArrayRef<Attribute> allThreadsRef(strategy.allThreadAttrs);
+  MLIRContext *ctx = b.getContext();
+  SmallVector<Attribute> threadDimMapping{threadX(ctx), threadY(ctx),
+                                          threadZ(ctx)};
+  threadDimMapping.resize(strategy.workgroupTileSizes.size());
   iree_compiler::TileToForallAndFuseAndDistributeResult tileResult =
       iree_compiler::buildTileFuseDistToForallWithNumThreads(
           /*builder=*/b,
@@ -109,9 +116,7 @@ static void buildSmallReductionStrategyThreadDistribution(
           /*opsToFuseH=*/fusionGroupH,
           /*numThreads=*/
           getAsOpFoldResult(b.getI64ArrayAttr(strategy.workgroupTileSizes)),
-          /*threadDimMapping=*/
-          b.getArrayAttr(
-              allThreadsRef.take_front(strategy.captures.reductionRank - 1)));
+          /*threadDimMapping=*/b.getArrayAttr(threadDimMapping));
   fillH = b.create<FuseIntoContainingOp>(fillH, tileResult.forallH);
   maybeLeadingH =
       b.create<FuseIntoContainingOp>(maybeLeadingH, tileResult.forallH);
@@ -148,17 +153,20 @@ static void buildSmallReductionStrategyThreadDistribution(
       // TODO: capture and generalize mostMinorDim.
       /*mostMinorDim=*/strategy.captures.maybeTrailingRank - 1,
       /*opSizes=*/strategy.captures.trailingOpSizes,
-      /*numThreads=*/strategy.getNumThreadsXInBlock(),
-      /*mappingAttr=*/strategy.allThreadAttrs.front());
+      /*numThreads=*/strategy.workgroupTileSizes[0],
+      /*mappingAttr=*/threadX(ctx));
 }
 
 void mlir::iree_compiler::gpu::buildSmallReductionStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
     const SmallReductionStrategy &strategy) {
   // Step 1. Apply block-level part of the strategy, keeps everything fused.
+  ArrayRef<int64_t> workgroupTileSizes{strategy.workgroupTileSizes};
   auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
         forall] =
-      buildReductionStrategyBlockDistribution(b, variantH, strategy);
+      buildReductionStrategyBlockDistribution(
+          b, variantH,
+          workgroupTileSizes.take_front(strategy.captures.reductionRank - 1));
 
   // Step 2. Apply thread-level part of the strategy, keeps everything fused.
   buildSmallReductionStrategyThreadDistribution(
@@ -166,5 +174,5 @@ void mlir::iree_compiler::gpu::buildSmallReductionStrategy(
       maybeTiledTrailingHBlock, strategy);
 
   // Step 3-4. Common trailing steps.
-  buildCommonTrailingStrategy(b, variantH, strategy);
+  buildCommonTrailingStrategy(b, variantH, strategy.getNumThreadsInBlock());
 }

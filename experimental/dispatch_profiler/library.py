@@ -1,7 +1,13 @@
-import enum
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+import enum, re
 from enum import auto
-import re
 import numpy as np
+from abc import ABC, abstractmethod
 from collections import namedtuple
 
 ###################################################################################################
@@ -48,11 +54,15 @@ GpuArchTypeNames = {
 ###################################################################################################
 class OperationKind(enum.Enum):
   Matmul = auto()
+  BatchMatmul = auto()
+  SplitkMatmul = auto()
   Conv2d = auto()
 
 
 OperationKindNames = {
     OperationKind.Matmul: 'matmul',
+    OperationKind.SplitkMatmul: 'matmul_splitk',
+    OperationKind.BatchMatmul: 'batch_matmul',
     OperationKind.Conv2d: 'conv2d'
 }
 
@@ -201,9 +211,9 @@ TranslationInfoTag = {
 }
 
 TranslationInfoName = {
-    TranslationInfo.LLVMGPUMatmulSIMT: "simt",
+    TranslationInfo.LLVMGPUMatmulSIMT: "simt_ffma",
     TranslationInfo.LLVMGPUMatmulTensorCore: "tensorcore_wmma",
-    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "tensorcore_mma_sync",
+    TranslationInfo.LLVMGPUMatmulTensorCoreMmaSync: "tensorcore_mmasync",
 }
 
 
@@ -303,3 +313,41 @@ def SubstituteTemplate(template, values):
     newtext = re.sub(regex, value, text)
     text = newtext
   return text
+
+
+###################################################################################################
+class ReferenceOpInterface(ABC):
+  """Interface for reference implementations."""
+
+  @abstractmethod
+  def get_input_filepaths(self):
+    """Returns the list of inputs."""
+    pass
+
+  @abstractmethod
+  def get_output_filepaths(self):
+    """Returns the list of outputs/."""
+    pass
+
+  @abstractmethod
+  def __call__(self):
+    """Runs the reference implementation."""
+    pass
+
+  def is_cached(self):
+    """Returns whether the reference run is cached."""
+
+    # Returns False if any of the reference input are missing.
+    for input_filepath in self.get_input_filepaths():
+      if not input_filepath.exists():
+        return False
+
+    # Returns False if any of the reference output are missing.
+    for output_filepath in self.get_output_filepaths():
+      if not output_filepath.exists():
+        return False
+
+    # Returns True if all the reference inputs and outputs are cached.
+    return True
+
+  ###################################################################################################

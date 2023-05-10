@@ -1,3 +1,9 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 from library import *
 
 
@@ -18,7 +24,7 @@ class Dispatch:
     self.is_fused_dispatch = False
 
   def name(self):
-    return self.operation.name() + '_' + self.configuration.name()
+    return f"{self.operation.name()}_{self.configuration.name()}"
 
 
 ################################################################################
@@ -28,9 +34,8 @@ class DispatchCollection:
     configurations but not in their operations. For example, a collection 
     of matmul dispatches with different tile sizes. 
     
-    The idea is that we can emit a single MLIR file for all the dispatches 
-    in the collection and compile with single run of iree-compile and them 
-    into a single executable
+    We can emit a single MLIR file for all the dispatches in a collection
+    and compile with single run of iree-compile and them into a single executable
   """
 
   def __init__(self, operation, configuration_list):
@@ -47,11 +52,9 @@ class DispatchCollection:
   def append(self, dispatch):
     """Appends a dispatch to the collection."""
     if dispatch.operation != self.operation:
-      print(self.operation.name())
-      print(dispatch.operation.name())
-      raise ValueError("operation (%s) does not match the "\
-                       "dispatch collection operation name (%s)."\
-                       % (self.operation.name(), dispatch.operation.name()))
+      raise ValueError(
+          f"operation {self.operation.name()} does not match the dispatch "
+          f"collection operation name {dispatch.operation.name()}.")
     self.configuration_list.append(dispatch.configuration)
 
   def num_of_dispatches(self):

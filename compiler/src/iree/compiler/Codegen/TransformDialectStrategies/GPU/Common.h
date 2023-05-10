@@ -7,9 +7,10 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractGemmLikeStrategy.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -17,7 +18,36 @@ namespace mlir {
 namespace iree_compiler {
 namespace gpu {
 
-struct AbstractReductionStrategy;
+//===----------------------------------------------------------------------===//
+// Base quantities generally useful for all GPU strategies.
+//===----------------------------------------------------------------------===//
+inline Attribute threadX(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimX);
+}
+inline Attribute threadY(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimY);
+}
+inline Attribute threadZ(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimZ);
+}
+inline Attribute warpX(MLIRContext *ctx) {
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimX);
+}
+inline Attribute warpY(MLIRContext *ctx) {
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimY);
+}
+inline Attribute warpZ(MLIRContext *ctx) {
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimZ);
+}
+inline Attribute linearIdX(MLIRContext *ctx) {
+  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimX);
+}
+inline Attribute linearIdY(MLIRContext *ctx) {
+  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimY);
+}
+inline Attribute linearIdZ(MLIRContext *ctx) {
+  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimZ);
+}
 
 //===----------------------------------------------------------------------===//
 // General helpers.
@@ -60,8 +90,8 @@ Value buildDistributeVectors(ImplicitLocOpBuilder& b, Value variantH,
 // TODO: abstract away AbstractReductionStrategy, this is supposed to be
 // retargetable.
 std::pair<Value, Value> buildCommonTrailingStrategy(
-    ImplicitLocOpBuilder& b, Value variantH,
-    const AbstractReductionStrategy& strategy);
+    ImplicitLocOpBuilder &b, Value variantH,
+    ArrayRef<int64_t> numThreadsInBlock);
 
 //===----------------------------------------------------------------------===//
 // Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
@@ -86,10 +116,85 @@ void build1DSplittingStrategyWithOptionalThreadMapping(
     int64_t mostMinorDim, SmallVector<int64_t> opSizes, int64_t numThreads,
     Attribute mappingAttr = Attribute(), int64_t maxVectorSize = 4);
 
+/// Build the transform IR to pad a matmul op `matmulOpH`.
+Value buildPadMatmul(ImplicitLocOpBuilder &b, Value matmulOpH,
+                     const AbstractGemmLikeStrategy &strategy);
+
+/// Build transform IR to hoist the padded output operand of a padded matmul.
+/// Additionally, this attempts to fold the padding into the producing fill, if
+/// available.
+// TODO: Generalize, this is not specific to a matmul.
+// TODO: Better API
+Value buildHoistOutputPaddingOp(ImplicitLocOpBuilder &b, Value variantH,
+                                Value paddedMatmulOpH,
+                                int64_t numLoopsToHoist = 1);
+
+/// Helper function to distribute one pad or copy operation.
+/// Note: When `foldIfBranch` is true, one must later perform masked
+/// vectorization of the result.
+/// This amounts to injecting knowledge about future transformations without
+/// adding leaky semantics.
+Value buildDistributeOnePadOrCopy(ImplicitLocOpBuilder &b, Value variantH,
+                                  Value copyOpH, ArrayRef<int64_t> numThreads,
+                                  ArrayRef<Attribute> threadDimMapping,
+                                  bool foldIfBranch = false);
+
+/// Distribute the explicit copies involved in a matmul operation
+/// `paddedMatmulOpH`.
+std::tuple<Value, Value, Value> buildDistributeCopies(
+    ImplicitLocOpBuilder &b, Value variantH, Value paddedMatmulOpH,
+    const AbstractGemmLikeStrategy &strategy);
+
+/// Specific pattern to perform masked vectorization of copies give as
+/// parameters, cleanup and vectorize the rest.
+void buildMatmulVectorization(ImplicitLocOpBuilder &b, Value variantH,
+                              Value lhsCopyOpH, Value rhsCopyOpH,
+                              Value copyBackOpH,
+                              const AbstractGemmLikeStrategy &strategy);
+
+/// Build the transform IR to perform conversion to tensor core operations.
+/// This is currently subject to phase orderings as follows:
+///   - Vector transfer_read and transfer_write patterns have different subview
+///     folding behavior, force a fold_memref_aliases on them to enable
+///     redundant vector transfer hoisting.
+///   - Unfortunately, fold_memref_aliases breaks vector_to_mma conversion
+///     across scf.for after unrolling due to insert_strided_slice /
+///     extract_strided_slice across iter_args boundaries.
+///   - Hoist redundant vector transfers to allow conversion to tensor core to
+///     proceed. We really don't want to do this after bufferization but we need
+///     to atm.
+Value buildConvertToTensorCoreOp(ImplicitLocOpBuilder &b, Value funcH,
+                                 const AbstractGemmLikeStrategy &strategy);
+
+void buildMultiBuffering(ImplicitLocOpBuilder &b, Value funcH,
+                         const AbstractGemmLikeStrategy &strategy);
+
+Value buildConvertToAsyncCopies(ImplicitLocOpBuilder &b, Value funcH,
+                                const AbstractGemmLikeStrategy &strategy);
+
+void buildPipelineSharedMemoryCopies(ImplicitLocOpBuilder &b, Value funcH,
+                                     const AbstractGemmLikeStrategy &strategy);
+
+Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH);
+
 //===----------------------------------------------------------------------===//
 // Higher-level problem-specific strategy creation APIs, these should favor
 // user-friendliness.
 //===----------------------------------------------------------------------===//
+/// Structure to hold a summary of HW-derived properties to configure the
+/// reduction strategy.
+/// The objective of this struct is to act as a minimal summary of key
+/// properties derived from the hardware (e.g. by an oracle) and that are
+/// sufficient to steer the strategy to produce a good version.
+/// These can be thought of as latent variables or embeddings that directly
+/// control the strategy and can be derived from the hardware by some procedure.
+enum class ReductionStrategy { Small, Staged };
+struct ReductionConfig {
+  int64_t maxNumThreads;
+  int64_t vectorSize;
+  ReductionStrategy strategy;
+};
+
 /// Placeholder for some hardware model proxy that contains relevant information
 /// to configure the reduction strategy. In the future, this will need to be
 /// driven by some contract with the runtime.

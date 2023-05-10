@@ -15,6 +15,7 @@ package(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
+        "AnnotateOpOrdinals.cpp",
         "ApplyPatterns.cpp",
         "CombineInitializers.cpp",
         "ConvertPrimitiveType.cpp",

@@ -67,7 +67,7 @@ jobs:
           git diff -U0 "${GITHUB_BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i
           git diff --exit-code
       - name: Instructions for fixing the above linting errors
-        if: ${{ failure() }}
+        if: failure()
         run: |
           printf "You can fix the lint errors above by running\n"
           printf "  git diff -U0 "${GITHUB_BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n"
@@ -167,7 +167,7 @@ jobs:
       - name: Check BUILD files are not named BUILD (prefer BUILD.bazel)
         run: exit $(git ls-files '**/BUILD' | wc -l)
       - name: Instructions for fixing the above linting error
-        if: ${{ failure() }}
+        if: failure()
         run: |
           echo "failure: found files named BUILD. Please rename the following files to BUILD.bazel:"
           git ls-files '**/BUILD'

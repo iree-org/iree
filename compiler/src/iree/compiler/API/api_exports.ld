@@ -168,6 +168,9 @@ VER_0 {
     mlirBlockPrint;
     mlirBoolAttrGet;
     mlirBoolAttrGetValue;
+    mlirBytecodeWriterConfigCreate;
+    mlirBytecodeWriterConfigDesiredEmitVersion;
+    mlirBytecodeWriterConfigDestroy;
     mlirComplexTypeGet;
     mlirComplexTypeGetElementType;
     mlirContextAppendDialectRegistry;
@@ -439,6 +442,7 @@ VER_0 {
     mlirOperationStateGet;
     mlirOperationVerify;
     mlirOperationWriteBytecode;
+    mlirOperationWriteBytecodeWithConfig;
     mlirPDLAttributeTypeGet;
     mlirPDLOperationTypeGet;
     mlirPDLRangeTypeGet;
@@ -580,6 +584,7 @@ VER_0 {
     mlirValueIsABlockArgument;
     mlirValueIsAOpResult;
     mlirValuePrint;
+    mlirValuePrintAsOperand;
     mlirValueReplaceAllUsesOfWith;
     mlirVectorTypeGet;
     mlirVectorTypeGetChecked;
