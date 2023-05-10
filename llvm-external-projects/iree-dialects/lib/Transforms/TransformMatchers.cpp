@@ -22,6 +22,7 @@ using namespace mlir;
 
 #define DEBUG_TYPE "transform-matchers"
 #define DBGS() llvm::dbgs() << "[" DEBUG_TYPE "] "
+#define DBGSNL() llvm::dbgs() << "\n[" DEBUG_TYPE "] "
 
 //===---------------------------------------------------------------------===//
 // CapturingOpMatcher
@@ -465,12 +466,14 @@ static bool isProjectedMap(AffineMap map, int64_t projectedDim) {
   return true;
 }
 
-/// Helper to turn a potentially negative index to positive within the range [0,
-/// ub] and indicate whether the transformed index is in bounds.
+/// Helper to turn a potentially negative index to positive within the range
+/// [0, ub) and indicate whether the transformed index is in bounds.
 static bool makeValidPositiveIndex(int64_t &index, int64_t ub) {
   int64_t positiveIndex = index >= 0 ? index : ub + index;
-  if (positiveIndex < 0 || ub < positiveIndex)
+  if (positiveIndex < 0 || ub < positiveIndex) {
+    LLVM_DEBUG(DBGSNL() << "  index out of range");
     return false;
+  }
   index = positiveIndex;
   return true;
 }
@@ -586,8 +589,10 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
                           ->get()
                           .getType()
                           .dyn_cast<ShapedType>();
-    if (!shapedType)
+    if (!shapedType) {
+      LLVM_DEBUG(DBGSNL() << "  not a shaped type");
       return false;
+    }
     elem.value = shapedType.getElementType();
     return true;
   });
@@ -728,9 +733,8 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
   predicates.push_back([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << " has elemental type with bit width " << width.value);
-    int64_t updatedPosition =
-        position >= 0 ? position : linalgOp.getNumDpsInits() + position;
-    if (0 < updatedPosition || updatedPosition >= linalgOp.getNumDpsInits())
+    int64_t updatedPosition = position;
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
       return false;
     auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
                           ->get()
@@ -754,8 +758,10 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
                           ->get()
                           .getType()
                           .dyn_cast<ShapedType>();
-    if (!shapedType || !shapedType.getElementType().isIntOrFloat())
+    if (!shapedType || !shapedType.getElementType().isIntOrFloat()) {
+      LLVM_DEBUG(DBGSNL() << "  could not infer element type");
       return false;
+    }
     width.value = shapedType.getElementType().getIntOrFloatBitWidth();
     return true;
   });
@@ -775,8 +781,10 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
                           ->get()
                           .getType()
                           .dyn_cast<ShapedType>();
-    if (!shapedType)
+    if (!shapedType) {
+      LLVM_DEBUG(DBGSNL() << "  not a shaped type");
       return false;
+    }
     elem.value = shapedType.getElementType();
     return true;
   });
