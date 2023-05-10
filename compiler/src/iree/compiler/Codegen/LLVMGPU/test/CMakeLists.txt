@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "attention.mlir"
+    "cast_address_space_function.mlir"
     "check_ir_before_llvm_conversion.mlir"
     "conv_pipeline_test.mlir"
     "convert_to_nvvm.mlir"

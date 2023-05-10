@@ -24,6 +24,7 @@ iree_cc_library(
     "ConvertToROCDL.cpp"
     "ExtractAddressComputationGPUPass.cpp"
     "KernelConfig.cpp"
+    "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMGPUDistribute.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
