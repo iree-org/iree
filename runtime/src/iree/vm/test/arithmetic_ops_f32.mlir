@@ -124,6 +124,16 @@ vm.module @arithmetic_ops_f32 {
     vm.return
   }
 
+  vm.export @test_round_f32_even
+  vm.func @test_round_f32_even() {
+    %c15 = vm.const.f32 1.5
+    %c15dno = util.optimization_barrier %c15 : f32
+    %v = vm.round.f32.even %c15dno : f32
+    %c2 = vm.const.f32 2.0
+    vm.check.eq %v, %c2, "roundeven(1.5)=2.0" : f32
+    vm.return
+  }
+
   vm.export @test_min_f32
   vm.func @test_min_f32() {
     %cn3 = vm.const.f32 -3.0

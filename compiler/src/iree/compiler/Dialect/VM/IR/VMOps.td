@@ -2459,6 +2459,18 @@ def VM_RoundF64Op :
   let summary = [{rounds the value to the nearest integer away from zero}];
 }
 
+def VM_RoundF32EvenOp :
+    VM_TotalUnaryArithmeticOp<F32, "round.f32.even", VM_OPC_RoundF32Even,
+                              [VM_ExtF32]> {
+  let summary = [{rounds the value to the nearest even integer}];
+}
+
+def VM_RoundF64EvenOp :
+    VM_TotalUnaryArithmeticOp<F64, "round.f64.even", VM_OPC_RoundF64Even,
+                              [VM_ExtF64]> {
+  let summary = [{rounds the value to the nearest even integer}];
+}
+
 def VM_MinF32Op :
     VM_TotalBinaryArithmeticOp<F32, "min.f32", VM_OPC_MinF32,
                                [VM_ExtF32, Commutative]> {

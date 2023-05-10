@@ -1752,6 +1752,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP_EXT_F32_UNARY_F32(CeilF32);
     VERIFY_OP_EXT_F32_UNARY_F32(FloorF32);
     VERIFY_OP_EXT_F32_UNARY_F32(RoundF32);
+    VERIFY_OP_EXT_F32_UNARY_F32(RoundF32Even);
     VERIFY_OP_EXT_F32_BINARY_F32(MinF32);
     VERIFY_OP_EXT_F32_BINARY_F32(MaxF32);
 
