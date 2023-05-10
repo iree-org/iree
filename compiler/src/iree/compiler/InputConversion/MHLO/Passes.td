@@ -23,6 +23,12 @@ def ConvertMHLOToLinalgExt
       "mlir::iree_compiler::MHLO::createConvertMHLOToLinalgExtPass()";
 }
 
+def ConvertMHLOCustomCallsToCalls
+    : Pass<"iree-mhlo-custom-calls-to-calls", "ModuleOp"> {
+  let summary = "Convert from XLA-HLO custom call ops to IREE runtime calls";
+  let constructor = "mlir::iree_compiler::MHLO::createMHLOCustomCallsToCallsPass()";
+}
+
 def FlattenTuplesInCFG :
     Pass<"iree-mhlo-flatten-tuples-in-cfg", "ModuleOp"> {
   let summary = "Flattens tuples in a CFG form of MHLO";

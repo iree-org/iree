@@ -40,6 +40,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 // Conversions into Linalg
 //------------------------------------------------------------------------------
 
+std::unique_ptr<OperationPass<ModuleOp>> createMHLOCustomCallsToCallsPass();
+
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
 std::unique_ptr<OperationPass<ModuleOp>> createMHLOToLinalgOnTensorsPass();
 
