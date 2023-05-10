@@ -740,6 +740,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_collective,  //
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_check_deref_or_null(args->r7, &recv_binding.buffer));
   iree_device_size_t element_count = iree_hal_cast_device_size(args->i10);
+
   return iree_hal_command_buffer_collective(command_buffer, channel, op, param,
                                             send_binding, recv_binding,
                                             element_count);
@@ -809,6 +810,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch,  //
   uint32_t workgroup_x = (uint32_t)args->i3;
   uint32_t workgroup_y = (uint32_t)args->i4;
   uint32_t workgroup_z = (uint32_t)args->i5;
+
   return iree_hal_command_buffer_dispatch(command_buffer, executable,
                                           entry_point, workgroup_x, workgroup_y,
                                           workgroup_z);
@@ -827,6 +829,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_check_deref(args->r3, &workgroups_buffer));
   iree_device_size_t workgroups_offset = iree_hal_cast_device_size(args->i4);
+
   return iree_hal_command_buffer_dispatch_indirect(
       command_buffer, executable, entry_point, workgroups_buffer,
       workgroups_offset);
