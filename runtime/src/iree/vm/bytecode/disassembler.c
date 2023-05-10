@@ -1957,6 +1957,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     DISASM_OP_EXT_F32_UNARY_F32(CeilF32, "vm.ceil.f32");
     DISASM_OP_EXT_F32_UNARY_F32(FloorF32, "vm.floor.f32");
     DISASM_OP_EXT_F32_UNARY_F32(RoundF32, "vm.round.f32");
+    DISASM_OP_EXT_F32_UNARY_F32(RoundF32Even, "vm.round.f32.even");
     DISASM_OP_EXT_F32_BINARY_F32(MinF32, "vm.min.f32");
     DISASM_OP_EXT_F32_BINARY_F32(MaxF32, "vm.max.f32");
 
