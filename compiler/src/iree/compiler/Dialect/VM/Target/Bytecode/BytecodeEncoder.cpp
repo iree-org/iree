@@ -361,6 +361,8 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
 
   V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
   for (auto &block : funcOp.getBlocks()) {
+    size_t blockStart = encoder.getOffset();
+
     if (failed(encoder.beginBlock(&block))) {
       funcOp.emitError() << "failed to begin block";
       return std::nullopt;
@@ -384,6 +386,17 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
 
     if (failed(encoder.endBlock(&block))) {
       funcOp.emitError() << "failed to end block";
+      return std::nullopt;
+    }
+
+    // From isa.h: IREE_VM_PC_BLOCK_MAX
+    static const size_t kVMMaxBlockSize = 0x00FFFFFFu;
+    size_t blockLength = encoder.getOffset() - blockStart;
+    if (blockLength > kVMMaxBlockSize) {
+      funcOp.emitError() << "encoded block too large; VM currently restricts "
+                            "bytecode function block bodies to "
+                         << kVMMaxBlockSize << "B but this function encodes to "
+                         << blockLength << "B";
       return std::nullopt;
     }
   }
