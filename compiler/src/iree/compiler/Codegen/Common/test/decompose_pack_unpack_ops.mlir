@@ -73,10 +73,7 @@ func.func @pad_and_pack(%arg0: tensor<13x15xf32>, %arg1: tensor<2x8x8x2xf32>, %a
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[PAD_VAL:[A-Za-z0-9]+]]:
-// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
-// CHECK:         %[[PAD:.+]] = tensor.pad %[[IN]] low[%[[C0]], %[[C0]]] high[%[[C3]], %[[C1]]]
+// CHECK:         %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[3, 1]
 // CHECK:           tensor.yield %[[PAD_VAL]]
 // CHECK:         } : tensor<13x15xf32> to tensor<16x16xf32>
 // CHECK:         %[[EXPAND:.+]] = tensor.expand_shape %[[PAD]] {{\[}}[0, 1], [2, 3]] : tensor<16x16xf32> into tensor<2x8x8x2xf32>
@@ -223,24 +220,20 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
   %pack = tensor.pack %src inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %dest : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
   return %pack : tensor<?x?x16x1xf32>
 }
-// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 16)>
+// CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 // CHECK:      func.func @pack_matmul_DYN_LHS
 // CHECK-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:   %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[OUT]], %c0 : tensor<?x?x16x1xf32>
-// CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[OUT]], %c1 : tensor<?x?x16x1xf32>
-// CHECK:        %[[RES0:.+]] = scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
-// CHECK-SAME:     iter_args(%[[ITER0:.+]] = %[[OUT]])
-// CHECK:          %[[RES1:.+]] = scf.for %[[J:.+]] = %[[C0]] to %[[D1]] step %[[C1]]
-// CHECK:            %[[IN_I:.+]] = affine.apply #[[MAP]](%[[I]])
-// CHECK:            %[[IN_TILE:.+]] = tensor.extract_slice %[[IN]][%[[IN_I]], %[[J]]] [16, 1] [1, 1]
-// CHECK:            %[[EMPTY:.+]] = tensor.empty() : tensor<16x1xf32>
-// CHECK:            %[[TRANSP:.+]] = linalg.transpose
-// CHECK-SAME:         ins(%[[IN_TILE]] : tensor<16x1xf32>)
-// CHECK-SAME:         outs(%[[EMPTY]] : tensor<16x1xf32>)
-// CHECK-SAME:         permutation = [0, 1]
+// CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[IN]], %c0 : tensor<?x?xf32>
+// CHECK-DAG:    %[[H0:.+]] = affine.apply #[[MAP]]()[%[[D0]]]
+// CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%0, 0]
+// CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
+// CHECK-SAME:     {{\[}}[0, 1], [2, 3]] : tensor<?x?xf32> into tensor<?x16x?x1xf32>
+// CHECK:        %[[TRANSP:.+]] = linalg.transpose
+// CHECK-SAME:     ins(%[[EXPANDED]] : tensor<?x16x?x1xf32>)
+// CHECK-SAME:     outs(%[[OUT]] : tensor<?x?x16x1xf32>)
+// CHECK-SAME:   permutation = [0, 2, 1, 3]
 
 // -----
 
@@ -248,21 +241,17 @@ func.func @pack_matmul_DYN_RHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
   %pack = tensor.pack %src outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %dest : tensor<?x?xf32> -> tensor<?x?x16x1xf32>
   return %pack : tensor<?x?x16x1xf32>
 }
-// CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 16)>
+// CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 // CHECK:      func.func @pack_matmul_DYN_RHS
 // CHECK-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:   %[[OUT:[A-Za-z0-9]+]]:
-// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[OUT]], %c0 : tensor<?x?x16x1xf32>
-// CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[OUT]], %c1 : tensor<?x?x16x1xf32>
-// CHECK:        %[[RES0:.+]] = scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
-// CHECK-SAME:     iter_args(%[[ITER0:.+]] = %[[OUT]])
-// CHECK:          %[[RES1:.+]] = scf.for %[[J:.+]] = %[[C0]] to %[[D1]] step %[[C1]]
-// CHECK:            %[[IN_I:.+]] = affine.apply #[[MAP]](%[[I]])
-// CHECK:            %[[IN_TILE:.+]] = tensor.extract_slice %[[IN]][%[[J]], %[[IN_I]]] [1, 16] [1, 1]
-// CHECK:            %[[EMPTY:.+]] = tensor.empty() : tensor<16x1xf32>
-// CHECK:            %[[TRANSP:.+]] = linalg.transpose
-// CHECK-SAME:         ins(%[[IN_TILE]] : tensor<1x16xf32>)
-// CHECK-SAME:         outs(%[[EMPTY]] : tensor<16x1xf32>)
-// CHECK-SAME:         permutation = [1, 0]
+// CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[IN]], %c1 : tensor<?x?xf32>
+// CHECK-DAG:    %[[H1:.+]] = affine.apply #[[MAP]]()[%[[D1]]]
+// CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[0, %[[H1]]]
+// CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
+// CHECK-SAME:     {{\[}}[0, 1], [2, 3]] : tensor<?x?xf32> into tensor<?x1x?x16xf32>
+// CHECK:        %[[TRANSP:.+]] = linalg.transpose
+// CHECK-SAME:     ins(%[[EXPANDED]] : tensor<?x1x?x16xf32>)
+// CHECK-SAME:     outs(%[[OUT]] : tensor<?x?x16x1xf32>)
+// CHECK-SAME:     permutation = [2, 0, 3, 1]
