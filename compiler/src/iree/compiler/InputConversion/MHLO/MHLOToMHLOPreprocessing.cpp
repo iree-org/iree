@@ -293,7 +293,7 @@ class TransposeReshapeGenericDotGeneral
   }
 
   Value ReshapeIfNonStandard(OpBuilder &b, Location loc, Value src,
-                            size_t dimsBorder0, size_t dimsBorder1) const {
+                             size_t dimsBorder0, size_t dimsBorder1) const {
     auto type = src.getType().cast<RankedTensorType>();
     auto shape = type.getShape();
     if (dimsBorder0 <= 1 && dimsBorder1 - dimsBorder0 <= 1 &&
