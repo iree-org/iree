@@ -582,6 +582,7 @@ _mlirValueGetType
 _mlirValueIsABlockArgument
 _mlirValueIsAOpResult
 _mlirValuePrint
+_mlirValuePrintAsOperand
 _mlirValueReplaceAllUsesOfWith
 _mlirVectorTypeGet
 _mlirVectorTypeGetChecked
