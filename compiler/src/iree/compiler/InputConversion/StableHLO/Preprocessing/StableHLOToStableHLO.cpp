@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -261,6 +262,191 @@ bool isConsecutive(ArrayRef<int64_t> array) {
   }
   return true;
 }
+
+/// Rewrites stablehlo.dot_general so lhs contraction dimensions are innermost
+/// and rhs contraction dimensions are dims right after batch dimension. The
+/// pattern inserts transposes so the dot_general always has the form:
+/// {batch_dims, parallel_dims, contraction_dims}.
+///   {batch_dims, contraction_dims, parallel_dims}
+/// After that, batch_dims, contraction_dims, parallel_dims are
+/// in consecutive order and not spliting the domain. This pattern inserts
+/// reshapes to collapse consecutive reduction and parallel dims to always
+/// generate a rank-3 dot_general op.
+struct TransposeReshapeGenericDotGeneral final
+    : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  Value TransposeIfNonConsecutive(OpBuilder &b, Location loc, Value src,
+                                  ArrayRef<int64_t> targetOrder) const {
+    if (isConsecutive(targetOrder)) return src;
+
+    auto type = cast<RankedTensorType>(src.getType());
+    SmallVector<int64_t, 4> transposeShape;
+    for (int64_t i : targetOrder) {
+      transposeShape.push_back(type.getDimSize(i));
+    }
+    return b.create<mlir::stablehlo::TransposeOp>(
+        loc, RankedTensorType::get(transposeShape, type.getElementType()), src,
+        b.getI64TensorAttr(targetOrder));
+  }
+
+  Value ReshapeIfNonStandard(OpBuilder &b, Location loc, Value src,
+                             size_t dimsBorder0, size_t dimsBorder1) const {
+    auto type = cast<RankedTensorType>(src.getType());
+    ArrayRef<int64_t> shape = type.getShape();
+    if (dimsBorder0 <= 1 && dimsBorder1 - dimsBorder0 <= 1 &&
+        shape.size() - dimsBorder1 <= 1)
+      return src;
+
+    SmallVector<int64_t, 4> result_shape = {
+        std::accumulate(shape.begin(), shape.begin() + dimsBorder0, 1,
+                        std::multiplies<int64_t>()),
+        std::accumulate(shape.begin() + dimsBorder0,
+                        shape.begin() + dimsBorder1, 1,
+                        std::multiplies<int64_t>()),
+        std::accumulate(shape.begin() + dimsBorder1, shape.end(), 1,
+                        std::multiplies<int64_t>())};
+    return b.create<mlir::stablehlo::ReshapeOp>(
+        loc, RankedTensorType::get(result_shape, type.getElementType()), src);
+  }
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
+    auto lhsShapeType = dyn_cast<RankedTensorType>(op.getLhs().getType());
+    auto rhsShapeType = dyn_cast<RankedTensorType>(op.getRhs().getType());
+    auto resultType = dyn_cast<RankedTensorType>(op.getResult().getType());
+    if (!lhsShapeType || !rhsShapeType || !resultType) return failure();
+
+    // TODO(jpienaar): This pattern is not safe for dynamic shapes and seems to
+    // be (now) redundant with later pass that does handle them. To decouple
+    // fixing and verifying redundant, this just limits to static shapes and
+    // then will remove this in follow up.
+    if (!lhsShapeType.hasStaticShape() || !rhsShapeType.hasStaticShape())
+      return failure();
+
+    SmallVector<int64_t> lhsTargetOrder, rhsTargetOrder;
+    mlir::stablehlo::DotDimensionNumbersAttr dimNumbers =
+        op.getDotDimensionNumbers();
+    ArrayRef<int64_t> lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
+    ArrayRef<int64_t> lhsContractingDims =
+        dimNumbers.getLhsContractingDimensions();
+    ArrayRef<int64_t> rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
+    ArrayRef<int64_t> rhsContractingDims =
+        dimNumbers.getRhsContractingDimensions();
+
+    // No contraction dims means this can be represented as a mul.
+    if (lhsContractingDims.empty() || rhsContractingDims.empty()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "can be represented as stablehlo.mul");
+    }
+
+    // No batching dimensions means this can be represented a dot.
+    if (lhsBatchingDims.empty() || rhsBatchingDims.empty()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "can be represented as stablehlo.dot");
+    }
+
+    SmallVector<bool> isLhsParallel(lhsShapeType.getRank(), true);
+    for (int64_t i : lhsBatchingDims) {
+      lhsTargetOrder.push_back(i);
+      isLhsParallel[i] = false;
+    }
+    for (int64_t i : lhsContractingDims) {
+      isLhsParallel[i] = false;
+    }
+    for (int64_t i = 0, e = lhsShapeType.getRank(); i < e; ++i) {
+      if (isLhsParallel[i]) {
+        lhsTargetOrder.push_back(i);
+      }
+    }
+    for (int64_t i : lhsContractingDims) {
+      lhsTargetOrder.push_back(i);
+    }
+
+    SmallVector<bool> isRhsParallel(rhsShapeType.getRank(), true);
+
+    for (int64_t i : rhsBatchingDims) {
+      rhsTargetOrder.push_back(i);
+      isRhsParallel[i] = false;
+    }
+    for (int64_t i : rhsContractingDims) {
+      rhsTargetOrder.push_back(i);
+      isRhsParallel[i] = false;
+    }
+    for (int64_t i = 0, e = rhsShapeType.getRank(); i < e; ++i) {
+      if (isRhsParallel[i]) {
+        rhsTargetOrder.push_back(i);
+      }
+    }
+
+    Value lhs = TransposeIfNonConsecutive(rewriter, op.getLoc(), op.getLhs(),
+                                          lhsTargetOrder);
+    Value rhs = TransposeIfNonConsecutive(rewriter, op.getLoc(), op.getRhs(),
+                                          rhsTargetOrder);
+
+    // The dimensions of this will always be transposed into {batch_dims,
+    // parallel_dims, contraction_dims}, and the
+    // following logic is based on this assumption.
+    // TODO(#7443): If we consider transpose performance, the above assumptions
+    // may not be true.
+    int64_t numLhsContractionDims = lhsContractingDims.size();
+    int64_t lhsContractionBase = lhsShapeType.getRank() - numLhsContractionDims;
+    int64_t rhsContractionBase = rhsBatchingDims.size();
+    int64_t numRhsContractionDims =
+        rhsContractionBase + rhsContractingDims.size();
+
+    lhs = ReshapeIfNonStandard(rewriter, op.getLoc(), lhs,
+                               lhsBatchingDims.size(), lhsContractionBase);
+    rhs = ReshapeIfNonStandard(rewriter, op.getLoc(), rhs,
+                               rhsBatchingDims.size(), numRhsContractionDims);
+
+    if (lhs == op.getLhs() && rhs == op.getRhs())
+      return rewriter.notifyMatchFailure(op, "already in canonical form");
+
+    auto dimensionNumbers = mlir::stablehlo::DotDimensionNumbersAttr::get(
+        rewriter.getContext(), /*lhsBatchingDimensions=*/0,
+        /*rhsBatchingDimensions=*/0,
+        /*lhsContractingDimensions=*/
+        cast<ShapedType>(lhs.getType()).getRank() - 1,
+        /*rhsContractingDimensions=*/1);
+    auto lhsNewType = cast<RankedTensorType>(lhs.getType());
+    auto rhsNewType = cast<RankedTensorType>(rhs.getType());
+
+    // if lhs's shape or rhs's shape has collapsed, we need reshape the result
+    bool needReshapeResult = lhsNewType.getRank() < lhsShapeType.getRank() ||
+                             rhsNewType.getRank() < rhsShapeType.getRank();
+    // batching、lhs parallel、rhs parallel this order is a conversion
+    SmallVector<int64_t, 4> newShape = {lhsNewType.getShape()[0],
+                                        lhsNewType.getShape()[1]};
+    if (rhsNewType.getRank() > 2) newShape.push_back(rhsNewType.getDimSize(2));
+
+    TensorType newResultType =
+        needReshapeResult
+            ? RankedTensorType::get(newShape, resultType.getElementType())
+            : op.getType();
+
+    auto newOp = rewriter.create<mlir::stablehlo::DotGeneralOp>(
+        op.getLoc(), newResultType, lhs, rhs, dimensionNumbers,
+        op.getPrecisionConfigAttr());
+
+    // Copy over unknown attributes as we currently rely on it to let user tune
+    // lowering parameters.
+    ArrayRef<StringRef> odsAttrs = op.getAttributeNames();
+    for (NamedAttribute kv : op->getAttrs()) {
+      if (!llvm::is_contained(odsAttrs, kv.getName().getValue())) {
+        newOp->setAttr(kv.getName(), kv.getValue());
+      }
+    }
+
+    Value result = newOp.getResult();
+    if (needReshapeResult) {
+      result = rewriter.create<mlir::stablehlo::ReshapeOp>(op.getLoc(),
+                                                           resultType, result);
+    }
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
 
 struct ScatterInt64Indices final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
@@ -1297,6 +1483,11 @@ struct StableHLOToStableHLOPreprocessing final
 
     // dot_general canonicalization patterns.
     populatePreprocessingDotGeneralToDotPatterns(context, &patterns);
+
+    // TODO(jpienaar): This may be redundant with lower_general_dot. Remove if
+    // so.
+    patterns.insert<TransposeReshapeGenericDotGeneral>(context,
+                                                       /*benefit=*/200);
     patterns.insert<DotGeneralIsMul>(context, /*benefit=*/300);
 
     // Fusion operations.
