@@ -327,7 +327,7 @@ def build_opt_command_line(input_file: str, tfs: TempFileSaver,
 
   # Tool paths.
   lld_path = find_tool("iree-lld")
-  cl.append(f"--iree-llvm-embedded-linker-path={lld_path}")
+  cl.append(f"--iree-llvmcpu-embedded-linker-path={lld_path}")
 
   crash_reproducer_path = tfs.alloc_optional(
       "core-reproducer.mlir", export_as=options.crash_reproducer_path)
