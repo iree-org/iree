@@ -8,11 +8,27 @@
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_COMMON_H_
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+// Needed until IREE builds its own gpu::GPUBlockMappingAttr / gpu::Blocks
+// attributes that are reusable across all targets.
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+//===----------------------------------------------------------------------===//
+// Base quantities generally useful for all CPU and GPU strategies.
+//===----------------------------------------------------------------------===//
+inline Attribute blockX(MLIRContext *ctx) {
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimX);
+}
+inline Attribute blockY(MLIRContext *ctx) {
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimY);
+}
+inline Attribute blockZ(MLIRContext *ctx) {
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimZ);
+}
 
 namespace IREE {
 namespace transform_dialect {
@@ -205,9 +221,8 @@ std::tuple<Value, Value, Value> buildTileReductionUsingScfForeach(
 /// Note: A future version of this op will be able to directly apply on the DAG
 /// and form the dispatch region.
 std::tuple<Value, Value, Value, Value, Value>
-buildReductionStrategyBlockDistribution(
-    ImplicitLocOpBuilder &b, Value variantH,
-    const AbstractReductionStrategy &strategy);
+buildReductionStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
+                                        ArrayRef<int64_t> workgroupTileSizes);
 
 /// Build transform IR that applies memory optimizations.
 Value buildMemoryOptimizations(ImplicitLocOpBuilder &b, Value funcH);

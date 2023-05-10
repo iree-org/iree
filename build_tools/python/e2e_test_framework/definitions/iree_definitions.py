@@ -167,26 +167,6 @@ class ImportConfig(object):
                                       ENTRY_FUNCTION=model.entry_function)
 
 
-DEFAULT_TF_V1_IMPORT_CONFIG = ImportConfig(
-    id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
-    name="tf_v1",
-    tool=ImportTool.TF_IMPORTER,
-    dialect_type=MLIRDialectType.MHLO,
-    import_flags=[
-        "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v1",
-        r"--tf-savedmodel-exported-names=${ENTRY_FUNCTION}"
-    ])
-
-DEFAULT_TF_V2_IMPORT_CONFIG = ImportConfig(
-    id=unique_ids.IREE_MODEL_IMPORT_TF_V1_DEFAULT,
-    tool=ImportTool.TF_IMPORTER,
-    name="tf_v2",
-    dialect_type=MLIRDialectType.MHLO,
-    import_flags=[
-        "--output-format=mlir-bytecode", "--tf-import-type=savedmodel_v2",
-        r"--tf-savedmodel-exported-names=${ENTRY_FUNCTION}"
-    ])
-
 DEFAULT_TFLITE_IMPORT_CONFIG = ImportConfig(
     id=unique_ids.IREE_MODEL_IMPORT_TFLITE_DEFAULT,
     name="tflite",
@@ -199,15 +179,19 @@ DEFAULT_LINALG_MLIR_IMPORT_CONFIG = ImportConfig(
     tool=ImportTool.NONE,
     dialect_type=MLIRDialectType.NONE)
 
+DEFAULT_MHLO_MLIR_IMPORT_CONFIG = ImportConfig(
+    id=unique_ids.IREE_MODEL_IMPORT_MHLO_MLIR_DEFAULT,
+    name="mhlo",
+    tool=ImportTool.NONE,
+    dialect_type=MLIRDialectType.MHLO)
+
 MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {
     common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
         DEFAULT_LINALG_MLIR_IMPORT_CONFIG,
     common_definitions.ModelSourceType.EXPORTED_TFLITE:
         DEFAULT_TFLITE_IMPORT_CONFIG,
-    common_definitions.ModelSourceType.EXPORTED_TF_V1:
-        DEFAULT_TF_V1_IMPORT_CONFIG,
-    common_definitions.ModelSourceType.EXPORTED_TF_V2:
-        DEFAULT_TF_V2_IMPORT_CONFIG,
+    common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR:
+        DEFAULT_MHLO_MLIR_IMPORT_CONFIG,
 }
 
 

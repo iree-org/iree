@@ -583,6 +583,7 @@ EXPORTS
   mlirValueIsABlockArgument
   mlirValueIsAOpResult
   mlirValuePrint
+  mlirValuePrintAsOperand
   mlirValueReplaceAllUsesOfWith
   mlirVectorTypeGet
   mlirVectorTypeGetChecked

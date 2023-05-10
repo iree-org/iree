@@ -36,7 +36,6 @@ using transform::SequenceOp;
 using transform_ext::StructuredOpMatcher;
 
 using iree_compiler::buildTileReductionUsingScfForeach;
-using iree_compiler::gpu::AbstractReductionStrategy;
 using iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle;
 using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
@@ -47,16 +46,18 @@ using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::ReductionConfig;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::gpu::StagedReductionStrategy;
+using iree_compiler::gpu::threadX;
+using iree_compiler::gpu::threadY;
 
-StagedReductionStrategy
-mlir::iree_compiler::gpu::StagedReductionStrategy::create(
-    MLIRContext *context,
+mlir::iree_compiler::gpu::StagedReductionStrategy::StagedReductionStrategy(
     const transform_ext::MatchedReductionCaptures &captures,
-    const ReductionConfig &reductionConfig) {
-  StagedReductionStrategy strategy(context, captures);
-  strategy.configure(reductionConfig);
+    const ReductionConfig &reductionConfig)
+    : AbstractReductionStrategy(captures, {}) {
+  configure(reductionConfig);
   LLVM_DEBUG(DBGS() << "use GPU staged reduction strategy\n");
-  return strategy;
+  LLVM_DEBUG(llvm::interleaveComma(workgroupTileSizes,
+                                   DBGS() << "--workgroupTileSizes:  ");
+             llvm::dbgs() << "\n");
 }
 
 void mlir::iree_compiler::gpu::StagedReductionStrategy::configure(
@@ -126,6 +127,7 @@ static void buildStagedReductionStrategyThreadLevel(
     ImplicitLocOpBuilder &b, Value isolatedParentOpH, Value gridReductionH,
     Value gridFillH, Value maybeTiledLeadingH, Value maybeTiledTrailingH,
     const StagedReductionStrategy &strategy) {
+  MLIRContext *ctx = b.getContext();
   // Map the potential maybeTiledLeadingH.
   // TODO: Consider fusing leading elementwise into threads.
   if (strategy.captures.maybeLeadingRank > 0) {
@@ -141,8 +143,8 @@ static void buildStagedReductionStrategyThreadLevel(
         // TODO: capture and generalize mostMinorDim.
         /*mostMinorDim=*/strategy.captures.maybeLeadingRank - 1,
         /*opSizes=*/strategy.captures.leadingOpSizes,
-        /*numThreads=*/strategy.getNumThreadsXInBlock(),
-        /*mappingAttr=*/strategy.allThreadAttrs.front(),
+        /*numThreads=*/strategy.getNumThreadsInBlock().front(),
+        /*mappingAttr=*/threadX(ctx),
         /*maxVectorSize=*/vectorSize);
   }
 
@@ -153,9 +155,9 @@ static void buildStagedReductionStrategyThreadLevel(
           /*isolatedParentOpH=*/isolatedParentOpH,
           /*reductionH=*/gridReductionH,
           /*reductionRank=*/strategy.captures.reductionRank,
-          /*tileSize=*/strategy.getNumThreadsXInBlock(),
+          /*tileSize=*/strategy.getNumThreadsInBlock().front(),
           /*reductionVectorSize=*/strategy.getVectorSize(),
-          /*mappingAttr=*/strategy.allThreadAttrs[0]);
+          /*mappingAttr=*/threadX(ctx));
 
   // Staged reduction step 2: multi-warp shuffle reduce.
   // Map the combiner reduction to one thread along y. Mapping this part along
@@ -188,7 +190,7 @@ static void buildStagedReductionStrategyThreadLevel(
       /*rootH=*/root,
       /*opsToFuse=*/opsToFuse,
       /*tileSizes=*/getAsOpFoldResult(b.getI64ArrayAttr({1})),
-      /*mappingAttr=*/b.getArrayAttr(strategy.allThreadAttrs[1]));
+      /*mappingAttr=*/b.getArrayAttr(threadY(ctx)));
 
   // Map the potential maybeTiledTrailingH if it hasn't been fused with the
   // reduction.
@@ -204,8 +206,8 @@ static void buildStagedReductionStrategyThreadLevel(
         // TODO: capture and generalize mostMinorDim.
         /*mostMinorDim=*/strategy.captures.maybeTrailingRank - 1,
         /*opSizes=*/strategy.captures.trailingOpSizes,
-        /*numThreads=*/strategy.getNumThreadsXInBlock(),
-        /*mappingAttr=*/strategy.allThreadAttrs.front(),
+        /*numThreads=*/strategy.getNumThreadsInBlock().front(),
+        /*mappingAttr=*/threadX(ctx),
         /*maxVectorSize=*/vectorSize);
   }
 }
@@ -218,9 +220,12 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
     const StagedReductionStrategy &strategy) {
   // Step 1. Match and tile to introduce the top-level scf.forall for
   // the block/workgroup level. Keep everything fused.
+  ArrayRef<int64_t> workgroupTileSizes{strategy.workgroupTileSizes};
   auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
         commonEnclosingForallH] =
-      buildReductionStrategyBlockDistribution(b, variantH, strategy);
+      buildReductionStrategyBlockDistribution(
+          b, variantH,
+          workgroupTileSizes.take_front(strategy.captures.reductionRank - 1));
 
   // Step 2. Split the reduction and tile the pieces to ensure vector
   // load/stores and mapping to a single warp with shuffles.
@@ -239,14 +244,16 @@ void mlir::iree_compiler::gpu::buildStagedReductionStrategy(
   shareForeachArgument(b, commonEnclosingForallH, ArrayRef<int64_t>({0}));
 
   // Step 4-5. Common trailing steps.
-  auto [variantH2, funcH] = buildCommonTrailingStrategy(b, variantH, strategy);
+  auto [variantH2, funcH] =
+      buildCommonTrailingStrategy(b, variantH, strategy.getNumThreadsInBlock());
 
   // Step 6. The staged strategy has a post-bufferization vector distribution
   // with rank-reduction. The vector distribution occurs on multiple warps and
   // is itself internally staged in 2 stages.
-  assert(strategy.getNumThreadsXInBlock() % kCudaWarpSize == 0 &&
+  assert(strategy.getNumThreadsInBlock().front() % kCudaWarpSize == 0 &&
          "strategy requires full warps");
-  int64_t numWarpsToUse = strategy.getNumThreadsXInBlock() / kCudaWarpSize;
+  int64_t numWarpsToUse =
+      strategy.getNumThreadsInBlock().front() / kCudaWarpSize;
   // Distribute the reduction on all the threads of the group. This allows us
   // to have the same data layout for the partial reduction and the merge and
   // therefore we can optimize away the temporary memory usage.

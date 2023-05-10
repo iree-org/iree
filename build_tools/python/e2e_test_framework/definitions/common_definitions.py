@@ -96,11 +96,10 @@ class ModelSourceType(Enum):
   """Type of model source."""
   # Exported Linalg MLIR file.
   EXPORTED_LINALG_MLIR = "exported_linalg_mlir"
+  # Exported MHLO file.
+  EXPORTED_MHLO_MLIR = "exported_mhlo_mlir"
   # Exported TFLite model file.
   EXPORTED_TFLITE = "exported_tflite"
-  # Exported SavedModel from Tensorflow.
-  EXPORTED_TF_V1 = "exported_tf_v1"
-  EXPORTED_TF_V2 = "exported_tf_v2"
 
 
 class InputDataFormat(Enum):

@@ -47,8 +47,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/%S_codegen_spec.mlir | \
 // RUN: FileCheck %s
 
-// RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit | \
+// RUN: iree-compile %s --iree-hal-target-backends=cuda | \
 // RUN: iree-run-module --module=- --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 

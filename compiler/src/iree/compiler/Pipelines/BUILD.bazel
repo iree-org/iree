@@ -48,6 +48,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//compiler/src/iree/compiler/Dialect/VM/Transforms",
         "//compiler/src/iree/compiler/InputConversion/Common",
+        "//compiler/src/iree/compiler/InputConversion/Common:AutoInputConversionPipeline",
         "//compiler/src/iree/compiler/InputConversion/MHLO",
         "//compiler/src/iree/compiler/InputConversion/StableHLO",
         "//compiler/src/iree/compiler/InputConversion/TMTensor",

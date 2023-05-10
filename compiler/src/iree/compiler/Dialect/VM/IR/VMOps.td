@@ -3798,6 +3798,11 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     CallInterfaceCallable getCallableForCallee() {
       return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
     }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
   }];
 }
 

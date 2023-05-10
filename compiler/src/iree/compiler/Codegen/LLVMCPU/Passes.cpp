@@ -554,14 +554,14 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(TilingLevel::ParallelTiles)));
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(static_cast<int64_t>(TilingLevel::ReductionTiles)));
 
   if (enableMicrokernels) {
     nestedModulePM.addPass(createLLVMCPULowerToUKernelsPass());
   } else {
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
+        static_cast<int64_t>(TilingLevel::ParallelTiles)));
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
+        static_cast<int64_t>(TilingLevel::ReductionTiles)));
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUVectorizationPass());
   }
