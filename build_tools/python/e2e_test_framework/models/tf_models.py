@@ -241,22 +241,20 @@ T5_LARGE_48x512_FP32_TF = common_definitions.Model(
     entry_function="forward",
     input_types=["48x512xi32", "48x512xi32"])
 
-# Disabled due to https://github.com/openxla/iree/issues/13189.
-#T5_LARGE_64x512_FP32_TF = common_definitions.Model(
-#    id=unique_ids.MODEL_T5_LARGE_64x512_FP32_TF,
-#    name="T5LargeTFBatch64",
-#    tags=["fp32", "seqlen512", "tensorflow", "batch-64"],
-#    source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
-#    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_64/hlo.mlirbc",
-#    entry_function="forward",
-#    input_types=["64x512xi32", "64x512xi32"])
+T5_LARGE_64x512_FP32_TF = common_definitions.Model(
+    id=unique_ids.MODEL_T5_LARGE_64x512_FP32_TF,
+    name="T5LargeTFBatch64",
+    tags=["fp32", "seqlen512", "tensorflow", "batch-64"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
+    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_64/hlo.mlirbc",
+    entry_function="forward",
+    input_types=["64x512xi32", "64x512xi32"])
 
-# Disabled due to https://github.com/openxla/iree/issues/13189.
-#T5_LARGE_512x512_FP32_TF = common_definitions.Model(
-#    id=unique_ids.MODEL_T5_LARGE_512x512_FP32_TF,
-#    name="T5LargeTFBatch512",
-#    tags=["fp32", "seqlen512", "tensorflow", "batch-512"],
-#    source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
-#    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_512/hlo.mlirbc",
-#    entry_function="forward",
-#    input_types=["512x512xi32", "512x512xi32"])
+T5_LARGE_512x512_FP32_TF = common_definitions.Model(
+    id=unique_ids.MODEL_T5_LARGE_512x512_FP32_TF,
+    name="T5LargeTFBatch512",
+    tags=["fp32", "seqlen512", "tensorflow", "batch-512"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
+    source_url=f"{TF_MODELS_ROOT_DIR}/T5_LARGE/batch_512/hlo.mlirbc",
+    entry_function="forward",
+    input_types=["512x512xi32", "512x512xi32"])
