@@ -34,14 +34,12 @@ using iree_compiler::cpu::ReductionConfig;
 using iree_compiler::cpu::ReductionStrategy;
 using transform_ext::RegisterMatchCallbacksOp;
 
-ReductionStrategy mlir::iree_compiler::cpu::ReductionStrategy::create(
-    MLIRContext *context,
+mlir::iree_compiler::cpu::ReductionStrategy::ReductionStrategy(
     const transform_ext::MatchedReductionCaptures &captures,
-    const ReductionConfig &reductionConfig) {
-  ReductionStrategy strategy(context, captures);
-  strategy.configure(reductionConfig);
+    const ReductionConfig &reductionConfig)
+    : AbstractReductionStrategy(captures, {}) {
+  configure(reductionConfig);
   LLVM_DEBUG(DBGS() << "use CPU reduction strategy\n");
-  return strategy;
 }
 
 void mlir::iree_compiler::cpu::ReductionStrategy::configure(
@@ -63,7 +61,8 @@ void mlir::iree_compiler::cpu::buildReductionStrategy(
   // Step 1. Tiling to the block/workgroup level. Keep everything fused.
   auto [maybeLeadingHBlock, gridFillH, gridReductionH, maybeTiledTrailingHBlock,
         forall] =
-      buildReductionStrategyBlockDistribution(b, variantH, strategy);
+      buildReductionStrategyBlockDistribution(b, variantH,
+                                              strategy.workgroupTileSizes);
 
   // Step 2. Naive first strategy to tile the most minor dimension by
   // strategy.getVectorSize().

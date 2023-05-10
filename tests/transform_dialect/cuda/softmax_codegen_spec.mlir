@@ -10,7 +10,7 @@ transform.sequence failures(propagate) {
   %exps_sum_fill,
   %exps,
   %exps_sum,
-  %div = transform.split_handles %ops in [6]
+  %div = transform.split_handle %ops
     : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation,
                            !pdl.operation, !pdl.operation, !pdl.operation)
 
@@ -44,7 +44,7 @@ transform.sequence failures(propagate) {
   %tiled_exps_sum_fill,
   %tiled_exp_and_exps_sum,
   %tiled_exp_and_exps_sum_2,
-  %tiled_div = transform.split_handles %tiled_ops in [6]
+  %tiled_div = transform.split_handle %tiled_ops
     : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation,
                            !pdl.operation, !pdl.operation, !pdl.operation)
   // Leaving the reduction untiled on threadIdx.x makes it sequential on
@@ -73,17 +73,16 @@ transform.sequence failures(propagate) {
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
-  %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op
-  %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2
+  transform.iree.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
+  %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!pdl.operation) -> !pdl.operation
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  transform.iree.erase_hal_descriptor_type_from_memref %memref_func
+  transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!pdl.operation) -> ()
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // =========================================================
   %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!pdl.operation) -> !pdl.operation
-  %func_3 = transform.iree.forall_to_workgroup %func_2
-  transform.iree.map_nested_forall_to_gpu_threads %func_3
-    { workgroup_size = [32, 4, 1] }
+  transform.iree.forall_to_workgroup %func_2 : (!pdl.operation) -> ()
+  transform.iree.map_nested_forall_to_gpu_threads %func_2 workgroup_dims = [32, 4, 1] : (!pdl.operation) -> ()
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===================================================================

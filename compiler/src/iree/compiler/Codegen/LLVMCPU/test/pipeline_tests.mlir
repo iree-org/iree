@@ -440,7 +440,7 @@ hal.executable private @quant_matmul_fusion {
 //          CHECK:     scf.for
 //          CHECK:       scf.for
 //          CHECK:         vector.outerproduct
-//          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) {double_round = true} : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
+//          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) <{double_round = true}> : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
 
 // -----
 
@@ -472,6 +472,10 @@ hal.executable private @mmt4d_ukernel {
   }
 }
 // CHECK-LABEL: func @ukernel_dispatch()
+// Checks scf.for for distribution loops.
+//       CHECK:   scf.for
+//       CHECK:     scf.for
+//   CHECK-NOT:       scf.for
 //       CHECK:   iree_codegen.ukernel.generic "ukernel.mmt4d"
 
 // -----

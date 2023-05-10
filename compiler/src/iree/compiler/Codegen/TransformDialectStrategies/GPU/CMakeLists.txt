@@ -15,8 +15,6 @@ iree_cc_library(
     TransformDialectStrategies
   HDRS
     "AbstractGemmLikeStrategy.h"
-    "AbstractGpuStrategy.h"
-    "AbstractReductionStrategy.h"
     "Common.h"
     "MatmulTensorCoreStrategy.h"
     "SmallReductionStrategy.h"

@@ -2156,6 +2156,11 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
     }
 
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
@@ -2814,6 +2819,11 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
       return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
     }
 
     Value getOperandSize(unsigned idx) {

@@ -584,6 +584,7 @@ VER_0 {
     mlirValueIsABlockArgument;
     mlirValueIsAOpResult;
     mlirValuePrint;
+    mlirValuePrintAsOperand;
     mlirValueReplaceAllUsesOfWith;
     mlirVectorTypeGet;
     mlirVectorTypeGetChecked;

@@ -7,7 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_
 
-#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/Common/AbstractReductionStrategy.h"
+#include "iree/compiler/Codegen/TransformDialectStrategies/GPU/Common.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -47,29 +48,23 @@ struct GPUModel;
 /// otherwise try with 2; otherwise just use 1.
 //
 // TODO: Split to ensure 4 on most of the problem and use a 1-epilogue. This is
-// best done if we can encode the future stride to ensure the 4 is algined.
+// best done if we can encode the future stride to ensure the 4 is aligned.
 class StagedReductionStrategy : public AbstractReductionStrategy {
  public:
-  static StagedReductionStrategy create(
-      MLIRContext *context,
+  StagedReductionStrategy(
       const transform_ext::MatchedReductionCaptures &captures,
       const ReductionConfig &reductionConfig);
 
   StagedReductionStrategy(const StagedReductionStrategy &) = default;
   StagedReductionStrategy &operator=(const StagedReductionStrategy &) = default;
 
-  std::array<int64_t, 3> getNumThreadsInBlock() const override {
+  std::array<int64_t, 3> getNumThreadsInBlock() const {
     return {numThreadsXInBlock, 1, 1};
   }
 
   int64_t getVectorSize() const { return vectorSize; }
 
  private:
-  StagedReductionStrategy(
-      MLIRContext *context,
-      const transform_ext::MatchedReductionCaptures &captures)
-      : AbstractReductionStrategy(context, captures) {}
-
   /// Compute the staged strategy based on the reductionDimensionSize, the
   /// `maxNumThreadsToUse` and the `vectorSize`.
   /// The latter 2 numbers control the tradeoff between parallelism and shared
