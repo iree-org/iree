@@ -800,11 +800,10 @@ jobs:
             "${BENCHMARK_COMMENT_ARTIFACT}" \
             "${BENCHMARK_COMMENT_GCS_ARTIFACT}"
       - name: Uploading results to dashboard
-        # if: github.ref_name == 'main'
+        if: github.ref_name == 'main'
         env:
           EXECUTION_BENCHMARK_RESULTS_PATTERN: ${{ steps.download-execution-results.outputs.execution-benchmark-results-pattern }}
-          # IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
-          IREE_DASHBOARD_API_TOKEN: "dummy-token"
+          IREE_DASHBOARD_API_TOKEN: ${{ secrets.IREE_DASHBOARD_API_TOKEN }}
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_DASHBOARD_API_TOKEN=${IREE_DASHBOARD_API_TOKEN}" \
