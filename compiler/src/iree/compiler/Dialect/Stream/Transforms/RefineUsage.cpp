@@ -312,6 +312,15 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
         cast<IREE::Util::SizeAwareOpInterface>(op.getOperation());
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
+      // If it is an alloca op with 0 as input, it will cause an infinite loop
+      // were it fetches itself to allocate 0 bytes. Thus, don't handle this
+      // case. Happens when there is a zero-size tensor.
+      if (isa<IREE::Stream::AsyncAllocaOp>(op)) {
+        Value defOp = cast<IREE::Stream::AsyncAllocaOp>(op).getResultSize(0);
+        if (defOp.getDefiningOp() &&
+            cast<arith::ConstantIndexOp>(defOp.getDefiningOp()).value() == 0)
+          continue;
+      }
       if (!result.getType().template isa<IREE::Stream::ResourceType>()) {
         continue;
       }

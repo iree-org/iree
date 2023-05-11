@@ -194,3 +194,19 @@ func.func @escapingAlloca() -> !hal.buffer_view {
   %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c123} -> !hal.buffer_view
   return %2 : !hal.buffer_view
 }
+
+// -----
+
+// Tests that check alloca with 0 as input. This test is just to make sure there is no compiler-hang
+// So -in terms of genrated code - we are not testing for anything particular.
+
+// CHECK-LABEL: @zeroAlloca
+func.func @zeroAlloca() -> (!hal.buffer_view) {
+    %c0 = arith.constant 0 : index
+    %0 = stream.async.alloca : !stream.resource<constant>{%c0}
+    %1 = stream.async.transfer %0 : !stream.resource<constant>{%c0} -> !stream.resource<*>{%c0}
+    %2 = stream.async.transfer %1 : !stream.resource<*>{%c0} -> !stream.resource<external>{%c0}
+    %3 = stream.tensor.export %2 : tensor<0xi32> in !stream.resource<external>{%c0} -> !hal.buffer_view
+    return %3 : !hal.buffer_view
+
+}
