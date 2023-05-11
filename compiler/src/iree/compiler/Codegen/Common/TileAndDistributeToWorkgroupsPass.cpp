@@ -447,8 +447,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       funcOp.emitOpError("resolving ranked shaped results dims failed");
       return signalPassFailure();
     }
-
-    variantOp->getParentOp()->dump();
   }
 }
 
