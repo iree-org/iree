@@ -1155,6 +1155,12 @@ iree_compiler_error_t *ireeCompilerInvocationOutputHALExecutable(
 // Unstable MLIRInterop.h helpers
 //===----------------------------------------------------------------------===//
 
+void ireeCompilerRegisterDialects(MlirDialectRegistry registry) {
+  mlir::DialectRegistry *cppRegistry = unwrap(registry);
+  mlir::iree_compiler::registerAllDialects(*cppRegistry);
+  mlir::iree_compiler::registerLLVMIRTranslations(*cppRegistry);
+}
+
 MlirContext ireeCompilerSessionGetContext(iree_compiler_session_t *session) {
   return wrap(&unwrap(session)->context);
 }

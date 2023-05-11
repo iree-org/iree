@@ -31,6 +31,7 @@ set(_PYTHON_INSTALL_PREFIX "python_packages/iree_compiler")
 # to be fixed to capture the correct include directories in that macro.
 include_directories(
   "${IREE_SOURCE_DIR}/compiler/src"
+  "${IREE_SOURCE_DIR}/compiler/bindings/c"
   "${IREE_SOURCE_DIR}/llvm-external-projects/iree-dialects/include"
   "${IREE_SOURCE_DIR}/third_party/llvm-project/mlir/include"
   "${IREE_SOURCE_DIR}/third_party/mlir-hlo/include"
@@ -61,12 +62,30 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
 )
 
 ################################################################################
+# Extensions
+################################################################################
+
+declare_mlir_python_sources(IREECompilerPythonExtensions)
+
+declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
+  MODULE_NAME _site_initialize_0
+  ADD_TO_PARENT IREECompilerPythonExtensions
+  SOURCES
+    IREECompilerRegistration.cpp
+  EMBED_CAPI_LINK_LIBS
+    iree_compiler_API_SharedImpl
+  PRIVATE_LINK_LIBS
+    LLVMSupport
+)
+
+################################################################################
 # Generate packages and shared library
 ################################################################################
 
 set(_SOURCE_COMPONENTS
   # Local sources.
   IREECompilerAPIPythonTools
+  IREECompilerPythonExtensions
 
   MLIRPythonSources.Core
 
