@@ -13,9 +13,43 @@ cc_library(
     name = "c_headers",
     hdrs = [
         "bindings/c/openxla/partitioner/embedding_api.h",
+        "bindings/c/openxla/partitioner/loader.h",
     ],
     includes = [
         "bindings/c",
+    ],
+)
+
+cc_library(
+    name = "loader",
+    srcs = [
+        "bindings/c/openxla/partitioner/loader/handle_symbols.inc",
+        "bindings/c/openxla/partitioner/loader/loader.cpp",
+    ],
+    copts = [
+        # This library is not compatible with Bazel's implicit shared library
+        # building for testing with the project-default visibility=hidden.
+        #"-fvisibility=default",
+    ],
+    deps = [
+        ":c_headers",
+    ],
+)
+
+cc_test(
+    name = "loader_test",
+    srcs = [
+        "bindings/c/openxla/partitioner/loader/loader_test.c",
+    ],
+    args = [
+        "$(location :libOpenXLAPartitioner.so)",
+    ],
+    data = [
+        ":libOpenXLAPartitioner.so",
+    ],
+    deps = [
+        ":c_headers",
+        ":loader",
     ],
 )
 

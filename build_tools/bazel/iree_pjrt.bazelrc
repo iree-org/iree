@@ -10,8 +10,13 @@
 
 # We want everything built with visibility hidden, because we use explicit
 # visibility project wide for exports. There is no better way to do this
-# in bazel.
+# in bazel. If building with hidden visibility, then we must also disable
+# Bazel's built-in shared-library-for-tests feature, since it implies that
+# we are explicitly controlling library creation. Further, force PIC code
+# since we are using all artifacts in as part of shared libraries.
 build --copt="-fvisibility=hidden"
+build --dynamic_mode=off
+build --force_pic
 build --copt="-fno-exceptions"
 
 # Required by OpenXLA
