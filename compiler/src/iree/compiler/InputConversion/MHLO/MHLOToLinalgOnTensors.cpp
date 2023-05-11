@@ -482,6 +482,18 @@ struct ConvertMHLOToLinalgOnTensorsPass
       return llvm::all_of(op.getOperandTypes(),
                           [&](Type type) { return !isIllegalFuncType(type); });
     });
+    target.addDynamicallyLegalOp<func::CallOp>([&](func::CallOp op) {
+      return llvm::all_of(op.getOperandTypes(),
+                          [&](Type type) { return !isIllegalFuncType(type); });
+    });
+    target.addDynamicallyLegalOp<cf::CondBranchOp>([&](cf::CondBranchOp op) {
+      return llvm::all_of(op.getOperandTypes(),
+                          [&](Type type) { return !isIllegalFuncType(type); });
+    });
+    target.addDynamicallyLegalOp<cf::BranchOp>([&](cf::BranchOp op) {
+      return llvm::all_of(op.getOperandTypes(),
+                          [&](Type type) { return !isIllegalFuncType(type); });
+    });
     target.addDynamicallyLegalOp<ml_program::GlobalOp>(
         [&](ml_program::GlobalOp op) {
           return typeConverter->isLegal(op.getType());
