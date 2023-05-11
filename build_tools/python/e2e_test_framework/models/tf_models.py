@@ -32,16 +32,16 @@ BERT_FOR_MASKED_LM_FP32_SEQLEN512 = common_definitions.Model(
     entry_function="forward",
     input_types=["1x512xi32", "1x512xi32"])
 
-EFFICIENTNET_V2_S_FP32 = common_definitions.Model(
-    id=unique_ids.MODEL_EFFICIENTNET_V2_S_FP32_TF,
-    name="EfficientNetV2STF",
-    tags=["fp32", "cnn", "tensorflow"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
-    # Converted from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/efficientnet_v2.py
-    source_url=
-    f"{TF_MODELS_MANUAL_ROOT_DIR}/EfficientNetV2STF_2023-05-07.timestamp_1683504734.mlirbc",
-    entry_function="forward",
-    input_types=["1x384x384x3xf32"])
+#EFFICIENTNET_V2_S_FP32 = common_definitions.Model(
+#    id=unique_ids.MODEL_EFFICIENTNET_V2_S_FP32_TF,
+#    name="EfficientNetV2STF",
+#    tags=["fp32", "cnn", "tensorflow"],
+#    source_type=common_definitions.ModelSourceType.EXPORTED_MHLO_MLIR,
+#    # Converted from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/efficientnet_v2.py
+#    source_url=
+#    f"{TF_MODELS_MANUAL_ROOT_DIR}/EfficientNetV2STF_2023-05-07.timestamp_1683504734.mlirbc",
+#    entry_function="forward",
+#    input_types=["1x384x384x3xf32"])
 
 # This is the model used in the MLPerf Inference Suite.
 BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(

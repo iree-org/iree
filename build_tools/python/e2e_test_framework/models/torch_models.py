@@ -65,15 +65,15 @@ EFFICIENTNET_V2_S_FP32_TORCH = common_definitions.Model(
     input_types=["1x3x384x384xf32"])
 
 # Converted from https://pytorch.org/vision/stable/models/generated/torchvision.models.efficientnet_b7.html#torchvision.models.efficientnet_b7
-EFFICIENTNET_B7_FP32_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_EFFICIENTNET_B7_FP32_TORCH,
-    name="EfficientNetB7PT",
-    tags=["fp32", "cnn", "depthwise-conv"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url=
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir",
-    entry_function="forward",
-    input_types=["1x3x600x600xf32"])
+#EFFICIENTNET_B7_FP32_TORCH = common_definitions.Model(
+#    id=unique_ids.MODEL_EFFICIENTNET_B7_FP32_TORCH,
+#    name="EfficientNetB7PT",
+#    tags=["fp32", "cnn", "depthwise-conv"],
+#    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+#    source_url=
+#    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir",
+#    entry_function="forward",
+#    input_types=["1x3x600x600xf32"])
 
 # Converted from https://huggingface.co/docs/transformers/v4.27.2/en/model_doc/bert#transformers.BertModel
 BERT_LARGE_1X384_FP32_TORCH = common_definitions.Model(

@@ -26,7 +26,7 @@ x86_64_MODELS_AND_THREADS = [
     (tflite_models.MOBILEBERT_FP16, [1, 8]),
     (tflite_models.MOBILEBERT_FP32, [1, 8]),
     (tflite_models.MOBILEBERT_INT8, [1, 8]),
-    (tf_models.EFFICIENTNET_V2_S_FP32, [1, 8]),
+    #(tf_models.EFFICIENTNET_V2_S_FP32, [1, 8]),
     (tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, [1, 8]),
     (tf_models.RESNET50_1X3X224X224_FP32_TF, [1, 8]),
     (torch_models.EFFICIENTNET_V2_S_FP32_TORCH, [1, 8]),
@@ -34,7 +34,7 @@ x86_64_MODELS_AND_THREADS = [
     # TODO: These models should be running at 8, 13, 28 threads but we use 8 for now until new hardware becomes available.
     (tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512, [8]),
     (tf_models.BERT_LARGE_TF_FP32_SEQLEN384, [8]),
-    (torch_models.EFFICIENTNET_B7_FP32_TORCH, [8]),
+    #(torch_models.EFFICIENTNET_B7_FP32_TORCH, [8]),
 ]
 
 # A subset of `x86_64_MODELS_AND_THREADS`.
@@ -52,7 +52,7 @@ x86_64_MODELS_AND_THREADS_EXPERIMENTAL = [
     # Medium models.
     (tflite_models.MOBILEBERT_FP32, [8]),
     (tflite_models.MOBILEBERT_INT8, [8]),
-    (tf_models.EFFICIENTNET_V2_S_FP32, [8]),
+    #(tf_models.EFFICIENTNET_V2_S_FP32, [8]),
     (tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, [8]),
     # Disabled due to https://github.com/openxla/iree/issues/11174.
     # (tf_models.RESNET50_1X3X224X224_FP32_TF, [8]),
@@ -129,13 +129,13 @@ T5_LARGE_TF_BATCHES = [
 ]
 
 CUDA_MODELS = [
-    tf_models.EFFICIENTNET_V2_S_FP32,
+    #tf_models.EFFICIENTNET_V2_S_FP32,
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
     tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512,
     tf_models.BERT_LARGE_TF_FP32_SEQLEN384,
     torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     torch_models.MODEL_UNET_2D_FP32_TORCH,
-    torch_models.EFFICIENTNET_B7_FP32_TORCH,
+    #torch_models.EFFICIENTNET_B7_FP32_TORCH,
 ]
 
 CUDA_MODELS_LONG = RESNET50_TF_BATCHES + BERT_LARGE_TF_BATCHES + T5_LARGE_TF_BATCHES + BERT_LARGE_TORCH_BATCHES + RESNET50_TORCH_BATCHES

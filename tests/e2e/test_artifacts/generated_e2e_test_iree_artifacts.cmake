@@ -312,23 +312,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-c8949024e2472bec7b18c4e3757412715c248273005ca6f8d5769656ed425a84"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.timestamp_1683504734.mlirbc"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_c8949024e2472bec7b18c4e3757412715c248273005ca6f8d5769656ed425a84/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-  FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-a30b64a3d7850881ee9db94e8f75c661af3f76f48d10b3342a6912e1c8879252"
   SRC
     "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.timestamp_1683504734.mlirbc"
@@ -409,23 +392,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
   FRIENDLY_NAME
     "BertLargeTF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-fd5cf4cd75cc1734be3eec2f4396491e9ebb7edd6b9c889cdc29ef72b47d6233"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_68caa96e-b8bb-48a2-bb08-a3044981a370_EfficientNetB7PT.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_fd5cf4cd75cc1734be3eec2f4396491e9ebb7edd6b9c889cdc29ef72b47d6233/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-  FRIENDLY_NAME
-    "EfficientNetB7PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -621,25 +587,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-aed1ca2855056bcd5b7e51063741685b4a387d9d0574b343e8ddc383b49afc76"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.timestamp_1683504734.mlirbc"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_aed1ca2855056bcd5b7e51063741685b4a387d9d0574b343e8ddc383b49afc76/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
-  FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-80a2368e148d9605d98060027b9198dea46efbf050a383784ec5df5e85904757"
   SRC
     "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.timestamp_1683504734.mlirbc"
@@ -678,22 +625,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-04ca0a5077b7dd5ace66d803c9b822dff3428b24e7620a61995aff0907af9533"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.timestamp_1683504734.mlirbc"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_04ca0a5077b7dd5ace66d803c9b822dff3428b24e7620a61995aff0907af9533/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-deafafd0926321a4b8e4dc73ed4a30b2ed9317d26488246461415be2ee857eb1"
   SRC
     "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.timestamp_1683504734.mlirbc"
@@ -703,6 +634,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "MiniLML12H384Uncased(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -719,6 +651,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertForMaskedLMTF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -735,6 +668,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -751,6 +685,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "ClipTextSeqLen64PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -767,24 +702,9 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Unet2dPT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-9470c46965ea67794da45496454c82eade29b5a519d8037b1314738621e02260"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_68caa96e-b8bb-48a2-bb08-a3044981a370_EfficientNetB7PT.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_9470c46965ea67794da45496454c82eade29b5a519d8037b1314738621e02260/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME
-    "EfficientNetB7PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -905,6 +825,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50TFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -921,6 +842,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50TFBatch8(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -937,6 +859,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50TFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -953,6 +876,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50TFBatch128(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -969,6 +893,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50TFBatch256(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -985,6 +910,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50TFBatch2048(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1001,6 +927,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1017,6 +944,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch16(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1033,6 +961,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch24(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1049,6 +978,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch32(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1065,6 +995,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch48(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1081,6 +1012,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1097,6 +1029,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch512(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1113,6 +1046,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch1024(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1129,6 +1063,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargeTFBatch1280(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1145,6 +1080,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "T5LargeTFBatch1(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1161,6 +1097,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "T5LargeTFBatch16(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1177,6 +1114,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "T5LargeTFBatch24(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1193,6 +1131,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "T5LargeTFBatch32(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1209,6 +1148,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "T5LargeTFBatch48(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1225,6 +1165,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "T5LargeTFBatch64(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1241,6 +1182,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "T5LargeTFBatch512(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1257,6 +1199,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1273,6 +1216,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch16(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1289,6 +1233,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch24(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1305,6 +1250,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch32(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1321,6 +1267,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch48(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1337,6 +1284,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1353,6 +1301,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch512(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1369,6 +1318,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch1024(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1385,6 +1335,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "BertLargePTBatch1280(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1401,6 +1352,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50PTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1417,6 +1369,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50PTBatch8(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1433,6 +1386,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50PTBatch64(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1449,6 +1403,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50PTBatch128(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1465,6 +1420,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50PTBatch256(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -1481,6 +1437,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
   FRIENDLY_NAME
     "Resnet50PTBatch2048(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
@@ -3095,27 +3052,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-01d35de2a55b9800e05151455eace0bf4493337ac1210fcc4904d630b075599a"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.timestamp_1683504734.mlirbc"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_01d35de2a55b9800e05151455eace0bf4493337ac1210fcc4904d630b075599a/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_01d35de2a55b9800e05151455eace0bf4493337ac1210fcc4904d630b075599a/scheduling_stats.json"
-  FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-2957930127e9b01e90ccddb7290e1c4b4abf6373cc36929809040e2c144d3fd7"
   SRC
     "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.timestamp_1683504734.mlirbc"
@@ -3216,27 +3152,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_BertLargeTF_module_8ee3c7b136703472b53bc8a19d8d28945aca93953612ccc65e55cd1b3dfda6c8/scheduling_stats.json"
   FRIENDLY_NAME
     "BertLargeTF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-63a2a9acdb2dafb66a49487fd7eecb79e49d870ec9b9ef17a1e8e9d50fe5c9ba"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_68caa96e-b8bb-48a2-bb08-a3044981a370_EfficientNetB7PT.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_63a2a9acdb2dafb66a49487fd7eecb79e49d870ec9b9ef17a1e8e9d50fe5c9ba/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_63a2a9acdb2dafb66a49487fd7eecb79e49d870ec9b9ef17a1e8e9d50fe5c9ba/scheduling_stats.json"
-  FRIENDLY_NAME
-    "EfficientNetB7PT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3472,29 +3387,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-c9a7c5b08db10ed782045b6810cb4ee157da9e95590456d3839c06163ee30fa7"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.timestamp_1683504734.mlirbc"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_c9a7c5b08db10ed782045b6810cb4ee157da9e95590456d3839c06163ee30fa7/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=mhlo"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-llvmcpu-enable-pad-consumer-fusion"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_c9a7c5b08db10ed782045b6810cb4ee157da9e95590456d3839c06163ee30fa7/scheduling_stats.json"
-  FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,fuse-padding,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-838cc09b422958a332fd76cf12a6a2a95b8346c8e8d2fe7b15cb5ace4c20581e"
   SRC
     "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.timestamp_1683504734.mlirbc"
@@ -3541,26 +3433,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    "iree-module-25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.timestamp_1683504734.mlirbc"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetV2STF_module_25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509/scheduling_stats.json"
-  FRIENDLY_NAME
-    "EfficientNetV2STF(mhlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     "iree-module-65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b"
   SRC
     "${ROOT_ARTIFACTS_DIR}/model_ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.timestamp_1683504734.mlirbc"
@@ -3570,6 +3442,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3590,6 +3463,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3610,6 +3484,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3630,6 +3505,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3650,32 +3526,13 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_Unet2dPT_module_925cdb19f2aa31a1907c81b5a9e179d91280c77b08a039c1cbf146f71683dde9/scheduling_stats.json"
   FRIENDLY_NAME
     "Unet2dPT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
-    "iree-module-3c94ab45ad76bd8b2083729b65340b987da3247c854faf7d06431cb05a3b0a23"
-  SRC
-    "${ROOT_ARTIFACTS_DIR}/model_68caa96e-b8bb-48a2-bb08-a3044981a370_EfficientNetB7PT.mlir"
-  MODULE_FILE_NAME
-    "${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_3c94ab45ad76bd8b2083729b65340b987da3247c854faf7d06431cb05a3b0a23/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_EfficientNetB7PT_module_3c94ab45ad76bd8b2083729b65340b987da3247c854faf7d06431cb05a3b0a23/scheduling_stats.json"
-  FRIENDLY_NAME
-    "EfficientNetB7PT(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3820,6 +3677,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3840,6 +3698,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3860,6 +3719,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3880,6 +3740,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3900,6 +3761,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3920,6 +3782,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3940,6 +3803,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3960,6 +3824,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3980,6 +3845,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4000,6 +3866,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4020,6 +3887,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4040,6 +3908,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4060,6 +3929,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4080,6 +3950,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4100,6 +3971,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4120,6 +3992,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4140,6 +4013,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4160,6 +4034,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4180,6 +4055,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4200,6 +4076,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4220,6 +4097,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4240,6 +4118,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=mhlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4260,6 +4139,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4280,6 +4160,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4300,6 +4181,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4320,6 +4202,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4340,6 +4223,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4360,6 +4244,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4380,6 +4265,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4400,6 +4286,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4420,6 +4307,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4440,6 +4328,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4460,6 +4349,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4480,6 +4370,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4500,6 +4391,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4520,6 +4412,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4540,6 +4433,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=cuda"
     "--iree-input-type=none"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-codegen-llvmgpu-enable-transform-dialect-matmul-tensorcore-strategy=true"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -6225,13 +6119,11 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-4afb465f351db6dbf3d06a03d98f0e77c9cc1e284d89f6db6367969793e44a59
   ${PACKAGE_NAME}_iree-imported-model-af95be67ed750381753ca4fe4341853e7e2884d4c4bd1dd9a17d8ceab3ee8882
   ${PACKAGE_NAME}_iree-imported-model-3bda9f3a5eb6a0fd3adc80187495d7ab840e409f379c70e3fd687934fafdd3b6
-  ${PACKAGE_NAME}_model-ebe7897f-5613-435b-a330-3cb967704e5e
   ${PACKAGE_NAME}_model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493
   ${PACKAGE_NAME}_model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-1
   ${PACKAGE_NAME}_model-cc474102-7d2f-4ec1-92ae-84e83ba0f390
   ${PACKAGE_NAME}_model-39d157ad-f0ec-4a76-963b-d783beaed60f
   ${PACKAGE_NAME}_model-8871f602-571c-4eb8-b94d-554cc8ceec5a
-  ${PACKAGE_NAME}_model-68caa96e-b8bb-48a2-bb08-a3044981a370
   ${PACKAGE_NAME}_model-9a9515c7-cb68-4c34-b1d2-0e8c0a3620b8
   ${PACKAGE_NAME}_model-340553d1-e6fe-41b6-b2c7-687c74ccec56
   ${PACKAGE_NAME}_model-50a7aece-73f9-47f4-a93a-4a1178f45407
@@ -6291,13 +6183,11 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-472e6a18344f13d47e89f87670b37eff583ae610c2a1d15ac1cca307ccfc2f4d
   ${PACKAGE_NAME}_iree-module-95dee09d7f3f9ee36d6c70645585b44b347ea001a1ab9a04b150ca2dc052255f
   ${PACKAGE_NAME}_iree-module-78154d58dddac432100d656b22fa9bcb45e4207a9ea2bc371bf089a68bad397a
-  ${PACKAGE_NAME}_iree-module-c8949024e2472bec7b18c4e3757412715c248273005ca6f8d5769656ed425a84
   ${PACKAGE_NAME}_iree-module-a30b64a3d7850881ee9db94e8f75c661af3f76f48d10b3342a6912e1c8879252
   ${PACKAGE_NAME}_iree-module-10a9a8a00ac0f36f45b5e35a032ca177b68621e3137dc57b9d6e08225301441b
   ${PACKAGE_NAME}_iree-module-047e75c462648b5fe1133f4ffbc3d1c7bdda154081d3eaa3be0b5445725b272b
   ${PACKAGE_NAME}_iree-module-1c7402f88ba881ec6abb39204faa4b5fedb2ffff4a6066555fcff0c7c4b74732
   ${PACKAGE_NAME}_iree-module-9c849d0ccfc89c0bca0740949572db8735832012a43c4c9f15c3a8ef0d9cca04
-  ${PACKAGE_NAME}_iree-module-fd5cf4cd75cc1734be3eec2f4396491e9ebb7edd6b9c889cdc29ef72b47d6233
   ${PACKAGE_NAME}_iree-module-711cb4e615cc4e032fe9f198b89e32f4f85c94cab6e9101eb8202b22c97a37b1
   ${PACKAGE_NAME}_iree-module-c37bfe2bb995b2703170a890bd81e372b687bed57087b1d8a6d8bb16b91c5ad4
   ${PACKAGE_NAME}_iree-module-3ba167fc59b5959be276b331951c759391d6e158572fc05603981dcc4bd3fc90
@@ -6308,16 +6198,13 @@ add_dependencies(iree-benchmark-suites
   ${PACKAGE_NAME}_iree-module-4b61f532e6cf4e175a7e90cd9418e3c2614176b5253875951f99e52d2621c152
   ${PACKAGE_NAME}_iree-module-8d15dde1c8c2ed90009698c357455dfc94fd96ae877f4892954bef0ec4361de8
   ${PACKAGE_NAME}_iree-module-9a2128d69c5c5a51402e01c4a848e90ec369fa601a3d9fc1ab69dab8db47e6d3
-  ${PACKAGE_NAME}_iree-module-aed1ca2855056bcd5b7e51063741685b4a387d9d0574b343e8ddc383b49afc76
   ${PACKAGE_NAME}_iree-module-80a2368e148d9605d98060027b9198dea46efbf050a383784ec5df5e85904757
   ${PACKAGE_NAME}_iree-module-f146632eb124afeb899eeae8aaf5ab6cd9efae22ee9ffb26d34fe1da10049fbe
-  ${PACKAGE_NAME}_iree-module-04ca0a5077b7dd5ace66d803c9b822dff3428b24e7620a61995aff0907af9533
   ${PACKAGE_NAME}_iree-module-deafafd0926321a4b8e4dc73ed4a30b2ed9317d26488246461415be2ee857eb1
   ${PACKAGE_NAME}_iree-module-bdd904cc5614ebf77609c7802a2dfc09f139aee2a247a247d10d320de72b0e28
   ${PACKAGE_NAME}_iree-module-45565cae821666fd34bca97be2e4cce3bd61e71308785728737d89acbb9bc9d2
   ${PACKAGE_NAME}_iree-module-c4b43b31944dbd567e48efacfdb33f707eb248538cf70fa7dcf1085c6c7dbd3f
   ${PACKAGE_NAME}_iree-module-c8ec2db5ee884e0af17814e61b13d7f7f1f2d4f7028e8c1920d0d968c27de2bb
-  ${PACKAGE_NAME}_iree-module-9470c46965ea67794da45496454c82eade29b5a519d8037b1314738621e02260
   ${PACKAGE_NAME}_iree-module-44e0517dcee4f94b6f7ea1dd6b5492ee9752b4a7cab27d3e5e5ad38ef23071c6
   ${PACKAGE_NAME}_iree-module-c0ea83b865fd0c67a3013086ef2250464e2aecfc615a95170ef46128d2e57208
   ${PACKAGE_NAME}_iree-module-c91ccf1fb3086a35cffd2e8bed6be929574a9ba626d9f271f577503ad07e3509
@@ -6453,13 +6340,11 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-5a4c96fc279262ad7d7f1d446d0bd3685b2ca42e06b0167df5be5737c9d42901
   ${PACKAGE_NAME}_iree-module-27bbe62536a23529b4dd0df3d4913ee18344df9b6e2a32fc834fb7d9bc520e24
   ${PACKAGE_NAME}_iree-module-78511a42a50f705b944437a040e1ee3bb5b2595a3b1d4db788586fe48f9a2453
-  ${PACKAGE_NAME}_iree-module-01d35de2a55b9800e05151455eace0bf4493337ac1210fcc4904d630b075599a
   ${PACKAGE_NAME}_iree-module-2957930127e9b01e90ccddb7290e1c4b4abf6373cc36929809040e2c144d3fd7
   ${PACKAGE_NAME}_iree-module-ee88f7648c08cb775827b3afa89a2aaccd34eff697306c2b35598ba7e4c78df8
   ${PACKAGE_NAME}_iree-module-b5078b9d2031b69ec5ce9b775c8701cef73add8ebfb786d9189ca3fb6474cf73
   ${PACKAGE_NAME}_iree-module-ddd1657bc5433ccca5c8ce562f581626457a793670958cd8b4016c426191a9c4
   ${PACKAGE_NAME}_iree-module-8ee3c7b136703472b53bc8a19d8d28945aca93953612ccc65e55cd1b3dfda6c8
-  ${PACKAGE_NAME}_iree-module-63a2a9acdb2dafb66a49487fd7eecb79e49d870ec9b9ef17a1e8e9d50fe5c9ba
   ${PACKAGE_NAME}_iree-module-9a1d228583ba1e56a19393f6938d16b5d582bb17f89fb5856b8b1c68e34abd45
   ${PACKAGE_NAME}_iree-module-00a22e8ada401de8f20895beff9a153585e585c2d686983e27f9d64fdf7d39a8
   ${PACKAGE_NAME}_iree-module-de34105293194986d706823bd3d20ce784506ec5918c4d0efac9839020bb5fdd
@@ -6470,16 +6355,13 @@ add_dependencies(iree-e2e-compile-stats-suites
   ${PACKAGE_NAME}_iree-module-152d0b6211fff7591df3418c549c979a8144fc34280c22a8b2b5ff8ea3d1b46c
   ${PACKAGE_NAME}_iree-module-e0533bdae79e15707a6eb26eb7f09c4d7dbdbfc40b993a4ad6289cf2bb1f13cb
   ${PACKAGE_NAME}_iree-module-ad9a410e86dd9d649de58f5a7dbdc6cd2300fb6b6a363f4483e930d9944d2d07
-  ${PACKAGE_NAME}_iree-module-c9a7c5b08db10ed782045b6810cb4ee157da9e95590456d3839c06163ee30fa7
   ${PACKAGE_NAME}_iree-module-838cc09b422958a332fd76cf12a6a2a95b8346c8e8d2fe7b15cb5ace4c20581e
   ${PACKAGE_NAME}_iree-module-8231a286cdc63a48f3f70a12ab5a182142c00cbebaccdc79e35ca552f02422e7
-  ${PACKAGE_NAME}_iree-module-25ad2815eb690276e9c2183aaafaf17a3df734bb6164071ad92dbf1e7faf7509
   ${PACKAGE_NAME}_iree-module-65586f1e5b51439dd951529c35fa9000a928f90039cc6cfb66d5c81d07a6c62b
   ${PACKAGE_NAME}_iree-module-8b19868be1c797cb585551c871c4171e78817e0efc49d30d91b9d722be283de9
   ${PACKAGE_NAME}_iree-module-c2085883b1f5c767f37508ab998a4bcd17d169fe6a5197d28e4dca8772c90253
   ${PACKAGE_NAME}_iree-module-88b6b5f712cd2f40d07a136e7f911c05b976c390e07f104c970292dee9a77e9a
   ${PACKAGE_NAME}_iree-module-925cdb19f2aa31a1907c81b5a9e179d91280c77b08a039c1cbf146f71683dde9
-  ${PACKAGE_NAME}_iree-module-3c94ab45ad76bd8b2083729b65340b987da3247c854faf7d06431cb05a3b0a23
   ${PACKAGE_NAME}_iree-module-9b4e60a06d92bebe93ee7824e1990d10bce55062bd896d3f15604881c446e528
   ${PACKAGE_NAME}_iree-module-52ce6f195b382daa71816b068bc1d13541397d6da097276699dbaffa95de35d7
   ${PACKAGE_NAME}_iree-module-973d25bc365d73084bfa35f317464f59a9b00f67d732733b4eaa476a418ecd95

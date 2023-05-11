@@ -120,16 +120,6 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
-    "model-ebe7897f-5613-435b-a330-3cb967704e5e"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/EfficientNetV2STF_2023-05-07.timestamp_1683504734.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_ebe7897f-5613-435b-a330-3cb967704e5e_EfficientNetV2STF.timestamp_1683504734.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
     "model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/MiniLML12H384Uncased_2023-05-07.timestamp_1683504734.mlirbc"
@@ -175,16 +165,6 @@ iree_fetch_artifact(
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertLargeTF_2023-05-07.timestamp_1683504734.mlirbc"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_8871f602-571c-4eb8-b94d-554cc8ceec5a_BertLargeTF.timestamp_1683504734.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
-    "model-68caa96e-b8bb-48a2-bb08-a3044981a370"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_68caa96e-b8bb-48a2-bb08-a3044981a370_EfficientNetB7PT.mlir"
   UNPACK
 )
 
