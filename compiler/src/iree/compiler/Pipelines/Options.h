@@ -36,6 +36,7 @@ struct InputDialectOptions {
     none,
     // Analyses the input to determine what input dialect pipeline to use.
     auto_detect,
+#ifdef IREE_HAVE_MHLO_INPUT
     // Legalizes input defined over MHLO ops.
     mhlo,
     // Special case of 'mhlo' legalization which also performs some XLA
@@ -43,10 +44,15 @@ struct InputDialectOptions {
     xla,
     // Legalizes input defined over StableHLO ops.
     stablehlo,
+#endif  // IREE_HAVE_MHLO_INPUT
+#ifdef IREE_HAVE_TORCH_INPUT
     // Legalizes input defined over TMTensor ops.
     tm_tensor,
+#endif  // IREE_HAVE_TORCH_INPUT
+#ifdef IREE_HAVE_TOSA_INPUT
     // Legalizes input defined over TOSA ops.
     tosa,
+#endif  // IREE_HAVE_TOSA_INPUT
   };
   Type type = Type::auto_detect;
 
