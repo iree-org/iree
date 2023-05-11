@@ -788,8 +788,8 @@ static void getDefaultMatmulCacheSizes(linalg::LinalgOp op,
 
 static LogicalResult setMatmulPadRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
-    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> workgroupTileSizes,
-    int vectorSize) {
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> cacheTileSizes,
+    ArrayRef<int64_t> workgroupTileSizes, int vectorSize) {
   // The tiling for parallel dims and reduction dims should be separated.
   int numTiledDims = workgroupTileSizes.size();
   SmallVector<int64_t> parallelTileSizes(workgroupTileSizes.begin(),
@@ -812,12 +812,6 @@ static LogicalResult setMatmulPadRootConfig(
   int64_t K = lhsShapedType.getShape().back();
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, workgroupTileSizes.back(), vectorSize));
-
-  SmallVector<int64_t> defaultCacheTileSizes;
-  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  getDefaultMatmulCacheSizes(linalgOp, defaultCacheTileSizes);
-  ArrayRef<int64_t> cacheTileSizes(defaultCacheTileSizes.end() - numTiledDims,
-                                   defaultCacheTileSizes.end());
 
   SmallVector<int64_t> parallelCacheTileSizes(numTiledDims, 0);
   SmallVector<int64_t> reductionCacheTileSizes(numTiledDims, 0);
@@ -1053,10 +1047,6 @@ static LogicalResult setRootConfig(
     maxTileSizes[0] = 1;
   }
 
-  // There are hard-coded configurations in DoubleTilingPadExpert, so it only
-  // works for linalg.matmul cases. We can relax it once we have better
-  // scheduling, e.g., transform dialect.
-  SmallVector<int64_t> flowTileSizes;
   auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
   bool usePaddingPipeline =
       vecPreProcStrategy == VectorPreProcStrategy::Padding;
@@ -1064,6 +1054,11 @@ static LogicalResult setRootConfig(
   LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
                        << vecPreProcStrategy << "\n");
 
+  // There are hard-coded configurations in DoubleTilingPadExpert, so it only
+  // works for linalg.matmul cases. We can relax it once we have better
+  // scheduling, e.g., transform dialect.
+  SmallVector<int64_t> flowTileSizes;
+  SmallVector<int64_t> cacheTileSizes;
   if (usePaddingPipeline) {
     // It's inspired from https://github.com/iree-org/iree-llvm-sandbox repo.
     // Sandbox has [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192
@@ -1072,8 +1067,14 @@ static LogicalResult setRootConfig(
       maxTileSizes[0] = 192;
       maxTileSizes[1] = 128;
     }
+
+    SmallVector<int64_t> defaultCacheTileSizes;
+    getDefaultMatmulCacheSizes(linalgOp, defaultCacheTileSizes);
+    cacheTileSizes.append(defaultCacheTileSizes.end() - numLoops,
+                          defaultCacheTileSizes.end());
+
     flowTileSizes = getDefaultDistributedLevelTileSizes(
-        linalgOp, workgroupTileSizes, maxTileSizes,
+        linalgOp, cacheTileSizes, maxTileSizes,
         /*allowIncompleteTile=*/true);
   } else {
     flowTileSizes = getDefaultDistributedLevelTileSizes(
@@ -1081,6 +1082,7 @@ static LogicalResult setRootConfig(
   }
 
   LLVM_DEBUG(KD_DBGS() << "Flow tile sizes: " << flowTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Cache tile sizes: " << cacheTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Workgroup tile sizes: " << workgroupTileSizes
                        << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
@@ -1093,11 +1095,13 @@ static LogicalResult setRootConfig(
                                 workgroupTileSizes, vectorSize);
   }
 
-  TileSizesListType tileSizes = {flowTileSizes, workgroupTileSizes};
   if (usePaddingPipeline) {
     return setMatmulPadRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                  workgroupTileSizes, vectorSize);
+                                  cacheTileSizes, workgroupTileSizes,
+                                  vectorSize);
   }
+
+  TileSizesListType tileSizes = {flowTileSizes, workgroupTileSizes};
   return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
                                   vectorSize, vecPreProcStrategy);
 }
