@@ -16,7 +16,6 @@ components:
 | `iree-runtime`      | IREE's runtime, including CPU and GPU backends                              |
 | `iree-tools-tf`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
 | `iree-tools-tflite` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
-| `iree-tools-xla`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |
 | `iree-jax`          | Tools for importing from [JAX](https://github.com/google/jax)               |
 
 Collectively, these packages allow for importing from frontends, compiling
@@ -88,8 +87,7 @@ Stable release packages are published to
       iree-compiler \
       iree-runtime \
       iree-tools-tf \
-      iree-tools-tflite \
-      iree-tools-xla
+      iree-tools-tflite
     ```
 
 !!! Tip "Tip - Nightly releases"
