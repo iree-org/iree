@@ -10,7 +10,7 @@
 #   Defaults to comparing against 'main'.
 #     ./build_tools/pytype/check_diff.sh
 #   A specific branch can be specified.
-#     ./build_tools/pytype/check_diff.sh  google
+#     ./build_tools/pytype/check_diff.sh  some-other-branch
 #   Or all python files outside of './third_party/' can be checked.
 #     ./build_tools/pytype/check_diff.sh  all
 
@@ -29,13 +29,8 @@ fi
 BASE=$(echo "${FILES?}" | \
        grep -vP '^(\./)?integrations/*$' | \
        grep -vP '(\./)?setup\.py$')
-IREE_TF=$(echo "${FILES?}" | \
-          grep -P '^(\./)?integrations/tensorflow/bindings/python/iree/tf/.*')
-IREE_XLA=$(echo "${FILES?}" | \
-           grep -P '^(\./)?integrations/tensorflow/bindings/python/iree/xla/.*')
-COMPILER=$(echo "${FILES?}" | \
-           grep -P '^(\./)?integrations/tensorflow/compiler/.*')
-E2E=$(echo "${FILES?}" | grep -P '^(\./)?integrations/tensorflow/e2e/.*')
+INTEGRATIONS=$(echo "${FILES?}" | \
+               grep -P '^(\./)?integrations/.*')
 
 function check_files() {
   # $1: previous return code
@@ -70,20 +65,8 @@ echo "Checking .py files outside of integrations/"
 check_files "${MAX_CODE?}" "${BASE?}"
 MAX_CODE="$?"
 
-echo "Checking .py files in integrations/tensorflow/bindings/python/iree/tf/.*"
-check_files "${MAX_CODE?}" "${IREE_TF?}"
-MAX_CODE="$?"
-
-echo "Checking .py files in integrations/tensorflow/bindings/python/iree/xla/.*"
-check_files "${MAX_CODE?}" "${IREE_XLA?}"
-MAX_CODE="$?"
-
-echo "Checking .py files in integrations/tensorflow/compiler/.*"
-check_files "${MAX_CODE?}" "${COMPILER?}"
-MAX_CODE="$?"
-
-echo "Checking .py files in integrations/tensorflow/e2e/.*"
-check_files "${MAX_CODE?}" "${E2E?}"
+echo "Checking .py files in integrations/.*"
+check_files "${MAX_CODE?}" "${INTEGRATIONS?}"
 MAX_CODE="$?"
 
 
