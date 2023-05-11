@@ -11,9 +11,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace utils {
+namespace {
 
 using ::iree::StatusCode;
 using ::iree::testing::status::StatusIs;
@@ -91,7 +89,7 @@ TEST_F(LibmpiTest, MPIErrorToIREEStatus) {
 
 TEST_F(LibmpiTest, Bcast) {
   const int N = 100;
-  char array[N];
+  char array[N] = {0};
   int root = 1;
 
   ASSERT_GT(world_size, 1)
@@ -105,15 +103,16 @@ TEST_F(LibmpiTest, Bcast) {
                                      IREE_MPI_COMM_WORLD(&symbols)),
                            "MPI_Bcast"));
 
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < N; i++) {
     EXPECT_EQ(array[i], 'r') << "[" << rank << "] failed at index " << i;
+  }
 }
 
 TEST_F(LibmpiTest, Gather) {
   const int N = 100;
-  char sendarray[N];
+  char sendarray[N] = {0};
   int root = 1;
-  char *recvbuf = NULL;
+  char* recvbuf = NULL;
 
   ASSERT_GT(world_size, 1)
       << "This test requires mpirun with more than one node";
@@ -121,7 +120,7 @@ TEST_F(LibmpiTest, Gather) {
   memset(sendarray, (char)(rank + 1), N);
 
   if (rank == root) {
-    recvbuf = (char *)malloc(world_size * N * sizeof(char));
+    recvbuf = (char*)malloc(world_size * N * sizeof(char));
     ASSERT_NE(recvbuf, nullptr);
   }
   IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
@@ -141,15 +140,15 @@ TEST_F(LibmpiTest, Gather) {
 
 TEST_F(LibmpiTest, Scatter) {
   const int N = 100;
-  char recvbuf[N];
+  char recvbuf[N] = {0};
   int root = 1;
-  char *sendbuf = NULL;
+  char* sendbuf = NULL;
 
   ASSERT_GT(world_size, 1)
       << "This test requires mpirun with more than one node";
 
   if (rank == root) {
-    sendbuf = (char *)malloc(world_size * N * sizeof(char));
+    sendbuf = (char*)malloc(world_size * N * sizeof(char));
     ASSERT_NE(sendbuf, nullptr);
     memset(sendbuf, 's', world_size * N * sizeof(char));
   }
@@ -171,14 +170,14 @@ TEST_F(LibmpiTest, Scatter) {
 
 TEST_F(LibmpiTest, Allgather) {
   const int N = 100;
-  char sendarray[N];
-  char *recvbuf = NULL;
+  char sendarray[N] = {0};
+  char* recvbuf = NULL;
 
   ASSERT_GT(world_size, 1)
       << "This test requires mpirun with more than one node";
 
   memset(sendarray, (char)(rank + 1), N);
-  recvbuf = (char *)malloc(world_size * N * sizeof(char));
+  recvbuf = (char*)malloc(world_size * N * sizeof(char));
   ASSERT_NE(recvbuf, nullptr);
 
   IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
@@ -196,17 +195,17 @@ TEST_F(LibmpiTest, Allgather) {
 
 TEST_F(LibmpiTest, Alltoall) {
   const int N = 100;
-  char *sendbuf = NULL;
-  char *recvbuf = NULL;
+  char* sendbuf = NULL;
+  char* recvbuf = NULL;
 
   ASSERT_GT(world_size, 1)
       << "Thist test requires mpirun with more than one node";
 
-  sendbuf = (char *)malloc(world_size * N * sizeof(char));
+  sendbuf = (char*)malloc(world_size * N * sizeof(char));
   ASSERT_NE(sendbuf, nullptr);
   memset(sendbuf, (char)('A' + rank), N * world_size);
 
-  recvbuf = (char *)malloc(world_size * N * sizeof(char));
+  recvbuf = (char*)malloc(world_size * N * sizeof(char));
   ASSERT_NE(recvbuf, nullptr);
 
   IREE_EXPECT_OK(MPI_RESULT_TO_STATUS(
@@ -225,8 +224,8 @@ TEST_F(LibmpiTest, Alltoall) {
 
 TEST_F(LibmpiTest, ReduceSum) {
   const int N = 100;
-  int sendbuf[N];
-  int recvbuf[N];
+  int sendbuf[N] = {0};
+  int recvbuf[N] = {0};
   int root = 1;
 
   ASSERT_GT(world_size, 1)
@@ -251,8 +250,8 @@ TEST_F(LibmpiTest, ReduceSum) {
 
 TEST_F(LibmpiTest, AllReduce) {
   const int N = 100;
-  int sendbuf[N];
-  int recvbuf[N];
+  int sendbuf[N] = {0};
+  int recvbuf[N] = {0};
 
   ASSERT_GT(world_size, 1)
       << "Thist test requires mpirun with more than one node";
@@ -271,6 +270,4 @@ TEST_F(LibmpiTest, AllReduce) {
   }
 }
 
-}  // namespace utils
-}  // namespace hal
-}  // namespace iree
+}  // namespace
