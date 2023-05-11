@@ -19,15 +19,13 @@ Install [`torch-mlir`](https://github.com/llvm/torch-mlir), necessary for
 compiling PyTorch models to a format IREE is able to execute:
 
 ```shell
-pip install -f https://llvm.github.io/torch-mlir/package-index/ torch-mlir
+pip install --pre torch-mlir \
+  -f https://llvm.github.io/torch-mlir/package-index/
+  --extra-index-url https://download.pytorch.org/whl/nightly/cpu
 ```
 
-A special `iree_torch` package makes it easy to compile PyTorch programs and
-run them on IREE:
-
-```shell
-pip install git+https://github.com/iree-org/iree-torch.git
-```
+The command will also install the right version of `torch` that has been tested
+with the version of `torch-mlir` being installed.
 
 ## Running a model
 
@@ -54,13 +52,13 @@ example_input = # ... an input to the model with the expected shape and dtype
 mlir = torch_mlir.compile(
     model,
     example_input,
-    output_type=torch_mlir.OutputType.LINALG_ON_TENSORS,
+    output_type="linalg-on-tensors",
     use_tracing=True)
 ```
 
 The full list of available output types can be found
-[here](https://github.com/llvm/torch-mlir/blob/6403c0e56f0e93e231df1c8d3dc78df7dd721b80/python/torch_mlir/__init__.py#L19)
-and includes linalg on tensors, mhlo, and tosa.
+[in the source code](https://github.com/llvm/torch-mlir/blob/main/python/torch_mlir/__init__.py),
+and includes `linalg-on-tensors`, `stablehlo`, and `tosa`.
 
 ### Compile the MLIR to an IREE VM flatbuffer
 
@@ -68,7 +66,12 @@ Next, we compile the resulting MLIR to IREE's deployable file format:
 
 ```python
 iree_backend = "llvm-cpu"
-iree_vmfb = iree_torch.compile_to_vmfb(mlir, iree_backend)
+iree_input_type = "tm_tensor"
+bytecode_stream = io.BytesIO()
+mlir.operation.write_bytecode(bytecode_stream)
+iree_vmfb = ireec.compile_str(bytecode_stream.getvalue(),
+                              target_backends=[iree_backend],
+                              input_type=iree_input_type)
 ```
 
 Here we have a choice of backend we want to target. See the
@@ -78,13 +81,24 @@ section of this site for a full list of targets and configurations.
 The generated flatbuffer can now be serialized and stored for another time or
 loaded and executed immediately.
 
+!!! note
+    The input type `tm_tensor` corresponds to the `linalg-on-tensors`
+    output type of `torch-mlir`.
+
+!!! note
+    The conversion to bytecode before passing the module to IREE is needed
+    to cross the border from the Torch-MLIR MLIR CAPI to the IREE MLIR CAPI.
+
 ### Load the VM flatbuffer into IREE
 
-Next, we load the flatbuffer into the IREE runtime. `iree_torch` provides a
-convenience method for loading this flatbuffer from Python:
+Next, we load the flatbuffer into the IREE runtime:
 
 ```python
-invoker = iree_torch.load_vmfb(iree_vmfb, iree_backend)
+config = ireert.Config(driver_name="local-sync")
+ctx = ireert.SystemContext(config=config)
+vm_module = ireert.VmModule.from_flatbuffer(ctx.instance, flatbuffer)
+ctx.add_vm_module(vm_module)
+invoker = ctx.modules.module
 ```
 
 ### Execute the model via IREE
@@ -92,7 +106,8 @@ invoker = iree_torch.load_vmfb(iree_vmfb, iree_backend)
 Finally, we can execute the loaded model:
 
 ```python
-result = invoker.forward(example_input)
+result = invoker.forward(example_input.numpy())
+numpy_result = np.asarray(result)
 ```
 
 ## Training
