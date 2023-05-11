@@ -73,7 +73,7 @@ vm.module @my_module {
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // Create a variable for the function result.
-    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> i32
+    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i32
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
@@ -99,7 +99,7 @@ vm.module @my_module {
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // Create a variable for the function result.
-    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> i32
+    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i32
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
@@ -126,7 +126,7 @@ vm.module @my_module {
   vm.func @call_internal_fn(%arg0 : i32) -> i32 {
 
     // Create a variable for the result.
-    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> i32
+    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i32
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
@@ -156,10 +156,10 @@ vm.module @my_module {
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // This holds the number of variadic arguments.
-    // CHECK-NEXT: %[[NARGS:.+]] = "emitc.constant"() {value = 2 : i32} : () -> i32
+    // CHECK-NEXT: %[[NARGS:.+]] = "emitc.constant"() <{value = 2 : i32}> : () -> i32
 
     // Create a variable for the result.
-    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> i32
+    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i32
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
@@ -189,10 +189,10 @@ vm.module @my_module {
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
     // This holds the number of variadic arguments.
-    // CHECK-NEXT: %[[NARGS:.+]] = "emitc.constant"() {value = 0 : i32} : () -> i32
+    // CHECK-NEXT: %[[NARGS:.+]] = "emitc.constant"() <{value = 0 : i32}> : () -> i32
 
     // Create a variable for the result.
-    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> i32
+    // CHECK-NEXT: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i32
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
@@ -318,13 +318,13 @@ vm.module @my_module {
   // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
 
   // Calculate the size of the arguments. To avoid empty structs we insert a dummy value.
-  // CHECK-NEXT: %[[ARGSIZE:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSIZE:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
 
   // Calculate the size of the result. To avoid empty structs we insert a dummy value.
-  // CHECK-NEXT: %[[RESULTSIZE:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESULTSIZE:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
 
   // Create a struct for the arguments and results.
-  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
 
@@ -381,7 +381,7 @@ vm.module @my_module {
   // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
 
   // Calculate the size of the arguments.
-  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call "sizeof"() {args = [i32]}
   // CHECK-NEXT: %[[ARGSIZE01:.+]] = emitc.call "EMITC_BINARY"(%[[ARGSIZE0]], %[[ARGSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
   // CHECK-NEXT: %[[ARGSIZE2:.+]] = emitc.call "sizeof"() {args = [i32]}
@@ -392,12 +392,12 @@ vm.module @my_module {
   // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call "EMITC_BINARY"(%[[ARGSIZE0123]], %[[ARGSIZE4]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
 
   // Calculate the size of the result.
-  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call "sizeof"() {args = [i32]}
   // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call "EMITC_BINARY"(%[[RESULTSIZE0]], %[[RESULTSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
 
   // Create a struct for the arguments and results.
-  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
 
@@ -484,19 +484,19 @@ vm.module @my_module {
   // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
 
   // Calculate the size of the arguments.
-  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call "sizeof"() {args = [i32]}
   // CHECK-NEXT: %[[ARGSIZE01:.+]] = emitc.call "EMITC_BINARY"(%[[ARGSIZE0]], %[[ARGSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
   // CHECK-NEXT: %[[ARGSIZE2:.+]] = emitc.call "sizeof"() {args = [i32]}
   // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call "EMITC_BINARY"(%[[ARGSIZE01]], %[[ARGSIZE2]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
 
   // Calculate the size of the result.
-  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call "sizeof"() {args = [i32]}
   // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call "EMITC_BINARY"(%[[RESULTSIZE0]], %[[RESULTSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
 
   // Create a struct for the arguments and results.
-  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
 
@@ -571,17 +571,17 @@ vm.module @my_module {
   // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
 
   // Calculate the size of the arguments.
-  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]}
   // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call "EMITC_BINARY"(%[[ARGSIZE0]], %[[ARGSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
 
   // Calculate the size of the result.
-  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]}
   // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call "EMITC_BINARY"(%[[RESULTSIZE0]], %[[RESULTSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
 
   // Create a struct for the arguments and results.
-  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
 
@@ -695,7 +695,7 @@ vm.module @my_module {
     // CHECK-NEXT: emitc.call "EMITC_DEREF_ASSIGN_VALUE"(%arg5, %arg3) : (!emitc.ptr<i32>, i32) -> ()
 
     // Create duplicate ref for
-    // CHECK-NEXT: %[[REF:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK-NEXT: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[REFSIZE:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> !emitc.opaque<"iree_host_size_t">
     // CHECK-NEXT: emitc.call "memset"(%[[REFPTR]], %[[REFSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> ()

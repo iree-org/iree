@@ -3,7 +3,7 @@
 vm.module @my_module {
   // CHECK-LABEL: @my_module_list_alloc
   vm.func @list_alloc(%arg0: i32) {
-    // CHECK: %[[REF:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     %list = vm.list.alloc %arg0 : (i32) -> !vm.list<i32>
     %list_dno = util.optimization_barrier %list : !vm.list<i32>
@@ -14,7 +14,7 @@ vm.module @my_module {
   // CHECK-LABEL: @my_module_list_size
   vm.func @list_size(%arg0: i32) {
     %list = vm.list.alloc %arg0 : (i32) -> !vm.list<i32>
-    // CHECK: %[[REF:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     %size = vm.list.size %list : (!vm.list<i32>) -> i32
     // CHECK: %[[SIZE:.+]] = emitc.call "iree_vm_list_size"(%{{.+}})
@@ -31,7 +31,7 @@ vm.module @my_module {
   // CHECK-LABEL: @my_module_ref
   vm.export @ref
   vm.func @ref(%arg0: i32) {
-    // CHECK: %[[REF:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     %buffer = vm.const.ref.rodata @byte_buffer : !vm.buffer
     %buffer_dno = util.optimization_barrier %buffer : !vm.buffer

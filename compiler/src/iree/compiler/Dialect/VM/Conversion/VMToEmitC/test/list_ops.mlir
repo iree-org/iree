@@ -3,7 +3,7 @@
 vm.module @my_module {
   // CHECK-LABEL: @my_module_list_alloc
   vm.func @list_alloc(%arg0: i32) -> !vm.list<i32> {
-    // CHECK: %[[LIST:.+]] = "emitc.variable"() {value = #emitc.opaque<"NULL">} : () -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
+    // CHECK: %[[LIST:.+]] = "emitc.variable"() <{value = #emitc.opaque<"NULL">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
     // CHECK: %[[LIST_PTR:.+]] = emitc.apply "&"(%3) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>) -> !emitc.ptr<!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>>
     // CHECK: %[[ALLOCATOR:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"allocator">]} : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.opaque<"iree_allocator_t">
 
@@ -62,7 +62,7 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: @my_module_list_get_i32
   vm.func @list_get_i32(%arg0: !vm.list<i32>, %arg1: i32) -> i32 {
-    // CHECK-NEXT: %0 = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_value_t">
+    // CHECK-NEXT: %0 = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_value_t">
     // CHECK-NEXT: %1 = emitc.apply "&"(%0) : (!emitc.opaque<"iree_vm_value_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>
     // CHECK-NEXT: %2 = emitc.apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %3 = emitc.call "iree_vm_list_deref"(%2) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
@@ -81,7 +81,7 @@ vm.module @my_module {
     // CHECK-NEXT: %1 = emitc.call "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
     // CHECK: %{{.+}} = emitc.call "iree_vm_list_get_ref_retain"(%1, %arg4, %arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
     // CHECK: %[[A:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg3) {args = [0 : index, #emitc.opaque<"type">]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_type_t">
-    // CHECK: %[[B:.+]] = "emitc.constant"() {value = #emitc.opaque<"IREE_VM_REF_TYPE_NULL">} : () -> !emitc.opaque<"iree_vm_ref_type_t">
+    // CHECK: %[[B:.+]] = "emitc.constant"() <{value = #emitc.opaque<"IREE_VM_REF_TYPE_NULL">}> : () -> !emitc.opaque<"iree_vm_ref_type_t">
     // CHECK: %[[C:.+]] = emitc.call "EMITC_BINARY"(%[[A]], %[[B]]) {args = [#emitc.opaque<"!=">, 0 : index, 1 : index]} : (!emitc.opaque<"iree_vm_ref_type_t">, !emitc.opaque<"iree_vm_ref_type_t">) -> i1
     // CHECK: %[[D:.+]] = emitc.call "iree_vm_type_def_is_value"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> i1
     // CHECK: %[[E:.+]] = emitc.call "iree_vm_type_def_as_ref"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> !emitc.opaque<"iree_vm_ref_type_t">
