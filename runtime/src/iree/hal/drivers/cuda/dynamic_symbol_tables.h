@@ -76,6 +76,7 @@ NCCL_PFN_DECL(ncclCommInitRankConfig, ncclComm_t*, int, ncclUniqueId, int,
               ncclConfig_t*)
 NCCL_PFN_DECL(ncclCommInitRank, ncclComm_t*, int, ncclUniqueId, int)
 NCCL_PFN_DECL(ncclCommInitAll, ncclComm_t*, int, const int*)
+NCCL_PFN_DECL(ncclCommSplit, ncclComm_t, int, int, ncclComm_t*, ncclConfig_t*)
 NCCL_PFN_DECL(ncclCommFinalize, ncclComm_t)
 NCCL_PFN_DECL(ncclCommDestroy, ncclComm_t)
 NCCL_PFN_DECL(ncclCommAbort, ncclComm_t)
@@ -106,5 +107,3 @@ NCCL_PFN_DECL(ncclRecv, void*, size_t, ncclDataType_t, int, ncclComm_t,
               cudaStream_t)
 NCCL_PFN_DECL(ncclGroupStart)
 NCCL_PFN_DECL(ncclGroupEnd)
-
-

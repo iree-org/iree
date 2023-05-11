@@ -1,6 +1,6 @@
 # The declaration-only header for NCCL
 
-The header is copied from a build of NCCL (2.15.5 as of writing).
+The header is copied from a build of NCCL (2.18.1 as of writing).
 
 This declaration-only header is required to query the dynamically injected
 NCCL API at runtime. See the following for more information:
