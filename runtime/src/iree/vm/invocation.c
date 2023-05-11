@@ -499,6 +499,8 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
       .function = function,
       .arguments = arguments,
       .results = results,
+      .format_arguments = cconv_arguments,
+      .format_results = cconv_results,
   };
   state->status =
       function.module->begin_call(function.module->self, stack, call);

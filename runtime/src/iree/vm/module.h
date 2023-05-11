@@ -229,6 +229,10 @@ typedef struct iree_vm_function_call_t {
   // Refs contained will be retained in the results buffer and callers must
   // either move or release them upon return from the call.
   iree_byte_span_t results;
+
+  iree_string_view_t format_arguments;
+  iree_string_view_t format_results;
+
 } iree_vm_function_call_t;
 
 #define IREE_VM_CCONV_TYPE_VOID 'v'
