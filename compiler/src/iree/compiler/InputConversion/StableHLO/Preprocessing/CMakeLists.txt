@@ -68,6 +68,7 @@ iree_cc_library(
     ChloOps
     LLVMSupport
     MLIRArithDialect
+    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMathDialect
