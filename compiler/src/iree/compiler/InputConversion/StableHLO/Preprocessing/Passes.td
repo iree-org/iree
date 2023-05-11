@@ -33,6 +33,11 @@ def EinsumToDotGeneral :
   let summary = "Legalizes einsum ops to general dot ops";
 }
 
+def FlattenTuplesInCFG :
+    Pass<"iree-stablehlo-preprocessing-flatten-tuples", "ModuleOp"> {
+  let summary = "Flattens tuples in the CFG form of StableHLO";
+}
+
 def GatherToTorchIndexSelect :
     Pass<"iree-stablehlo-preprocessing-gather-to-torch-index-select", "func::FuncOp"> {
   let summary = "Legalizes gathers to a torch index select";
