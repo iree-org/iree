@@ -284,7 +284,8 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_name(
     const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
     iree_string_view_t name, iree_vm_function_t* out_function) {
   IREE_ASSERT_ARGUMENT(module);
-  return module->lookup_function(module->self, linkage, name, out_function);
+  return module->lookup_function(module->self, linkage, name,
+                                 /*expected_signature=*/NULL, out_function);
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(

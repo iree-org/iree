@@ -377,8 +377,12 @@ typedef struct iree_vm_module_t {
 
   // Looks up a function with the given name and linkage in the module.
   // This may perform a linear scan and results should be cached.
+  // An optional |expected_signature| can be specified in cases where the
+  // module may be able to provide additional validation or versioning based on
+  // it. Implementations should not assume all lookups will include a signature.
   iree_status_t(IREE_API_PTR* lookup_function)(
       void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
+      const iree_vm_function_signature_t* expected_signature,
       iree_vm_function_t* out_function);
 
   // Gets one or more pieces of function information:
