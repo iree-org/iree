@@ -572,9 +572,8 @@ class CUDATargetBackend final : public TargetBackend {
     }
 
     std::string gpuImage = produceGpuImage(ptxImage);
-    auto gpuImageRef = flatbuffers_uint8_vec_create(
-        builder, reinterpret_cast<const uint8_t *>(gpuImage.c_str()),
-        gpuImage.size());
+    auto gpuImageRef =
+        flatbuffers_string_create(builder, gpuImage.c_str(), gpuImage.size());
     iree_hal_cuda_BlockSizeDef_vec_start(builder);
     for (const auto &workgroupSize : workgroupSizes) {
       iree_hal_cuda_BlockSizeDef_vec_push_create(
