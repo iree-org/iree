@@ -70,9 +70,8 @@ static std::optional<Value> materializeCast(OpBuilder &builder, Type toType,
       castType = shapedType.clone(castType);
 
     if (castType != fromType)
-      fromValue =
-          builder.create<UnrealizedConversionCastOp>(loc, castType, fromValue)
-              ->getResult(0);
+      fromValue = builder.create<tensor::BitcastOp>(loc, castType, fromValue)
+                      ->getResult(0);
   }
 
   if (fromType.getRank() != 0) return fromValue;
@@ -595,9 +594,6 @@ struct ConvertMHLOToLinalgExtPass
         [](mhlo::ComplexOp complexOp) {
           return !isInBodyOfLinalgExtOps(complexOp);
         });
-    // We deliberately allow unrealized casts to persist. These should fall away
-    // when the rest of MHLO is converted.
-    target.addLegalOp<UnrealizedConversionCastOp>();
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
