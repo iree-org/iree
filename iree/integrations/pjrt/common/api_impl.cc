@@ -97,16 +97,16 @@ iree_status_t MapElementTypeToXlaElementType(
       *xla_primitive = xla::PrimitiveType::PRED;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_INT_8:
-      *xla_primitive = xla::PrimitiveType::U8;
+      *xla_primitive = xla::PrimitiveType::S8;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_INT_16:
-      *xla_primitive = xla::PrimitiveType::U16;
+      *xla_primitive = xla::PrimitiveType::S16;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_INT_32:
-      *xla_primitive = xla::PrimitiveType::U32;
+      *xla_primitive = xla::PrimitiveType::S32;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_INT_64:
-      *xla_primitive = xla::PrimitiveType::U64;
+      *xla_primitive = xla::PrimitiveType::S64;
       return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
       *xla_primitive = xla::PrimitiveType::S8;
