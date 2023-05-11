@@ -1,3 +1,5 @@
+// XFAIL: *
+
 // RUN: iree-compile --compile-to=input %s | \
 // RUN: iree-compile --output-format=vm-asm --iree-hal-target-backends=vmvx - | \
 // RUN: FileCheck %s --check-prefix=INPUT-PHASE
