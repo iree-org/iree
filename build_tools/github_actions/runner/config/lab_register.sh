@@ -22,7 +22,7 @@ RUNNER_ENV="${RUNNER_ENV:-prod}"
 OS_FAMILY="${OS_FAMILY:-ubuntu}"
 RUNNER_DIR="${RUNNER_DIR:-actions-runner}"
 
-sed -i "s/%RUNNER_GROUP%/${RUNNER_GROUP}/" "${RUNNER_DIR}/.env"
+sed -i "s#^RUNNER_GROUP=.*\$#RUNNER_GROUP=${RUNNER_GROUP}#" "${RUNNER_DIR}/.env"
 
 declare -a RUNNER_LABELS_ARRAY=(
   "os-family=${OS_FAMILY}"
