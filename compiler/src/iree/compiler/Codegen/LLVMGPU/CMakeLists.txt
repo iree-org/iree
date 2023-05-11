@@ -27,6 +27,7 @@ iree_cc_library(
     "LLVMGPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMGPUDistribute.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
+    "LLVMGPULowerToUKernels.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUTensorAlloc.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"

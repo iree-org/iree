@@ -552,6 +552,14 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 /// Performs the final conversion to ROCDL+LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
+/// A Pass to lowers linalg's fill and matmul to microkernel op
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPULowerToUKernelsPass();
+
+/// Lowers linalg's fill and matmul to microkernel op
+FailureOr<Operation *> lowerMatmulToMicrokernel(
+    RewriterBase &rewriter, linalg::LinalgOp matmulOp, ArrayRef<int64_t> tiles,
+    int64_t stages, Optional<StringRef> ukName = std::nullopt);
+
 /// Perform tiling and distribution to threads.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
     bool distributeToWarp = false);
