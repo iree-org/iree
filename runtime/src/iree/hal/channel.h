@@ -33,6 +33,9 @@ typedef uint32_t iree_hal_channel_flags_t;
 #define IREE_HAL_CHANNEL_RANK_DEFAULT ((int32_t)-1)
 #define IREE_HAL_CHANNEL_COUNT_DEFAULT ((int32_t)-1)
 
+// Indicates that the rank will not be part of any group.
+#define IREE_HAL_CHANNEL_NO_COLOR ((int32_t)-1)
+
 // Parameters defining how a channel should be configured.
 typedef struct {
   // Flags controlling channel behavior.
@@ -79,6 +82,17 @@ IREE_API_EXPORT void iree_hal_channel_retain(iree_hal_channel_t* channel);
 // Releases the given |channel| from the caller.
 IREE_API_EXPORT void iree_hal_channel_release(iree_hal_channel_t* channel);
 
+// Splits |base_channel| into a subgroup based on |color| and |key|.
+// Returns a NULL channel if color is IREE_HAL_CHANNEL_NO_COLOR indicating that
+// the rank is not a participant in any subgroup.
+//
+// Equivalent to:
+//   MPI_Comm_split
+//   ncclCommSplit
+IREE_API_EXPORT iree_status_t iree_hal_channel_split(
+    iree_hal_channel_t* base_channel, int32_t color, int32_t key,
+    iree_hal_channel_flags_t flags, iree_hal_channel_t** out_split_channel);
+
 // Returns the rank the channel represents as a participant in a collective
 // group in `[0, count)` and the total participant count.
 IREE_API_EXPORT void iree_hal_channel_query_rank_and_count(
@@ -99,6 +113,11 @@ iree_hal_channel_count(const iree_hal_channel_t* channel);
 
 typedef struct iree_hal_channel_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_channel_t* channel);
+
+  iree_status_t(IREE_API_PTR* split)(iree_hal_channel_t* base_channel,
+                                     int32_t color, int32_t key,
+                                     iree_hal_channel_flags_t flags,
+                                     iree_hal_channel_t** out_split_channel);
 
   void(IREE_API_PTR* query_rank_and_count)(const iree_hal_channel_t* channel,
                                            int32_t* out_rank,

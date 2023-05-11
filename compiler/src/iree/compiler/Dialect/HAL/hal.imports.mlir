@@ -178,6 +178,15 @@ vm.import private @channel.create(
 ) -> !vm.ref<!hal.channel>
 attributes {nosideeffects}
 
+// Splits a collective communication channel.
+vm.import private @channel.split(
+  %channel : !vm.ref<!hal.channel>,
+  %color : i32,
+  %key : i32,
+  %flags : i32
+) -> !vm.ref<!hal.channel>
+attributes {nosideeffects}
+
 // Returns the rank of the local participant in the group and the group count.
 vm.import private @channel.rank_and_count(
   %channel : !vm.ref<!hal.channel>

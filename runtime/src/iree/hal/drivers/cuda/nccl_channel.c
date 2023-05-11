@@ -56,7 +56,7 @@ typedef struct iree_hal_cuda_nccl_channel_t {
   // Hash of the unique ID used to create the communicator.
   // This is consistent with the hashes NCCL itself uses for logging but is not
   // guaranteed to be unique - only use for informational purposes.
-  uint64_t id_hash;
+  IREE_TRACE(uint64_t id_hash;)
 
   // This participant's rank in the communicator.
   // Equivalent to ncclCommUserRank.
@@ -86,7 +86,7 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
   *out_channel = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  const uint64_t id_hash = iree_hal_cuda_nccl_hash_id(id);
+  IREE_TRACE(const uint64_t id_hash = iree_hal_cuda_nccl_hash_id(id));
   IREE_TRACE_ZONE_APPEND_VALUE(z0, id_hash);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, rank);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, count);
@@ -107,7 +107,7 @@ iree_status_t iree_hal_cuda_nccl_channel_create(
     iree_hal_resource_initialize(&iree_hal_cuda_nccl_channel_vtable,
                                  &channel->resource);
     channel->context_wrapper = context_wrapper;
-    channel->id_hash = id_hash;
+    IREE_TRACE(channel->id_hash = id_hash);
     channel->rank = rank;
     channel->count = count;
     channel->comm = comm;
@@ -142,13 +142,65 @@ static void iree_hal_cuda_nccl_channel_destroy(
   //  syms->ncclCommDestroy(channel->comm)
   NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
                     ncclCommFinalize(channel->comm));
+
   NCCL_IGNORE_ERROR(channel->context_wrapper->syms,
                     ncclCommDestroy(channel->comm));
   iree_allocator_free(host_allocator, channel);
+
   IREE_TRACE_ZONE_END(z0);
 }
 
-void iree_hal_cuda_nccl_channel_query_rank_and_count(
+static iree_status_t iree_hal_cuda_nccl_channel_split(
+    iree_hal_channel_t* base_channel, int32_t color, int32_t key,
+    iree_hal_channel_flags_t flags, iree_hal_channel_t** out_split_channel) {
+  iree_hal_cuda_nccl_channel_t* channel =
+      iree_hal_cuda_nccl_channel_cast(base_channel);
+  iree_hal_cuda_dynamic_symbols_t* syms = channel->context_wrapper->syms;
+
+  // TODO: see if we need to set the sharing config - we may always want to.
+  ncclConfig_t config = NCCL_CONFIG_INITIALIZER;
+  config.blocking = 1;  // FIXME: use async to check a timeout
+
+  // Split the communicator.
+  ncclComm_t split_comm = NULL;
+  NCCL_RETURN_IF_ERROR(
+      syms, ncclCommSplit(channel->comm, color, key, &split_comm, &config),
+      "ncclCommSplit");
+
+  // Query the local rank/count from the split communicator.
+  int split_rank = 0;
+  int split_count = 0;
+  iree_status_t status = NCCL_RESULT_TO_STATUS(
+      syms, ncclCommUserRank(split_comm, &split_rank), "ncclCommUserRank");
+  if (iree_status_is_ok(status)) {
+    status = NCCL_RESULT_TO_STATUS(
+        syms, ncclCommCount(split_comm, &split_count), "ncclCommCount");
+  }
+
+  // Wrap the split communicator in a new channel.
+  iree_hal_cuda_nccl_channel_t* split_channel = NULL;
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_allocator_malloc(channel->context_wrapper->host_allocator,
+                              sizeof(*split_channel), (void**)&split_channel);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_cuda_nccl_channel_vtable,
+                                 &split_channel->resource);
+    split_channel->context_wrapper = channel->context_wrapper;
+    split_channel->rank = split_rank;
+    split_channel->count = split_count;
+    split_channel->comm = split_comm;
+    *out_split_channel = (iree_hal_channel_t*)split_channel;
+  }
+
+  if (!iree_status_is_ok(status)) {
+    NCCL_IGNORE_ERROR(syms, ncclCommDestroy(split_comm));
+  }
+  return status;
+}
+
+static void iree_hal_cuda_nccl_channel_query_rank_and_count(
     const iree_hal_channel_t* base_channel, int32_t* out_rank,
     int32_t* out_count) {
   IREE_ASSERT_ARGUMENT(base_channel);
@@ -458,5 +510,6 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
 
 static const iree_hal_channel_vtable_t iree_hal_cuda_nccl_channel_vtable = {
     .destroy = iree_hal_cuda_nccl_channel_destroy,
+    .split = iree_hal_cuda_nccl_channel_split,
     .query_rank_and_count = iree_hal_cuda_nccl_channel_query_rank_and_count,
 };

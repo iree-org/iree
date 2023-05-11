@@ -1699,7 +1699,16 @@ void ChannelCountOp::getAsmResultNames(
 
 void ChannelDefaultOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "channel_default");
+  setNameFn(getResult(), "default_channel");
+}
+
+//===----------------------------------------------------------------------===//
+// flow.channel.split
+//===----------------------------------------------------------------------===//
+
+void ChannelSplitOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "channel");
 }
 
 //===----------------------------------------------------------------------===//

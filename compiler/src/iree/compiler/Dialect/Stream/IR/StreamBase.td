@@ -441,12 +441,10 @@ def Stream_Channel : TypeDef<Stream_Dialect, "Channel", [
     may exist within the same program to allow for partial operations or
     hierarchical operations.
 
-    In programs that have already been partitioned prior to being compiled there
-    will often exist only one channel and `stream.channel.default` can be used
-    to reference it. In programs that model SPMD behavior internally channels
-    can be created or provided by hosting applications. For example, the program
-    could expose a `@set_channels(!util.list<!stream.channel>)` method that
-    stores the channels in globals for use throughout the program allowing for
+    In programs that model SPMD behavior internally channels can be created or
+    provided by hosting applications. For example, the program could expose a
+    `@set_channels(!util.list<!stream.channel>)` method that stores the channels
+    in globals for use throughout the program allowing for
     application-controlled channel configuration.
   }];
 }

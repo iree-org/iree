@@ -3092,19 +3092,19 @@ SmallVector<int64_t, 4> TimepointAwaitOp::getTiedResultOperandIndices() {
 }
 
 //===----------------------------------------------------------------------===//
-// stream.channel.default
+// stream.channel.create
 //===----------------------------------------------------------------------===//
 
-void ChannelDefaultOp::getAsmResultNames(
+void ChannelCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "channel");
 }
 
 //===----------------------------------------------------------------------===//
-// stream.channel.create
+// stream.channel.split
 //===----------------------------------------------------------------------===//
 
-void ChannelCreateOp::getAsmResultNames(
+void ChannelSplitOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "channel");
 }
