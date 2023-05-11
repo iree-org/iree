@@ -204,15 +204,11 @@ static iree_status_t iree_vm_context_resolve_module_imports(
       }
     }
 
-    // Query the function signature from the module that contains it.
-    // We don't use the signature from the module requesting the import as we
-    // want a single source of truth unless the obtained imported signature is
-    // empty, in which case we use the signature from the module requesting the
-    // import.
+    // Query the function signature from the module that contains it; we don't
+    // use the signature from the module requesting the import as we want a
+    // single source of truth.
     iree_vm_function_signature_t import_signature =
         iree_vm_function_signature(&import_function);
-    if (iree_string_view_is_empty(import_signature.calling_convention))
-      import_signature = expected_signature;
 
     // Simple check to confirm the signatures match. We still can't trust that
     // the module using the import *actually* calls it with the right convention

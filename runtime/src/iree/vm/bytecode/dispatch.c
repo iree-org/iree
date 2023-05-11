@@ -552,8 +552,6 @@ static iree_status_t iree_vm_bytecode_call_import(
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
   call.function = import->function;
-  call.format_arguments = import->arguments;
-  call.format_results = import->results;
 
   // Marshal inputs from registers to the ABI arguments buffer.
   call.arguments.data_length = import->argument_buffer_size;

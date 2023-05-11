@@ -4,10 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "module.h"
+#include "iree/vm/module.h"
 
 #include <cstring>
 #include <functional>
+#include <mutex>
 #include <optional>
 #include <variant>
 #include <vector>
@@ -15,6 +16,11 @@
 #include "iree/base/internal/span.h"
 #include "iree/modules/hal/types.h"
 #include "iree/runtime/api.h"
+#include "iree/vm/dynamic/api.h"
+
+typedef std::optional<std::string> CustomCallStatus;
+
+typedef void (*CustomCallPtr)(void* output, void** input, CustomCallStatus*);
 
 namespace {
 
@@ -41,8 +47,7 @@ StatusOr<int> FormatToSize(const char* format, iree_host_size_t formatSize) {
         continue;
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "Format %c unimplemented",
-                                format[i]);
+                                "Format %c unimplemented", format[i]);
     }
   }
   return outSize;
@@ -50,14 +55,12 @@ StatusOr<int> FormatToSize(const char* format, iree_host_size_t formatSize) {
 
 StatusOr<iree_vm_ref_t*> GetBufferViewRefPtr(uint8_t* ptr) {
   auto* refPtr = reinterpret_cast<iree_vm_ref_t*>(ptr);
-  if (refPtr->type !=
-      vm::ref_type_descriptor<iree_hal_buffer_view_t>::type()) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "parameter contains a reference to the wrong type; "
-        "have %.*s but expected iree_hal_buffer_view_t",
-        (int)iree_vm_ref_type_name(refPtr->type).size,
-        iree_vm_ref_type_name(refPtr->type).data);
+  if (refPtr->type != vm::ref_type_descriptor<iree_hal_buffer_view_t>::type()) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "parameter contains a reference to the wrong type; "
+                            "have %.*s but expected iree_hal_buffer_view_t",
+                            (int)iree_vm_ref_type_name(refPtr->type).size,
+                            iree_vm_ref_type_name(refPtr->type).data);
   }
   return refPtr;
 }
@@ -77,45 +80,68 @@ size_t GetFormatSize(const char c) {
   }
 }
 
-StatusOr<uint8_t*> FormattedToRaw(
-    const char* format, iree_host_size_t formatSize, uint8_t* formattedPtr,
-    uint8_t* raw) {
+StatusOr<uint8_t*> FormattedToRaw(const char* format,
+                                  iree_host_size_t formatSize,
+                                  uint8_t* formattedPtr, uint8_t* raw) {
   for (auto i = 0; i < formatSize; i++) {
     switch (format[i]) {
       case IREE_VM_CCONV_TYPE_I32:
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F32:
       case IREE_VM_CCONV_TYPE_F64: {
-          auto size = GetFormatSize(format[i]);
-          memcpy((void*)raw, (void*)formattedPtr, size);
-          formattedPtr += size;
-          raw += size;
-        }
+        auto size = GetFormatSize(format[i]);
+        memcpy((void*)raw, (void*)formattedPtr, size);
+        formattedPtr += size;
+        raw += size;
+      }
         continue;
       case IREE_VM_CCONV_TYPE_REF: {
-          IREE_ASSIGN_OR_RETURN(iree_vm_ref_t* refPtr,
-                                GetBufferViewRefPtr(formattedPtr));
-          iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(
-              (const iree_hal_buffer_view_t*)refPtr->ptr);
-          iree_hal_buffer_mapping_t mapping = {{0}};
-          Status status = iree_hal_buffer_map_range(buffer,
-            IREE_HAL_MAPPING_MODE_PERSISTENT, IREE_HAL_MEMORY_ACCESS_ANY, 0,
-            IREE_WHOLE_BUFFER, &mapping);
-          if (!status.ok())
-            return status;
-          memcpy((void*)raw, (void*)&mapping.contents.data, sizeof(uint8_t*));
-          iree_status_ignore(iree_hal_buffer_unmap_range(&mapping));
-          formattedPtr += sizeof(iree_vm_ref_t);
-          raw += sizeof(uint8_t*);
-        }
+        IREE_ASSIGN_OR_RETURN(iree_vm_ref_t * refPtr,
+                              GetBufferViewRefPtr(formattedPtr));
+        iree_vm_ref_retain_inplace(refPtr);
+        iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(
+            (const iree_hal_buffer_view_t*)refPtr->ptr);
+        iree_hal_buffer_mapping_t mapping = {{0}};
+        Status status = iree_hal_buffer_map_range(
+            buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+            IREE_HAL_MEMORY_ACCESS_ANY, 0, IREE_WHOLE_BUFFER, &mapping);
+        if (!status.ok()) return status;
+        memcpy((void*)raw, (void*)&mapping.contents.data, sizeof(uint8_t*));
+        iree_status_ignore(iree_hal_buffer_unmap_range(&mapping));
+        formattedPtr += sizeof(iree_vm_ref_t);
+        raw += sizeof(uint8_t*);
+      }
         continue;
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "Format %c unimplemented",
-                                format[i]);
+                                "Format %c unimplemented", format[i]);
     }
   }
   return formattedPtr;
+}
+
+void ReleaseFormattedRef(const char* format, iree_host_size_t formatSize,
+                         uint8_t* formattedPtr) {
+  for (auto i = 0; i < formatSize; i++) {
+    switch (format[i]) {
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F32:
+      case IREE_VM_CCONV_TYPE_F64: {
+        auto size = GetFormatSize(format[i]);
+        formattedPtr += size;
+      }
+        continue;
+      case IREE_VM_CCONV_TYPE_REF: {
+        auto* refPtr = reinterpret_cast<iree_vm_ref_t*>(formattedPtr);
+        iree_vm_ref_release(refPtr);
+        formattedPtr += sizeof(iree_vm_ref_t);
+      }
+        continue;
+      default:
+        return;
+    }
+  }
 }
 
 Status CopyBetweenFormatted(const char* format, iree_host_size_t formatSize,
@@ -126,23 +152,22 @@ Status CopyBetweenFormatted(const char* format, iree_host_size_t formatSize,
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F32:
       case IREE_VM_CCONV_TYPE_F64: {
-          auto size = GetFormatSize(format[i]);
-          memcpy((void*)outFormattedPtr, (void*)inFormattedPtr, size);
-          inFormattedPtr += size;
-          outFormattedPtr += size;
-        }
+        auto size = GetFormatSize(format[i]);
+        memcpy((void*)outFormattedPtr, (void*)inFormattedPtr, size);
+        inFormattedPtr += size;
+        outFormattedPtr += size;
+      }
         continue;
       case IREE_VM_CCONV_TYPE_REF: {
-          IREE_ASSIGN_OR_RETURN(iree_vm_ref_t* refPtr,
-                                GetBufferViewRefPtr(inFormattedPtr));
-          iree_vm_ref_move(refPtr,
-                           reinterpret_cast<iree_vm_ref_t*>(outFormattedPtr));
-        }
+        IREE_ASSIGN_OR_RETURN(iree_vm_ref_t * refPtr,
+                              GetBufferViewRefPtr(inFormattedPtr));
+        iree_vm_ref_move(refPtr,
+                         reinterpret_cast<iree_vm_ref_t*>(outFormattedPtr));
+      }
         continue;
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "Format %c unimplemented",
-                                format[i]);
+                                "Format %c unimplemented", format[i]);
     }
   }
   return OkStatus();
@@ -150,93 +175,117 @@ Status CopyBetweenFormatted(const char* format, iree_host_size_t formatSize,
 
 Status GetFenceRefPtr(uint8_t* ptr, vm::ref<iree_hal_fence_t>& fence) {
   auto* refPtr = reinterpret_cast<iree_vm_ref_t*>(ptr);
-  if (refPtr->type !=
-      vm::ref_type_descriptor<iree_hal_fence_t>::type()) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "parameter contains a reference to the wrong type; "
-        "have %.*s but expected iree_hal_fence_t",
-        (int)iree_vm_ref_type_name(refPtr->type).size,
-        iree_vm_ref_type_name(refPtr->type).data);
+  if (refPtr->type != vm::ref_type_descriptor<iree_hal_fence_t>::type()) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "parameter contains a reference to the wrong type; "
+                            "have %.*s but expected iree_hal_fence_t",
+                            (int)iree_vm_ref_type_name(refPtr->type).size,
+                            iree_vm_ref_type_name(refPtr->type).data);
   }
   fence = vm::retain_ref(reinterpret_cast<iree_hal_fence_t*>(refPtr->ptr));
   memset(refPtr, 0, sizeof(*refPtr));
   return OkStatus();
 }
 
-Status GetFences(
-    const char* format, uint8_t* formattedPtr,
-    vm::ref<iree_hal_fence_t>& waitFence,
-    vm::ref<iree_hal_fence_t>& signalFence) {
+Status GetFences(const char* format, uint8_t* formattedPtr,
+                 vm::ref<iree_hal_fence_t>& waitFence,
+                 vm::ref<iree_hal_fence_t>& signalFence) {
   if (!(format[0] == IREE_VM_CCONV_TYPE_REF &&
         format[1] == IREE_VM_CCONV_TYPE_REF)) {
-     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                             "Format %c, %c unexpected; "
-                             "fence references expected",
-                             format[0], format[1]);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "Format %c, %c unexpected; "
+                            "fence references expected",
+                            format[0], format[1]);
   }
   Status status = GetFenceRefPtr(formattedPtr, waitFence);
-  if (!status.ok())
-    return status;
+  if (!status.ok()) return status;
   status = GetFenceRefPtr(formattedPtr + sizeof(iree_vm_ref_t), signalFence);
   return status;
 }
 
-Status CustomCall(CustomCallPtr fnPtr, iree_vm_function_call_t call) {
-  iree_string_view_t functionName = iree_vm_function_name(&call.function);
-  printf("CustomCall name: %.*s\n", (int)functionName.size, functionName.data);
-  auto argResFormatSize = call.format_arguments.size - 2;
-  auto argResFormatData = call.format_arguments.data;
-  auto resFormatSize = call.format_results.size;
-  auto resFormatData = call.format_results.data;
-  IREE_ASSIGN_OR_RETURN(
-      int argResSize, FormatToSize(argResFormatData, argResFormatSize));
+Status CustomCall(CustomCallPtr fnPtr, iree_vm_function_call_t call,
+                  const iree_string_view_t& formatArguments,
+                  const iree_string_view_t& formatResults) {
+  auto argResFormatSize = formatArguments.size - 2;
+  auto argResFormatData = formatArguments.data;
+  auto resFormatSize = formatResults.size;
+  auto resFormatData = formatResults.data;
+  IREE_ASSIGN_OR_RETURN(int argResSize,
+                        FormatToSize(argResFormatData, argResFormatSize));
   std::unique_ptr<uint8_t[]> argResList(new uint8_t[argResSize]());
-  IREE_ASSIGN_OR_RETURN(
-      uint8_t* fencePtr,
-      FormattedToRaw(argResFormatData, argResFormatSize,
-                     call.arguments.data, argResList.get()));
+  IREE_ASSIGN_OR_RETURN(uint8_t * fencePtr,
+                        FormattedToRaw(argResFormatData, argResFormatSize,
+                                       call.arguments.data, argResList.get()));
   vm::ref<iree_hal_fence_t> waitFence;
   vm::ref<iree_hal_fence_t> signalFence;
   Status status = GetFences(argResFormatData + argResFormatSize, fencePtr,
                             waitFence, signalFence);
-  if (!status.ok())
+  if (!status.ok()) {
+    ReleaseFormattedRef(argResFormatData, argResFormatSize,
+                        call.arguments.data);
     return status;
+  }
 
   std::optional<std::string> error;
-  IREE_ASSIGN_OR_RETURN(
-    int resSize, FormatToSize(resFormatData, resFormatSize));
+  IREE_ASSIGN_OR_RETURN(int resSize,
+                        FormatToSize(resFormatData, resFormatSize));
   uint8_t* resList = argResList.get();
   uint8_t* argList = argResList.get() + resSize;
 
   status = iree_hal_fence_wait(waitFence.get(), iree_infinite_timeout());
-  if (!status.ok())
+  if (!status.ok()) {
+    ReleaseFormattedRef(argResFormatData, argResFormatSize,
+                        call.arguments.data);
     return status;
+  }
 
-  fnPtr((void*)resList, (void **)argList);
+  CustomCallStatus customCallStatus;
+  fnPtr((void*)resList, (void**)argList, &customCallStatus);
+  if (customCallStatus.has_value()) {
+    ReleaseFormattedRef(argResFormatData, argResFormatSize,
+                        call.arguments.data);
+    return iree_make_status(
+        IREE_STATUS_UNKNOWN, "Custom Call returned an error: %.*s",
+        (int)customCallStatus->size(), customCallStatus->data());
+  }
 
   status = CopyBetweenFormatted(resFormatData, resFormatSize,
                                 call.arguments.data, call.results.data);
-  if (!status.ok())
-    return status;
-  if(error.has_value()) {
+  ReleaseFormattedRef(argResFormatData, argResFormatSize, call.arguments.data);
+  if (!status.ok()) return status;
+  if (error.has_value()) {
     return iree_make_status(IREE_STATUS_UNKNOWN,
                             "Custom Call returned an error");
   }
   status = iree_hal_fence_signal(signalFence.get());
-  if (!status.ok())
-    iree_hal_fence_fail(signalFence.get(), status.release());
+  if (!status.ok()) iree_hal_fence_fail(signalFence.get(), status.release());
 
   return OkStatus();
 }
 
+struct CustomCallFunction {
+  iree_string_view_t name;
+  CustomCallPtr fnPtr;
+  iree_string_view_t callingConvention;
+  iree_string_view_t formatArguments;
+  iree_string_view_t formatResults;
+};
+
+// The reason why we cannot use |NativeModule| here is because the API for the
+// dispatch table in |NativeModule| contains |NativeFunction<State>| which
+// requires custom calls to be defined as member functions instead of as pure
+// functions. Since the custom calls can be added dynamically by the user, the
+// user cannot add member functions to a class that can be stored in
+// |NativeModule|'s dispatch table.
+// TODO(muralivi): Generalize |NativeModule| so that |begin_call|,
+// |NativeFunction<State>| etc can be parameterized.
 class CustomCallModule final {
   using State = std::monostate;
+
  public:
-  CustomCallModule(const char* name, uint32_t version, iree_vm_instance_t* instance,
-                   iree_allocator_t allocator,
-                   iree::span<std::pair<iree_string_view_t,
-                                        CustomCallPtr>> dispatch_table)
+  CustomCallModule(const char* name, uint32_t version,
+                   iree_vm_instance_t* instance, iree_allocator_t allocator,
+                   iree::span<CustomCallFunction> dispatch_table)
       : name_(name),
         version_(version),
         instance_(instance),
@@ -276,9 +325,7 @@ class CustomCallModule final {
   }
 
   // Notifies the module a signal has been raised.
-  Status Notify(State* state, iree_vm_signal_t signal) {
-    return OkStatus();
-  }
+  Status Notify(State* state, iree_vm_signal_t signal) { return OkStatus(); }
 
   static CustomCallModule* FromModulePointer(void* self) {
     return reinterpret_cast<CustomCallModule*>(self);
@@ -344,18 +391,18 @@ class CustomCallModule final {
       out_function->ordinal = static_cast<uint16_t>(ordinal);
     }
     if (out_name) {
-      *out_name = dispatch_function.first;
+      *out_name = dispatch_function.name;
     }
     if (out_signature) {
-      out_signature->calling_convention = iree_string_view_empty();
+      out_signature->calling_convention = dispatch_function.callingConvention;
     }
     return iree_ok_status();
   }
 
-  static iree_status_t ModuleLookupFunction(void* self,
-                                            iree_vm_function_linkage_t linkage,
-                                            iree_string_view_t name,
-                                            iree_vm_function_t* out_function) {
+  static iree_status_t ModuleLookupFunction(
+      void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
+      const iree_vm_function_signature_t* signature,
+      iree_vm_function_t* out_function) {
     IREE_ASSERT_ARGUMENT(out_function);
     std::memset(out_function, 0, sizeof(*out_function));
     if (IREE_UNLIKELY(!name.data || !name.size)) {
@@ -367,8 +414,21 @@ class CustomCallModule final {
     out_function->module = module->interface();
     out_function->linkage = IREE_VM_FUNCTION_LINKAGE_EXPORT;
     for (int i = 0; i < module->dispatch_table_.size(); ++i) {
-      if (iree_string_view_equal(name, module->dispatch_table_[i].first)) {
+      if (iree_string_view_equal(name, module->dispatch_table_[i].name)) {
         out_function->ordinal = i;
+        iree_string_view_t formatArguments, formatResults;
+        if (signature) {
+          iree_status_t status = iree_vm_function_call_get_cconv_fragments(
+              signature, &formatArguments, &formatResults);
+          if (!iree_status_is_ok(status)) return status;
+        }
+        {
+          std::lock_guard<std::mutex> l(moduleLock);
+          module->dispatch_table_[i].callingConvention =
+              signature->calling_convention;
+          module->dispatch_table_[i].formatArguments = formatArguments;
+          module->dispatch_table_[i].formatResults = formatResults;
+        }
         return iree_ok_status();
       }
     }
@@ -430,12 +490,13 @@ class CustomCallModule final {
         stack, &call.function, IREE_VM_STACK_FRAME_NATIVE, frame_size,
         /*frame_cleanup_fn=*/nullptr, &callee_frame));
 
-    iree_status_t status = CustomCall(info.second, call);
+    iree_status_t status =
+        CustomCall(info.fnPtr, call, info.formatArguments, info.formatResults);
 
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
       status = iree_status_annotate_f(
           status, "while invoking C++ function %s.%.*s", module->name_,
-          (int)info.first.size, info.first.data);
+          (int)info.name.size, info.name.data);
       return status;
     }
 
@@ -447,31 +508,75 @@ class CustomCallModule final {
   iree_vm_instance_t* instance_;
   const iree_allocator_t allocator_;
   iree_vm_module_t interface_;
+  static std::mutex moduleLock;
 
-  const iree::span<std::pair<iree_string_view_t,
-                             CustomCallPtr>> dispatch_table_;
+  const iree::span<CustomCallFunction> dispatch_table_;
 };
+
+std::mutex CustomCallModule::moduleLock;
 
 }  // namespace
 
-std::vector<std::pair<iree_string_view_t, CustomCallPtr>> customCallFunctions;
+std::vector<CustomCallFunction> customCallFunctions;
 
 extern "C" void AddCustomCall(const char* name, CustomCallPtr fnPtr) {
-  customCallFunctions.push_back(std::make_pair(iree_make_cstring_view(name),
-                                               fnPtr));
+  customCallFunctions.push_back(CustomCallFunction{
+      iree_make_cstring_view(name), fnPtr, iree_string_view_empty(),
+      iree_string_view_empty(), iree_string_view_empty()});
 }
 
-// Note that while we are using C++ bindings internally we still expose the
-// module as a C instance. This hides the details of our implementation.
-extern "C" void iree_custom_module_custom_call_create(
-    iree_vm_instance_t* instance, iree_hal_device_t* device,
-    iree_allocator_t host_allocator, iree_runtime_session_t* session) {
-  iree_vm_module_t* custom_module = NULL;
+void Internal(int s, void* out, void** in, CustomCallStatus* error) {
+  int32_t* outBuffer;
+  memcpy(&outBuffer, out, sizeof(int32_t*));
+  intptr_t mRaw, nRaw;
+  int8_t* inPtr = (int8_t*)in;
+  memcpy(&mRaw, inPtr, sizeof(intptr_t));
+  inPtr += sizeof(intptr_t);
+  memcpy(&nRaw, inPtr, sizeof(intptr_t));
+  inPtr += sizeof(intptr_t);
+  int32_t* inBuffer;
+  memcpy(&inBuffer, inPtr, sizeof(int32_t*));
+  int m(mRaw), n(nRaw);
+  int totalCount = m * n;
+  printf("CustomCall times: %d m: %d n: %d\n", s, m, n);
+  for (int i = 0; i < totalCount; i++) {
+    printf(
+        "CustomCall input times: %d, index: %d, inBuffer: %d, outBuffer: %d\n",
+        s, i, inBuffer[i], outBuffer[i]);
+    outBuffer[i] = inBuffer[i] * s;
+    printf(
+        "CustomCall output times: %d, index: %d, inBuffer: %d, outBuffer: "
+        "%d\n",
+        s, i, inBuffer[i], outBuffer[i]);
+  }
+}
+
+void Double(void* out, void** in, CustomCallStatus* error) {
+  return Internal(2, out, in, error);
+}
+
+void Triple(void* out, void** in, CustomCallStatus* error) {
+  return Internal(3, out, in, error);
+}
+
+extern "C" IREE_VM_DYNAMIC_MODULE_EXPORT iree_status_t create_custom_module(
+    iree_vm_dynamic_module_version_t max_version, iree_vm_instance_t* instance,
+    iree_host_size_t param_count, const iree_string_pair_t* params,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
+  if (max_version != IREE_VM_DYNAMIC_MODULE_VERSION_LATEST) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "unsupported runtime version %u, module compiled with version %u",
+        max_version, IREE_VM_DYNAMIC_MODULE_VERSION_LATEST);
+  }
+
+  IREE_RETURN_IF_ERROR(iree_hal_module_resolve_all_types(instance));
+  AddCustomCall("Double", Double);
+  AddCustomCall("Triple", Triple);
+
   auto module = std::make_unique<CustomCallModule>(
       "custom_call", /*version=*/0, instance, host_allocator,
-      iree::span<std::pair<iree_string_view_t, CustomCallPtr>>(
-          customCallFunctions));
-  custom_module = module.release()->interface();
-  IREE_CHECK_OK(iree_runtime_session_append_module(session, custom_module));
-  iree_vm_module_release(custom_module);
+      iree::span<CustomCallFunction>(customCallFunctions));
+  *out_module = module.release()->interface();
+  return iree_ok_status();
 }

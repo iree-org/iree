@@ -1,4 +1,4 @@
-# Copyright 2022 The IREE Authors
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -12,7 +12,8 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-compile
-    iree_samples_custom_module_async_run
+    iree-run-module
+    iree_samples_custom_module_custom_call_module
   LABELS
     "hostonly"
 )
