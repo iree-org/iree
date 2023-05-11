@@ -116,10 +116,6 @@ void build1DSplittingStrategyWithOptionalThreadMapping(
     int64_t mostMinorDim, SmallVector<int64_t> opSizes, int64_t numThreads,
     Attribute mappingAttr = Attribute(), int64_t maxVectorSize = 4);
 
-/// Build the transform IR to pad a matmul op `matmulOpH`.
-Value buildPadMatmul(ImplicitLocOpBuilder &b, Value matmulOpH,
-                     const AbstractGemmLikeStrategy &strategy);
-
 /// Build transform IR to hoist the padded output operand of a padded matmul.
 /// Additionally, this attempts to fold the padding into the producing fill, if
 /// available.

@@ -29,6 +29,7 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 // TODO: significantly better namespacing.
+using iree_compiler::buildPad;
 using iree_compiler::buildTileFuseDistToForallWithNumThreads;
 using iree_compiler::buildTileFuseDistToForallWithTileSizes;
 using iree_compiler::TileToForallAndFuseAndDistributeResult;
@@ -39,7 +40,6 @@ using iree_compiler::gpu::buildDistributeCopies;
 using iree_compiler::gpu::buildHoistOutputPaddingOp;
 using iree_compiler::gpu::buildMatmulVectorization;
 using iree_compiler::gpu::buildMultiBuffering;
-using iree_compiler::gpu::buildPadMatmul;
 using iree_compiler::gpu::buildPipelineSharedMemoryCopies;
 using iree_compiler::gpu::kCudaWarpSize;
 using iree_compiler::gpu::MatmulStrategy;
@@ -226,8 +226,11 @@ void iree_compiler::gpu::buildMatmulTensorCoreStrategy(
                             getAsOpFoldResult(b.getI64ArrayAttr(tileSizes)));
 
   // Step 2. Pad the matmul op.
+  // TODO: use captured type information to configure the padding values.
   auto paddedMatmulOpH =
-      buildPadMatmul(b, tileReductionResult.tiledOpH, strategy);
+      buildPad(b, tileReductionResult.tiledOpH,
+               b.getF32ArrayAttr(strategy.paddingValues).getValue(),
+               strategy.paddingDimensions, strategy.packingDimensions);
 
   // Step 3. Hoist the padding of the output operand above the reduction loop.
   // The resulting fillOp will be mapped with the contraction using an SIMD

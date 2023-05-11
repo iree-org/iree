@@ -248,6 +248,21 @@ mlir::iree_compiler::buildTileFuseDistToForallWithNumThreads(
       b, isolatedParentOpH, rootH, opsHToFuse, numThreads, threadDimMapping);
 }
 
+/// Build the transform IR to pad an op `opH`.
+// TODO: Better upstream builder.
+Value mlir::iree_compiler::buildPad(
+    ImplicitLocOpBuilder &b, Value opH, ArrayRef<Attribute> paddingValues,
+    ArrayRef<int64_t> paddingDimensions, ArrayRef<int64_t> packingDimensions,
+    ArrayRef<SmallVector<int64_t>> transposePaddings) {
+  SmallVector<Attribute> transposeAttrs;
+  for (auto &transp : transposePaddings)
+    transposeAttrs.push_back(b.getI64ArrayAttr(transp));
+  return b.create<transform::PadOp>(
+      opH.getType(), opH, b.getArrayAttr(paddingValues),
+      b.getI64ArrayAttr(paddingDimensions),
+      b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs));
+}
+
 /// Apply patterns and vectorize.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
