@@ -27,6 +27,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/ElementPackingUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -36,19 +37,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-/// Returns the legal element type to use instead of the passed in element type.
-/// If the type is already legal, returns std::nullopt.
-static std::optional<Type> getLegalizedElementType(Type elementType) {
-  if (auto intType = elementType.dyn_cast<IntegerType>()) {
-    unsigned bitWidth = intType.getWidth();
-    unsigned byteAlignedBitWidth =
-        IREE::Util::getRoundedElementByteWidth(intType) * 8;
-    if (byteAlignedBitWidth == bitWidth) return elementType;
-    return IntegerType::get(elementType.getContext(), byteAlignedBitWidth);
-  }
-  return elementType;
-}
 
 /// Insert instructions to convert from one element type to another.
 static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
@@ -73,7 +61,7 @@ static std::optional<Type> getLegalizedType(Type t) {
   if (auto shapedType = t.dyn_cast<RankedTensorType>()) {
     Type elementType = shapedType.getElementType();
     std::optional<Type> legalizedElementType =
-        getLegalizedElementType(elementType);
+        legalizeStorageElementType(elementType);
     if (!legalizedElementType) return std::nullopt;
     return RankedTensorType::get(shapedType.getShape(),
                                  legalizedElementType.value(),
@@ -118,7 +106,7 @@ struct ConstantOpTypeConversion
           constantOp, "expected attribute type to be shaped type");
     }
     std::optional<Type> legalizedElementType =
-        getLegalizedElementType(attrType.getElementType());
+        legalizeStorageElementType(attrType.getElementType());
     if (!legalizedElementType) {
       return rewriter.notifyMatchFailure(constantOp,
                                          "cannot legalize elementType");
@@ -224,7 +212,8 @@ struct GenericOpTypePropagation
         signatureConverter.addInputs(index, argType);
         continue;
       }
-      std::optional<Type> legalizedArgType = getLegalizedElementType(argType);
+      std::optional<Type> legalizedArgType =
+          legalizeStorageElementType(argType);
       if (!legalizedArgType) {
         return genericOp.emitOpError("failed to get legalized type for arg ")
                << index;
@@ -270,7 +259,7 @@ struct GenericOpTypePropagation
           OpOperand *yieldOperand =
               modifiedOp.getMatchingYieldValue(modifiedOpOperand);
           std::optional<Type> legalizedType =
-              getLegalizedElementType(yieldOperand->get().getType());
+              legalizeStorageElementType(yieldOperand->get().getType());
           if (!legalizedType) {
             return genericOp.emitOpError(
                 "failed to get legalized type for yield value");
@@ -300,7 +289,7 @@ struct LinalgFillTypePropagation
       ConversionPatternRewriter &rewriter) const final {
     Value value = adaptor.getInputs().front();
     std::optional<Type> legalizedElementType =
-        getLegalizedElementType(value.getType());
+        legalizeStorageElementType(value.getType());
     if (!legalizedElementType) {
       return fillOp.emitOpError("failed to get legalized type for value");
     }

@@ -171,6 +171,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VMVX::IR
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
+    iree::compiler::Utils
   PUBLIC
 )
 
