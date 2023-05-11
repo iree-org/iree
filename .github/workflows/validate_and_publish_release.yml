@@ -41,7 +41,7 @@ jobs:
       - name: Install python packages
         id: install_python_packages
         run: |
-          python -m pip install -f file://$PWD/artifact/ iree-compiler iree-runtime iree-tools-tflite iree-tools-tf iree-tools-xla
+          python -m pip install -f file://$PWD/artifact/ iree-compiler iree-runtime iree-tools-tflite iree-tools-tf
       - name: Run iree-benchmark-module
         id: run_iree_benchmark_module
         run: ./bin/iree-benchmark-module --help

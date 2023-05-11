@@ -11,8 +11,7 @@ python -m pip install \
   iree-compiler \
   iree-runtime \
   iree-tools-tf \
-  iree-tools-tflite \
-  iree-tools-xla
+  iree-tools-tflite
 ```
 
 ## Supported frameworks

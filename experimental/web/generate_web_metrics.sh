@@ -67,7 +67,7 @@ trap "deactivate 2> /dev/null" EXIT
 
 python -m pip install --upgrade \
   --find-links https://openxla.github.io/iree/pip-release-links.html \
-  iree-compiler iree-tools-tflite iree-tools-xla
+  iree-compiler iree-tools-tflite
 
 ###############################################################################
 # Download program source files                                               #
