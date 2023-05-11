@@ -92,8 +92,9 @@ TEST_F(LibmpiTest, Bcast) {
   char array[N] = {0};
   int root = 1;
 
-  ASSERT_GT(world_size, 1)
-      << "This test requires mpirun with more than one node";
+  if (world_size < 2) {
+    GTEST_SKIP() << "This test requires mpiexec with more than one node";
+  }
 
   if (rank == root) memset(array, 'r', N);
 
@@ -114,8 +115,9 @@ TEST_F(LibmpiTest, Gather) {
   int root = 1;
   char* recvbuf = NULL;
 
-  ASSERT_GT(world_size, 1)
-      << "This test requires mpirun with more than one node";
+  if (world_size < 2) {
+    GTEST_SKIP() << "This test requires mpiexec with more than one node";
+  }
 
   memset(sendarray, (char)(rank + 1), N);
 
@@ -144,8 +146,9 @@ TEST_F(LibmpiTest, Scatter) {
   int root = 1;
   char* sendbuf = NULL;
 
-  ASSERT_GT(world_size, 1)
-      << "This test requires mpirun with more than one node";
+  if (world_size < 2) {
+    GTEST_SKIP() << "This test requires mpiexec with more than one node";
+  }
 
   if (rank == root) {
     sendbuf = (char*)malloc(world_size * N * sizeof(char));
@@ -173,8 +176,9 @@ TEST_F(LibmpiTest, Allgather) {
   char sendarray[N] = {0};
   char* recvbuf = NULL;
 
-  ASSERT_GT(world_size, 1)
-      << "This test requires mpirun with more than one node";
+  if (world_size < 2) {
+    GTEST_SKIP() << "This test requires mpiexec with more than one node";
+  }
 
   memset(sendarray, (char)(rank + 1), N);
   recvbuf = (char*)malloc(world_size * N * sizeof(char));
@@ -198,8 +202,9 @@ TEST_F(LibmpiTest, Alltoall) {
   char* sendbuf = NULL;
   char* recvbuf = NULL;
 
-  ASSERT_GT(world_size, 1)
-      << "Thist test requires mpirun with more than one node";
+  if (world_size < 2) {
+    GTEST_SKIP() << "Thist test requires mpiexec with more than one node";
+  }
 
   sendbuf = (char*)malloc(world_size * N * sizeof(char));
   ASSERT_NE(sendbuf, nullptr);
@@ -228,8 +233,9 @@ TEST_F(LibmpiTest, ReduceSum) {
   int recvbuf[N] = {0};
   int root = 1;
 
-  ASSERT_GT(world_size, 1)
-      << "Thist test requires mpirun with more than one node";
+  if (world_size < 2) {
+    GTEST_SKIP() << "Thist test requires mpiexec with more than one node";
+  }
 
   for (int i = 0; i < N; i++) sendbuf[i] = i + 1;
 
@@ -253,8 +259,9 @@ TEST_F(LibmpiTest, AllReduce) {
   int sendbuf[N] = {0};
   int recvbuf[N] = {0};
 
-  ASSERT_GT(world_size, 1)
-      << "Thist test requires mpirun with more than one node";
+  if (world_size < 2) {
+    GTEST_SKIP() << "Thist test requires mpiexec with more than one node";
+  }
 
   for (int i = 0; i < N; i++) sendbuf[i] = i + 1;
 
