@@ -14,7 +14,7 @@ This allows us to validate that our benchmarks are behaving as we expect them
 to, and to run them using valid inputs for each model.
 
 This guide assumes that you can run the tensorflow integration tests. See
-[this doc](https://openxla.github.io/iree/building-from-source/python-bindings-and-importers/)
+[this doc](https://openxla.github.io/iree/building-from-source/getting-started/#python-bindings)
 for more information. That doc also covers writing new tests, which you'll need
 to do if you'd like to benchmark a new TensorFlow model.
 

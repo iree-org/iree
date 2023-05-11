@@ -7,7 +7,7 @@ as well as models defined using [`functorch`](https://pytorch.org/functorch/).
 ## Prerequisites
 
 Install IREE pip packages, either from pip or by
-[building from source](../building-from-source/python-bindings-and-importers.md):
+[building from source](../building-from-source/getting-started/#python-bindings):
 
 ```shell
 pip install \

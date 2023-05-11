@@ -57,6 +57,7 @@ export CC=clang
 export CXX=clang++
 python3 configure_bazel.py
 
+# TODO(mariecwhite): Use Python-based importers (no Bazel build)
 cd integrations/tensorflow
 bazel build -c opt --cxxopt="-Wno-deprecated-builtins" iree_tf_compiler:iree-import-tflite
 ./symlink_binaries.sh

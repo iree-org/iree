@@ -551,6 +551,23 @@ static inline float vm_neg_f32(float operand) { return -operand; }
 static inline float vm_ceil_f32(float operand) { return ceilf(operand); }
 static inline float vm_floor_f32(float operand) { return floorf(operand); }
 static inline float vm_round_f32(float operand) { return roundf(operand); }
+static inline float vm_round_f32_even(float operand) {
+#if __STC_VERSION__ >= 202300L  // C23
+  return roundevenf(operand);
+#else
+  float rounded = roundf(operand);
+  if (fabsf(operand - rounded) == 0.5f) {
+    if (fmodf(rounded, 2.0f) != 0) {
+      if (rounded > 0.0f) {
+        rounded -= 1.0f;
+      } else {
+        rounded += 1.0f;
+      }
+    }
+  }
+  return rounded;
+#endif  // C23
+}
 static inline float vm_min_f32(float lhs, float rhs) {
   return rhs < lhs ? rhs : lhs;
 }

@@ -9,7 +9,6 @@ compiler or import tools themselves.
 ## Reference pages
 
 * [Getting started](./getting-started.md)
-* [Bindings and importers](./python-bindings-and-importers.md)
 * [Android cross-compilation](./android.md)
 * [iOS cross-compilation](./ios.md)
 * [RISC-V cross-compilation](./riscv.md)

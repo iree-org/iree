@@ -292,11 +292,13 @@ class TransposeReshapeGenericDotGeneral
         b.getI64TensorAttr(targetOrder));
   }
 
-  Value ReshapeIfMorethan3D(OpBuilder &b, Location loc, Value src,
-                            size_t dimsBorder0, size_t dimsBorder1) const {
+  Value ReshapeIfNonStandard(OpBuilder &b, Location loc, Value src,
+                             size_t dimsBorder0, size_t dimsBorder1) const {
     auto type = src.getType().cast<RankedTensorType>();
-    if (type.getRank() <= 3) return src;
     auto shape = type.getShape();
+    if (dimsBorder0 <= 1 && dimsBorder1 - dimsBorder0 <= 1 &&
+        shape.size() - dimsBorder1 <= 1)
+      return src;
     SmallVector<int64_t, 4> result_shape = {
         std::accumulate(shape.begin(), shape.begin() + dimsBorder0, 1,
                         std::multiplies<int64_t>()),
@@ -387,10 +389,10 @@ class TransposeReshapeGenericDotGeneral
     int64_t numRhsContractionDims =
         rhsContractionBase + rhsContractingDims.size();
 
-    lhs = ReshapeIfMorethan3D(rewriter, op.getLoc(), lhs,
-                              lhsBatchingDims.size(), lhsContractionBase);
-    rhs = ReshapeIfMorethan3D(rewriter, op.getLoc(), rhs,
-                              rhsBatchingDims.size(), numRhsContractionDims);
+    lhs = ReshapeIfNonStandard(rewriter, op.getLoc(), lhs,
+                               lhsBatchingDims.size(), lhsContractionBase);
+    rhs = ReshapeIfNonStandard(rewriter, op.getLoc(), rhs,
+                               rhsBatchingDims.size(), numRhsContractionDims);
 
     if (lhs == op.getLhs() && rhs == op.getRhs())
       return rewriter.notifyMatchFailure(op, "already in canonical form");

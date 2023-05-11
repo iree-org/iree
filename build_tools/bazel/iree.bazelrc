@@ -13,7 +13,7 @@ build --experimental_guard_against_concurrent_changes
 # Default to optimized builds
 # Override via: "-c dbg" or --compilation_mode=dbg
 build --compilation_mode=opt
-# Used in TensorFlow, so we have to enable it here as well.
+# Legacy from when we depended on TensorFlow, might not be needed in IREE.
 common --experimental_repo_remote_exec
 # Actually printing output on errors is... a useful default
 test --test_output=errors
@@ -59,8 +59,6 @@ build:generic_gcc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build:generic_gcc --copt=-Wno-unused-but-set-parameter
 build:generic_gcc --copt=-Wno-comment
 build:generic_gcc --copt=-Wno-attributes
-# NOTE: from a TF dep: external/upb/upb/upb.c and fails on GCC 10.
-build:generic_gcc --copt=-Wno-stringop-truncation
 
 ###############################################################################
 # Options for "generic_clang" builds: these options should generally apply to
@@ -159,12 +157,10 @@ build:generic_clang --linkopt=-Wl,--fatal-warnings
 ###############################################################################
 
 build:macos_clang --config=generic_clang
-build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-unused-variable
-build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler,utils@-Wno-range-loop-analysis
+build:macos_clang --per_file_copt=utils@-Wno-range-loop-analysis
 
 build:macos_clang_release --config=macos_clang
-build:macos_clang_release --per_file_copt=tensorflow,iree_tf_compiler@-Wno-unused-variable
-build:macos_clang_release --per_file_copt=tensorflow,iree_tf_compiler,utils@-Wno-range-loop-analysis
+build:macos_clang_release --per_file_copt=utils@-Wno-range-loop-analysis
 build:macos_clang_release --compilation_mode=opt
 build:macos_clang_release --copt=-DNDEBUG
 
@@ -277,7 +273,6 @@ build:remote_cache_bazel_ci --config=_remote_cache_base
 # included for clarity and so that this reference is automatically updated by
 # manage_images.py
 build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:b3cce73eb9f41d67981bc8f00e98fd66fe3487caec1bcbf38d4039dcc61e499d"}'
-build:remote_cache_bazel_tf_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/frontends-swiftshader@sha256:da14cc93637d3bfad469a670d4d7a49982df5d107b775331965e3bacb981d4cf"}'
 
 
 ###############################################################################
@@ -337,36 +332,9 @@ build:_msvc_base --per_file_copt=farmhash@/wd4319 # zero extending to T of great
 build:_msvc_base --linkopt=/IGNORE:4217 # mismatch import/export declspec
 build:_msvc_base --linkopt=/IGNORE:4001 # no object files
 
-# Flags to make tensorflow build.
-# Some of these are also of general use and fine to enable globally for windows.
-build:_msvc_base --copt=/arch:AVX
-# TensorFlow requires the "monolithic" build mode for now on Windows.
-build:_msvc_base --define framework_shared_object=false
-
-# Workaround WinGDI.h defining `ERROR`, which conflicts with logging macros.
-# Note that IREE and TensorFlow both `#undef ERROR` and define their own
-# separate logging constants with the same name, but IREE needs the Windows
-# "graphics device interface" (GDI) for certain GUI sample projects.
-build:_msvc_base --per_file_copt=tensorflow@-DNOGDI
-
-# Disables TensorFlow eigen bloat and reduces compile times.
-build:_msvc_base --define=override_eigen_strong_inline=true
-
-# Another TensorFlow flag from their config script.
-build:_msvc_base --define with_default_optimizations=true
-
 # Separate configs for different MSVC versions as we might want slightly different options.
 build:msvc2017 --config=_msvc_base
 build:msvc2019 --config=_msvc_base
-
-# TensorFlow builds depend on this flag, but it doesn't appear to work with
-# gmock in some of our unit tests, so only enable it for TensorFlow files.
-# MSVC (Windows): Standards-conformant preprocessor mode
-# See https://docs.microsoft.com/en-us/cpp/preprocessor/preprocessor-experimental-overview
-build:msvc2017 --per_file_copt=tensorflow@/experimental:preprocessor
-# It's also called different things in different MSVC versions and will spam the logs
-# if we use the old name with a newer msvc.
-build:msvc2019 --per_file_copt=tensorflow@/Zc:preprocessor
 
 # Assume the newer version and alias to --config=windows
 build:msvc --config=msvc2019

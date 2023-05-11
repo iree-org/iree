@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "canonicalization.mlir",
+            "canonicalize_dot_general.mlir",
             "complex_lowering.mlir",
             "dot_general_to_dot.mlir",
             "einsum_to_dot_general.mlir",

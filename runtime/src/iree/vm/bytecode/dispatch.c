@@ -1952,6 +1952,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32, vm_round_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32Even, vm_round_f32_even);
       DISPATCH_OP_EXT_F32_BINARY_F32(MinF32, vm_min_f32);
       DISPATCH_OP_EXT_F32_BINARY_F32(MaxF32, vm_max_f32);
 

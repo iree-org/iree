@@ -848,14 +848,8 @@ static iree_status_t iree_vm_bytecode_function_verify_arguments(
   iree_host_size_t args_ref = 0;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_count_cconv_regs(
       verify_state->cconv_arguments, &args_i32, &args_ref));
-  iree_host_size_t rets_i32 = 0;
-  iree_host_size_t rets_ref = 0;
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_count_cconv_regs(
-      verify_state->cconv_results, &rets_i32, &rets_ref));
   if (verify_state->i32_register_count < args_i32 ||
-      verify_state->i32_register_count < rets_i32 ||
-      verify_state->ref_register_count < args_ref ||
-      verify_state->ref_register_count < rets_ref) {
+      verify_state->ref_register_count < args_ref) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "insufficient register storage for function arguments/results");
@@ -1758,6 +1752,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     VERIFY_OP_EXT_F32_UNARY_F32(CeilF32);
     VERIFY_OP_EXT_F32_UNARY_F32(FloorF32);
     VERIFY_OP_EXT_F32_UNARY_F32(RoundF32);
+    VERIFY_OP_EXT_F32_UNARY_F32(RoundF32Even);
     VERIFY_OP_EXT_F32_BINARY_F32(MinF32);
     VERIFY_OP_EXT_F32_BINARY_F32(MaxF32);
 
