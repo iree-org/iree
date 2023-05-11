@@ -56,12 +56,12 @@ BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
         lambda config: "cuda" in config.tags and "long-running" in config.tags,
     "vulkan-nvidia":
         lambda config: "vulkan-nvidia" in config.tags,
-    "experimental-android-cpu":
+    "android-cpu":
         lambda config:
         (config.target_device_spec.architecture.type == common_definitions.
          ArchitectureType.CPU and config.target_device_spec.host_environment.
          platform == "android"),
-    "experimental-android-gpu":
+    "android-gpu":
         lambda config:
         (config.target_device_spec.architecture.type == common_definitions.
          ArchitectureType.GPU and config.target_device_spec.host_environment.
