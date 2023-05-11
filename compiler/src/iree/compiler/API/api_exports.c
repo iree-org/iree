@@ -37,6 +37,7 @@ extern void ireeCompilerOutputOpenFD();
 extern void ireeCompilerOutputOpenFile();
 extern void ireeCompilerOutputOpenMembuffer();
 extern void ireeCompilerOutputWrite();
+extern void ireeCompilerRegisterDialects();
 extern void ireeCompilerRunLldMain();
 extern void ireeCompilerRunMain();
 extern void ireeCompilerSessionCreate();
@@ -627,6 +628,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerOutputOpenFile;
   x += (uintptr_t)&ireeCompilerOutputOpenMembuffer;
   x += (uintptr_t)&ireeCompilerOutputWrite;
+  x += (uintptr_t)&ireeCompilerRegisterDialects;
   x += (uintptr_t)&ireeCompilerRunLldMain;
   x += (uintptr_t)&ireeCompilerRunMain;
   x += (uintptr_t)&ireeCompilerSessionCreate;

@@ -28,6 +28,7 @@ _ireeCompilerOutputOpenFD
 _ireeCompilerOutputOpenFile
 _ireeCompilerOutputOpenMembuffer
 _ireeCompilerOutputWrite
+_ireeCompilerRegisterDialects
 _ireeCompilerRunLldMain
 _ireeCompilerRunMain
 _ireeCompilerSessionCreate

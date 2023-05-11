@@ -30,6 +30,7 @@ VER_0 {
     ireeCompilerOutputOpenFile;
     ireeCompilerOutputOpenMembuffer;
     ireeCompilerOutputWrite;
+    ireeCompilerRegisterDialects;
     ireeCompilerRunLldMain;
     ireeCompilerRunMain;
     ireeCompilerSessionCreate;
