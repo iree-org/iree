@@ -31,7 +31,7 @@ for compiler passes and pipelines in other `.../test/*.mlir` files.
 ### Running a Test
 
 For the test
-https://github.com/openxla/iree/blob/main/iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir
+https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir
 
 With CMake, run this from the build directory:
 
@@ -100,18 +100,19 @@ should generally follow the style and best practices of that framework.
 
 ### Running a Test
 
-For the test iree/base/arena_test.cc
+For the test
+[`/runtime/src/iree/base/bitfield_test.cc`](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/bitfield_test.cc):
 
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R iree/base/arena_test
+$ ctest -R iree/base/bitfield_test
 ```
 
 With Bazel, run this from the repo root:
 
 ```shell
-$ bazel test iree/base:arena_test
+$ bazel test //runtime/src/iree/base:arena_test
 ```
 
 ### Setting test environments
@@ -212,11 +213,6 @@ framework compiles test programs on the host machine into standalone test binary
 files that can be pushed to test devices (such as Android phones) where they
 run with gtest style assertions (e.g. `check.expect_almost_eq(lhs, rhs)`).
 
-> Note:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;IREE end-to-end tests historically used `iree-run-mlir`.
-> We are in the process of transitioning them to use the check framework, but
-> that migration is incomplete, so some tests still use `iree-run-mlir`.
-
 ### Building e2e tests
 
 The files needed by these tests are not built by default with CMake. You'll
@@ -294,7 +290,7 @@ an arbitrary SSA-value you can use `util.optimization_barrier`.
 Next we use this input constant to exercise the runtime feature under test (in
 this case, just a single floor operation). Finally, we use a check dialect
 operation to make an assertion about the output. There are a few different
-[assertion operations](https://github.com/openxla/iree/tree/main/iree/compiler/Modules/Check).
+[assertion operations](https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Modules/Check).
 Here we use the `expect_almost_eq_const` op: *almost* because we are comparing
 floats and want to allow for floating-point imprecision, and *const* because we
 want to compare it to a constant value. This last part is just syntactic sugar
