@@ -32,7 +32,7 @@ developers.
 
 ## IREE Compiler Code Layout
 
-[iree/compiler/](https://github.com/openxla/iree/blob/main/iree/compiler/)
+[iree/compiler/](https://github.com/openxla/iree/blob/main/compiler/)
 
 *   IREE's MLIR dialects, LLVM compiler passes, module translation code, etc.
 
