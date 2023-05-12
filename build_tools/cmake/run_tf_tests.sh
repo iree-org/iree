@@ -34,18 +34,19 @@ CMD=(
   --max-time 1800
 )
 
-TARGET_BACKEND=""
+declare -a TARGET_BACKENDS=()
 
 if (( ${IREE_VULKAN_DISABLE} != 1 )); then
-  TARGET_BACKEND="vulkan"
+  TARGET_BACKENDS+=(vulkan)
 fi
 
 if (( ${IREE_VMVX_TESTS_ENABLE} == 1 )); then
-  TARGET_BACKEND="vmvx,${TARGET_BACKEND}"
+  TARGET_BACKENDS+=(vmvx)
 fi
 
-if [[ -n ${TARGET_BACKEND} ]]; then
-  CMD+=(-D FEATURES=${TARGET_BACKEND})
+if [[ -n "${TARGET_BACKENDS[*]}" ]]; then
+  TARGET_BACKENDS_STR="$(IFS="," ; echo "${TARGET_BACKENDS[*]}")"
+  CMD+=(-D FEATURES=${TARGET_BACKENDS_STR})
 fi
 
 if (( ${IREE_LLVM_CPU_DISABLE} == 1 )); then
