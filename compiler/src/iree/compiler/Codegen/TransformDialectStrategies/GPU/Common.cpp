@@ -329,17 +329,6 @@ std::pair<Value, Value> mlir::iree_compiler::gpu::buildCommonTrailingStrategy(
 /// Key function for vtable.
 AbstractGemmLikeStrategy::~AbstractGemmLikeStrategy() {}
 
-/// Build the transform IR to pad a matmul op `matmulOpH`.
-Value mlir::iree_compiler::gpu::buildPadMatmul(
-    ImplicitLocOpBuilder &b, Value matmulOpH,
-    const AbstractGemmLikeStrategy &strategy) {
-  // TODO: Better upstream builder.
-  return b.create<transform::PadOp>(
-      matmulOpH.getType(), matmulOpH, b.getF32ArrayAttr(strategy.paddingValues),
-      b.getI64ArrayAttr(strategy.paddingDimensions),
-      b.getI64ArrayAttr(strategy.packingDimensions), ArrayAttr());
-}
-
 /// Build transform IR to hoist the padded output operand of a padded matmul.
 /// Additionally, this attempts to fold the padding into the producing fill, if
 /// available.
