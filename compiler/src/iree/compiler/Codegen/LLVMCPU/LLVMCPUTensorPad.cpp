@@ -36,6 +36,8 @@ class LLVMCPUTensorPadPass : public LLVMCPUTensorPadBase<LLVMCPUTensorPadPass> {
 void LLVMCPUTensorPadPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
+  // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so we
+  // can kick canonicalization patterns to fold outer tensor.pad ops away.
   bool nofold;
   utils::IteratorType targetIterType;
   switch (option) {
@@ -56,6 +58,7 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     IRRewriter rewriter(context);
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << linalgOp);
 
+    // Early exit if there are no target dimensions to pad.
     if (option == LLVMCPUTensorPadOption::ParallelDims &&
         linalgOp.getNumParallelLoops() == 0)
       continue;
@@ -81,6 +84,9 @@ void LLVMCPUTensorPadPass::runOnOperation() {
       paddingValueAttributes.push_back(builder.getZeroAttr(elemType));
     }
 
+    // If nofold is true, we must create pad ops for input operands. The output
+    // operands mostly come from scf.for iter_arg. We can not infer the bounding
+    // box for such case, so we do not force pad happening.
     SmallVector<bool> noFold(linalgOp.getNumDpsInputs(), nofold);
     noFold.append(linalgOp.getNumDpsInits(), false);
 
