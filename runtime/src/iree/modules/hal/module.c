@@ -564,6 +564,23 @@ IREE_VM_ABI_EXPORT(iree_hal_module_channel_create,  //
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_channel_split,  //
+                   iree_hal_module_state_t,        //
+                   riii, r) {
+  iree_hal_channel_t* base_channel = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_channel_check_deref(args->r0, &base_channel));
+  int32_t color = args->i1;
+  int32_t key = args->i2;
+  int32_t flags = args->i3;
+
+  iree_hal_channel_t* split_channel = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_channel_split(base_channel, color, key, flags, &split_channel));
+
+  rets->r0 = iree_hal_channel_move_ref(split_channel);
+  return iree_ok_status();
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_channel_rank_and_count,  //
                    iree_hal_module_state_t,                 //
                    r, ii) {

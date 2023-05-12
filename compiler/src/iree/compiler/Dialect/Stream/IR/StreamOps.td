@@ -3321,32 +3321,6 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
 // Channels
 //===----------------------------------------------------------------------===//
 
-def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  Stream_AffinityOp,
-]> {
-  let summary = [{returns a default collective communication channel}];
-  let description = [{
-    Returns a channel initialized using the runtime environment for the
-    particular affinity.
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$group,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_Channel:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    (`group` `(` $group^ `)`)?
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
 def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -3381,6 +3355,36 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
     (`rank` `(` $rank^ `)`)?
     (`count` `(` $count^ `)`)?
     `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+]> {
+  let summary = [{splits a collective communication channel}];
+  let description = [{
+    Partitions the group associated with the given channel into disjoint
+    subgroups for each unique value of color. Each new subgroup contains all
+    participants of the same color and within each subgroup the key argument
+    is used to define the rank order. When multiple participants in a group
+    use the same key the tie will be broken using their rank in the parent
+    group. A color of -1 indicates that the rank does not participate in any
+    subgroup and will return a null channel.
+  }];
+
+  let arguments = (ins
+    Stream_Channel:$channel,
+    Index:$color,
+    Index:$key
+  );
+  let results = (outs
+    Stream_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    $channel `,` $color `,` $key
+    `:` type($channel) `->` type($result)
     attr-dict-with-keyword
   }];
 }
