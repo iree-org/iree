@@ -49,13 +49,6 @@ set(CMAKE_PLATFORM_NO_VERSIONED_SONAME 1)
 # Sources
 ################################################################################
 
-declare_mlir_python_sources(IREECompilerAPIPythonSources
-  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
-  SOURCES
-    transforms/ireec.py
-)
-declare_mlir_python_sources(IREECompilerAPIPythonExtensions)
-
 declare_mlir_python_sources(IREECompilerAPIPythonTools
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   SOURCES
@@ -68,28 +61,11 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
 )
 
 ################################################################################
-# Extensions
-################################################################################
-
-declare_mlir_python_extension(IREECompilerAPIPythonExtensions.IREECTransforms
-  MODULE_NAME _ireecTransforms
-  ADD_TO_PARENT IREECompilerAPIPythonExtensions
-  SOURCES
-    IREECTransforms.cpp
-  EMBED_CAPI_LINK_LIBS
-    IREECompilerCAPILib
-  PRIVATE_LINK_LIBS
-    LLVMSupport
-)
-
-################################################################################
 # Generate packages and shared library
 ################################################################################
 
 set(_SOURCE_COMPONENTS
   # Local sources.
-  IREECompilerAPIPythonSources
-  IREECompilerAPIPythonExtensions
   IREECompilerAPIPythonTools
 
   MLIRPythonSources.Core
@@ -110,11 +86,6 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.tosa
   MLIRPythonSources.Dialects.transform
   MLIRPythonSources.Dialects.vector
-
-  # mhlo project.
-  # TODO: Consider re-enabling these. They have been broken for some time.
-  # MLIRHLOPythonSources
-  # MLIRHLOPythonExtensions
 
   # iree-dialects project.
   IREEDialectsPythonSources

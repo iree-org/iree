@@ -27,6 +27,7 @@ iree_compiler_cc_library(
         "MLIRInterop.h",
     ],
     deps = [
+        "//compiler/bindings/c:headers",
         "@llvm-project//mlir:CAPIIRHeaders",
     ],
 )
@@ -39,7 +40,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/API/Internal:IREEMLIRLSPServerToolEntryPoint",
         "//compiler/src/iree/compiler/API/Internal:IREEOptToolEntryPoint",
         "//compiler/src/iree/compiler/API/Internal:LLDToolEntryPoint",
-        "//compiler/src/iree/compiler/API/Internal:MLIRInterop",
         "//llvm-external-projects/iree-dialects:CAPI",
         "@llvm-project//mlir:CAPIDebug",
         "@llvm-project//mlir:CAPIIR",
