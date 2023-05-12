@@ -1374,7 +1374,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, SwitchI32, {
       int32_t index = VM_DecOperandRegI32("index");
-      int32_t default_value = VM_DecIntAttr32("default_value");
+      int32_t default_value = VM_DecOperandRegI32("default_value");
       const iree_vm_register_list_t* value_reg_list =
           VM_DecVariadicOperands("values");
       int32_t* result = VM_DecResultRegI32("result");
@@ -1387,7 +1387,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(CORE, SwitchI64, {
       int32_t index = VM_DecOperandRegI32("index");
-      int64_t default_value = VM_DecIntAttr64("default_value");
+      int64_t default_value = VM_DecOperandRegI64("default_value");
       const iree_vm_register_list_t* value_reg_list =
           VM_DecVariadicOperands("values");
       int64_t* result = VM_DecResultRegI64("result");
@@ -1926,7 +1926,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
       DISPATCH_OP(EXT_F32, SwitchF32, {
         int32_t index = VM_DecOperandRegI32("index");
-        float default_value = VM_DecFloatAttr32("default_value");
+        float default_value = VM_DecOperandRegF32("default_value");
         const iree_vm_register_list_t* value_reg_list =
             VM_DecVariadicOperands("values");
         float* result = VM_DecResultRegF32("result");

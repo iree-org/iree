@@ -1260,7 +1260,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, SwitchI32) {
       uint16_t index_reg = VM_ParseOperandRegI32("index");
-      int32_t default_value = VM_ParseIntAttr32("default_value");
+      int32_t default_value = VM_ParseOperandRegI32("default_value");
       const iree_vm_register_list_t* value_reg_list =
           VM_ParseVariadicOperands("values");
       uint16_t result_reg = VM_ParseResultRegI32("result");
@@ -1278,7 +1278,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(CORE, SwitchI64) {
       uint16_t index_reg = VM_ParseOperandRegI32("index");
-      int64_t default_value = VM_ParseIntAttr64("default_value");
+      int64_t default_value = VM_ParseOperandRegI64("default_value");
       const iree_vm_register_list_t* value_reg_list =
           VM_ParseVariadicOperands("values");
       uint16_t result_reg = VM_ParseResultRegI64("result");
@@ -1926,7 +1926,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 
     DISASM_OP(EXT_F32, SwitchF32) {
       uint16_t index_reg = VM_ParseOperandRegI32("index");
-      float default_value = VM_ParseFloatAttr32("default_value");
+      float default_value = VM_ParseOperandRegF32("default_value");
       const iree_vm_register_list_t* value_reg_list =
           VM_ParseVariadicOperands("values");
       uint16_t result_reg = VM_ParseResultRegF32("result");

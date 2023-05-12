@@ -1355,14 +1355,14 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(CORE, SwitchI32, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyIntAttr32(default_value);
+      VM_VerifyOperandRegI32(default_value);
       VM_VerifyVariadicOperandsI32(values);
       VM_VerifyResultRegI32(result);
     });
 
     VERIFY_OP(CORE, SwitchI64, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyIntAttr64(default_value);
+      VM_VerifyOperandRegI64(default_value);
       VM_VerifyVariadicOperandsI64(values);
       VM_VerifyResultRegI64(result);
     });
@@ -1732,7 +1732,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     VERIFY_OP(EXT_F32, SwitchF32, {
       VM_VerifyOperandRegI32(index);
-      VM_VerifyFloatAttr32(default_value);
+      VM_VerifyOperandRegF32(default_value);
       VM_VerifyVariadicOperandsF32(values);
       VM_VerifyResultRegF32(result);
     });
