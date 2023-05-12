@@ -23,9 +23,14 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
+    "CommonPasses.h"
+    "LLVMCPUPasses.h"
+    "LLVMGPUPasses.h"
     "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
+    "SPIRVPasses.h"
+    "VMVXPasses.h"
   DEPS
     ::PassesIncGen
     MLIRLinalgTransforms

@@ -28,9 +28,14 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "PassHeaders",
     hdrs = [
+        "CommonPasses.h",
+        "LLVMCPUPasses.h",
+        "LLVMGPUPasses.h",
         "PassDetail.h",
         "Passes.h",
         "Passes.h.inc",
+        "SPIRVPasses.h",
+        "VMVXPasses.h",
     ],
     deps = [
         ":PassesIncGen",
