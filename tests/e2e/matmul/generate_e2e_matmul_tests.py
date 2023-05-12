@@ -401,6 +401,12 @@ def generate_function(
   rhs_tensor_type = f"tensor<{rhs_k}x{rhs_n}x{lhs_rhs_type.value}>"
   acc_tensor_type = f"tensor<{acc_m}x{acc_n}x{acc_type.value}>"
 
+  zero = f"0.0"
+  add = f"addf"
+  if acc_type == MatrixElemTypeId.I32:
+    zero = f"0"
+    add = f"addi"
+  
   # Compilation info is optional; prints empty string by default.
   func_definition = ""
   compilation_info_attr = ""
@@ -424,8 +430,18 @@ def generate_function(
 
   func_definition = func_definition + (
       f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
-      f"  %result = linalg.matmul {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
-      f"  return %result: {acc_tensor_type}\n"
+      f"  %cst = arith.constant {zero} : {acc_type.value}\n"
+      f"  %f = linalg.fill ins(%cst : {acc_type.value}) outs(%acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
+      f"  %result = linalg.matmul {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%f: {acc_tensor_type}) -> {acc_tensor_type}\n"
+      f"  %acc1 = linalg.generic"
+      f"   {{indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],"
+      f"   iterator_types = [\"parallel\", \"parallel\"]}}"
+      f"   ins(%result, %acc : {acc_tensor_type}, {acc_tensor_type}) outs(%f : {acc_tensor_type}) {{\n"
+      f"   ^bb0(%in: {acc_type.value}, %in_0: {acc_type.value}, %out: {acc_type.value}):\n"
+      f"     %add = arith.{add} %in, %in_0 : {acc_type.value}\n"
+      f"     linalg.yield %add : {acc_type.value}\n"
+      f"  }} -> {acc_tensor_type}\n"
+      f"  return %acc1: {acc_tensor_type}\n"
       f"}}\n")
   return MLIRFunction(
       name=func_name,
