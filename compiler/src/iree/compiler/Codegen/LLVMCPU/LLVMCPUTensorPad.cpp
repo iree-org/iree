@@ -36,15 +36,20 @@ class LLVMCPUTensorPadPass : public LLVMCPUTensorPadBase<LLVMCPUTensorPadPass> {
 void LLVMCPUTensorPadPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
+  // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so we
+  // can kick canonicalization patterns to fold outer tensor.pad ops away.
+  bool nofold;
   utils::IteratorType targetIterType;
   switch (option) {
     case LLVMCPUTensorPadOption::ParallelDims:
       LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
       targetIterType = utils::IteratorType::parallel;
+      nofold = false;
       break;
     case LLVMCPUTensorPadOption::ReductionDims:
       LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
       targetIterType = utils::IteratorType::reduction;
+      nofold = true;
       break;
   };
   SmallVector<linalg::LinalgOp> candidates;
@@ -52,6 +57,15 @@ void LLVMCPUTensorPadPass::runOnOperation() {
   for (auto linalgOp : candidates) {
     IRRewriter rewriter(context);
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << linalgOp);
+
+    // Early exit if there are no target dimensions to pad.
+    if (option == LLVMCPUTensorPadOption::ParallelDims &&
+        linalgOp.getNumParallelLoops() == 0)
+      continue;
+    if (option == LLVMCPUTensorPadOption::ReductionDims &&
+        linalgOp.getNumReductionLoops() == 0)
+      continue;
+
     IRRewriter::InsertionGuard g(rewriter);
     rewriter.setInsertionPointAfter(linalgOp);
 
@@ -70,9 +84,16 @@ void LLVMCPUTensorPadPass::runOnOperation() {
       paddingValueAttributes.push_back(builder.getZeroAttr(elemType));
     }
 
+    // If nofold is true, we must create pad ops for input operands. The output
+    // operands mostly come from scf.for iter_arg. We can not infer the bounding
+    // box for such case, so we do not force pad happening.
+    SmallVector<bool> noFold(linalgOp.getNumDpsInputs(), nofold);
+    noFold.append(linalgOp.getNumDpsInits(), false);
+
     auto options = linalg::LinalgPaddingOptions()
                        .setPaddingDimensions(paddingDims)
-                       .setPaddingValues(paddingValueAttributes);
+                       .setPaddingValues(paddingValueAttributes)
+                       .setPackPaddings(noFold);
     FailureOr<linalg::LinalgOp> maybePaddedLinalgOp =
         linalg::padAndHoistLinalgOp(rewriter, linalgOp, options);
     if (failed(maybePaddedLinalgOp)) {
