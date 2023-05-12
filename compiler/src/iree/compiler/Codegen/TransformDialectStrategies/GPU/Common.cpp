@@ -808,7 +808,8 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
   //   - f32 only atm.
   //   - Mandatory fill op.
   //   - No trailing op.
-  //   - If the matmul is "too aligned" then use the default IREE strategy.
+  //   - If the matmul is "too aligned", then use the default IREE strategy.
+  //   - If the matmul is "too small", then use the default IREE strategy.
   //   - Otherwise, we take it.
   if (!fill->getCaptured() || trailing->getCaptured()) {
     LDBG("--Matmul strategy fill / trailing preconditions failed\n");
@@ -842,6 +843,20 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
 
   if (!supportedUnalignedCases) {
     LDBG("--Matmul strategy alignment check failed\n");
+    return failure();
+  }
+
+  // Currently the unaligned transform strategy does not properly handle
+  // degenerate dimensions that should have been rank-reduced (e.g. `1`).
+  // Also, it is unprofitable to force small matmuls through a high latency
+  // tensorcore path, we are better off with a simple simt strategy.
+  // TODO: profitability details can be ironed out in the future when we have a
+  // heuristic to better select strategy parameters.
+  bool unsupportedSmallCases = (matmulSize[0] > 0 && matmulSize[0] < 8) ||
+                               (matmulSize[1] > 0 && matmulSize[1] < 8) ||
+                               (matmulSize[2] > 0 && matmulSize[2] < 8);
+  if (unsupportedSmallCases) {
+    LDBG("--Matmul strategy small size check failed\n");
     return failure();
   }
 
