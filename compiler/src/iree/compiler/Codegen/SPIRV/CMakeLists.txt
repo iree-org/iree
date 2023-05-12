@@ -29,7 +29,6 @@ iree_cc_library(
     "SPIRVBreakDownLargeVector.cpp"
     "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
-    "SPIRVEmulateBf16.cpp"
     "SPIRVEmulateI64.cpp"
     "SPIRVEraseStorageBufferStaticShape.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"

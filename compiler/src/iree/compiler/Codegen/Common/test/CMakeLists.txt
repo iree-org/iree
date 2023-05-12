@@ -26,6 +26,7 @@ iree_lit_test_suite(
     "decompose_pack_unpack_ops.mlir"
     "distribute_gpu_shared_memory.mlir"
     "eliminate_empty_tensors.mlir"
+    "emulate_bf16.mlir"
     "erase_hal_descriptor_type.mlir"
     "extract_address_computation.mlir"
     "flatten_memref_subspan.mlir"

@@ -720,8 +720,8 @@ createSPIRVCreateFastSlowPathPass();
 /// Emulates 64-bit integer ops with 32-bit integer ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
 
-/// Emulates bfloat 16 ops with 32-bit float ops.
-std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateBf16Pass();
+/// Convert BF16 buffer ops and conversions to simulated behavior with uint16.
+std::unique_ptr<OperationPass<ModuleOp>> createConvertBf16ToUInt16BuffersPass();
 
 /// Turns static shaped storage buffer subspan ops into dynamic shaped ones.
 std::unique_ptr<OperationPass<func::FuncOp>>

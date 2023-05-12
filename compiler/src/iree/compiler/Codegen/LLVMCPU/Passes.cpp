@@ -633,8 +633,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
     passManager.addNestedPass<func::FuncOp>(
         createLLVMCPUEmitVectorizationRemarksPass());
   }
-  passManager.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  passManager.addPass(IREE::Util::createPromoteArithBF16ToF32Pass());
+  passManager.addPass(createConvertBf16ToUInt16BuffersPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
 

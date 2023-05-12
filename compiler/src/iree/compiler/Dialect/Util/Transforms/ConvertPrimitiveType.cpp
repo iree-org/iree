@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -320,6 +321,11 @@ struct ConvertArithTypesPass : public Base {
     // Operations are legal if they don't contain any illegal type.
     target.addDynamicallyLegalDialect<arith::ArithDialect>(checkOp);
     target.addDynamicallyLegalDialect<math::MathDialect>(checkOp);
+
+    // Some arithmetic operations exist in the vector dialect.
+    target
+        .addDynamicallyLegalOp<vector::ReductionOp, vector::MultiDimReductionOp,
+                               vector::MaskOp, vector::YieldOp>(checkOp);
 
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {

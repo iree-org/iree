@@ -108,6 +108,12 @@ def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   ];
 }
 
+def ConvertBf16ToUInt16Buffers :
+    Pass<"iree-convert-bf16-to-uint16-buffers", "ModuleOp"> {
+  let summary = "Convert bf16 buffers to uint16 equivalents";
+  let constructor = "mlir::iree_compiler::createConvertBf16ToUInt16BuffersPass()";
+}
+
 def ExtractAddressComputation: Pass<"extract-address-computation"> {
   let summary = "Extract address computations from memory accesses";
   let description = [{
@@ -858,12 +864,6 @@ def SPIRVEmulateI64 :
     Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
   let summary = "Emulate 64-bit integer ops with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
-}
-
-def SPIRVEmulateBf16 :
-    Pass<"iree-spirv-emulate-bf16", "ModuleOp"> {
-  let summary = "Emulate bfloat 16 ops with 32-bit float ops";
-  let constructor = "mlir::iree_compiler::createSPIRVEmulateBf16Pass()";
 }
 
 def SPIRVEraseStorageBufferStaticShape :

@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --iree-spirv-emulate-bf16 %s | FileCheck %s
+// RUN:   --iree-emulate-bf16 %s | FileCheck %s
 
 // CHECK-LABEL: @bf16_conversion
 func.func @bf16_conversion() {
