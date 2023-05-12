@@ -72,9 +72,9 @@ static iree_hal_executable_plugin_status_t iree_uk_plugin_resolve(
     const void* fn_ptr;
   } plugin_entry_point_t;
   static const plugin_entry_point_t entry_points[] = {
-      {"ukernel.mmt4d", iree_uk_plugin_mmt4d},
-      {"ukernel.pack", iree_uk_plugin_pack},
-      {"ukernel.unpack", iree_uk_plugin_unpack},
+      {"iree_uk_mmt4d", iree_uk_plugin_mmt4d},
+      {"iree_uk_pack", iree_uk_plugin_pack},
+      {"iree_uk_unpack", iree_uk_plugin_unpack},
   };
   *out_resolution = 0;
   bool any_required_not_found = false;

@@ -59,7 +59,7 @@ static FnNameAndDefAttrs getFnNameAndDefAttrs(
     result.defAttrs.emplace_back(rewriter.getStringAttr("vm.import.module"),
                                  rewriter.getStringAttr("vmvx"));
   } else {
-    result.name = std::string("ukernel.") + ukernelName;
+    result.name = std::string("iree_uk_") + ukernelName;
     result.defAttrs.emplace_back(
         rewriter.getStringAttr("hal.import.fields"),
         rewriter.getArrayAttr({rewriter.getStringAttr("processor_data")}));
