@@ -14,6 +14,7 @@ cd "${ROOT_DIR}"
 BUILD_DIR="$1"
 IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-0}"
 IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
+IREE_VMVX_TESTS_ENABLE="${IREE_VMVX_TESTS_ENABLE:-0}"
 
 source "${BUILD_DIR}/.env" && export PYTHONPATH
 source build_tools/cmake/setup_tf_python.sh
@@ -32,6 +33,11 @@ CMD=(
 
 if (( ${IREE_VULKAN_DISABLE} != 1 )); then
   CMD+=(-D FEATURES=vulkan)
+  if (( ${IREE_VMVX_TESTS_ENABLE} == 1 )); then
+    CMD+=(,vmvx)
+  fi
+elif (( ${IREE_VMVX_TESTS_ENABLE} == 1 )); then
+  CMD+=(-D FEATURES=vmvx)
 fi
 
 if (( ${IREE_LLVM_CPU_DISABLE} == 1 )); then
