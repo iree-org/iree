@@ -66,6 +66,9 @@ void buildIREEVMTransformPassPipeline(
     case InputDialectOptions::Type::stablehlo:
       stablehlo::buildStableHLOInputConversionPassPipeline(passManager);
       break;
+    case InputDialectOptions::Type::stablehlo_xla:
+      stablehlo::buildStableHLOXLAInputConversionPassPipeline(passManager);
+      break;
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
     case InputDialectOptions::Type::tm_tensor:

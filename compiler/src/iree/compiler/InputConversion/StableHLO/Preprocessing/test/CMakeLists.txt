@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "complex_lowering.mlir"
     "dot_general_to_dot.mlir"
     "einsum_to_dot_general.mlir"
+    "flatten_tuples_in_cfg.mlir"
     "gather_to_torch_index_select.mlir"
     "stablehlo_to_stablehlo.mlir"
     "unfuse_batch_norm.mlir"
