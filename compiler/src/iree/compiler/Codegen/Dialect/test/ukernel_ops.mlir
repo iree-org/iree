@@ -106,7 +106,7 @@ func.func @ukernel_generic_non_tensor_memref_outs(
 
 func.func @ukernel_generic_err_tensor_outs(
     %out0: tensor<?xf32>, %out1 : memref<?x?xf32>) {
-  // expected-error @+1 {{expected the number of results (0) to be equal to the number of output tensors (1)}}
+  // expected-error @+1 {{expected the number of tensor results (0) to be equal to the number of output tensors (1)}}
   iree_codegen.ukernel.generic "foo"
       outs(%out0, %out1 : tensor<?xf32>, memref<?x?xf32>)
 }
@@ -132,7 +132,7 @@ func.func @ukernel_generic_mixed_tensor_memref(
 func.func @ukernel_generic_err_memref_outs(
     %out0: tensor<?xf32>, %out1 : memref<?x?xf32>)
     -> (tensor<?xf32>, tensor<?x?xf32>){
-  // expected-error @+1 {{expected the number of results (2) to be equal to the number of output tensors (1)}}
+  // expected-error @+1 {{expected the number of tensor results (2) to be equal to the number of output tensors (1)}}
   %0:2 = iree_codegen.ukernel.generic "foo"
       outs(%out0, %out1 : tensor<?xf32>, memref<?x?xf32>) -> tensor<?xf32>, tensor<?x?xf32>
 }
