@@ -708,6 +708,12 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
                       workgroupSize, pipelineDepth, storeStage, subgroupSize,
                       maxBytes, elementBits);
 
+  // Tile all additional reduction dimensions with size 1 to materialize loops.
+  for (auto [i, it] : llvm::enumerate(op.getIteratorTypesArray())) {
+    if (linalg::isReductionIterator(it) && reductionTileSizes[i] == 0)
+      reductionTileSizes[i] = 1;
+  }
+
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
   if (isBM) {
     threadTileSizes[bIndex] = workgroupTileSizes[bIndex] / workgroupSize[2];
@@ -903,8 +909,7 @@ LogicalResult setCooperativeMatrixConfig(
       dimN, dimK);
   if (!coopMatSize) return failure();
 
-  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
-      SPIRVCooperativeMatrixVectorize;
+  auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
 
   std::optional<int64_t> subgroupSize = limits.getSubgroupSize();
   // AMD RDNA architectures supports both wave32 and wave64 modes. Prefer to use
