@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/InputConversion/StableHLO/Rewriters.h"
+#include "iree/compiler/Utils/IndexSet.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
@@ -43,7 +44,7 @@ namespace {
 // mode combinations for cross-replica and cross partition communication. See
 // the stablehlo specification for more details about the different modes.
 
-std::optional<IREE::Flow::CollectiveElementType>
+static std::optional<IREE::Flow::CollectiveElementType>
 convertToFlowCollectiveElementType(Type type) {
   if (type.isF32()) {
     return IREE::Flow::CollectiveElementType::Float32;
@@ -92,7 +93,7 @@ convertToFlowCollectiveElementType(Type type) {
   return std::nullopt;
 }
 
-std::optional<IREE::Flow::CollectiveReductionOp>
+static std::optional<IREE::Flow::CollectiveReductionOp>
 convertToFlowCollectiveReductionOp(const Operation &op) {
   if (isa<mlir::stablehlo::AddOp>(op)) {
     return IREE::Flow::CollectiveReductionOp::ReductionSum;
@@ -111,7 +112,7 @@ convertToFlowCollectiveReductionOp(const Operation &op) {
   return std::nullopt;
 }
 
-IREE::Flow::CollectiveElementTypeAttr getCollectiveElementTypeAttr(
+static IREE::Flow::CollectiveElementTypeAttr getCollectiveElementTypeAttr(
     MLIRContext *context, RankedTensorType type) {
   std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
       convertToFlowCollectiveElementType(type.getElementType());
@@ -123,13 +124,7 @@ IREE::Flow::CollectiveElementTypeAttr getCollectiveElementTypeAttr(
 }
 
 template <typename T>
-LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
-  // Check there is only one group in the replica_groups
-  ShapedType replicaGroupType = op.getReplicaGroups().getType();
-  if (replicaGroupType.getRank() != 2 || replicaGroupType.getDimSize(0) != 1) {
-    return rewriter.notifyMatchFailure(op, "must have a single replica group");
-  }
-
+static LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
   // Note that the channel handle attribute consists of two 64-bit values,
   // handle and type.
   int64_t handle =
@@ -151,8 +146,106 @@ LogicalResult checkCollectiveAttrs(T op, PatternRewriter &rewriter) {
   return success();
 }
 
-Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
-                    Value input, int64_t srcDim, int64_t dstDim) {
+/// Returns `color` and `key` parameter values indexed by the rank of the
+/// participant in |baseChannel|.
+///
+/// Examples:
+///   (0),(1)     => colors=[0,1], keys=[0,0]
+///   (0,1),(2,3) => colors=[0,0,1,1], keys=[0,1,0,1]
+static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
+                                                    Value baseChannel,
+                                                    DenseIntElementsAttr groups,
+                                                    OpBuilder &builder) {
+  IndexSet indexSet(loc, builder);
+  Value noColor = indexSet.get(-1);
+  if (!groups) return std::make_pair(noColor, noColor);
+
+  auto groupsType = groups.getType().cast<RankedTensorType>();
+  assert(groupsType.getRank() == 2);
+  int64_t rows = groupsType.getShape()[0];
+  int64_t cols = groupsType.getShape()[1];
+  auto values = groups.getValues<int64_t>();
+
+  // Find the max rank so we can size our tables. Today the tables are always
+  // dense starting from rank 0 but we could offset the rank lookup if for
+  // example all ranks started at some offset.
+  int64_t maxRank = 0;
+  for (int64_t rank : values) {
+    maxRank = std::max(maxRank, rank);
+  }
+
+  // Table of <color, key> pairs indexed by rank. -1 is used to indicate that
+  // a particular rank does not participate in any group.
+  SmallVector<Value> colorTable(maxRank + 1, noColor);
+  SmallVector<Value> keyTable(maxRank + 1, noColor);
+
+  // Sparsely populate table with each rank getting a color/key pair.
+  // Rows equate to colors (groups) and columns equate to keys (local ranks).
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      const int64_t index = i * cols + j;
+      int64_t rank = values[index];
+      // -1 represents a null value in a group, where the group does not
+      // fully occupy the space in the row, e.g., [[0,1,2,3], [4,5,-1,-1]].
+      if (rank != -1) {
+        colorTable[rank] = indexSet.get(i);
+        keyTable[rank] = indexSet.get(j);
+      }
+    }
+  }
+
+  // Lookup the color/key split parameters by indexing into the tables we
+  // generated from the static op information.
+  Value rank = builder.create<IREE::Flow::ChannelRankOp>(loc, baseChannel);
+  Value color =
+      builder.create<IREE::Util::SwitchOp>(loc, rank, noColor, colorTable);
+  Value key =
+      builder.create<IREE::Util::SwitchOp>(loc, rank, noColor, keyTable);
+  return std::make_pair(color, key);
+}
+
+/// Creates a channel matching the given |channelHandleAttr| scoped to the
+/// requested group.
+static Value createChannelWithGroupInfo(
+    Location loc, mlir::stablehlo::ChannelHandleAttr channelHandleAttr,
+    DenseIntElementsAttr replicaGroups, bool useGlobalDeviceIds,
+    OpBuilder &builder) {
+  // Base channel that may be split by the group info.
+  Value baseChannel =
+      builder.create<IREE::Flow::ChannelDefaultOp>(loc, /*group=*/StringAttr{});
+
+  // TODO(okkwon): Convert replica_groups into flattened IDs.
+  //
+  // Once stablehlo exposes `num_replicas` and `num_partitions`,
+  // use the channel ID to determine the collective operation mode, such as
+  // cross_replica, cross_partition, cross_replic_and_partition, and
+  // flattend_ids. Currently, we only supports the flanttend_ids mode.
+  //
+  // int64_t channelId = 0;
+  // if (channelHandleAttr) {
+  //   channelId = channelHandleAttr.getHandle();
+  // }
+
+  // No need to split if there is a single group.
+  ShapedType replicaGroupType = replicaGroups.getType();
+  assert(replicaGroupType.getRank() == 2);
+  if (replicaGroupType.getDimSize(0) == 1) {
+    return baseChannel;
+  }
+
+  // Construct lookups for color and key split parameters.
+  // Note that `replica_groups` can be interpreted in multiple ways based on the
+  // other attributes.
+  auto [color, key] =
+      makeSplitColorAndKey(loc, baseChannel, replicaGroups, builder);
+
+  // Split the channel. Note that this is an expensive operation.
+  return builder.create<IREE::Flow::ChannelSplitOp>(loc, baseChannel, color,
+                                                    key);
+}
+
+static Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
+                           Value input, int64_t srcDim, int64_t dstDim) {
   // Creates a transpose op that swaps dimensions srcDim and dstDim in the
   // input.
   auto inputType = cast<RankedTensorType>(input.getType());
@@ -162,11 +255,9 @@ Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
   std::swap(permutation[srcDim], permutation[dstDim]);
   std::swap(inputShape[srcDim], inputShape[dstDim]);
   DenseIntElementsAttr permutationAttr = rewriter.getI64VectorAttr(permutation);
-  return rewriter
-      .create<mlir::stablehlo::TransposeOp>(
-          loc, RankedTensorType::get(inputShape, inputType.getElementType()),
-          input, permutationAttr)
-      .getResult();
+  return rewriter.create<mlir::stablehlo::TransposeOp>(
+      loc, RankedTensorType::get(inputShape, inputType.getElementType()), input,
+      permutationAttr);
 }
 
 /// Converts stablehlo.replica_id to flow.channel.default + flow.channel.rank.
@@ -206,12 +297,12 @@ struct AllGatherOpConversion final
       return failure();
     }
 
-    // Currently only the default channel is used.
     Location loc = op.getLoc();
 
-    // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    // Get the channel used for communication.
+    Value channel = createChannelWithGroupInfo(
+        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
+        op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getResult().getType());
@@ -236,11 +327,8 @@ struct AllGatherOpConversion final
     // Create an empty tensor for the result.
     Value target = rewriter.create<tensor::EmptyOp>(
         loc, gatherResultShape, resultType.getElementType());
-    Value gatherResult =
-        rewriter
-            .create<IREE::Flow::CollectiveAllGatherOp>(
-                op.getLoc(), elementTypeAttr, target, gatherInput, channel)
-            .getResult();
+    Value gatherResult = rewriter.create<IREE::Flow::CollectiveAllGatherOp>(
+        op.getLoc(), elementTypeAttr, target, gatherInput, channel);
 
     if (requiresTranspose) {
       gatherResult =
@@ -295,12 +383,12 @@ struct AllReduceOpConversion final
                                          "the second op must be a terminator");
     }
 
-    // Currently only the default channel is used.
     Location loc = op.getLoc();
 
-    // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    // Get the channel used for communication.
+    Value channel = createChannelWithGroupInfo(
+        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
+        op.getUseGlobalDeviceIds(), rewriter);
 
     // Convert stablehlo reduction op into flow reduction op.
     auto reductionOpAttr =
@@ -345,12 +433,8 @@ Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
     newShape.push_back(splitCount);
     newShape.push_back(inputShape[i] / splitCount);
   }
-  Value result =
-      rewriter
-          .create<mlir::stablehlo::ReshapeOp>(
-              loc, RankedTensorType::get(newShape, inputType.getElementType()),
-              input)
-          .getResult();
+  Value result = rewriter.create<mlir::stablehlo::ReshapeOp>(
+      loc, RankedTensorType::get(newShape, inputType.getElementType()), input);
 
   // Transpose
   SmallVector<int64_t> permutation;
@@ -368,23 +452,18 @@ Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
     transposeResultShape.push_back(newShape[permutation[i]]);
   }
 
-  result = rewriter
-               .create<mlir::stablehlo::TransposeOp>(
-                   loc,
-                   RankedTensorType::get(transposeResultShape,
-                                         inputType.getElementType()),
-                   result, rewriter.getI64VectorAttr(permutation))
-               .getResult();
+  result = rewriter.create<mlir::stablehlo::TransposeOp>(
+      loc,
+      RankedTensorType::get(transposeResultShape, inputType.getElementType()),
+      result, rewriter.getI64VectorAttr(permutation));
 
   // Reshape
   llvm::SmallVector<int64_t> finalShape(inputShape);
   finalShape[concatDim] *= splitCount;
   finalShape[splitDim] /= splitCount;
-  return rewriter
-      .create<mlir::stablehlo::ReshapeOp>(
-          loc, RankedTensorType::get(finalShape, inputType.getElementType()),
-          result)
-      .getResult();
+  return rewriter.create<mlir::stablehlo::ReshapeOp>(
+      loc, RankedTensorType::get(finalShape, inputType.getElementType()),
+      result);
 }
 
 struct AllToAllOpConversion final
@@ -396,8 +475,9 @@ struct AllToAllOpConversion final
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    // Create a channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
+    // Get the channel used for communication.
+    // TODO: update to use createChannelWithGroupInfo.
+    Value channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
         loc, /*group=*/StringAttr{});
 
     // Get the collective element type attribute.
@@ -429,11 +509,8 @@ struct AllToAllOpConversion final
         loc, cast<RankedTensorType>(allToAllInput.getType()).getShape(),
         resultType.getElementType());
     // Create all-to-all.
-    Value allToAllResult = rewriter
-                               .create<IREE::Flow::CollectiveAllToAllOp>(
-                                   op.getLoc(), elementTypeAttr, target,
-                                   allToAllInput, channel.getResult())
-                               .getResult();
+    Value allToAllResult = rewriter.create<IREE::Flow::CollectiveAllToAllOp>(
+        op.getLoc(), elementTypeAttr, target, allToAllInput, channel);
 
     if (requiresTranspose) {
       allToAllResult =
@@ -496,12 +573,12 @@ struct ReduceScatterOpConversion final
     auto reductionOpAttr =
         IREE::Flow::CollectiveReductionOpAttr::get(op.getContext(), *redOp);
 
-    // Currently only the default channel is used.
     Location loc = op.getLoc();
 
-    // Create a default channel.
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
+    // Get the channel used for communication.
+    Value channel = createChannelWithGroupInfo(
+        loc, op.getChannelHandleAttr(), op.getReplicaGroups(),
+        op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getResult().getType());
@@ -530,28 +607,22 @@ struct ReduceScatterOpConversion final
       std::swap(reduceInputShape[0], reduceInputShape[scatterDim]);
       std::swap(scatterResultShape[0], scatterResultShape[scatterDim]);
       // Transpose the input.
-      reduceInput =
-          rewriter
-              .create<mlir::stablehlo::TransposeOp>(
-                  loc, RankedTensorType::get(reduceInputShape, elemType),
-                  reduceInput, permutationAttr)
-              .getResult();
+      reduceInput = rewriter.create<mlir::stablehlo::TransposeOp>(
+          loc, RankedTensorType::get(reduceInputShape, elemType), reduceInput,
+          permutationAttr);
     }
 
     // Create an empty tensor for the result.
     Value target = rewriter.create<tensor::EmptyOp>(
         loc, scatterResultShape, resultType.getElementType());
-    Value scatterResult = rewriter
-                              .create<IREE::Flow::CollectiveReduceScatterOp>(
-                                  op.getLoc(), reductionOpAttr, elementTypeAttr,
-                                  target, reduceInput, channel)
-                              .getResult();
+    Value scatterResult =
+        rewriter.create<IREE::Flow::CollectiveReduceScatterOp>(
+            op.getLoc(), reductionOpAttr, elementTypeAttr, target, reduceInput,
+            channel);
 
     if (scatterDim != 0) {
-      scatterResult = rewriter
-                          .create<mlir::stablehlo::TransposeOp>(
-                              loc, resultType, scatterResult, permutationAttr)
-                          .getResult();
+      scatterResult = rewriter.create<mlir::stablehlo::TransposeOp>(
+          loc, resultType, scatterResult, permutationAttr);
     }
 
     rewriter.replaceOp(op, scatterResult);
