@@ -140,16 +140,6 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
-    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-1"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_1/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-1_Resnet50TFBatch1.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
     "model-cc474102-7d2f-4ec1-92ae-84e83ba0f390"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_V2_S/batch_1/linalg.mlir"
@@ -185,6 +175,96 @@ iree_fetch_artifact(
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230321.784_1679461251/EFFICIENTNET_B7/batch_1/linalg.mlir"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_68caa96e-b8bb-48a2-bb08-a3044981a370_EfficientNetB7PT.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-1"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_1/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-1_BertLargeTFBatch1.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-32"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_32/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-32_BertLargeTFBatch32.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-64"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_64/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-64_BertLargeTFBatch64.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-1"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_1/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-1_Resnet50TFBatch1.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-64"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_64/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-64_Resnet50TFBatch64.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-128"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_128/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-128_Resnet50TFBatch128.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-587e595d-2adf-4e41-9617-43178a133725-batch-1"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_1/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-1_T5LargeTFBatch1.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-587e595d-2adf-4e41-9617-43178a133725-batch-16"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_16/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-16_T5LargeTFBatch16.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME
+    "model-587e595d-2adf-4e41-9617-43178a133725-batch-32"
+  SOURCE_URL
+    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_32/hlo.mlirbc"
+  OUTPUT
+    "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-32_T5LargeTFBatch32.mlirbc"
   UNPACK
 )
 
@@ -280,26 +360,6 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
-    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-64"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_64/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-64_Resnet50TFBatch64.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
-    "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-128"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_128/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-128_Resnet50TFBatch128.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
     "model-9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-256"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_256/hlo.mlirbc"
@@ -315,16 +375,6 @@ iree_fetch_artifact(
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/RESNET50/batch_2048/hlo.mlirbc"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_9a5a8b8c-6e7a-4b51-bb4f-84e738957238-batch-2048_Resnet50TFBatch2048.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
-    "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-1"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_1/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-1_BertLargeTFBatch1.mlirbc"
   UNPACK
 )
 
@@ -350,31 +400,11 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
-    "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-32"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_32/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-32_BertLargeTFBatch32.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
     "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-48"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_48/hlo.mlirbc"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-48_BertLargeTFBatch48.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
-    "model-5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-64"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/BERT_LARGE/batch_64/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_5f3de3b3-fd00-4582-a97e-b70ff5edab07-batch-64_BertLargeTFBatch64.mlirbc"
   UNPACK
 )
 
@@ -410,41 +440,11 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME
-    "model-587e595d-2adf-4e41-9617-43178a133725-batch-1"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_1/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-1_T5LargeTFBatch1.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
-    "model-587e595d-2adf-4e41-9617-43178a133725-batch-16"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_16/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-16_T5LargeTFBatch16.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
     "model-587e595d-2adf-4e41-9617-43178a133725-batch-24"
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_24/hlo.mlirbc"
   OUTPUT
     "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-24_T5LargeTFBatch24.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME
-    "model-587e595d-2adf-4e41-9617-43178a133725-batch-32"
-  SOURCE_URL
-    "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.12.0_1683544084/T5_LARGE/batch_32/hlo.mlirbc"
-  OUTPUT
-    "${ROOT_ARTIFACTS_DIR}/model_587e595d-2adf-4e41-9617-43178a133725-batch-32_T5LargeTFBatch32.mlirbc"
   UNPACK
 )
 

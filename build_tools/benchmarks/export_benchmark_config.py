@@ -48,8 +48,11 @@ from e2e_test_framework.definitions import iree_definitions
 PresetMatcher = Callable[[Any], bool]
 EXECUTION_BENCHMARK_PRESET_MATCHERS: Dict[str, PresetMatcher] = {
     "x86_64":
-        lambda config: config.target_device_spec.architecture.architecture ==
-        "x86_64",
+        lambda config: (benchmark_tags.X86_64 in config.tags and benchmark_tags.
+                        LONG_RUNNING not in config.tags),
+    "x86_64-long":
+        lambda config: (benchmark_tags.X86_64 in config.tags and benchmark_tags.
+                        LONG_RUNNING in config.tags),
     "cuda":
         lambda config: (benchmark_tags.CUDA in config.tags and benchmark_tags.
                         LONG_RUNNING not in config.tags),
