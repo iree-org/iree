@@ -174,7 +174,7 @@ avoiding it for now. ([1](https://www.google.com/search?q=%22TfLiteInterpreterOp
 
 Custom ops in tflite map to functions imported into compiled IREE modules.
 The IREE tflite API shim could provide a wrapper implemented as an
-[iree_vm_module_t](https://github.com/openxla/iree/blob/main/iree/vm/module.h)
+[iree_vm_module_t](https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/module.h)
 that resolves and executes the functions as they are called by the VM. Having
 real IREE modules, though, provides significant benefits in representation
 such as the ability to have asynchronous custom behavior that interacts well
